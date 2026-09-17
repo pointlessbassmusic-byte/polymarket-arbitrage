@@ -52,6 +52,20 @@ class CoinGeckoClient:
         data = await self._get("/search/trending")
         return [c.get("item", {}) for c in (data or {}).get("coins", [])]
 
+    async def simple_price(self, ids: list[str], vs_currency: str = "usd") -> dict[str, float]:
+        """USD price for CoinGecko coin ids (used to size native-token entries)."""
+        data = await self._get(
+            "/simple/price",
+            params={"ids": ",".join(ids), "vs_currencies": vs_currency},
+        )
+        out: dict[str, float] = {}
+        for cid, prices in (data or {}).items():
+            try:
+                out[cid] = float(prices[vs_currency])
+            except (KeyError, TypeError, ValueError):
+                continue
+        return out
+
     async def top_movers(self, vs_currency: str = "usd", per_page: int = 100) -> list[dict]:
         """Market snapshot ordered by 24h volume, with 1h/24h/7d change."""
         data = await self._get(

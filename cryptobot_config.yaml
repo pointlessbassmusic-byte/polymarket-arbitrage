@@ -12,11 +12,7 @@ scanner:
   arb_check_top_n: 10          # deep pool scan for the N wildest tokens
   arb_check_every_cycles: 5
   max_position_age_s: 21600    # 6h time stop — swings, not bags
-
-  # OpenSea (NFT floor volatility, log-only). Needs a free API key.
-  opensea_api_key: ""          # or set env var and load it yourself
-  opensea_collections: []      # e.g. [pudgypenguins, miladymaker]
-  nft_floor_move_threshold: 0.10
+  edge_report_every_cycles: 30 # log learned per-pattern edge stats
 
 signals:
   # Universe hygiene — most microcap "volatility" is exit liquidity

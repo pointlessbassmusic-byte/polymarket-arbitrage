@@ -101,6 +101,7 @@ def detect_breakout(snap: TokenSnapshot, vol: VolatilityProfile,
         symbol=snap.base_symbol, side=Side.LONG, price_usd=snap.price_usd,
         confidence=confidence, expected_move=target, stop_loss_pct=stop,
         take_profit_pct=target, risk_reward=rr, liquidity_usd=snap.liquidity_usd,
+        token_address=snap.base_address,
         reason=(f"breakout: 5m {vol.move_5m:+.1%}, 30m {vol.move_30m:+.1%}, "
                 f"buys {snap.buy_sell_ratio:.0%}, 1h vol surge "
                 f"{snap.volume_1h_usd / hourly_avg:.1f}x"),
@@ -129,7 +130,7 @@ def detect_mean_revert(snap: TokenSnapshot, vol: VolatilityProfile,
         symbol=snap.base_symbol, side=Side.LONG, price_usd=snap.price_usd,
         confidence=0.4 + 0.2 * snap.buy_sell_ratio, expected_move=target,
         stop_loss_pct=stop, take_profit_pct=target, risk_reward=rr,
-        liquidity_usd=snap.liquidity_usd,
+        liquidity_usd=snap.liquidity_usd, token_address=snap.base_address,
         reason=(f"mean-revert: 1h {vol.move_1h:+.1%} flush vs 24h "
                 f"{vol.move_24h:+.1%} trend, targeting half-retrace"),
     ), cfg)
@@ -148,6 +149,7 @@ def detect_regime_shift(snap: TokenSnapshot, vol: VolatilityProfile,
         symbol=snap.base_symbol, side=Side.LONG, price_usd=snap.price_usd,
         confidence=0.35, expected_move=target, stop_loss_pct=stop,
         take_profit_pct=target, risk_reward=3.0, liquidity_usd=snap.liquidity_usd,
+        token_address=snap.base_address,
         reason=(f"regime shift: 5m move z={vol.zscore_5m:.1f} while 1h still "
                 f"{vol.move_1h:+.1%} — early wake-up"),
     ), cfg)
@@ -178,6 +180,7 @@ def detect_cross_dex_arb(pools: list[TokenSnapshot],
         confidence=0.8, expected_move=net, stop_loss_pct=cfg.arb_fee_buffer,
         take_profit_pct=net, risk_reward=net / cfg.arb_fee_buffer,
         liquidity_usd=min(lo.liquidity_usd, hi.liquidity_usd),
+        token_address=lo.base_address,
         reason=(f"cross-DEX gap {spread:.1%} ({net:.1%} net): buy "
                 f"{lo.chain}:{lo.pair_address[:10]}… @ {lo.price_usd:.6g}, sell "
                 f"{hi.chain}:{hi.pair_address[:10]}… @ {hi.price_usd:.6g}"),

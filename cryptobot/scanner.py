@@ -7,8 +7,11 @@ Each cycle:
   3. Rank by multi-window "wildness", run the signal detectors.
   4. Periodically pull all pools for the wildest tokens and check cross-DEX
      price gaps.
-  5. Manage open (paper) positions: trailing stops, targets, time stops.
-  6. Optionally snapshot OpenSea collections for NFT floor swings (log-only).
+  5. Manage open positions: trailing stops, targets, time stops. When a
+     live executor is armed, entries buy and exits sell on-chain via the
+     MetaMask-key + 0x path; otherwise everything is paper.
+  6. Feed every closed trade to the EdgeTracker, which learns per-pattern
+     expectancy and scales future signal confidence accordingly.
 """
 
 from __future__ import annotations
@@ -19,9 +22,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from .analytics import EdgeTracker
 from .data.coingecko import CoinGeckoClient
 from .data.dexscreener import DexScreenerClient
-from .data.opensea import OpenSeaClient
+from .execution.wallet import NATIVE_GECKO_IDS
 from .models import Signal, SignalType, TokenSnapshot, now
 from .portfolio import Portfolio
 from .risk import RiskConfig, RiskManager
@@ -44,9 +48,7 @@ class ScannerConfig:
     arb_check_top_n: int = 10           # deep-scan pools of the N wildest tokens
     arb_check_every_cycles: int = 5
     max_position_age_s: float = 6 * 3600  # time stop
-    opensea_collections: list[str] = field(default_factory=list)
-    opensea_api_key: str = ""
-    nft_floor_move_threshold: float = 0.10
+    edge_report_every_cycles: int = 30
 
 
 class Scanner:
@@ -57,16 +59,17 @@ class Scanner:
         self.sig_cfg = sig_cfg
         self.dex = DexScreenerClient()
         self.gecko = CoinGeckoClient()
-        self.opensea = (
-            OpenSeaClient(scan_cfg.opensea_api_key)
-            if scan_cfg.opensea_api_key and scan_cfg.opensea_collections else None
-        )
         self.vol = VolatilityEngine()
         self.risk = RiskManager(risk_cfg)
         self.portfolio = Portfolio(
             state_file=(state_dir / "cryptobot_portfolio.json") if state_dir else None
         )
+        self.edges = EdgeTracker(
+            state_file=(state_dir / "cryptobot_edges.json") if state_dir else None
+        )
         self.executor = executor
+        self._native_prices: dict[str, float] = {}   # gecko id -> usd
+        self._native_prices_ts: float = 0.0
         # key -> (chain, base_address) so we can deep-scan pools later
         self.tracked: dict[str, tuple[str, str]] = {}
         self._cycle = 0
@@ -75,8 +78,6 @@ class Scanner:
     async def close(self) -> None:
         await self.dex.close()
         await self.gecko.close()
-        if self.opensea:
-            await self.opensea.close()
 
     # -- universe ----------------------------------------------------------
 
@@ -162,8 +163,8 @@ class Scanner:
         await self._manage_positions()
         self._act_on_signals(signals)
 
-        if self.opensea and self._cycle % 5 == 1:
-            await self._nft_pass()
+        if self._cycle % self.cfg.edge_report_every_cycles == 0 and self.edges.by_type:
+            logger.info("edge report: %s", self.edges.report())
 
         top = profiles[0][1] if profiles else None
         logger.info(
@@ -191,21 +192,6 @@ class Scanner:
                 out.append(sig)
         return out
 
-    async def _nft_pass(self) -> None:
-        assert self.opensea is not None
-        for slug in self.cfg.opensea_collections:
-            try:
-                snap = await self.opensea.collection_stats(slug)
-            except Exception as exc:
-                logger.warning("opensea %s failed: %s", slug, exc)
-                continue
-            if snap and abs(snap.one_day_change) >= self.cfg.nft_floor_move_threshold:
-                logger.info(
-                    "NFT floor swing: %s floor %.4f ETH, 24h %+.1f%%, 7d %+.1f%%",
-                    slug, snap.floor_price_eth,
-                    100 * snap.one_day_change, 100 * snap.seven_day_change,
-                )
-
     # -- positions ---------------------------------------------------------
 
     async def _manage_positions(self) -> None:
@@ -230,6 +216,11 @@ class Scanner:
                 trade = self.portfolio.close(key, price, reason)
                 if trade:
                     self.risk.record_pnl(trade.pnl_usd)
+                    self.edges.record(trade)
+                    if self.executor is not None and pos.token_address:
+                        asyncio.create_task(
+                            self.executor.sell(pos.chain, pos.token_address, pos.qty)
+                        )
 
     def _act_on_signals(self, signals: list[Signal]) -> None:
         # Best asymmetry first; one entry per token per cycle.
@@ -242,6 +233,11 @@ class Scanner:
                 continue
             if sig.key in self.portfolio.positions:
                 continue
+            # Learned edge: scale confidence by the pattern's realized
+            # expectancy once enough trades exist to judge it.
+            sig.confidence = min(
+                1.0, sig.confidence * self.edges.confidence_multiplier(sig.type.value)
+            )
             size = self.risk.size_position(sig, list(self.portfolio.positions.values()))
             if size <= 0:
                 continue
@@ -249,18 +245,31 @@ class Scanner:
             if self.executor is not None:
                 asyncio.create_task(self._execute_live(sig, size))
 
+    async def _native_price(self, chain: str) -> float:
+        """USD price of the chain's gas token, cached for 5 minutes."""
+        gecko_id = NATIVE_GECKO_IDS.get(chain)
+        if gecko_id is None:
+            return 0.0
+        if now() - self._native_prices_ts > 300:
+            try:
+                ids = sorted(set(NATIVE_GECKO_IDS.values()))
+                self._native_prices = await self.gecko.simple_price(ids)
+                self._native_prices_ts = now()
+            except Exception as exc:
+                logger.warning("native price refresh failed: %s", exc)
+        return self._native_prices.get(gecko_id, 0.0)
+
     async def _execute_live(self, sig: Signal, size_usd: float) -> None:
+        if not sig.token_address:
+            return
         try:
-            # Buying <token> with the chain's native gas token.
-            quote = await self.executor.quote(
+            native_price = await self._native_price(sig.chain)
+            await self.executor.buy(
                 sig.chain,
-                sell_token="0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",  # native
-                buy_token=sig.key.split(":", 1)[1],
-                sell_amount_usd=size_usd,
-                sell_token_price_usd=1.0,  # placeholder: executor re-prices
+                token_address=sig.token_address,
+                notional_usd=size_usd,
+                native_price_usd=native_price,
             )
-            if quote:
-                await self.executor.execute_swap(sig.chain, quote, size_usd)
         except Exception:
             logger.exception("live execution failed for %s", sig.symbol)
 

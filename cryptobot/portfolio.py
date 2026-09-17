@@ -37,6 +37,7 @@ class Portfolio:
             trail_pct=self.default_trail if sig.type == SignalType.VOL_BREAKOUT else None,
             high_water=sig.price_usd,
             signal_type=sig.type,
+            token_address=sig.token_address,
         )
         self.positions[pos.key] = pos
         logger.info(

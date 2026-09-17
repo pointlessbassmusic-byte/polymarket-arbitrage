@@ -12,10 +12,28 @@ behind a double safety switch.
 |---|---|
 | Price/volatility backbone | **DexScreener API** (free, covers every token a MetaMask wallet can trade, native 5m/1h/6h/24h windows) + **CoinGecko** trending for attention flow |
 | 30-minute window | Built in-house: the scanner samples every tracked pair each minute and `VolatilityEngine` computes 30m moves, realized vol, and per-token z-scores |
-| MetaMask as trading backbone | `execution/wallet.py` signs swaps with the same private key your MetaMask wallet uses, routed through the **0x Swap API** (the aggregator behind MetaMask Swaps) |
-| OpenSea | OpenSea has **no token-trading API** (it's NFTs only), so it can't price memecoins. It's used for what it *can* do: `data/opensea.py` tracks collection **floor-price volatility** as a second swing universe (log-only, needs a free API key) |
+| MetaMask as trading backbone | `execution/wallet.py` signs swaps with the same private key your MetaMask wallet uses, routed through the **0x Swap API** (the aggregator behind MetaMask Swaps). Entries buy the token with the chain's native coin; exits sell it back, with exact-amount allowances (never infinite approvals) |
 | Patterns | Four detectors: volatility **breakout** (ride with trailing stop), **mean reversion** (fade a local flush), **regime shift** (quiet coin waking up, z-score based), **cross-DEX arbitrage** (same token, different pool prices, net of fees) |
 | Asymmetric risk | Structural, not predictive: stops sit where the setup is invalidated (near), targets at the prior extension (far); anything under **2:1 reward/risk is refused**. Sizing is capped quarter-Kelly, additionally clipped to 0.5% of pool liquidity so your own exit doesn't become the slippage |
+| Learning the edge | `analytics.py` buckets every closed trade by pattern and chain, tracking win rate, profit factor and **expectancy per dollar**. Once a pattern has ≥10 trades, its realized expectancy scales the confidence (and therefore sizing) of future signals of that type — detectors must keep paying to keep full size |
+
+## Crypto vs prediction-market arbitrage — why this engine is different
+
+The Polymarket bot in this repo captures **structural** edges: YES+NO
+bundles priced below $1, or the same event priced differently on two
+venues. Those edges are near-riskless once filled — the risk is execution.
+DEX swing edges are **statistical**: they only exist on average, decay as
+regimes change, and carry real adverse-move risk while you're in the
+position. That difference drives the design here:
+
+* stops/targets and a hard reward:risk gate replace "hold to resolution";
+* the edge tracker exists because a crypto pattern that worked last month
+  can stop working — realized expectancy, not backtests, sets sizing;
+* liquidity hygiene matters more than price: in prediction markets the
+  book is the book, on DEXes *your own exit* is the slippage;
+* the only truly structural edge kept here is cross-DEX price gaps, and
+  even those are gated by a fee buffer since the two legs aren't atomic
+  from a wallet.
 
 ## Quick start
 
@@ -63,14 +81,14 @@ cryptobot/
 ├── volatility.py        # multi-window engine (5m/30m/1h/24h, z-scores)
 ├── signals.py           # 4 detectors + asymmetry gate
 ├── risk.py              # capped Kelly sizing, exposure & loss limits
-├── portfolio.py         # paper positions, trailing stops, PnL ledger
+├── portfolio.py         # positions, trailing stops, PnL ledger
+├── analytics.py         # per-pattern edge tracker → confidence feedback
 ├── scanner.py           # discover → observe → detect → manage loop
 ├── data/
 │   ├── dexscreener.py   # main price/volume/liquidity feed
-│   ├── coingecko.py     # trending + majors
-│   └── opensea.py       # NFT floor volatility (log-only)
+│   └── coingecko.py     # trending, majors, native-token prices
 └── execution/
-    └── wallet.py        # 0x quotes + MetaMask-key signing (opt-in)
+    └── wallet.py        # 0x buy/sell + MetaMask-key signing (opt-in)
 ```
 
 Tests: `python -m pytest tests/test_cryptobot.py -v`

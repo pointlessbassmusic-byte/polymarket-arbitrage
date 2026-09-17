@@ -5,8 +5,9 @@ import time
 
 import pytest
 
+from cryptobot.analytics import MIN_SAMPLES, MULT_CAP, MULT_FLOOR, EdgeTracker
 from cryptobot.data.dexscreener import parse_pair
-from cryptobot.models import Side, Signal, SignalType, TokenSnapshot
+from cryptobot.models import ClosedTrade, Side, Signal, SignalType, TokenSnapshot
 from cryptobot.portfolio import Portfolio
 from cryptobot.risk import RiskConfig, RiskManager
 from cryptobot.signals import (
@@ -189,6 +190,81 @@ class TestPortfolio:
         trade = pf.close("base:0xPAIR", 1.10, "take_profit")
         assert trade.pnl_usd == pytest.approx(10.0)
         assert pf.realized_pnl == pytest.approx(10.0)
+
+
+# -- edge tracker ----------------------------------------------------------
+
+def make_trade(pnl: float, signal_type=SignalType.VOL_BREAKOUT,
+               chain: str = "base") -> ClosedTrade:
+    return ClosedTrade(
+        key=f"{chain}:0xPAIR", symbol="TEST", side=Side.LONG,
+        entry_price=1.0, exit_price=1.0 + pnl / 100.0, size_usd=100.0,
+        pnl_usd=pnl, opened_at=NOW, closed_at=NOW + 600,
+        exit_reason="take_profit", signal_type=signal_type,
+    )
+
+
+class TestEdgeTracker:
+    def test_neutral_until_enough_samples(self):
+        tr = EdgeTracker()
+        for _ in range(MIN_SAMPLES - 1):
+            tr.record(make_trade(-10.0))
+        assert tr.confidence_multiplier("vol_breakout") == 1.0
+
+    def test_losing_pattern_sized_down(self):
+        tr = EdgeTracker()
+        for _ in range(MIN_SAMPLES):
+            tr.record(make_trade(-10.0))   # -10% per $ staked
+        mult = tr.confidence_multiplier("vol_breakout")
+        assert MULT_FLOOR <= mult < 0.8
+
+    def test_winning_pattern_sized_up_but_capped(self):
+        tr = EdgeTracker()
+        for _ in range(MIN_SAMPLES):
+            tr.record(make_trade(50.0))    # absurdly hot streak
+        assert tr.confidence_multiplier("vol_breakout") == MULT_CAP
+
+    def test_buckets_are_independent(self):
+        tr = EdgeTracker()
+        for _ in range(MIN_SAMPLES):
+            tr.record(make_trade(-10.0, SignalType.MEAN_REVERT))
+        assert tr.confidence_multiplier("vol_breakout") == 1.0
+        assert tr.confidence_multiplier("mean_revert") < 1.0
+
+    def test_report_tracks_chains(self):
+        tr = EdgeTracker()
+        tr.record(make_trade(5.0, chain="base"))
+        tr.record(make_trade(-3.0, chain="ethereum"))
+        rep = tr.report()
+        assert rep["by_chain"]["base"]["trades"] == 1
+        assert rep["by_chain"]["ethereum"]["total_pnl"] == pytest.approx(-3.0)
+
+    def test_persistence_roundtrip(self, tmp_path):
+        f = tmp_path / "edges.json"
+        tr = EdgeTracker(state_file=f)
+        for _ in range(MIN_SAMPLES):
+            tr.record(make_trade(10.0))
+        reloaded = EdgeTracker(state_file=f)
+        assert reloaded.by_type["vol_breakout"].trades == MIN_SAMPLES
+        assert reloaded.confidence_multiplier("vol_breakout") > 1.0
+
+
+# -- token address plumbing (live execution needs it, key holds the pair) --
+
+class TestTokenAddressPlumbing:
+    def test_signal_carries_token_address(self):
+        from cryptobot.signals import SignalConfig, detect_breakout
+        from cryptobot.volatility import VolatilityEngine
+        snap = make_snap(change_5m=0.05, change_1h=0.15,
+                         volume_1h_usd=100_000.0)
+        sig = detect_breakout(snap, VolatilityEngine().observe(snap), SignalConfig())
+        assert sig is not None
+        assert sig.token_address == "0xTOKEN"
+
+    def test_position_inherits_token_address(self):
+        pf = Portfolio()
+        pos = pf.open_from_signal(make_signal(token_address="0xTOKEN"), 100.0)
+        assert pos.token_address == "0xTOKEN"
 
 
 # -- dexscreener parsing ---------------------------------------------------

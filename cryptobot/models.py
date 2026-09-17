@@ -20,7 +20,6 @@ class SignalType(str, Enum):
     MEAN_REVERT = "mean_revert"            # overextended spike, fade / buy the dip
     CROSS_DEX_ARB = "cross_dex_arb"        # same token priced differently across pools
     VOL_REGIME_SHIFT = "vol_regime_shift"  # quiet coin waking up (5m vol >> 24h vol)
-    NFT_FLOOR_SWING = "nft_floor_swing"    # OpenSea collection floor volatility
 
 
 @dataclass
@@ -111,6 +110,8 @@ class Signal:
     # Asymmetry: expected upside / expected downside. > 2 is what we hunt for.
     risk_reward: float = 1.0
     liquidity_usd: float = 0.0
+    # ERC-20 address of the token itself (key holds the pair address).
+    token_address: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -146,6 +147,7 @@ class Position:
     trail_pct: Optional[float] = None
     high_water: float = 0.0    # best price seen since entry (for trailing)
     signal_type: Optional[SignalType] = None
+    token_address: str = ""
 
     def unrealized_pnl(self, price: float) -> float:
         if self.side == Side.LONG:
@@ -166,20 +168,6 @@ class ClosedTrade:
     closed_at: float
     exit_reason: str
     signal_type: Optional[SignalType] = None
-
-
-@dataclass
-class NftCollectionSnapshot:
-    """One observation of an OpenSea collection."""
-
-    ts: float
-    slug: str
-    floor_price_eth: float
-    one_day_volume_eth: float = 0.0
-    one_day_change: float = 0.0     # fraction
-    seven_day_change: float = 0.0
-    num_owners: int = 0
-    total_supply: int = 0
 
 
 def now() -> float:
