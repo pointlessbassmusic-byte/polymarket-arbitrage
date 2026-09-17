@@ -17,6 +17,10 @@
 
 ---
 
+> 🌊 **New:** this repo now also ships a [**crypto volatility / memecoin swing bot**](cryptobot/README.md) — scans DEX tokens for wild 5m/30m/1h/24h volatility, detects breakouts, mean reversions, regime shifts and cross-DEX arbitrage, and rides swings with asymmetric risk/reward gating. Paper trading by default; MetaMask-key execution opt-in. Run it with `python run_cryptobot.py`.
+
+---
+
 ## 🎬 Demo
 
 ### 🎥 Video Demo

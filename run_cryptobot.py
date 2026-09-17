@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Entry point for the crypto volatility / memecoin swing bot.
+
+Usage:
+    python run_cryptobot.py                 # continuous paper-trading loop
+    python run_cryptobot.py --once          # single scan cycle, print signals
+    python run_cryptobot.py --config my.yaml
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import logging
+import sys
+from pathlib import Path
+
+import yaml
+
+from cryptobot.execution.wallet import WalletConfig, WalletExecutor
+from cryptobot.risk import RiskConfig
+from cryptobot.scanner import Scanner, ScannerConfig
+from cryptobot.signals import SignalConfig
+
+
+def _build(cls, section: dict):
+    """Instantiate a dataclass from a config section, ignoring unknown keys."""
+    fields = {f for f in cls.__dataclass_fields__}  # type: ignore[attr-defined]
+    return cls(**{k: v for k, v in (section or {}).items() if k in fields})
+
+
+def load(config_path: Path) -> Scanner:
+    raw = yaml.safe_load(config_path.read_text()) if config_path.exists() else {}
+    scan_cfg = _build(ScannerConfig, raw.get("scanner"))
+    sig_cfg = _build(SignalConfig, raw.get("signals"))
+    risk_cfg = _build(RiskConfig, raw.get("risk"))
+
+    executor = None
+    exec_raw = raw.get("execution") or {}
+    if exec_raw.get("live"):
+        executor = WalletExecutor(_build(WalletConfig, exec_raw))
+
+    return Scanner(scan_cfg, sig_cfg, risk_cfg,
+                   state_dir=config_path.parent, executor=executor)
+
+
+async def main() -> int:
+    parser = argparse.ArgumentParser(description="Crypto volatility swing bot")
+    parser.add_argument("--config", type=Path,
+                        default=Path(__file__).parent / "cryptobot_config.yaml")
+    parser.add_argument("--once", action="store_true",
+                        help="run one scan cycle and print signals as JSON")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+    )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    scanner = load(args.config)
+    try:
+        if args.once:
+            signals = await scanner.run_cycle()
+            print(json.dumps([s.as_dict() for s in signals], indent=2))
+        else:
+            await scanner.run_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        await scanner.close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(asyncio.run(main()))

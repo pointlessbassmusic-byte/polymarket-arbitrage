@@ -1,0 +1,65 @@
+# Crypto volatility / memecoin swing bot configuration
+# =====================================================
+# Paper trading is the default. To go live you must BOTH set execution.live
+# to true here AND export CRYPTOBOT_ARM_LIVE=yes. Secrets stay in env vars —
+# never put a private key in this file.
+
+scanner:
+  scan_interval_s: 60          # one full scan per minute (5m window needs this)
+  chains: [ethereum, base, solana, bsc, arbitrum]
+  watchlist_queries: [PEPE, WIF, BONK, SHIB, DOGE, FLOKI, BRETT, POPCAT, MOG, TURBO]
+  max_tracked_pairs: 150
+  arb_check_top_n: 10          # deep pool scan for the N wildest tokens
+  arb_check_every_cycles: 5
+  max_position_age_s: 21600    # 6h time stop — swings, not bags
+
+  # OpenSea (NFT floor volatility, log-only). Needs a free API key.
+  opensea_api_key: ""          # or set env var and load it yourself
+  opensea_collections: []      # e.g. [pudgypenguins, miladymaker]
+  nft_floor_move_threshold: 0.10
+
+signals:
+  # Universe hygiene — most microcap "volatility" is exit liquidity
+  min_liquidity_usd: 50000
+  min_volume_24h_usd: 100000
+  min_pair_age_hours: 24       # skip fresh launches (rug window)
+  max_fdv_to_liquidity: 500
+
+  # Volatility breakout (ride the swing)
+  breakout_move_5m: 0.03
+  breakout_move_30m: 0.06
+  breakout_min_buy_ratio: 0.55
+  breakout_volume_surge: 2.0
+
+  # Mean reversion (fade the flush)
+  revert_min_drop_1h: -0.15
+  revert_max_trend_24h: 0.10
+
+  # Regime shift (quiet coin waking up)
+  regime_min_zscore: 3.0
+  regime_max_move_1h: 0.05
+
+  # Cross-DEX arbitrage
+  arb_min_spread: 0.02
+  arb_fee_buffer: 0.012
+
+  # The asymmetry gate: refuse anything under 2:1 reward/risk
+  min_risk_reward: 2.0
+
+risk:
+  bankroll_usd: 1000
+  kelly_fraction: 0.25         # quarter-Kelly — memecoin edges are guesses
+  max_position_usd: 100
+  max_position_pct_of_liquidity: 0.005   # never be >0.5% of the pool
+  max_open_positions: 8
+  max_total_exposure_usd: 500
+  max_daily_loss_usd: 100
+  min_confidence: 0.35
+
+execution:
+  live: false                  # PAPER TRADING. See header before flipping.
+  private_key_env: CRYPTOBOT_PRIVATE_KEY   # export a DEDICATED hot wallet key
+  zerox_api_key_env: CRYPTOBOT_0X_API_KEY
+  max_trade_usd: 50            # hard cap per on-chain trade
+  max_slippage: 0.02
+  rpc_urls: {}                 # e.g. {base: "https://mainnet.base.org"}
