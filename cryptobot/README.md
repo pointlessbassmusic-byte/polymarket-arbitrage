@@ -16,6 +16,9 @@ behind a double safety switch.
 | Patterns | Four detectors: volatility **breakout** (ride with trailing stop), **mean reversion** (fade a local flush), **regime shift** (quiet coin waking up, z-score based), **cross-DEX arbitrage** (same token, different pool prices, net of fees) |
 | Asymmetric risk | Structural, not predictive: stops sit where the setup is invalidated (near), targets at the prior extension (far); anything under **2:1 reward/risk is refused**. Sizing is capped quarter-Kelly, additionally clipped to 0.5% of pool liquidity so your own exit doesn't become the slippage |
 | Learning the edge | `analytics.py` buckets every closed trade by pattern and chain, tracking win rate, profit factor and **expectancy per dollar**. Once a pattern has ≥10 trades, its realized expectancy scales the confidence (and therefore sizing) of future signals of that type — detectors must keep paying to keep full size |
+| Rug/honeypot screen | `data/goplus.py` queries the free [GoPlus Labs security database](https://docs.gopluslabs.io/reference/token-security-api) before **any** entry: honeypot flags, sell/buy taxes, unsellable positions, owner powers (pause, blacklist, balance edits). Renounced ownership neutralizes owner-power flags (so PEPE-style blue chips pass), unless a hidden owner is detected |
+| Regime protections | `protections.py` ports [Freqtrade's protections framework](https://www.freqtrade.io/en/stable/plugins/): per-token **cooldown** after every close, **StoplossGuard** (4 stop-outs in 2h → global entry halt), **LowProfitPairs** (a token that keeps losing gets locked), **MaxDrawdown** (15% off equity peak → pause). Entries only — exits always run |
+| Volatility management | Research on crypto momentum shows the premium survives but crashes hard unless volatility-managed. Stops widen with the token's own realized vol (ATR-style, so normal noise doesn't shake you out), and stakes scale down as realized vol rises above target, equalizing dollar-vol per position |
 
 ## Crypto vs prediction-market arbitrage — why this engine is different
 
@@ -83,10 +86,12 @@ cryptobot/
 ├── risk.py              # capped Kelly sizing, exposure & loss limits
 ├── portfolio.py         # positions, trailing stops, PnL ledger
 ├── analytics.py         # per-pattern edge tracker → confidence feedback
+├── protections.py       # Freqtrade-style cooldown / guards / drawdown halt
 ├── scanner.py           # discover → observe → detect → manage loop
 ├── data/
 │   ├── dexscreener.py   # main price/volume/liquidity feed
-│   └── coingecko.py     # trending, majors, native-token prices
+│   ├── coingecko.py     # trending, majors, native-token prices
+│   └── goplus.py        # GoPlus security DB: rug/honeypot screen
 └── execution/
     └── wallet.py        # 0x buy/sell + MetaMask-key signing (opt-in)
 ```

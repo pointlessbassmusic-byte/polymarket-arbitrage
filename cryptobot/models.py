@@ -112,6 +112,9 @@ class Signal:
     liquidity_usd: float = 0.0
     # ERC-20 address of the token itself (key holds the pair address).
     token_address: str = ""
+    # Realized 30m volatility at signal time (stdev of sampled log returns),
+    # used for volatility-targeted position sizing.
+    vol_30m: float = 0.0
 
     def as_dict(self) -> dict:
         return {

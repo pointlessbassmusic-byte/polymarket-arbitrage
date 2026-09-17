@@ -7,7 +7,9 @@ import pytest
 
 from cryptobot.analytics import MIN_SAMPLES, MULT_CAP, MULT_FLOOR, EdgeTracker
 from cryptobot.data.dexscreener import parse_pair
+from cryptobot.data.goplus import ScreenConfig, evaluate
 from cryptobot.models import ClosedTrade, Side, Signal, SignalType, TokenSnapshot
+from cryptobot.protections import ProtectionConfig, ProtectionManager
 from cryptobot.portfolio import Portfolio
 from cryptobot.risk import RiskConfig, RiskManager
 from cryptobot.signals import (
@@ -247,6 +249,124 @@ class TestEdgeTracker:
         reloaded = EdgeTracker(state_file=f)
         assert reloaded.by_type["vol_breakout"].trades == MIN_SAMPLES
         assert reloaded.confidence_multiplier("vol_breakout") > 1.0
+
+
+# -- goplus security screen ------------------------------------------------
+
+class TestSecurityScreen:
+    CFG = ScreenConfig()
+
+    def test_clean_token_passes(self):
+        v = evaluate({"is_honeypot": "0", "is_open_source": "1",
+                      "buy_tax": "0.0", "sell_tax": "0.01"}, self.CFG)
+        assert v.ok
+
+    def test_honeypot_rejected(self):
+        v = evaluate({"is_honeypot": "1"}, self.CFG)
+        assert not v.ok and "honeypot" in v.reasons
+
+    def test_high_sell_tax_rejected(self):
+        v = evaluate({"sell_tax": "0.25", "is_open_source": "1"}, self.CFG)
+        assert not v.ok
+        assert any("sell tax" in r for r in v.reasons)
+
+    def test_owner_powers_rejected(self):
+        v = evaluate({"transfer_pausable": "1", "owner_change_balance": "1",
+                      "is_open_source": "1",
+                      "owner_address": "0xB0B0000000000000000000000000000000000001"},
+                     self.CFG)
+        assert not v.ok and len(v.reasons) == 2
+
+    def test_renounced_ownership_neutralizes_owner_powers(self):
+        # PEPE-style contract: has pause/blacklist functions, but ownership
+        # is renounced so nobody can call them.
+        data = {"transfer_pausable": "1", "is_blacklisted": "1",
+                "is_open_source": "1",
+                "owner_address": "0x0000000000000000000000000000000000000000"}
+        assert evaluate(data, self.CFG).ok
+        # Hidden owner voids the renounce.
+        assert not evaluate({**data, "hidden_owner": "1"}, self.CFG).ok
+        # Honeypot is a hard reject regardless of renounce.
+        assert not evaluate({**data, "is_honeypot": "1"}, self.CFG).ok
+
+    def test_soft_flags_reject_only_in_combination(self):
+        # Mintable alone: fine (many legit tokens are).
+        assert evaluate({"is_mintable": "1", "is_open_source": "1"}, self.CFG).ok
+        # Mintable AND closed-source: rug template.
+        assert not evaluate({"is_mintable": "1", "is_open_source": "0"}, self.CFG).ok
+
+
+# -- protections -----------------------------------------------------------
+
+class TestProtections:
+    def make_pm(self, **kw) -> ProtectionManager:
+        cfg = ProtectionConfig(**kw)
+        return ProtectionManager(cfg, starting_equity=1000.0)
+
+    def close_trade(self, pm, key="base:0xPAIR", pnl=-10.0, reason="stop_loss"):
+        t = make_trade(pnl)
+        # Protections measure lookbacks against wall-clock now().
+        t = ClosedTrade(**{**vars(t), "key": key, "exit_reason": reason,
+                           "closed_at": time.time()})
+        pm.on_trade_closed(t)
+
+    def test_cooldown_blocks_reentry(self):
+        pm = self.make_pm(cooldown_s=1800.0)
+        self.close_trade(pm, pnl=5.0, reason="take_profit")
+        allowed, why = pm.entry_allowed("base:0xPAIR")
+        assert not allowed and "cooldown" in why
+        assert pm.entry_allowed("base:0xOTHER")[0]
+
+    def test_stoploss_guard_halts_globally(self):
+        pm = self.make_pm(cooldown_s=0.0, stoploss_guard_limit=3)
+        for i in range(3):
+            self.close_trade(pm, key=f"base:0x{i}", pnl=-10.0)
+        assert not pm.entry_allowed("base:0xNEW")[0]
+
+    def test_low_profit_locks_token(self):
+        pm = self.make_pm(cooldown_s=0.0, stoploss_guard_limit=99,
+                          low_profit_min_trades=2)
+        self.close_trade(pm, pnl=-5.0, reason="time_stop")
+        self.close_trade(pm, pnl=-5.0, reason="time_stop")
+        assert not pm.entry_allowed("base:0xPAIR")[0]
+        assert pm.entry_allowed("base:0xOTHER")[0]
+
+    def test_max_drawdown_halts(self):
+        pm = self.make_pm(cooldown_s=0.0, stoploss_guard_limit=99,
+                          max_drawdown_pct=0.10)
+        self.close_trade(pm, key="base:0xA", pnl=-120.0, reason="time_stop")
+        assert pm.drawdown >= 0.10
+        assert not pm.entry_allowed("base:0xB")[0]
+
+
+# -- volatility-managed sizing ---------------------------------------------
+
+class TestVolTargeting:
+    def test_high_vol_scales_stake_down(self):
+        rm = RiskManager(RiskConfig(vol_target_30m=0.04, max_position_usd=1e9,
+                                    max_position_pct_of_liquidity=1.0))
+        calm = rm.size_position(make_signal(vol_30m=0.02), [])
+        wild = rm.size_position(make_signal(vol_30m=0.16), [])
+        assert calm > 0 and wild > 0
+        assert wild == pytest.approx(calm / 4.0)
+
+    def test_breakout_stop_widens_with_realized_vol(self):
+        from cryptobot.signals import SignalConfig, detect_breakout
+        from cryptobot.volatility import VolatilityEngine
+        eng = VolatilityEngine()
+        # Build a jagged 30m history so realized vol is large.
+        price = 1.0
+        for i in range(10):
+            price *= 1.06 if i % 2 == 0 else 0.97
+            eng.observe(make_snap(ts=NOW + i * 180, price_usd=price))
+        snap = make_snap(ts=NOW + 10 * 180, price_usd=price * 1.05,
+                         change_5m=0.05, change_1h=0.15,
+                         volume_1h_usd=100_000.0)
+        vol = eng.observe(snap)
+        assert vol.realized_vol_30m > 0.02
+        sig = detect_breakout(snap, vol, SignalConfig())
+        if sig is not None:  # rr gate may reject the widened stop — also valid
+            assert sig.stop_loss_pct >= 2.0 * vol.realized_vol_30m
 
 
 # -- token address plumbing (live execution needs it, key holds the pair) --

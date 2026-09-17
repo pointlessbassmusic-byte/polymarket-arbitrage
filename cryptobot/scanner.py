@@ -25,8 +25,10 @@ from typing import Optional
 from .analytics import EdgeTracker
 from .data.coingecko import CoinGeckoClient
 from .data.dexscreener import DexScreenerClient
+from .data.goplus import ScreenConfig, TokenScreen
 from .execution.wallet import NATIVE_GECKO_IDS
 from .models import Signal, SignalType, TokenSnapshot, now
+from .protections import ProtectionConfig, ProtectionManager
 from .portfolio import Portfolio
 from .risk import RiskConfig, RiskManager
 from .signals import SignalConfig, detect_all, detect_cross_dex_arb
@@ -54,11 +56,17 @@ class ScannerConfig:
 class Scanner:
     def __init__(self, scan_cfg: ScannerConfig, sig_cfg: SignalConfig,
                  risk_cfg: RiskConfig, state_dir: Optional[Path] = None,
-                 executor=None):
+                 executor=None, screen_cfg: Optional[ScreenConfig] = None,
+                 protection_cfg: Optional[ProtectionConfig] = None):
         self.cfg = scan_cfg
         self.sig_cfg = sig_cfg
         self.dex = DexScreenerClient()
         self.gecko = CoinGeckoClient()
+        self.screen = TokenScreen(screen_cfg)
+        self.protections = ProtectionManager(
+            protection_cfg or ProtectionConfig(),
+            starting_equity=risk_cfg.bankroll_usd,
+        )
         self.vol = VolatilityEngine()
         self.risk = RiskManager(risk_cfg)
         self.portfolio = Portfolio(
@@ -78,6 +86,7 @@ class Scanner:
     async def close(self) -> None:
         await self.dex.close()
         await self.gecko.close()
+        await self.screen.close()
 
     # -- universe ----------------------------------------------------------
 
@@ -161,7 +170,7 @@ class Scanner:
             signals.extend(await self._arb_pass(profiles[: self.cfg.arb_check_top_n]))
 
         await self._manage_positions()
-        self._act_on_signals(signals)
+        await self._act_on_signals(signals)
 
         if self._cycle % self.cfg.edge_report_every_cycles == 0 and self.edges.by_type:
             logger.info("edge report: %s", self.edges.report())
@@ -217,12 +226,13 @@ class Scanner:
                 if trade:
                     self.risk.record_pnl(trade.pnl_usd)
                     self.edges.record(trade)
+                    self.protections.on_trade_closed(trade)
                     if self.executor is not None and pos.token_address:
                         asyncio.create_task(
                             self.executor.sell(pos.chain, pos.token_address, pos.qty)
                         )
 
-    def _act_on_signals(self, signals: list[Signal]) -> None:
+    async def _act_on_signals(self, signals: list[Signal]) -> None:
         # Best asymmetry first; one entry per token per cycle.
         for sig in sorted(signals, key=lambda s: s.risk_reward * s.confidence,
                           reverse=True):
@@ -233,6 +243,10 @@ class Scanner:
                 continue
             if sig.key in self.portfolio.positions:
                 continue
+            allowed, why = self.protections.entry_allowed(sig.key)
+            if not allowed:
+                logger.debug("skip %s: %s", sig.symbol, why)
+                continue
             # Learned edge: scale confidence by the pattern's realized
             # expectancy once enough trades exist to judge it.
             sig.confidence = min(
@@ -240,6 +254,11 @@ class Scanner:
             )
             size = self.risk.size_position(sig, list(self.portfolio.positions.values()))
             if size <= 0:
+                continue
+            # Last gate before money: contract-level rug/honeypot screen.
+            verdict = await self.screen.check(sig.chain, sig.token_address)
+            if not verdict.ok:
+                logger.info("skip %s: %s", sig.symbol, verdict)
                 continue
             self.portfolio.open_from_signal(sig, size)
             if self.executor is not None:

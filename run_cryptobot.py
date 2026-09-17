@@ -18,7 +18,9 @@ from pathlib import Path
 
 import yaml
 
+from cryptobot.data.goplus import ScreenConfig
 from cryptobot.execution.wallet import WalletConfig, WalletExecutor
+from cryptobot.protections import ProtectionConfig
 from cryptobot.risk import RiskConfig
 from cryptobot.scanner import Scanner, ScannerConfig
 from cryptobot.signals import SignalConfig
@@ -42,7 +44,9 @@ def load(config_path: Path) -> Scanner:
         executor = WalletExecutor(_build(WalletConfig, exec_raw))
 
     return Scanner(scan_cfg, sig_cfg, risk_cfg,
-                   state_dir=config_path.parent, executor=executor)
+                   state_dir=config_path.parent, executor=executor,
+                   screen_cfg=_build(ScreenConfig, raw.get("security")),
+                   protection_cfg=_build(ProtectionConfig, raw.get("protections")))
 
 
 async def main() -> int:

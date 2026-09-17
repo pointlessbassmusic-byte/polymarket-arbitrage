@@ -27,6 +27,10 @@ class RiskConfig:
     max_daily_loss_usd: float = 100.0
     max_positions_per_token: int = 1
     min_confidence: float = 0.35
+    # Volatility targeting: scale stakes down when a token's realized 30m
+    # vol exceeds this reference level. Academic result: volatility-managed
+    # momentum keeps the premium while avoiding the crash tail.
+    vol_target_30m: float = 0.04
 
 
 @dataclass
@@ -79,6 +83,10 @@ class RiskManager:
         if kelly <= 0:
             return 0.0
         stake = kelly * self.cfg.kelly_fraction * self.cfg.bankroll_usd
+        # Vol targeting: a token running 2x the reference vol gets half the
+        # stake, keeping each position's expected dollar-vol roughly equal.
+        if sig.vol_30m > self.cfg.vol_target_30m > 0:
+            stake *= self.cfg.vol_target_30m / sig.vol_30m
         stake = min(
             stake,
             self.cfg.max_position_usd,

@@ -42,6 +42,28 @@ signals:
   # The asymmetry gate: refuse anything under 2:1 reward/risk
   min_risk_reward: 2.0
 
+# Contract-level rug/honeypot screen (GoPlus Labs security database,
+# free API). Hard-rejects honeypots, unsellable tokens, pausable trading,
+# owner balance edits, blacklists, and excessive taxes before ANY entry.
+security:
+  max_buy_tax: 0.10
+  max_sell_tax: 0.10
+  max_creator_percent: 0.20
+  block_on_unknown: false      # true = refuse tokens the API can't screen
+  cache_ttl_s: 3600
+
+# Freqtrade-style protections — all gate new entries only, exits always run
+protections:
+  cooldown_s: 1800             # 30 min per-token cooldown after any close
+  stoploss_guard_window_s: 7200
+  stoploss_guard_limit: 4      # 4 stop-outs in 2h -> hostile regime, halt
+  stoploss_guard_halt_s: 3600
+  low_profit_window_s: 21600
+  low_profit_min_trades: 2     # 2+ net-losing trades on a token -> lock it
+  low_profit_lock_s: 7200
+  max_drawdown_pct: 0.15       # 15% off equity peak -> pause and reset
+  drawdown_halt_s: 7200
+
 risk:
   bankroll_usd: 1000
   kelly_fraction: 0.25         # quarter-Kelly — memecoin edges are guesses
@@ -51,6 +73,7 @@ risk:
   max_total_exposure_usd: 500
   max_daily_loss_usd: 100
   min_confidence: 0.35
+  vol_target_30m: 0.04         # stakes scale down above this realized vol
 
 execution:
   live: false                  # PAPER TRADING. See header before flipping.

@@ -90,9 +90,10 @@ def detect_breakout(snap: TokenSnapshot, vol: VolatilityProfile,
     if hourly_avg <= 0 or snap.volume_1h_usd / hourly_avg < cfg.breakout_volume_surge:
         return None
 
-    # Stop just under the 30m launch point; target a continuation of the
-    # same magnitude. Momentum continuation is the asymmetric leg.
-    stop = max(0.02, vol.move_30m * 0.5)
+    # Stop just under the 30m launch point, widened to at least ~2 units
+    # of current realized vol (ATR-style: adaptive stops avoid getting
+    # shaken out by noise that is normal for THIS token right now).
+    stop = max(0.02, vol.move_30m * 0.5, 2.0 * vol.realized_vol_30m)
     target = max(vol.move_30m * 1.5, vol.move_1h)
     rr = target / stop if stop > 0 else 0.0
     confidence = min(1.0, 0.3 + 0.5 * snap.buy_sell_ratio + 0.1 * min(vol.zscore_5m / 3.0, 1.0))
@@ -101,7 +102,7 @@ def detect_breakout(snap: TokenSnapshot, vol: VolatilityProfile,
         symbol=snap.base_symbol, side=Side.LONG, price_usd=snap.price_usd,
         confidence=confidence, expected_move=target, stop_loss_pct=stop,
         take_profit_pct=target, risk_reward=rr, liquidity_usd=snap.liquidity_usd,
-        token_address=snap.base_address,
+        token_address=snap.base_address, vol_30m=vol.realized_vol_30m,
         reason=(f"breakout: 5m {vol.move_5m:+.1%}, 30m {vol.move_30m:+.1%}, "
                 f"buys {snap.buy_sell_ratio:.0%}, 1h vol surge "
                 f"{snap.volume_1h_usd / hourly_avg:.1f}x"),
@@ -122,7 +123,8 @@ def detect_mean_revert(snap: TokenSnapshot, vol: VolatilityProfile,
         return None
 
     drop = abs(vol.move_1h)
-    stop = max(0.03, drop * 0.25)       # below the flush low
+    # Below the flush low, widened by current realized vol (ATR-style).
+    stop = max(0.03, drop * 0.25, 2.0 * vol.realized_vol_30m)
     target = drop * 0.5                  # half-retrace of the dump
     rr = target / stop if stop > 0 else 0.0
     return _gated(Signal(
@@ -131,6 +133,7 @@ def detect_mean_revert(snap: TokenSnapshot, vol: VolatilityProfile,
         confidence=0.4 + 0.2 * snap.buy_sell_ratio, expected_move=target,
         stop_loss_pct=stop, take_profit_pct=target, risk_reward=rr,
         liquidity_usd=snap.liquidity_usd, token_address=snap.base_address,
+        vol_30m=vol.realized_vol_30m,
         reason=(f"mean-revert: 1h {vol.move_1h:+.1%} flush vs 24h "
                 f"{vol.move_24h:+.1%} trend, targeting half-retrace"),
     ), cfg)
@@ -149,7 +152,7 @@ def detect_regime_shift(snap: TokenSnapshot, vol: VolatilityProfile,
         symbol=snap.base_symbol, side=Side.LONG, price_usd=snap.price_usd,
         confidence=0.35, expected_move=target, stop_loss_pct=stop,
         take_profit_pct=target, risk_reward=3.0, liquidity_usd=snap.liquidity_usd,
-        token_address=snap.base_address,
+        token_address=snap.base_address, vol_30m=vol.realized_vol_30m,
         reason=(f"regime shift: 5m move z={vol.zscore_5m:.1f} while 1h still "
                 f"{vol.move_1h:+.1%} — early wake-up"),
     ), cfg)
