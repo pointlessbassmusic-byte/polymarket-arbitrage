@@ -387,6 +387,49 @@ class TestTokenAddressPlumbing:
         assert pos.token_address == "0xTOKEN"
 
 
+# -- dashboard -------------------------------------------------------------
+
+class TestDashboard:
+    def make_scanner(self):
+        from cryptobot.risk import RiskConfig
+        from cryptobot.scanner import Scanner, ScannerConfig
+        from cryptobot.signals import SignalConfig
+        return Scanner(ScannerConfig(), SignalConfig(), RiskConfig())
+
+    def test_state_is_json_serializable(self):
+        import json
+        sc = self.make_scanner()
+        sc.portfolio.open_from_signal(make_signal(), 100.0)
+        sc._latest_prices["base:0xPAIR"] = 1.05
+        state = sc.state()
+        json.dumps(state)  # must not raise
+        assert state["positions"][0]["symbol"] == "TEST"
+        assert state["positions"][0]["pnl_usd"] == pytest.approx(5.0)
+        assert state["bankroll_usd"] == 1000.0
+        assert not state["live_armed"]
+
+    def test_api_serves_state_and_page(self):
+        import asyncio
+        import httpx
+        from cryptobot.dashboard import create_app
+
+        sc = self.make_scanner()
+        app = create_app(sc)
+
+        async def run():
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport,
+                                         base_url="http://test") as client:
+                r = await client.get("/api/state")
+                assert r.status_code == 200
+                assert r.json()["cycle"] == 0
+                page = await client.get("/")
+                assert page.status_code == 200
+                assert "Crypto Volatility Bot" in page.text
+
+        asyncio.run(run())
+
+
 # -- dexscreener parsing ---------------------------------------------------
 
 class TestParsePair:

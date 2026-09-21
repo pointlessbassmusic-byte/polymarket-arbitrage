@@ -4,6 +4,7 @@
 Usage:
     python run_cryptobot.py                 # continuous paper-trading loop
     python run_cryptobot.py --once          # single scan cycle, print signals
+    python run_cryptobot.py --dashboard     # loop + web dashboard on :8081
     python run_cryptobot.py --config my.yaml
 """
 
@@ -55,6 +56,10 @@ async def main() -> int:
                         default=Path(__file__).parent / "cryptobot_config.yaml")
     parser.add_argument("--once", action="store_true",
                         help="run one scan cycle and print signals as JSON")
+    parser.add_argument("--dashboard", action="store_true",
+                        help="serve the live web dashboard alongside the loop")
+    parser.add_argument("--port", type=int, default=8081,
+                        help="dashboard port (default 8081)")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -69,6 +74,18 @@ async def main() -> int:
         if args.once:
             signals = await scanner.run_cycle()
             print(json.dumps([s.as_dict() for s in signals], indent=2))
+        elif args.dashboard:
+            import uvicorn
+
+            from cryptobot.dashboard import create_app
+
+            server = uvicorn.Server(uvicorn.Config(
+                create_app(scanner), host="0.0.0.0", port=args.port,
+                log_level="warning",
+            ))
+            logging.getLogger(__name__).info(
+                "dashboard at http://localhost:%d", args.port)
+            await asyncio.gather(scanner.run_forever(), server.serve())
         else:
             await scanner.run_forever()
     except KeyboardInterrupt:

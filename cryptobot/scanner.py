@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -78,6 +79,11 @@ class Scanner:
         self.executor = executor
         self._native_prices: dict[str, float] = {}   # gecko id -> usd
         self._native_prices_ts: float = 0.0
+        # Dashboard state (read-only from the outside)
+        self.recent_signals: deque[dict] = deque(maxlen=100)
+        self.movers: list[dict] = []
+        self.equity_curve: deque[tuple[float, float]] = deque(maxlen=1440)
+        self.started_at: float = now()
         # key -> (chain, base_address) so we can deep-scan pools later
         self.tracked: dict[str, tuple[str, str]] = {}
         self._cycle = 0
@@ -174,6 +180,25 @@ class Scanner:
 
         if self._cycle % self.cfg.edge_report_every_cycles == 0 and self.edges.by_type:
             logger.info("edge report: %s", self.edges.report())
+
+        # Dashboard state
+        for sig in signals:
+            self.recent_signals.appendleft(sig.as_dict() | {"symbol": sig.symbol})
+        self.movers = [
+            {
+                "symbol": v.symbol, "key": v.key,
+                "price_usd": self._latest_prices.get(v.key, 0.0),
+                "move_5m": v.move_5m, "move_30m": v.move_30m,
+                "move_1h": v.move_1h, "move_24h": v.move_24h,
+                "zscore_5m": v.zscore_5m, "wildness": v.wildness,
+            }
+            for _, v in profiles[:15]
+        ]
+        summary = self.portfolio.summary(self._latest_prices)
+        self.equity_curve.append(
+            (now(), self.risk.cfg.bankroll_usd
+             + summary["realized_pnl"] + summary["unrealized_pnl"])
+        )
 
         top = profiles[0][1] if profiles else None
         logger.info(
@@ -291,6 +316,49 @@ class Scanner:
             )
         except Exception:
             logger.exception("live execution failed for %s", sig.symbol)
+
+    # -- dashboard ---------------------------------------------------------
+
+    def state(self) -> dict:
+        """Full JSON-serializable snapshot for the dashboard."""
+        summary = self.portfolio.summary(self._latest_prices)
+        positions = []
+        for p in self.portfolio.positions.values():
+            price = self._latest_prices.get(p.key, p.entry_price)
+            positions.append({
+                "symbol": p.symbol, "chain": p.chain, "key": p.key,
+                "entry_price": p.entry_price, "price": price,
+                "size_usd": p.size_usd, "pnl_usd": round(p.unrealized_pnl(price), 2),
+                "stop_loss": p.stop_loss, "take_profit": p.take_profit,
+                "opened_at": p.opened_at,
+                "signal_type": p.signal_type.value if p.signal_type else None,
+            })
+        closed = [
+            {
+                "symbol": t.symbol, "pnl_usd": round(t.pnl_usd, 2),
+                "size_usd": t.size_usd, "exit_reason": t.exit_reason,
+                "closed_at": t.closed_at,
+                "signal_type": t.signal_type.value if t.signal_type else None,
+            }
+            for t in self.portfolio.closed[-50:]
+        ][::-1]
+        return {
+            "ts": now(),
+            "started_at": self.started_at,
+            "cycle": self._cycle,
+            "tracked_pairs": len(self.tracked),
+            "bankroll_usd": self.risk.cfg.bankroll_usd,
+            "live_armed": bool(self.executor and getattr(self.executor, "armed", False)),
+            "halted": self.risk.state.halted,
+            "drawdown": round(self.protections.drawdown, 4),
+            "summary": summary,
+            "positions": positions,
+            "closed_trades": closed,
+            "signals": list(self.recent_signals)[:50],
+            "movers": self.movers,
+            "edges": self.edges.report(),
+            "equity_curve": [(round(t), round(v, 2)) for t, v in self.equity_curve],
+        }
 
     # -- loop --------------------------------------------------------------
 

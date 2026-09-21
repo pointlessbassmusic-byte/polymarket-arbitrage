@@ -48,7 +48,15 @@ python run_cryptobot.py --once
 
 # continuous paper-trading loop (1 scan/minute)
 python run_cryptobot.py
+
+# loop + live web dashboard at http://localhost:8081
+python run_cryptobot.py --dashboard
 ```
+
+The dashboard shows equity, open positions with live PnL, recent signals,
+the wildest multi-window movers, closed trades, and the learned edge report
+per pattern (win rate, profit factor, expectancy, current sizing multiplier).
+Light and dark mode follow your system theme.
 
 Tune everything in [`cryptobot_config.yaml`](../cryptobot_config.yaml):
 watchlist queries, chains, liquidity/volume hygiene floors, detector
@@ -87,6 +95,7 @@ cryptobot/
 ├── portfolio.py         # positions, trailing stops, PnL ledger
 ├── analytics.py         # per-pattern edge tracker → confidence feedback
 ├── protections.py       # Freqtrade-style cooldown / guards / drawdown halt
+├── dashboard.py         # FastAPI live dashboard (--dashboard)
 ├── scanner.py           # discover → observe → detect → manage loop
 ├── data/
 │   ├── dexscreener.py   # main price/volume/liquidity feed
