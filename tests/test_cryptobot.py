@@ -387,6 +387,70 @@ class TestTokenAddressPlumbing:
         assert pos.token_address == "0xTOKEN"
 
 
+# -- backtest --------------------------------------------------------------
+
+class TestBacktest:
+    def make_candles(self, n=400, base=1.0):
+        from cryptobot.data.geckoterminal import Candle
+        return [Candle(ts=NOW + i * 300, open=base, high=base * 1.002,
+                       low=base * 0.998, close=base, volume_usd=10_000.0)
+                for i in range(n)]
+
+    def make_meta(self):
+        from cryptobot.backtest import PoolMeta
+        return PoolMeta(chain="base", pair_address="0xPAIR", symbol="TEST",
+                        token_address="0xTOKEN", liquidity_usd=200_000.0,
+                        fdv_usd=5_000_000.0)
+
+    def test_snapshot_from_candles_windows(self):
+        from cryptobot.backtest import CANDLES_PER_DAY, snapshot_from_candles
+        candles = self.make_candles(CANDLES_PER_DAY + 20)
+        # +10% on the final candle vs the previous one
+        candles[-1].close = 1.10
+        snap = snapshot_from_candles(candles, len(candles) - 1,
+                                     self.make_meta(), 0.55)
+        assert snap.change_5m == pytest.approx(0.10)
+        assert snap.change_24h == pytest.approx(0.10, abs=0.01)
+        assert snap.buy_sell_ratio == pytest.approx(0.55)
+        assert snap.volume_1h_usd == pytest.approx(12 * 10_000.0)
+
+    def test_flat_history_produces_no_trades(self):
+        from cryptobot.backtest import Backtester
+        bt = Backtester(SignalConfig(), RiskConfig())
+        report = bt.run({"base:0xPAIR": (self.make_meta(), self.make_candles())})
+        assert report["trades"] == 0
+        assert report["signals"] == 0
+
+    def test_pump_produces_breakout_trade_and_conservative_stop(self):
+        from cryptobot.backtest import CANDLES_PER_DAY, Backtester
+        candles = self.make_candles(CANDLES_PER_DAY + 60)
+        # Engineer a pump: +4%/candle for 8 candles with a volume surge,
+        # then a hard dump through any stop.
+        start = CANDLES_PER_DAY + 20
+        price = 1.0
+        for i in range(start, start + 8):
+            price *= 1.04
+            candles[i].close = price
+            candles[i].high = price * 1.01
+            candles[i].low = price / 1.05
+            candles[i].volume_usd = 400_000.0
+        for i in range(start + 8, len(candles)):
+            price *= 0.90
+            candles[i].close = price
+            candles[i].high = price * 1.02
+            candles[i].low = price * 0.97
+        bt = Backtester(SignalConfig(), RiskConfig())
+        report = bt.run({"base:0xPAIR": (self.make_meta(), candles)})
+        assert report["signals"] > 0
+        assert report["trades"] >= 1
+        # Every trade must have closed through a known exit path (a target
+        # during the pump or a stop during the dump), never left dangling.
+        reasons = {t.exit_reason for t in bt.portfolio.closed}
+        assert reasons <= {"stop_loss", "trailing_stop", "take_profit",
+                           "time_stop", "backtest_end"}
+        assert not bt.portfolio.positions
+
+
 # -- dashboard -------------------------------------------------------------
 
 class TestDashboard:

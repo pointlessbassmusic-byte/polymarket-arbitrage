@@ -51,6 +51,10 @@ python run_cryptobot.py
 
 # loop + live web dashboard at http://localhost:8081
 python run_cryptobot.py --dashboard
+
+# replay real history through the same detectors (GeckoTerminal candles)
+python -m cryptobot.backtest PEPE BRETT --days 3
+python -m cryptobot.backtest BRETT --chain base --days 7 --json
 ```
 
 The dashboard shows equity, open positions with live PnL, recent signals,
@@ -96,13 +100,29 @@ cryptobot/
 ├── analytics.py         # per-pattern edge tracker → confidence feedback
 ├── protections.py       # Freqtrade-style cooldown / guards / drawdown halt
 ├── dashboard.py         # FastAPI live dashboard (--dashboard)
+├── backtest.py          # candle replay through the live detectors
 ├── scanner.py           # discover → observe → detect → manage loop
 ├── data/
 │   ├── dexscreener.py   # main price/volume/liquidity feed
 │   ├── coingecko.py     # trending, majors, native-token prices
+│   ├── geckoterminal.py # historical per-pool OHLCV for backtests
 │   └── goplus.py        # GoPlus security DB: rug/honeypot screen
 └── execution/
     └── wallet.py        # 0x buy/sell + MetaMask-key signing (opt-in)
 ```
+
+## Backtesting honestly
+
+`python -m cryptobot.backtest` replays 5-minute GeckoTerminal candles for
+each token's canonical pool (aged pools ranked by real 24h volume — fresh
+copycat pools faking liquidity are excluded) through the **same**
+volatility engine, detectors, Kelly sizing, protections, and exit logic
+the live scanner runs, on a virtual clock. Three limitations are stated
+rather than hidden: candles carry no buy/sell split (the breakout buy-ratio
+gate is neutralized, so breakout results skew slightly optimistic);
+liquidity/FDV are today's values held constant; and intra-candle order is
+unknown, so when a candle spans both stop and target the **stop is assumed
+to hit first** (conservative). Use it to compare threshold settings, not
+to project returns.
 
 Tests: `python -m pytest tests/test_cryptobot.py -v`
