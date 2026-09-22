@@ -269,4 +269,29 @@ whole module. What it changed:
 * Token symbols are escaped everywhere (they come from whoever deployed
   the token), and runtime state files are gitignored by glob.
 
-Tests: `python -m pytest tests/test_cryptobot.py -v`
+## Tests
+
+```bash
+python -m pytest tests/ -v
+```
+
+`tests/test_cryptobot.py` is unit-level. `tests/test_integration.py` is
+the one that earns its keep: it fakes **only** the network boundary
+(DexScreener, CoinGecko, GoPlus) and drives a scripted market through the
+real scanner — discovery, volatility engine, detectors, cost gating, risk
+sizing, protections, portfolio, persistence and the decision journal — on
+a virtual clock, asserting that a signal in at one end produces an
+accounted, journalled, persisted trade at the other.
+
+That split is deliberate. Two review passes over this module found
+thirteen bugs, and nearly every one lived in the *seams* between
+components rather than inside them — the fast-exit loop reading the wrong
+book, a portfolio that saved but never loaded, the edge tracker fed twice
+per outcome, a security screen that read silence as safety. Each unit was
+individually correct; 120-odd unit tests caught none of them.
+
+The integration tests were validated the only way that means anything:
+every one of those bugs was reintroduced one at a time and the suite had
+to fail. One test did *not* fail on the first attempt — it exercised two
+helpers instead of the loop whose guard actually held the bug — and was
+rewritten to drive the real loop until it did.
