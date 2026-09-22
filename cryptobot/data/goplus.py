@@ -52,6 +52,19 @@ class SecurityVerdict:
         return "REJECTED: " + "; ".join(self.reasons)
 
 
+# Keys GoPlus populates for any contract it has actually analysed. A
+# record missing all of them is not "a token with no problems" — it is a
+# token nobody has looked at yet, which is precisely the fresh-deploy
+# case this screen exists to catch.
+_CORE_KEYS = ("is_honeypot", "buy_tax", "sell_tax", "is_open_source",
+              "cannot_sell_all", "owner_address")
+
+
+def is_analysed(data: dict) -> bool:
+    """True when the record carries real analysis, not just an echo."""
+    return any(k in data for k in _CORE_KEYS)
+
+
 @dataclass
 class ScreenConfig:
     max_buy_tax: float = 0.10
@@ -91,7 +104,16 @@ def _renounced(data: dict) -> bool:
 
 
 def evaluate(data: dict, cfg: ScreenConfig) -> SecurityVerdict:
-    """Turn one GoPlus token record into a trade/no-trade verdict."""
+    """Turn one GoPlus token record into a trade/no-trade verdict.
+
+    Absence of flags is NOT evidence of safety: an empty or unanalysed
+    record must come back `known=False` so the caller can decide, rather
+    than silently reading as a clean bill of health.
+    """
+    if not is_analysed(data):
+        return SecurityVerdict(ok=not cfg.block_on_unknown, known=False,
+                               reasons=["no GoPlus analysis for this contract"],
+                               checked_at=time.time())
     reasons: list[str] = []
 
     # Hard rejects: the contract can stop you from exiting.
@@ -171,7 +193,11 @@ class TokenScreen:
             return SecurityVerdict(ok=not self.cfg.block_on_unknown, known=False)
 
         verdict = evaluate(data, self.cfg)
-        self._cache[cache_key] = verdict
+        # Never cache an unknown verdict: caching it would freeze a
+        # "nobody has analysed this yet" answer for the whole TTL, right
+        # through the window when GoPlus first indexes the contract.
+        if verdict.known:
+            self._cache[cache_key] = verdict
         if not verdict.ok:
             logger.info("security screen %s %s: %s", chain, token_address[:10], verdict)
         return verdict

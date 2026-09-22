@@ -69,6 +69,8 @@ coverage.xml
 config.live.yaml
 
 
-# Cryptobot runtime state
-cryptobot_portfolio.json
-cryptobot_edges.json
+# Cryptobot runtime state (per-book portfolios, learned edge stats).
+# Globbed, not literal: the books are written as
+# cryptobot_<book>_portfolio.json, so a literal name silently stops
+# matching the moment a book is added or renamed.
+cryptobot_*.json

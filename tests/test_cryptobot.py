@@ -299,6 +299,30 @@ class TestSecurityScreen:
                      self.CFG)
         assert not v.ok and len(v.reasons) == 2
 
+    def test_unanalysed_contract_is_unknown_not_clear(self):
+        # Absence of flags is not evidence of safety: GoPlus returns thin
+        # records for contracts it has not indexed, which is exactly the
+        # fresh-deploy case the screen exists to catch.
+        for rec in ({}, {"holder_count": "12"}):
+            v = evaluate(rec, self.CFG)
+            assert v.known is False
+            assert "no GoPlus analysis" in " ".join(v.reasons)
+        # A real, analysed record still reads as known.
+        assert evaluate({"is_honeypot": "0", "is_open_source": "1"},
+                        self.CFG).known is True
+
+    def test_unknown_can_be_made_to_fail_closed(self):
+        strict = ScreenConfig(block_on_unknown=True)
+        assert evaluate({}, strict).ok is False
+
+    def test_real_money_refuses_unscreened_tokens(self):
+        # Paper may trade unscreened tokens (keeps the benchmark whole);
+        # a book that spends real money must not.
+        import inspect
+        from cryptobot.scanner import Scanner
+        src = inspect.getsource(Scanner._consider)
+        assert "book.executes_onchain and not verdict.known" in src
+
     def test_renounced_ownership_neutralizes_owner_powers(self):
         # PEPE-style contract: has pause/blacklist functions, but ownership
         # is renounced so nobody can call them.
@@ -571,6 +595,77 @@ class TestMevProtection:
         assert w3 is None          # refused before any network call
 
 
+# -- quote validation (the signing path) -----------------------------------
+
+class TestQuoteValidation:
+    """The signed transaction is built entirely from the aggregator's
+    response, so the response must be checked against the request."""
+
+    def good(self, **kw):
+        from cryptobot.execution.wallet import NATIVE
+        q = {
+            "chainId": 8453,
+            "sellToken": NATIVE, "buyToken": "0xTOKEN",
+            "sellAmount": "1000", "buyAmount": "5000",
+            "minBuyAmount": "4900",
+            "transaction": {"to": "0xRouter", "data": "0xdead", "value": "1000"},
+        }
+        q.update(kw)
+        return q
+
+    def check(self, q, **kw):
+        from cryptobot.execution.wallet import NATIVE, validate_quote
+        args = dict(chain="base", sell_token=NATIVE, buy_token="0xTOKEN",
+                    sell_amount_raw=1000, max_slippage=0.02)
+        args.update(kw)
+        validate_quote(q, **args)
+
+    def test_matching_quote_passes(self):
+        self.check(self.good())
+
+    def test_rejects_value_above_what_we_offered(self):
+        from cryptobot.execution.wallet import QuoteRejected
+        q = self.good()
+        q["transaction"]["value"] = str(10**21)      # drain attempt
+        with pytest.raises(QuoteRejected, match="wei"):
+            self.check(q)
+
+    def test_erc20_sell_must_send_no_native_value(self):
+        from cryptobot.execution.wallet import NATIVE, QuoteRejected
+        q = self.good(sellToken="0xTOKEN", buyToken=NATIVE)
+        q["transaction"]["value"] = "5000"
+        with pytest.raises(QuoteRejected):
+            self.check(q, sell_token="0xTOKEN", buy_token=NATIVE)
+
+    def test_rejects_swapped_out_buy_token(self):
+        from cryptobot.execution.wallet import QuoteRejected
+        with pytest.raises(QuoteRejected, match="buyToken"):
+            self.check(self.good(buyToken="0xATTACKER"))
+
+    def test_rejects_wrong_chain(self):
+        from cryptobot.execution.wallet import QuoteRejected
+        with pytest.raises(QuoteRejected, match="chain"):
+            self.check(self.good(chainId=1))
+
+    def test_rejects_selling_more_than_offered(self):
+        from cryptobot.execution.wallet import QuoteRejected
+        with pytest.raises(QuoteRejected, match="sells"):
+            self.check(self.good(sellAmount="99999"))
+
+    def test_rejects_slippage_wider_than_configured(self):
+        from cryptobot.execution.wallet import QuoteRejected
+        with pytest.raises(QuoteRejected, match="slippage"):
+            self.check(self.good(minBuyAmount="1"))
+
+    def test_rejects_quote_without_a_transaction(self):
+        from cryptobot.execution.wallet import QuoteRejected
+        with pytest.raises(QuoteRejected, match="no transaction"):
+            self.check(self.good(transaction={}))
+
+    def test_case_insensitive_address_comparison(self):
+        self.check(self.good(buyToken="0xtoken"))
+
+
 # -- backtest --------------------------------------------------------------
 
 class TestBacktest:
@@ -713,8 +808,10 @@ class TestDashboard:
 
         async def run():
             transport = httpx.ASGITransport(app=app)
+            # Loopback origin: the app pins the Host header, so a made-up
+            # hostname is (correctly) refused as a rebinding attempt.
             async with httpx.AsyncClient(transport=transport,
-                                         base_url="http://test") as client:
+                                         base_url="http://localhost") as client:
                 r = await client.get("/api/state")
                 assert r.status_code == 200
                 assert r.json()["cycle"] == 0
@@ -731,6 +828,54 @@ class TestDashboard:
                 assert "locked" in body["error"]
 
         asyncio.run(run())
+
+    def test_api_requires_token_and_pins_host(self):
+        # Loopback alone does not stop DNS rebinding: an attacker page
+        # whose hostname resolves to 127.0.0.1 is same-origin with us.
+        # The Host pin closes that; the token closes everything else that
+        # can reach the port.
+        import asyncio
+        import httpx
+        from cryptobot.dashboard import create_app
+
+        sc = self.make_scanner()
+        app = create_app(sc, token="s3cret")
+
+        async def run():
+            tr = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=tr,
+                                         base_url="http://localhost") as c:
+                assert (await c.get("/api/state")).status_code == 401
+                assert (await c.get(
+                    "/api/state",
+                    headers={"X-Dashboard-Token": "wrong"})).status_code == 401
+                assert (await c.post(
+                    "/api/mode", json={"mode": "real"})).status_code == 401
+                ok = await c.get("/api/state",
+                                 headers={"X-Dashboard-Token": "s3cret"})
+                assert ok.status_code == 200
+                assert (await c.get("/api/state?t=s3cret")).status_code == 200
+                # Rebinding attempt: correct token, attacker Host.
+                rebind = await c.get("/api/state",
+                                     headers={"Host": "evil.example.com",
+                                              "X-Dashboard-Token": "s3cret"})
+                assert rebind.status_code == 421
+
+        asyncio.run(run())
+
+    def test_dashboard_binds_loopback_by_default(self):
+        # The dashboard has no authentication and exposes the full
+        # position book plus a trading-mode switch. Binding it to every
+        # interface would hand that to anyone on the network, so the
+        # default must stay loopback and widening must be explicit.
+        import run_cryptobot
+        parser = None
+        import argparse, contextlib, io
+        # Re-parse the module's own CLI definition rather than duplicating it.
+        src = open("run_cryptobot.py").read()
+        assert 'parser.add_argument("--host", default="127.0.0.1"' in src
+        assert 'host=args.host' in src
+        assert 'host="0.0.0.0"' not in src
 
     def test_decision_journal_records_skips_with_reasons(self):
         from cryptobot.book import Decision, DecisionJournal

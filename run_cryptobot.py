@@ -14,6 +14,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -67,6 +68,12 @@ async def main() -> int:
                         help="serve the live web dashboard alongside the loop")
     parser.add_argument("--port", type=int, default=8081,
                         help="dashboard port (default 8081)")
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="dashboard bind address. Defaults to loopback: "
+                             "the dashboard has no authentication, exposes "
+                             "the full position book on /api/state and can "
+                             "switch trading mode on /api/mode. Only widen "
+                             "this behind a trusted proxy or VPN.")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -100,12 +107,30 @@ async def main() -> int:
 
             from cryptobot.dashboard import create_app
 
+            import secrets
+
+            log = logging.getLogger(__name__)
+            # Guards every /api/* route. Not a login — it is what stops
+            # anything else that can reach the port (or a rebinding page)
+            # from reading the book or switching trading mode.
+            token = os.environ.get("CRYPTOBOT_DASHBOARD_TOKEN") \
+                or secrets.token_urlsafe(16)
+            extra_hosts = ({args.host.lower()}
+                           if args.host not in ("0.0.0.0", "::") else set())
+            if args.host not in ("127.0.0.1", "localhost", "::1"):
+                log.warning(
+                    "dashboard binding to %s — it has NO authentication: "
+                    "anyone who can reach port %d can read your positions "
+                    "and switch trading mode. Put it behind a proxy or VPN.",
+                    args.host, args.port)
             server = uvicorn.Server(uvicorn.Config(
-                create_app(scanner), host="0.0.0.0", port=args.port,
-                log_level="warning",
+                create_app(scanner, token=token, extra_hosts=extra_hosts),
+                host=args.host, port=args.port, log_level="warning",
             ))
-            logging.getLogger(__name__).info(
-                "dashboard at http://localhost:%d", args.port)
+            log.info("dashboard at http://%s:%d/?t=%s   (the token is "
+                     "required — open this exact URL)",
+                     "localhost" if args.host == "127.0.0.1" else args.host,
+                     args.port, token)
             await asyncio.gather(scanner.run_forever(), server.serve())
         else:
             await scanner.run_forever()

@@ -14,12 +14,20 @@ Run with:  python run_cryptobot.py --dashboard [--port 8081]
 from __future__ import annotations
 
 import logging
+import secrets
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+# Host headers we will answer to. Binding to loopback keeps remote hosts
+# out, but it does NOT stop DNS rebinding: an attacker page whose
+# hostname re-resolves to 127.0.0.1 becomes same-origin with this app and
+# can drive /api/mode. Pinning the Host header closes that, because the
+# browser sends the attacker's hostname, not ours.
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"}
 
 
 class ModeRequest(BaseModel):
@@ -28,8 +36,34 @@ class ModeRequest(BaseModel):
     mode: str
 
 
-def create_app(scanner) -> FastAPI:
+def create_app(scanner, token: str | None = None,
+               extra_hosts: set[str] | None = None) -> FastAPI:
+    """Build the dashboard app.
+
+    `token` guards every /api/* route. It is not a login system — it is
+    the thing that stops a page you visited, or anything else that can
+    reach the port, from reading your position book or flipping the bot
+    into real-money mode. Generated at startup and handed to you in the
+    URL.
+    """
     app = FastAPI(title="Crypto Volatility Bot", docs_url=None, redoc_url=None)
+    allowed = LOOPBACK_HOSTS | (extra_hosts or set())
+
+    @app.middleware("http")
+    async def guard(request: Request, call_next):
+        host = (request.headers.get("host") or "").split(":")[0].lower()
+        if host and host not in allowed:
+            # Almost certainly DNS rebinding; a legitimate client sends
+            # the address it was told to use.
+            logger.warning("rejected request with Host %r", host)
+            return JSONResponse({"error": "host not allowed"}, status_code=421)
+        if token and request.url.path.startswith("/api/"):
+            sent = (request.headers.get("x-dashboard-token")
+                    or request.query_params.get("t") or "")
+            if not secrets.compare_digest(sent, token):
+                return JSONResponse({"error": "bad or missing token"},
+                                    status_code=401)
+        return await call_next(request)
 
     @app.get("/api/state")
     async def state() -> dict:
@@ -266,12 +300,18 @@ function table(cols,rows,nums=[]){
   return `<table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table>`;
 }
 
+// The API token travels in this page's own URL; forward it on every
+// call so the guard above lets us through.
+const TOKEN=new URLSearchParams(location.search).get("t")||"";
+const authed=(h={})=>TOKEN?Object.assign({"X-Dashboard-Token":TOKEN},h):h;
+
 async function setMode(m){
   if(m===view&&S&&S.mode===m)return;
   if(m==="real"&&S&&!S.real_unlocked){view="sim";render();return;}
   try{
     const r=await fetch("/api/mode",{method:"POST",
-      headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:m})});
+      headers:authed({"Content-Type":"application/json"}),
+      body:JSON.stringify({mode:m})});
     const j=await r.json();
     if(j.ok){view=m;}
   }catch(e){}
@@ -446,7 +486,9 @@ function render(){
 
 async function poll(){
   try{
-    const r=await fetch("/api/state");
+    const r=await fetch("/api/state",{headers:authed()});
+    if(r.status===401){$("meta").textContent=
+      "unauthorized — open the URL printed by the bot (it carries ?t=…)";return;}
     S=await r.json();
     if(view==="sim"&&S.mode==="real")view="real";
     render();

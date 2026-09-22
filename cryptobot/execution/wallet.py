@@ -107,6 +107,64 @@ class WalletConfig:
     max_slippage: float = 0.02
 
 
+def _same_addr(a: Any, b: Any) -> bool:
+    return str(a or "").lower() == str(b or "").lower()
+
+
+class QuoteRejected(Exception):
+    """The aggregator's response does not match what we asked for."""
+
+
+def validate_quote(quote: dict, *, chain: str, sell_token: str,
+                   buy_token: str, sell_amount_raw: int,
+                   max_slippage: float) -> None:
+    """Check a 0x response against the request BEFORE signing it.
+
+    The transaction that gets signed is built entirely out of this
+    response — `to`, `data` and `value` all come off the wire. Whoever
+    can answer for the aggregator (a compromised endpoint, a hostile
+    resolver, an egress proxy) would otherwise get a blank cheque
+    against the hot wallet. None of these checks cost anything; all of
+    them fail closed.
+    """
+    txq = quote.get("transaction") or {}
+    if not txq.get("to") or not txq.get("data"):
+        raise QuoteRejected("quote carries no transaction")
+
+    # The only native value we ever intend to send is the amount we asked
+    # to sell (and zero when selling an ERC-20). Anything above that is
+    # the response trying to spend more of the wallet than we offered.
+    value = int(txq.get("value") or 0)
+    intended = sell_amount_raw if _same_addr(sell_token, NATIVE) else 0
+    if value > intended:
+        raise QuoteRejected(
+            f"quote would send {value} wei, we offered {intended}")
+
+    # It must be the trade we asked for, on the chain we asked for.
+    if (cid := quote.get("chainId")) is not None and int(cid) != CHAIN_IDS[chain]:
+        raise QuoteRejected(f"quote is for chain {cid}, expected "
+                            f"{CHAIN_IDS[chain]}")
+    for field_name, expected in (("sellToken", sell_token),
+                                 ("buyToken", buy_token)):
+        got = quote.get(field_name)
+        if got is not None and not _same_addr(got, expected):
+            raise QuoteRejected(f"{field_name} is {got}, expected {expected}")
+    got_sell = quote.get("sellAmount")
+    if got_sell is not None and int(got_sell) > sell_amount_raw:
+        raise QuoteRejected(f"quote sells {got_sell}, we offered "
+                            f"{sell_amount_raw}")
+
+    # Slippage must be enforced by a figure in the response, not merely by
+    # the slippageBps we asked the remote side to honor.
+    min_buy = quote.get("minBuyAmount")
+    buy = quote.get("buyAmount")
+    if min_buy is not None and buy is not None and int(buy) > 0:
+        if int(min_buy) < int(buy) * (1.0 - max_slippage) * 0.99:
+            raise QuoteRejected(
+                f"minBuyAmount {min_buy} allows more slippage than the "
+                f"configured {max_slippage:.1%}")
+
+
 class WalletExecutor:
     """Buys and sells DEX tokens via 0x quotes signed with a local key."""
 
@@ -188,6 +246,13 @@ class WalletExecutor:
         quote = await self._quote(chain, NATIVE, token_address, sell_raw, acct.address)
         if not quote:
             return None
+        try:
+            validate_quote(quote, chain=chain, sell_token=NATIVE,
+                           buy_token=token_address, sell_amount_raw=sell_raw,
+                           max_slippage=self.cfg.max_slippage)
+        except QuoteRejected as exc:
+            logger.error("refusing to sign buy quote on %s: %s", chain, exc)
+            return None
         return await asyncio.to_thread(self._broadcast, w3, acct, chain, quote)
 
     async def sell(self, chain: str, token_address: str,
@@ -218,9 +283,25 @@ class WalletExecutor:
         if not quote:
             return None
 
-        # Approve the 0x AllowanceHolder for exactly this amount if needed.
+        try:
+            validate_quote(quote, chain=chain, sell_token=token_address,
+                           buy_token=NATIVE, sell_amount_raw=sell_raw,
+                           max_slippage=self.cfg.max_slippage)
+        except QuoteRejected as exc:
+            logger.error("refusing to sign sell quote on %s: %s", chain, exc)
+            return None
+
+        # Approve for exactly this amount if needed. The spender is named
+        # by the response, so it must be the same contract the transaction
+        # itself calls — otherwise a crafted quote could farm an allowance
+        # out to an unrelated address.
         allowance_issue = ((quote.get("issues") or {}).get("allowance")) or {}
         spender = allowance_issue.get("spender")
+        tx_target = ((quote.get("transaction") or {}).get("to"))
+        if spender and not _same_addr(spender, tx_target):
+            logger.error("refusing to approve %s: it is not the contract the "
+                         "quote calls (%s)", spender, tx_target)
+            return None
         if spender:
             ok = await asyncio.to_thread(
                 self._approve, w3, acct, chain, token_address, spender, sell_raw

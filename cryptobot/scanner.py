@@ -394,6 +394,15 @@ class Scanner:
         if not verdict.ok:
             note("skipped", "security", str(verdict), size)
             return
+        # An UNSCREENED token (GoPlus down, rate-limited, chain not
+        # covered, or contract not yet analysed) is fine to paper-trade —
+        # the sim book stays a complete benchmark — but real money never
+        # buys a contract nobody has checked.
+        if book.executes_onchain and not verdict.known:
+            note("skipped", "security",
+                 "unscreened contract — refusing to spend real money on a "
+                 "token GoPlus has not analysed", size)
+            return
 
         book.portfolio.open_from_signal(sig, size)
         note("opened", "entry", sig.reason, size)

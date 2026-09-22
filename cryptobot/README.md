@@ -238,4 +238,35 @@ Run `python run_cryptobot.py --preflight` before arming live: it checks
 keys, RPCs, wallet balances, MEV relay coverage, every data feed, and
 per-chain economic viability against your position caps.
 
+## Security posture
+
+A bot that holds a hot-wallet key and serves a web UI is worth treating
+as an attack surface, so a dedicated security review was run over the
+whole module. What it changed:
+
+* **The dashboard is loopback-only and token-guarded.** It has no login,
+  `/api/state` exposes the entire position book, and `/api/mode` can
+  switch the bot to real money — so it binds `127.0.0.1` by default
+  (`--host` to widen, with a warning) and every `/api/*` route needs a
+  token generated at startup and printed in the URL.
+* **Host headers are pinned.** Binding to loopback does *not* stop DNS
+  rebinding: an attacker page whose hostname re-resolves to 127.0.0.1
+  becomes same-origin with the dashboard. Requests carrying any other
+  Host are refused with 421.
+* **The rug screen requires positive evidence.** GoPlus returns thin
+  records for contracts it has not analysed, and "no flags set" used to
+  read as "clear" — and got cached for an hour. An unanalysed record is
+  now `known=False`, is never cached, and **real money will not buy a
+  contract nobody has screened** (paper still will, so the benchmark
+  stays complete).
+* **Swap quotes are validated before they are signed.** The signed
+  transaction's `to`, `data` and `value` all come off the wire from the
+  aggregator. Each quote is now checked against the request — native
+  value never exceeds what was offered, the sell/buy tokens and chain
+  must match, the sell amount cannot grow, `minBuyAmount` must respect
+  the configured slippage, and an allowance is only ever granted to the
+  same contract the transaction calls.
+* Token symbols are escaped everywhere (they come from whoever deployed
+  the token), and runtime state files are gitignored by glob.
+
 Tests: `python -m pytest tests/test_cryptobot.py -v`
