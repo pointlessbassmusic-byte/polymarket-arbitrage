@@ -171,7 +171,8 @@ class Backtester:
                         continue
                     if not self.costs.entry_allowed(
                             sig.expected_move, size, sig.liquidity_usd,
-                            sig.chain)[0]:
+                            sig.chain, take_profit_pct=sig.take_profit_pct,
+                            stop_loss_pct=sig.stop_loss_pct)[0]:
                         continue
                     self.portfolio.open_from_signal(sig, size)
                     break

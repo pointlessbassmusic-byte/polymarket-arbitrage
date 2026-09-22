@@ -53,6 +53,11 @@ class ScannerConfig:
     arb_check_every_cycles: int = 5
     max_position_age_s: float = 6 * 3600  # time stop
     edge_report_every_cycles: int = 30
+    # Open positions are re-priced on their own fast loop, independent of
+    # the (slow, expensive) discovery cycle: a memecoin can gap through a
+    # stop in well under a minute, and the slippage between the stop level
+    # and the actual fill is a pure, avoidable cost.
+    position_check_interval_s: float = 15.0
 
 
 class Scanner:
@@ -92,6 +97,9 @@ class Scanner:
         self.tracked: dict[str, tuple[str, str]] = {}
         self._cycle = 0
         self._latest_prices: dict[str, float] = {}
+        # Discovery and the fast position monitor both mutate the
+        # portfolio, so all position changes are serialized.
+        self._book_lock = asyncio.Lock()
 
     async def close(self) -> None:
         await self.dex.close()
@@ -179,8 +187,9 @@ class Scanner:
         if self._cycle % self.cfg.arb_check_every_cycles == 0:
             signals.extend(await self._arb_pass(profiles[: self.cfg.arb_check_top_n]))
 
-        await self._manage_positions()
-        await self._act_on_signals(signals)
+        async with self._book_lock:
+            await self._manage_positions()
+            await self._act_on_signals(signals)
 
         if self._cycle % self.cfg.edge_report_every_cycles == 0 and self.edges.by_type:
             logger.info("edge report: %s", self.edges.report())
@@ -287,7 +296,9 @@ class Scanner:
             # Profitability gate: the edge must survive its own round-trip
             # costs (fees + price impact + gas) with margin at this size.
             ok, why = self.costs.entry_allowed(
-                sig.expected_move, size, sig.liquidity_usd, sig.chain)
+                sig.expected_move, size, sig.liquidity_usd, sig.chain,
+                take_profit_pct=sig.take_profit_pct,
+                stop_loss_pct=sig.stop_loss_pct)
             if not ok:
                 logger.info("skip %s: %s", sig.symbol, why)
                 continue
@@ -373,12 +384,34 @@ class Scanner:
 
     # -- loop --------------------------------------------------------------
 
-    async def run_forever(self) -> None:
-        logger.info(
-            "scanner started: %d watchlist queries, chains=%s, live=%s",
-            len(self.cfg.watchlist_queries), self.cfg.chains,
-            bool(self.executor and getattr(self.executor, "armed", False)),
-        )
+    async def _refresh_position_prices(self) -> None:
+        """Re-price only the open positions — one call per chain, cheap."""
+        by_chain: dict[str, list[str]] = {}
+        for pos in self.portfolio.positions.values():
+            by_chain.setdefault(pos.chain, []).append(pos.key.split(":", 1)[1])
+        for chain, addrs in by_chain.items():
+            try:
+                for snap in await self.dex.get_pairs(chain, addrs):
+                    self._latest_prices[snap.key] = snap.price_usd
+            except Exception as exc:
+                logger.warning("position re-price on %s failed: %s", chain, exc)
+
+    async def monitor_positions_forever(self) -> None:
+        """Fast exit loop: prices open positions and runs stops/targets
+        between discovery cycles. Exiting late is a real cost, and this
+        is the cheapest place to recover it."""
+        while True:
+            await asyncio.sleep(self.cfg.position_check_interval_s)
+            if not self.portfolio.positions:
+                continue
+            try:
+                async with self._book_lock:
+                    await self._refresh_position_prices()
+                    await self._manage_positions()
+            except Exception:
+                logger.exception("position monitor failed")
+
+    async def run_discovery_forever(self) -> None:
         while True:
             started = now()
             try:
@@ -387,3 +420,14 @@ class Scanner:
                 logger.exception("cycle failed")
             elapsed = now() - started
             await asyncio.sleep(max(5.0, self.cfg.scan_interval_s - elapsed))
+
+    async def run_forever(self) -> None:
+        logger.info(
+            "scanner started: %d watchlist queries, chains=%s, live=%s, "
+            "discovery %.0fs / position checks %.0fs",
+            len(self.cfg.watchlist_queries), self.cfg.chains,
+            bool(self.executor and getattr(self.executor, "armed", False)),
+            self.cfg.scan_interval_s, self.cfg.position_check_interval_s,
+        )
+        await asyncio.gather(self.run_discovery_forever(),
+                             self.monitor_positions_forever())

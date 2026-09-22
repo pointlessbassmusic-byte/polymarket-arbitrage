@@ -13,6 +13,10 @@ AllowanceHolder for exactly the amount sold, each time — never infinite.
 Safety model:
   * live trading requires BOTH config `execution.live: true` AND the env var
     CRYPTOBOT_ARM_LIVE=yes — belt and suspenders against accidental sends;
+  * transactions on mempool-exposed chains are broadcast through a PRIVATE
+    RELAY (Flashbots Protect on Ethereum, 48 Club on BSC) so sandwich bots
+    never see them pending; trading such a chain without one is refused
+    by default;
   * per-trade notional is capped here again, independent of the risk layer;
   * slippage is bounded on every quote;
   * web3/eth-account import lazily so paper mode needs neither.
@@ -37,6 +41,21 @@ ZEROX_BASE = "https://api.0x.org"
 
 # 0x convention for the chain's native gas token
 NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+
+# Private transaction relays: a swap broadcast to a public mempool is
+# visible to sandwich bots before it lands, and a volatile memecoin swap
+# is exactly what they hunt. Sending through a private relay keeps the
+# transaction hidden until it is included. Free, no key required.
+PRIVATE_RPCS = {
+    "ethereum": "https://rpc.flashbots.net/fast",   # Flashbots Protect
+    "bsc": "https://rpc.48.club",                   # 48 Club private txs
+}
+
+# Chains with a public mempool, where an unprotected swap is exposed.
+# The centralized-sequencer L2s (base/arbitrum/optimism) have no public
+# pending pool to snipe from, so they are not listed — that is a real
+# property of those chains, not an oversight.
+MEMPOOL_EXPOSED = {"ethereum", "bsc", "polygon"}
 
 # chainId map for the chain names DexScreener uses (EVM only)
 CHAIN_IDS = {
@@ -78,6 +97,12 @@ class WalletConfig:
     private_key_env: str = "CRYPTOBOT_PRIVATE_KEY"
     zerox_api_key_env: str = "CRYPTOBOT_0X_API_KEY"
     rpc_urls: dict[str, str] = field(default_factory=dict)  # chain -> RPC
+    # chain -> private relay for SENDING transactions (reads still use
+    # rpc_urls). Defaults to the known free relays; set {} to disable.
+    private_rpc_urls: dict[str, str] = field(
+        default_factory=lambda: dict(PRIVATE_RPCS))
+    # Refuse live trades on a mempool-exposed chain with no private relay.
+    require_mev_protection: bool = True
     max_trade_usd: float = 50.0
     max_slippage: float = 0.02
 
@@ -206,10 +231,35 @@ class WalletExecutor:
 
     # -- signing plumbing (sync, run in threads) ---------------------------
 
+    def mev_protected(self, chain: str) -> bool:
+        """True when this chain's sends cannot be sniped from a mempool."""
+        if chain not in MEMPOOL_EXPOSED:
+            return True          # no public pending pool to watch
+        return bool(self.cfg.private_rpc_urls.get(chain))
+
+    def _send_provider(self, w3, chain: str):
+        """Web3 pointed at the private relay for broadcasting, when one is
+        configured; otherwise the same public provider used for reads."""
+        relay = self.cfg.private_rpc_urls.get(chain)
+        if not relay:
+            return w3
+        try:
+            from web3 import Web3
+            return Web3(Web3.HTTPProvider(relay, request_kwargs={"timeout": 20}))
+        except ImportError:
+            return w3
+
     def _connect(self, chain: str):
         rpc = self.cfg.rpc_urls.get(chain)
         if not rpc:
             logger.warning("no RPC configured for chain %r", chain)
+            return None, None
+        if self.cfg.require_mev_protection and not self.mev_protected(chain):
+            logger.error(
+                "refusing to trade %s: public mempool and no private relay "
+                "configured — swaps would be sandwich-exposed. Set "
+                "execution.private_rpc_urls.%s or require_mev_protection: false",
+                chain, chain)
             return None, None
         try:
             from eth_account import Account  # lazy: optional dependency
@@ -239,8 +289,9 @@ class WalletExecutor:
                 "chainId": CHAIN_IDS[chain],
             })
             signed = acct.sign_transaction(tx)
-            tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
-            w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
+            sender = self._send_provider(w3, chain)
+            tx_hash = sender.eth.send_raw_transaction(signed.raw_transaction)
+            w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
             logger.info("approved %s for %d units", spender[:10], amount)
             return True
         except Exception:
@@ -261,8 +312,11 @@ class WalletExecutor:
                 "chainId": CHAIN_IDS[chain],
             }
             signed = acct.sign_transaction(tx)
-            tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
-            logger.info("broadcast %s on %s", tx_hash.hex(), chain)
+            sender = self._send_provider(w3, chain)
+            tx_hash = sender.eth.send_raw_transaction(signed.raw_transaction)
+            logger.info("broadcast %s on %s%s", tx_hash.hex(), chain,
+                        " (private relay)"
+                        if self.cfg.private_rpc_urls.get(chain) else "")
             return tx_hash.hex()
         except Exception:
             logger.exception("broadcast failed on %s", chain)

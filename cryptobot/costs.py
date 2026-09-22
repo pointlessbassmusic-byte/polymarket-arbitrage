@@ -51,6 +51,10 @@ class CostConfig:
     # 4.0 chosen by cost-aware backtest sweep: beat 3.0 at every
     # capitalization level once fills were charged real costs.
     min_edge_multiple: float = 4.0
+    # ...AND when the asymmetry survives costs. See net_risk_reward: the
+    # gross gate in SignalConfig is measured before fees, which lets
+    # tight-stop setups through that are net losing bets.
+    min_net_risk_reward: float = 1.25
     # Refuse entries where gas alone eats more than this fraction per side.
     max_gas_fraction: float = 0.01
 
@@ -84,8 +88,32 @@ class CostModel:
                        chain: str) -> float:
         return size_usd * self.round_trip_fraction(size_usd, liquidity_usd, chain)
 
+    def net_risk_reward(self, take_profit_pct: float, stop_loss_pct: float,
+                        size_usd: float, liquidity_usd: float,
+                        chain: str) -> float:
+        """Reward:risk AFTER costs — the number that actually decides.
+
+        Costs are paid on the winner and the loser alike, so they shrink
+        the numerator and grow the denominator at the same time:
+
+            net RR = (target - round_trip) / (stop + round_trip)
+
+        A 6.6%/2.6% setup reads 2.5:1 gross, but on Ethereum at $333 size
+        (2.2% round trip) it is 0.92:1 — a losing bet wearing a winning
+        gate. Tight stops suffer most, since the cost is a large fraction
+        of a small stop.
+        """
+        rt = self.round_trip_fraction(size_usd, liquidity_usd, chain)
+        net_win = take_profit_pct - rt
+        net_loss = stop_loss_pct + rt
+        if net_win <= 0 or net_loss <= 0:
+            return 0.0
+        return net_win / net_loss
+
     def entry_allowed(self, expected_move: float, size_usd: float,
-                      liquidity_usd: float, chain: str) -> tuple[bool, str]:
+                      liquidity_usd: float, chain: str,
+                      take_profit_pct: float | None = None,
+                      stop_loss_pct: float | None = None) -> tuple[bool, str]:
         """Gate: does this trade's edge survive its own costs?"""
         if size_usd <= 0:
             return False, "zero size"
@@ -99,6 +127,13 @@ class CostModel:
             return False, (f"edge {expected_move:.1%} < "
                            f"{self.cfg.min_edge_multiple:.0f}x round-trip "
                            f"cost {cost:.1%}")
+        if take_profit_pct is not None and stop_loss_pct is not None:
+            net_rr = self.net_risk_reward(take_profit_pct, stop_loss_pct,
+                                          size_usd, liquidity_usd, chain)
+            if net_rr < self.cfg.min_net_risk_reward:
+                return False, (f"net reward:risk {net_rr:.2f} < "
+                               f"{self.cfg.min_net_risk_reward:.2f} "
+                               f"(gross looks better; {cost:.1%} costs eat it)")
         return True, ""
 
     def min_viable_size(self, chain: str) -> float:

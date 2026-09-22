@@ -427,6 +427,29 @@ class TestCostModel:
         assert cm.min_viable_size("ethereum") == pytest.approx(200.0)
         assert cm.min_viable_size("base") == pytest.approx(5.0)
 
+    def test_net_risk_reward_exposes_cost_destroyed_asymmetry(self):
+        cm = self.make()
+        # The real SPX failure: 6.6% target / 2.6% stop on Ethereum at $333
+        # reads 2.5:1 gross but costs ~2.2% round trip.
+        gross_rr = 0.066 / 0.026
+        assert gross_rr > 2.0                      # passes the gross gate
+        net = cm.net_risk_reward(0.066, 0.026, 333.0, 13_700_000.0, "ethereum")
+        assert net < 1.0                           # ...but is a losing bet
+        # With the edge multiple relaxed (so it is not what rejects here),
+        # the net-RR floor is what stands between this and a real loss.
+        loose = self.make(min_edge_multiple=1.0)
+        ok, why = loose.entry_allowed(0.066, 333.0, 13_700_000.0, "ethereum",
+                                      take_profit_pct=0.066, stop_loss_pct=0.026)
+        assert not ok and "net reward:risk" in why
+
+    def test_net_risk_reward_passes_when_costs_are_cheap(self):
+        cm = self.make()
+        # Same setup on base ($0.05 gas) survives.
+        net = cm.net_risk_reward(0.10, 0.03, 200.0, 1_000_000.0, "base")
+        assert net > 1.5
+        assert cm.entry_allowed(0.10, 200.0, 1_000_000.0, "base",
+                                take_profit_pct=0.10, stop_loss_pct=0.03)[0]
+
     def test_breakeven_ratchet_protects_green_trades(self):
         from cryptobot.costs import CostModel
         pf = Portfolio(cost_model=CostModel())
@@ -453,6 +476,37 @@ class TestCostModel:
         assert trade.costs_usd == pytest.approx(1.20, abs=0.01)
         assert trade.pnl_usd == pytest.approx(8.80, abs=0.01)
         assert pf.total_costs == pytest.approx(1.20, abs=0.01)
+
+
+# -- MEV protection --------------------------------------------------------
+
+class TestMevProtection:
+    def cfg(self, **kw):
+        from cryptobot.execution.wallet import WalletConfig
+        return WalletConfig(**kw)
+
+    def test_l2s_need_no_relay(self):
+        from cryptobot.execution.wallet import WalletExecutor
+        ex = WalletExecutor(self.cfg(private_rpc_urls={}))
+        # No public pending pool on sequencer L2s.
+        assert ex.mev_protected("base")
+        assert ex.mev_protected("arbitrum")
+
+    def test_mempool_chains_need_a_relay(self):
+        from cryptobot.execution.wallet import WalletExecutor
+        bare = WalletExecutor(self.cfg(private_rpc_urls={}))
+        assert not bare.mev_protected("ethereum")
+        assert not bare.mev_protected("bsc")
+        # Defaults ship with relays configured.
+        assert WalletExecutor(self.cfg()).mev_protected("ethereum")
+
+    def test_connect_refuses_exposed_chain(self):
+        from cryptobot.execution.wallet import WalletExecutor
+        ex = WalletExecutor(self.cfg(
+            private_rpc_urls={}, require_mev_protection=True,
+            rpc_urls={"ethereum": "https://example.invalid"}))
+        w3, acct = ex._connect("ethereum")
+        assert w3 is None          # refused before any network call
 
 
 # -- backtest --------------------------------------------------------------

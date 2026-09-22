@@ -22,7 +22,7 @@ import os
 import httpx
 
 from .costs import CostModel
-from .execution.wallet import CHAIN_IDS, WalletConfig
+from .execution.wallet import CHAIN_IDS, MEMPOOL_EXPOSED, WalletConfig
 from .risk import RiskConfig
 
 OK, WARN, FAIL = "ok", "warn", "fail"
@@ -140,6 +140,24 @@ async def run_preflight(wallet_cfg: WalletConfig, risk_cfg: RiskConfig,
                           "eth-account not installed — pip install web3")
             except Exception:
                 check.add(FAIL, "private key", "not a valid secp256k1 key")
+
+        # MEV exposure: an unprotected swap on a public-mempool chain is
+        # visible to sandwich bots before it lands.
+        for chain in chains:
+            if chain not in MEMPOOL_EXPOSED:
+                continue
+            relay = wallet_cfg.private_rpc_urls.get(chain)
+            if relay:
+                check.add(OK, f"MEV protection: {chain}",
+                          relay.split("//")[-1].split("/")[0])
+            elif wallet_cfg.require_mev_protection:
+                check.add(WARN, f"MEV protection: {chain}",
+                          "no private relay — trades on this chain will be "
+                          "refused (set private_rpc_urls or disable the guard)")
+            else:
+                check.add(FAIL, f"MEV protection: {chain}",
+                          "guard disabled AND no relay — swaps are "
+                          "sandwich-exposed")
 
         evm_chains = [c for c in chains if c in CHAIN_IDS]
         for chain in evm_chains:

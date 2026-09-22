@@ -75,7 +75,11 @@ requires **all** of:
 2. `CRYPTOBOT_ARM_LIVE=yes` in the environment,
 3. a private key in `$CRYPTOBOT_PRIVATE_KEY` — use a **dedicated hot wallet**
    with only what you can lose, never your main MetaMask key,
-4. RPC URLs per chain in the config.
+4. RPC URLs per chain in the config,
+5. a passing `--preflight`.
+
+A [free 0x API key](https://0x.org) in `$CRYPTOBOT_0X_API_KEY` is strongly
+recommended — without it the quote endpoint is heavily rate-limited.
 
 Even armed, every trade re-checks a hard per-trade USD cap and max slippage,
 allowances are approved per-amount (never infinite), and a daily-loss
@@ -98,6 +102,8 @@ cryptobot/
 ├── risk.py              # capped Kelly sizing, exposure & loss limits
 ├── portfolio.py         # positions, trailing stops, PnL ledger
 ├── analytics.py         # per-pattern edge tracker → confidence feedback
+├── costs.py             # round-trip cost model + net-RR entry gate
+├── preflight.py         # go-live checklist (--preflight)
 ├── protections.py       # Freqtrade-style cooldown / guards / drawdown halt
 ├── dashboard.py         # FastAPI live dashboard (--dashboard)
 ├── backtest.py          # candle replay through the live detectors
@@ -108,7 +114,7 @@ cryptobot/
 │   ├── geckoterminal.py # historical per-pool OHLCV for backtests
 │   └── goplus.py        # GoPlus security DB: rug/honeypot screen
 └── execution/
-    └── wallet.py        # 0x buy/sell + MetaMask-key signing (opt-in)
+    └── wallet.py        # 0x buy/sell, MetaMask-key signing, private relays
 ```
 
 ## Backtesting honestly
@@ -154,8 +160,30 @@ live. Three mechanisms restored net profitability and are now defaults:
    learns net expectancy and the dashboard shows PnL net of a visible
    cost line — no fantasy numbers anywhere.
 
+4. **Net reward:risk gate** — the asymmetry test now runs *after* costs.
+   This was found by tracing a real backtest loss: two SPX trades lost
+   $30.81 on price moves of only −2.6% and −2.3%, because each $333
+   Ethereum position paid $7.35 round-trip. Their setup read 2.5:1
+   gross — and (6.6% − 2.2%) / (2.6% + 2.2%) = **0.92:1 net**. A losing
+   bet wearing a winning gate, because costs are charged on the winner
+   and the loser alike and hit tight stops hardest. Gating on net
+   reward:risk ≥ 1.25 fixed it, and made results *insensitive* to the
+   edge-multiple setting (2×, 3× and 4× now converge on the same
+   trades) — the sign of a structural fix rather than a tuned one.
+5. **MEV protection** — swaps on public-mempool chains are broadcast
+   through a private relay ([Flashbots Protect](https://docs.flashbots.net/flashbots-protect/quick-start)
+   on Ethereum, 48 Club on BSC; both free, no key), so sandwich bots
+   never see them pending. A volatile memecoin swap is precisely what
+   they hunt. Trading an exposed chain without a relay is refused by
+   default. Base/Arbitrum/Optimism have no public pending pool, so they
+   need none — that is a real property of sequencer L2s, not an omission.
+6. **Fast exit loop** — open positions are re-priced every 15s on their
+   own loop, independent of the 60s discovery cycle. A memecoin can gap
+   through a stop in well under a minute, and the gap between the stop
+   level and the actual fill is pure avoidable cost.
+
 Run `python run_cryptobot.py --preflight` before arming live: it checks
-keys, RPCs, wallet balances, every data feed, and per-chain economic
-viability against your position caps.
+keys, RPCs, wallet balances, MEV relay coverage, every data feed, and
+per-chain economic viability against your position caps.
 
 Tests: `python -m pytest tests/test_cryptobot.py -v`
