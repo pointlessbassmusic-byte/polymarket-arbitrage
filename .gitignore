@@ -68,3 +68,7 @@ coverage.xml
 # Sensitive config (use config.yaml.example for template)
 config.live.yaml
 
+
+# Cryptobot runtime state
+cryptobot_portfolio.json
+cryptobot_edges.json

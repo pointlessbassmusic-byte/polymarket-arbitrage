@@ -1,0 +1,135 @@
+# Crypto volatility / memecoin swing bot configuration
+# =====================================================
+# The simulated book. It ALWAYS runs on live market data, whether or not
+# real money is armed, so you always have a benchmark — and once real
+# trading starts, the gap between the two books measures real execution
+# quality. Sizing below is derived from backtest sweeps, not guessed.
+sim:
+  bankroll_usd: 200            # $200 returned ~2x what $100 did over the
+                               # same 8 days (0.45% vs 0.25%), because
+                               # larger positions amortize gas better.
+                               # Set to 100 if you prefer; it still works.
+
+# Paper trading is the default. To go live you must BOTH set execution.live
+# to true here AND export CRYPTOBOT_ARM_LIVE=yes. Secrets stay in env vars —
+# never put a private key in this file.
+
+scanner:
+  scan_interval_s: 60          # one full scan per minute (5m window needs this)
+  # Cheap-gas chains only. An 8-day/8-token backtest sweep found BSC
+  # lost money in EVERY configuration, and restricting to base+solana
+  # turned a $500 book from -0.24% to +0.55%. Ethereum needs $200+
+  # positions to clear its own gas, so it prices out small accounts.
+  chains: [base, solana]
+  watchlist_queries: [PEPE, WIF, BONK, SHIB, DOGE, FLOKI, BRETT, POPCAT, MOG, TURBO]
+  max_tracked_pairs: 150
+  arb_check_top_n: 10          # deep pool scan for the N wildest tokens
+  arb_check_every_cycles: 5
+  max_position_age_s: 21600    # 6h time stop — swings, not bags
+  position_check_interval_s: 15  # open positions re-priced every 15s,
+                                 # independent of the 60s discovery cycle
+  edge_report_every_cycles: 30 # log learned per-pattern edge stats
+
+signals:
+  # Universe hygiene — most microcap "volatility" is exit liquidity
+  min_liquidity_usd: 50000
+  min_volume_24h_usd: 100000
+  min_pair_age_hours: 24       # skip fresh launches (rug window)
+  max_fdv_to_liquidity: 500
+
+  # Volatility breakout (ride the swing)
+  breakout_move_5m: 0.03
+  breakout_move_30m: 0.06
+  breakout_min_buy_ratio: 0.55
+  breakout_volume_surge: 2.0
+
+  # Mean reversion (fade the flush)
+  revert_min_drop_1h: -0.15
+  revert_max_trend_24h: 0.10
+
+  # Regime shift (quiet coin waking up). 4.0 tuned by backtest sweep
+  # (8 tokens x 8 days): beat 3.0 on win rate and per-token robustness.
+  regime_min_zscore: 4.0
+  regime_max_move_1h: 0.05
+
+  # Cross-DEX arbitrage
+  arb_min_spread: 0.02
+  arb_fee_buffer: 0.012
+
+  # The asymmetry gate: refuse anything under 2:1 reward/risk
+  min_risk_reward: 2.0
+
+# Contract-level rug/honeypot screen (GoPlus Labs security database,
+# free API). Hard-rejects honeypots, unsellable tokens, pausable trading,
+# owner balance edits, blacklists, and excessive taxes before ANY entry.
+security:
+  max_buy_tax: 0.10
+  max_sell_tax: 0.10
+  max_creator_percent: 0.20
+  block_on_unknown: false      # true = refuse tokens the API can't screen
+  cache_ttl_s: 3600
+
+# Round-trip cost model: fees + price impact + gas, charged on every
+# paper/backtest fill and enforced as an entry gate (expected move must
+# beat min_edge_multiple x the round trip). Update gas_usd as gas moves.
+costs:
+  dex_fee: 0.003               # per swap side
+  extra_slippage: 0.002        # routing/MEV/latency per side
+  min_edge_multiple: 4.0       # edge must be 4x the round-trip cost (swept)
+  min_net_risk_reward: 1.25    # reward:risk AFTER costs, not before —
+                               # a 2.5:1 gross setup can be 0.9:1 net
+  max_gas_fraction: 0.01       # gas may eat at most 1% of size per side
+  gas_usd:                     # USD per swap, per chain
+    ethereum: 2.0              # => needs >=$200 positions to be viable
+    base: 0.05
+    arbitrum: 0.15
+    optimism: 0.10
+    polygon: 0.05
+    bsc: 0.30
+    solana: 0.03
+
+# Freqtrade-style protections — all gate new entries only, exits always run
+protections:
+  cooldown_s: 1800             # 30 min per-token cooldown after any close
+  stoploss_guard_window_s: 7200
+  stoploss_guard_limit: 4      # 4 stop-outs in 2h -> hostile regime, halt
+  stoploss_guard_halt_s: 3600
+  low_profit_window_s: 21600
+  low_profit_min_trades: 2     # 2+ net-losing trades on a token -> lock it
+  low_profit_lock_s: 7200
+  max_drawdown_pct: 0.15       # 15% off equity peak -> pause and reset
+  drawdown_halt_s: 7200
+
+risk:
+  # --- REAL-money book. Sim sizing is derived from sim.bankroll_usd. ---
+  bankroll_usd: 1000
+  # Risk-based sizing: position = (bankroll x risk_per_trade_pct) / stop.
+  # Sizing on notional (plain Kelly) produced ~$3 positions on a $100
+  # book, which cannot clear gas anywhere — so the account never traded.
+  risk_per_trade_pct: 0.015
+  min_position_usd: 40         # economic floor; below this gas dominates
+  kelly_fraction: 0.25         # quarter-Kelly — memecoin edges are guesses
+  max_position_usd: 100
+  max_position_pct_of_liquidity: 0.005   # never be >0.5% of the pool
+  max_open_positions: 8
+  max_total_exposure_usd: 500
+  max_daily_loss_usd: 100
+  min_confidence: 0.35
+  vol_target_30m: 0.04         # stakes scale down above this realized vol
+
+execution:
+  live: false                  # PAPER TRADING. See header before flipping.
+  private_key_env: CRYPTOBOT_PRIVATE_KEY   # export a DEDICATED hot wallet key
+  zerox_api_key_env: CRYPTOBOT_0X_API_KEY
+  max_trade_usd: 50            # hard cap per on-chain trade
+  max_slippage: 0.02
+  rpc_urls: {}                 # e.g. {base: "https://mainnet.base.org"}
+
+  # MEV protection: transactions on public-mempool chains are broadcast
+  # through a private relay so sandwich bots never see them pending.
+  # Defaults below are free and need no key. Base/Arbitrum/Optimism have
+  # no public pending pool, so they need no relay.
+  require_mev_protection: true   # refuse exposed chains rather than bleed
+  private_rpc_urls:
+    ethereum: "https://rpc.flashbots.net/fast"
+    bsc: "https://rpc.48.club"
