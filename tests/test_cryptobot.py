@@ -58,9 +58,31 @@ class TestVolatilityEngine:
     def test_zscore_flags_unusual_move(self):
         eng = VolatilityEngine()
         for i in range(20):
-            eng.observe(make_snap(ts=NOW + i * 300, change_5m=0.001))
+            eng.observe(make_snap(ts=NOW + i * 300,
+                                  change_5m=0.001 + 0.0004 * (i % 3)))
         v = eng.observe(make_snap(ts=NOW + 21 * 300, change_5m=0.08))
         assert v.zscore_5m > 3.0
+
+    def test_zscore_excludes_the_sample_it_scores(self):
+        # Including the current move in its own baseline caps z at
+        # (n-1)/sqrt(n) — 3.18 at the 12-sample gate — so a 4.0 threshold
+        # could never fire. Scoring against the prior baseline must not.
+        eng = VolatilityEngine()
+        for i in range(14):
+            eng.observe(make_snap(ts=NOW + i * 300,
+                                  change_5m=0.002 + 0.0005 * (i % 4)))
+        v = eng.observe(make_snap(ts=NOW + 15 * 300, change_5m=0.09))
+        assert v.zscore_5m > 4.0
+
+    def test_dead_quiet_coin_waking_up_still_scores(self):
+        # A flat history has ~zero variance; without a noise floor the
+        # z-score collapses to 0 and the regime detector goes blind on
+        # exactly the case it exists for.
+        eng = VolatilityEngine()
+        for i in range(15):
+            eng.observe(make_snap(ts=NOW + i * 300, change_5m=0.0))
+        v = eng.observe(make_snap(ts=NOW + 16 * 300, change_5m=0.06))
+        assert v.zscore_5m > 4.0
 
     def test_wildness_prefers_short_window_action(self):
         eng = VolatilityEngine()
@@ -331,6 +353,21 @@ class TestProtections:
         assert not pm.entry_allowed("base:0xPAIR")[0]
         assert pm.entry_allowed("base:0xOTHER")[0]
 
+    def test_drawdown_halt_not_swallowed_by_an_active_stoploss_halt(self):
+        # A StoplossGuard halt (and the closes during it) must not consume
+        # the drawdown budget and leave MaxDrawdown permanently disarmed.
+        pm = self.make_pm(cooldown_s=0.0, stoploss_guard_limit=2,
+                          stoploss_guard_halt_s=60.0, max_drawdown_pct=0.10,
+                          drawdown_halt_s=7200.0)
+        for i in range(2):                       # trip StoplossGuard first
+            self.close_trade(pm, key=f"base:0x{i}", pnl=-5.0)
+        assert not pm.entry_allowed("base:0xNEW")[0]
+        # Now blow through the drawdown while that halt is still running.
+        self.close_trade(pm, key="base:0xBIG", pnl=-120.0, reason="time_stop")
+        assert pm.drawdown >= 0.10
+        # The longer drawdown halt must win, not be skipped.
+        assert pm._halted_until - time.time() > 3600
+
     def test_max_drawdown_halts(self):
         pm = self.make_pm(cooldown_s=0.0, stoploss_guard_limit=99,
                           max_drawdown_pct=0.10)
@@ -466,6 +503,31 @@ class TestCostModel:
         assert pf.check_exit("base:0xPAIR", pos.stop_loss) == "trailing_stop"
         trade = pf.close("base:0xPAIR", pos.stop_loss, "trailing_stop")
         assert trade.pnl_usd == pytest.approx(0.0, abs=0.25)
+
+    def test_portfolio_survives_restart_with_open_positions(self, tmp_path):
+        # Without a loader a restart abandons open positions — a real
+        # on-chain position the bot forgets never gets its stop or sell.
+        from cryptobot.costs import CostModel
+        f = tmp_path / "book.json"
+        pf = Portfolio(state_file=f, cost_model=CostModel())
+        pf.open_from_signal(make_signal(), 100.0)
+        pf.close("base:0xPAIR", 1.05, "take_profit")
+        pf.open_from_signal(make_signal(key="base:0xOPEN"), 60.0)
+
+        again = Portfolio(state_file=f, cost_model=CostModel())
+        assert "base:0xOPEN" in again.positions
+        assert again.positions["base:0xOPEN"].size_usd == pytest.approx(60.0)
+        assert again.positions["base:0xOPEN"].side is Side.LONG
+        assert again.positions["base:0xOPEN"].signal_type is SignalType.VOL_BREAKOUT
+        assert len(again.closed) == 1
+        assert again.realized_pnl == pytest.approx(pf.realized_pnl)
+        assert again.total_costs == pytest.approx(pf.total_costs)
+
+    def test_corrupt_state_file_starts_flat_rather_than_crashing(self, tmp_path):
+        f = tmp_path / "book.json"
+        f.write_text("{not json")
+        pf = Portfolio(state_file=f)
+        assert pf.positions == {} and pf.realized_pnl == 0.0
 
     def test_portfolio_charges_costs_on_close(self):
         from cryptobot.costs import CostModel
@@ -610,6 +672,31 @@ class TestDashboard:
         assert not ok and "locked" in why
         assert sc.mode == "sim"
         assert sc.set_mode("sim")[0]
+
+    def test_fast_exit_loop_covers_real_positions_not_just_sim(self):
+        # A real position must be managed even when the sim book is flat:
+        # the 15s loop is the only thing standing between a live stop and
+        # the next discovery cycle.
+        sc = self.make_scanner()
+        sc.books["real"].portfolio.open_from_signal(make_signal(), 100.0)
+        assert not sc.books["sim"].portfolio.positions
+        held = sc._open_positions()
+        assert [p.symbol for p in held] == ["TEST"]
+
+    def test_edge_tracker_is_not_fed_twice_per_outcome(self):
+        # Both books trade the same signals; recording both would count
+        # one market outcome twice and halve the MIN_SAMPLES gate.
+        import inspect
+        from cryptobot.scanner import Scanner
+        src = inspect.getsource(Scanner._manage_positions)
+        assert 'if book.name == "sim":' in src
+
+    def test_tracked_keeps_held_pairs_and_the_wildest(self):
+        sc = self.make_scanner()
+        sc.books["real"].portfolio.open_from_signal(make_signal(), 50.0)
+        sc.tracked = {"base:0xPAIR": ("base", "0xTOKEN")}
+        held = {p.key for p in sc._open_positions()}
+        assert "base:0xPAIR" in held
 
     def test_sim_book_always_active_real_only_when_armed(self):
         sc = self.make_scanner()

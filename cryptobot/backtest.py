@@ -26,6 +26,7 @@ import argparse
 import asyncio
 import json
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from .analytics import EdgeTracker
@@ -95,19 +96,38 @@ class Backtester:
         self.edges = EdgeTracker()
         self.protections = ProtectionManager(
             prot_cfg or ProtectionConfig(), risk_cfg.bankroll_usd)
-        # Protections/risk measure wall-clock; the replay drives a virtual
-        # clock instead, so patch their notion of now.
+        # Protections/risk/portfolio measure wall-clock; the replay drives
+        # a virtual clock instead. The patch is applied only for the
+        # duration of run() and always restored — leaving it in place
+        # would freeze the clock for any later live use in this process,
+        # silently disabling every protection and the daily-loss roll.
         self._vclock = 0.0
+
+    @contextmanager
+    def _virtual_clock(self):
+        """Point the time-dependent modules at the replay clock, then put
+        them back exactly as they were."""
         import cryptobot.portfolio as pf_mod
         import cryptobot.protections as prot_mod
         import cryptobot.risk as risk_mod
-        prot_mod.now = lambda: self._vclock          # type: ignore[assignment]
-        risk_mod.now = lambda: self._vclock          # type: ignore[assignment]
-        pf_mod.now = lambda: self._vclock            # type: ignore[assignment]
+        mods = (pf_mod, prot_mod, risk_mod)
+        saved = [m.now for m in mods]
+        for m in mods:
+            m.now = lambda: self._vclock     # type: ignore[assignment]
+        try:
+            yield
+        finally:
+            for m, original in zip(mods, saved):
+                m.now = original             # type: ignore[assignment]
 
     def run(self, pools: dict[str, tuple[PoolMeta, list[Candle]]],
             max_position_age_s: float = 6 * 3600) -> dict:
         """Replay all pools in parallel on a shared 5-minute clock."""
+        with self._virtual_clock():
+            return self._run(pools, max_position_age_s)
+
+    def _run(self, pools: dict[str, tuple[PoolMeta, list[Candle]]],
+             max_position_age_s: float) -> dict:
         engine = VolatilityEngine()
         # Merge all candle timestamps into one ordered clock.
         clock = sorted({c.ts for _, cs in pools.values() for c in cs})

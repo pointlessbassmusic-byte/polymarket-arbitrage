@@ -243,6 +243,12 @@ const cls=v=>v>0?"pos":v<0?"neg":"";
 // alone (colour is not available to every reader, and red "$1.88" reads
 // as a gain).
 const money=(v,d=2)=>(v<0?"\u2212":"+")+"$"+n(Math.abs(v),d);
+// Token symbols, chain names and skip reasons originate from
+// DexScreener / GoPlus — i.e. from whoever deployed the token. They are
+// interpolated into innerHTML, so they must be escaped: an unescaped
+// symbol would be stored XSS running same-origin with /api/mode.
+const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,
+  c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const ago=t=>{const s=Date.now()/1000-t;
   if(s<60)return Math.max(0,Math.round(s))+"s";
   if(s<5400)return Math.round(s/60)+"m";
@@ -303,11 +309,11 @@ function renderFeed(decs){
       : (d.size_usd?`<span class="dim">$${n(d.size_usd,0)}</span>`:"");
     const bookTag=d.book==="real"?'<span class="tag book-real">real</span>':"";
     return `<div class="dec"><div class="age">${ago(d.ts)}</div><div class="body">
-      <div class="head"><span class="tag ${d.action}">${d.action}</span>
-        <span class="sym">${d.symbol}</span>
-        <span class="dim" style="font-size:12px">${d.chain} · ${d.signal_type||d.stage}</span>
+      <div class="head"><span class="tag ${esc(d.action)}">${esc(d.action)}</span>
+        <span class="sym">${esc(d.symbol)}</span>
+        <span class="dim" style="font-size:12px">${esc(d.chain)} · ${esc(d.signal_type||d.stage)}</span>
         ${bookTag}</div>
-      <div class="why">${d.reason||""}</div></div>
+      <div class="why">${esc(d.reason)}</div></div>
       <div class="amt">${amt}</div></div>`;
   }).join("");
 }
@@ -316,11 +322,12 @@ function renderFunnel(counts){
   const order=["entry","protections","sizing","costs","security","exit"];
   const label={entry:"Entered",protections:"Cooldown/guard",sizing:"Too small",
     costs:"Costs too high",security:"Failed rug scan",exit:"Exited"};
+  // keys are a fixed server-side vocabulary, but escape anyway
   const rows=order.filter(k=>counts[k]);
   if(!rows.length){$("funnel").innerHTML='<div class="empty">no signals evaluated yet</div>';return;}
   const max=Math.max(...rows.map(k=>counts[k]));
   $("funnel").innerHTML=rows.map(k=>
-    `<div class="frow"><span class="dim">${label[k]||k}</span>
+    `<div class="frow"><span class="dim">${esc(label[k]||k)}</span>
      <span class="bar"><span class="${k==='entry'?'opened':''}"
        style="width:${(100*counts[k]/max).toFixed(1)}%"></span></span>
      <span class="n">${counts[k]}</span></div>`).join("");
@@ -338,7 +345,7 @@ function drawChart(){
   const xs=curve.map(p=>p[0]);
   const series=showReal?[1,2]:[1];
   let vals=[];series.forEach(i=>curve.forEach(p=>vals.push(p[i])));
-  const base=S.books.sim.starting_equity;vals.push(base);
+  const base=S.books[view].starting_equity;vals.push(base);
   let y0=Math.min(...vals),y1=Math.max(...vals);
   if(y1-y0<0.02*base){y0=base*0.99;y1=base*1.01;}
   const pad=(y1-y0)*0.12;y0-=pad;y1+=pad;
@@ -393,8 +400,8 @@ function render(){
   $("lock").textContent=S.real_unlocked
     ? (S.mode==="real"?"Real money is ARMED and trading.":"Unlocked — switch when ready.")
     : "🔒 "+S.real_locked_reason;
-  $("meta").innerHTML=`cycle ${S.cycle} · ${S.tracked_pairs} pairs tracked · `+
-    `${(S.chains||[]).join(", ")} · up ${ago(S.started_at)}`;
+  $("meta").innerHTML=`cycle ${esc(S.cycle)} · ${esc(S.tracked_pairs)} pairs `+
+    `tracked · ${esc((S.chains||[]).join(", "))} · up ${ago(S.started_at)}`;
 
   renderCards(b);
   renderFeed((S.decisions||[]).filter(d=>d.book===view));
@@ -402,23 +409,23 @@ function render(){
 
   $("positions").innerHTML=table(
     ["Token","Pattern","Entry","Now","Size","P&L","Age"],
-    (b.positions||[]).map(p=>[{v:p.symbol,c:"sym"},{v:p.signal_type||"",c:"dim"},
+    (b.positions||[]).map(p=>[{v:esc(p.symbol),c:"sym"},{v:esc(p.signal_type),c:"dim"},
       px(p.entry_price),px(p.price),"$"+n(p.size_usd,0),
       {v:money(p.pnl_usd),c:cls(p.pnl_usd)},
       {v:ago(p.opened_at),c:"dim"}]),[2,3,4,5,6]);
 
   $("closed").innerHTML=table(
     ["Token","Pattern","P&L","Costs","Exit","Held","When"],
-    (b.closed_trades||[]).slice(0,14).map(t=>[{v:t.symbol,c:"sym"},
-      {v:t.signal_type||"",c:"dim"},
+    (b.closed_trades||[]).slice(0,14).map(t=>[{v:esc(t.symbol),c:"sym"},
+      {v:esc(t.signal_type),c:"dim"},
       {v:money(t.pnl_usd),c:cls(t.pnl_usd)},
-      {v:"$"+n(t.costs_usd),c:"dim"},{v:t.exit_reason,c:"dim"},
+      {v:"$"+n(t.costs_usd),c:"dim"},{v:esc(t.exit_reason),c:"dim"},
       {v:ago(Date.now()/1000-t.held_s),c:"dim"},{v:ago(t.closed_at),c:"dim"}]),
     [2,3,5,6]);
 
   $("movers").innerHTML=table(
     ["Token","Price","5m","30m","1h","24h"],
-    (S.movers||[]).slice(0,12).map(m=>[{v:m.symbol,c:"sym"},px(m.price_usd),
+    (S.movers||[]).slice(0,12).map(m=>[{v:esc(m.symbol),c:"sym"},px(m.price_usd),
       {v:pct(m.move_5m),c:cls(m.move_5m)},{v:pct(m.move_30m),c:cls(m.move_30m)},
       {v:pct(m.move_1h),c:cls(m.move_1h)},{v:pct(m.move_24h),c:cls(m.move_24h)}]),
     [1,2,3,4,5]);
@@ -426,7 +433,7 @@ function render(){
   const et=(S.edges&&S.edges.by_signal_type)||{};
   $("edges").innerHTML=table(
     ["Pattern","Trades","Win rate","Profit factor","Expectancy/$","Net P&L","Sizing ×"],
-    Object.entries(et).map(([k,v])=>[k,n(v.trades,0),
+    Object.entries(et).map(([k,v])=>[esc(k),n(v.trades,0),
       v.win_rate==null?"–":(100*v.win_rate).toFixed(0)+"%",
       v.profit_factor==null?"–":n(v.profit_factor),
       n(v.expectancy_per_dollar,3),

@@ -94,8 +94,12 @@ class ProtectionManager:
         self._equity_peak = max(self._equity_peak, self._equity)
         if self._equity_peak > 0:
             dd = 1.0 - self._equity / self._equity_peak
-            if dd >= self.cfg.max_drawdown_pct and ts >= self._halted_until:
-                self._halted_until = ts + self.cfg.drawdown_halt_s
+            # Evaluate regardless of an existing halt: a StoplossGuard halt
+            # (and the closes during it) could otherwise consume the whole
+            # drawdown budget, after which this would never engage.
+            if dd >= self.cfg.max_drawdown_pct:
+                self._halted_until = max(self._halted_until,
+                                         ts + self.cfg.drawdown_halt_s)
                 logger.warning(
                     "MaxDrawdown: %.1f%% off peak — halting entries %.0f min",
                     100 * dd, self.cfg.drawdown_halt_s / 60,

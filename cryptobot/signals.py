@@ -50,9 +50,10 @@ class SignalConfig:
     revert_min_drop_1h: float = -0.15     # -15% in an hour
     revert_max_trend_24h: float = 0.10    # not already a one-way collapse
 
-    # Regime shift. z >= 4 chosen by an 8-day/8-token backtest sweep:
-    # vs z=3 it lifted win rate 46%->55% and cut losing tokens 3->2 with
-    # the gain spread across tokens; z=5 started cutting winners.
+    # Regime shift. Held at 4.0 as the stable middle of the positive
+    # range: a post-z-score-fix sweep spans +1.25% (z=4.5) to -1.50%
+    # (z=5.0) on 3-10 trades per cell, which is noise rather than a
+    # tunable signal. See cryptobot_config.yaml for the numbers.
     regime_min_zscore: float = 4.0
     regime_max_move_1h: float = 0.05      # big windows still quiet
 

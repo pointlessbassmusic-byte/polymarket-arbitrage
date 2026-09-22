@@ -27,6 +27,7 @@ class _History:
     recent_5m_moves: Deque[float] = field(default_factory=lambda: deque(maxlen=288))
 
     def prune(self, now_ts: float, max_age: float = 26 * 3600) -> None:
+        """Drop samples older than the longest window we report on."""
         while self.samples and now_ts - self.samples[0][0] > max_age:
             self.samples.popleft()
 
@@ -74,6 +75,11 @@ class VolatilityEngine:
         move_5m = snap.change_5m
         if move_5m is None:
             move_5m = _move_over(h, snap.ts, 300, snap.price_usd) or 0.0
+        # Score this move against the PRIOR baseline, then record it.
+        # Including it in its own baseline caps z at (n-1)/sqrt(n) — at the
+        # 12-sample gate that is 3.18, so a threshold of 4.0 could never
+        # fire, and every z-score was biased low.
+        zscore = self._zscore(h, move_5m)
         h.recent_5m_moves.append(move_5m)
 
         move_30m = _move_over(h, snap.ts, 1800, snap.price_usd)
@@ -97,22 +103,40 @@ class VolatilityEngine:
             move_1h=move_1h,
             move_24h=move_24h,
             realized_vol_30m=_realized_vol(h, snap.ts, 1800),
-            zscore_5m=self._zscore(h, move_5m),
+            zscore_5m=zscore,
             samples=len(h.samples),
         )
 
-    @staticmethod
-    def _zscore(h: _History, current: float) -> float:
+    # Noise floor for the z-score denominator. A near-flat history has
+    # ~zero variance, and dividing by it either explodes or (worse, when
+    # guarded by `return 0.0`) makes a dead-quiet coin that suddenly jumps
+    # score z=0 — silencing the very "quiet coin waking up" case the
+    # regime detector exists to catch. 0.1% per 5m sits well below any
+    # real token's chop, so this binds only on pathologically flat series.
+    MIN_STD_5M = 0.001
+
+    @classmethod
+    def _zscore(cls, h: _History, current: float) -> float:
         moves = list(h.recent_5m_moves)
         if len(moves) < 6:
             return 0.0
         mean = sum(moves) / len(moves)
         var = sum((m - mean) ** 2 for m in moves) / (len(moves) - 1)
-        std = math.sqrt(var)
-        if std < 1e-9:
-            return 0.0
+        std = max(math.sqrt(var), cls.MIN_STD_5M)
         return (current - mean) / std
 
     def history_len(self, key: str) -> int:
         h = self._hist.get(key)
         return len(h.samples) if h else 0
+
+    def retain(self, keys: set[str]) -> int:
+        """Drop history for pairs we no longer track.
+
+        A long-running scanner sees thousands of pairs; without this the
+        per-pair history grows without bound, unlike `tracked` which is
+        capped. Returns the number of pairs dropped.
+        """
+        stale = [k for k in self._hist if k not in keys]
+        for k in stale:
+            del self._hist[k]
+        return len(stale)

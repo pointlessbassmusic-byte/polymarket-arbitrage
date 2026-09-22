@@ -25,6 +25,7 @@ class Portfolio:
         # None = frictionless fills (unit tests); live/paper/backtest pass
         # a CostModel so every close is charged the realistic round trip.
         self.cost_model = cost_model
+        self._load()
 
     # -- entries -----------------------------------------------------------
 
@@ -140,12 +141,57 @@ class Portfolio:
             "win_rate": round(wins / len(self.closed), 3) if self.closed else None,
         }
 
+    def _load(self) -> None:
+        """Restore open positions and history after a restart.
+
+        Without this a restart silently abandons open positions — and a
+        real on-chain position that the bot forgets never gets its stop
+        or its sell. The next save() would then erase it from disk too.
+        """
+        if not self.state_file or not self.state_file.exists():
+            return
+        try:
+            data = json.loads(self.state_file.read_text())
+        except (OSError, ValueError):
+            logger.exception("could not read %s — starting flat", self.state_file)
+            return
+
+        def revive(d: dict, cls):
+            d = dict(d)
+            d["side"] = Side(d.get("side", "long"))
+            st = d.get("signal_type")
+            d["signal_type"] = SignalType(st) if st else None
+            fields = cls.__dataclass_fields__
+            return cls(**{k: v for k, v in d.items() if k in fields})
+
+        try:
+            self.realized_pnl = float(data.get("realized_pnl", 0.0))
+            self.total_costs = float(data.get("total_costs", 0.0))
+            for raw in data.get("positions", []):
+                pos = revive(raw, Position)
+                self.positions[pos.key] = pos
+            for raw in data.get("closed", []):
+                self.closed.append(revive(raw, ClosedTrade))
+        except (TypeError, ValueError, KeyError):
+            logger.exception("malformed state in %s — starting flat",
+                             self.state_file)
+            self.positions.clear()
+            self.closed.clear()
+            self.realized_pnl = 0.0
+            self.total_costs = 0.0
+            return
+        if self.positions:
+            logger.warning("restored %d open position(s) from %s: %s",
+                           len(self.positions), self.state_file.name,
+                           ", ".join(p.symbol for p in self.positions.values()))
+
     def save(self) -> None:
         if not self.state_file:
             return
         try:
             data = {
                 "realized_pnl": self.realized_pnl,
+                "total_costs": self.total_costs,
                 "positions": [vars(p) | {"side": p.side.value,
                                           "signal_type": p.signal_type.value if p.signal_type else None}
                               for p in self.positions.values()],

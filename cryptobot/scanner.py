@@ -223,10 +223,20 @@ class Scanner:
 
         # Track the wildest pairs for continuity across cycles.
         profiles.sort(key=lambda sv: sv[1].wildness, reverse=True)
-        for s, _ in profiles[: self.cfg.max_tracked_pairs]:
-            self.tracked[s.key] = (s.chain, s.base_address)
-        while len(self.tracked) > self.cfg.max_tracked_pairs:
-            self.tracked.pop(next(iter(self.tracked)))
+        held = {p.key for p in self._open_positions()}
+        keep = {s.key: (s.chain, s.base_address)
+                for s, _ in profiles[: self.cfg.max_tracked_pairs]}
+        # Never drop a pair we still hold, however calm it has gone.
+        for key, meta in self.tracked.items():
+            if key in held:
+                keep.setdefault(key, meta)
+        self.tracked = keep
+        # Bound memory: history and prices for pairs we no longer track
+        # (and do not hold) serve no purpose and grow without limit.
+        retain = set(self.tracked) | held
+        self.vol.retain(retain)
+        self._latest_prices = {k: v for k, v in self._latest_prices.items()
+                               if k in retain}
 
         signals: list[Signal] = []
         for s, v in profiles:
@@ -316,7 +326,13 @@ class Scanner:
                     continue
                 book.risk.record_pnl(trade.pnl_usd)
                 book.protections.on_trade_closed(trade)
-                self.edges.record(trade)
+                # The shared EdgeTracker learns from the SIM book only.
+                # Both books trade the same signals, so recording both
+                # would count one market outcome twice — halving the
+                # MIN_SAMPLES gate and blending two bankrolls into the
+                # expectancy that feeds sizing.
+                if book.name == "sim":
+                    self.edges.record(trade)
                 self.journal.record(Decision(
                     ts=now(), book=book.name, symbol=pos.symbol,
                     chain=pos.chain,
@@ -442,14 +458,19 @@ class Scanner:
 
     # -- loop --------------------------------------------------------------
 
+    def _open_positions(self) -> list:
+        """Every open position across every book — sim and real alike."""
+        return [p for b in self.books.values()
+                for p in b.portfolio.positions.values()]
+
     async def _refresh_position_prices(self) -> None:
-        """Re-price only the open positions — one call per chain, cheap."""
-        by_chain: dict[str, list[str]] = {}
-        for pos in self.portfolio.positions.values():
-            by_chain.setdefault(pos.chain, []).append(pos.key.split(":", 1)[1])
+        """Re-price the open positions of ALL books — one call per chain."""
+        by_chain: dict[str, set[str]] = {}
+        for pos in self._open_positions():
+            by_chain.setdefault(pos.chain, set()).add(pos.key.split(":", 1)[1])
         for chain, addrs in by_chain.items():
             try:
-                for snap in await self.dex.get_pairs(chain, addrs):
+                for snap in await self.dex.get_pairs(chain, sorted(addrs)):
                     self._latest_prices[snap.key] = snap.price_usd
             except Exception as exc:
                 logger.warning("position re-price on %s failed: %s", chain, exc)
@@ -460,7 +481,9 @@ class Scanner:
         is the cheapest place to recover it."""
         while True:
             await asyncio.sleep(self.cfg.position_check_interval_s)
-            if not self.portfolio.positions:
+            # Real positions must be managed even when the sim book is
+            # flat or halted — a live stop cannot wait for discovery.
+            if not self._open_positions():
                 continue
             try:
                 async with self._book_lock:

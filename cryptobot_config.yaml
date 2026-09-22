@@ -47,8 +47,14 @@ signals:
   revert_min_drop_1h: -0.15
   revert_max_trend_24h: 0.10
 
-  # Regime shift (quiet coin waking up). 4.0 tuned by backtest sweep
-  # (8 tokens x 8 days): beat 3.0 on win rate and per-token robustness.
+  # Regime shift (quiet coin waking up).
+  # Re-validated after the z-score itself was corrected (it used to
+  # include the sample it was scoring, which biased every z low). The
+  # re-run gives 3.0:+0.54% / 4.0:+0.45% / 4.5:+1.25% / 5.0:-1.50% on
+  # 3-10 trades each — swings that large between adjacent settings on
+  # samples that small are noise, so this is NOT tuned to the best cell.
+  # 4.0 is kept as the stable middle of the positive range; the live
+  # EdgeTracker is the only thing that can really settle it.
   regime_min_zscore: 4.0
   regime_max_move_1h: 0.05
 
