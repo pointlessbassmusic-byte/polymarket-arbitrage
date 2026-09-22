@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from .analytics import EdgeTracker
+from .costs import CostConfig, CostModel
 from .data.coingecko import CoinGeckoClient
 from .data.dexscreener import DexScreenerClient
 from .data.goplus import ScreenConfig, TokenScreen
@@ -58,11 +59,13 @@ class Scanner:
     def __init__(self, scan_cfg: ScannerConfig, sig_cfg: SignalConfig,
                  risk_cfg: RiskConfig, state_dir: Optional[Path] = None,
                  executor=None, screen_cfg: Optional[ScreenConfig] = None,
-                 protection_cfg: Optional[ProtectionConfig] = None):
+                 protection_cfg: Optional[ProtectionConfig] = None,
+                 cost_cfg: Optional[CostConfig] = None):
         self.cfg = scan_cfg
         self.sig_cfg = sig_cfg
         self.dex = DexScreenerClient()
         self.gecko = CoinGeckoClient()
+        self.costs = CostModel(cost_cfg)
         self.screen = TokenScreen(screen_cfg)
         self.protections = ProtectionManager(
             protection_cfg or ProtectionConfig(),
@@ -71,7 +74,8 @@ class Scanner:
         self.vol = VolatilityEngine()
         self.risk = RiskManager(risk_cfg)
         self.portfolio = Portfolio(
-            state_file=(state_dir / "cryptobot_portfolio.json") if state_dir else None
+            state_file=(state_dir / "cryptobot_portfolio.json") if state_dir else None,
+            cost_model=self.costs,
         )
         self.edges = EdgeTracker(
             state_file=(state_dir / "cryptobot_edges.json") if state_dir else None
@@ -279,6 +283,13 @@ class Scanner:
             )
             size = self.risk.size_position(sig, list(self.portfolio.positions.values()))
             if size <= 0:
+                continue
+            # Profitability gate: the edge must survive its own round-trip
+            # costs (fees + price impact + gas) with margin at this size.
+            ok, why = self.costs.entry_allowed(
+                sig.expected_move, size, sig.liquidity_usd, sig.chain)
+            if not ok:
+                logger.info("skip %s: %s", sig.symbol, why)
                 continue
             # Last gate before money: contract-level rug/honeypot screen.
             verdict = await self.screen.check(sig.chain, sig.token_address)

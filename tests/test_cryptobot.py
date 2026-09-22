@@ -387,6 +387,74 @@ class TestTokenAddressPlumbing:
         assert pos.token_address == "0xTOKEN"
 
 
+# -- cost model ------------------------------------------------------------
+
+class TestCostModel:
+    def make(self, **kw):
+        from cryptobot.costs import CostConfig, CostModel
+        return CostModel(CostConfig(**kw))
+
+    def test_round_trip_includes_all_components(self):
+        cm = self.make()
+        # $100 on base ($0.05 gas) in a $200k pool:
+        # 2*(0.003 + 0.002 + 100/200000 + 0.05/100) = 2*0.006 = 1.2%
+        frac = cm.round_trip_fraction(100.0, 200_000.0, "base")
+        assert frac == pytest.approx(0.012, abs=1e-4)
+
+    def test_gas_floor_blocks_small_ethereum_trades(self):
+        cm = self.make()
+        ok, why = cm.entry_allowed(0.10, 50.0, 200_000.0, "ethereum")
+        assert not ok and "gas" in why
+        # Same trade on base is fine.
+        assert cm.entry_allowed(0.10, 50.0, 200_000.0, "base")[0]
+
+    def test_thin_edge_rejected(self):
+        cm = self.make()
+        # 2% expected move can't clear 3x a ~1.2% round trip.
+        ok, why = cm.entry_allowed(0.02, 100.0, 200_000.0, "base")
+        assert not ok and "round-trip" in why
+        # 6% clears it.
+        assert cm.entry_allowed(0.06, 100.0, 200_000.0, "base")[0]
+
+    def test_price_impact_scales_with_size_vs_depth(self):
+        cm = self.make()
+        thin = cm.round_trip_fraction(1000.0, 50_000.0, "base")
+        deep = cm.round_trip_fraction(1000.0, 5_000_000.0, "base")
+        assert thin > deep
+
+    def test_min_viable_size(self):
+        cm = self.make()
+        assert cm.min_viable_size("ethereum") == pytest.approx(200.0)
+        assert cm.min_viable_size("base") == pytest.approx(5.0)
+
+    def test_breakeven_ratchet_protects_green_trades(self):
+        from cryptobot.costs import CostModel
+        pf = Portfolio(cost_model=CostModel())
+        # Non-trailing position (mean-revert), round trip ~1.2% on base.
+        pf.open_from_signal(
+            make_signal(type=SignalType.MEAN_REVERT, take_profit_pct=0.20),
+            100.0)
+        # Price reaches 2x costs + 1% above entry -> stop moves to entry+costs.
+        assert pf.check_exit("base:0xPAIR", 1.04) is None
+        pos = pf.positions["base:0xPAIR"]
+        assert pos.breakeven_set
+        assert pos.stop_loss > pos.entry_price
+        # Full retrace now exits as a scratch, not a -5% stop-out.
+        assert pf.check_exit("base:0xPAIR", pos.stop_loss) == "trailing_stop"
+        trade = pf.close("base:0xPAIR", pos.stop_loss, "trailing_stop")
+        assert trade.pnl_usd == pytest.approx(0.0, abs=0.25)
+
+    def test_portfolio_charges_costs_on_close(self):
+        from cryptobot.costs import CostModel
+        pf = Portfolio(cost_model=CostModel())
+        pf.open_from_signal(make_signal(), 100.0)
+        trade = pf.close("base:0xPAIR", 1.10, "take_profit")
+        # Gross +$10, minus 2*(0.003+0.002+100/200000+0.05/100) = $1.20
+        assert trade.costs_usd == pytest.approx(1.20, abs=0.01)
+        assert trade.pnl_usd == pytest.approx(8.80, abs=0.01)
+        assert pf.total_costs == pytest.approx(1.20, abs=0.01)
+
+
 # -- backtest --------------------------------------------------------------
 
 class TestBacktest:

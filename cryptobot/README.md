@@ -133,4 +133,29 @@ breakout thresholds validated as-is — loosening them turned the sweep
 negative, tightening lost the biggest winner. One sweep window is weak
 evidence on its own; the live EdgeTracker remains the ongoing check.
 
+## The cost reality (read this before going live)
+
+Charging realistic round-trip costs (swap fees + price impact vs pool
+depth + per-chain gas) against the same 8-token window turned the gross
++$3.30 into **−$0.66 net** — the frictionless model would have lost money
+live. Three mechanisms restored net profitability and are now defaults:
+
+1. **Cost-aware entry gate** — a signal's expected move must clear 4× its
+   own round-trip cost at the proposed size, and gas may eat at most 1%
+   of the position per side. Consequence: Ethereum mainnet needs ≥$200
+   positions to qualify; small accounts automatically concentrate on
+   Base/Arbitrum/BSC/Solana where gas is cents.
+2. **Breakeven ratchet** — once a trade is 2× its round-trip cost above
+   entry, the stop moves to entry+costs. This alone flipped the sweep:
+   the best configuration went from −$4.19 to **+$2.94 net** (62% win
+   rate, positive on every traded token) because cost-bleeding time-stops
+   and round-trippers became scratches instead of losses.
+3. **Costs charged on every paper/backtest fill**, so the EdgeTracker
+   learns net expectancy and the dashboard shows PnL net of a visible
+   cost line — no fantasy numbers anywhere.
+
+Run `python run_cryptobot.py --preflight` before arming live: it checks
+keys, RPCs, wallet balances, every data feed, and per-chain economic
+viability against your position caps.
+
 Tests: `python -m pytest tests/test_cryptobot.py -v`

@@ -19,6 +19,7 @@ from pathlib import Path
 
 import yaml
 
+from cryptobot.costs import CostConfig
 from cryptobot.data.goplus import ScreenConfig
 from cryptobot.execution.wallet import WalletConfig, WalletExecutor
 from cryptobot.protections import ProtectionConfig
@@ -47,7 +48,8 @@ def load(config_path: Path) -> Scanner:
     return Scanner(scan_cfg, sig_cfg, risk_cfg,
                    state_dir=config_path.parent, executor=executor,
                    screen_cfg=_build(ScreenConfig, raw.get("security")),
-                   protection_cfg=_build(ProtectionConfig, raw.get("protections")))
+                   protection_cfg=_build(ProtectionConfig, raw.get("protections")),
+                   cost_cfg=_build(CostConfig, raw.get("costs")))
 
 
 async def main() -> int:
@@ -56,6 +58,9 @@ async def main() -> int:
                         default=Path(__file__).parent / "cryptobot_config.yaml")
     parser.add_argument("--once", action="store_true",
                         help="run one scan cycle and print signals as JSON")
+    parser.add_argument("--preflight", action="store_true",
+                        help="check keys, RPCs, balances, and per-chain "
+                             "viability, then exit")
     parser.add_argument("--dashboard", action="store_true",
                         help="serve the live web dashboard alongside the loop")
     parser.add_argument("--port", type=int, default=8081,
@@ -68,6 +73,20 @@ async def main() -> int:
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    if args.preflight:
+        from cryptobot.costs import CostModel
+        from cryptobot.preflight import run_preflight
+
+        raw = yaml.safe_load(args.config.read_text()) if args.config.exists() else {}
+        ok = await run_preflight(
+            _build(WalletConfig, raw.get("execution")),
+            _build(RiskConfig, raw.get("risk")),
+            CostModel(_build(CostConfig, raw.get("costs"))),
+            (raw.get("scanner") or {}).get("chains")
+            or ["ethereum", "base", "solana", "bsc", "arbitrum"],
+        )
+        return 0 if ok else 1
 
     scanner = load(args.config)
     try:

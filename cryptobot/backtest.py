@@ -29,6 +29,7 @@ import logging
 from dataclasses import dataclass
 
 from .analytics import EdgeTracker
+from .costs import CostConfig, CostModel
 from .data.dexscreener import DexScreenerClient
 from .data.geckoterminal import Candle, GeckoTerminalClient
 from .models import TokenSnapshot
@@ -85,10 +86,12 @@ def snapshot_from_candles(candles: list[Candle], i: int, meta: PoolMeta,
 
 class Backtester:
     def __init__(self, sig_cfg: SignalConfig, risk_cfg: RiskConfig,
-                 prot_cfg: ProtectionConfig | None = None):
+                 prot_cfg: ProtectionConfig | None = None,
+                 cost_cfg: CostConfig | None = None):
         self.sig_cfg = sig_cfg
         self.risk = RiskManager(risk_cfg)
-        self.portfolio = Portfolio()
+        self.costs = CostModel(cost_cfg)
+        self.portfolio = Portfolio(cost_model=self.costs)
         self.edges = EdgeTracker()
         self.protections = ProtectionManager(
             prot_cfg or ProtectionConfig(), risk_cfg.bankroll_usd)
@@ -164,9 +167,14 @@ class Backtester:
                                          * self.edges.confidence_multiplier(sig.type.value))
                     size = self.risk.size_position(
                         sig, list(self.portfolio.positions.values()))
-                    if size > 0:
-                        self.portfolio.open_from_signal(sig, size)
-                        break
+                    if size <= 0:
+                        continue
+                    if not self.costs.entry_allowed(
+                            sig.expected_move, size, sig.liquidity_usd,
+                            sig.chain)[0]:
+                        continue
+                    self.portfolio.open_from_signal(sig, size)
+                    break
 
         # Force-close whatever is still open at the end.
         for key in list(self.portfolio.positions.keys()):

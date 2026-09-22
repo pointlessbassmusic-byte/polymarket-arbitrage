@@ -53,6 +53,23 @@ security:
   block_on_unknown: false      # true = refuse tokens the API can't screen
   cache_ttl_s: 3600
 
+# Round-trip cost model: fees + price impact + gas, charged on every
+# paper/backtest fill and enforced as an entry gate (expected move must
+# beat min_edge_multiple x the round trip). Update gas_usd as gas moves.
+costs:
+  dex_fee: 0.003               # per swap side
+  extra_slippage: 0.002        # routing/MEV/latency per side
+  min_edge_multiple: 4.0       # edge must be 4x the round-trip cost (swept)
+  max_gas_fraction: 0.01       # gas may eat at most 1% of size per side
+  gas_usd:                     # USD per swap, per chain
+    ethereum: 2.0              # => needs >=$200 positions to be viable
+    base: 0.05
+    arbitrum: 0.15
+    optimism: 0.10
+    polygon: 0.05
+    bsc: 0.30
+    solana: 0.03
+
 # Freqtrade-style protections — all gate new entries only, exits always run
 protections:
   cooldown_s: 1800             # 30 min per-token cooldown after any close

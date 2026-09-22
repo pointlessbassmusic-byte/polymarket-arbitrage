@@ -151,6 +151,8 @@ class Position:
     high_water: float = 0.0    # best price seen since entry (for trailing)
     signal_type: Optional[SignalType] = None
     token_address: str = ""
+    liquidity_usd: float = 0.0   # pool depth at entry, for cost modeling
+    breakeven_set: bool = False  # stop already ratcheted to entry+costs
 
     def unrealized_pnl(self, price: float) -> float:
         if self.side == Side.LONG:
@@ -171,6 +173,7 @@ class ClosedTrade:
     closed_at: float
     exit_reason: str
     signal_type: Optional[SignalType] = None
+    costs_usd: float = 0.0       # round-trip fees/impact/gas charged
 
 
 def now() -> float:

@@ -216,7 +216,7 @@ function render(s) {
   $("tiles").innerHTML =
     tile("Equity", "$" + fmt(equity), "bankroll $" + fmt(s.bankroll_usd, 0)) +
     tile("Realized PnL", `<span class="${pnlCls(sum.realized_pnl)}">$${fmt(sum.realized_pnl)}</span>`,
-         (sum.trades || 0) + " trades") +
+         (sum.trades || 0) + " trades · net of $" + fmt(sum.total_costs) + " costs") +
     tile("Unrealized PnL", `<span class="${pnlCls(sum.unrealized_pnl)}">$${fmt(sum.unrealized_pnl)}</span>`,
          (sum.open_positions || 0) + " open · $" + fmt(sum.exposure_usd, 0) + " exposure") +
     tile("Win rate", sum.win_rate == null ? "–" : (100 * sum.win_rate).toFixed(0) + "%",

@@ -7,18 +7,24 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+from .costs import CostModel
 from .models import ClosedTrade, Position, Side, Signal, SignalType, now
 
 logger = logging.getLogger(__name__)
 
 
 class Portfolio:
-    def __init__(self, trail_pct: float = 0.05, state_file: Optional[Path] = None):
+    def __init__(self, trail_pct: float = 0.05, state_file: Optional[Path] = None,
+                 cost_model: Optional[CostModel] = None):
         self.positions: dict[str, Position] = {}
         self.closed: list[ClosedTrade] = []
         self.realized_pnl: float = 0.0
+        self.total_costs: float = 0.0
         self.default_trail = trail_pct
         self.state_file = state_file
+        # None = frictionless fills (unit tests); live/paper/backtest pass
+        # a CostModel so every close is charged the realistic round trip.
+        self.cost_model = cost_model
 
     # -- entries -----------------------------------------------------------
 
@@ -38,6 +44,7 @@ class Portfolio:
             high_water=sig.price_usd,
             signal_type=sig.type,
             token_address=sig.token_address,
+            liquidity_usd=sig.liquidity_usd,
         )
         self.positions[pos.key] = pos
         logger.info(
@@ -58,6 +65,17 @@ class Portfolio:
             return None
         if price > pos.high_water:
             pos.high_water = price
+            # Breakeven ratchet: once the trade is decently green (2x its
+            # own round-trip cost above entry), move the stop to entry plus
+            # costs — a trade that cleared its costs never finishes red.
+            if self.cost_model is not None and not pos.breakeven_set:
+                rt = self.cost_model.round_trip_fraction(
+                    pos.size_usd, pos.liquidity_usd, pos.chain)
+                if price >= pos.entry_price * (1.0 + 2.0 * rt + 0.01):
+                    be_stop = pos.entry_price * (1.0 + rt + 0.002)
+                    if be_stop > pos.stop_loss:
+                        pos.stop_loss = be_stop
+                    pos.breakeven_set = True
             # Ratchet the stop up under a trailing position once in profit.
             if pos.trail_pct is not None and price > pos.entry_price:
                 trailed = price * (1.0 - pos.trail_pct)
@@ -79,19 +97,26 @@ class Portfolio:
         if pos is None:
             return None
         pnl = pos.unrealized_pnl(price)
+        costs = 0.0
+        if self.cost_model is not None:
+            costs = self.cost_model.round_trip_usd(
+                pos.size_usd, pos.liquidity_usd, pos.chain)
+            pnl -= costs
+            self.total_costs += costs
         trade = ClosedTrade(
             key=pos.key, symbol=pos.symbol, side=pos.side,
             entry_price=pos.entry_price, exit_price=price,
             size_usd=pos.size_usd, pnl_usd=pnl,
             opened_at=pos.opened_at, closed_at=now(),
             exit_reason=reason, signal_type=pos.signal_type,
+            costs_usd=round(costs, 4),
         )
         self.closed.append(trade)
         self.realized_pnl += pnl
         logger.info(
-            "CLOSE %-12s %+.2f USD (%.1f%%) @ %.6g  [%s]",
+            "CLOSE %-12s %+.2f USD net (%.1f%%, costs %.2f) @ %.6g  [%s]",
             pos.symbol, pnl, 100.0 * pnl / pos.size_usd if pos.size_usd else 0.0,
-            price, reason,
+            costs, price, reason,
         )
         self.save()
         return trade
@@ -106,6 +131,7 @@ class Portfolio:
         )
         wins = sum(1 for t in self.closed if t.pnl_usd > 0)
         return {
+            "total_costs": round(self.total_costs, 2),
             "open_positions": len(self.positions),
             "exposure_usd": round(sum(p.size_usd for p in self.positions.values()), 2),
             "realized_pnl": round(self.realized_pnl, 2),
