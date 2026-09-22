@@ -576,23 +576,45 @@ class TestBacktest:
 # -- dashboard -------------------------------------------------------------
 
 class TestDashboard:
-    def make_scanner(self):
+    def make_scanner(self, sim_bankroll=0.0):
         from cryptobot.risk import RiskConfig
         from cryptobot.scanner import Scanner, ScannerConfig
         from cryptobot.signals import SignalConfig
-        return Scanner(ScannerConfig(), SignalConfig(), RiskConfig())
+        return Scanner(ScannerConfig(), SignalConfig(), RiskConfig(),
+                       sim_bankroll_usd=sim_bankroll)
 
     def test_state_is_json_serializable(self):
         import json
         sc = self.make_scanner()
-        sc.portfolio.open_from_signal(make_signal(), 100.0)
+        sc.books["sim"].portfolio.open_from_signal(make_signal(), 100.0)
         sc._latest_prices["base:0xPAIR"] = 1.05
         state = sc.state()
         json.dumps(state)  # must not raise
-        assert state["positions"][0]["symbol"] == "TEST"
-        assert state["positions"][0]["pnl_usd"] == pytest.approx(5.0)
-        assert state["bankroll_usd"] == 1000.0
-        assert not state["live_armed"]
+        sim = state["books"]["sim"]
+        assert sim["positions"][0]["symbol"] == "TEST"
+        # PnL is net of the cost model now.
+        assert sim["positions"][0]["pnl_usd"] == pytest.approx(5.0)
+        assert state["mode"] == "sim"
+        assert not state["real_unlocked"]
+
+    def test_sim_book_uses_its_own_bankroll(self):
+        sc = self.make_scanner(sim_bankroll=200.0)
+        assert sc.books["sim"].starting_equity == 200.0
+        assert sc.books["sim"].risk.cfg.max_position_usd == pytest.approx(50.0)
+        # Real book keeps the configured bankroll, untouched.
+        assert sc.books["real"].starting_equity == 1000.0
+
+    def test_real_mode_is_locked_without_arming(self):
+        sc = self.make_scanner()
+        ok, why = sc.set_mode("real")
+        assert not ok and "locked" in why
+        assert sc.mode == "sim"
+        assert sc.set_mode("sim")[0]
+
+    def test_sim_book_always_active_real_only_when_armed(self):
+        sc = self.make_scanner()
+        names = [b.name for b in sc.active_books()]
+        assert names == ["sim"]
 
     def test_api_serves_state_and_page(self):
         import asyncio
@@ -611,9 +633,32 @@ class TestDashboard:
                 assert r.json()["cycle"] == 0
                 page = await client.get("/")
                 assert page.status_code == 200
-                assert "Crypto Volatility Bot" in page.text
+                assert "Crypto Swing Bot" in page.text
+
+                # Real mode cannot be armed through the API.
+                m = await client.post("/api/mode", json={"mode": "real"})
+                assert m.status_code == 200
+                body = m.json()
+                assert body["ok"] is False
+                assert body["mode"] == "sim"
+                assert "locked" in body["error"]
 
         asyncio.run(run())
+
+    def test_decision_journal_records_skips_with_reasons(self):
+        from cryptobot.book import Decision, DecisionJournal
+        j = DecisionJournal()
+        j.record(Decision(ts=NOW, book="sim", symbol="A", chain="base",
+                          signal_type="vol_breakout", action="skipped",
+                          stage="costs", reason="edge too small"))
+        j.record(Decision(ts=NOW, book="sim", symbol="B", chain="base",
+                          signal_type="vol_breakout", action="opened",
+                          stage="entry", reason="breakout", size_usd=40.0))
+        recent = j.recent()
+        assert recent[0]["symbol"] == "B"      # newest first
+        assert recent[1]["reason"] == "edge too small"
+        assert j.counts() == {"costs": 1, "entry": 1}
+        assert len(j.recent(book="real")) == 0
 
 
 # -- dexscreener parsing ---------------------------------------------------

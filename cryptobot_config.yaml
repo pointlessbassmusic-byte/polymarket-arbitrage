@@ -1,12 +1,26 @@
 # Crypto volatility / memecoin swing bot configuration
 # =====================================================
+# The simulated book. It ALWAYS runs on live market data, whether or not
+# real money is armed, so you always have a benchmark — and once real
+# trading starts, the gap between the two books measures real execution
+# quality. Sizing below is derived from backtest sweeps, not guessed.
+sim:
+  bankroll_usd: 200            # $200 returned ~2x what $100 did over the
+                               # same 8 days (0.45% vs 0.25%), because
+                               # larger positions amortize gas better.
+                               # Set to 100 if you prefer; it still works.
+
 # Paper trading is the default. To go live you must BOTH set execution.live
 # to true here AND export CRYPTOBOT_ARM_LIVE=yes. Secrets stay in env vars —
 # never put a private key in this file.
 
 scanner:
   scan_interval_s: 60          # one full scan per minute (5m window needs this)
-  chains: [ethereum, base, solana, bsc, arbitrum]
+  # Cheap-gas chains only. An 8-day/8-token backtest sweep found BSC
+  # lost money in EVERY configuration, and restricting to base+solana
+  # turned a $500 book from -0.24% to +0.55%. Ethereum needs $200+
+  # positions to clear its own gas, so it prices out small accounts.
+  chains: [base, solana]
   watchlist_queries: [PEPE, WIF, BONK, SHIB, DOGE, FLOKI, BRETT, POPCAT, MOG, TURBO]
   max_tracked_pairs: 150
   arb_check_top_n: 10          # deep pool scan for the N wildest tokens
@@ -87,7 +101,13 @@ protections:
   drawdown_halt_s: 7200
 
 risk:
+  # --- REAL-money book. Sim sizing is derived from sim.bankroll_usd. ---
   bankroll_usd: 1000
+  # Risk-based sizing: position = (bankroll x risk_per_trade_pct) / stop.
+  # Sizing on notional (plain Kelly) produced ~$3 positions on a $100
+  # book, which cannot clear gas anywhere — so the account never traded.
+  risk_per_trade_pct: 0.015
+  min_position_usd: 40         # economic floor; below this gas dominates
   kelly_fraction: 0.25         # quarter-Kelly — memecoin edges are guesses
   max_position_usd: 100
   max_position_pct_of_liquidity: 0.005   # never be >0.5% of the pool

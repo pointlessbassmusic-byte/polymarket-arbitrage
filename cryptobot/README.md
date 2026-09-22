@@ -57,10 +57,34 @@ python -m cryptobot.backtest PEPE BRETT --days 3
 python -m cryptobot.backtest BRETT --chain base --days 7 --json
 ```
 
-The dashboard shows equity, open positions with live PnL, recent signals,
-the wildest multi-window movers, closed trades, and the learned edge report
-per pattern (win rate, profit factor, expectancy, current sizing multiplier).
-Light and dark mode follow your system theme.
+### The dashboard
+
+Two books run side by side on the same live market data:
+
+* **Simulated** — always trading, simulated money, starts at
+  `sim.bankroll_usd` (default $200). This is the benchmark and the
+  learning engine.
+* **Real** — identical logic, but its entries also execute on-chain.
+  The toggle is **locked** until `execution.live`, `CRYPTOBOT_ARM_LIVE`
+  and a valid key are all in place; the UI switch is a third safety
+  layer, never a way to arm anything.
+
+Running both at once is deliberate: once real money starts, the sim book
+keeps a parallel record of what the strategy *should* have made, so the
+gap between the two lines is a direct measurement of real execution
+quality rather than a guess.
+
+The centrepiece is the **live decision feed**: every signal the bot
+evaluated and what it did about it — including each one it declined and
+which gate stopped it (cooldown, sizing, cost, rug scan). A bot that
+shows only its trades hides most of its reasoning, and the skips are
+where the risk controls earn their keep. A funnel beside it counts where
+signals die, so you can see at a glance whether the edge is being
+filtered by costs, by protections, or by the security screen.
+
+Also shown: equity for both books, open positions with live P&L, closed
+trades with the costs each one paid, the wildest multi-window movers, and
+the learned edge per pattern. Light and dark follow your system theme.
 
 Tune everything in [`cryptobot_config.yaml`](../cryptobot_config.yaml):
 watchlist queries, chains, liquidity/volume hygiene floors, detector
@@ -138,6 +162,34 @@ tokens 3→2, gain spread across tokens; z=5 cut winners), while the
 breakout thresholds validated as-is — loosening them turned the sweep
 negative, tightening lost the biggest winner. One sweep window is weak
 evidence on its own; the live EdgeTracker remains the ongoing check.
+
+## What $100–$200 can actually do
+
+Sizing was originally fractional-Kelly on notional, which quietly broke
+small accounts: on a $100 book it produced ~$3 positions, and a $3
+position cannot clear gas on any chain, so **the account never traded at
+all**. The fix was to size on *risk* rather than notional — a $25
+position with a 5% stop risks $1.25, so position size and risk are not
+the same thing:
+
+    position = (bankroll x risk_per_trade_pct) / stop_distance
+
+Tight stops now earn proportionally larger positions, which is exactly
+what makes a small account viable. Measured over the same 8-day window:
+
+| Bankroll | Return | Costs as % of gross |
+|---|---|---|
+| $100 | +0.25% | 87% |
+| **$200** | **+0.45%** | **77%** |
+| $500 (all chains) | −0.24% | 111% |
+| $500 (base+solana) | +0.55% | 91% |
+
+Two things follow, and both are now defaults. **$200 roughly doubles
+$100's return** — not because the strategy changes, but because larger
+positions amortize fixed gas better. And the chain list is restricted to
+**base + solana**: BSC lost money in every configuration tested, and
+Ethereum needs $200+ *per position* just to clear its own gas, which
+prices out a small account entirely.
 
 ## The cost reality (read this before going live)
 

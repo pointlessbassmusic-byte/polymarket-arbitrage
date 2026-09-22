@@ -49,7 +49,9 @@ def load(config_path: Path) -> Scanner:
                    state_dir=config_path.parent, executor=executor,
                    screen_cfg=_build(ScreenConfig, raw.get("security")),
                    protection_cfg=_build(ProtectionConfig, raw.get("protections")),
-                   cost_cfg=_build(CostConfig, raw.get("costs")))
+                   cost_cfg=_build(CostConfig, raw.get("costs")),
+                   sim_bankroll_usd=float(
+                       (raw.get("sim") or {}).get("bankroll_usd", 200.0)))
 
 
 async def main() -> int:

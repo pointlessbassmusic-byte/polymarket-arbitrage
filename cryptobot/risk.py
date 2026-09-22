@@ -1,9 +1,25 @@
 """Position sizing and account-level risk limits.
 
-Sizing is capped fractional-Kelly: stake proportional to edge/odds, scaled
-down hard (memecoin "probabilities" are guesses), then clipped by per-trade,
-per-token and liquidity caps. Liquidity cap matters most: in a thin pool
-your own exit is the slippage, so never hold more than a sliver of the pool.
+Sizing is RISK-BASED, not notional-based: what a stop-protected trade can
+actually lose is (position x stop distance), not the position. So we fix
+the dollar risk per trade and solve for the position:
+
+    risk_$   = bankroll x risk_per_trade_pct x (edge quality scalar)
+    position = risk_$ / stop_loss_pct
+
+A $25 position with a 5% stop risks $1.25, the same as a $12.50 position
+with a 10% stop — and sizing on notional (plain Kelly) misses that, which
+is why it produced ~$3 positions on a $100 book. Positions that small
+cannot clear DEX gas economics on any chain, so the account simply never
+traded. Tight stops now earn proportionally larger positions, which is
+what makes a small account viable at all.
+
+Kelly still sets the *edge quality scalar* (a trade with better odds gets
+more of the risk budget), but it no longer sets the notional directly.
+
+Everything is then clipped by per-trade, per-token, exposure and liquidity
+caps. The liquidity cap matters most: in a thin pool your own exit is the
+slippage, so never hold more than a sliver of the pool.
 """
 
 from __future__ import annotations
@@ -19,8 +35,15 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RiskConfig:
     bankroll_usd: float = 1_000.0
-    kelly_fraction: float = 0.25          # quarter-Kelly
+    # Fraction of the bankroll risked if a trade hits its stop. This, not
+    # position size, is the real risk dial.
+    risk_per_trade_pct: float = 0.015     # 1.5% of bankroll per stop-out
+    kelly_fraction: float = 0.25          # quarter-Kelly, as a scalar on risk
     max_position_usd: float = 100.0
+    # Floor: below this a position cannot outrun gas on most chains. A
+    # trade whose risk-based size lands under it is sized UP to the floor
+    # when affordable, else skipped entirely (never silently undersized).
+    min_position_usd: float = 0.0
     max_position_pct_of_liquidity: float = 0.005   # 0.5% of pool
     max_open_positions: int = 8
     max_total_exposure_usd: float = 500.0
@@ -76,21 +99,37 @@ class RiskManager:
         if room <= 0:
             return 0.0
 
-        # Kelly: f = p - q/b, with b = win/loss ratio, p = confidence.
+        # Kelly as an edge-quality scalar in [0, 1]: f = p - q/b.
         b = sig.risk_reward
         p = sig.confidence
         kelly = p - (1.0 - p) / b if b > 0 else 0.0
         if kelly <= 0:
             return 0.0
-        stake = kelly * self.cfg.kelly_fraction * self.cfg.bankroll_usd
+        quality = min(1.0, kelly / self.cfg.kelly_fraction) \
+            if self.cfg.kelly_fraction > 0 else 1.0
+
+        # Risk budget -> position, via the stop distance.
+        risk_usd = self.cfg.bankroll_usd * self.cfg.risk_per_trade_pct * quality
+        stop = max(sig.stop_loss_pct, 0.005)      # guard against /0
+        stake = risk_usd / stop
+
         # Vol targeting: a token running 2x the reference vol gets half the
         # stake, keeping each position's expected dollar-vol roughly equal.
         if sig.vol_30m > self.cfg.vol_target_30m > 0:
             stake *= self.cfg.vol_target_30m / sig.vol_30m
-        stake = min(
-            stake,
+
+        ceiling = min(
             self.cfg.max_position_usd,
             self.cfg.max_position_pct_of_liquidity * sig.liquidity_usd,
             room,
         )
+        stake = min(stake, ceiling)
+
+        # Economic floor: an undersized position is dominated by gas, so
+        # size up to the floor when the caps allow, otherwise stand aside.
+        if self.cfg.min_position_usd > 0 and stake < self.cfg.min_position_usd:
+            if ceiling >= self.cfg.min_position_usd:
+                stake = self.cfg.min_position_usd
+            else:
+                return 0.0
         return stake if stake >= 1.0 else 0.0

@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from .analytics import EdgeTracker
+from .book import Decision, DecisionJournal, TradingBook
 from .costs import CostConfig, CostModel
 from .data.coingecko import CoinGeckoClient
 from .data.dexscreener import DexScreenerClient
@@ -65,26 +66,36 @@ class Scanner:
                  risk_cfg: RiskConfig, state_dir: Optional[Path] = None,
                  executor=None, screen_cfg: Optional[ScreenConfig] = None,
                  protection_cfg: Optional[ProtectionConfig] = None,
-                 cost_cfg: Optional[CostConfig] = None):
+                 cost_cfg: Optional[CostConfig] = None,
+                 sim_bankroll_usd: float = 0.0):
         self.cfg = scan_cfg
         self.sig_cfg = sig_cfg
         self.dex = DexScreenerClient()
         self.gecko = CoinGeckoClient()
         self.costs = CostModel(cost_cfg)
         self.screen = TokenScreen(screen_cfg)
-        self.protections = ProtectionManager(
-            protection_cfg or ProtectionConfig(),
-            starting_equity=risk_cfg.bankroll_usd,
-        )
         self.vol = VolatilityEngine()
-        self.risk = RiskManager(risk_cfg)
-        self.portfolio = Portfolio(
-            state_file=(state_dir / "cryptobot_portfolio.json") if state_dir else None,
-            cost_model=self.costs,
-        )
         self.edges = EdgeTracker(
             state_file=(state_dir / "cryptobot_edges.json") if state_dir else None
         )
+        self.journal = DecisionJournal()
+        # Two books on the same live data: sim always trades (benchmark +
+        # learning), real only once armed. See book.py.
+        from dataclasses import replace as _replace
+        sim_cfg = _replace(risk_cfg, bankroll_usd=sim_bankroll_usd,
+                           max_position_usd=sim_bankroll_usd * 0.25,
+                           min_position_usd=sim_bankroll_usd * 0.20,
+                           max_total_exposure_usd=sim_bankroll_usd * 0.75,
+                           max_daily_loss_usd=sim_bankroll_usd * 0.10,
+                           max_open_positions=3) \
+            if sim_bankroll_usd else risk_cfg
+        self.books = {
+            "sim": TradingBook.create("sim", sim_cfg, self.costs,
+                                      protection_cfg, state_dir, False),
+            "real": TradingBook.create("real", risk_cfg, self.costs,
+                                       protection_cfg, state_dir, True),
+        }
+        self.mode = "sim"
         self.executor = executor
         self._native_prices: dict[str, float] = {}   # gecko id -> usd
         self._native_prices_ts: float = 0.0
@@ -100,6 +111,43 @@ class Scanner:
         # Discovery and the fast position monitor both mutate the
         # portfolio, so all position changes are serialized.
         self._book_lock = asyncio.Lock()
+
+    # Back-compat: the sim book is the default view of "the portfolio".
+    @property
+    def portfolio(self):
+        return self.books["sim"].portfolio
+
+    @property
+    def risk(self):
+        return self.books["sim"].risk
+
+    @property
+    def protections(self):
+        return self.books["sim"].protections
+
+    @property
+    def real_armed(self) -> bool:
+        return bool(self.executor and getattr(self.executor, "armed", False))
+
+    def set_mode(self, mode: str) -> tuple[bool, str]:
+        """Switch the active book. Real mode requires a genuinely armed
+        executor — the UI toggle is a third safety layer, never a bypass
+        of the config flag and the CRYPTOBOT_ARM_LIVE env var."""
+        if mode not in ("sim", "real"):
+            return False, f"unknown mode {mode!r}"
+        if mode == "real" and not self.real_armed:
+            return False, ("real mode is locked: needs execution.live=true, "
+                           "CRYPTOBOT_ARM_LIVE=yes and a valid private key")
+        self.mode = mode
+        logger.warning("mode switched to %s", mode)
+        return True, ""
+
+    def active_books(self) -> list[TradingBook]:
+        """Books that may open NEW positions right now."""
+        books = [self.books["sim"]]          # sim always runs
+        if self.mode == "real" and self.real_armed:
+            books.append(self.books["real"])
+        return books
 
     async def close(self) -> None:
         await self.dex.close()
@@ -207,11 +255,10 @@ class Scanner:
             }
             for _, v in profiles[:15]
         ]
-        summary = self.portfolio.summary(self._latest_prices)
+        t = now()
         self.equity_curve.append(
-            (now(), self.risk.cfg.bankroll_usd
-             + summary["realized_pnl"] + summary["unrealized_pnl"])
-        )
+            (t, self.books["sim"].equity(self._latest_prices),
+             self.books["real"].equity(self._latest_prices)))
 
         top = profiles[0][1] if profiles else None
         logger.info(
@@ -242,74 +289,100 @@ class Scanner:
     # -- positions ---------------------------------------------------------
 
     async def _manage_positions(self) -> None:
-        for key in list(self.portfolio.positions.keys()):
-            pos = self.portfolio.positions[key]
-            price = self._latest_prices.get(key)
-            if price is None:
-                # Pair fell out of every feed — refetch it directly.
-                try:
-                    fresh = await self.dex.get_pairs(pos.chain, [key.split(":", 1)[1]])
-                    if fresh:
-                        price = fresh[0].price_usd
-                        self._latest_prices[key] = price
-                except Exception:
-                    pass
-            if price is None:
-                continue
-            reason = self.portfolio.check_exit(key, price)
-            if reason is None and now() - pos.opened_at > self.cfg.max_position_age_s:
-                reason = "time_stop"
-            if reason:
-                trade = self.portfolio.close(key, price, reason)
-                if trade:
-                    self.risk.record_pnl(trade.pnl_usd)
-                    self.edges.record(trade)
-                    self.protections.on_trade_closed(trade)
-                    if self.executor is not None and pos.token_address:
-                        asyncio.create_task(
-                            self.executor.sell(pos.chain, pos.token_address, pos.qty)
-                        )
+        """Run exits for every book — sim and real alike. Exits never
+        depend on the active mode: a position that exists must be managed."""
+        for book in self.books.values():
+            for key in list(book.portfolio.positions.keys()):
+                pos = book.portfolio.positions[key]
+                price = self._latest_prices.get(key)
+                if price is None:
+                    try:
+                        fresh = await self.dex.get_pairs(
+                            pos.chain, [key.split(":", 1)[1]])
+                        if fresh:
+                            price = fresh[0].price_usd
+                            self._latest_prices[key] = price
+                    except Exception:
+                        pass
+                if price is None:
+                    continue
+                reason = book.portfolio.check_exit(key, price)
+                if reason is None and now() - pos.opened_at > self.cfg.max_position_age_s:
+                    reason = "time_stop"
+                if not reason:
+                    continue
+                trade = book.portfolio.close(key, price, reason)
+                if not trade:
+                    continue
+                book.risk.record_pnl(trade.pnl_usd)
+                book.protections.on_trade_closed(trade)
+                self.edges.record(trade)
+                self.journal.record(Decision(
+                    ts=now(), book=book.name, symbol=pos.symbol,
+                    chain=pos.chain,
+                    signal_type=pos.signal_type.value if pos.signal_type else "",
+                    action="closed", stage="exit", reason=reason,
+                    size_usd=pos.size_usd, price_usd=price,
+                    pnl_usd=trade.pnl_usd,
+                ))
+                if book.executes_onchain and self.executor and pos.token_address:
+                    asyncio.create_task(
+                        self.executor.sell(pos.chain, pos.token_address, pos.qty))
 
     async def _act_on_signals(self, signals: list[Signal]) -> None:
-        # Best asymmetry first; one entry per token per cycle.
+        """Evaluate every signal against every active book, journaling the
+        outcome — including the skips, which is where the risk controls
+        actually show their work."""
         for sig in sorted(signals, key=lambda s: s.risk_reward * s.confidence,
                           reverse=True):
             if sig.type == SignalType.CROSS_DEX_ARB:
-                # Arb is reported, and (only if a live executor is armed)
-                # would be handed to it. Paper mode just logs the edge.
                 logger.info("ARB   %s", sig.reason)
                 continue
-            if sig.key in self.portfolio.positions:
-                continue
-            allowed, why = self.protections.entry_allowed(sig.key)
-            if not allowed:
-                logger.debug("skip %s: %s", sig.symbol, why)
-                continue
-            # Learned edge: scale confidence by the pattern's realized
-            # expectancy once enough trades exist to judge it.
+            # Learned edge scales confidence once a pattern has a record.
             sig.confidence = min(
-                1.0, sig.confidence * self.edges.confidence_multiplier(sig.type.value)
-            )
-            size = self.risk.size_position(sig, list(self.portfolio.positions.values()))
-            if size <= 0:
-                continue
-            # Profitability gate: the edge must survive its own round-trip
-            # costs (fees + price impact + gas) with margin at this size.
-            ok, why = self.costs.entry_allowed(
-                sig.expected_move, size, sig.liquidity_usd, sig.chain,
-                take_profit_pct=sig.take_profit_pct,
-                stop_loss_pct=sig.stop_loss_pct)
-            if not ok:
-                logger.info("skip %s: %s", sig.symbol, why)
-                continue
-            # Last gate before money: contract-level rug/honeypot screen.
-            verdict = await self.screen.check(sig.chain, sig.token_address)
-            if not verdict.ok:
-                logger.info("skip %s: %s", sig.symbol, verdict)
-                continue
-            self.portfolio.open_from_signal(sig, size)
-            if self.executor is not None:
-                asyncio.create_task(self._execute_live(sig, size))
+                1.0, sig.confidence * self.edges.confidence_multiplier(sig.type.value))
+            for book in self.active_books():
+                await self._consider(book, sig)
+
+    async def _consider(self, book: TradingBook, sig: Signal) -> None:
+        """One signal, one book: walk the gates and journal the verdict."""
+        def note(action: str, stage: str, reason: str, size: float = 0.0) -> None:
+            self.journal.record(Decision(
+                ts=now(), book=book.name, symbol=sig.symbol, chain=sig.chain,
+                signal_type=sig.type.value, action=action, stage=stage,
+                reason=reason, size_usd=size, price_usd=sig.price_usd,
+                confidence=sig.confidence, risk_reward=sig.risk_reward,
+            ))
+
+        if sig.key in book.portfolio.positions:
+            return                      # already held; not a decision
+        allowed, why = book.protections.entry_allowed(sig.key)
+        if not allowed:
+            note("skipped", "protections", why)
+            return
+        size = book.risk.size_position(
+            sig, list(book.portfolio.positions.values()))
+        if size <= 0:
+            note("skipped", "sizing",
+                 "no size: risk caps, exposure limit, or below the "
+                 "economic floor for this chain")
+            return
+        ok, why = self.costs.entry_allowed(
+            sig.expected_move, size, sig.liquidity_usd, sig.chain,
+            take_profit_pct=sig.take_profit_pct,
+            stop_loss_pct=sig.stop_loss_pct)
+        if not ok:
+            note("skipped", "costs", why, size)
+            return
+        verdict = await self.screen.check(sig.chain, sig.token_address)
+        if not verdict.ok:
+            note("skipped", "security", str(verdict), size)
+            return
+
+        book.portfolio.open_from_signal(sig, size)
+        note("opened", "entry", sig.reason, size)
+        if book.executes_onchain and self.executor is not None:
+            asyncio.create_task(self._execute_live(sig, size))
 
     async def _native_price(self, chain: str) -> float:
         """USD price of the chain's gas token, cached for 5 minutes."""
@@ -343,43 +416,28 @@ class Scanner:
 
     def state(self) -> dict:
         """Full JSON-serializable snapshot for the dashboard."""
-        summary = self.portfolio.summary(self._latest_prices)
-        positions = []
-        for p in self.portfolio.positions.values():
-            price = self._latest_prices.get(p.key, p.entry_price)
-            positions.append({
-                "symbol": p.symbol, "chain": p.chain, "key": p.key,
-                "entry_price": p.entry_price, "price": price,
-                "size_usd": p.size_usd, "pnl_usd": round(p.unrealized_pnl(price), 2),
-                "stop_loss": p.stop_loss, "take_profit": p.take_profit,
-                "opened_at": p.opened_at,
-                "signal_type": p.signal_type.value if p.signal_type else None,
-            })
-        closed = [
-            {
-                "symbol": t.symbol, "pnl_usd": round(t.pnl_usd, 2),
-                "size_usd": t.size_usd, "exit_reason": t.exit_reason,
-                "closed_at": t.closed_at,
-                "signal_type": t.signal_type.value if t.signal_type else None,
-            }
-            for t in self.portfolio.closed[-50:]
-        ][::-1]
+        prices = self._latest_prices
+        locked_reason = "" if self.real_armed else (
+            "needs execution.live=true, CRYPTOBOT_ARM_LIVE=yes and a funded "
+            "wallet key — run --preflight to check")
         return {
             "ts": now(),
             "started_at": self.started_at,
             "cycle": self._cycle,
             "tracked_pairs": len(self.tracked),
-            "bankroll_usd": self.risk.cfg.bankroll_usd,
-            "live_armed": bool(self.executor and getattr(self.executor, "armed", False)),
-            "halted": self.risk.state.halted,
-            "drawdown": round(self.protections.drawdown, 4),
-            "summary": summary,
-            "positions": positions,
-            "closed_trades": closed,
-            "signals": list(self.recent_signals)[:50],
+            "mode": self.mode,
+            "real_unlocked": self.real_armed,
+            "real_locked_reason": locked_reason,
+            "chains": self.cfg.chains,
+            "books": {name: b.state(prices, self.edges)
+                      for name, b in self.books.items()},
+            "decisions": self.journal.recent(60),
+            "gate_counts": self.journal.counts(),
+            "signals": list(self.recent_signals)[:40],
             "movers": self.movers,
             "edges": self.edges.report(),
-            "equity_curve": [(round(t), round(v, 2)) for t, v in self.equity_curve],
+            "equity_curve": [(round(t), round(a, 2), round(r, 2))
+                             for t, a, r in self.equity_curve],
         }
 
     # -- loop --------------------------------------------------------------
