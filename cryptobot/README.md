@@ -125,4 +125,12 @@ unknown, so when a candle spans both stop and target the **stop is assumed
 to hit first** (conservative). Use it to compare threshold settings, not
 to project returns.
 
+The shipped defaults were checked against an 8-token × 8-day sweep
+(PEPE, BRETT, MOG, TURBO, FLOKI, POPCAT, SPX, TOSHI; ~18k candles):
+the regime-shift z-score gate was raised 3→4 (win rate 46%→55%, losing
+tokens 3→2, gain spread across tokens; z=5 cut winners), while the
+breakout thresholds validated as-is — loosening them turned the sweep
+negative, tightening lost the biggest winner. One sweep window is weak
+evidence on its own; the live EdgeTracker remains the ongoing check.
+
 Tests: `python -m pytest tests/test_cryptobot.py -v`

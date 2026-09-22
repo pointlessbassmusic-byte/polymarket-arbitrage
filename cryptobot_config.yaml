@@ -31,8 +31,9 @@ signals:
   revert_min_drop_1h: -0.15
   revert_max_trend_24h: 0.10
 
-  # Regime shift (quiet coin waking up)
-  regime_min_zscore: 3.0
+  # Regime shift (quiet coin waking up). 4.0 tuned by backtest sweep
+  # (8 tokens x 8 days): beat 3.0 on win rate and per-token robustness.
+  regime_min_zscore: 4.0
   regime_max_move_1h: 0.05
 
   # Cross-DEX arbitrage
