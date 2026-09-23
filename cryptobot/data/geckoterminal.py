@@ -99,18 +99,34 @@ class GeckoTerminalClient:
 
     async def ohlcv_history(self, chain: str, pool: str, *, days: float,
                             aggregate: int = 5) -> list[Candle]:
-        """Paginate back `days` of 5-minute candles (multiple calls)."""
+        """Paginate back `days` of candles (multiple calls).
+
+        Pagination stops on TIME, not on candle count. GeckoTerminal omits
+        empty buckets, so a sparse pool returns 1000 candles spanning
+        months rather than the 3.5 days a dense pool would — walking the
+        cursor back past the free tier's history limit and collecting 401s
+        instead of data.
+        """
+        import time as _time
         needed = int(days * 24 * 60 / aggregate)
+        floor_ts = _time.time() - days * 86400
         out: list[Candle] = []
         before: Optional[int] = None
-        while len(out) < needed:
-            page = await self.ohlcv(chain, pool, aggregate=aggregate,
-                                    limit=1000, before_ts=before)
+        for _ in range(12):                      # hard page cap
+            try:
+                page = await self.ohlcv(chain, pool, aggregate=aggregate,
+                                        limit=1000, before_ts=before)
+            except (httpx.HTTPStatusError, httpx.TransportError) as exc:
+                logger.warning("ohlcv page failed for %s (%s) - keeping %d "
+                               "candles already fetched", pool[:10], exc, len(out))
+                break
             if not page:
                 break
             out = page + out
-            before = int(page[0].ts)
-            if len(page) < 100:   # history exhausted
+            oldest = int(page[0].ts)
+            if oldest <= floor_ts or len(out) >= needed or len(page) < 100:
                 break
-            await asyncio.sleep(2.1)   # stay under the rate limit
+            before = oldest
+            await asyncio.sleep(2.1)             # stay under the rate limit
+        out = [c for c in out if c.ts >= floor_ts]
         return out[-needed:] if len(out) > needed else out
