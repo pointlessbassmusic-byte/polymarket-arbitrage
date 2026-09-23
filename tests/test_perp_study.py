@@ -216,3 +216,53 @@ class TestRuleByYear:
                 assert c["n"] >= 30
         text = P.render_rules("long", table)
         assert "yrs+" in text
+
+
+class TestWalkForward:
+    def _rows(self, years, per_year=400, seed=0):
+        import random
+        rng = random.Random(seed)
+        rows = []
+        for y in years:
+            t0 = int(dt.datetime(y, 1, 1, tzinfo=dt.timezone.utc).timestamp())
+            for i in range(per_year):
+                a, b = rng.random(), rng.random()
+                # rule cell (a high, b low) wins; everything else loses
+                good = a > 0.66 and b < 0.34
+                rows.append({"ts": t0 + i * 3600 * 6, "year": y, "symbol": f"S{i % 5}",
+                             "fa": a, "fb": b, "win": int(good),
+                             "pnl": 0.05 if good else -0.01})
+        rows.sort(key=lambda r: r["ts"])
+        return rows
+
+    def test_parse_rule(self):
+        assert P.parse_rule("move_7d[2] & rvol_7d[1]") == (("move_7d", 2), ("rvol_7d", 1))
+        assert P.parse_rule("a[0]&b[2]") == (("a", 0), ("b", 2))
+        with pytest.raises(ValueError):
+            P.parse_rule("a[0]")
+
+    def test_first_years_are_only_used_for_fitting(self):
+        rows = self._rows([2021, 2022, 2023, 2024])
+        table = P.walk_forward_rule(rows, (("fa", 2), ("fb", 0)), lambda y: 0.002)
+        assert [r["year"] for r in table] == [2023, 2024]
+        assert table[0]["fit_n"] == 800 and table[1]["fit_n"] == 1200
+
+    def test_rule_beats_benchmark_when_the_cell_is_the_edge(self):
+        rows = self._rows([2021, 2022, 2023, 2024])
+        table = P.walk_forward_rule(rows, (("fa", 2), ("fb", 0)), lambda y: 0.002)
+        for r in table:
+            assert r["net"] > 0.04
+            assert r["bench"] < 0
+            assert r["lift"] > 0
+
+    def test_cost_is_charged_per_year(self):
+        rows = self._rows([2021, 2022, 2023])
+        cheap = P.walk_forward_rule(rows, (("fa", 2), ("fb", 0)), lambda y: 0.0)
+        dear = P.walk_forward_rule(rows, (("fa", 2), ("fb", 0)), lambda y: 0.01)
+        assert cheap[0]["net"] - dear[0]["net"] == pytest.approx(0.01)
+
+    def test_render_summarises(self):
+        rows = self._rows([2021, 2022, 2023])
+        table = P.walk_forward_rule(rows, (("fa", 2), ("fb", 0)), lambda y: 0.002)
+        text = P.render_walk_forward("short", Barrier(0.1, 0.05), (("fa", 2), ("fb", 0)), table)
+        assert "beats benchmark" in text and "trade-weighted" in text

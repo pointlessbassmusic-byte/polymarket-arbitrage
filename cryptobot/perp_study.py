@@ -31,8 +31,8 @@ import pickle
 import statistics
 from pathlib import Path
 
-from cryptobot.research import (Barrier, candidate_rules, hit_rate, validate,
-                                render_validate)
+from cryptobot.research import (Barrier, bucket_of, candidate_rules, hit_rate,
+                                quantiles, validate, render_validate)
 from cryptobot.data.hyperliquid import TAKER_FEE
 
 logger = logging.getLogger(__name__)
@@ -165,6 +165,7 @@ def rule_by_year(rows, bar: Barrier, cost_fn, top_k: int = 5,
     scored.sort(key=lambda t: -t[0])
     out = []
     years = sorted({r["year"] for r in rows})
+    oos = rows[cut:]
     for lift, name, pred in scored[:top_k]:
         cells = {}
         for y in years:
@@ -175,22 +176,102 @@ def rule_by_year(rows, bar: Barrier, cost_fn, top_k: int = 5,
             p = hit_rate(g)
             cells[y] = {"n": len(g), "hit": p, "lift": p - hit_rate(base),
                         "net": statistics.mean(r["pnl"] for r in g) - cost_fn(y)}
-        out.append({"rule": name, "lift_in": lift, "years": cells})
+        # The clean number: only rows after the selection cut, with a
+        # standard error on trading days rather than rows.
+        g = [r for r in oos if pred(r)]
+        days = len({r["ts"] for r in g})
+        pnl = [r["pnl"] for r in g]
+        net = (statistics.mean(pnl) - cost_fn(oos[-1]["year"])) if pnl else 0.0
+        se = (statistics.pstdev(pnl) / math.sqrt(days)) if len(pnl) > 1 and days else 0.0
+        out.append({"rule": name, "lift_in": lift, "years": cells,
+                    "oos": {"n": len(g), "days": days, "net": net, "se": se}})
     return out
 
 
 def render_rules(side: str, table: list[dict]) -> str:
     years = sorted({y for t in table for y in t["years"]})
-    out = [f"== {side.upper()} top in-sample rules, by calendar year (net per trade) ==",
-           f"{'rule':<40s} " + " ".join(f"{y:>8d}" for y in years) + "   yrs+"]
+    out = [f"== {side.upper()} top in-sample rules: net per trade by calendar year "
+           f"(n trades), then out-of-sample only ==",
+           f"{'rule':<34s} " + " ".join(f"{y:>13d}" for y in years)
+           + f"  yrs+  {'OOS net':>14s} {'n':>5s}"]
     for t in table:
         cells = []
         for y in years:
             c = t["years"].get(y)
-            cells.append(f"{100 * c['net']:>+7.2f}%" if c else f"{'-':>8s}")
+            cells.append(f"{100 * c['net']:>+7.2f}% ({c['n']:>3d})" if c else f"{'-':>13s}")
         pos = sum(c["net"] > 0 for c in t["years"].values())
-        out.append(f"{t['rule']:<40s} " + " ".join(cells) + f"   {pos}/{len(t['years'])}")
+        o = t["oos"]
+        out.append(f"{t['rule']:<34s} " + " ".join(cells)
+                   + f"  {pos}/{len(t['years'])}   "
+                   f"{100 * o['net']:>+6.2f}%±{100 * o['se']:.2f} {o['n']:>5d}")
     return "\n".join(out)
+
+
+def walk_forward_rule(rows, rule: tuple, cost_fn, *, min_fit_years: int = 2) -> list[dict]:
+    """Expanding-window walk-forward for ONE two-feature rule.
+
+    For each calendar year Y, the tercile cuts are fitted on every row
+    before Y and the rule is traded through Y only. Nothing in year Y
+    touches its own cuts. The benchmark is the unconditional side over
+    the same year, so the table shows the rule's lift over "just trade
+    this side every day", not its lift over zero.
+    """
+    (f1, b1), (f2, b2) = rule
+    years = sorted({r["year"] for r in rows})
+    out = []
+    for y in years[min_fit_years:]:
+        fit = [r for r in rows if r["year"] < y]
+        test = [r for r in rows if r["year"] == y]
+        if len(fit) < 250 or not test:
+            continue
+        cuts = {f: quantiles(fit, f, 3) for f in (f1, f2)}
+        sel = [r for r in test if bucket_of(r[f1], cuts[f1]) == b1
+               and bucket_of(r[f2], cuts[f2]) == b2]
+        if len(sel) < 20:
+            continue
+        cost = cost_fn(y)
+        pnl = [r["pnl"] for r in sel]
+        days = len({r["ts"] for r in sel})
+        net = statistics.mean(pnl) - cost
+        se = statistics.pstdev(pnl) / math.sqrt(days) if days > 1 else 0.0
+        bench = statistics.mean(r["pnl"] for r in test) - cost
+        out.append({"year": y, "n": len(sel), "days": days, "fit_n": len(fit),
+                    "net": net, "se": se, "bench": bench, "lift": net - bench,
+                    "coins": len({r["symbol"] for r in sel})})
+    return out
+
+
+def render_walk_forward(side: str, bar: Barrier, rule: tuple, table: list[dict]) -> str:
+    name = f"{rule[0][0]}[{rule[0][1]}] & {rule[1][0]}[{rule[1][1]}]"
+    out = [f"== WALK-FORWARD {side.upper()} {bar}: {name} ==",
+           "cuts refitted each year on prior years only; benchmark = unconditional "
+           f"{side} over the same year",
+           f"{'year':>5s} {'fit_n':>6s} {'coins':>5s} {'n':>5s} {'days':>5s} "
+           f"{'rule net':>14s} {'bench':>8s} {'lift':>8s}"]
+    for r in table:
+        out.append(f"{r['year']:>5d} {r['fit_n']:>6d} {r['coins']:>5d} {r['n']:>5d} {r['days']:>5d} "
+                   f"{100 * r['net']:>+7.2f}%±{100 * r['se']:.2f} {100 * r['bench']:>+7.2f}% "
+                   f"{100 * r['lift']:>+7.2f}%")
+    if table:
+        pos = sum(r["net"] > 0 for r in table)
+        beat = sum(r["lift"] > 0 for r in table)
+        tot_n = sum(r["n"] for r in table)
+        w = sum(r["net"] * r["n"] for r in table) / tot_n
+        out.append(f"net positive {pos}/{len(table)} years; beats benchmark {beat}/{len(table)}; "
+                   f"trade-weighted net {100 * w:+.2f}% over {tot_n} trades")
+    return "\n".join(out)
+
+
+def parse_rule(text: str) -> tuple:
+    """'move_7d[2]&rvol_7d[1]' -> (('move_7d', 2), ('rvol_7d', 1))."""
+    parts = [p.strip() for p in text.split("&")]
+    if len(parts) != 2:
+        raise ValueError("rule must be 'feat[b] & feat[b]'")
+    out = []
+    for p in parts:
+        name, _, rest = p.partition("[")
+        out.append((name.strip(), int(rest.rstrip("]"))))
+    return tuple(out)
 
 
 def render_years(side: str, bar: Barrier, table: list[dict]) -> str:
@@ -216,6 +297,9 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=7, help="horizon in days")
     ap.add_argument("--validate", action="store_true",
                     help="also run the feature-selection test per side")
+    ap.add_argument("--walk-forward", metavar="SIDE:RULE",
+                    help="yearly walk-forward of one rule, e.g. "
+                         "'short:move_7d[2]&rvol_7d[1]'")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -231,6 +315,14 @@ def main() -> int:
         print("mean daily funding by year: " +
               ", ".join(f"{y}: {100 * v:+.3f}%" for y, v in sorted(fy.items())))
     print()
+    if args.walk_forward:
+        side, _, rule_text = args.walk_forward.partition(":")
+        rule = parse_rule(rule_text)
+        rows = collect(pools, bar, args.days, side)
+        cost_fn = lambda y: round_trip_cost(args.days / 2, fy.get(y, 0.0), side)
+        print(render_walk_forward(side, bar, rule,
+                                  walk_forward_rule(rows, rule, cost_fn)))
+        return 0
     for side in ("long", "short"):
         rows = collect(pools, bar, args.days, side)
         cost_fn = lambda y, s=side: round_trip_cost(args.days / 2, fy.get(y, 0.0), s)

@@ -396,6 +396,93 @@ books, or an information source that is not the price series itself.
 None of those are testable from candles, and none of them is what this
 project currently trades.
 
+## The first thing that survived: shorting bounces on perps
+
+Everything above was long-only, on DEX candles, at ~1.2% friction, over
+at most a year. Hyperliquid's public API (no key) serves daily perp
+candles back to 2023 for 18 of the same memecoins, plus funding history,
+at 0.035% taker with a short side. `python -m cryptobot.perp_study` runs
+the whole apparatus on that: both sides, by calendar year, fees +
+slippage + funding in the cost, timeouts scored at the realized move
+rather than as a stop.
+
+**Unconditional, nothing works.** Long loses in 6 of 7 years at every
+geometry. Short wins the bear years and loses the manias — a regime bet.
+
+**Conditional, the selection test finally passes.** In-sample lift
+predicts out-of-sample lift: pearson **+0.34 long, +0.59 short** (it was
+−0.27 on 21 days of DEX data). Two short rules and one long rule came
+out on top; the honest test is a yearly **walk-forward** — tercile cuts
+refitted each year on prior years only, benchmark = the unconditional
+side over the same year:
+
+`short: move_1d[2] & move_3d[0]` — a top-tercile up-day after a
+bottom-tercile 3-day move, i.e. **short the one-day bounce in a
+decline** — at ±20%/10%, 14-day horizon:
+
+| year | coins | trades | rule net | uncond. short | lift |
+|---|---|---|---|---|---|
+| 2022 | 3 | 49 | +2.06% ±2.3 | +0.70% | +1.36% |
+| 2023 | 6 | 55 | +2.87% ±2.0 | +0.71% | +2.16% |
+| 2024 (mania) | 14 | 243 | +0.30% ±1.4 | −0.05% | +0.35% |
+| 2025 | 18 | 462 | +1.38% ±1.4 | +1.25% | +0.13% |
+| 2026 | 18 | 129 | +3.15% ±2.2 | +0.69% | +2.47% |
+
+**5 of 5 years positive, beats the benchmark 5 of 5, +1.47% per trade
+over 938 trades.** At the tighter ±15/5 over 7 days it is 4 of 5 (2025
+flat at −0.01%), +0.60% per trade.
+
+`short: move_7d[2] & rvol_7d[1]` — short a top-tercile 7-day rally in
+mid-range volatility — is +2.07% per trade over 1,646 trades at ±20/10
+but **loses the 2024 mania** (−2.27%). It reads as 6-of-6 when the
+tercile cuts are fitted on the first half of the data, because that half
+includes 2024; refit honestly it is 4 of 5. That is exactly the kind of
+leak the walk-forward exists to catch.
+
+`long: rvol_7d[0] & drawdown_30d[0]` — quiet and deep below the 30-day
+high — beats buy-and-hold every year but nets ≈ 0 (−0.03%). Long is
+still dead.
+
+### What to be careful about
+
+- **Survivorship in 2021–23.** Those years have 3–6 coins: the ones that
+  survived to be listed. The strong years for the rule are also the
+  thin ones.
+- **The barrier is doing less than the drift.** At ±20/10 over 14 days
+  most trades reach neither barrier, so the P&L is mostly "short for 14
+  days after the pattern". The rule's job is to pick *when*, and its
+  lift over the unconditional short is what shows it does.
+- **Funding was a tailwind that has gone.** Mean daily funding was
+  +0.104% in 2024 (shorts were paid ~0.4% per hold), +0.01% in 2025,
+  −0.004% in 2026. The 2024 result would be negative without it.
+- **Selection.** Chosen as the top rules of 176 per side, then swept
+  across 12 geometries. Year-by-year consistency across two manias and
+  two bears is the defence; it is not the same as a fresh sample.
+- **Execution is assumed, not measured.** Daily-close entries, 0.05%
+  slippage per side, average funding across coins. The coins the rule
+  selects (just rallied) tend to carry *higher* positive funding, which
+  helps a short, but their books are thinner.
+
+```bash
+python -m cryptobot.perp_study --cache hl_daily.pkl --funding hl_funding.pkl \
+    --target 0.20 --stop 0.10 --days 14 --walk-forward "short:move_1d[2]&move_3d[0]"
+python -m cryptobot.perp_study --cache hl_daily.pkl --funding hl_funding.pkl --validate
+```
+
+### What this means for the bot
+
+The engine as built — long-only, DEX, five-minute volatility — trades a
+strategy the data says does not exist. The one thing that has survived
+every test so far is a **daily, short-side, exchange-executed** rule.
+Getting from here to a fundable bot is: a Hyperliquid execution adapter
+(the venue is a perps DEX, so it is still a wallet signature, no KYC), a
+daily scheduler in place of the minute loop, and the same two books —
+sim first — running the rule live so the paper trades accumulate against
+real fills, real funding and real slippage. Roughly 100–460 trades a
+year across 18 coins at +1.5% each is the ceiling the history suggests;
+a $200 book risking 10% per trade would have made on the order of
+$50–$150 a year, before compounding and before anything goes wrong.
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool
