@@ -314,36 +314,87 @@ python -m cryptobot.research buckets  --cache pools.pkl --target 0.04 --stop 0.0
 python -m cryptobot.research validate --cache pools.pkl   # run this before trusting anything
 ```
 
-### What the data actually points at
+### The regime question, on a year of data
 
-The regime swing between the two halves is **+20.8pp** — three times
-larger than the biggest feature effect, and the only thing in the dataset
-with real magnitude. Sorting by market breadth (fraction of tokens up over
-24h) is not yet evidence of anything: in the first half every breadth
-quintile is negative with no ordering, in the second half every one is
-positive. Breadth is absorbing the calendar, not predicting it.
+The 21-day regime swing had the magnitude to matter, so it was tested
+properly: `python -m cryptobot.regime` on **six months of hourly** and
+**one year of daily** candles across the same 17 tokens (the free
+GeckoTerminal tier's limits). Market state is measured cross-sectionally
+(breadth = fraction of tokens up over the lookback), the unit of
+observation is the timestamp rather than the token, windows do not
+overlap, and bucket cuts are fitted on the first half and scored on the
+second.
 
-It cannot be tested on this dataset either way. Twenty-one days contains
-roughly **14 regime episodes lasting more than 6 hours** — the effective
-sample size for a regime signal is ~14, not the 57,420 candle
-observations. Establishing a regime effect needs months to years of
-history, not more tokens over the same three weeks.
+**The state does not persist.** Autocorrelation at the first
+non-overlapping lag — the number that says whether a regime lasts longer
+than a trade:
+
+| lookback | step | data | clean autocorr |
+|---|---|---|---|
+| 24h | 24h | 6mo hourly | −0.084 |
+| 72h | 24h | 6mo hourly | −0.045 |
+| 168h | 24h | 6mo hourly | −0.144 |
+| 168h | 24h | 1y daily | −0.128 |
+| 336h | 24h | 1y daily | −0.127 |
+| 168h | 168h | 1y daily | +0.161 (n=51, within noise) |
+
+The raw lag-1 figures (+0.74, +0.83) look like strong persistence until
+set against their mechanical floor: a 7-day window sampled daily shares
+6 days with its neighbour, so pure noise autocorrelates at ~0.86. The
+module reports that floor alongside. Every observed value sits at or
+below it.
+
+**The state does not predict.** On one year of daily data every breadth
+and median-return bucket's forward lift is within one standard error of
+zero, net returns at DEX friction run −1.6% to −2.0% per trade in every
+cell, and the bucket ordering flips sign between lookbacks (+0.73 at 7d,
+−0.66 at 14d). The one cell that looked live on hourly data — top
+7-day-breadth quartile, +14.7pp hit-rate lift on 21 observations — is
+−0.1pp on the year of daily data at the same lookback.
+
+**What the year actually was.** Equal-weight, the basket returned
+**−69.6%** (median −71.4%, 0 of 16 tokens positive):
+
+```
+HIGHER -91%  BRETT -86%  TOSHI -83%  Bonk -82%  Mog -81%  MEW -81%
+KEYCAT -77%  POPCAT -73%  PONKE -70%  TURBO -69%  FLOKI -66%  DEGEN -61%
+DOGE -59%    SPX -54%    PEPE -52%    AERO -31%
+```
+
+That is a drift of roughly −0.3% per day. Every long-only signal in this
+project — breakout, mean reversion, regime, breadth — was measured
+against that current, and none of them found anything strong enough to
+swim in it.
+
+```bash
+python -m cryptobot.regime --cache hourly.pkl --lookback 168 --horizon 24
+python -m cryptobot.regime --cache daily.pkl --candle-hours 24 --lookback 168 --horizon 24
+```
 
 ### Where this leaves the strategy
 
-Two independent measurements agree that break-even friction is ~0.8%
-round trip and the DEX path costs ~1.2%. Three conclusions, in order of
-confidence:
+Four independent measurements — walk-forward on the detectors, barrier
+sweep, feature-selection validation, regime persistence — agree. In
+order of confidence:
 
-- **Do not fund the DEX version.** This is well established — it holds
-  across every geometry, every feature bucket and both halves.
-- **Entry timing from these price features is a dead end.** Also well
-  established: 183 rules, negative selection correlation.
-- **The venue is the live question, and regime is the untested one.** At
-  CEX taker friction (0.30% round trip) the same trades turn positive,
-  but only if the edge is real — and 17 trades cannot show that. Regime
-  has the magnitude to matter and has not been ruled out; it needs a
-  longer history to test.
+- **Do not fund the DEX version.** Holds across every geometry, every
+  feature bucket, every regime state and both halves of every dataset.
+- **Entry timing from price features is a dead end.** 183 rules,
+  negative selection correlation.
+- **Market regime is not a usable signal at any scale from 1 to 14
+  days.** No persistence beyond the mechanical overlap, no out-of-sample
+  prediction, on a year of data.
+- **The asset class was a −70% long over the test year.** Long-only
+  memecoin strategies of any kind start from a −0.3%/day handicap. A
+  fee-cheaper venue lowers the cost side of the arithmetic but does not
+  touch that.
+
+What would change the picture is a different *edge source*, not a
+different parameter: short exposure (which needs a venue with perps or
+borrow), cross-venue price discrepancies measured against real order
+books, or an information source that is not the price series itself.
+None of those are testable from candles, and none of them is what this
+project currently trades.
 
 ## The cost reality
 
