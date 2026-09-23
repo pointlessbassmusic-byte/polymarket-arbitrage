@@ -253,6 +253,98 @@ python -m cryptobot.study PEPE BRETT MOG SPX --days 21 --windows 6
 python -m cryptobot.study --cache pools.pkl --windows 6 --hold-hours 48
 ```
 
+### Is there an edge in the data at all?
+
+The study above says the detectors as built do not clear friction. The
+prior question — does *any* signal in this data — is answered by
+`python -m cryptobot.research`, which skips strategies entirely and
+measures the one outcome a stop-and-target trader cares about: for every
+candle, does price reach +T before −S?
+
+A bucket is only interesting if it beats the break-even hit rate
+`p = (S + cost) / (T + S)`.
+
+**1. No barrier geometry is net positive on its own.** Sweeping nine
+target/stop pairs × four horizons over the same 21 days, every one of the
+36 cells loses roughly the cost:
+
+| barrier | 24h hit | break-even | gross | net |
+|---|---|---|---|---|
+| +4%/−2% | 36.8% | 53.3% | +0.21% | **−0.99%** |
+| +6%/−2% | 26.6% | 40.0% | +0.13% | −1.07% |
+| +8%/−3% (48h) | 30.0% | 38.2% | +0.30% | −0.90% |
+
+Gross is within noise of zero — the price process is close to driftless,
+which is what it should be. The whole loss is friction.
+
+**2. No feature bucket closes the gap.** At +4%/−2% over 24h the gap any
+signal must close is 16.5pp. Across seven features × ten deciles the
+largest lift is **+6.4pp** (`move_24h` d7), and the best two-feature cell
+out of several hundred reaches 46.0% against a 53.3% break-even — gross
++0.76% per trade against 1.2% costs. Best case, still short.
+
+That +0.76% independently reproduces the +0.82% break-even friction the
+walk-forward study measured from actual trades. Two different methods,
+same number.
+
+**3. The selection does not survive out of sample.** This is the one that
+settles it. Ranking 183 two-feature rules on the first half of the data
+and scoring them on the second — measured as **lift over each half's own
+baseline**, because a market that rallies in the second half lifts every
+rule at once:
+
+```
+in-sample  2026-09-03..2026-09-12  base hit 26.4%
+out-sample 2026-09-12..2026-09-22  base hit 47.2%
+regime swing between halves: +20.8pp
+
+correlation of in-sample lift vs out-of-sample lift:
+    pearson -0.272   spearman -0.185
+
+top-10 by in-sample lift: +6.2pp in sample -> -2.0pp out of sample
+```
+
+The correlation is **negative**. Picking the best-looking rule on past
+data makes you slightly *worse* than picking at random. Any strategy
+assembled by searching these features is fitting noise.
+
+```bash
+python -m cryptobot.research sweep    --cache pools.pkl
+python -m cryptobot.research buckets  --cache pools.pkl --target 0.04 --stop 0.02
+python -m cryptobot.research validate --cache pools.pkl   # run this before trusting anything
+```
+
+### What the data actually points at
+
+The regime swing between the two halves is **+20.8pp** — three times
+larger than the biggest feature effect, and the only thing in the dataset
+with real magnitude. Sorting by market breadth (fraction of tokens up over
+24h) is not yet evidence of anything: in the first half every breadth
+quintile is negative with no ordering, in the second half every one is
+positive. Breadth is absorbing the calendar, not predicting it.
+
+It cannot be tested on this dataset either way. Twenty-one days contains
+roughly **14 regime episodes lasting more than 6 hours** — the effective
+sample size for a regime signal is ~14, not the 57,420 candle
+observations. Establishing a regime effect needs months to years of
+history, not more tokens over the same three weeks.
+
+### Where this leaves the strategy
+
+Two independent measurements agree that break-even friction is ~0.8%
+round trip and the DEX path costs ~1.2%. Three conclusions, in order of
+confidence:
+
+- **Do not fund the DEX version.** This is well established — it holds
+  across every geometry, every feature bucket and both halves.
+- **Entry timing from these price features is a dead end.** Also well
+  established: 183 rules, negative selection correlation.
+- **The venue is the live question, and regime is the untested one.** At
+  CEX taker friction (0.30% round trip) the same trades turn positive,
+  but only if the edge is real — and 17 trades cannot show that. Regime
+  has the magnitude to matter and has not been ruled out; it needs a
+  longer history to test.
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool
