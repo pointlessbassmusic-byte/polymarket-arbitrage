@@ -112,6 +112,21 @@ class TestPersistence:
         rows = [{"breadth": 1.0 if i % 2 else 0.0} for i in range(100)]
         assert G.persistence(rows)["autocorr"] < -0.9
 
+    def test_overlapping_windows_report_their_mechanical_null(self):
+        rows = [{"breadth": 0.5} for _ in range(50)]
+        p = G.persistence(rows, lookback_hours=168, horizon_hours=24)
+        assert p["null"] == pytest.approx(6 / 7)
+        assert p["lag"] == 7
+
+    def test_clean_autocorr_uses_non_overlapping_lag(self):
+        # Noise smoothed over 7 samples: lag-1 is high, lag-7 is not.
+        rng = random.Random(4)
+        raw = [rng.random() for _ in range(2000)]
+        rows = [{"breadth": sum(raw[i:i + 7]) / 7} for i in range(1990)]
+        p = G.persistence(rows, lookback_hours=168, horizon_hours=24)
+        assert p["autocorr"] > 0.7
+        assert abs(p["autocorr_clean"]) < 0.15
+
     def test_slow_regime_has_positive_autocorr_and_few_episodes(self):
         rows = [{"breadth": 1.0 if (i // 25) % 2 else 0.0} for i in range(100)]
         p = G.persistence(rows)

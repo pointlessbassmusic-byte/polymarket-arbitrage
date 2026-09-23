@@ -134,11 +134,23 @@ def _corr(xs, ys) -> float:
     return num / den if den else 0.0
 
 
-def persistence(rows, key="breadth") -> dict:
-    """Lag-1 autocorrelation of the state across consecutive (non-overlapping)
-    observations, plus how long runs above/below the median last."""
+def persistence(rows, key="breadth", *, lookback_hours: int = 24,
+                horizon_hours: int = 24) -> dict:
+    """Autocorrelation of the state across observations.
+
+    Consecutive observations are `horizon` apart, but the state looks back
+    `lookback`; when lookback > horizon the windows OVERLAP and share
+    data, so even pure noise autocorrelates at roughly
+    1 - horizon/lookback. That mechanical floor is reported as `null`,
+    and `autocorr_clean` is measured at the first lag whose windows do
+    not overlap, which is the number that says whether the state
+    actually persists.
+    """
     xs = [r[key] for r in rows]
     ac = _corr(xs[:-1], xs[1:])
+    null = max(0.0, 1.0 - horizon_hours / lookback_hours)
+    lag = max(1, math.ceil(lookback_hours / horizon_hours))
+    clean = _corr(xs[:-lag], xs[lag:]) if len(xs) > lag + 2 else 0.0
     med = statistics.median(xs)
     runs, cur, last = [], 0, None
     for x in xs:
@@ -150,7 +162,8 @@ def persistence(rows, key="breadth") -> dict:
                 runs.append(cur)
             cur, last = 1, s
     runs.append(cur)
-    return {"autocorr": ac, "n": len(xs), "episodes": len(runs),
+    return {"autocorr": ac, "null": null, "lag": lag, "autocorr_clean": clean,
+            "n": len(xs), "episodes": len(runs),
             "mean_run": statistics.mean(runs) if runs else 0.0}
 
 
@@ -209,7 +222,9 @@ def render(rows, pers: dict, preds: list[dict], bar: Barrier, cost: float,
            f"median cross-section {int(statistics.median(r['n_tokens'] for r in rows))} tokens",
            f"state lookback {lookback_hours}h; barrier {bar}; cost {100 * cost:.2f}%; "
            f"break-even hit {100 * bar.breakeven(cost):.1f}%", "",
-           f"persistence of breadth: lag-1 autocorr {pers['autocorr']:+.3f}, "
+           f"persistence of breadth: lag-1 autocorr {pers['autocorr']:+.3f} "
+           f"(overlap null ~{pers['null']:+.2f}); non-overlapping lag-{pers['lag']} "
+           f"autocorr {pers['autocorr_clean']:+.3f}; "
            f"{pers['episodes']} episodes above/below median, "
            f"mean run {pers['mean_run']:.1f} x {horizon_hours}h", ""]
     for p in preds:
@@ -251,8 +266,9 @@ def main() -> int:
         print(f"only {len(rows)} usable observations")
         return 1
     preds = [predict(rows, k, bar, args.cost) for k in ("breadth", "median")]
-    print(render(rows, persistence(rows), preds, bar, args.cost,
-                 args.lookback, args.horizon))
+    pers = persistence(rows, lookback_hours=args.lookback,
+                       horizon_hours=args.horizon)
+    print(render(rows, pers, preds, bar, args.cost, args.lookback, args.horizon))
     return 0
 
 
