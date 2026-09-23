@@ -98,8 +98,11 @@ class GeckoTerminalClient:
         return []
 
     async def ohlcv_history(self, chain: str, pool: str, *, days: float,
-                            aggregate: int = 5) -> list[Candle]:
+                            aggregate: int = 5,
+                            timeframe: str = "minute") -> list[Candle]:
         """Paginate back `days` of candles (multiple calls).
+
+        `timeframe` is minute/hour/day; `aggregate` is candles per bucket.
 
         Pagination stops on TIME, not on candle count. GeckoTerminal omits
         empty buckets, so a sparse pool returns 1000 candles spanning
@@ -108,14 +111,16 @@ class GeckoTerminalClient:
         instead of data.
         """
         import time as _time
-        needed = int(days * 24 * 60 / aggregate)
+        minutes = {"minute": 1, "hour": 60, "day": 1440}[timeframe]
+        needed = int(days * 24 * 60 / (aggregate * minutes))
         floor_ts = _time.time() - days * 86400
         out: list[Candle] = []
         before: Optional[int] = None
         for _ in range(12):                      # hard page cap
             try:
-                page = await self.ohlcv(chain, pool, aggregate=aggregate,
-                                        limit=1000, before_ts=before)
+                page = await self.ohlcv(chain, pool, timeframe=timeframe,
+                                        aggregate=aggregate, limit=1000,
+                                        before_ts=before)
             except (httpx.HTTPStatusError, httpx.TransportError) as exc:
                 logger.warning("ohlcv page failed for %s (%s) - keeping %d "
                                "candles already fetched", pool[:10], exc, len(out))
