@@ -148,12 +148,13 @@ def bucket_of(value, cuts) -> int:
     return next((k for k, c in enumerate(cuts) if value < c), len(cuts))
 
 
-def bucket_report(rows, bar: Barrier, cost: float, n_buckets=5) -> dict:
+def bucket_report(rows, bar: Barrier, cost: float, n_buckets=5,
+                  features=FEATURES) -> dict:
     """Hit rate per feature quantile against break-even. In-sample only."""
     be = bar.breakeven(cost)
     out = {"n": len(rows), "breakeven": be, "base_rate": hit_rate(rows),
            "features": {}}
-    for feat in FEATURES:
+    for feat in features:
         cuts = quantiles(rows, feat, n_buckets)
         groups: list[list] = [[] for _ in range(n_buckets)]
         for r in rows:
@@ -172,11 +173,11 @@ def bucket_report(rows, bar: Barrier, cost: float, n_buckets=5) -> dict:
     return out
 
 
-def candidate_rules(rows, n_bands=3):
+def candidate_rules(rows, n_bands=3, features=FEATURES):
     """Every two-feature cell, as (name, predicate) built on THESE rows' cuts."""
-    cuts = {f: quantiles(rows, f, n_bands) for f in FEATURES}
+    cuts = {f: quantiles(rows, f, n_bands) for f in features}
     rules = []
-    for f1, f2 in itertools.combinations(FEATURES, 2):
+    for f1, f2 in itertools.combinations(features, 2):
         for b1 in range(n_bands):
             for b2 in range(n_bands):
                 def pred(r, f1=f1, b1=b1, f2=f2, b2=b2):
@@ -203,7 +204,8 @@ def _ranks(vals):
     return out
 
 
-def validate(rows, bar: Barrier, cost: float, n_bands=3) -> dict:
+def validate(rows, bar: Barrier, cost: float, n_bands=3,
+             features=FEATURES) -> dict:
     """Rank rules on the first half, score them on the second.
 
     Scored as lift over each half's own baseline. A rising market lifts
@@ -214,7 +216,7 @@ def validate(rows, bar: Barrier, cost: float, n_bands=3) -> dict:
     in_s, out_s = rows[:cut], rows[cut:]
     base_in, base_out = hit_rate(in_s), hit_rate(out_s)
     scored = []
-    for name, pred in candidate_rules(in_s, n_bands):
+    for name, pred in candidate_rules(in_s, n_bands, features):
         gi = [r for r in in_s if pred(r)]
         go = [r for r in out_s if pred(r)]
         if len(gi) < MIN_CELL or len(go) < MIN_CELL:
