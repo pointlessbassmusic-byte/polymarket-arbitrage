@@ -930,3 +930,48 @@ class TestParsePair:
         assert s is not None
         assert s.change_5m is None
         assert s.liquidity_usd == 0.0
+
+
+# -- walk-forward study ----------------------------------------------------
+
+class TestStudy:
+    def test_isolate_silences_the_other_detectors(self):
+        from cryptobot.study import isolate
+        from cryptobot.volatility import VolatilityEngine
+        # A snapshot that would trip breakout under the real config.
+        snap = make_snap(change_5m=0.05, change_1h=0.15,
+                         volume_1h_usd=100_000.0)
+        vol = VolatilityEngine().observe(snap)
+        assert detect_breakout(snap, vol, isolate("breakout")) is not None
+        for other in ("mean_revert", "regime"):
+            assert detect_breakout(snap, vol, isolate(other)) is None
+
+    def test_significance_refuses_to_infer_from_a_tiny_sample(self):
+        from cryptobot.study import MIN_TRADES_FOR_INFERENCE, significance
+        # Two lucky trades can produce a large |t| that means nothing.
+        tiny = [make_trade(10.0), make_trade(11.0)]
+        s = significance(tiny)
+        assert s["enough"] is False
+        assert s["significant"] is False
+
+    def test_significance_reports_a_real_sample(self):
+        from cryptobot.study import significance
+        wins = [make_trade(5.0) for _ in range(12)]
+        s = significance(wins)
+        assert s["enough"] is True
+        assert s["n"] == 12
+        assert s["mean"] > 0
+        assert s["ci_lo"] <= s["mean"] <= s["ci_hi"]
+
+    def test_split_windows_keeps_only_slices_with_warmup(self):
+        from cryptobot.backtest import CANDLES_PER_DAY
+        from cryptobot.data.geckoterminal import Candle
+        from cryptobot.study import split_windows
+        from cryptobot.backtest import PoolMeta
+        meta = PoolMeta(chain="base", pair_address="0xP", symbol="T",
+                        token_address="0xT", liquidity_usd=1e5, fdv_usd=1e6)
+        candles = [Candle(ts=NOW + i * 300, open=1, high=1, low=1, close=1,
+                          volume_usd=1.0) for i in range(4 * CANDLES_PER_DAY)]
+        assert len(split_windows({"base:0xP": (meta, candles)}, 3)) == 3
+        # Too short to contain a warm-up: no usable windows.
+        assert split_windows({"base:0xP": (meta, candles[:100])}, 3) == []

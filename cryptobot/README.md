@@ -128,6 +128,7 @@ cryptobot/
 ├── analytics.py         # per-pattern edge tracker → confidence feedback
 ├── costs.py             # round-trip cost model + net-RR entry gate
 ├── preflight.py         # go-live checklist (--preflight)
+├── study.py             # walk-forward edge study (-m cryptobot.study)
 ├── protections.py       # Freqtrade-style cooldown / guards / drawdown halt
 ├── dashboard.py         # FastAPI live dashboard (--dashboard)
 ├── backtest.py          # candle replay through the live detectors
@@ -191,7 +192,68 @@ positions amortize fixed gas better. And the chain list is restricted to
 Ethereum needs $200+ *per position* just to clear its own gas, which
 prices out a small account entirely.
 
-## The cost reality (read this before going live)
+## What 21 days of real data say (read this first)
+
+A walk-forward study over **21 days × 18 tokens** (`python -m
+cryptobot.study`), with each detector run in isolation across six
+consecutive non-overlapping windows:
+
+| detector | trades | gross | costs | net | windows +/- |
+|---|---|---|---|---|---|
+| breakout | 2 | −$3.04 | $1.02 | −$4.05 | 0 / 2 |
+| mean reversion | 0 | — | — | — | never fired in 21 days |
+| regime shift | 18 | **+$2.06** | **$10.56** | **−$8.49** | 2 / 2 |
+
+**The strategy loses money on a DEX, and the reason is not the signal.**
+The regime detector's gross edge is positive (+$2.06); its costs are
+$10.56 — five times larger. Half its exits were time stops: trades that
+went nowhere and paid a full round trip to learn nothing.
+
+Three things follow, none of which are fixed by tuning:
+
+1. **Holding longer helps, but not enough.** Raising the time stop from
+   6h to 48h eliminates the timeouts and more than triples gross
+   (+$2.06 → +$7.09), because targets finally get a chance to be
+   reached. Costs are unchanged, so net is still −$2.86.
+2. **Being more selective makes it worse.** Raising the cost gate to 6×
+   or 8× cuts the sample to 7 and 2 trades, both negative. There is no
+   selectivity setting that rescues it.
+3. **Bigger positions do not help.** At $50 on Base, gas is only ~0.2 of
+   the 1.18% round trip; the rest is the DEX fee and slippage, which are
+   *proportional*. Scale changes nothing.
+
+### The edge is not established
+
+Per-trade gross return over the best configuration: **+0.82%, standard
+error 0.82%, t = 1.00, 95% CI −0.78% … +2.42%.** It is not
+distinguishable from zero. Roughly 68 trades would settle it; there are
+17. The single favourable 8-day window that an earlier commit reported as
+"+0.45%" does not survive out of sample — which is what a walk-forward is
+for.
+
+### Where the arithmetic could work
+
+The break-even friction for the measured gross edge is ~0.82% round trip.
+Holding the same trades fixed and varying only the fee:
+
+| venue | round trip | net on $200 / 21d |
+|---|---|---|
+| DEX as configured | 1.00% | −$1.35 |
+| DEX 0.05% fee tier | 0.50% | +$2.87 |
+| CEX taker (0.10%) | 0.30% | +$4.56 |
+| CEX maker (0.02%) | 0.14% | +$5.91 |
+
+This is **conditional on the edge being real**, which 17 trades cannot
+show. It is a reason to keep measuring, not a reason to fund anything.
+
+Re-run the study as paper data accumulates:
+
+```bash
+python -m cryptobot.study PEPE BRETT MOG SPX --days 21 --windows 6
+python -m cryptobot.study --cache pools.pkl --windows 6 --hold-hours 48
+```
+
+## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool
 depth + per-chain gas) against the same 8-token window turned the gross
