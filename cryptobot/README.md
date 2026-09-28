@@ -483,6 +483,47 @@ year across 18 coins at +1.5% each is the ceiling the history suggests;
 a $200 book risking 10% per trade would have made on the order of
 $50–$150 a year, before compounding and before anything goes wrong.
 
+## Running the strategy that survived: `cryptobot.perp_bot`
+
+The bounce-short rule now runs as its own daily bot, built to match how
+it was validated rather than how the 5-minute scanner works:
+
+```bash
+python -m cryptobot.perp_bot --once                 # evaluate today, print signals
+python -m cryptobot.perp_bot --dashboard --port 8082  # sim book live, hourly monitor
+```
+
+- **Daily cadence.** Once a day after 00:10 UTC it pulls closed daily
+  candles for 18 Hyperliquid memecoins, refits the tercile cuts on every
+  candle before today (the expanding window from the walk-forward), and
+  shorts any coin whose last day is a top-tercile up-move inside a
+  bottom-tercile 3-day move. Target −20%, stop +10%, 14-day time exit.
+- **Two books, same as the scanner.** `sim` always trades on live data
+  and is the benchmark; `real` is dormant until armed
+  (`perp.live: true`, `CRYPTOBOT_ARM_LIVE=yes`, and a wallet key in
+  `CRYPTOBOT_PRIVATE_KEY`). The real book records actual fills, so the
+  gap between the two is measured execution cost.
+- **Exchange costs on paper fills.** Taker fee + slippage each side, no
+  gas. Shorts use a side-aware portfolio: stop above entry, target
+  below, breakeven ratchet moving the stop *down*, and no trailing — a
+  trailing short in a squeeze is how a bounded loss stops being one.
+- **Execution is a wallet signature.** Hyperliquid is a perps DEX, so
+  going live needs no exchange account. Orders are IOC limits at mid ±
+  1% (a market order with a worst-price cap) via the official SDK,
+  reduce-only on closes so a stale state file can never flip a position.
+  The SDK is imported lazily; paper trading never needs it installed.
+- **Restarts are safe.** Both books persist to `cryptobot_<book>_portfolio.json`
+  and restore on start; a real position is never forgotten.
+
+The dashboard is the same one, pointed at the perp bot (port 8082). It
+shows the fitted cuts, the last evaluation, both books, every decision
+and why.
+
+Treat the sim book as the experiment it is. The history says roughly
+100–460 trades a year at +1.5% each; a couple of hundred live paper
+trades against real mids and real funding is what will say whether the
+walk-forward was telling the truth.
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool

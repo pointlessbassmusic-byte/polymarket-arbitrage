@@ -30,6 +30,8 @@ class Portfolio:
     # -- entries -----------------------------------------------------------
 
     def open_from_signal(self, sig: Signal, size_usd: float) -> Position:
+        # A short's stop sits ABOVE entry and its target below.
+        d = 1.0 if sig.side == Side.LONG else -1.0
         pos = Position(
             key=sig.key,
             chain=sig.chain,
@@ -39,8 +41,8 @@ class Portfolio:
             size_usd=size_usd,
             qty=size_usd / sig.price_usd,
             opened_at=sig.ts,
-            stop_loss=sig.price_usd * (1.0 - sig.stop_loss_pct),
-            take_profit=sig.price_usd * (1.0 + sig.take_profit_pct),
+            stop_loss=sig.price_usd * (1.0 - d * sig.stop_loss_pct),
+            take_profit=sig.price_usd * (1.0 + d * sig.take_profit_pct),
             trail_pct=self.default_trail if sig.type == SignalType.VOL_BREAKOUT else None,
             high_water=sig.price_usd,
             signal_type=sig.type,
@@ -64,6 +66,8 @@ class Portfolio:
         pos = self.positions.get(key)
         if pos is None:
             return None
+        if pos.side == Side.SHORT:
+            return self._check_exit_short(pos, price)
         if price > pos.high_water:
             pos.high_water = price
             # Breakeven ratchet: once the trade is decently green (2x its
@@ -90,6 +94,32 @@ class Portfolio:
             if pos.trail_pct is not None:
                 pos.take_profit = price * 2.0  # effectively disabled
                 return None
+            return "take_profit"
+        return None
+
+    def _check_exit_short(self, pos: Position, price: float) -> Optional[str]:
+        """Mirror of the long logic: profit is DOWN, the stop is above.
+
+        `high_water` holds the best (lowest) price seen. The breakeven
+        ratchet moves the stop DOWN to entry minus costs once the trade
+        is 2x its own costs in profit. Shorts never trail: the strategy
+        that uses them was validated with a fixed target, and a trailing
+        short in a squeeze is how a bounded loss becomes an unbounded
+        one.
+        """
+        if pos.high_water == 0.0 or price < pos.high_water:
+            pos.high_water = price
+            if self.cost_model is not None and not pos.breakeven_set:
+                rt = self.cost_model.round_trip_fraction(
+                    pos.size_usd, pos.liquidity_usd, pos.chain)
+                if price <= pos.entry_price * (1.0 - 2.0 * rt - 0.01):
+                    be_stop = pos.entry_price * (1.0 - rt - 0.002)
+                    if be_stop < pos.stop_loss:
+                        pos.stop_loss = be_stop
+                    pos.breakeven_set = True
+        if price >= pos.stop_loss:
+            return "stop_loss" if price >= pos.entry_price else "breakeven_stop"
+        if price <= pos.take_profit:
             return "take_profit"
         return None
 

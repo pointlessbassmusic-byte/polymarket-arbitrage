@@ -79,6 +79,17 @@ class HyperliquidClient:
         meta = await self._info({"type": "meta"}) or {}
         return [u["name"] for u in meta.get("universe", []) if not u.get("isDelisted")]
 
+    async def all_mids(self) -> dict[str, float]:
+        """Current mid price for every perp, keyed by coin name."""
+        mids = await self._info({"type": "allMids"}) or {}
+        out = {}
+        for coin, px in mids.items():
+            try:
+                out[coin] = float(px)
+            except (TypeError, ValueError):
+                continue
+        return out
+
     async def candles(self, coin: str, interval: str = "1d", *,
                       start_ms: int = 0, end_ms: Optional[int] = None) -> list[Candle]:
         """Candles oldest-first. The API returns at most ~5000 per call."""

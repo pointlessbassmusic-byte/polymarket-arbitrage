@@ -139,3 +139,16 @@ execution:
   private_rpc_urls:
     ethereum: "https://rpc.flashbots.net/fast"
     bsc: "https://rpc.48.club"
+
+# Daily perp bot (python -m cryptobot.perp_bot): the bounce-short rule
+# that survived the multi-year walk-forward. Runs on Hyperliquid, which
+# is a perps DEX — going live is a wallet key, no exchange account.
+# Sim book sizing derives from sim.bankroll_usd above; real from risk:.
+perp:
+  live: false                  # PAPER. Also needs CRYPTOBOT_ARM_LIVE=yes.
+  private_key_env: CRYPTOBOT_PRIVATE_KEY
+  max_trade_usd: 50
+  max_slippage: 0.01
+  target_pct: 0.20             # validated geometry: -20% target,
+  stop_pct: 0.10               # +10% stop, 14-day time exit
+  hold_days: 14

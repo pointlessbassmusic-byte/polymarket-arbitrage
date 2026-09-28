@@ -10,8 +10,7 @@ from typing import Optional
 
 class Side(str, Enum):
     LONG = "long"
-    # Shorting memecoins on-chain is rarely practical; kept for completeness
-    # (used by the NFT module to flag "avoid/exit" rather than actual shorts).
+    # Shorts run on perps (Hyperliquid), never on spot DEX pools.
     SHORT = "short"
 
 
@@ -20,6 +19,7 @@ class SignalType(str, Enum):
     MEAN_REVERT = "mean_revert"            # overextended spike, fade / buy the dip
     CROSS_DEX_ARB = "cross_dex_arb"        # same token priced differently across pools
     VOL_REGIME_SHIFT = "vol_regime_shift"  # quiet coin waking up (5m vol >> 24h vol)
+    BOUNCE_SHORT = "bounce_short"          # daily perp: short a one-day bounce in a decline
 
 
 @dataclass
