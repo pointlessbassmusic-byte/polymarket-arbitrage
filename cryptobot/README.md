@@ -524,6 +524,50 @@ Treat the sim book as the experiment it is. The history says roughly
 trades against real mids and real funding is what will say whether the
 walk-forward was telling the truth.
 
+### Does the bot trade what was validated? (`--replay`)
+
+`python -m cryptobot.perp_bot --replay hl_daily.pkl --replay-from 2025-05-20`
+drives the bot's own evaluate/consider/monitor through the cached daily
+history, checking stops on each day's high and targets on its low, and
+compares with the study over the same window. It is the check that the
+code trades the rule, not a cousin of it. It caught three things:
+
+1. **The breakeven ratchet.** Sized for 5-minute DEX swings, it fired
+   on the first ordinary daily dip and dragged the stop to just under
+   entry; 83% of trades were then scratched on the next day's high and
+   one in fifty reached the target. The rule was validated with a fixed
+   stop and target, so the perp books run without the ratchet.
+2. **Re-entry timing decides a full percent.** After a stop-out (a +10%
+   squeeze) the bounce pattern fires again almost immediately, and those
+   re-entries are the losers. Making a coin eligible again 14 days after
+   its last *exit* gave +0.3% per trade; 14 days after its last *entry*
+   — the nearest one-position reading of the walk-forward — gave +1.2%.
+   The bot uses entry-based eligibility, and that sensitivity is the
+   honest width of the estimate.
+3. **Time exits at the day's high.** A replay artefact — the first
+   monitor tick after 14 days landed on the high phase — that cost ~5%
+   on every time exit. Fixed to fill at the open, as an hourly monitor
+   would.
+
+With those settled, the bot's replay and the study agree trade for trade
+(245 vs 247 trades; 77/134/34 vs 77/137/33 target/stop/timeout):
+
+| | trades | net per trade |
+|---|---|---|
+| replay 2025-05 → 2025-12 | 140 | +1.00% |
+| replay 2026 | 105 | +1.57% |
+| **replay, whole window** | **245** | **+1.24%** |
+| study, same semantics | 247 | +1.16% |
+
+**What to expect.** The out-of-sample, one-position-per-coin figure for
+this rule is roughly +1.2% net per trade with a standard error near
+0.8%, on a window that was a bear market for the asset class. Small
+changes in re-entry timing move it between +0.3% and +1.2%. That is a
+strategy worth paper-trading, not one worth leveraging. At ~180 trades a
+year it is on the order of +$2 per $10 of position per year — a $200 sim
+book risking 10% per trade would have made about $40 over this window
+before compounding.
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool

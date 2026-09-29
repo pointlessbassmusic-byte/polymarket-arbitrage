@@ -72,6 +72,29 @@ class TestShortPortfolio:
         assert pf.positions[key].stop_loss == pytest.approx(110.0)
         assert pf.check_exit(key, 100.5) is None       # still open: no ratchet
 
+    def test_coin_is_ineligible_for_hold_days_after_entry(self, monkeypatch):
+        client = FakeClient({"A": _series(bounce=True), "B": _series(), "C": _series(),
+                             "D": _series(), "E": _series(), "F": _series()},
+                            {"A": 100.0})
+        t0 = client.t0 + 400 * DAY + 3600
+        monkeypatch.setattr(PB, "now", lambda: t0)
+        bot = _bot(client)
+        asyncio.run(bot.run_daily())
+        entry = bot.books["sim"].portfolio.positions[f"{CHAIN}:A"].entry_price
+        # stop out on day 2, then the pattern fires again: refused until day 14
+        client.mids["A"] = entry * 1.11
+        monkeypatch.setattr(PB, "now", lambda: t0 + 2 * DAY)
+        asyncio.run(bot.monitor())
+        assert f"{CHAIN}:A" not in bot.books["sim"].portfolio.positions
+        bot.last_daily_run = 0
+        asyncio.run(bot.run_daily())
+        assert f"{CHAIN}:A" not in bot.books["sim"].portfolio.positions
+        assert bot.journal.recent(3)[0]["stage"] == "cooldown"
+        monkeypatch.setattr(PB, "now", lambda: t0 + 14 * DAY + 1)
+        bot.last_daily_run = 0
+        asyncio.run(bot.run_daily())
+        assert f"{CHAIN}:A" in bot.books["sim"].portfolio.positions
+
     def test_perp_books_run_without_the_ratchet(self, monkeypatch):
         client = FakeClient({"A": _series(bounce=True), "B": _series(), "C": _series(),
                              "D": _series(), "E": _series(), "F": _series()}, {})
@@ -266,6 +289,7 @@ class TestBooks:
         assert f"{CHAIN}:A" not in bot.books["sim"].portfolio.positions   # cooldown
         bot.books["sim"].protections = __import__("cryptobot.protections", fromlist=["x"]).ProtectionManager(
             ProtectionConfig(cooldown_s=0), 200)
+        bot.eligible_at.clear()
         asyncio.run(bot.run_daily())
         assert f"{CHAIN}:A" in bot.books["sim"].portfolio.positions
         client.mids["A"] = entry

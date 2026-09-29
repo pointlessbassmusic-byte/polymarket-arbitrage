@@ -98,6 +98,18 @@ class PerpBot:
         self.client = client or HyperliquidClient()
         self.executor = executor or PerpExecutor(exec_cfg)
         self.costs = perp_cost_model()
+        # One trade per coin per hold period, measured from ENTRY: a coin
+        # becomes eligible again hold_days after it was last entered,
+        # whether or not that trade is still open. That is the nearest
+        # one-position-at-a-time reading of the walk-forward, which scored
+        # every signal day. A stop-out is a +10% squeeze, which is exactly
+        # when the pattern fires again, and those immediate re-entries are
+        # the losers; measuring the wait from exit instead of entry
+        # dropped the replay from +1.2% to +0.3% per trade. The per-token
+        # cooldown protection is therefore off here (see `_eligible`).
+        import dataclasses
+        prot_cfg = dataclasses.replace(prot_cfg, cooldown_s=0)
+        self.eligible_at: dict[str, float] = {}
         self.books = {
             # No breakeven ratchet: the rule was validated with a fixed
             # stop and target, and on daily candles the ratchet scratches
@@ -219,6 +231,11 @@ class PerpBot:
 
         if sig.key in book.portfolio.positions:
             return
+        until = self.eligible_at.get(f"{book.name}:{sig.key}", 0.0)
+        if now() < until:
+            note("skipped", "cooldown",
+                 f"entered within the last {self.cfg.hold_days}d")
+            return
         allowed, why = book.protections.entry_allowed(sig.key)
         if not allowed:
             note("skipped", "protections", why)
@@ -244,6 +261,7 @@ class PerpBot:
             sig = Signal(**{**vars(sig), "price_usd": fill.price})
             size = fill.qty * fill.price
         book.portfolio.open_from_signal(sig, size)
+        self.eligible_at[f"{book.name}:{sig.key}"] = sig.ts + self.cfg.hold_days * 86400
         note("opened", "entry", sig.reason, size)
 
     # -- monitoring --------------------------------------------------------
@@ -407,19 +425,36 @@ async def replay(pools: dict, start_ts: float, cfg: PerpBotConfig, *,
                   executor=PerpExecutor(PerpExecConfig()))
     days = sorted({int(c.ts // 86400) * 86400 for cs in client.series.values()
                    for c in cs if c.ts >= start_ts})
-    # Patch THIS module's clock, whichever name it was imported under
-    # (`python -m` runs it as __main__, where a patch on cryptobot.perp_bot
-    # would not be seen).
+    # One virtual clock for every module that reads the time: this one
+    # (under whichever name it was imported — `python -m` runs it as
+    # __main__), and the portfolio / protections / risk layers, whose
+    # cooldowns and daily limits would otherwise run on wall-clock time.
+    import cryptobot.portfolio as pf_mod
+    import cryptobot.protections as prot_mod
+    import cryptobot.risk as risk_mod
     g = globals()
-    real_now = g["now"]
+    clocks = [g, vars(pf_mod), vars(prot_mod), vars(risk_mod)]
+    saved = [c["now"] for c in clocks]
+    vclock = [0.0]
+
+    def set_clock(t: float) -> None:
+        vclock[0] = t
+
+    for c in clocks:
+        c["now"] = lambda: vclock[0]
     sim = bot.books["sim"].portfolio
 
-    def barrier_price(sym: str, extreme: float, phase: str) -> float:
+    def barrier_price(sym: str, c, phase: str, at: float) -> float:
         """Fill at the barrier, not the day's extreme: an hourly monitor
-        exits near the level, and the study assumed exactly that."""
+        exits near the level, and the study assumed exactly that. A time
+        exit fires on the first tick after the hold elapses, which is the
+        open of that day, not its high."""
+        extreme = getattr(c, phase)
         pos = sim.positions.get(f"{CHAIN}:{sym}")
         if pos is None:
             return extreme
+        if at - pos.opened_at >= cfg.hold_days * 86400:
+            return c.open
         if phase == "high" and extreme >= pos.stop_loss:
             return pos.stop_loss
         if phase == "low" and extreme <= pos.take_profit:
@@ -431,21 +466,22 @@ async def replay(pools: dict, start_ts: float, cfg: PerpBotConfig, *,
             # 00:10 UTC: yesterday's candle has closed; evaluate and enter at
             # its close (the study's entry price).
             client.today = day
-            g["now"] = lambda d=day: d + 600
+            set_clock(day + 600)
             await bot.run_daily()
             # During the day: stop on the high, then target on the low.
             todays = {sym: next((c for c in cs if int(c.ts // 86400) * 86400 == day), None)
                       for sym, cs in client.series.items()}
             for phase in ("high", "low", "close"):
-                client.mids = {sym: barrier_price(sym, getattr(c, phase), phase)
+                at = day + {"high": 3600 * 8, "low": 3600 * 16, "close": 86400 - 60}[phase]
+                client.mids = {sym: barrier_price(sym, c, phase, at)
                                for sym, c in todays.items() if c}
-                g["now"] = lambda d=day, p=phase: d + {"high": 3600 * 8, "low": 3600 * 16,
-                                                      "close": 86400 - 60}[p]
+                set_clock(at)
                 client.funding = {sym: daily_funding / 24.0 for sym in client.mids} \
                     if phase == "close" else {}
                 await bot.monitor()
     finally:
-        g["now"] = real_now
+        for c, original in zip(clocks, saved):
+            c["now"] = original
     book = bot.books["sim"]
     closed = book.portfolio.closed
     by_year: dict[int, list[float]] = {}
