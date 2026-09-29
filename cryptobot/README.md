@@ -568,6 +568,51 @@ year it is on the order of +$2 per $10 of position per year — a $200 sim
 book risking 10% per trade would have made about $40 over this window
 before compounding.
 
+### More volume, more venues? Measured
+
+Three obvious ways to scale were checked before building any of them.
+
+**Cross-venue arbitrage (Kraken / Coinbase / OKX / Hyperliquid).** A
+two-minute live sample of eight memecoins, taking the best executable
+pair each tick (buy at the lowest ask, sell at the highest bid):
+
+| coin | gross spread, median | best net after taker fees |
+|---|---|---|
+| PEPE | 0.018% | −0.067% |
+| WIF | 0.075% | +0.085% |
+| BONK | 0.087% | +0.060% |
+| DOGE | 0.036% | −0.036% |
+
+Net of both venues' taker fees the spread is negative **91%** of the
+time; the best moments are +0.06–0.09% and last seconds. Spot–spot arb
+between major venues is a market-maker's business with co-location and
+fee tiers this book will never have. Kraken as a *venue* is useful for
+one thing here: the spot leg of a carry trade (below).
+
+**Same rule, whole Hyperliquid universe (176 perps, 158 non-memes).**
+The bounce-short walked forward on everything: 3 of 5 years positive,
+beats the unconditional short in 2 of 5, −0.9% in 2023 and −0.35% in
+2024, +0.88% trade-weighted only because 2025–26 was a bear. On
+non-memes alone it is the same shape. Adding 158 coins multiplies trade
+count by nine and turns a 5-of-5 rule into a coin-flip: the edge is a
+memecoin phenomenon. More coins is more volume, not more profit.
+
+**Funding carry (short perp, long spot).** From the funding history:
+
+| year | mean funding/day | annualised | hours negative |
+|---|---|---|---|
+| 2023 | +0.056% | 20% | 38% |
+| 2024 | +0.104% | 38% | 8% |
+| 2025 | +0.010% | 4% | 22% |
+| 2026 | −0.004% | −2% | 27% |
+
+Holding the top-3 funding coins, rebalanced monthly, would have paid
+13–22%/yr gross in the flat years and 65% in 2024, before ~7%/yr of
+rebalancing cost. It is market-neutral and high-capacity, and it is
+the one thing a second venue (Kraken spot) actually enables. It is also
+entirely regime-dependent: the yield is whatever the crowd's leverage
+appetite is, and this year it is roughly zero.
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool
