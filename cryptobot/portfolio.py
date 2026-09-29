@@ -15,7 +15,13 @@ logger = logging.getLogger(__name__)
 
 class Portfolio:
     def __init__(self, trail_pct: float = 0.05, state_file: Optional[Path] = None,
-                 cost_model: Optional[CostModel] = None):
+                 cost_model: Optional[CostModel] = None,
+                 breakeven_ratchet: bool = True):
+        # The breakeven ratchet suits 5-minute swing trades with a cost of
+        # a few tenths of a percent. On daily candles it fires on the first
+        # ordinary dip and scratches every trade before the target can be
+        # reached; a strategy validated without it must run without it.
+        self.breakeven_ratchet = breakeven_ratchet
         self.positions: dict[str, Position] = {}
         self.closed: list[ClosedTrade] = []
         self.realized_pnl: float = 0.0
@@ -73,7 +79,8 @@ class Portfolio:
             # Breakeven ratchet: once the trade is decently green (2x its
             # own round-trip cost above entry), move the stop to entry plus
             # costs — a trade that cleared its costs never finishes red.
-            if self.cost_model is not None and not pos.breakeven_set:
+            if (self.breakeven_ratchet and self.cost_model is not None
+                    and not pos.breakeven_set):
                 rt = self.cost_model.round_trip_fraction(
                     pos.size_usd, pos.liquidity_usd, pos.chain)
                 if price >= pos.entry_price * (1.0 + 2.0 * rt + 0.01):
@@ -109,7 +116,8 @@ class Portfolio:
         """
         if pos.high_water == 0.0 or price < pos.high_water:
             pos.high_water = price
-            if self.cost_model is not None and not pos.breakeven_set:
+            if (self.breakeven_ratchet and self.cost_model is not None
+                    and not pos.breakeven_set):
                 rt = self.cost_model.round_trip_fraction(
                     pos.size_usd, pos.liquidity_usd, pos.chain)
                 if price <= pos.entry_price * (1.0 - 2.0 * rt - 0.01):

@@ -114,7 +114,8 @@ class TradingBook:
     def create(cls, name: str, risk_cfg: RiskConfig, costs: CostModel,
                prot_cfg: Optional[ProtectionConfig] = None,
                state_dir: Optional[Path] = None,
-               executes_onchain: bool = False) -> "TradingBook":
+               executes_onchain: bool = False,
+               breakeven_ratchet: bool = True) -> "TradingBook":
         return cls(
             name=name,
             starting_equity=risk_cfg.bankroll_usd,
@@ -122,6 +123,7 @@ class TradingBook:
                 state_file=(state_dir / f"cryptobot_{name}_portfolio.json")
                 if state_dir else None,
                 cost_model=costs,
+                breakeven_ratchet=breakeven_ratchet,
             ),
             risk=RiskManager(risk_cfg),
             protections=ProtectionManager(prot_cfg or ProtectionConfig(),

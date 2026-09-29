@@ -67,6 +67,7 @@ class PerpBotConfig:
     # Walk-forward hit rate (~35%) at 2:1 is the confidence the sizer sees.
     confidence: float = 0.35
     liquidity_usd: float = 5_000_000   # perp book depth proxy for the cost model
+    fetch_pause_s: float = 0.2         # between per-coin candle requests
     state_dir: Optional[Path] = None
 
 
@@ -98,10 +99,15 @@ class PerpBot:
         self.executor = executor or PerpExecutor(exec_cfg)
         self.costs = perp_cost_model()
         self.books = {
+            # No breakeven ratchet: the rule was validated with a fixed
+            # stop and target, and on daily candles the ratchet scratches
+            # every trade on its first dip (replay: 83% "stops" at entry).
             "sim": TradingBook.create("sim", sim_risk, self.costs, prot_cfg,
-                                      cfg.state_dir, executes_onchain=False),
+                                      cfg.state_dir, executes_onchain=False,
+                                      breakeven_ratchet=False),
             "real": TradingBook.create("real", real_risk, self.costs, prot_cfg,
-                                       cfg.state_dir, executes_onchain=True),
+                                       cfg.state_dir, executes_onchain=True,
+                                       breakeven_ratchet=False),
         }
         # Real positions the executor opened, keyed like the portfolio, so a
         # close knows the quantity to flatten.
@@ -112,6 +118,7 @@ class PerpBot:
         self.last_daily_run: float = 0.0
         self._mids: dict[str, float] = {}
         self._funding: dict[str, float] = {}
+        self._features: dict[str, dict[float, dict]] = {}
         self.recent_signals: deque = deque(maxlen=40)
         self.equity_curve: deque = deque(maxlen=2000)
         self.cuts: dict[str, list[float]] = {}
@@ -157,10 +164,20 @@ class PerpBot:
                 continue
             closes = [c.close for c in closed]
             vols = [c.volume_usd for c in closed]
-            for i in range(WARMUP_DAYS, len(closed) - 1):
-                rows_hist.append(daily_features(closes, vols, i))
-            today[coin] = (daily_features(closes, vols, len(closed) - 1), closes[-1])
-            await asyncio.sleep(0.2)
+            # Features of a closed candle never change, so they are cached
+            # per (coin, candle ts) and only new candles are computed.
+            cache = self._features.setdefault(coin, {})
+            feats = []
+            for i in range(WARMUP_DAYS, len(closed)):
+                ts = closed[i].ts
+                f = cache.get(ts)
+                if f is None:
+                    f = cache[ts] = daily_features(closes, vols, i)
+                feats.append(f)
+            rows_hist.extend(feats[:-1])
+            today[coin] = (feats[-1], closes[-1])
+            if self.cfg.fetch_pause_s:
+                await asyncio.sleep(self.cfg.fetch_pause_s)
         self.history_days = len(rows_hist) // max(len(today), 1)
         if len(rows_hist) < self.cfg.min_history_days:
             logger.warning("only %d history rows — not fitting", len(rows_hist))
@@ -343,6 +360,108 @@ class PerpBot:
             await asyncio.sleep(self.cfg.monitor_interval_s)
 
 
+class ReplayClient:
+    """Reveals cached daily candles up to a moving 'today' so the live bot
+    can be driven through history one day at a time."""
+
+    def __init__(self, pools: dict):
+        self.series = {meta.symbol: candles for _, (meta, candles) in pools.items()}
+        self.today: float = 0.0
+        self.mids: dict[str, float] = {}
+        self.funding: dict[str, float] = {}
+
+    async def candles(self, coin, interval="1d", **kw):
+        return [c for c in self.series.get(coin, []) if c.ts < self.today]
+
+    async def all_mids(self):
+        return dict(self.mids)
+
+    async def funding_rates(self):
+        return dict(self.funding)
+
+    async def close(self):
+        pass
+
+
+async def replay(pools: dict, start_ts: float, cfg: PerpBotConfig, *,
+                 bankroll: float = 10_000.0, daily_funding: float = 0.0) -> dict:
+    """Run the bot's own evaluate/consider/monitor through history.
+
+    Exits are checked against each day's high (stop side) and then low
+    (target side), the study's conservative convention. Sizing caps are
+    lifted so every signal trades, which is what the study measured; the
+    number that matters is the mean net return per trade, compared with
+    `perp_study --walk-forward` over the same window.
+    """
+    import dataclasses
+    import datetime as dt
+    client = ReplayClient(pools)
+    cfg = dataclasses.replace(cfg, fetch_pause_s=0.0, coins=tuple(client.series))
+    risk = RiskConfig(bankroll_usd=bankroll, risk_per_trade_pct=0.001,
+                      max_position_usd=10.0, max_total_exposure_usd=1e9,
+                      max_daily_loss_usd=1e9, max_open_positions=10_000,
+                      min_position_usd=10.0, min_confidence=0.0)
+    prot = ProtectionConfig(cooldown_s=0, stoploss_guard_limit=10_000,
+                            low_profit_min_trades=10_000, max_drawdown_pct=1.0)
+    bot = PerpBot(cfg, risk, risk, prot, PerpExecConfig(), client=client,
+                  executor=PerpExecutor(PerpExecConfig()))
+    days = sorted({int(c.ts // 86400) * 86400 for cs in client.series.values()
+                   for c in cs if c.ts >= start_ts})
+    # Patch THIS module's clock, whichever name it was imported under
+    # (`python -m` runs it as __main__, where a patch on cryptobot.perp_bot
+    # would not be seen).
+    g = globals()
+    real_now = g["now"]
+    sim = bot.books["sim"].portfolio
+
+    def barrier_price(sym: str, extreme: float, phase: str) -> float:
+        """Fill at the barrier, not the day's extreme: an hourly monitor
+        exits near the level, and the study assumed exactly that."""
+        pos = sim.positions.get(f"{CHAIN}:{sym}")
+        if pos is None:
+            return extreme
+        if phase == "high" and extreme >= pos.stop_loss:
+            return pos.stop_loss
+        if phase == "low" and extreme <= pos.take_profit:
+            return pos.take_profit
+        return extreme
+
+    try:
+        for day in days:
+            # 00:10 UTC: yesterday's candle has closed; evaluate and enter at
+            # its close (the study's entry price).
+            client.today = day
+            g["now"] = lambda d=day: d + 600
+            await bot.run_daily()
+            # During the day: stop on the high, then target on the low.
+            todays = {sym: next((c for c in cs if int(c.ts // 86400) * 86400 == day), None)
+                      for sym, cs in client.series.items()}
+            for phase in ("high", "low", "close"):
+                client.mids = {sym: barrier_price(sym, getattr(c, phase), phase)
+                               for sym, c in todays.items() if c}
+                g["now"] = lambda d=day, p=phase: d + {"high": 3600 * 8, "low": 3600 * 16,
+                                                      "close": 86400 - 60}[p]
+                client.funding = {sym: daily_funding / 24.0 for sym in client.mids} \
+                    if phase == "close" else {}
+                await bot.monitor()
+    finally:
+        g["now"] = real_now
+    book = bot.books["sim"]
+    closed = book.portfolio.closed
+    by_year: dict[int, list[float]] = {}
+    for t in closed:
+        y = dt.datetime.utcfromtimestamp(t.opened_at).year
+        by_year.setdefault(y, []).append(t.pnl_usd / t.size_usd)
+    return {
+        "trades": len(closed),
+        "open": len(book.portfolio.positions),
+        "mean_net": (sum(t.pnl_usd / t.size_usd for t in closed) / len(closed)) if closed else 0.0,
+        "by_year": {y: (len(v), sum(v) / len(v)) for y, v in sorted(by_year.items())},
+        "exits": {r: sum(1 for t in closed if t.exit_reason == r)
+                  for r in {t.exit_reason for t in closed}},
+    }
+
+
 def load_config(path: Path) -> dict:
     import yaml
     return yaml.safe_load(path.read_text()) or {}
@@ -379,6 +498,23 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
 
 async def _main(args) -> int:
     cfg = load_config(args.config)
+    if args.replay:
+        import datetime as dt
+        import pickle
+        pools = pickle.loads(args.replay.read_bytes())
+        start = dt.datetime.fromisoformat(args.replay_from).replace(
+            tzinfo=dt.timezone.utc).timestamp()
+        perp = cfg.get("perp", {})
+        rcfg = PerpBotConfig(target_pct=float(perp.get("target_pct", 0.20)),
+                             stop_pct=float(perp.get("stop_pct", 0.10)),
+                             hold_days=int(perp.get("hold_days", 14)))
+        rep = await replay(pools, start, rcfg)
+        print(f"replay from {args.replay_from}: {rep['trades']} closed trades, "
+              f"{rep['open']} still open, mean net {100 * rep['mean_net']:+.2f}%/trade")
+        for y, (n, m) in rep["by_year"].items():
+            print(f"  {y}: n={n:4d}  mean net {100 * m:+.2f}%")
+        print(f"  exits: {rep['exits']}")
+        return 0
     bot = build(cfg, args.state_dir)
     if args.once:
         signals = await bot.evaluate()
@@ -404,6 +540,9 @@ def main() -> int:
     ap.add_argument("--config", type=Path, default=Path("cryptobot_config.yaml"))
     ap.add_argument("--state-dir", type=Path, default=Path("."))
     ap.add_argument("--once", action="store_true", help="evaluate today and exit")
+    ap.add_argument("--replay", type=Path, metavar="CACHE",
+                    help="drive the bot through cached daily history (pickle)")
+    ap.add_argument("--replay-from", default="2025-05-20")
     ap.add_argument("--dashboard", action="store_true")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8082)

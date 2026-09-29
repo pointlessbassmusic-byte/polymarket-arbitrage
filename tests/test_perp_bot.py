@@ -63,6 +63,23 @@ class TestShortPortfolio:
         assert pos.breakeven_set and 99.0 < pos.stop_loss < 100.0
         assert pf.check_exit(key, 99.9) == "breakeven_stop"
 
+    def test_ratchet_can_be_disabled(self):
+        pf = Portfolio(cost_model=perp_cost_model(), breakeven_ratchet=False)
+        pf.open_from_signal(_sig(), 100.0)
+        key = f"{CHAIN}:X"
+        assert pf.check_exit(key, 95.0) is None
+        assert not pf.positions[key].breakeven_set
+        assert pf.positions[key].stop_loss == pytest.approx(110.0)
+        assert pf.check_exit(key, 100.5) is None       # still open: no ratchet
+
+    def test_perp_books_run_without_the_ratchet(self, monkeypatch):
+        client = FakeClient({"A": _series(bounce=True), "B": _series(), "C": _series(),
+                             "D": _series(), "E": _series(), "F": _series()}, {})
+        monkeypatch.setattr(PB, "now", lambda: client.t0 + 400 * DAY + 3600)
+        bot = _bot(client)
+        assert not bot.books["sim"].portfolio.breakeven_ratchet
+        assert not bot.books["real"].portfolio.breakeven_ratchet
+
     def test_short_never_trails(self):
         pf = Portfolio()
         pf.open_from_signal(_sig(), 50.0)
@@ -420,3 +437,26 @@ class TestExecutor:
         ex._info, ex._exchange = FakeInfo(), FakeExchange()
         with pytest.raises(RuntimeError, match="no margin"):
             asyncio.run(ex.open_short("X", 30.0, 2.0))
+
+
+class TestReplay:
+    def test_replay_trades_the_bounce_and_reports_by_year(self):
+        from cryptobot.backtest import PoolMeta
+        import datetime as dt
+        t0 = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc).timestamp()
+        pools = {}
+        for k in range(6):
+            closes = _series(500, bounce=(k == 0))
+            # put the bounce mid-series so the replay sees the exit too
+            if k == 0:
+                closes = closes[:-4] + closes[-4:] + [closes[-1] * 0.85] * 20
+            meta = PoolMeta(chain="hyperliquid", pair_address=f"C{k}", symbol=f"C{k}",
+                            token_address="", liquidity_usd=0.0, fdv_usd=None)
+            pools[str(k)] = (meta, [Candle(ts=t0 + i * DAY, open=c, high=c * 1.01,
+                                           low=c * 0.99, close=c, volume_usd=1.0)
+                                    for i, c in enumerate(closes)])
+        cfg = PerpBotConfig(coins=tuple(f"C{k}" for k in range(6)), min_history_days=50)
+        rep = asyncio.run(PB.replay(pools, t0 + 470 * DAY, cfg))
+        assert rep["trades"] >= 1
+        assert set(rep["exits"]) <= {"take_profit", "stop_loss", "time_exit", "breakeven_stop"}
+        assert set(rep["by_year"]) == {2025}          # historical clock, not today's
