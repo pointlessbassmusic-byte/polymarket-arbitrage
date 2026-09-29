@@ -613,6 +613,52 @@ the one thing a second venue (Kraken spot) actually enables. It is also
 entirely regime-dependent: the yield is whatever the crowd's leverage
 appetite is, and this year it is roughly zero.
 
+## The second strategy: funding carry (`cryptobot.carry_bot`)
+
+Short the perp on Hyperliquid, hold the same notional of spot on Kraken,
+collect funding. Market-neutral: the return is the funding rate, not
+the price. It is the one thing a second venue actually enables, and it
+is complementary to the bounce-short across regimes — funding pays most
+in the manias where the short rule struggles.
+
+`python -m cryptobot.carry_study --funding hl_funding.pkl --sweep` scores
+the rule family (rank by trailing funding, hold the top N above a bar,
+exit when recent funding turns negative) per calendar year, charging a
+full round trip (perp taker + spot taker, both ways: 0.79%) on every
+entry. It is far less parameter-sensitive than the bounce-short: a dozen
+combinations are positive in every year with the worst year still
+positive. The one chosen has the fewest entries and the lowest fee drag:
+
+**top 3 by 14-day trailing funding · enter above 0.06%/day · exit when
+the 3-day rate is negative or the coin leaves the top 6**
+
+| year | gross funding | fees | net | annualised | entries | slots used |
+|---|---|---|---|---|---|---|
+| 2023 (7 mo) | 12.4% | 3.7% | +8.7% | +14.6% | 14 | 32% |
+| 2024 | 49.3% | 5.5% | **+43.8%** | +43.7% | 21 | 93% |
+| 2025 | 13.2% | 3.2% | +10.1% | +10.1% | 12 | 55% |
+| 2026 (9 mo) | 3.4% | 1.3% | +2.1% | +2.9% | 5 | 28% |
+
+**What the study cannot see: basis.** A carry position's P&L is funding
+minus fees *plus* whatever the perp–spot spread does over the hold. On
+liquid coins it is small and mean-reverting; on a memecoin during a
+squeeze it can move a few percent in a day. The sim book tracks it per
+position (`basis_usd`) so that, after a few months, the funding the
+study promised can be compared with what the book actually kept.
+
+```bash
+python -m cryptobot.carry_bot --once                      # ranking + what sim would hold
+python -m cryptobot.carry_bot --dashboard --port 8083     # sim book live
+```
+
+The bot re-ranks daily after 00:20 UTC, accrues funding hourly from the
+live rate, and marks basis from live Hyperliquid mids and Kraken
+mid-quotes. 16 of the 18 memecoins have a Kraken USD pair; the other two
+are skipped. Real mode is not yet available for this bot: the perp leg
+reuses the Hyperliquid executor, but the spot leg needs Kraken's signed
+private API, which is not wired. Until it is, the real book would be a
+naked short, so `set_mode("real")` stays refused and the state says why.
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool

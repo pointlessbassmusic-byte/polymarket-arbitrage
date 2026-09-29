@@ -1,0 +1,86 @@
+"""Tests for the funding-carry study on hand-built funding histories."""
+
+import datetime as dt
+
+import pytest
+
+from cryptobot.data.hyperliquid import Funding
+from cryptobot import carry_study as C
+
+DAY = 86400
+T0 = int(dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc).timestamp())
+
+
+def _hourly(coin_rates: dict[str, float], days: int, start=T0):
+    """Constant hourly rate per coin for `days` days."""
+    return {c: [Funding(ts=start + h * 3600, rate=r, premium=0.0)
+                for h in range(days * 24)] for c, r in coin_rates.items()}
+
+
+class TestDailyFunding:
+    def test_sums_hourly_rows_into_days(self):
+        daily = C.daily_funding(_hourly({"A": 0.0001}, 2))
+        assert set(daily["A"]) == {T0, T0 + DAY}
+        assert daily["A"][T0] == pytest.approx(0.0024)
+
+    def test_trailing_uses_only_prior_days(self):
+        daily = C.daily_funding(_hourly({"A": 0.0001}, 10))
+        daily["A"][T0 + 5 * DAY] = 1.0        # today's value must not count
+        assert C.trailing(daily["A"], T0 + 5 * DAY, 3) == pytest.approx(0.0024)
+
+    def test_trailing_needs_enough_history(self):
+        assert C.trailing({T0: 0.001}, T0 + 10 * DAY, 7) is None
+
+
+class TestSimulate:
+    def test_holds_the_best_payer_and_collects_its_funding(self):
+        fund = _hourly({"A": 0.0002, "B": 0.00001, "C": -0.0001}, 40)
+        daily = C.daily_funding(fund)
+        rule = C.CarryRule(top_n=1, lookback=7, enter_min=0.0001, exit_min=0.0)
+        res = C.simulate(daily, rule, T0 + 15 * DAY, T0 + 40 * DAY, round_trip=0.01)
+        r = res[2024]
+        assert r["entries"] == 1
+        assert r["fees"] == pytest.approx(0.01)
+        assert r["gross"] == pytest.approx(25 * 0.0002 * 24)
+        assert r["utilisation"] == pytest.approx(1.0)
+
+    def test_nothing_held_when_no_coin_clears_the_entry_bar(self):
+        daily = C.daily_funding(_hourly({"A": 0.000001}, 30))
+        res = C.simulate(daily, C.CarryRule(enter_min=0.001), T0 + 15 * DAY, T0 + 30 * DAY)
+        assert res[2024]["entries"] == 0 and res[2024]["net"] == 0.0
+
+    def test_exit_when_recent_funding_turns_negative(self):
+        fund = _hourly({"A": 0.0002}, 40)
+        for f in fund["A"]:
+            if f.ts >= T0 + 25 * DAY:
+                f.rate = -0.0002
+        daily = C.daily_funding(fund)
+        rule = C.CarryRule(top_n=1, lookback=7, enter_min=0.0001, exit_lookback=3, exit_min=0.0)
+        res = C.simulate(daily, rule, T0 + 15 * DAY, T0 + 40 * DAY, round_trip=0.0)
+        # held from day 15 through the first negative days, then exited
+        assert res[2024]["utilisation"] < 0.7
+        assert res[2024]["gross"] > 0
+
+    def test_fees_are_charged_per_slot_share(self):
+        fund = _hourly({"A": 0.0002, "B": 0.0002, "C": 0.0002}, 30)
+        daily = C.daily_funding(fund)
+        res = C.simulate(daily, C.CarryRule(top_n=3, enter_min=0.0001), T0 + 15 * DAY,
+                         T0 + 30 * DAY, round_trip=0.03)
+        assert res[2024]["entries"] == 3
+        assert res[2024]["fees"] == pytest.approx(0.03)   # 3 x 0.03/3
+
+    def test_sweep_ranks_by_worst_year(self):
+        fund = _hourly({"A": 0.0003, "B": 0.0001}, 400)
+        rows = C.sweep(C.daily_funding(fund), T0 + 15 * DAY, T0 + 400 * DAY)
+        worsts = [r[0] for r in rows]
+        assert worsts == sorted(worsts, reverse=True)
+        assert "top" in str(rows[0][4])
+
+
+class TestRender:
+    def test_render_lists_years(self):
+        fund = _hourly({"A": 0.0002}, 30)
+        daily = C.daily_funding(fund)
+        rule = C.CarryRule(top_n=1, enter_min=0.0001)
+        text = C.render(rule, C.simulate(daily, rule, T0 + 15 * DAY, T0 + 30 * DAY))
+        assert "2024" in text and "net positive" in text
