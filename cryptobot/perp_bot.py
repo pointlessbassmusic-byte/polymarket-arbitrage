@@ -111,6 +111,7 @@ class PerpBot:
         self.started_at = now()
         self.last_daily_run: float = 0.0
         self._mids: dict[str, float] = {}
+        self._funding: dict[str, float] = {}
         self.recent_signals: deque = deque(maxlen=40)
         self.equity_curve: deque = deque(maxlen=2000)
         self.cuts: dict[str, list[float]] = {}
@@ -236,8 +237,19 @@ class PerpBot:
         except Exception as exc:
             logger.warning("mids refresh failed: %s", exc)
             return
+        try:
+            rates = await self.client.funding_rates()
+        except Exception as exc:
+            logger.warning("funding refresh failed: %s", exc)
+            rates = {}
+        self._funding = rates
+        t = now()
         for book in self.books.values():
+            dirty = False
             for key, pos in list(book.portfolio.positions.items()):
+                if pos.symbol in rates:
+                    pos.accrue_funding(rates[pos.symbol], t)
+                    dirty = True
                 mid = self._mids.get(pos.symbol)
                 if mid is None:
                     continue
@@ -265,8 +277,11 @@ class PerpBot:
                 self.journal.record(Decision(
                     ts=now(), book=book.name, symbol=pos.symbol, chain=CHAIN,
                     signal_type=SignalType.BOUNCE_SHORT.value, action="closed",
-                    stage="exit", reason=reason, size_usd=pos.size_usd,
-                    price_usd=price, pnl_usd=trade.pnl_usd))
+                    stage="exit", reason=f"{reason} (funding {trade.funding_usd:+.2f})",
+                    size_usd=pos.size_usd, price_usd=price, pnl_usd=trade.pnl_usd))
+                dirty = False
+            if dirty:
+                book.portfolio.save()
         prices = {k: self._mids.get(k.split(":")[1], 0.0) for b in self.books.values()
                   for k in b.portfolio.positions}
         self.equity_curve.append((now(), self.books["sim"].equity(prices),
@@ -294,6 +309,7 @@ class PerpBot:
                 "hold_days": self.cfg.hold_days, "cuts": self.cuts,
                 "history_days": self.history_days,
                 "last_daily_run": self.last_daily_run,
+                "funding_hourly": {c: self._funding.get(c, 0.0) for c in self.cfg.coins},
             },
             "books": {n: b.state(prices, self.edges) for n, b in self.books.items()},
             "decisions": self.journal.recent(60),

@@ -153,11 +153,27 @@ class Position:
     token_address: str = ""
     liquidity_usd: float = 0.0   # pool depth at entry, for cost modeling
     breakeven_set: bool = False  # stop already ratcheted to entry+costs
+    # Perp carry accrued so far (positive = received). Funding is paid
+    # hourly on perps; a 14-day short at 0.1%/day is 1.4% of notional,
+    # which is not a rounding error next to a 1.5% edge.
+    funding_usd: float = 0.0
+    funding_accrued_at: float = 0.0
 
     def unrealized_pnl(self, price: float) -> float:
         if self.side == Side.LONG:
-            return (price - self.entry_price) * self.qty
-        return (self.entry_price - price) * self.qty
+            return (price - self.entry_price) * self.qty + self.funding_usd
+        return (self.entry_price - price) * self.qty + self.funding_usd
+
+    def accrue_funding(self, hourly_rate: float, at: float) -> float:
+        """Charge or credit funding for the hours since the last accrual.
+        Positive rates are paid by longs to shorts."""
+        since = self.funding_accrued_at or self.opened_at
+        hours = max(0.0, (at - since) / 3600.0)
+        sign = 1.0 if self.side == Side.SHORT else -1.0
+        amount = sign * self.size_usd * hourly_rate * hours
+        self.funding_usd += amount
+        self.funding_accrued_at = at
+        return amount
 
 
 @dataclass
@@ -174,6 +190,7 @@ class ClosedTrade:
     exit_reason: str
     signal_type: Optional[SignalType] = None
     costs_usd: float = 0.0       # round-trip fees/impact/gas charged
+    funding_usd: float = 0.0     # perp carry over the hold (positive = received)
 
 
 def now() -> float:

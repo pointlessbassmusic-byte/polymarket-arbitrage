@@ -90,6 +90,21 @@ class HyperliquidClient:
                 continue
         return out
 
+    async def funding_rates(self) -> dict[str, float]:
+        """Current hourly funding rate per coin (fraction of notional).
+        Positive = longs pay shorts."""
+        res = await self._info({"type": "metaAndAssetCtxs"}) or []
+        if len(res) != 2:
+            return {}
+        meta, ctxs = res
+        out = {}
+        for u, c in zip(meta.get("universe", []), ctxs):
+            try:
+                out[u["name"]] = float(c.get("funding") or 0.0)
+            except (TypeError, ValueError):
+                continue
+        return out
+
     async def candles(self, coin: str, interval: str = "1d", *,
                       start_ms: int = 0, end_ms: Optional[int] = None) -> list[Candle]:
         """Candles oldest-first. The API returns at most ~5000 per call."""

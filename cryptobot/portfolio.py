@@ -140,7 +140,7 @@ class Portfolio:
             size_usd=pos.size_usd, pnl_usd=pnl,
             opened_at=pos.opened_at, closed_at=now(),
             exit_reason=reason, signal_type=pos.signal_type,
-            costs_usd=round(costs, 4),
+            costs_usd=round(costs, 4), funding_usd=round(pos.funding_usd, 4),
         )
         self.closed.append(trade)
         self.realized_pnl += pnl

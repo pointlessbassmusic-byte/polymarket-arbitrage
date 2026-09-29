@@ -91,11 +91,15 @@ class TestRule:
 
 
 class FakeClient:
-    """Serves synthetic daily candles and mids; records nothing else."""
+    """Serves synthetic daily candles, mids and funding; records nothing else."""
 
     def __init__(self, series: dict[str, list[float]], mids: dict[str, float],
-                 t0: float = 1_800_000_000.0 - 400 * DAY):
+                 t0: float = 1_800_000_000.0 - 400 * DAY, funding=None):
         self.series, self.mids, self.t0 = series, mids, t0
+        self.funding = funding or {}
+
+    async def funding_rates(self):
+        return dict(self.funding)
 
     async def candles(self, coin, interval="1d", **kw):
         closes = self.series[coin]
@@ -293,6 +297,55 @@ class TestBooks:
         r = c.get("/api/state", headers={"x-dashboard-token": "t"})
         assert r.status_code == 200
         assert r.json()["strategy"]["rule"] == "move_1d[2] & move_3d[0]"
+
+
+class TestFunding:
+    def test_short_receives_positive_funding_long_pays(self):
+        pf = Portfolio()
+        pos = pf.open_from_signal(_sig(t=0.0), 100.0)
+        assert pos.accrue_funding(0.001, 3600 * 10) == pytest.approx(1.0)    # 10h x 0.1%
+        assert pos.funding_usd == pytest.approx(1.0)
+        assert pos.accrue_funding(0.001, 3600 * 12) == pytest.approx(0.2)    # only 2 more hours
+        lp = Portfolio().open_from_signal(_sig(side=Side.LONG, t=0.0), 100.0)
+        assert lp.accrue_funding(0.001, 3600) == pytest.approx(-0.1)
+
+    def test_funding_flows_into_pnl_and_the_closed_trade(self):
+        pf = Portfolio()
+        pos = pf.open_from_signal(_sig(t=0.0), 100.0)
+        pos.accrue_funding(0.002, 3600 * 5)                # +1.00
+        assert pos.unrealized_pnl(100.0) == pytest.approx(1.0)
+        trade = pf.close(f"{CHAIN}:X", 100.0, "time_exit")
+        assert trade.funding_usd == pytest.approx(1.0)
+        assert trade.pnl_usd == pytest.approx(1.0)
+
+    def test_monitor_accrues_and_persists(self, monkeypatch, tmp_path):
+        client = FakeClient({"A": _series(bounce=True), "B": _series(), "C": _series(),
+                             "D": _series(), "E": _series(), "F": _series()},
+                            {"A": 100.0}, funding={"A": 0.001})
+        t0 = client.t0 + 400 * DAY + 3600
+        monkeypatch.setattr(PB, "now", lambda: t0)
+        bot = _bot(client, tmp=tmp_path)
+        asyncio.run(bot.run_daily())
+        pos = bot.books["sim"].portfolio.positions[f"{CHAIN}:A"]
+        client.mids["A"] = pos.entry_price
+        monkeypatch.setattr(PB, "now", lambda: t0 + 3600 * 24)
+        asyncio.run(bot.monitor())
+        assert pos.funding_usd == pytest.approx(pos.size_usd * 0.001 * 24)
+        again = _bot(client, tmp=tmp_path)
+        assert again.books["sim"].portfolio.positions[f"{CHAIN}:A"].funding_usd \
+            == pytest.approx(pos.funding_usd)
+        assert bot.state()["strategy"]["funding_hourly"]["A"] == 0.001
+
+    def test_old_state_files_without_funding_fields_still_load(self, tmp_path):
+        import json
+        f = tmp_path / "p.json"
+        pf = Portfolio(state_file=f)
+        pf.open_from_signal(_sig(), 50.0)
+        data = json.loads(f.read_text())
+        for p in data["positions"]:
+            p.pop("funding_usd"); p.pop("funding_accrued_at")
+        f.write_text(json.dumps(data))
+        assert Portfolio(state_file=f).positions[f"{CHAIN}:X"].funding_usd == 0.0
 
 
 class TestExecutor:
