@@ -36,6 +36,7 @@ from typing import Optional
 from .book import Decision, DecisionJournal
 from .data.hyperliquid import TAKER_FEE, HyperliquidClient
 from .data.kraken import KrakenClient, TAKER_FEE as KRAKEN_TAKER
+from .execution.kraken_spot import KrakenSpotExecutor, SpotExecConfig
 from .execution.perp_exchange import PerpExecConfig, PerpExecutor
 from .models import now
 
@@ -76,6 +77,8 @@ class CarryPosition:
     funding_usd: float = 0.0
     funding_accrued_at: float = 0.0
     fees_usd: float = 0.0
+    perp_qty: float = 0.0        # real book: contracts to buy back
+    spot_volume: float = 0.0     # real book: base units to sell
 
     def accrue(self, hourly_rate: float, at: float) -> float:
         since = self.funding_accrued_at or self.opened_at
@@ -118,14 +121,20 @@ class CarryBook:
     closed: list = field(default_factory=list)
     realized: float = 0.0
     state_file: Optional[Path] = None
+    # Spot legs whose perp was already closed but whose sell failed:
+    # {coin: volume}. Retried every tick; a stranded spot long is bounded,
+    # which is why exits close the perp first.
+    pending_spot_sells: dict = field(default_factory=dict)
 
     def equity(self, perps: dict, spots: dict) -> float:
         unreal = sum(p.pnl(perps.get(p.coin, p.perp_entry), spots.get(p.coin, p.spot_entry))
                      for p in self.positions.values())
         return self.starting_equity + self.realized + unreal
 
-    def open(self, coin, notional, perp, spot, at, fee_frac) -> CarryPosition:
-        pos = CarryPosition(coin, notional, perp, spot, at, fees_usd=notional * fee_frac / 2)
+    def open(self, coin, notional, perp, spot, at, fee_frac,
+             perp_qty: float = 0.0, spot_volume: float = 0.0) -> CarryPosition:
+        pos = CarryPosition(coin, notional, perp, spot, at, fees_usd=notional * fee_frac / 2,
+                            perp_qty=perp_qty, spot_volume=spot_volume)
         self.positions[coin] = pos
         self.save()
         return pos
@@ -182,6 +191,7 @@ class CarryBook:
         try:
             self.state_file.write_text(json.dumps({
                 "realized": self.realized,
+                "pending_spot_sells": self.pending_spot_sells,
                 "positions": [asdict(p) for p in self.positions.values()],
                 "closed": [asdict(t) for t in self.closed[-200:]]}, indent=2))
         except OSError:
@@ -193,6 +203,8 @@ class CarryBook:
         try:
             d = json.loads(self.state_file.read_text())
             self.realized = float(d.get("realized", 0.0))
+            self.pending_spot_sells = {k: float(v) for k, v in
+                                       (d.get("pending_spot_sells") or {}).items()}
             self.positions = {p["coin"]: CarryPosition(**p) for p in d.get("positions", [])}
             self.closed = [CarryClosed(**t) for t in d.get("closed", [])]
         except (OSError, ValueError, TypeError, KeyError):
@@ -204,11 +216,14 @@ class CarryBot:
     def __init__(self, cfg: CarryConfig, sim_equity: float, real_equity: float,
                  exec_cfg: PerpExecConfig, hl: Optional[HyperliquidClient] = None,
                  kraken: Optional[KrakenClient] = None,
-                 executor: Optional[PerpExecutor] = None):
+                 executor: Optional[PerpExecutor] = None,
+                 spot_executor: Optional[KrakenSpotExecutor] = None,
+                 spot_cfg: Optional[SpotExecConfig] = None):
         self.cfg = cfg
         self.hl = hl or HyperliquidClient()
         self.kraken = kraken or KrakenClient()
         self.executor = executor or PerpExecutor(exec_cfg)
+        self.spot = spot_executor or KrakenSpotExecutor(spot_cfg or SpotExecConfig())
         self.books = {}
         for name, eq, ex in (("sim", sim_equity, False), ("real", real_equity, True)):
             b = CarryBook(name, eq, ex,
@@ -231,13 +246,16 @@ class CarryBot:
     # -- mode ----------------------------------------------------------------
     @property
     def real_armed(self) -> bool:
-        return self.executor.armed
+        # Both legs or neither: one leg alone is a naked position.
+        return bool(self.executor.armed and self.spot.armed)
 
     def set_mode(self, mode: str) -> tuple[bool, str]:
         if mode not in ("sim", "real"):
             return False, "mode must be sim or real"
         if mode == "real" and not self.real_armed:
-            return False, "real mode needs perp.live=true, CRYPTOBOT_ARM_LIVE=yes and a wallet key"
+            return False, ("real mode needs BOTH legs armed: perp.live and carry.live true, "
+                           "CRYPTOBOT_ARM_LIVE=yes, a wallet key, and "
+                           "CRYPTOBOT_KRAKEN_KEY / CRYPTOBOT_KRAKEN_SECRET")
         self.mode = mode
         return True, ""
 
@@ -247,6 +265,7 @@ class CarryBot:
     async def close(self):
         await self.hl.close()
         await self.kraken.close()
+        await self.spot.close()
 
     # -- data ----------------------------------------------------------------
     async def refresh_prices(self) -> None:
@@ -338,25 +357,53 @@ class CarryBot:
                 notional = book.equity(self.perps, self.spots) * self.cfg.slot_fraction
                 if notional < 10:
                     continue
+                perp_qty = spot_vol = 0.0
                 if book.executes:
-                    try:
-                        fill = await self.executor.open_short(coin, notional, self.perps[coin])
-                    except Exception as exc:
-                        self._note(book, coin, "skipped", "execution", f"perp short failed: {exc}")
+                    legs = await self._open_legs(book, coin, notional)
+                    if legs is None:
                         continue
-                    perp_px = fill.price
-                    # TODO spot leg: Kraken private API (signed). Until then the real
-                    # book records the sim spot price and journals it.
-                    self._note(book, coin, "opened", "entry",
-                               "spot leg NOT executed: Kraken private API not wired", notional)
+                    perp_px, spot_px, perp_qty, spot_vol, notional = legs
                 else:
-                    perp_px = self.perps[coin]
-                book.open(coin, notional, perp_px, self.spots[coin], t, fee)
+                    perp_px, spot_px = self.perps[coin], self.spots[coin]
+                book.open(coin, notional, perp_px, spot_px, t, fee,
+                          perp_qty=perp_qty, spot_volume=spot_vol)
+                naked = "NAKED SHORT (no spot leg) — " if book.executes and not spot_vol else ""
                 self._note(book, coin, "opened", "entry",
-                           f"trailing {self.cfg.lookback_days}d funding "
+                           f"{naked}trailing {self.cfg.lookback_days}d funding "
                            f"{100 * by_coin[coin]['rate_long']:+.3f}%/d, rank {rank_of[coin] + 1}",
                            notional)
         self.last_daily_run = t
+
+    async def _open_legs(self, book, coin, notional):
+        """Short perp, then buy spot of the SAME filled notional. If the
+        spot leg fails, buy the perp back: never hold a naked short."""
+        try:
+            pf = await self.executor.open_short(coin, notional, self.perps[coin])
+        except Exception as exc:
+            self._note(book, coin, "skipped", "execution", f"perp short failed: {exc}")
+            return None
+        filled_usd = pf.qty * pf.price
+        try:
+            sf = await self.spot.buy(coin, filled_usd)
+        except Exception as exc:
+            logger.error("spot buy failed for %s after perp filled — unwinding perp", coin)
+            try:
+                await self.executor.close(coin, pf.qty, self.perps[coin])
+                self._note(book, coin, "skipped", "execution",
+                           f"spot buy failed ({exc}); perp short unwound")
+            except Exception as exc2:
+                # Worst case: a naked short we could not flatten. Record it as
+                # a position with no spot leg so monitoring keeps trying to exit.
+                logger.critical("NAKED SHORT %s: spot failed and perp unwind failed: %s",
+                                coin, exc2)
+                self._note(book, coin, "opened", "execution",
+                           f"NAKED SHORT — spot buy failed and perp unwind failed: {exc2}",
+                           filled_usd)
+                return pf.price, self.spots.get(coin, pf.price), pf.qty, 0.0, filled_usd
+            return None
+        # spot price normalised to the perp's units (k-coins are per 1000)
+        mult = 1000.0 if coin.startswith("k") and coin[1:].isupper() else 1.0
+        return pf.price, sf.price * mult, pf.qty, sf.volume, filled_usd
 
     async def _close(self, book, coin, why, fee, t):
         perp = self.perps.get(coin)
@@ -366,10 +413,17 @@ class CarryBot:
         if book.executes:
             pos = book.positions[coin]
             try:
-                await self.executor.close(coin, pos.notional_usd / pos.perp_entry, perp)
+                await self.executor.close(coin, pos.perp_qty or pos.notional_usd / pos.perp_entry,
+                                          perp)
             except Exception:
-                logger.exception("real perp close failed for %s — keeping", coin)
+                logger.exception("real perp close failed for %s — keeping both legs", coin)
                 return
+            if pos.spot_volume > 0:
+                try:
+                    await self.spot.sell(coin, pos.spot_volume)
+                except Exception:
+                    logger.exception("spot sell failed for %s — queued for retry", coin)
+                    book.pending_spot_sells[coin] = pos.spot_volume
         trade = book.close(coin, perp, spot, t, fee, why)
         if trade:
             self._note(book, coin, "closed", "exit",
@@ -382,8 +436,21 @@ class CarryBot:
                                      reason=reason, size_usd=size, pnl_usd=pnl))
 
     # -- hourly --------------------------------------------------------------
+    async def _retry_spot_sells(self, book) -> None:
+        for coin, vol in list(book.pending_spot_sells.items()):
+            try:
+                await self.spot.sell(coin, vol)
+            except Exception as exc:
+                logger.warning("spot sell retry for %s failed: %s", coin, exc)
+                continue
+            del book.pending_spot_sells[coin]
+            self._note(book, coin, "closed", "exit", "queued spot sell completed")
+            book.save()
+
     async def monitor(self) -> None:
         await self.refresh_prices()
+        if self.books["real"].pending_spot_sells:
+            await self._retry_spot_sells(self.books["real"])
         t = now()
         for book in self.books.values():
             dirty = False
@@ -421,8 +488,8 @@ class CarryBot:
             "tracked_pairs": len(self._pairs), "mode": self.mode,
             "real_unlocked": self.real_armed,
             "real_locked_reason": "" if self.real_armed else
-                "needs perp.live=true, CRYPTOBOT_ARM_LIVE=yes and a wallet key "
-                "(and the Kraken spot leg is not yet wired for real money)",
+                "needs BOTH legs armed: perp.live + carry.live, CRYPTOBOT_ARM_LIVE=yes, "
+                "a wallet key and CRYPTOBOT_KRAKEN_KEY/SECRET",
             "chains": ["hyperliquid", "kraken"],
             "strategy": {"rule": f"top{self.cfg.top_n} by {self.cfg.lookback_days}d funding, "
                                  f"enter > {100 * self.cfg.enter_min_daily:.3f}%/d, "
@@ -450,8 +517,12 @@ def build(cfg: dict, state_dir: Optional[Path]) -> CarryBot:
     exec_cfg = PerpExecConfig(live=bool(perp.get("live", False)),
                               private_key_env=perp.get("private_key_env", "CRYPTOBOT_PRIVATE_KEY"),
                               max_trade_usd=float(perp.get("max_trade_usd", 50)))
+    spot_cfg = SpotExecConfig(live=bool(carry.get("live", False)),
+                              max_trade_usd=float(perp.get("max_trade_usd", 50)),
+                              max_slippage=float(carry.get("max_slippage", 0.01)))
     return CarryBot(ccfg, float(cfg.get("sim", {}).get("bankroll_usd", 200)),
-                    float(cfg.get("risk", {}).get("bankroll_usd", 1000)), exec_cfg)
+                    float(cfg.get("risk", {}).get("bankroll_usd", 1000)), exec_cfg,
+                    spot_cfg=spot_cfg)
 
 
 async def _main(args) -> int:

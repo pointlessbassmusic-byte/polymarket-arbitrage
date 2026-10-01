@@ -674,10 +674,28 @@ worth having.
 The bot defaults to that universe, discovered live (Hyperliquid perps ∩
 Kraken USD pairs), re-ranks daily after 00:20 UTC, accrues funding
 hourly from the live rate, and marks basis from live Hyperliquid mids and
-Kraken mid-quotes. Real mode is not yet available for this bot: the perp leg
-reuses the Hyperliquid executor, but the spot leg needs Kraken's signed
-private API, which is not wired. Until it is, the real book would be a
-naked short, so `set_mode("real")` stays refused and the state says why.
+Kraken mid-quotes. **Real mode, both legs.** The spot leg is `execution/kraken_spot.py`:
+Kraken's signed private API (HMAC-SHA512, verified against Kraken's
+published test vector), IOC limit orders at mid ± 1%, volumes floored to
+the pair's lot size and refused under its minimum. Real mode needs
+*both* legs armed — `perp.live` and `carry.live` true,
+`CRYPTOBOT_ARM_LIVE=yes`, the Hyperliquid wallet key, and
+`CRYPTOBOT_KRAKEN_KEY` / `CRYPTOBOT_KRAKEN_SECRET`. Create the Kraken key
+with trade and query permissions only, **never withdrawal**.
+
+Two venues means two places to fail, and the order of operations is
+chosen so the bad case is always the bounded one:
+
+| situation | what the bot does |
+|---|---|
+| perp short fails | buys no spot; nothing opened |
+| perp fills, spot buy fails | buys the perp back immediately |
+| ...and that unwind also fails | records the position as **NAKED SHORT** in the journal and keeps managing it, rather than hiding it |
+| exit: perp close fails | keeps both legs, retries next day |
+| exit: perp closed, spot sell fails | queues the sell, retries every hour, persists across restarts |
+
+Exits close the perp first because a stranded spot long can lose at most
+what it cost; a stranded short cannot be bounded.
 
 ## The cost reality
 

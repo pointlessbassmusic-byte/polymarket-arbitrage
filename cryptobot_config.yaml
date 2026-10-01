@@ -159,6 +159,11 @@ perp:
 # it was chosen on AND top-ranked on 150 other coins. Universe defaults to
 # every Hyperliquid perp with a Kraken USD pair; set `coins:` to restrict.
 carry:
+  live: false                  # Kraken spot leg. Real mode needs this AND
+                               # perp.live AND CRYPTOBOT_ARM_LIVE=yes AND
+                               # CRYPTOBOT_KRAKEN_KEY / _SECRET (trade-only key,
+                               # NO withdrawal permission).
+  max_slippage: 0.01
   top_n: 3
   lookback_days: 14
   enter_min_daily: 0.0006      # 0.06%/day ~ 22%/yr before fees
