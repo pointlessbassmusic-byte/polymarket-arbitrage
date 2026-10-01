@@ -23,6 +23,9 @@ class FakeHL:
     async def all_mids(self):
         return dict(self.mids)
 
+    async def universe(self):
+        return list(self.mids)
+
     async def funding_rates(self):
         return dict(self.rates)
 
@@ -209,6 +212,22 @@ class TestDaily:
         bot, *_ = self._bot(monkeypatch, {"A": 0.002})
         ok, why = bot.set_mode("real")
         assert not ok and "ARM_LIVE" in why
+
+    def test_empty_coin_list_discovers_the_universe(self, monkeypatch):
+        monkeypatch.setattr(CB, "now", lambda: T0 + 30 * 86400)
+        daily = {"A": 0.002, "B": 0.002, "C": 0.0001}
+        hl = FakeHL({c: 1.0 for c in daily}, {}, daily)
+        kr = FakeKraken({c: 1.0 for c in daily}, pairs={"A": "AUSD", "C": "CUSD"})
+        bot = CB.CarryBot(CB.CarryConfig(), 200.0, 1000.0, PerpExecConfig(),
+                          hl=hl, kraken=kr, executor=FakeExec())
+        asyncio.run(bot.run_daily())
+        assert [r["coin"] for r in bot.ranking] == ["A", "C"]     # B has no spot pair
+        assert set(bot.books["sim"].positions) == {"A"}
+
+    def test_short_window_rate_comes_from_the_same_fetch(self, monkeypatch):
+        bot, hl, kr = self._bot(monkeypatch, {"A": 0.0024})
+        long_r, short_r = asyncio.run(bot.trailing_rates("A"))
+        assert long_r == pytest.approx(0.0024) and short_r == pytest.approx(0.0024)
 
     def test_daily_due_once_per_day(self, monkeypatch):
         bot, *_ = self._bot(monkeypatch, {"A": 0.002})

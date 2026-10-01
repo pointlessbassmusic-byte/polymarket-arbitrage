@@ -651,10 +651,30 @@ python -m cryptobot.carry_bot --once                      # ranking + what sim w
 python -m cryptobot.carry_bot --dashboard --port 8083     # sim book live
 ```
 
-The bot re-ranks daily after 00:20 UTC, accrues funding hourly from the
-live rate, and marks basis from live Hyperliquid mids and Kraken
-mid-quotes. 16 of the 18 memecoins have a Kraken USD pair; the other two
-are skipped. Real mode is not yet available for this bot: the perp leg
+**On the full universe it is better, not worse.** Unlike the
+bounce-short, carry is not a memecoin phenomenon: there is nearly always
+*someone* paying funding. Rerun on the 150 Hyperliquid perps that have a
+Kraken USD spot pair, the same rule — chosen on 18 memecoins — is again
+the top-ranked set of parameters, which is an out-of-sample confirmation
+of the choice:
+
+| year | memes only (18) | Kraken-tradeable (150) |
+|---|---|---|
+| 2023 | +14.6% | +13.2% |
+| 2024 | +43.7% | +37.7% |
+| 2025 | +10.1% | +8.1% |
+| 2026 | +2.9% | **+17.0%** |
+| worst year | +2.9% | **+8.1%** |
+
+68 coins were held at some point, none for more than 9% of slot-days.
+The price of breadth is turnover: fees run 7–18% a year against 1–6% on
+the memes-only version, so a maker spot leg (Kraken 0.16% vs 0.26%) is
+worth having.
+
+The bot defaults to that universe, discovered live (Hyperliquid perps ∩
+Kraken USD pairs), re-ranks daily after 00:20 UTC, accrues funding
+hourly from the live rate, and marks basis from live Hyperliquid mids and
+Kraken mid-quotes. Real mode is not yet available for this bot: the perp leg
 reuses the Hyperliquid executor, but the spot leg needs Kraken's signed
 private API, which is not wired. Until it is, the real book would be a
 naked short, so `set_mode("real")` stays refused and the state says why.

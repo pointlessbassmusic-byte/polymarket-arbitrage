@@ -155,8 +155,9 @@ perp:
 
 # Funding-carry bot (python -m cryptobot.carry_bot): short perp on
 # Hyperliquid, long spot on Kraken, collect funding. Market-neutral.
-# Rule from cryptobot.carry_study (4/4 years positive). Sim only until
-# the Kraken private API is wired; the perp leg reuses perp.* above.
+# Rule from cryptobot.carry_study: 4/4 years positive on the 18 memecoins
+# it was chosen on AND top-ranked on 150 other coins. Universe defaults to
+# every Hyperliquid perp with a Kraken USD pair; set `coins:` to restrict.
 carry:
   top_n: 3
   lookback_days: 14

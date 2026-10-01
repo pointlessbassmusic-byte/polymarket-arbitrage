@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Optional
 
 from .book import Decision, DecisionJournal
-from .data.hyperliquid import MEMECOINS, TAKER_FEE, HyperliquidClient
+from .data.hyperliquid import TAKER_FEE, HyperliquidClient
 from .data.kraken import KrakenClient, TAKER_FEE as KRAKEN_TAKER
 from .execution.perp_exchange import PerpExecConfig, PerpExecutor
 from .models import now
@@ -46,7 +46,10 @@ SLIPPAGE = 0.0005
 
 @dataclass
 class CarryConfig:
-    coins: tuple = MEMECOINS
+    # Empty = discover at runtime: every Hyperliquid perp with a Kraken USD
+    # spot pair (~150). Breadth is what carry runs on — on 150 coins the
+    # worst year was +8.1% against +2.9% on the 18 memecoins alone.
+    coins: tuple = ()
     top_n: int = 3
     lookback_days: int = 14
     enter_min_daily: float = 0.0006
@@ -223,6 +226,7 @@ class CarryBot:
         self.ranking: list[dict] = []
         self.equity_curve: deque = deque(maxlen=2000)
         self._pairs: dict[str, str] = {}
+        self._coins: list[str] = []
 
     # -- mode ----------------------------------------------------------------
     @property
@@ -246,15 +250,17 @@ class CarryBot:
 
     # -- data ----------------------------------------------------------------
     async def refresh_prices(self) -> None:
+        if not self._coins:
+            self._coins = await self.universe()
         try:
             mids = await self.hl.all_mids()
-            self.perps = {c: mids[c] for c in self.cfg.coins if c in mids}
+            self.perps = {c: mids[c] for c in self._coins if c in mids}
             self.rates = await self.hl.funding_rates()
         except Exception as exc:
             logger.warning("hyperliquid refresh failed: %s", exc)
         try:
             if not self._pairs:
-                for c in self.cfg.coins:
+                for c in self._coins:
                     p = await self.kraken.pair_for(c)
                     if p:
                         self._pairs[c] = p
@@ -267,26 +273,39 @@ class CarryBot:
         except Exception as exc:
             logger.warning("kraken refresh failed: %s", exc)
 
-    async def trailing_daily(self, coin: str, days: int) -> Optional[float]:
+    async def trailing_rates(self, coin: str) -> tuple[Optional[float], Optional[float]]:
+        """(long-window, short-window) mean daily funding from ONE fetch."""
+        long_d, short_d = self.cfg.lookback_days, self.cfg.exit_lookback_days
+        t = now()
         try:
-            rows = await self.hl.funding_history(coin, start_ms=int((now() - days * 86400) * 1000),
-                                                 max_calls=3)
+            rows = await self.hl.funding_history(
+                coin, start_ms=int((t - long_d * 86400) * 1000), max_calls=3)
         except Exception as exc:
             logger.warning("funding history %s failed: %s", coin, exc)
-            return None
-        if len(rows) < days * 12:
-            return None
-        return statistics.mean(r.rate for r in rows) * 24
+            return None, None
+        if len(rows) < long_d * 12:
+            return None, None
+        recent = [r.rate for r in rows if r.ts >= t - short_d * 86400]
+        return (statistics.mean(r.rate for r in rows) * 24,
+                statistics.mean(recent) * 24 if recent else None)
+
+    async def universe(self) -> list[str]:
+        if self.cfg.coins:
+            return list(self.cfg.coins)
+        try:
+            return await self.hl.universe()
+        except Exception as exc:
+            logger.warning("universe fetch failed: %s", exc)
+            return list(self._pairs)
 
     # -- daily ---------------------------------------------------------------
     async def run_daily(self) -> None:
         await self.refresh_prices()
         ranking = []
-        for coin in self.cfg.coins:
+        for coin in self._coins:
             if coin not in self._pairs:
                 continue                        # no spot leg on Kraken
-            long_r = await self.trailing_daily(coin, self.cfg.lookback_days)
-            short_r = await self.trailing_daily(coin, self.cfg.exit_lookback_days)
+            long_r, short_r = await self.trailing_rates(coin)
             if long_r is None:
                 continue
             ranking.append({"coin": coin, "rate_long": long_r, "rate_short": short_r})
@@ -385,7 +404,8 @@ class CarryBot:
         return day > last and (t % 86400) >= sched
 
     async def run_forever(self) -> None:
-        logger.info("carry bot up: %d coins, top %d, mode %s", len(self.cfg.coins),
+        logger.info("carry bot up: %s, top %d, mode %s",
+                    f"{len(self.cfg.coins)} coins" if self.cfg.coins else "full universe",
                     self.cfg.top_n, self.mode)
         await self.run_daily()
         while True:
@@ -409,7 +429,7 @@ class CarryBot:
                                  f"exit < {100 * self.cfg.exit_min_daily:.3f}%/d "
                                  f"({self.cfg.exit_lookback_days}d)",
                          "ranking": self.ranking[:10],
-                         "funding_hourly": self.rates and {c: self.rates.get(c, 0.0) for c in self.cfg.coins},
+                         "universe": len(self._pairs),
                          "last_daily_run": self.last_daily_run},
             "books": {n: b.state(self.perps, self.spots) for n, b in self.books.items()},
             "decisions": self.journal.recent(60), "gate_counts": self.journal.counts(),
@@ -426,7 +446,7 @@ def build(cfg: dict, state_dir: Optional[Path]) -> CarryBot:
         enter_min_daily=float(carry.get("enter_min_daily", 0.0006)),
         exit_min_daily=float(carry.get("exit_min_daily", 0.0)),
         slot_fraction=float(carry.get("slot_fraction", 0.30)),
-        coins=tuple(carry.get("coins", MEMECOINS)), state_dir=state_dir)
+        coins=tuple(carry.get("coins") or ()), state_dir=state_dir)
     exec_cfg = PerpExecConfig(live=bool(perp.get("live", False)),
                               private_key_env=perp.get("private_key_env", "CRYPTOBOT_PRIVATE_KEY"),
                               max_trade_usd=float(perp.get("max_trade_usd", 50)))
