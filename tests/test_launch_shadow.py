@@ -57,6 +57,13 @@ class TestFilters:
         assert not L.crowd_proxy(_p(b30=5, s30=10))          # sellers in the last 30m
         assert not L.crowd_proxy(_p(v1=30_000, v6=40_000))   # one spike, not spread
 
+    def test_costs_and_losses_are_capped_at_the_ticket(self):
+        assert L.round_trip(1e-6) == 1.0
+        assert L.round_trip(0) == 1.0
+        assert L.net_return(1.0, 0.5, 1e-6) == -1.0
+        assert L.net_return(1.0, None, 50_000) == -1.0
+        assert L.net_return(1.0, 2.0, 50_000) == pytest.approx(1.0 - 0.008)
+
     def test_round_trip_grows_as_pools_thin(self):
         assert L.round_trip(50_000) == pytest.approx(2 * (0.003 + 0.001))
         assert L.round_trip(12_000) > L.round_trip(50_000)

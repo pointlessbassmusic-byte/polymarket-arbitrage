@@ -133,8 +133,17 @@ def crowd_proxy(p: dict) -> bool:
 
 
 def round_trip(liq: float) -> float:
-    impact = TICKET_USD / liq if liq > 0 else 1.0
-    return 2 * (AMM_FEE + impact)
+    """Fees plus price impact, capped: a ticket into an empty pool loses
+    the ticket, it cannot lose a million percent of it."""
+    impact = min(1.0, TICKET_USD / liq) if liq > 0 else 1.0
+    return min(1.0, 2 * (AMM_FEE + impact))
+
+
+def net_return(entry_price: float, exit_price: Optional[float], liq: float) -> float:
+    """Price change minus round trip, floored at -100%. A vanished pool is -100%."""
+    if exit_price is None:
+        return -1.0
+    return max(-1.0, exit_price / entry_price - 1 - round_trip(liq))
 
 
 # ------------------------------------------------------------------ state
@@ -288,9 +297,7 @@ def report(ledger: Ledger) -> str:
                     continue
                 if m[h] is None:
                     gone += 1
-                    rets.append(-1.0)            # a pool that vanished is a total loss
-                    continue
-                rets.append(m[h] / e["price"] - 1 - round_trip(e["liq"]))
+                rets.append(net_return(e["price"], m[h], e["liq"]))
             if not rets:
                 continue
             out.append(f"{g:6s} {h:>3d} {len(rets):>4d} {100 * statistics.mean(rets):>+8.1f}% "
