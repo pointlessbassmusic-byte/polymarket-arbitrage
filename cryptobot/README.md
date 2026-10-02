@@ -674,7 +674,34 @@ worth having.
 The bot defaults to that universe, discovered live (Hyperliquid perps ∩
 Kraken USD pairs), re-ranks daily after 00:20 UTC, accrues funding
 hourly from the live rate, and marks basis from live Hyperliquid mids and
-Kraken mid-quotes. **Real mode, both legs.** The spot leg is `execution/kraken_spot.py`:
+Kraken mid-quotes. **Basis, measured.** Kraken publishes two years of daily spot candles,
+so every carry trade since October 2024 can be priced on both legs
+(`python -m cryptobot.basis_study`). That surfaced a live bug before it
+cost anything: Kraken's **LIT** is Litentry (~$0.12), Hyperliquid's
+**LIT** is a different token (~$4), and ticker matching would have
+"hedged" a short in one by buying the other. One such trade showed
+−63% basis on the study's history. The bot now refuses any coin whose
+spot and perp prices differ by more than 3% at entry (journaled as an
+`identity` skip). On today's universe LIT is the only coin it catches;
+the median gap of the other 151 coins is 0.08%.
+
+With the collision removed, 70 trades priced on both venues:
+
+| per trade | mean | median |
+|---|---|---|
+| funding collected | +1.57% | +0.52% |
+| basis | +0.02% (sd 0.72%, worst −3.28%) | +0.04% |
+| **net after 0.79% fees** | **+0.80%** | **−0.07%** |
+
+Basis is noise, and it does not blow out when the coin moves 30%+
+(mean +0.24% on those trades). The real shape of the strategy shows in
+the last row: only 34 of 70 trades beat the round trip. The money is in
+the long holds; short holds mostly pay fees. Fees are therefore the
+lever that matters most: posting the spot leg as a maker order
+(Kraken 0.16% instead of 0.26%) takes the round trip from 0.79% to about
+0.59%.
+
+**Real mode, both legs.** The spot leg is `execution/kraken_spot.py`:
 Kraken's signed private API (HMAC-SHA512, verified against Kraken's
 published test vector), IOC limit orders at mid ± 1%, volumes floored to
 the pair's lot size and refused under its minimum. Real mode needs

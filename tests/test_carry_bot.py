@@ -213,6 +213,24 @@ class TestDaily:
         ok, why = bot.set_mode("real")
         assert not ok and "ARM_LIVE" in why
 
+    def test_refuses_a_coin_whose_spot_is_a_different_asset(self, monkeypatch):
+        monkeypatch.setattr(CB, "now", lambda: T0 + 30 * 86400)
+        daily = {"LIT": 0.003, "A": 0.002}
+        hl = FakeHL({"LIT": 4.0, "A": 1.0}, {}, daily)
+        kr = FakeKraken({"LIT": 0.12, "A": 1.0})      # ticker collision
+        bot = _bot(hl, kr)
+        asyncio.run(bot.run_daily())
+        assert set(bot.books["sim"].positions) == {"A"}
+        assert any(d["stage"] == "identity" and d["symbol"] == "LIT"
+                   for d in bot.journal.recent(10))
+
+    def test_normal_basis_passes_the_identity_gate(self, monkeypatch):
+        monkeypatch.setattr(CB, "now", lambda: T0 + 30 * 86400)
+        hl = FakeHL({"A": 1.0}, {}, {"A": 0.002})
+        bot = _bot(hl, FakeKraken({"A": 1.004}))
+        asyncio.run(bot.run_daily())
+        assert "A" in bot.books["sim"].positions
+
     def test_empty_coin_list_discovers_the_universe(self, monkeypatch):
         monkeypatch.setattr(CB, "now", lambda: T0 + 30 * 86400)
         daily = {"A": 0.002, "B": 0.002, "C": 0.0001}

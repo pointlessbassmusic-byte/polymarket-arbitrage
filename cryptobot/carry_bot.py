@@ -57,6 +57,11 @@ class CarryConfig:
     exit_lookback_days: int = 3
     exit_min_daily: float = 0.0
     slot_fraction: float = 0.30          # of book equity per slot (3 slots = 90%)
+    # Spot and perp must price the same asset. Pairs are matched by ticker,
+    # and tickers collide: Kraken's LIT is Litentry (~$0.12), Hyperliquid's
+    # LIT is a different token (~$4). A "hedge" across two assets is two
+    # naked positions. Normal spot/perp gaps are a few tenths of a percent.
+    max_price_gap: float = 0.03
     daily_at_utc_hour: int = 0
     daily_at_utc_minute: int = 20
     monitor_interval_s: int = 3600
@@ -354,6 +359,12 @@ class CarryBot:
                     continue
                 if coin not in self.perps or coin not in self.spots:
                     continue
+                gap = self.price_gap(coin)
+                if gap is None or gap > self.cfg.max_price_gap:
+                    self._note(book, coin, "skipped", "identity",
+                               f"spot and perp prices differ by {100 * (gap or 0):.1f}% — "
+                               f"not the same asset, or a broken market")
+                    continue
                 notional = book.equity(self.perps, self.spots) * self.cfg.slot_fraction
                 if notional < 10:
                     continue
@@ -373,6 +384,13 @@ class CarryBot:
                            f"{100 * by_coin[coin]['rate_long']:+.3f}%/d, rank {rank_of[coin] + 1}",
                            notional)
         self.last_daily_run = t
+
+    def price_gap(self, coin: str) -> Optional[float]:
+        """|spot / perp - 1|, both in the perp's units, from live mids."""
+        perp, spot = self.perps.get(coin), self.spots.get(coin)
+        if not perp or not spot:
+            return None
+        return abs(spot / perp - 1.0)
 
     async def _open_legs(self, book, coin, notional):
         """Short perp, then buy spot of the SAME filled notional. If the

@@ -77,6 +77,31 @@ class TestSimulate:
         assert "top" in str(rows[0][4])
 
 
+class TestTradeLog:
+    def test_records_entry_exit_and_funding_per_trade(self):
+        fund = _hourly({"A": 0.0002}, 40)
+        for f in fund["A"]:
+            if f.ts >= T0 + 25 * DAY:
+                f.rate = -0.0002
+        daily = C.daily_funding(fund)
+        trades = []
+        rule = C.CarryRule(top_n=1, lookback=7, enter_min=0.0001, exit_lookback=3, exit_min=0.0)
+        C.simulate(daily, rule, T0 + 15 * DAY, T0 + 40 * DAY, round_trip=0.0, trades=trades)
+        t = trades[0]
+        assert t["coin"] == "A" and t["entry"] == T0 + 15 * DAY
+        assert t["exit"] > T0 + 25 * DAY and not t.get("open")
+        held_days = (t["exit"] - t["entry"]) // DAY
+        assert t["funding"] == pytest.approx(10 * 0.0048 - (held_days - 10) * 0.0048)
+
+    def test_open_positions_are_logged_at_the_end(self):
+        daily = C.daily_funding(_hourly({"A": 0.0002}, 30))
+        trades = []
+        C.simulate(daily, C.CarryRule(top_n=1, enter_min=0.0001), T0 + 15 * DAY,
+                   T0 + 30 * DAY, trades=trades)
+        assert trades == [{"coin": "A", "entry": T0 + 15 * DAY, "exit": T0 + 30 * DAY,
+                           "funding": pytest.approx(15 * 0.0048), "open": True}]
+
+
 class TestRender:
     def test_render_lists_years(self):
         fund = _hourly({"A": 0.0002}, 30)

@@ -66,9 +66,17 @@ def trailing(series: dict[int, float], day: int, n: int) -> float | None:
 
 
 def simulate(daily: dict[str, dict[int, float]], rule: CarryRule,
-             start: int, end: int, round_trip: float = ROUND_TRIP) -> dict:
-    """Walk day by day. Returns per-year net yield on capital and turnover."""
+             start: int, end: int, round_trip: float = ROUND_TRIP,
+             trades: list | None = None) -> dict:
+    """Walk day by day. Returns per-year net yield on capital and turnover.
+
+    If `trades` is a list, each completed or still-open position is
+    appended as {coin, entry, exit, funding}: entry is the first day
+    funding accrued, exit the first day it no longer did (or `end` for a
+    position still open), funding the sum of daily rates collected.
+    """
     held: dict[str, int] = {}                     # coin -> entry day
+    collected: dict[str, float] = {}
     per_year: dict[int, dict] = {}
     day = start
     while day < end:
@@ -85,6 +93,9 @@ def simulate(daily: dict[str, dict[int, float]], rule: CarryRule,
         for c in list(held):
             recent = trailing(daily[c], day, rule.exit_lookback)
             if (recent is not None and recent < rule.exit_min) or rank_of.get(c, 999) >= 2 * rule.top_n:
+                if trades is not None:
+                    trades.append({"coin": c, "entry": held[c], "exit": day,
+                                   "funding": collected.pop(c, 0.0)})
                 del held[c]
         # entries into free slots
         for c in top:
@@ -92,6 +103,7 @@ def simulate(daily: dict[str, dict[int, float]], rule: CarryRule,
                 break
             if c not in held:
                 held[c] = day
+                collected[c] = 0.0
                 yr["entries"] += 1
                 yr["fees"] += round_trip / rule.top_n     # per-slot capital share
         # accrue today's realised funding on held slots
@@ -99,9 +111,14 @@ def simulate(daily: dict[str, dict[int, float]], rule: CarryRule,
             f = daily[c].get(day)
             if f is not None:
                 yr["funding"] += f / rule.top_n
+                collected[c] = collected.get(c, 0.0) + f
         yr["slot_days"] += len(held)
         yr["days"] += 1
         day += 86400
+    if trades is not None:
+        for c, entry in held.items():
+            trades.append({"coin": c, "entry": entry, "exit": end,
+                           "funding": collected.get(c, 0.0), "open": True})
     out = {}
     for y, r in per_year.items():
         net = r["funding"] - r["fees"]
