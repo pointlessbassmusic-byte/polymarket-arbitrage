@@ -1,0 +1,242 @@
+"""Paper-trading portfolio: positions, trailing stops, PnL ledger."""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+from typing import Optional
+
+from .costs import CostModel
+from .models import ClosedTrade, Position, Side, Signal, SignalType, now
+
+logger = logging.getLogger(__name__)
+
+
+class Portfolio:
+    def __init__(self, trail_pct: float = 0.05, state_file: Optional[Path] = None,
+                 cost_model: Optional[CostModel] = None,
+                 breakeven_ratchet: bool = True):
+        # The breakeven ratchet suits 5-minute swing trades with a cost of
+        # a few tenths of a percent. On daily candles it fires on the first
+        # ordinary dip and scratches every trade before the target can be
+        # reached; a strategy validated without it must run without it.
+        self.breakeven_ratchet = breakeven_ratchet
+        self.positions: dict[str, Position] = {}
+        self.closed: list[ClosedTrade] = []
+        self.realized_pnl: float = 0.0
+        self.total_costs: float = 0.0
+        self.default_trail = trail_pct
+        self.state_file = state_file
+        # None = frictionless fills (unit tests); live/paper/backtest pass
+        # a CostModel so every close is charged the realistic round trip.
+        self.cost_model = cost_model
+        self._load()
+
+    # -- entries -----------------------------------------------------------
+
+    def open_from_signal(self, sig: Signal, size_usd: float) -> Position:
+        # A short's stop sits ABOVE entry and its target below.
+        d = 1.0 if sig.side == Side.LONG else -1.0
+        pos = Position(
+            key=sig.key,
+            chain=sig.chain,
+            symbol=sig.symbol,
+            side=sig.side,
+            entry_price=sig.price_usd,
+            size_usd=size_usd,
+            qty=size_usd / sig.price_usd,
+            opened_at=sig.ts,
+            stop_loss=sig.price_usd * (1.0 - d * sig.stop_loss_pct),
+            take_profit=sig.price_usd * (1.0 + d * sig.take_profit_pct),
+            trail_pct=self.default_trail if sig.type == SignalType.VOL_BREAKOUT else None,
+            high_water=sig.price_usd,
+            signal_type=sig.type,
+            token_address=sig.token_address,
+            liquidity_usd=sig.liquidity_usd,
+        )
+        self.positions[pos.key] = pos
+        logger.info(
+            "OPEN  %-12s $%.2f @ %.6g  stop %.6g  target %.6g  (%s)",
+            pos.symbol, size_usd, pos.entry_price, pos.stop_loss,
+            pos.take_profit, sig.type.value,
+        )
+        self.save()
+        return pos
+
+    # -- exits -------------------------------------------------------------
+
+    def check_exit(self, key: str, price: float) -> Optional[str]:
+        """Update trailing state; return an exit reason if the position
+        should close at `price`, else None."""
+        pos = self.positions.get(key)
+        if pos is None:
+            return None
+        if pos.side == Side.SHORT:
+            return self._check_exit_short(pos, price)
+        if price > pos.high_water:
+            pos.high_water = price
+            # Breakeven ratchet: once the trade is decently green (2x its
+            # own round-trip cost above entry), move the stop to entry plus
+            # costs — a trade that cleared its costs never finishes red.
+            if (self.breakeven_ratchet and self.cost_model is not None
+                    and not pos.breakeven_set):
+                rt = self.cost_model.round_trip_fraction(
+                    pos.size_usd, pos.liquidity_usd, pos.chain)
+                if price >= pos.entry_price * (1.0 + 2.0 * rt + 0.01):
+                    be_stop = pos.entry_price * (1.0 + rt + 0.002)
+                    if be_stop > pos.stop_loss:
+                        pos.stop_loss = be_stop
+                    pos.breakeven_set = True
+            # Ratchet the stop up under a trailing position once in profit.
+            if pos.trail_pct is not None and price > pos.entry_price:
+                trailed = price * (1.0 - pos.trail_pct)
+                if trailed > pos.stop_loss:
+                    pos.stop_loss = trailed
+        if price <= pos.stop_loss:
+            return "stop_loss" if price <= pos.entry_price else "trailing_stop"
+        if price >= pos.take_profit:
+            # Breakouts trail instead of taking profit at the first target —
+            # that's where the fat right tail lives.
+            if pos.trail_pct is not None:
+                pos.take_profit = price * 2.0  # effectively disabled
+                return None
+            return "take_profit"
+        return None
+
+    def _check_exit_short(self, pos: Position, price: float) -> Optional[str]:
+        """Mirror of the long logic: profit is DOWN, the stop is above.
+
+        `high_water` holds the best (lowest) price seen. The breakeven
+        ratchet moves the stop DOWN to entry minus costs once the trade
+        is 2x its own costs in profit. Shorts never trail: the strategy
+        that uses them was validated with a fixed target, and a trailing
+        short in a squeeze is how a bounded loss becomes an unbounded
+        one.
+        """
+        if pos.high_water == 0.0 or price < pos.high_water:
+            pos.high_water = price
+            if (self.breakeven_ratchet and self.cost_model is not None
+                    and not pos.breakeven_set):
+                rt = self.cost_model.round_trip_fraction(
+                    pos.size_usd, pos.liquidity_usd, pos.chain)
+                if price <= pos.entry_price * (1.0 - 2.0 * rt - 0.01):
+                    be_stop = pos.entry_price * (1.0 - rt - 0.002)
+                    if be_stop < pos.stop_loss:
+                        pos.stop_loss = be_stop
+                    pos.breakeven_set = True
+        if price >= pos.stop_loss:
+            return "stop_loss" if price >= pos.entry_price else "breakeven_stop"
+        if price <= pos.take_profit:
+            return "take_profit"
+        return None
+
+    def close(self, key: str, price: float, reason: str) -> Optional[ClosedTrade]:
+        pos = self.positions.pop(key, None)
+        if pos is None:
+            return None
+        pnl = pos.unrealized_pnl(price)
+        costs = 0.0
+        if self.cost_model is not None:
+            costs = self.cost_model.round_trip_usd(
+                pos.size_usd, pos.liquidity_usd, pos.chain)
+            pnl -= costs
+            self.total_costs += costs
+        trade = ClosedTrade(
+            key=pos.key, symbol=pos.symbol, side=pos.side,
+            entry_price=pos.entry_price, exit_price=price,
+            size_usd=pos.size_usd, pnl_usd=pnl,
+            opened_at=pos.opened_at, closed_at=now(),
+            exit_reason=reason, signal_type=pos.signal_type,
+            costs_usd=round(costs, 4), funding_usd=round(pos.funding_usd, 4),
+        )
+        self.closed.append(trade)
+        self.realized_pnl += pnl
+        logger.info(
+            "CLOSE %-12s %+.2f USD net (%.1f%%, costs %.2f) @ %.6g  [%s]",
+            pos.symbol, pnl, 100.0 * pnl / pos.size_usd if pos.size_usd else 0.0,
+            costs, price, reason,
+        )
+        self.save()
+        return trade
+
+    # -- reporting ---------------------------------------------------------
+
+    def summary(self, prices: Optional[dict[str, float]] = None) -> dict:
+        prices = prices or {}
+        unrealized = sum(
+            p.unrealized_pnl(prices.get(k, p.entry_price))
+            for k, p in self.positions.items()
+        )
+        wins = sum(1 for t in self.closed if t.pnl_usd > 0)
+        return {
+            "total_costs": round(self.total_costs, 2),
+            "open_positions": len(self.positions),
+            "exposure_usd": round(sum(p.size_usd for p in self.positions.values()), 2),
+            "realized_pnl": round(self.realized_pnl, 2),
+            "unrealized_pnl": round(unrealized, 2),
+            "trades": len(self.closed),
+            "win_rate": round(wins / len(self.closed), 3) if self.closed else None,
+        }
+
+    def _load(self) -> None:
+        """Restore open positions and history after a restart.
+
+        Without this a restart silently abandons open positions — and a
+        real on-chain position that the bot forgets never gets its stop
+        or its sell. The next save() would then erase it from disk too.
+        """
+        if not self.state_file or not self.state_file.exists():
+            return
+        try:
+            data = json.loads(self.state_file.read_text())
+        except (OSError, ValueError):
+            logger.exception("could not read %s — starting flat", self.state_file)
+            return
+
+        def revive(d: dict, cls):
+            d = dict(d)
+            d["side"] = Side(d.get("side", "long"))
+            st = d.get("signal_type")
+            d["signal_type"] = SignalType(st) if st else None
+            fields = cls.__dataclass_fields__
+            return cls(**{k: v for k, v in d.items() if k in fields})
+
+        try:
+            self.realized_pnl = float(data.get("realized_pnl", 0.0))
+            self.total_costs = float(data.get("total_costs", 0.0))
+            for raw in data.get("positions", []):
+                pos = revive(raw, Position)
+                self.positions[pos.key] = pos
+            for raw in data.get("closed", []):
+                self.closed.append(revive(raw, ClosedTrade))
+        except (TypeError, ValueError, KeyError):
+            logger.exception("malformed state in %s — starting flat",
+                             self.state_file)
+            self.positions.clear()
+            self.closed.clear()
+            self.realized_pnl = 0.0
+            self.total_costs = 0.0
+            return
+        if self.positions:
+            logger.warning("restored %d open position(s) from %s: %s",
+                           len(self.positions), self.state_file.name,
+                           ", ".join(p.symbol for p in self.positions.values()))
+
+    def save(self) -> None:
+        if not self.state_file:
+            return
+        try:
+            data = {
+                "realized_pnl": self.realized_pnl,
+                "total_costs": self.total_costs,
+                "positions": [vars(p) | {"side": p.side.value,
+                                          "signal_type": p.signal_type.value if p.signal_type else None}
+                              for p in self.positions.values()],
+                "closed": [vars(t) | {"side": t.side.value,
+                                       "signal_type": t.signal_type.value if t.signal_type else None}
+                           for t in self.closed[-200:]],
+            }
+            self.state_file.write_text(json.dumps(data, indent=2))
+        except OSError:
+            logger.exception("failed to persist portfolio state")
