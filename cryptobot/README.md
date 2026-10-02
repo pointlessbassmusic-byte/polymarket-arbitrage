@@ -761,6 +761,44 @@ Sources: [Liu, Tsyvinski & Wu, Common Risk Factors in Cryptocurrency](https://ww
 [funding extremes as crowding](https://www.luxalgo.com/library/concept/funding-rate/);
 [meme-coin volume-spike buy signal](https://www.tradingview.com/script/VGtCLwDu-Meme-Coin-Buy-Signal-Indicator-by-ashar).
 
+## The "FOMO desk" post, in shadow (`cryptobot.launch_shadow`)
+
+An X article (@savipww, 2026-09-23) describes a desk that scans fresh
+memecoin launches every 15 minutes, kills most with hard thresholds,
+asks an LLM (TypeSafe's "Jev") typed questions about the survivors, and
+buys one, holding one position at a time.
+
+What it claims cannot be checked: $89 → $7,769 in seven days with no
+trade log, the best day of which came from its prediction-market side,
+not memecoins; thresholds "tuned over one week"; an exit rule described
+as the thing that makes it work but never given; and referral links to
+the trading venue in every section. What it gets right is its own
+instruction: run it in shadow for a week before trusting it.
+
+`launch_shadow` does that for the part public data can test. It never
+trades. Every 15 minutes it pulls trending pools on Solana, BSC and Base
+from GeckoTerminal, keeps launches aged 15 minutes to 72 hours, and
+records the first sighting of each pool in three groups:
+
+- **fresh**: every launch in the window (the baseline);
+- **hard**: passes the article's thresholds verbatim: liquidity ≥ $12k,
+  24h volume ≥ $40k, market cap $60k–$8M, ≥ 150 trades, not the
+  buys-without-sells trap;
+- **crowd**: also passes a stated stand-in for the LLM's "crowd"
+  judgement: buys > sells over 30m and 1h, and the last hour no more
+  than half of the last six hours' volume.
+
+It then prices each recorded pool at +1h, +4h and +24h. A pool that has
+vanished counts as −100%. The filter only earns its place if its group
+beats the baseline observed over the same hours. The holder checks (top
+wallet, top-10 share, holder count) and the LLM itself are not tested;
+they need the article's logged-in FOMO session.
+
+```bash
+python -m cryptobot.launch_shadow --state launches.jsonl            # leave running
+python -m cryptobot.launch_shadow --state launches.jsonl --report   # results so far
+```
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool
