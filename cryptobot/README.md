@@ -724,6 +724,43 @@ chosen so the bad case is always the bounded one:
 Exits close the perp first because a stranded spot long can lose at most
 what it cost; a stranded short cannot be bounded.
 
+## Published strategies, tested as published (`cryptobot.factor_study`)
+
+Four ideas from papers and open-source trading tools, each with a
+concrete claim and parameters fixed *before* seeing this data. None is
+tuned here, so every year is out of sample for every one of them.
+Hyperliquid perps, 176 coins, mid-2023 to now, perp fees + slippage +
+realised funding on every leg.
+
+| idea | source | result |
+|---|---|---|
+| weekly cross-sectional momentum (long top quintile, short bottom) | Liu & Tsyvinski, NBER w25882: ~3%/week | **−0.26%/wk**, t = −0.45; 2 of 4 years positive. Liquid-only momentum and illiquid-only reversal also fail |
+| crowded funding reverses (short high funding, long low) | widely repeated trading claim | **−0.38%/wk**; even gross is negative: high-funding coins kept outperforming |
+| FOMO volume-spike breakout (vol > 2× 10d mean, SMA5 > SMA20, BTC > SMA20) | open-source meme-coin buy signal | apparent lift vs all days, but **against the average coin on the same day it is +0.14–0.33%, t ≤ 1.1**, 2023 negative; hedged ≈ 0. The signal times the market, it does not pick coins |
+| short new listings | common claim that listings bleed | **−14% to −21% mean** (median short wins at 7d, but rare 5× listing pumps dominate). Going long is lottery-shaped and decaying |
+
+What the FOMO signal was really carrying is its BTC-trend condition.
+Isolated as "hold only while BTC > SMA50", it cuts drawdowns sharply
+(2025: −17% vs −33% buy-and-hold; 2026: −18% vs −40%) and beats
+buy-and-hold in 4 of 6 years, but it is a long-only market bet that
+still lost 51% in 2022. It does not belong in a book built on
+market-neutral carry and a short-side rule.
+
+Used as a regime filter on the bounce-short (short only when BTC <
+SMA50) it **does not help**: the rule did better in uptrends in 2024
+and 2025 and worse in 2023 and 2026, every split within about one
+standard error. The rule does not depend on regime, so the filter stays
+out.
+
+```bash
+python -m cryptobot.factor_study --perps hl_all_daily.pkl --funding hl_funding_all.pkl
+```
+
+Sources: [Liu, Tsyvinski & Wu, Common Risk Factors in Cryptocurrency](https://www.nber.org/papers/w25882.pdf);
+[weekly reversal only in small/illiquid coins](https://wp.ffu.vse.cz/artkey/wps-202301-0003_impact-of-size-and-volume-on-cryptocurrency-momentum-and-reversal.php);
+[funding extremes as crowding](https://www.luxalgo.com/library/concept/funding-rate/);
+[meme-coin volume-spike buy signal](https://www.tradingview.com/script/VGtCLwDu-Meme-Coin-Buy-Signal-Indicator-by-ashar).
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool
