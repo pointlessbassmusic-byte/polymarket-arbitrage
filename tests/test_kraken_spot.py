@@ -133,6 +133,102 @@ class TestExecutor:
             asyncio.run(ex.buy("NOPE", 10.0))
 
 
+class FakeKrakenAPI:
+    """Order book + order lifecycle. `fills` decides each resting order's
+    outcome in turn: a fraction of its volume that fills before cancel,
+    or "reject" for a post-only order that would have crossed."""
+
+    def __init__(self, fills, bid=0.000010, ask=0.0000102):
+        self.fills, self.bid, self.ask = list(fills), bid, ask
+        self.orders, self.added, self.cancelled = {}, [], []
+
+    def __call__(self, req):
+        pub = _public(req)
+        if req.url.path.endswith("/Ticker"):
+            return httpx.Response(200, json={"result": {"PEPEUSD": {
+                "b": [str(self.bid), "1", "1"], "a": [str(self.ask), "1", "1"]}}})
+        if pub:
+            return pub
+        body = dict(urllib.parse.parse_qsl(req.content.decode()))
+        path = req.url.path
+        if path.endswith("/AddOrder"):
+            self.added.append(body)
+            if body.get("oflags") == "post":
+                outcome = self.fills.pop(0)
+                if outcome == "reject":
+                    return httpx.Response(200, json={"error": ["EOrder:Post only order"]})
+            else:
+                outcome = 1.0                        # taker IOC fills
+            txid = f"T{len(self.added)}"
+            vol = float(body["volume"])
+            self.orders[txid] = {"status": "closed" if outcome == 1.0 else "open",
+                                 "vol_exec": str(vol * outcome), "price": body["price"]}
+            return httpx.Response(200, json={"error": [], "result": {"txid": [txid]}})
+        if path.endswith("/CancelOrder"):
+            self.cancelled.append(body["txid"])
+            self.orders[body["txid"]]["status"] = "canceled"
+            return httpx.Response(200, json={"error": [], "result": {"count": 1}})
+        if path.endswith("/QueryOrders"):
+            return httpx.Response(200, json={"error": [], "result": {
+                body["txid"]: self.orders[body["txid"]]}})
+        return httpx.Response(404)
+
+
+class TestMakerLoop:
+    def _ex(self, monkeypatch, api, **cfg):
+        for k, v in KEY_ENV.items():
+            monkeypatch.setenv(k, v)
+        monkeypatch.setattr(asyncio, "sleep", _nosleep)
+        return KrakenSpotExecutor(SpotExecConfig(live=True, maker_wait_s=10, maker_poll_s=5,
+                                                 maker_reprices=2, **cfg),
+                                  client=_kraken(api))
+
+    def test_full_maker_fill_at_the_bid(self, monkeypatch):
+        api = FakeKrakenAPI([1.0])
+        f = asyncio.run(self._ex(monkeypatch, api).buy_maker("kPEPE", 30.0))
+        assert api.added[0]["oflags"] == "post"
+        assert float(api.added[0]["price"]) == pytest.approx(0.000010)     # the bid
+        assert f.maker_volume == f.volume and len(api.added) == 1
+
+    def test_unfilled_rests_are_cancelled_repriced_then_taken(self, monkeypatch):
+        api = FakeKrakenAPI([0.0, 0.0, 0.0])
+        f = asyncio.run(self._ex(monkeypatch, api).buy_maker("kPEPE", 30.0))
+        assert len(api.cancelled) == 3
+        assert [a.get("oflags") for a in api.added] == ["post", "post", "post", None]
+        assert api.added[-1]["timeinforce"] == "IOC"
+        assert f.maker_volume == 0 and f.volume > 0
+
+    def test_partial_maker_then_taker_for_the_rest(self, monkeypatch):
+        api = FakeKrakenAPI([0.5, 0.0, 0.0])
+        f = asyncio.run(self._ex(monkeypatch, api).buy_maker("kPEPE", 30.0))
+        assert f.maker_volume == pytest.approx(f.volume * 0.5, rel=0.01)
+        assert float(api.added[-1]["volume"]) == pytest.approx(f.volume * 0.5, rel=0.01)
+
+    def test_post_only_rejection_is_a_zero_fill_not_an_error(self, monkeypatch):
+        api = FakeKrakenAPI(["reject", 1.0])
+        f = asyncio.run(self._ex(monkeypatch, api).buy_maker("kPEPE", 30.0))
+        assert f.maker_volume == f.volume and len(api.added) == 2
+
+    def test_maker_sell_rests_at_the_ask(self, monkeypatch):
+        api = FakeKrakenAPI([1.0])
+        asyncio.run(self._ex(monkeypatch, api).sell_maker("kPEPE", 3_000_000))
+        assert api.added[0]["type"] == "sell"
+        assert float(api.added[0]["price"]) == pytest.approx(0.0000102)
+
+    def test_dry_run_reports_a_maker_fill(self, monkeypatch):
+        monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
+        ex = KrakenSpotExecutor(SpotExecConfig(), client=_kraken(FakeKrakenAPI([])))
+        f = asyncio.run(ex.buy_maker("kPEPE", 30.0))
+        assert f.dry_run and f.maker_volume == f.volume
+
+
+_real_sleep = asyncio.sleep
+
+
+async def _nosleep(*_a, **_k):
+    await _real_sleep(0)
+
+
 # --------------------------------------------------------------- two-leg logic
 
 T0 = float(int(dt.datetime(2026, 3, 1, tzinfo=dt.timezone.utc).timestamp()))
@@ -175,19 +271,33 @@ class Spot:
             raise RuntimeError("kraken down")
         return SpotFill("P", "sell", vol, 1.0, "T")
 
+    async def buy_maker(self, coin, notional):
+        self.calls.append(("buy_maker", coin, notional))
+        if self.fail_buy:
+            raise RuntimeError("kraken down")
+        vol = self.partial * notional if hasattr(self, "partial") else notional
+        return SpotFill("P", "buy", vol, 1.0, "T", maker_volume=vol)
+
+    async def sell_maker(self, coin, vol):
+        self.calls.append(("sell_maker", coin, vol))
+        if self.fail_sell:
+            raise RuntimeError("kraken down")
+        return SpotFill("P", "sell", vol, 1.0, "T", maker_volume=vol)
+
     async def close(self):
         pass
 
 
-def _bot(monkeypatch, perp, spot):
+def _bot(monkeypatch, perp, spot, maker=False):
     import sys
     sys.path.insert(0, "tests")
     from test_carry_bot import FakeHL, FakeKraken
     monkeypatch.setattr(CB, "now", lambda: T0 + 30 * 86400)
     daily = {"A": 0.002}
     hl = FakeHL({"A": 1.0}, {"A": 0.0001}, daily)
-    bot = CB.CarryBot(CB.CarryConfig(coins=("A",)), 200.0, 1000.0, PerpExecConfig(),
-                      hl=hl, kraken=FakeKraken({"A": 1.0}), executor=perp, spot_executor=spot)
+    bot = CB.CarryBot(CB.CarryConfig(coins=("A",), maker_spot=maker), 200.0, 1000.0,
+                      PerpExecConfig(), hl=hl, kraken=FakeKraken({"A": 1.0}),
+                      executor=perp, spot_executor=spot)
     assert bot.set_mode("real")[0]
     return bot, hl
 
@@ -261,6 +371,50 @@ class TestTwoLegs:
                               executor=p, spot_executor=s)
             ok, why = bot.set_mode("real")
             assert not ok and "BOTH legs" in why
+
+    # --- maker path: spot first, perp for what filled -----------------------
+    def test_maker_entry_buys_spot_first_then_shorts_the_filled_amount(self, monkeypatch):
+        perp, spot = Perp(), Spot()
+        spot.partial = 0.6                                    # only 60% filled
+        bot, _ = _bot(monkeypatch, perp, spot, maker=True)
+        asyncio.run(bot.run_daily())
+        assert spot.calls[0][0] == "buy_maker" and perp.calls[0][0] == "short"
+        assert perp.calls[0][2] == pytest.approx(0.6 * spot.calls[0][2])
+        pos = bot.books["real"].positions["A"]
+        assert pos.notional_usd == pytest.approx(0.6 * spot.calls[0][2])
+
+    def test_maker_spot_failure_never_touches_the_perp(self, monkeypatch):
+        perp, spot = Perp(), Spot(fail_buy=True)
+        bot, _ = _bot(monkeypatch, perp, spot, maker=True)
+        asyncio.run(bot.run_daily())
+        assert perp.calls == [] and "A" not in bot.books["real"].positions
+
+    def test_maker_perp_failure_sells_the_spot_back(self, monkeypatch):
+        perp, spot = Perp(fail_open=True), Spot()
+        bot, _ = _bot(monkeypatch, perp, spot, maker=True)
+        asyncio.run(bot.run_daily())
+        assert [c[0] for c in spot.calls] == ["buy_maker", "sell"]
+        assert "A" not in bot.books["real"].positions
+        assert "spot sold back" in bot.journal.recent(5, book="real")[0]["reason"]
+
+    def test_maker_perp_failure_queues_spot_if_sellback_fails(self, monkeypatch):
+        perp, spot = Perp(fail_open=True), Spot(fail_sell=True)
+        bot, _ = _bot(monkeypatch, perp, spot, maker=True)
+        asyncio.run(bot.run_daily())
+        assert bot.books["real"].pending_spot_sells["A"] > 0
+
+    def test_maker_exit_closes_perp_then_sells_spot_as_maker(self, monkeypatch):
+        perp, spot = Perp(), Spot()
+        bot, hl = _bot(monkeypatch, perp, spot, maker=True)
+        asyncio.run(bot.run_daily())
+        hl.daily["A"] = -0.001
+        bot.last_daily_run = 0
+        asyncio.run(bot.run_daily())
+        assert perp.calls[-1][0] == "close" and spot.calls[-1][0] == "sell_maker"
+
+    def test_maker_fees_in_the_round_trip(self):
+        assert CB.round_trip_fraction(True) == pytest.approx(2 * (0.00035 + 0.0005) + 2 * 0.0016)
+        assert CB.round_trip_fraction(False) == pytest.approx(0.0079)
 
     def test_pending_sells_survive_restart(self, tmp_path):
         b = CB.CarryBook("real", 1000.0, executes=True, state_file=tmp_path / "r.json")

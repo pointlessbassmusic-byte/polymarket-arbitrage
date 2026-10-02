@@ -696,10 +696,29 @@ With the collision removed, 70 trades priced on both venues:
 Basis is noise, and it does not blow out when the coin moves 30%+
 (mean +0.24% on those trades). The real shape of the strategy shows in
 the last row: only 34 of 70 trades beat the round trip. The money is in
-the long holds; short holds mostly pay fees. Fees are therefore the
-lever that matters most: posting the spot leg as a maker order
-(Kraken 0.16% instead of 0.26%) takes the round trip from 0.79% to about
-0.59%.
+the long holds; short holds mostly pay fees, so fees are the lever.
+
+**Maker spot leg (default).** Posting the Kraken leg as a post-only
+order at the touch costs 0.16% with no spread, instead of 0.26% plus
+slippage. On the same 70 trades:
+
+| spot leg | round trip | median trade | trades beating fees | annualised 2023 / 24 / 25 / 26 |
+|---|---|---|---|---|
+| taker | 0.79% | −0.07% | 34 / 70 | +13.2% / +37.7% / +8.1% / +17.5% |
+| **maker** | **0.49%** | **+0.23%** | **46 / 70** | **+20.7% / +44.6% / +12.7% / +21.1%** |
+
+That assumes the maker orders fill. The executor rests a post-only
+order at the bid (buys) or ask (sells), re-posts at the new touch up to
+three times if it does not fill within two minutes, and sends whatever
+is left as a capped taker order, so a trade always completes. Every
+fill records how much went through as maker, which is how the real book
+will show the true fee.
+
+A maker order can wait, so the order of operations flips on entry:
+**spot first, then the perp short for exactly what filled.** A spot long
+left waiting can lose at most what it cost; a short left waiting has no
+ceiling. If the perp then fails, the spot is sold straight back (or
+queued for retry). Exits still close the perp first.
 
 **Real mode, both legs.** The spot leg is `execution/kraken_spot.py`:
 Kraken's signed private API (HMAC-SHA512, verified against Kraken's

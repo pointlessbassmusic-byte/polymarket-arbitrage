@@ -62,14 +62,25 @@ class CarryConfig:
     # LIT is a different token (~$4). A "hedge" across two assets is two
     # naked positions. Normal spot/perp gaps are a few tenths of a percent.
     max_price_gap: float = 0.03
+    # Spot leg as a post-only maker order (Kraken 0.16%, no spread) rather
+    # than a taker (0.26% + spread). On the 70 trades priced on both
+    # venues this takes the round trip from 0.79% to 0.49% and the
+    # median trade from -0.07% to +0.23%. The sim book assumes maker
+    # fills; the real book records what actually filled as maker.
+    maker_spot: bool = True
     daily_at_utc_hour: int = 0
     daily_at_utc_minute: int = 20
     monitor_interval_s: int = 3600
     state_dir: Optional[Path] = None
 
 
-def round_trip_fraction() -> float:
-    return 2 * (TAKER_FEE + SLIPPAGE) + 2 * (KRAKEN_TAKER + SLIPPAGE)
+KRAKEN_MAKER = 0.0016
+
+
+def round_trip_fraction(maker_spot: bool = False) -> float:
+    perp = 2 * (TAKER_FEE + SLIPPAGE)
+    spot = 2 * KRAKEN_MAKER if maker_spot else 2 * (KRAKEN_TAKER + SLIPPAGE)
+    return perp + spot
 
 
 @dataclass
@@ -339,7 +350,7 @@ class CarryBot:
         rank_of = {r["coin"]: i for i, r in enumerate(ranking)}
         by_coin = {r["coin"]: r for r in ranking}
         top = [r["coin"] for r in ranking if r["rate_long"] > self.cfg.enter_min_daily][:self.cfg.top_n]
-        fee = round_trip_fraction()
+        fee = round_trip_fraction(self.cfg.maker_spot)
         t = now()
         for book in self.active_books():
             # exits
@@ -393,6 +404,44 @@ class CarryBot:
         return abs(spot / perp - 1.0)
 
     async def _open_legs(self, book, coin, notional):
+        if self.cfg.maker_spot:
+            return await self._open_legs_maker(book, coin, notional)
+        return await self._open_legs_taker(book, coin, notional)
+
+    async def _open_legs_maker(self, book, coin, notional):
+        """Buy spot as maker FIRST, then short the perp for what filled.
+
+        A maker order can rest for minutes. Waiting with an unhedged spot
+        long risks at most what the spot cost; waiting with an unhedged
+        short does not have a ceiling. So the leg that waits goes first.
+        """
+        try:
+            sf = await self.spot.buy_maker(coin, notional)
+        except Exception as exc:
+            self._note(book, coin, "skipped", "execution", f"spot maker buy failed: {exc}")
+            return None
+        mult = 1000.0 if coin.startswith("k") and coin[1:].isupper() else 1.0
+        spot_px = sf.price * mult
+        filled_usd = sf.volume * sf.price
+        try:
+            pf = await self.executor.open_short(coin, filled_usd, self.perps[coin])
+        except Exception as exc:
+            logger.error("perp short failed for %s after spot filled — selling spot", coin)
+            try:
+                await self.spot.sell(coin, sf.volume)
+                self._note(book, coin, "skipped", "execution",
+                           f"perp short failed ({exc}); spot sold back")
+            except Exception:
+                book.pending_spot_sells[coin] = book.pending_spot_sells.get(coin, 0.0) + sf.volume
+                book.save()
+                self._note(book, coin, "skipped", "execution",
+                           f"perp short failed ({exc}); spot sell queued for retry")
+            return None
+        if sf.volume and sf.maker_volume < sf.volume:
+            logger.info("%s spot: %.0f%% filled as maker", coin, 100 * sf.maker_volume / sf.volume)
+        return pf.price, spot_px, pf.qty, sf.volume, filled_usd
+
+    async def _open_legs_taker(self, book, coin, notional):
         """Short perp, then buy spot of the SAME filled notional. If the
         spot leg fails, buy the perp back: never hold a naked short."""
         try:
@@ -438,7 +487,10 @@ class CarryBot:
                 return
             if pos.spot_volume > 0:
                 try:
-                    await self.spot.sell(coin, pos.spot_volume)
+                    if self.cfg.maker_spot:
+                        await self.spot.sell_maker(coin, pos.spot_volume)
+                    else:
+                        await self.spot.sell(coin, pos.spot_volume)
                 except Exception:
                     logger.exception("spot sell failed for %s — queued for retry", coin)
                     book.pending_spot_sells[coin] = pos.spot_volume
@@ -531,6 +583,7 @@ def build(cfg: dict, state_dir: Optional[Path]) -> CarryBot:
         enter_min_daily=float(carry.get("enter_min_daily", 0.0006)),
         exit_min_daily=float(carry.get("exit_min_daily", 0.0)),
         slot_fraction=float(carry.get("slot_fraction", 0.30)),
+        maker_spot=bool(carry.get("maker_spot", True)),
         coins=tuple(carry.get("coins") or ()), state_dir=state_dir)
     exec_cfg = PerpExecConfig(live=bool(perp.get("live", False)),
                               private_key_env=perp.get("private_key_env", "CRYPTOBOT_PRIVATE_KEY"),
