@@ -54,6 +54,9 @@ DURATIONS = ("5m", "1h", "6h", "24h")
 PAGES = 3
 CALL_PAUSE_S = 2.1                     # ~28 calls/min, under the free limit
 HORIZONS_H = (1, 4, 24)
+# A mark taken this far past its horizon (e.g. the logger was down) is
+# recorded as missed rather than passed off as the horizon's price.
+LATE_FACTOR = 1.5
 
 # The article's thresholds.py, HARD block, market-data part, verbatim.
 HARD = {
@@ -156,6 +159,7 @@ class Ledger:
         self.path = path
         self.entries: dict[tuple, dict] = {}
         self.marks: dict[tuple, dict[int, Optional[float]]] = {}
+        self.missed: dict[tuple, set] = {}
         if path.exists():
             for line in path.read_text().splitlines():
                 try:
@@ -166,6 +170,13 @@ class Ledger:
                 if r["kind"] == "entry":
                     self.entries.setdefault(key, r)
                 elif r["kind"] == "mark":
+                    late = r.get("late")
+                    if late is None and key in self.entries:
+                        late = r["ts"] > self.entries[key]["ts"] + int(r["h"]) * 3600 * LATE_FACTOR
+                    if late:
+                        self.missed.setdefault(key, set()).add(int(r["h"]))
+                        self.marks.setdefault(key, {}).setdefault(int(r["h"]), None)
+                        continue
                     self.marks.setdefault(key, {})[int(r["h"])] = r["price"]
 
     def _write(self, row: dict) -> None:
@@ -191,11 +202,16 @@ class Ledger:
                     out.append((key, h))
         return out
 
-    def mark(self, key: tuple, h: int, price: Optional[float]) -> None:
-        self.marks.setdefault(key, {})[h] = price
+    def mark(self, key: tuple, h: int, price: Optional[float],
+             at: Optional[float] = None) -> None:
+        at = time.time() if at is None else at
+        late = at > self.entries[key]["ts"] + h * 3600 * LATE_FACTOR
+        self.marks.setdefault(key, {})[h] = None if late else price
+        if late:
+            self.missed.setdefault(key, set()).add(h)
         net, pool, group = key
         self._write({"kind": "mark", "net": net, "pool": pool, "group": group,
-                     "h": h, "price": price, "ts": time.time()})
+                     "h": h, "price": price, "ts": at, "late": late})
 
 
 # ------------------------------------------------------------------ fetch
@@ -284,6 +300,10 @@ def report(ledger: Ledger) -> str:
     out.append(f"observing since {dt.datetime.utcfromtimestamp(first):%Y-%m-%d %H:%M} UTC; "
                f"net = price change - (2 x {100 * AMM_FEE:.1f}% AMM fee + ${TICKET_USD:.0f} impact "
                f"vs pool), venue fees excluded")
+    missed = sum(len(v) for v in ledger.missed.values())
+    if missed:
+        out.append(f"{missed} marks missed (taken > {LATE_FACTOR}x their horizon, logger down) "
+                   f"and excluded")
     out.append(f"{'group':6s} {'h':>3s} {'n':>4s} {'mean net':>9s} {'median':>8s} "
                f"{'>0':>5s} {'<=-50%':>7s} {'gone':>5s}")
     for g in groups:
@@ -293,7 +313,7 @@ def report(ledger: Ledger) -> str:
                 if key[2] != g:
                     continue
                 m = ledger.marks.get(key, {})
-                if h not in m:
+                if h not in m or h in ledger.missed.get(key, ()):
                     continue
                 if m[h] is None:
                     gone += 1

@@ -89,6 +89,31 @@ class TestLedger:
         assert L.Ledger(f).marks[("solana", "P1", "hard")] == {1: 1.5}
         assert [h for _, h in L.Ledger(f).due(NOW + 25 * 3600)] == [4, 24]
 
+    def test_late_marks_are_missed_not_passed_off(self, tmp_path):
+        f = tmp_path / "l.jsonl"
+        led = L.Ledger(f)
+        led.enter(_p(), "hard", NOW)
+        key = ("solana", "P1", "hard")
+        led.mark(key, 1, 9.0, at=NOW + 4 * 3600)        # 1h price taken 4h later
+        led.mark(key, 4, 2.0, at=NOW + 4 * 3600)
+        for l in (led, L.Ledger(f)):                    # live and reloaded
+            assert l.missed[key] == {1}
+            assert l.marks[key][4] == 2.0
+        text = L.report(L.Ledger(f))
+        assert "1 marks missed" in text
+        assert not any(line.startswith("hard") and line.split()[1] == "1"
+                       for line in text.splitlines())
+
+    def test_old_ledgers_without_the_late_flag_are_judged_by_timestamp(self, tmp_path):
+        import json as _j
+        f = tmp_path / "l.jsonl"
+        led = L.Ledger(f)
+        led.enter(_p(), "hard", NOW)
+        with f.open("a") as fh:
+            fh.write(_j.dumps({"kind": "mark", "net": "solana", "pool": "P1", "group": "hard",
+                               "h": 1, "price": 5.0, "ts": NOW + 4 * 3600}) + "\n")
+        assert L.Ledger(f).missed[("solana", "P1", "hard")] == {1}
+
     def test_corrupt_lines_are_skipped(self, tmp_path):
         f = tmp_path / "l.jsonl"
         f.write_text("{bad\n")
