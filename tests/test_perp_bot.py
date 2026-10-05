@@ -503,3 +503,16 @@ def test_build_coinbase_venue_uses_us_universe_and_whole_contract_executor(tmp_p
 def test_build_rejects_unknown_venue(tmp_path):
     with pytest.raises(ValueError):
         PB.build({"perp": {"venue": "binance"}}, tmp_path)
+
+
+def test_build_coinbase_seed_falls_back_to_state_dir(tmp_path, monkeypatch):
+    import pickle
+    from cryptobot.backtest import PoolMeta
+    monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
+    meta = PoolMeta(chain="hl", pair_address="DOGE", symbol="DOGE", token_address="DOGE",
+                    liquidity_usd=0.0, fdv_usd=None)
+    (tmp_path / "seed.pkl").write_bytes(pickle.dumps({"DOGE": (meta, [Candle(ts=1.0, open=1, high=1, low=1, close=1, volume_usd=1)])}))
+    cfg = {"perp": {"venue": "coinbase", "history_seed": "state/seed.pkl"},
+           "allocation": {"carry": 0.0, "bounce_short": 1.0}}
+    bot = PB.build(cfg, tmp_path)
+    assert "DOGE" in bot.client._seed

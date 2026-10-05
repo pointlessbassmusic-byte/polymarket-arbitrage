@@ -972,7 +972,16 @@ python -m cryptobot.desk --preflight            # what real money needs, and wha
 ```
 
 **On an always-on machine** (the sims need weeks of uninterrupted
-uptime to say anything; a laptop that sleeps will not do):
+uptime to say anything; a laptop that sleeps will not do). One command
+does all of the below on a fresh Ubuntu/Debian server such as a Linode:
+
+```bash
+git clone https://github.com/pointlessbassmusic-byte/polymarket-arbitrage && cd polymarket-arbitrage
+git checkout claude/crypto-arbitrage-volatility-bot-qic8gv
+./deploy.sh          # installs Docker, writes .env with a random token, builds the seed, starts paper trading
+```
+
+Or by hand:
 
 ```bash
 cp .env.example .env                            # set CRYPTOBOT_DASH_TOKEN at least

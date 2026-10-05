@@ -572,7 +572,10 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
         if perp.get("data", "coinbase") == "coinbase":
             from .data.coinbase_futures import CoinbaseMarketData
             seed = perp.get("history_seed")
-            client = CoinbaseMarketData(history_seed=Path(seed) if seed else None)
+            seed_path = Path(seed) if seed else None
+            if seed_path and not seed_path.exists() and state_dir:
+                seed_path = Path(state_dir) / seed_path.name     # inside Docker, state is /data
+            client = CoinbaseMarketData(history_seed=seed_path)
     return PerpBot(bot_cfg, sim_risk, real_risk, ProtectionConfig(**prot_kw), exec_cfg,
                    client=client, executor=executor)
 
