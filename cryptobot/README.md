@@ -854,6 +854,66 @@ assumes the scan's snapshot price, which a real order would not get.
 python -m cryptobot.launch_shadow --state launches.jsonl --exits candles.pkl
 ```
 
+## Polymarket "Bitcoin Up or Down": two X posts, tested (`cryptobot.updown_study`)
+
+Two posts (@RetroValix, @Dan1ro0, Oct 2026) describe bots on Polymarket's
+15-minute "Bitcoin Up or Down" markets, which pay $1 a share to Up if
+Chainlink's BTC/USD price ends at or above where it started:
+
+1. **Fair value + hedge-to-lock** (account "mo-money", "+$470,883"):
+   price each side with a model (BTC vs its open, time left,
+   volatility), buy the cheap side, then buy the other side when the
+   pair can be completed for under $1.
+2. **DMI/ADX** ("+$809,704"): buy the side whose directional index
+   (+DI or −DI) dominates when ADX > 25.
+
+Both posts carry referral or product links and neither shows how its
+account's results arose. The test is against what Polymarket actually
+quoted: 2,100 resolved BTC 15-minute markets (Sep 13 – Oct 5 2026), each
+with its ~1-minute price history, plus 1-minute Coinbase BTC candles
+(`cryptobot.updown_data`). Costs are Polymarket's taker fee,
+**0.07 × p × (1 − p) per share** (3.5% of the stake at 50¢; makers pay
+none), plus half a cent of spread. Settings are chosen on the first 11
+days and scored on the last 11.
+
+**A trap worth knowing.** The first run showed taker profits of +12% to
++39% per dollar out of sample. That was an artefact: quotes print about
+once a minute, and comparing a model fed BTC's price *now* against a
+quote up to a minute old makes the market look slow. Fixed so the
+information test only gives the model BTC data from before the quote's
+timestamp, and trades fill at the first quote printed after the
+decision:
+
+| at 5 min before close (10 and 2 min are similar) | test half (Sep 24 – Oct 5) |
+|---|---|
+| market price is calibrated? | yes: priced 0.6 → won ~0.59 |
+| fair-value model adds information? | no: log loss 0.4294 → 0.4338 (worse) |
+| taker on model edge | **−7.2% per $**, 1 of 12 days up |
+| + hedge-to-lock | **−9.4% per $**, win rate 56%, 1 of 12 days up |
+| maker bid at fair value − margin | **−31% per $** (filled when price falls through it) |
+| DMI/ADX > 25, as posted | **−2.9% per $** despite a 74% hit rate |
+
+What this means:
+
+- **The market already prices the public information.** The fair-value
+  model and DMI only restate what the current price says. DMI's high hit
+  rate is the trend the price has already absorbed, and the fee takes
+  the rest.
+- **Hedge-to-lock buys consistency, not profit.** It turns fewer large
+  losses into many small wins and occasional large losses: the win
+  rate rises, the return does not.
+- **The only edge visible is speed.** The stale-quote artefact shows
+  the printed prices *did* lag BTC. Capturing that needs a live order
+  book and a BTC feed measured in seconds or less, competing with
+  professional market makers. That is plausibly what an "HFT" account
+  like mo-money does; it cannot be tested on minute data and is not a
+  realistic edge for this bot.
+
+```bash
+python -m cryptobot.updown_data --out updown_15m.pkl --days 30
+python -m cryptobot.updown_study --data updown_15m.pkl
+```
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool
