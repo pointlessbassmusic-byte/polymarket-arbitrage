@@ -1,0 +1,5 @@
+# Real-money execution for the trading desk (paper trading needs none of these).
+# Hyperliquid perp orders are EIP-712 signed by the official SDK; the Kraken
+# spot leg signs with the standard library and needs nothing extra.
+hyperliquid-python-sdk>=0.24.0
+eth-account>=0.11.0

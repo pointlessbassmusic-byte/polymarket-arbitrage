@@ -949,6 +949,57 @@ python -m cryptobot.hypotheses --similar "sell 60% at 2x and hold a moonbag"
 python -m cryptobot.hypotheses --verdict alive
 ```
 
+## Running it: the trading desk (`cryptobot.desk`)
+
+Both surviving strategies run in one process, each on its share of the
+bankroll (`allocation:` in the config, 50/50 by default), behind one
+dashboard:
+
+| path | what |
+|---|---|
+| `/` | both strategies' sim and real equity, and the total |
+| `/bounce/` | bounce-short dashboard |
+| `/carry/` | carry dashboard |
+
+One token guards every API route, mounted ones included. The books
+persist in the state directory and are restored on start.
+
+**Locally:**
+
+```bash
+python -m cryptobot.desk                        # paper trade both; prints the dashboard URL
+python -m cryptobot.desk --preflight            # what real money needs, and what is missing
+```
+
+**On an always-on machine** (the sims need weeks of uninterrupted
+uptime to say anything; a laptop that sleeps will not do):
+
+```bash
+cp .env.example .env                            # set CRYPTOBOT_DASH_TOKEN at least
+docker compose up -d                            # restarts on crash and reboot; state in ./state
+docker compose logs -f                          # dashboard URL
+docker compose run --rm desk python -m cryptobot.desk --preflight
+```
+
+The port is published on 127.0.0.1 only. From elsewhere, use an SSH
+tunnel (`ssh -L 8080:localhost:8080 your-server`) rather than opening it.
+
+**Going live** is a checklist, and `--preflight` checks every line:
+
+1. `perp.live: true` and `carry.live: true` in the config;
+2. `CRYPTOBOT_ARM_LIVE=yes`;
+3. a **dedicated** Hyperliquid wallet key (`CRYPTOBOT_PRIVATE_KEY`);
+4. a Kraken key with trade and query permissions only, **never
+   withdrawal** (`CRYPTOBOT_KRAKEN_KEY` / `_SECRET`);
+5. `perp.max_trade_usd` at least the largest planned order (otherwise
+   orders are capped and positions undersized);
+6. each venue funded: carry's spot leg on Kraken, carry's perp margin
+   plus the bounce-short's capital on Hyperliquid. For a $1,000 real
+   bankroll split 50/50 that is $225 on Kraken and $725 on Hyperliquid.
+
+Then switch each dashboard's toggle to real. The sim books keep running
+alongside, so the gap between sim and real is measured execution cost.
+
 ## Carry on capital, and the 50/50 split
 
 **A correction.** Carry yields quoted above (+13% to +45% a year) are per

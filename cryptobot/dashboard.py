@@ -57,7 +57,14 @@ def create_app(scanner, token: str | None = None,
             # the address it was told to use.
             logger.warning("rejected request with Host %r", host)
             return JSONResponse({"error": "host not allowed"}, status_code=421)
-        if token and request.url.path.startswith("/api/"):
+        # Match on the path RELATIVE to where this app is mounted. Mounted
+        # under /carry, a request arrives as /carry/api/state; checking the
+        # raw path for "/api/" would quietly stop enforcing the token.
+        path = request.url.path
+        root = request.scope.get("root_path") or ""
+        if root and path.startswith(root):
+            path = path[len(root):] or "/"
+        if token and "/api/" in path:
             sent = (request.headers.get("x-dashboard-token")
                     or request.query_params.get("t") or "")
             if not secrets.compare_digest(sent, token):
@@ -309,7 +316,7 @@ async function setMode(m){
   if(m===view&&S&&S.mode===m)return;
   if(m==="real"&&S&&!S.real_unlocked){view="sim";render();return;}
   try{
-    const r=await fetch("/api/mode",{method:"POST",
+    const r=await fetch("api/mode",{method:"POST",
       headers:authed({"Content-Type":"application/json"}),
       body:JSON.stringify({mode:m})});
     const j=await r.json();
@@ -486,7 +493,7 @@ function render(){
 
 async function poll(){
   try{
-    const r=await fetch("/api/state",{headers:authed()});
+    const r=await fetch("api/state",{headers:authed()});
     if(r.status===401){$("meta").textContent=
       "unauthorized — open the URL printed by the bot (it carries ?t=…)";return;}
     S=await r.json();

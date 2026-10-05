@@ -74,3 +74,6 @@ config.live.yaml
 # cryptobot_<book>_portfolio.json, so a literal name silently stops
 # matching the moment a book is added or renamed.
 cryptobot_*.json
+
+# Trading desk state (books, ledgers)
+state/

@@ -1,0 +1,268 @@
+"""The trading desk: both surviving strategies in one process.
+
+Runs the bounce-short bot (`perp_bot`) and the funding-carry bot
+(`carry_bot`) side by side, each sizing from its share of the bankroll
+(`allocation:` in the config), behind one web server:
+
+    /          combined view: each strategy's sim and real equity, and the total
+    /bounce/   the bounce-short dashboard
+    /carry/    the carry dashboard
+
+One token guards every API route, including the mounted ones.
+
+    python -m cryptobot.desk                     # paper trade both, dashboard on :8080
+    python -m cryptobot.desk --preflight         # what real money needs, and what is missing
+
+Both bots persist their books in --state-dir and restore them on start, so
+a restart (or a container being replaced) loses nothing.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import logging
+import os
+import secrets
+from pathlib import Path
+from typing import Optional
+
+from fastapi import Request     # module level: annotations here are resolved by name
+
+logger = logging.getLogger(__name__)
+
+
+# ------------------------------------------------------------------ summary
+
+def summary(bots: dict) -> dict:
+    """Equity per strategy and in total, for both books."""
+    out = {"strategies": {}, "total": {}}
+    for name, bot in bots.items():
+        st = bot.state()
+        row = {"mode": st["mode"], "real_unlocked": st["real_unlocked"]}
+        for book in ("sim", "real"):
+            b = st["books"][book]
+            row[book] = {"start": b["starting_equity"], "equity": b["equity"],
+                         "open": b["summary"]["open_positions"],
+                         "trades": b["summary"]["trades"]}
+            tot = out["total"].setdefault(book, {"start": 0.0, "equity": 0.0})
+            tot["start"] += b["starting_equity"]
+            tot["equity"] += b["equity"]
+        out["strategies"][name] = row
+    for book, tot in out["total"].items():
+        tot["return_pct"] = (tot["equity"] / tot["start"] - 1.0) if tot["start"] else 0.0
+    return out
+
+
+SUMMARY_PAGE = """<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trading Desk</title><style>
+:root{--bg:#fff;--fg:#1d1d1f;--mut:#6e6e73;--line:#e5e5ea;--up:#1a7f37;--dn:#c62828}
+@media (prefers-color-scheme:dark){:root{--bg:#111;--fg:#f2f2f2;--mut:#9a9aa0;--line:#2a2a2e;--up:#4cc26b;--dn:#ff6b6b}}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif;margin:0;padding:24px 16px;max-width:860px;margin:auto}
+h1{font-size:20px;margin:0 0 4px}p{color:var(--mut);margin:0 0 20px}
+table{width:100%;border-collapse:collapse}th,td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:500;font-size:13px}
+.up{color:var(--up)}.dn{color:var(--dn)}a{color:inherit}</style></head><body>
+<h1>Trading desk</h1><p>Funding carry + bounce-short, each on its share of the bankroll.
+Open <a id="lb" href="bounce/">bounce-short</a> · <a id="lc" href="carry/">carry</a></p>
+<table><thead><tr><th>strategy</th><th>mode</th><th>sim equity</th><th>sim open</th>
+<th>real equity</th><th>real open</th></tr></thead><tbody id="rows"></tbody></table>
+<script>
+const T=new URLSearchParams(location.search).get("t")||"";
+for(const id of ["lb","lc"]){const a=document.getElementById(id);if(T)a.href+="?t="+encodeURIComponent(T)}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct=(e,s)=>{if(!s)return"";const r=e/s-1;return ` <span class="${r>=0?"up":"dn"}">${r>=0?"+":""}${(100*r).toFixed(2)}%</span>`};
+async function tick(){try{
+ const r=await fetch("api/summary",{headers:{"x-dashboard-token":T}});const d=await r.json();
+ let h="";for(const [n,s] of Object.entries(d.strategies)){
+  h+=`<tr><td>${esc(n)}</td><td>${esc(s.mode)}</td><td>$${s.sim.equity.toFixed(2)}${pct(s.sim.equity,s.sim.start)}</td><td>${s.sim.open}</td>`+
+     `<td>$${s.real.equity.toFixed(2)}${pct(s.real.equity,s.real.start)}</td><td>${s.real.open}</td></tr>`}
+ const t=d.total;h+=`<tr><th>total</th><th></th><th>$${t.sim.equity.toFixed(2)}${pct(t.sim.equity,t.sim.start)}</th><th></th>`+
+     `<th>$${t.real.equity.toFixed(2)}${pct(t.real.equity,t.real.start)}</th><th></th></tr>`;
+ document.getElementById("rows").innerHTML=h}catch(e){}}
+tick();setInterval(tick,5000);
+</script></body></html>"""
+
+
+def create_desk_app(bots: dict, token: Optional[str], extra_hosts: Optional[set] = None):
+    import secrets as _s
+    from fastapi import FastAPI
+    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+    from .dashboard import LOOPBACK_HOSTS, create_app
+
+    app = FastAPI(title="Trading Desk", docs_url=None, redoc_url=None)
+    allowed = LOOPBACK_HOSTS | (extra_hosts or set())
+
+    @app.middleware("http")
+    async def guard(request: Request, call_next):
+        host = (request.headers.get("host") or "").split(":")[0].lower()
+        if host and host not in allowed:
+            return JSONResponse({"error": "host not allowed"}, status_code=421)
+        if token and request.url.path == "/api/summary":
+            sent = request.headers.get("x-dashboard-token") or request.query_params.get("t") or ""
+            if not _s.compare_digest(sent, token):
+                return JSONResponse({"error": "bad or missing token"}, status_code=401)
+        return await call_next(request)
+
+    @app.get("/api/summary")
+    async def api_summary() -> dict:
+        return summary(bots)
+
+    @app.get("/", response_class=HTMLResponse)
+    async def index() -> str:
+        return SUMMARY_PAGE
+
+    def slash_redirect(prefix: str):
+        async def _slash(request: Request):
+            q = f"?{request.url.query}" if request.url.query else ""
+            return RedirectResponse(f"/{prefix}/{q}")
+        return _slash
+
+    for name, bot in bots.items():
+        app.add_api_route(f"/{name}", slash_redirect(name), include_in_schema=False)
+        app.mount(f"/{name}", create_app(bot, token=token, extra_hosts=extra_hosts))
+    return app
+
+
+# ---------------------------------------------------------------- preflight
+
+def capital_plan(cfg: dict) -> dict:
+    """Where the real bankroll has to sit, per venue, for both strategies
+    at their configured sizes."""
+    from .carry_bot import allocation
+    carry = cfg.get("carry", {})
+    bank = float(cfg.get("risk", {}).get("bankroll_usd", 1000))
+    c_share, b_share = allocation(cfg, "carry"), allocation(cfg, "bounce_short")
+    lev = float(carry.get("perp_leverage", 1.0))
+    deployed = int(carry.get("top_n", 3)) * float(carry.get("slot_fraction", 0.30))
+    carry_notional = c_share * bank * deployed / (1 + 1 / lev)
+    return {
+        "bankroll": bank,
+        "carry_capital": c_share * bank,
+        "bounce_capital": b_share * bank,
+        "kraken_usd": carry_notional,                        # spot leg
+        "hyperliquid_usdc": carry_notional / lev + b_share * bank,
+        "max_trade_usd": float(cfg.get("perp", {}).get("max_trade_usd", 50)),
+        "largest_order": max(carry_notional / max(1, int(carry.get("top_n", 3))),
+                             b_share * bank / len(cfg.get("perp", {}).get("coins") or range(18))),
+    }
+
+
+def preflight(cfg: dict, env: dict, balances: Optional[dict] = None) -> list[tuple[str, bool, str]]:
+    """Checklist for real money. `balances` = {"kraken_usd": x,
+    "hyperliquid_usdc": y} when they could be read; None skips that check."""
+    plan = capital_plan(cfg)
+    perp, carry = cfg.get("perp", {}), cfg.get("carry", {})
+    checks = [
+        ("perp.live is true", bool(perp.get("live")), "set perp.live: true in the config"),
+        ("carry.live is true", bool(carry.get("live")), "set carry.live: true (Kraken spot leg)"),
+        ("CRYPTOBOT_ARM_LIVE=yes", env.get("CRYPTOBOT_ARM_LIVE", "").lower() == "yes",
+         "export CRYPTOBOT_ARM_LIVE=yes"),
+        ("Hyperliquid wallet key", bool(env.get(perp.get("private_key_env", "CRYPTOBOT_PRIVATE_KEY"))),
+         "export CRYPTOBOT_PRIVATE_KEY (a dedicated wallet, not your main one)"),
+        ("Kraken API key + secret", bool(env.get("CRYPTOBOT_KRAKEN_KEY") and env.get("CRYPTOBOT_KRAKEN_SECRET")),
+         "export CRYPTOBOT_KRAKEN_KEY / _SECRET (trade + query permissions, NO withdrawal)"),
+        ("orders fit under max_trade_usd", plan["largest_order"] <= plan["max_trade_usd"],
+         f"largest planned order ${plan['largest_order']:.2f} > perp.max_trade_usd "
+         f"${plan['max_trade_usd']:.2f}: orders would be capped and positions undersized"),
+    ]
+    if balances is not None:
+        for venue, need in (("kraken_usd", plan["kraken_usd"]),
+                            ("hyperliquid_usdc", plan["hyperliquid_usdc"])):
+            have = balances.get(venue)
+            checks.append((f"{venue} >= ${need:.2f}", have is not None and have >= need,
+                           f"have ${have if have is not None else 0:.2f}, need ${need:.2f}"))
+    return checks
+
+
+async def read_balances(cfg: dict, env: dict) -> dict:
+    """Best-effort live balances; a venue that cannot be read is omitted."""
+    out = {}
+    key = env.get(cfg.get("perp", {}).get("private_key_env", "CRYPTOBOT_PRIVATE_KEY"))
+    if key:
+        try:
+            import httpx
+            from eth_account import Account
+            addr = Account.from_key(key).address
+            async with httpx.AsyncClient(timeout=20) as c:
+                r = await c.post("https://api.hyperliquid.xyz/info",
+                                 json={"type": "clearinghouseState", "user": addr})
+                out["hyperliquid_usdc"] = float(r.json()["marginSummary"]["accountValue"])
+        except Exception as exc:
+            logger.warning("hyperliquid balance unavailable: %s", exc)
+    if env.get("CRYPTOBOT_KRAKEN_KEY") and env.get("CRYPTOBOT_KRAKEN_SECRET"):
+        try:
+            from .execution.kraken_spot import KrakenSpotExecutor, SpotExecConfig
+            ex = KrakenSpotExecutor(SpotExecConfig())
+            ex._key, ex._secret = env["CRYPTOBOT_KRAKEN_KEY"], env["CRYPTOBOT_KRAKEN_SECRET"]
+            bal = await ex.balance()
+            await ex.close()
+            out["kraken_usd"] = float(bal.get("ZUSD", 0.0)) + float(bal.get("USD", 0.0))
+        except Exception as exc:
+            logger.warning("kraken balance unavailable: %s", exc)
+    return out
+
+
+def render_preflight(cfg: dict, checks: list) -> str:
+    plan = capital_plan(cfg)
+    out = [f"real bankroll ${plan['bankroll']:.2f}: carry ${plan['carry_capital']:.2f}, "
+           f"bounce-short ${plan['bounce_capital']:.2f}",
+           f"  fund Kraken with >= ${plan['kraken_usd']:.2f} USD (carry spot leg)",
+           f"  fund Hyperliquid with >= ${plan['hyperliquid_usdc']:.2f} USDC "
+           f"(carry perp margin + bounce-short)", ""]
+    for name, ok, fix in checks:
+        out.append(f"  [{'ok' if ok else '  '}] {name}" + ("" if ok else f"  -> {fix}"))
+    ready = all(ok for _, ok, _ in checks)
+    out.append("\nREADY for real money" if ready else "\nNOT ready: paper trading only until every box is ticked")
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------- main
+
+def build(cfg: dict, state_dir: Path) -> dict:
+    from . import carry_bot, perp_bot
+    return {"bounce": perp_bot.build(cfg, state_dir), "carry": carry_bot.build(cfg, state_dir)}
+
+
+async def _main(args) -> int:
+    import yaml
+    cfg = yaml.safe_load(args.config.read_text()) or {}
+    if args.preflight:
+        env = dict(os.environ)
+        balances = await read_balances(cfg, env)
+        print(render_preflight(cfg, preflight(cfg, env, balances or None)))
+        return 0
+    args.state_dir.mkdir(parents=True, exist_ok=True)
+    bots = build(cfg, args.state_dir)
+    token = args.token or os.environ.get("CRYPTOBOT_DASH_TOKEN") or secrets.token_urlsafe(16)
+    import uvicorn
+    app = create_desk_app(bots, token, set(args.allow_host or []))
+    shown = "localhost" if args.host in ("0.0.0.0", "127.0.0.1") else args.host
+    logger.info("desk dashboard: http://%s:%d/?t=%s", shown, args.port, token)
+    server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning"))
+    try:
+        await asyncio.gather(bots["bounce"].run_forever(), bots["carry"].run_forever(), server.serve())
+    finally:
+        for b in bots.values():
+            await b.close()
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="carry + bounce-short trading desk")
+    ap.add_argument("--config", type=Path, default=Path("cryptobot_config.yaml"))
+    ap.add_argument("--state-dir", type=Path, default=Path("state"))
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=8080)
+    ap.add_argument("--token", default=None, help="dashboard token (default: random, or $CRYPTOBOT_DASH_TOKEN)")
+    ap.add_argument("--allow-host", action="append",
+                    help="extra Host header to accept, e.g. your server's name (repeatable)")
+    ap.add_argument("--preflight", action="store_true")
+    args = ap.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    return asyncio.run(_main(args))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
