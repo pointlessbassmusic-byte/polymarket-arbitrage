@@ -818,6 +818,42 @@ python -m cryptobot.launch_shadow --state launches.jsonl            # leave runn
 python -m cryptobot.launch_shadow --state launches.jsonl --report   # results so far
 ```
 
+### What the shadow run showed (two evenings, Oct 2–3 2026)
+
+Holding filtered launches for 24 hours lost money: median −21% for the
+post's filters, −42% for every fresh launch. The post's missing exit
+rule is where any edge would have to be, so `--exits` replays every
+recorded launch through its 5-minute candles under 36 rules (take
+profit +20/+50/+100%/none × stop −15/−30%/none × sell after 1/4/24h).
+A candle that opens through the stop fills at its open, because
+memecoins gap. The rule is chosen on the first evening and scored on the
+second; choosing on all the data would find a lucky rule.
+
+| | picked on Oct 2 (mean) | tested on Oct 3 (mean) | every fresh launch, same rule, Oct 3 |
+|---|---|---|---|
+| post's filters: tp +100%, no stop, 4h | +11.7% (n=47) | **+13.8%** (n=47) | **+18.1%** (n=70) |
+| my "many buyers" stand-in: no tp, stop −30%, 4h | +16.2% (n=19) | +12.5% (median −30.6%) | +213.5% (one launch) |
+
+Two findings, both from far too little data to trade on:
+
+- **The exit matters, not the filter.** Selling within four hours turned
+  the 24-hour losses into gains on both evenings, out of sample. But
+  buying every trending launch with the same exit did as well or better.
+  Across all 36 rules the post's filter beats the unfiltered baseline in
+  20, a coin flip; the "many buyers" stand-in in 4.
+- **The returns are carried by a few launches.** Means are positive while
+  medians hover near zero or below, and single launches move the
+  averages by hundreds of percent. That is lottery-shaped, the same shape
+  that made shorting new perp listings fail.
+
+Two evenings of one market mood cannot separate an edge from a good
+week for launches. Venue fees (FOMO's own) are not included, and entry
+assumes the scan's snapshot price, which a real order would not get.
+
+```bash
+python -m cryptobot.launch_shadow --state launches.jsonl --exits candles.pkl
+```
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool

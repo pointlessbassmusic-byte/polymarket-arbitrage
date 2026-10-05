@@ -289,6 +289,137 @@ class Scanner:
         await self.c.aclose()
 
 
+# ------------------------------------------------------------ exit replay
+
+EXIT_GRID = [(tp, sl, h) for tp in (0.2, 0.5, 1.0, None)
+             for sl in (0.15, 0.30, None) for h in (1, 4, 24)]
+
+
+def exit_trade(candles, entry_ts: float, entry_price: float, liq: float,
+               tp: Optional[float], sl: Optional[float], max_h: float) -> Optional[float]:
+    """Replay one long from `entry_price` through 5-minute candles.
+
+    Stop is checked before target in each candle (the conservative order
+    when a candle touches both). A candle that OPENS through a barrier
+    fills at its open: memecoins gap, and assuming a clean fill at the
+    stop would flatter every stop rule. With no barrier hit, the trade
+    exits at the last close at or before the time limit. Returns net of
+    the round trip, floored at -100%, or None with no candles to replay.
+    """
+    stop = entry_price * (1 - sl) if sl is not None else None
+    target = entry_price * (1 + tp) if tp is not None else None
+    deadline = entry_ts + max_h * 3600
+    last = None
+    for c in candles:
+        if c.ts < entry_ts:
+            continue
+        if c.ts > deadline:
+            break
+        if stop is not None and c.open <= stop:
+            return max(-1.0, c.open / entry_price - 1 - round_trip(liq))
+        if stop is not None and c.low <= stop:
+            return max(-1.0, -sl - round_trip(liq))
+        if target is not None and c.open >= target:
+            return c.open / entry_price - 1 - round_trip(liq)
+        if target is not None and c.high >= target:
+            return tp - round_trip(liq)
+        last = c.close
+    if last is None:
+        return None
+    return max(-1.0, last / entry_price - 1 - round_trip(liq))
+
+
+def rule_name(tp, sl, h) -> str:
+    return (f"tp {'+' + str(int(tp * 100)) + '%' if tp else 'none':>5s}  "
+            f"sl {'-' + str(int(sl * 100)) + '%' if sl else 'none':>5s}  {h:>2d}h")
+
+
+def exit_results(ledger: "Ledger", candles: dict, group: str, rule, day: Optional[str] = None):
+    """Net returns of `rule` over one group's entries (optionally one UTC day)."""
+    out = []
+    for key, e in ledger.entries.items():
+        if key[2] != group:
+            continue
+        if day and dt.datetime.utcfromtimestamp(e["ts"]).strftime("%Y-%m-%d") != day:
+            continue
+        cs = candles.get((key[0], key[1], int(e["ts"])))
+        if not cs:
+            continue
+        r = exit_trade(cs, e["ts"], e["price"], e["liq"], *rule)
+        if r is not None:
+            out.append(r)
+    return out
+
+
+def _summ(rets):
+    if not rets:
+        return "n=0"
+    return (f"n={len(rets):3d}  median {100 * statistics.median(rets):+6.1f}%  "
+            f"mean {100 * statistics.mean(rets):+7.1f}%  up {100 * sum(r > 0 for r in rets) / len(rets):3.0f}%")
+
+
+def exit_report(ledger: "Ledger", candles: dict, by: str = "mean") -> str:
+    """Pick the best rule on the first day by `by` (mean = what a trader
+    keeps; median is misleading for take-profit rules, which cap every
+    winner and say nothing about the size of the losers), then score it
+    on the remaining days against the baseline under the same rule."""
+    days = sorted({dt.datetime.utcfromtimestamp(e["ts"]).strftime("%Y-%m-%d")
+                   for k, e in ledger.entries.items()
+                   if (k[0], k[1], int(e["ts"])) in candles})
+    out = [f"exit replay on 5-minute candles; days with data: {', '.join(days)}"]
+    if len(days) < 2:
+        out.append("need two days of entries to pick a rule on one and test it on the other")
+        return "\n".join(out)
+    pick_day, test_days = days[0], days[1:]
+    for group in ("hard", "crowd"):
+        scored = []
+        for rule in EXIT_GRID:
+            r = exit_results(ledger, candles, group, rule, pick_day)
+            if len(r) >= 5:
+                stat = statistics.mean(r) if by == "mean" else statistics.median(r)
+                scored.append((stat, rule))
+        if not scored:
+            continue
+        scored.sort(key=lambda t: t[0], reverse=True)      # ties keep grid order
+        best = scored[0][1]
+        out.append(f"\n== {group}: best of {len(EXIT_GRID)} rules on {pick_day} (by {by}) "
+                   f"-> {rule_name(*best)}")
+        out.append(f"  picked on {pick_day}:  {_summ(exit_results(ledger, candles, group, best, pick_day))}")
+        for d in test_days:
+            out.append(f"  tested on {d}:  {_summ(exit_results(ledger, candles, group, best, d))}")
+            out.append(f"    baseline, same rule, {d}: "
+                       f"{_summ(exit_results(ledger, candles, 'fresh', best, d))}")
+        pos = sum(1 for m, _ in scored if m > 0)
+        out.append(f"  rules with a positive {by} on {pick_day}: {pos} of {len(scored)}")
+    return "\n".join(out)
+
+
+async def fetch_candles(ledger: "Ledger", path: Path) -> dict:
+    """5-minute candles for each (pool, entry) from entry to +24h; cached."""
+    from cryptobot.data.geckoterminal import GeckoTerminalClient
+    import pickle
+    out = pickle.loads(path.read_bytes()) if path.exists() else {}
+    gt = GeckoTerminalClient()
+    try:
+        for (net, pool, _), e in ledger.entries.items():
+            key = (net, pool, int(e["ts"]))
+            end = int(e["ts"]) + 24 * 3600 + 600
+            if key in out or end > time.time():
+                continue
+            try:
+                cs = await gt.ohlcv(net, pool, timeframe="minute", aggregate=5,
+                                    limit=300, before_ts=end)
+            except Exception as exc:
+                logger.warning("ohlcv %s failed: %s", pool[:10], exc)
+                cs = []
+            out[key] = [c for c in cs if c.ts >= e["ts"] - 300]
+            path.write_bytes(pickle.dumps(out))
+            await asyncio.sleep(CALL_PAUSE_S)
+    finally:
+        await gt.close()
+    return out
+
+
 # ----------------------------------------------------------------- report
 
 def report(ledger: Ledger) -> str:
@@ -350,8 +481,15 @@ def main() -> int:
     ap.add_argument("--cycle", type=int, default=900)
     ap.add_argument("--cycles", type=int, default=None)
     ap.add_argument("--report", action="store_true")
+    ap.add_argument("--exits", type=Path, metavar="CANDLE_CACHE",
+                    help="fetch 5m candles into this cache and replay the exit grid")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    if args.exits:
+        led = Ledger(args.state)
+        candles = asyncio.run(fetch_candles(led, args.exits))
+        print(exit_report(led, candles, by="mean"))
+        return 0
     if args.report:
         print(report(Ledger(args.state)))
         return 0

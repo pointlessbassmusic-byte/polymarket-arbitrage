@@ -171,3 +171,55 @@ class TestReport:
         assert cols[2] == "2"                                   # n
         assert cols[3] == f"{100 * expected:+.1f}%"             # mean net
         assert cols[-1] == "1" and cols[-2] == "1"             # one gone, one <= -50%
+
+
+class TestExitReplay:
+    from cryptobot.backtest import Candle as _C
+
+    def _c(self, i, o, h, l, c):
+        from cryptobot.backtest import Candle
+        return Candle(ts=NOW + i * 300, open=o, high=h, low=l, close=c, volume_usd=1.0)
+
+    def test_target_hit_pays_the_target(self):
+        cs = [self._c(1, 1.0, 1.1, 0.95, 1.05), self._c(2, 1.05, 1.6, 1.0, 1.5)]
+        r = L.exit_trade(cs, NOW, 1.0, 50_000, tp=0.5, sl=0.3, max_h=24)
+        assert r == pytest.approx(0.5 - L.round_trip(50_000))
+
+    def test_stop_checked_before_target_in_one_candle(self):
+        cs = [self._c(1, 1.0, 2.0, 0.5, 1.0)]
+        assert L.exit_trade(cs, NOW, 1.0, 50_000, 0.5, 0.3, 24) == pytest.approx(
+            -0.3 - L.round_trip(50_000))
+
+    def test_gap_through_the_stop_fills_at_the_open(self):
+        cs = [self._c(1, 1.0, 1.0, 1.0, 1.0), self._c(2, 0.2, 0.25, 0.1, 0.1)]
+        assert L.exit_trade(cs, NOW, 1.0, 50_000, None, 0.3, 24) == pytest.approx(
+            0.2 - 1 - L.round_trip(50_000))
+
+    def test_time_limit_exits_at_the_last_close_before_it(self):
+        cs = [self._c(i, 1.0, 1.0, 1.0, 1.0 + i / 100) for i in range(1, 30)]
+        r = L.exit_trade(cs, NOW, 1.0, 50_000, None, None, max_h=1)       # 12 candles
+        assert r == pytest.approx(0.12 - L.round_trip(50_000))
+
+    def test_no_candles_is_no_result(self):
+        assert L.exit_trade([], NOW, 1.0, 50_000, 0.5, 0.3, 4) is None
+
+    def test_losses_floor_at_the_ticket(self):
+        cs = [self._c(1, 0.001, 0.001, 0.001, 0.001)]
+        assert L.exit_trade(cs, NOW, 1.0, 100, None, None, 24) == -1.0
+
+    def test_report_picks_on_day_one_and_tests_on_day_two(self, tmp_path):
+        from cryptobot.backtest import Candle
+        led = L.Ledger(tmp_path / "l.jsonl")
+        candles = {}
+        for t0, tag in ((NOW, "a"), (NOW + 86400, "b")):
+            for i in range(6):
+                p = {**_p(addr=f"{tag}{i}"), "price": 1.0}
+                for g in ("fresh", "hard", "crowd"):
+                    led.enter(p, g, t0)
+                candles[("solana", f"{tag}{i}", int(t0))] = [
+                    Candle(ts=t0 + k * 300, open=1.0 + (k - 1) / 50, high=1.0 + k / 50,
+                           low=1.0 + (k - 1) / 50, close=1.0 + k / 50, volume_usd=1.0)
+                    for k in range(1, 290)]
+        text = L.exit_report(led, candles)
+        assert "best of 36 rules" in text and "(by mean)" in text
+        assert text.count("tested on") == 2 and "baseline, same rule" in text
