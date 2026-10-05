@@ -292,3 +292,25 @@
   verdict: adopted
   regime: "every year positive in backtest; two strategies, both tested on the same coins"
   rerun: "see README 'Carry on capital'"
+
+- id: bounce-short-us3
+  title: "Bounce-short restricted to the three memecoin perps on US venues (DOGE, 1000PEPE, 1000SHIB)"
+  source: "constraint: Hyperliquid blocks US residents; Coinbase Derivatives lists these three"
+  claim: "The rule keeps its edge on the three coins a US resident can short on a regulated venue."
+  test: "Walk-forward, cuts refit on prior years, one slot per coin at 1x, a third of capital each; fees at HL-like, 0.40%, 0.60% round trip."
+  data: "Hyperliquid daily perps 2022-2026 for DOGE/kPEPE/kSHIB (Coinbase candles only since 2025-12)"
+  result: "5/5 years positive, beats unconditional short 5/5, +2.76%/trade over 230; on capital at 0.40%: +9.6/+6.9/+20.1/+50.1/+7.0%; max DD about -20%"
+  verdict: alive
+  regime: "2022 bear through 2025 collapse; contracts are whole ($480/$440/$60), so a real bankroll under ~$1,500 trades fewer coins"
+  rerun: "python -m cryptobot.perp_study --cache hl_daily_us3.pkl --funding hl_funding.pkl --target 0.20 --stop 0.10 --days 14 --walk-forward \"short:move_1d[2]&move_3d[0]\""
+
+- id: carry-us
+  title: "Funding carry on US venues (Coinbase Derivatives / Kraken Futures US)"
+  source: "constraint: Hyperliquid blocks US residents"
+  claim: "Short perp + long spot still collects funding on the memecoin perps US venues list."
+  test: "Kraken Futures v4 historical funding, past year, on the coins both venues list; universe count."
+  data: "Kraken Futures funding history 2025-10 to 2026-10; Coinbase product list"
+  result: "DOGE +0.005, PEPE -0.006, SHIB -0.015 %/day average (HL about +0.01); only 3 memecoin perps, carry needed ~150 coins of breadth"
+  verdict: killed
+  regime: "post-mania; funding near zero or negative on majors-adjacent memecoins"
+  rerun: "see README 'Running from the US'"

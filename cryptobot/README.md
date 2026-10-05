@@ -986,11 +986,13 @@ tunnel (`ssh -L 8080:localhost:8080 your-server`) rather than opening it.
 
 **Going live** is a checklist, and `--preflight` checks every line:
 
-1. `perp.live: true` and `carry.live: true` in the config;
+1. `perp.live: true` (and `carry.live: true` when carry has capital);
 2. `CRYPTOBOT_ARM_LIVE=yes`;
-3. a **dedicated** Hyperliquid wallet key (`CRYPTOBOT_PRIVATE_KEY`);
-4. a Kraken key with trade and query permissions only, **never
-   withdrawal** (`CRYPTOBOT_KRAKEN_KEY` / `_SECRET`);
+3. the venue key: a Coinbase CDP trade-only key
+   (`CRYPTOBOT_COINBASE_KEY_NAME` / `_SECRET`) on `perp.venue: coinbase`,
+   or a **dedicated** Hyperliquid wallet key (`CRYPTOBOT_PRIVATE_KEY`);
+4. with carry on, a Kraken key with trade and query permissions only,
+   **never withdrawal** (`CRYPTOBOT_KRAKEN_KEY` / `_SECRET`);
 5. `perp.max_trade_usd` at least the largest planned order (otherwise
    orders are capped and positions undersized);
 6. each venue funded: carry's spot leg on Kraken, carry's perp margin
@@ -999,6 +1001,65 @@ tunnel (`ssh -L 8080:localhost:8080 your-server`) rather than opening it.
 
 Then switch each dashboard's toggle to real. The sim books keep running
 alongside, so the gap between sim and real is measured execution cost.
+
+## Running from the US: Coinbase Derivatives instead of Hyperliquid
+
+Hyperliquid blocks US residents. The bot does not route around that: a
+VPN or a non-US server reaching Hyperliquid from a US account breaks its
+terms and is the kind of thing that ends with frozen funds. Hyperliquid's
+public market data (no account, no key) is still used for research.
+
+A Linode is the right server either way. It only needs to be always on;
+a US region is fine for Coinbase and Kraken US, and must not be used to
+reach Hyperliquid's trading API from the US.
+
+**The bounce-short moves to Coinbase Derivatives**, Coinbase's
+CFTC-regulated futures venue (`perp.venue: coinbase`). It lists
+perpetual-style futures (hourly funding, 24/7) on three of the eighteen
+memecoins: DOGE, 1000PEPE, 1000SHIB, in whole contracts of about $480,
+$440 and $60. The rule itself does not change. Re-tested on just those
+three coins, walk-forward with cuts refit on prior years, one slot per
+coin at 1x, a third of the capital each:
+
+| year | HL-like fees | 0.40% round trip | 0.60% round trip |
+|---|---|---|---|
+| 2022 | +11.8% | +9.6% | +7.8% |
+| 2023 | +8.8% | +6.9% | +5.2% |
+| 2024 | +23.5% | +20.1% | +17.1% |
+| 2025 | +53.2% | +50.1% | +47.4% |
+| 2026 YTD | +9.3% | +7.0% | +5.1% |
+
+5/5 years positive, beats the unconditional short 5/5, +2.76% per trade
+over 230 trades, max drawdown about −20%. Coinbase's taker fee is 0.10%
+per side plus slippage, so the middle column is the realistic one.
+
+What changes in practice:
+
+- **Whole contracts.** The sim book keeps fractional sizes, so the sim
+  is the strategy's return. The real book sends `floor(slot /
+  contract)` contracts and journals a `sizing` skip when a slot is
+  smaller than one contract; `--preflight` reports the live contract
+  sizes and the minimum bankroll (about $1,500 for all three coins at
+  100% bounce-short). Below that, the real book trades only the coins it
+  can afford whole.
+- **History.** Coinbase's candles start in December 2025 (PEP in
+  February 2026), so the tercile cuts are fitted on seeded Hyperliquid
+  public history (`perp.history_seed`) until Coinbase has enough of its
+  own. Build it once with
+  `python -m cryptobot.data.coinbase_futures --seed state/hl_daily_us3.pkl`
+  (public endpoint, no account).
+- **Keys.** A CDP API key with *trade* permission only, ECDSA type,
+  futures enabled on the account (`CRYPTOBOT_COINBASE_KEY_NAME` /
+  `_SECRET`). Same arming rule: `perp.live: true` and
+  `CRYPTOBOT_ARM_LIVE=yes` and both env vars.
+
+**Carry is shelved in the US.** Carry's edge needed breadth (the
+150-coin universe); US venues list three memecoin perps, and over the
+past year their funding on Kraken Futures averaged DOGE +0.005, PEPE
+−0.006, SHIB −0.015 %/day (Hyperliquid about +0.01%/day): there is
+nobody to collect from. `allocation.carry: 0` turns it off and the desk
+runs the bounce-short alone; set it back to 0.5 with `perp.venue:
+hyperliquid` where Hyperliquid is available.
 
 ## Carry on capital, and the 50/50 split
 

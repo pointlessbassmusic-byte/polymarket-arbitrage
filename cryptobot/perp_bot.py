@@ -253,6 +253,9 @@ class PerpBot:
         if book.executes_onchain:
             try:
                 fill = await self.executor.open_short(sig.symbol, size, sig.price_usd)
+            except ValueError as exc:            # SizeTooSmall: whole contracts
+                note("skipped", "sizing", str(exc), size)
+                return
             except Exception as exc:
                 logger.exception("real short failed for %s", sig.symbol)
                 note("skipped", "execution", f"order failed: {exc}", size)
@@ -518,14 +521,29 @@ def slot_risk(base: dict, bank: float, n_coins: int) -> RiskConfig:
                          "max_daily_loss_usd": bank * 0.10, "min_confidence": 0.0})
 
 
+VENUES = ("hyperliquid", "coinbase")
+
+
 def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
+    """Venue comes from `perp.venue`. On `coinbase` (Coinbase Derivatives,
+    the CFTC-regulated venue US clients can use) the universe is the three
+    memecoins it lists, orders are whole contracts through the Coinbase
+    SDK, and market data can come from Coinbase too (`perp.data`), seeded
+    with cached history for the tercile fit."""
     from .carry_bot import allocation
     perp = cfg.get("perp", {})
+    venue = perp.get("venue", "hyperliquid")
+    if venue not in VENUES:
+        raise ValueError(f"perp.venue must be one of {VENUES}")
     share = allocation(cfg, "bounce_short")
     sim_bank = share * float(cfg.get("sim", {}).get("bankroll_usd", 200))
     risk_kw = {k: v for k, v in cfg.get("risk", {}).items()
                if k in RiskConfig.__dataclass_fields__}
-    coins = tuple(perp.get("coins", MEMECOINS))
+    if venue == "coinbase":
+        from .execution.coinbase_futures import US_COINS
+        coins = tuple(perp.get("coins") or US_COINS)
+    else:
+        coins = tuple(perp.get("coins") or MEMECOINS)
     real_bank = share * float(risk_kw.get("bankroll_usd", 1000))
     real_risk = slot_risk(risk_kw, real_bank, len(coins))
     sim_risk = slot_risk(risk_kw, sim_bank, len(coins))
@@ -544,7 +562,19 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
         max_trade_usd=float(perp.get("max_trade_usd", 50)),
         max_slippage=float(perp.get("max_slippage", 0.01)),
     )
-    return PerpBot(bot_cfg, sim_risk, real_risk, ProtectionConfig(**prot_kw), exec_cfg)
+    executor = client = None
+    if venue == "coinbase":
+        from .execution.coinbase_futures import CoinbaseExecConfig, CoinbaseFuturesExecutor
+        executor = CoinbaseFuturesExecutor(CoinbaseExecConfig(
+            live=bool(perp.get("live", False)),
+            max_trade_usd=float(perp.get("max_trade_usd", 500)),
+            max_slippage=float(perp.get("max_slippage", 0.01))))
+        if perp.get("data", "coinbase") == "coinbase":
+            from .data.coinbase_futures import CoinbaseMarketData
+            seed = perp.get("history_seed")
+            client = CoinbaseMarketData(history_seed=Path(seed) if seed else None)
+    return PerpBot(bot_cfg, sim_risk, real_risk, ProtectionConfig(**prot_kw), exec_cfg,
+                   client=client, executor=executor)
 
 
 async def _main(args) -> int:

@@ -146,8 +146,16 @@ execution:
 # Sim book sizing derives from sim.bankroll_usd above; real from risk:.
 perp:
   live: false                  # PAPER. Also needs CRYPTOBOT_ARM_LIVE=yes.
-  private_key_env: CRYPTOBOT_PRIVATE_KEY
-  max_trade_usd: 50
+  # Where the short leg trades. Hyperliquid is not available to US
+  # residents; `coinbase` uses Coinbase Derivatives' CFTC-regulated
+  # perpetual-style futures (DOGE, 1000PEPE, 1000SHIB), in whole contracts
+  # of roughly $480 / $440 / $60. The bounce-short on those three coins is
+  # 5/5 years positive and beats the unconditional short 5/5 (see README).
+  venue: coinbase
+  data: coinbase               # market data source; `hyperliquid` (public API) also works
+  history_seed: state/hl_daily_us3.pkl   # cached daily history to fit cuts before Coinbase's Dec 2025 listing
+  private_key_env: CRYPTOBOT_PRIVATE_KEY # Hyperliquid venue only
+  max_trade_usd: 500           # per order; must cover one contract (~$480 for DOGE)
   max_slippage: 0.01
   target_pct: 0.20             # validated geometry: -20% target,
   stop_pct: 0.10               # +10% stop, 14-day time exit
@@ -179,6 +187,10 @@ carry:
 # the bounce-short in the 2025 collapse (+35.8%). 50/50 kept every year
 # between +6% and +20% on capital in the backtests. Each bot sizes from
 # its share of sim.bankroll_usd (paper) and risk.bankroll_usd (real).
+# On Coinbase (US) carry is off: the three listed memecoins paid negative
+# or near-zero funding over the past year, and carry's edge needed breadth
+# across ~150 coins. Set carry back to 0.5 and perp.venue to hyperliquid
+# where Hyperliquid is available.
 allocation:
-  carry: 0.5
-  bounce_short: 0.5
+  carry: 0.0
+  bounce_short: 1.0

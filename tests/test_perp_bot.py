@@ -484,3 +484,22 @@ class TestReplay:
         assert rep["trades"] >= 1
         assert set(rep["exits"]) <= {"take_profit", "stop_loss", "time_exit", "breakeven_stop"}
         assert set(rep["by_year"]) == {2025}          # historical clock, not today's
+
+
+def test_build_coinbase_venue_uses_us_universe_and_whole_contract_executor(tmp_path, monkeypatch):
+    from cryptobot.execution.coinbase_futures import CoinbaseFuturesExecutor, US_COINS
+    from cryptobot.data.coinbase_futures import CoinbaseMarketData
+    monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
+    cfg = {"perp": {"venue": "coinbase", "max_trade_usd": 500},
+           "allocation": {"carry": 0.0, "bounce_short": 1.0},
+           "sim": {"bankroll_usd": 200}, "risk": {"bankroll_usd": 1500}}
+    bot = PB.build(cfg, tmp_path)
+    assert tuple(bot.cfg.coins) == US_COINS
+    assert isinstance(bot.executor, CoinbaseFuturesExecutor)
+    assert isinstance(bot.client, CoinbaseMarketData)
+    assert not bot.executor.armed
+
+
+def test_build_rejects_unknown_venue(tmp_path):
+    with pytest.raises(ValueError):
+        PB.build({"perp": {"venue": "binance"}}, tmp_path)

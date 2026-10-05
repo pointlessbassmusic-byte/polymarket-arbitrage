@@ -111,3 +111,22 @@ class TestPreflight:
         checks = D.preflight(CFG, {}, {"kraken_usd": 100, "hyperliquid_usdc": 800})
         res = {n: ok for n, ok, _ in checks}
         assert res["kraken_usd >= $225.00"] is False and res["hyperliquid_usdc >= $725.00"] is True
+
+
+def test_coinbase_preflight_drops_carry_and_checks_contract_size():
+    cfg = {"perp": {"venue": "coinbase", "live": True, "max_trade_usd": 500},
+           "carry": {"live": False}, "allocation": {"carry": 0.0, "bounce_short": 1.0},
+           "risk": {"bankroll_usd": 900}}
+    env = {"CRYPTOBOT_ARM_LIVE": "yes", "CRYPTOBOT_COINBASE_KEY_NAME": "n",
+           "CRYPTOBOT_COINBASE_KEY_SECRET": "s"}
+    plan = D.capital_plan(cfg)
+    assert plan["coinbase_usd"] == 900 and plan["hyperliquid_usdc"] == 0 and plan["kraken_usd"] == 0
+    assert plan["bounce_slot"] == pytest.approx(300)
+    checks = D.preflight(cfg, env, {"coinbase_usd": 1000.0},
+                            {"DOGE": 480.0, "kPEPE": 440.0, "kSHIB": 60.0})
+    names = [n for n, _, _ in checks]
+    assert not any("Kraken" in n or "Hyperliquid" in n or "carry.live" in n for n in names)
+    slot = next(c for c in checks if c[0].startswith("each slot"))
+    assert slot[1] is False and "$1,440" in slot[2]          # 3 × $480 at 100% bounce
+    assert next(c for c in checks if c[0].startswith("coinbase_usd"))[1] is True
+    assert next(c for c in checks if "max_trade_usd" in c[0])[1] is True

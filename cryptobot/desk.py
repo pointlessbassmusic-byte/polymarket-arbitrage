@@ -64,7 +64,7 @@ h1{font-size:20px;margin:0 0 4px}p{color:var(--mut);margin:0 0 20px}
 table{width:100%;border-collapse:collapse}th,td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line)}
 th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:500;font-size:13px}
 .up{color:var(--up)}.dn{color:var(--dn)}a{color:inherit}</style></head><body>
-<h1>Trading desk</h1><p>Funding carry + bounce-short, each on its share of the bankroll.
+<h1>Trading desk</h1><p>Each strategy on its share of the bankroll.
 Open <a id="lb" href="bounce/">bounce-short</a> · <a id="lc" href="carry/">carry</a></p>
 <table><thead><tr><th>strategy</th><th>mode</th><th>sim equity</th><th>sim open</th>
 <th>real equity</th><th>real open</th></tr></thead><tbody id="rows"></tbody></table>
@@ -127,51 +127,99 @@ def create_desk_app(bots: dict, token: Optional[str], extra_hosts: Optional[set]
 
 # ---------------------------------------------------------------- preflight
 
+def venue(cfg: dict) -> str:
+    return cfg.get("perp", {}).get("venue", "hyperliquid")
+
+
 def capital_plan(cfg: dict) -> dict:
     """Where the real bankroll has to sit, per venue, for both strategies
     at their configured sizes."""
     from .carry_bot import allocation
     carry = cfg.get("carry", {})
+    perp = cfg.get("perp", {})
     bank = float(cfg.get("risk", {}).get("bankroll_usd", 1000))
     c_share, b_share = allocation(cfg, "carry"), allocation(cfg, "bounce_short")
     lev = float(carry.get("perp_leverage", 1.0))
     deployed = int(carry.get("top_n", 3)) * float(carry.get("slot_fraction", 0.30))
     carry_notional = c_share * bank * deployed / (1 + 1 / lev)
+    if venue(cfg) == "coinbase":
+        from .execution.coinbase_futures import US_COINS
+        n_coins = len(perp.get("coins") or US_COINS)
+        default_cap = 500.0
+    else:
+        n_coins = len(perp.get("coins") or range(18))
+        default_cap = 50.0
+    slot = b_share * bank / n_coins
     return {
-        "bankroll": bank,
+        "bankroll": bank, "venue": venue(cfg),
         "carry_capital": c_share * bank,
         "bounce_capital": b_share * bank,
+        "bounce_slot": slot,
         "kraken_usd": carry_notional,                        # spot leg
-        "hyperliquid_usdc": carry_notional / lev + b_share * bank,
-        "max_trade_usd": float(cfg.get("perp", {}).get("max_trade_usd", 50)),
-        "largest_order": max(carry_notional / max(1, int(carry.get("top_n", 3))),
-                             b_share * bank / len(cfg.get("perp", {}).get("coins") or range(18))),
+        "hyperliquid_usdc": carry_notional / lev + (b_share * bank if venue(cfg) != "coinbase" else 0.0),
+        "coinbase_usd": b_share * bank if venue(cfg) == "coinbase" else 0.0,
+        "max_trade_usd": float(perp.get("max_trade_usd", default_cap)),
+        "largest_order": max(carry_notional / max(1, int(carry.get("top_n", 3))), slot),
     }
 
 
-def preflight(cfg: dict, env: dict, balances: Optional[dict] = None) -> list[tuple[str, bool, str]]:
+async def contract_prices() -> dict:
+    """Live dollar size of one Coinbase contract per coin."""
+    from .data.coinbase_futures import CoinbaseMarketData
+    from .execution.coinbase_futures import CONTRACTS
+    md = CoinbaseMarketData()
+    try:
+        mids = await md.all_mids()
+    finally:
+        await md.close()
+    return {c: mids[c] * CONTRACTS[c].units_per_contract for c in CONTRACTS if c in mids}
+
+
+def preflight(cfg: dict, env: dict, balances: Optional[dict] = None,
+              contract_usd: Optional[dict] = None) -> list[tuple[str, bool, str]]:
     """Checklist for real money. `balances` = {"kraken_usd": x,
-    "hyperliquid_usdc": y} when they could be read; None skips that check."""
+    "hyperliquid_usdc": y, "coinbase_usd": z} when they could be read;
+    `contract_usd` = live dollar size per Coinbase contract."""
     plan = capital_plan(cfg)
     perp, carry = cfg.get("perp", {}), cfg.get("carry", {})
+    carry_on = plan["carry_capital"] > 0
     checks = [
         ("perp.live is true", bool(perp.get("live")), "set perp.live: true in the config"),
-        ("carry.live is true", bool(carry.get("live")), "set carry.live: true (Kraken spot leg)"),
         ("CRYPTOBOT_ARM_LIVE=yes", env.get("CRYPTOBOT_ARM_LIVE", "").lower() == "yes",
          "export CRYPTOBOT_ARM_LIVE=yes"),
-        ("Hyperliquid wallet key", bool(env.get(perp.get("private_key_env", "CRYPTOBOT_PRIVATE_KEY"))),
-         "export CRYPTOBOT_PRIVATE_KEY (a dedicated wallet, not your main one)"),
-        ("Kraken API key + secret", bool(env.get("CRYPTOBOT_KRAKEN_KEY") and env.get("CRYPTOBOT_KRAKEN_SECRET")),
-         "export CRYPTOBOT_KRAKEN_KEY / _SECRET (trade + query permissions, NO withdrawal)"),
-        ("orders fit under max_trade_usd", plan["largest_order"] <= plan["max_trade_usd"],
-         f"largest planned order ${plan['largest_order']:.2f} > perp.max_trade_usd "
-         f"${plan['max_trade_usd']:.2f}: orders would be capped and positions undersized"),
     ]
+    if plan["venue"] == "coinbase":
+        checks.append(("Coinbase CDP API key (ES256) name + secret",
+                       bool(env.get("CRYPTOBOT_COINBASE_KEY_NAME") and env.get("CRYPTOBOT_COINBASE_KEY_SECRET")),
+                       "export CRYPTOBOT_COINBASE_KEY_NAME / _SECRET: a CDP key with trade permission "
+                       "only, ECDSA (not Ed25519), futures enabled on the account"))
+    else:
+        checks.append(("Hyperliquid wallet key",
+                       bool(env.get(perp.get("private_key_env", "CRYPTOBOT_PRIVATE_KEY"))),
+                       "export CRYPTOBOT_PRIVATE_KEY (a dedicated wallet, not your main one)"))
+    if carry_on:
+        checks += [
+            ("carry.live is true", bool(carry.get("live")), "set carry.live: true (Kraken spot leg)"),
+            ("Kraken API key + secret", bool(env.get("CRYPTOBOT_KRAKEN_KEY") and env.get("CRYPTOBOT_KRAKEN_SECRET")),
+             "export CRYPTOBOT_KRAKEN_KEY / _SECRET (trade + query permissions, NO withdrawal)"),
+        ]
+    checks.append(("orders fit under max_trade_usd", plan["largest_order"] <= plan["max_trade_usd"],
+                   f"largest planned order ${plan['largest_order']:.2f} > perp.max_trade_usd "
+                   f"${plan['max_trade_usd']:.2f}: orders would be capped and positions undersized"))
+    if plan["venue"] == "coinbase" and contract_usd:
+        worst = max(contract_usd.values())
+        checks.append((f"each slot (${plan['bounce_slot']:.0f}) buys at least one contract",
+                       plan["bounce_slot"] >= worst,
+                       f"the largest contract is ${worst:,.0f}; with {len(contract_usd)} coins the "
+                       f"bounce-short needs a bankroll of at least ${worst * len(contract_usd) / max(1e-9, plan['bounce_capital'] / plan['bankroll']):,.0f}"))
     if balances is not None:
-        for venue, need in (("kraken_usd", plan["kraken_usd"]),
-                            ("hyperliquid_usdc", plan["hyperliquid_usdc"])):
-            have = balances.get(venue)
-            checks.append((f"{venue} >= ${need:.2f}", have is not None and have >= need,
+        needs = [("kraken_usd", plan["kraken_usd"]), ("hyperliquid_usdc", plan["hyperliquid_usdc"]),
+                 ("coinbase_usd", plan["coinbase_usd"])]
+        for venue_key, need in needs:
+            if need <= 0:
+                continue
+            have = balances.get(venue_key)
+            checks.append((f"{venue_key} >= ${need:.2f}", have is not None and have >= need,
                            f"have ${have if have is not None else 0:.2f}, need ${need:.2f}"))
     return checks
 
@@ -191,6 +239,14 @@ async def read_balances(cfg: dict, env: dict) -> dict:
                 out["hyperliquid_usdc"] = float(r.json()["marginSummary"]["accountValue"])
         except Exception as exc:
             logger.warning("hyperliquid balance unavailable: %s", exc)
+    if env.get("CRYPTOBOT_COINBASE_KEY_NAME") and env.get("CRYPTOBOT_COINBASE_KEY_SECRET"):
+        try:
+            from .execution.coinbase_futures import CoinbaseExecConfig, CoinbaseFuturesExecutor
+            ex = CoinbaseFuturesExecutor(CoinbaseExecConfig())
+            ex._name, ex._secret = env["CRYPTOBOT_COINBASE_KEY_NAME"], env["CRYPTOBOT_COINBASE_KEY_SECRET"].replace("\\n", "\n")
+            out["coinbase_usd"] = (await ex.balance())["total_usd_balance"]
+        except Exception as exc:
+            logger.warning("coinbase balance unavailable: %s", exc)
     if env.get("CRYPTOBOT_KRAKEN_KEY") and env.get("CRYPTOBOT_KRAKEN_SECRET"):
         try:
             from .execution.kraken_spot import KrakenSpotExecutor, SpotExecConfig
@@ -207,10 +263,14 @@ async def read_balances(cfg: dict, env: dict) -> dict:
 def render_preflight(cfg: dict, checks: list) -> str:
     plan = capital_plan(cfg)
     out = [f"real bankroll ${plan['bankroll']:.2f}: carry ${plan['carry_capital']:.2f}, "
-           f"bounce-short ${plan['bounce_capital']:.2f}",
-           f"  fund Kraken with >= ${plan['kraken_usd']:.2f} USD (carry spot leg)",
-           f"  fund Hyperliquid with >= ${plan['hyperliquid_usdc']:.2f} USDC "
-           f"(carry perp margin + bounce-short)", ""]
+           f"bounce-short ${plan['bounce_capital']:.2f} on {plan['venue']}"]
+    if plan["kraken_usd"] > 0:
+        out.append(f"  fund Kraken with >= ${plan['kraken_usd']:.2f} USD (carry spot leg)")
+    if plan["hyperliquid_usdc"] > 0:
+        out.append(f"  fund Hyperliquid with >= ${plan['hyperliquid_usdc']:.2f} USDC")
+    if plan["coinbase_usd"] > 0:
+        out.append(f"  fund Coinbase with >= ${plan['coinbase_usd']:.2f} USD (swept to the futures account automatically)")
+    out.append("")
     for name, ok, fix in checks:
         out.append(f"  [{'ok' if ok else '  '}] {name}" + ("" if ok else f"  -> {fix}"))
     ready = all(ok for _, ok, _ in checks)
@@ -221,8 +281,14 @@ def render_preflight(cfg: dict, checks: list) -> str:
 # --------------------------------------------------------------------- main
 
 def build(cfg: dict, state_dir: Path) -> dict:
+    """Carry is only built when it has capital; on Coinbase-only US setups
+    allocation.carry is 0 and the desk is the bounce-short alone."""
     from . import carry_bot, perp_bot
-    return {"bounce": perp_bot.build(cfg, state_dir), "carry": carry_bot.build(cfg, state_dir)}
+    from .carry_bot import allocation
+    bots = {"bounce": perp_bot.build(cfg, state_dir)}
+    if allocation(cfg, "carry") > 0:
+        bots["carry"] = carry_bot.build(cfg, state_dir)
+    return bots
 
 
 async def _main(args) -> int:
@@ -231,7 +297,13 @@ async def _main(args) -> int:
     if args.preflight:
         env = dict(os.environ)
         balances = await read_balances(cfg, env)
-        print(render_preflight(cfg, preflight(cfg, env, balances or None)))
+        sizes = None
+        if venue(cfg) == "coinbase":
+            try:
+                sizes = await contract_prices()
+            except Exception as exc:
+                logger.warning("contract prices unavailable: %s", exc)
+        print(render_preflight(cfg, preflight(cfg, env, balances or None, sizes)))
         return 0
     args.state_dir.mkdir(parents=True, exist_ok=True)
     bots = build(cfg, args.state_dir)
@@ -242,7 +314,7 @@ async def _main(args) -> int:
     logger.info("desk dashboard: http://%s:%d/?t=%s", shown, args.port, token)
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning"))
     try:
-        await asyncio.gather(bots["bounce"].run_forever(), bots["carry"].run_forever(), server.serve())
+        await asyncio.gather(*(b.run_forever() for b in bots.values()), server.serve())
     finally:
         for b in bots.values():
             await b.close()

@@ -3,3 +3,5 @@
 # spot leg signs with the standard library and needs nothing extra.
 hyperliquid-python-sdk>=0.24.0
 eth-account>=0.11.0
+# Coinbase Derivatives (US venue): the official Advanced Trade SDK signs CDP ES256 JWTs.
+coinbase-advanced-py>=1.8.0
