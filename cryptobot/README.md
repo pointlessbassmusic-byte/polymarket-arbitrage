@@ -914,6 +914,41 @@ python -m cryptobot.updown_data --out updown_15m.pkl --days 30
 python -m cryptobot.updown_study --data updown_15m.pkl
 ```
 
+### Moonbags: "sell 60% at 2×, let the rest ride" (@0xNevsky)
+
+The post's rule, "$100 → $4,216 overnight": sell 60% at 2× (which
+returns 1.2× the entry, so the rest is "free"), keep 40% running. Tested
+on the same 139 recorded launches, with 5-minute candles, as a
+scale-out exit (`exit_scaled`, 40 variants: sell 50/60/100% at 2× or 3×,
+optional −30% stop before the take, the bag held or trailed 50% from its
+peak, 4h or 24h):
+
+| every fresh launch | mean/trade | without top 3 trades | top 3 share of profit | typical median |
+|---|---|---|---|---|
+| post's rule: 60% at 2×, −30% stop, bag held 24h | +53.5% | **−4.9%** | **109%** | −30.7% |
+| 50% at 3×, bag trails 50%, 4h (best moonbag) | +88.4% | +15.1% | 83% | −5% to +16% |
+| all out at 3×, 24h | +13.2% | +9.1% | 33% | −27% to −58% |
+
+Moonbags raise the average by keeping the rare 25–55× runner, and that
+is all they do: the post's own rule loses money without its three best
+trades. They make returns **less** consistent, not more. Selling
+everything at the target has the smallest mean and the least
+dependence on any single trade. 139 launches over two evenings; entry
+at the scan's snapshot price and no venue fee, both optimistic.
+
+## Negative results, kept (`cryptobot.hypotheses`)
+
+Every idea tested here, the dead ones included, is in
+`cryptobot/hypotheses.yaml` with its source, claim, test, data, result,
+verdict and the command that reproduces it: 23 so far, 2 alive (the
+bounce-short and funding carry), 1 adopted, 17 killed, 3 inconclusive.
+Check a new idea against it before testing:
+
+```bash
+python -m cryptobot.hypotheses --similar "sell 60% at 2x and hold a moonbag"
+python -m cryptobot.hypotheses --verdict alive
+```
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool

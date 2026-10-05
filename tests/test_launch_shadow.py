@@ -223,3 +223,65 @@ class TestExitReplay:
         text = L.exit_report(led, candles)
         assert "best of 36 rules" in text and "(by mean)" in text
         assert text.count("tested on") == 2 and "baseline, same rule" in text
+
+
+class TestScaledExit:
+    def _c(self, i, o, h, l, c):
+        from cryptobot.backtest import Candle
+        return Candle(ts=NOW + i * 300, open=o, high=h, low=l, close=c, volume_usd=1.0)
+
+    RULE = dict(take_mult=2.0, take_frac=0.6, sl=0.3, trail=None, max_h=24)
+
+    def test_the_posts_arithmetic_sell_60_at_2x_then_the_bag_rugs(self):
+        # 60% at 2x returns 1.2x; the 40% bag goes to zero: +20% before costs
+        cs = [self._c(1, 1.0, 2.1, 0.95, 2.0), self._c(2, 2.0, 2.0, 0.0001, 0.0001)]
+        r = L.exit_scaled(cs, NOW, 1.0, 50_000, **self.RULE)
+        assert r == pytest.approx(0.2 + 0.4 * 0.0001 - L.round_trip(50_000), abs=1e-6)
+
+    def test_bag_riding_to_9x(self):
+        cs = [self._c(1, 1.0, 2.0, 1.0, 2.0), self._c(2, 2.0, 9.2, 2.0, 9.2)]
+        r = L.exit_scaled(cs, NOW, 1.0, 50_000, **self.RULE)
+        assert r == pytest.approx(1.2 + 0.4 * 9.2 - 1 - L.round_trip(50_000))
+
+    def test_stop_before_the_take_closes_everything(self):
+        cs = [self._c(1, 1.0, 1.1, 0.6, 0.7), self._c(2, 0.7, 5.0, 0.7, 5.0)]
+        assert L.exit_scaled(cs, NOW, 1.0, 50_000, **self.RULE) == pytest.approx(
+            -0.3 - L.round_trip(50_000))
+
+    def test_no_stop_after_the_take_unless_trailing(self):
+        cs = [self._c(1, 1.0, 2.0, 1.0, 2.0), self._c(2, 2.0, 4.0, 2.0, 4.0),
+              self._c(3, 4.0, 4.0, 1.5, 1.5)]
+        held = L.exit_scaled(cs, NOW, 1.0, 50_000, **self.RULE)
+        trail = L.exit_scaled(cs, NOW, 1.0, 50_000, **{**self.RULE, "trail": 0.5})
+        assert held == pytest.approx(1.2 + 0.4 * 1.5 - 1 - L.round_trip(50_000))
+        assert trail == pytest.approx(1.2 + 0.4 * 2.0 - 1 - L.round_trip(50_000))
+
+    def test_gap_above_the_target_sells_at_the_open(self):
+        cs = [self._c(1, 3.0, 3.0, 3.0, 3.0)]
+        r = L.exit_scaled(cs, NOW, 1.0, 50_000, **{**self.RULE, "take_frac": 1.0})
+        assert r == pytest.approx(2.0 - L.round_trip(50_000))
+
+    def test_never_hits_the_take_exits_at_the_deadline(self):
+        cs = [self._c(i, 1.0, 1.2, 0.9, 1.1) for i in range(1, 400)]
+        r = L.exit_scaled(cs, NOW, 1.0, 50_000, **{**self.RULE, "max_h": 4})
+        assert r == pytest.approx(0.1 - L.round_trip(50_000))
+
+    def test_grid_has_no_trailing_on_all_out_rules(self):
+        assert all(not (r["take_frac"] == 1.0 and r["trail"]) for r in L.SCALED_GRID)
+
+
+def test_scaled_report_compares_moonbag_and_all_out(tmp_path):
+    from cryptobot.backtest import Candle
+    led = L.Ledger(tmp_path / "l.jsonl")
+    candles = {}
+    for t0, tag in ((NOW, "a"), (NOW + 86400, "b")):
+        for i in range(6):
+            p = {**_p(addr=f"{tag}{i}"), "price": 1.0}
+            for g in ("fresh", "hard"):
+                led.enter(p, g, t0)
+            candles[("solana", f"{tag}{i}", int(t0))] = [
+                Candle(ts=t0 + k * 300, open=1 + (k - 1) / 20, high=1 + k / 20,
+                       low=1 + (k - 1) / 20, close=1 + k / 20, volume_usd=1.0)
+                for k in range(1, 290)]
+    text = L.scaled_report(led, candles)
+    assert "best overall" in text and "best all-out" in text and "tested" in text

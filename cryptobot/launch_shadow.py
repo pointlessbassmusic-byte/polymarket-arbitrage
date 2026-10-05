@@ -329,6 +329,119 @@ def exit_trade(candles, entry_ts: float, entry_price: float, liq: float,
     return max(-1.0, last / entry_price - 1 - round_trip(liq))
 
 
+def exit_scaled(candles, entry_ts: float, entry_price: float, liq: float, *,
+                take_mult: float, take_frac: float, sl: Optional[float],
+                trail: Optional[float], max_h: float) -> Optional[float]:
+    """Scale-out exit (the "moonbag" rule): sell `take_frac` of the position
+    at `take_mult` x entry; the rest rides until the time limit, or until
+    it falls `trail` from its peak. Before the take, an optional stop `sl`
+    closes everything. Gaps fill at the candle open, stops before targets
+    within a candle, as in exit_trade. Returns net of one round trip on
+    the whole position, floored at -100%."""
+    stop = entry_price * (1 - sl) if sl is not None else None
+    target = entry_price * take_mult
+    deadline = entry_ts + max_h * 3600
+    taken = 0.0              # fraction already sold
+    proceeds = 0.0           # value received per unit of entry notional
+    peak = None
+    last = None
+    for c in candles:
+        if c.ts < entry_ts:
+            continue
+        if c.ts > deadline:
+            break
+        rest = 1.0 - taken
+        if taken == 0.0:
+            if stop is not None and c.open <= stop:
+                return max(-1.0, c.open / entry_price - 1 - round_trip(liq))
+            if stop is not None and c.low <= stop:
+                return max(-1.0, -sl - round_trip(liq))
+            if c.high >= target:
+                px = max(c.open, target)
+                proceeds += take_frac * px / entry_price
+                taken = take_frac
+                if taken >= 1.0:
+                    return proceeds - 1 - round_trip(liq)
+                peak = c.high
+                last = c.close
+                continue
+        else:
+            if trail is not None:
+                floor_px = peak * (1 - trail)
+                if c.open <= floor_px:
+                    return proceeds + rest * c.open / entry_price - 1 - round_trip(liq)
+                if c.low <= floor_px:
+                    return proceeds + rest * floor_px / entry_price - 1 - round_trip(liq)
+            peak = max(peak, c.high)
+        last = c.close
+    if last is None:
+        return None
+    rest = 1.0 - taken
+    return max(-1.0, proceeds + rest * last / entry_price - 1 - round_trip(liq))
+
+
+SCALED_GRID = [dict(take_mult=m, take_frac=f, sl=sl, trail=tr, max_h=h)
+               for m in (2.0, 3.0) for f in (0.5, 0.6, 1.0) for sl in (0.30, None)
+               for tr in (None, 0.5) for h in (4, 24)
+               if not (f == 1.0 and tr is not None)]
+
+
+def scaled_name(r: dict) -> str:
+    return (f"sell {int(r['take_frac'] * 100)}% at {r['take_mult']:.0f}x, "
+            f"stop {('-' + str(int(r['sl'] * 100)) + '%') if r['sl'] else 'none'}, "
+            f"bag {'trail ' + str(int(r['trail'] * 100)) + '%' if r['trail'] else 'held'}, "
+            f"{r['max_h']}h")
+
+
+def scaled_results(ledger: "Ledger", candles: dict, group: str, rule: dict,
+                   day: Optional[str] = None) -> list:
+    out = []
+    for key, e in ledger.entries.items():
+        if key[2] != group:
+            continue
+        if day and dt.datetime.utcfromtimestamp(e["ts"]).strftime("%Y-%m-%d") != day:
+            continue
+        cs = candles.get((key[0], key[1], int(e["ts"])))
+        if not cs:
+            continue
+        r = exit_scaled(cs, e["ts"], e["price"], e["liq"], **rule)
+        if r is not None:
+            out.append(r)
+    return out
+
+
+def scaled_report(ledger: "Ledger", candles: dict) -> str:
+    """Moonbag rules vs all-out rules: pick on day one by mean, test on the rest."""
+    days = sorted({dt.datetime.utcfromtimestamp(e["ts"]).strftime("%Y-%m-%d")
+                   for k, e in ledger.entries.items()
+                   if (k[0], k[1], int(e["ts"])) in candles})
+    if len(days) < 2:
+        return "need two days of entries"
+    pick, tests = days[0], days[1:]
+    out = [f"scale-out ('moonbag') exits, {len(SCALED_GRID)} rules; pick on {pick} by mean, "
+           f"test on {', '.join(tests)}"]
+    for group in ("fresh", "hard"):
+        scored = []
+        for rule in SCALED_GRID:
+            r = scaled_results(ledger, candles, group, rule, pick)
+            if len(r) >= 5:
+                scored.append((statistics.mean(r), rule))
+        scored.sort(key=lambda t: t[0], reverse=True)
+        best = scored[0][1]
+        best_all_out = next(r for _, r in scored if r["take_frac"] == 1.0)
+        out.append(f"\n== {group}")
+        for label, rule in (("best overall", best), ("best all-out", best_all_out)):
+            out.append(f"  {label}: {scaled_name(rule)}")
+            out.append(f"    picked {pick}: {_summ(scaled_results(ledger, candles, group, rule, pick))}")
+            for d in tests:
+                out.append(f"    tested {d}: {_summ(scaled_results(ledger, candles, group, rule, d))}")
+        bags = [(m, r) for m, r in scored if r["take_frac"] < 1.0]
+        outs = [(m, r) for m, r in scored if r["take_frac"] == 1.0]
+        out.append(f"  on {pick}: moonbag rules mean of means {100 * statistics.mean(m for m, _ in bags):+.1f}% "
+                   f"vs all-out {100 * statistics.mean(m for m, _ in outs):+.1f}%")
+    return "\n".join(out)
+
+
 def rule_name(tp, sl, h) -> str:
     return (f"tp {'+' + str(int(tp * 100)) + '%' if tp else 'none':>5s}  "
             f"sl {'-' + str(int(sl * 100)) + '%' if sl else 'none':>5s}  {h:>2d}h")
@@ -489,6 +602,8 @@ def main() -> int:
         led = Ledger(args.state)
         candles = asyncio.run(fetch_candles(led, args.exits))
         print(exit_report(led, candles, by="mean"))
+        print()
+        print(scaled_report(led, candles))
         return 0
     if args.report:
         print(report(Ledger(args.state)))
