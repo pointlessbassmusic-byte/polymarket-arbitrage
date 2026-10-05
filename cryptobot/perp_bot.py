@@ -503,24 +503,39 @@ def load_config(path: Path) -> dict:
     return yaml.safe_load(path.read_text()) or {}
 
 
+def slot_risk(base: dict, bank: float, n_coins: int) -> RiskConfig:
+    """One equal slot per coin at 1x: every signal gets bank / n_coins of
+    notional and total exposure never exceeds the bank. That is how the
+    rule was measured on capital (+1.4% to +35.8% a year, max drawdown
+    -15.5%, all 18 slots in use at the worst moment); sizing by stop
+    distance would put ~15% of the bank in each short and lever up when
+    signals cluster, which they do."""
+    slot = bank / max(1, n_coins)
+    return RiskConfig(**{**base, "bankroll_usd": bank, "max_position_usd": slot,
+                         "min_position_usd": slot,
+                         "risk_per_trade_pct": slot * 0.10 / bank if bank else 0.0,
+                         "max_total_exposure_usd": bank, "max_open_positions": n_coins,
+                         "max_daily_loss_usd": bank * 0.10, "min_confidence": 0.0})
+
+
 def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
+    from .carry_bot import allocation
     perp = cfg.get("perp", {})
-    sim_bank = float(cfg.get("sim", {}).get("bankroll_usd", 200))
+    share = allocation(cfg, "bounce_short")
+    sim_bank = share * float(cfg.get("sim", {}).get("bankroll_usd", 200))
     risk_kw = {k: v for k, v in cfg.get("risk", {}).items()
                if k in RiskConfig.__dataclass_fields__}
-    real_risk = RiskConfig(**risk_kw)
-    sim_risk = RiskConfig(**{**risk_kw, "bankroll_usd": sim_bank,
-                             "max_total_exposure_usd": sim_bank * 2.0,
-                             "max_position_usd": sim_bank * 0.25,
-                             "max_daily_loss_usd": sim_bank * 0.10,
-                             "min_position_usd": 10.0})
+    coins = tuple(perp.get("coins", MEMECOINS))
+    real_bank = share * float(risk_kw.get("bankroll_usd", 1000))
+    real_risk = slot_risk(risk_kw, real_bank, len(coins))
+    sim_risk = slot_risk(risk_kw, sim_bank, len(coins))
     prot_kw = {k: v for k, v in cfg.get("protections", {}).items()
                if k in ProtectionConfig.__dataclass_fields__}
     bot_cfg = PerpBotConfig(
         target_pct=float(perp.get("target_pct", 0.20)),
         stop_pct=float(perp.get("stop_pct", 0.10)),
         hold_days=int(perp.get("hold_days", 14)),
-        coins=tuple(perp.get("coins", MEMECOINS)),
+        coins=coins,
         state_dir=state_dir,
     )
     exec_cfg = PerpExecConfig(

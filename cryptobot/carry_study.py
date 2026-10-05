@@ -26,6 +26,7 @@ import itertools
 import pickle
 import statistics
 from dataclasses import dataclass
+from typing import Optional
 from pathlib import Path
 
 from cryptobot.data.hyperliquid import TAKER_FEE
@@ -126,6 +127,75 @@ def simulate(daily: dict[str, dict[int, float]], rule: CarryRule,
                   "annualised": net * 365 / r["days"] if r["days"] else 0.0,
                   "entries": r["entries"],
                   "utilisation": r["slot_days"] / (r["days"] * rule.top_n) if r["days"] else 0.0}
+    return out
+
+
+DAY = 86400
+MAINTENANCE = 0.025        # maintenance margin assumed for liquidation levels
+
+
+def liquidation_rise(leverage: float) -> float:
+    """Price rise from entry at which an isolated short at `leverage` is
+    liquidated, absent added margin: initial margin 1/L minus maintenance."""
+    return 1.0 / leverage - MAINTENANCE
+
+
+def guard_trades(trades: list[dict], bars: dict, guard: Optional[float],
+                 leverage: float, daily: dict, round_trip: float) -> list[dict]:
+    """Replay logged carry trades against daily perp candles with a margin
+    guard: close both legs the first day the coin trades `guard` above
+    entry. The hedge makes the price move itself P&L-neutral, so a guard
+    exit costs the funding not yet collected plus the round trip already
+    charged. Conservative on ordering: a day whose high reaches the
+    liquidation level counts as a liquidation unless it OPENED past the
+    guard (when the guard, checked hourly, would already have fired) and
+    below liquidation."""
+    liq = liquidation_rise(leverage)
+    out = []
+    for t in trades:
+        b = bars.get(t["coin"], {})
+        e = b.get(t["entry"] - DAY)
+        if not e:
+            continue
+        entry = e.close
+        f = daily.get(t["coin"], {})
+        funding, status, exit_day = 0.0, "held", t["exit"]
+        d = t["entry"]
+        while d < t["exit"]:
+            x = b.get(d)
+            if x is not None:
+                if x.open >= entry * (1 + liq):
+                    status, exit_day = "liquidated", d
+                    break
+                guard_open = guard is not None and x.open >= entry * (1 + guard)
+                if x.high >= entry * (1 + liq) and not guard_open:
+                    status, exit_day = "liquidated", d
+                    break
+                if guard is not None and x.high >= entry * (1 + guard):
+                    status, exit_day = "guarded", d
+                    break
+            funding += f.get(d, 0.0)
+            d += DAY
+        out.append({**t, "status": status, "exit": exit_day,
+                    "funding": funding, "net": funding - round_trip})
+    return out
+
+
+def on_capital(trades: list[dict], leverage: float, top_n: int, start: int, end: int) -> dict:
+    """Annualised return on CAPITAL by year. Each slot is 1/top_n of the
+    notional; a $1 position needs $1 of spot plus 1/L of perp margin, so
+    capital = notional * (1 + 1/L)."""
+    per_notional_to_capital = 1.0 / (1.0 + 1.0 / leverage)
+    years: dict[int, float] = {}
+    for t in trades:
+        y = dt.datetime.utcfromtimestamp(t["entry"]).year
+        years[y] = years.get(y, 0.0) + t["net"] / top_n
+    out = {}
+    for y, v in years.items():
+        y0 = max(start, int(dt.datetime(y, 1, 1, tzinfo=dt.timezone.utc).timestamp()))
+        y1 = min(end, int(dt.datetime(y + 1, 1, 1, tzinfo=dt.timezone.utc).timestamp()))
+        days = max(1, (y1 - y0) // DAY)
+        out[y] = v * per_notional_to_capital * 365 / days
     return out
 
 

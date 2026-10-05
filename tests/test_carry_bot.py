@@ -146,7 +146,8 @@ class TestDaily:
         assert set(bot.books["sim"].positions) == {"A", "B", "C"}
         assert not bot.books["real"].positions
         pos = bot.books["sim"].positions["A"]
-        assert pos.notional_usd == pytest.approx(60.0)      # 30% of $200
+        # 30% of $200 = $60 of capital: $30 of spot + $30 of 1x perp margin
+        assert pos.notional_usd == pytest.approx(30.0)
         assert bot.journal.recent(1)[0]["action"] == "opened"
 
     def test_nothing_below_the_entry_bar(self, monkeypatch):
@@ -190,7 +191,7 @@ class TestDaily:
         monkeypatch.setattr(CB, "now", lambda: T0 + 30 * 86400 + 5 * H)
         asyncio.run(bot.monitor())
         pos = bot.books["sim"].positions["A"]
-        assert pos.funding_usd == pytest.approx(60.0 * 0.0001 * 5)
+        assert pos.funding_usd == pytest.approx(30.0 * 0.0001 * 5)
         hl.mids["A"] = 1.02                              # perp rallies, spot flat
         asyncio.run(bot.monitor())
         eq = bot.books["sim"].equity(bot.perps, bot.spots)
@@ -247,6 +248,35 @@ class TestDaily:
         long_r, short_r = asyncio.run(bot.trailing_rates("A"))
         assert long_r == pytest.approx(0.0024) and short_r == pytest.approx(0.0024)
 
+    def test_slot_notional_counts_both_legs(self, monkeypatch):
+        bot, *_ = self._bot(monkeypatch, {"A": 0.002})
+        assert bot.slot_notional(1000.0) == pytest.approx(150.0)        # 1x
+        bot.cfg.perp_leverage = 3.0
+        assert bot.slot_notional(1000.0) == pytest.approx(300.0 / (4 / 3))
+
+    def test_margin_guard_closes_both_legs_on_a_rally(self, monkeypatch):
+        bot, hl, kr = self._bot(monkeypatch, {"A": 0.002})
+        asyncio.run(bot.run_daily())
+        entry = bot.books["sim"].positions["A"].perp_entry
+        hl.mids["A"] = entry * 1.49
+        kr.spots["A"] = entry * 1.49
+        asyncio.run(bot.monitor())
+        assert "A" in bot.books["sim"].positions
+        hl.mids["A"] = entry * 1.51
+        kr.spots["A"] = entry * 1.51
+        asyncio.run(bot.monitor())
+        assert "A" not in bot.books["sim"].positions
+        closed = bot.books["sim"].closed[-1]
+        assert closed.reason.startswith("margin guard")
+        assert abs(closed.basis_usd) < 0.5            # hedged: the rally itself costs ~nothing
+
+    def test_guard_can_be_disabled(self, monkeypatch):
+        bot, hl, kr = self._bot(monkeypatch, {"A": 0.002}, margin_guard=None)
+        asyncio.run(bot.run_daily())
+        hl.mids["A"] = kr.spots["A"] = 5.0
+        asyncio.run(bot.monitor())
+        assert "A" in bot.books["sim"].positions
+
     def test_daily_due_once_per_day(self, monkeypatch):
         bot, *_ = self._bot(monkeypatch, {"A": 0.002})
         day0 = int(T0 // 86400) * 86400
@@ -254,3 +284,40 @@ class TestDaily:
         assert not bot._daily_due(day0 + 5000)
         assert not bot._daily_due(day0 + 86400 + 100)
         assert bot._daily_due(day0 + 86400 + 1300)
+
+
+class TestAllocation:
+    def test_default_is_an_even_split(self):
+        assert CB.allocation({}, "carry") == 0.5
+        assert CB.allocation({}, "bounce_short") == 0.5
+
+    def test_shares_are_normalised(self):
+        cfg = {"allocation": {"carry": 3, "bounce_short": 1}}
+        assert CB.allocation(cfg, "carry") == 0.75
+        assert CB.allocation(cfg, "other") == 0.0
+
+    def test_both_bots_size_from_their_share(self, tmp_path):
+        from cryptobot import perp_bot as PB
+        cfg = {"sim": {"bankroll_usd": 200}, "risk": {"bankroll_usd": 1000},
+               "allocation": {"carry": 0.5, "bounce_short": 0.5}}
+        carry = CB.build(cfg, tmp_path)
+        assert carry.books["sim"].starting_equity == 100.0
+        assert carry.books["real"].starting_equity == 500.0
+        perp = PB.build(cfg, tmp_path)
+        sim = perp.books["sim"].risk.cfg
+        assert sim.bankroll_usd == 100.0
+        assert sim.max_total_exposure_usd == 100.0
+        assert sim.max_position_usd == pytest.approx(100.0 / 18)
+
+
+def test_bounce_short_signal_gets_exactly_one_slot():
+    from cryptobot import perp_bot as PB
+    from cryptobot.models import Side, Signal, SignalType
+    from cryptobot.risk import RiskManager
+    for bank in (100.0, 500.0, 5000.0):
+        rm = RiskManager(PB.slot_risk({}, bank, 18))
+        sig = Signal(ts=0, type=SignalType.BOUNCE_SHORT, key="hyperliquid:X", chain="hyperliquid",
+                     symbol="X", side=Side.SHORT, price_usd=1.0, confidence=0.35,
+                     expected_move=0.2, stop_loss_pct=0.10, take_profit_pct=0.20,
+                     risk_reward=2.0, liquidity_usd=5e6, reason="t")
+        assert rm.size_position(sig, []) == pytest.approx(bank / 18)

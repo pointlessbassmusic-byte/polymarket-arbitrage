@@ -57,7 +57,7 @@
   claim: "move_1d top tercile AND move_3d bottom tercile -> short, -20% target / +10% stop / 14d."
   test: "Yearly walk-forward (cuts refit on prior years); bot replay reconciled trade for trade."
   data: "18 memecoin perps, daily, 2022-2026"
-  result: "5/5 years positive, beats unconditional short 5/5, +1.47%/trade over 938; replay +1.24%"
+  result: "5/5 years positive, beats unconditional short 5/5, +1.47%/trade over 938; replay +1.24%; on capital with one 1/18 slot per coin: +5.2% / +1.4% / +35.8% / +11.2% for 2023-26, max drawdown -15.5%, all 18 slots in use at once at worst"
   verdict: alive
   regime: "survives the 2024 mania and 2025-26 collapse; not regime-dependent (BTC SMA50 split within noise)"
   rerun: "python -m cryptobot.perp_study --cache hl_daily.pkl --funding hl_funding.pkl --target 0.20 --stop 0.10 --days 14 --walk-forward \"short:move_1d[2]&move_3d[0]\""
@@ -90,7 +90,7 @@
   claim: "Holding the top-3 funding payers (enter > 0.06%/day, exit when 3d rate < 0) is market-neutral income."
   test: "Per calendar year on realised hourly funding; basis measured on both venues."
   data: "150 Kraken-tradeable perps, 2023-2026; Kraken daily spot for basis"
-  result: "+13.2% / +37.7% / +8.1% / +17.5% annualised; basis mean +0.02%/trade; maker spot leg 0.49% round trip"
+  result: "on CAPITAL (both legs), 1x, +50% margin guard, maker spot: +6.9% / +12.2% / +3.8% / +5.8% for 2023-26, zero liquidations (per-notional yields of +13-45% quoted earlier counted only one leg); basis mean +0.02%/trade"
   verdict: alive
   regime: "yield follows leverage appetite; near zero on memecoins alone in 2026, positive on the full universe"
   rerun: "python -m cryptobot.carry_study --funding hl_funding_kraken.pkl --top 3 --lookback 14 --enter-min 0.0006"
@@ -259,3 +259,36 @@
   verdict: inconclusive
   regime: "needs live order book + sub-second BTC feed"
   rerun: "none"
+
+- id: carry-leverage
+  title: "Lever the carry perp leg (1.5x-3x) to raise return on capital"
+  source: "original research"
+  claim: "Less perp margin per position frees capital for a bigger position."
+  test: "Replay 187 carry trades on daily perp candles with guards; a day reaching liquidation counts as one."
+  data: "150 Kraken-tradeable perps, 2023-2026"
+  result: "every leverage above 1x either liquidates (2x: 7-29 trades) or needs a guard so tight it exits too often; best is 1x"
+  verdict: killed
+  regime: "high-funding coins are the ones that pump: one in ten holds rose 80%+, largest single day +67%"
+  rerun: "see README 'Carry on capital'"
+
+- id: carry-margin-guard
+  title: "Close both carry legs when the coin rallies 50% above entry"
+  source: "original research"
+  claim: "A guard removes liquidation risk at little cost, because the hedge makes the rally itself P&L-neutral."
+  test: "Same replay, guards +15% to +50%."
+  data: "187 carry trades, 2023-2026"
+  result: "1x + 50%: zero liquidations (16 without a guard), worst year +3.8% on capital vs +5.1% unguarded-but-uncharged"
+  verdict: adopted
+  regime: "hourly monitoring; daily data cannot rule out an intra-hour jump straight through both levels"
+  rerun: "see README 'Carry on capital'"
+
+- id: carry-plus-bounce-short
+  title: "Split capital 50/50 between carry and the bounce-short"
+  source: "original research"
+  claim: "The two survivors are complementary across regimes."
+  test: "Per-year return on capital of each, combined."
+  data: "2023-2026"
+  result: "+6.1% / +6.8% / +19.8% / +8.5%; carry carries the 2024 mania, the bounce-short the 2025 collapse"
+  verdict: adopted
+  regime: "every year positive in backtest; two strategies, both tested on the same coins"
+  rerun: "see README 'Carry on capital'"

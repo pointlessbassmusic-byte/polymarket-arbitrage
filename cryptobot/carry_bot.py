@@ -56,7 +56,20 @@ class CarryConfig:
     enter_min_daily: float = 0.0006
     exit_lookback_days: int = 3
     exit_min_daily: float = 0.0
-    slot_fraction: float = 0.30          # of book equity per slot (3 slots = 90%)
+    # Share of CAPITAL committed per slot, both legs included. A $1 carry
+    # position needs $1 of spot plus 1/perp_leverage of perp margin, so the
+    # notional is capital * slot_fraction / (1 + 1/perp_leverage). Sizing
+    # notional off equity directly (as before) quietly assumed half the
+    # capital a position really ties up.
+    slot_fraction: float = 0.30
+    perp_leverage: float = 1.0
+    # Close both legs when the coin trades this far above the perp entry.
+    # High-funding coins are the ones that pump: over 187 historical carry
+    # trades one in ten rose 80%+ during the hold, and at 1x 16 would have
+    # been liquidated with no guard. A +50% guard had zero liquidations and
+    # gave up little funding; leverage above 1x never paid once liquidations
+    # are counted. The hedge makes the move itself P&L-neutral.
+    margin_guard: Optional[float] = 0.50
     # Spot and perp must price the same asset. Pairs are matched by ticker,
     # and tickers collide: Kraken's LIT is Litentry (~$0.12), Hyperliquid's
     # LIT is a different token (~$4). A "hedge" across two assets is two
@@ -376,7 +389,7 @@ class CarryBot:
                                f"spot and perp prices differ by {100 * (gap or 0):.1f}% — "
                                f"not the same asset, or a broken market")
                     continue
-                notional = book.equity(self.perps, self.spots) * self.cfg.slot_fraction
+                notional = self.slot_notional(book.equity(self.perps, self.spots))
                 if notional < 10:
                     continue
                 perp_qty = spot_vol = 0.0
@@ -395,6 +408,16 @@ class CarryBot:
                            f"{100 * by_coin[coin]['rate_long']:+.3f}%/d, rank {rank_of[coin] + 1}",
                            notional)
         self.last_daily_run = t
+
+    def slot_notional(self, equity: float) -> float:
+        """Notional per slot, so that spot + perp margin = slot_fraction of capital."""
+        return equity * self.cfg.slot_fraction / (1.0 + 1.0 / self.cfg.perp_leverage)
+
+    def guard_tripped(self, pos) -> bool:
+        if self.cfg.margin_guard is None:
+            return False
+        perp = self.perps.get(pos.coin)
+        return perp is not None and perp >= pos.perp_entry * (1 + self.cfg.margin_guard)
 
     def price_gap(self, coin: str) -> Optional[float]:
         """|spot / perp - 1|, both in the perp's units, from live mids."""
@@ -522,12 +545,17 @@ class CarryBot:
         if self.books["real"].pending_spot_sells:
             await self._retry_spot_sells(self.books["real"])
         t = now()
+        fee = round_trip_fraction(self.cfg.maker_spot)
         for book in self.books.values():
             dirty = False
-            for pos in book.positions.values():
+            for pos in list(book.positions.values()):
                 if pos.coin in self.rates:
                     pos.accrue(self.rates[pos.coin], t)
                     dirty = True
+                if self.guard_tripped(pos):
+                    rise = self.perps[pos.coin] / pos.perp_entry - 1
+                    await self._close(book, pos.coin,
+                                      f"margin guard: perp up {100 * rise:.0f}% from entry", fee, t)
             if dirty:
                 book.save()
         self.equity_curve.append((t, self.books["sim"].equity(self.perps, self.spots),
@@ -575,6 +603,15 @@ class CarryBot:
         }
 
 
+def allocation(cfg: dict, strategy: str) -> float:
+    """Share of the bankroll given to `strategy` (config `allocation:`).
+    Carry and the bounce-short are complementary: carry earned most in the
+    2024 mania, the bounce-short in the 2025 collapse. 50/50 by default."""
+    shares = cfg.get("allocation") or {"carry": 0.5, "bounce_short": 0.5}
+    total = sum(float(v) for v in shares.values()) or 1.0
+    return float(shares.get(strategy, 0.0)) / total
+
+
 def build(cfg: dict, state_dir: Optional[Path]) -> CarryBot:
     carry = cfg.get("carry", {})
     perp = cfg.get("perp", {})
@@ -583,6 +620,9 @@ def build(cfg: dict, state_dir: Optional[Path]) -> CarryBot:
         enter_min_daily=float(carry.get("enter_min_daily", 0.0006)),
         exit_min_daily=float(carry.get("exit_min_daily", 0.0)),
         slot_fraction=float(carry.get("slot_fraction", 0.30)),
+        perp_leverage=float(carry.get("perp_leverage", 1.0)),
+        margin_guard=(None if carry.get("margin_guard", 0.50) is None
+                      else float(carry.get("margin_guard", 0.50))),
         maker_spot=bool(carry.get("maker_spot", True)),
         coins=tuple(carry.get("coins") or ()), state_dir=state_dir)
     exec_cfg = PerpExecConfig(live=bool(perp.get("live", False)),
@@ -591,8 +631,9 @@ def build(cfg: dict, state_dir: Optional[Path]) -> CarryBot:
     spot_cfg = SpotExecConfig(live=bool(carry.get("live", False)),
                               max_trade_usd=float(perp.get("max_trade_usd", 50)),
                               max_slippage=float(carry.get("max_slippage", 0.01)))
-    return CarryBot(ccfg, float(cfg.get("sim", {}).get("bankroll_usd", 200)),
-                    float(cfg.get("risk", {}).get("bankroll_usd", 1000)), exec_cfg,
+    share = allocation(cfg, "carry")
+    return CarryBot(ccfg, share * float(cfg.get("sim", {}).get("bankroll_usd", 200)),
+                    share * float(cfg.get("risk", {}).get("bankroll_usd", 1000)), exec_cfg,
                     spot_cfg=spot_cfg)
 
 

@@ -170,4 +170,15 @@ carry:
   lookback_days: 14
   enter_min_daily: 0.0006      # 0.06%/day ~ 22%/yr before fees
   exit_min_daily: 0.0
-  slot_fraction: 0.30          # of equity per slot
+  slot_fraction: 0.30          # of CAPITAL per slot, spot + perp margin
+  perp_leverage: 1.0           # >1x never paid once liquidations counted
+  margin_guard: 0.50           # close both legs if the coin rallies 50%
+
+# Capital split between the two strategies that survived testing. They are
+# complementary: carry earned most in the 2024 mania (+12.2% on capital),
+# the bounce-short in the 2025 collapse (+35.8%). 50/50 kept every year
+# between +6% and +20% on capital in the backtests. Each bot sizes from
+# its share of sim.bankroll_usd (paper) and risk.bankroll_usd (real).
+allocation:
+  carry: 0.5
+  bounce_short: 0.5

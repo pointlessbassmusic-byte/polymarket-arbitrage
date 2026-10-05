@@ -109,3 +109,52 @@ class TestRender:
         rule = C.CarryRule(top_n=1, enter_min=0.0001)
         text = C.render(rule, C.simulate(daily, rule, T0 + 15 * DAY, T0 + 30 * DAY))
         assert "2024" in text and "net positive" in text
+
+
+class TestGuardAndCapital:
+    def _bars(self, highs, opens=None, start=T0):
+        from cryptobot.backtest import Candle
+        opens = opens or [1.0] * len(highs)
+        return {start + i * DAY: Candle(ts=start + i * DAY, open=opens[i], high=h, low=0.9,
+                                        close=1.0, volume_usd=1.0)
+                for i, h in enumerate(highs)}
+
+    def _trade(self):
+        return {"coin": "A", "entry": T0 + DAY, "exit": T0 + 6 * DAY, "funding": 0.0}
+
+    def test_liquidation_level(self):
+        assert C.liquidation_rise(1) == pytest.approx(0.975)
+        assert C.liquidation_rise(2) == pytest.approx(0.475)
+
+    def test_guard_exits_before_liquidation(self):
+        bars = {"A": self._bars([1.0, 1.0, 1.6, 1.0, 1.0, 1.0, 1.0])}
+        daily = {"A": {T0 + k * DAY: 0.01 for k in range(10)}}
+        (t,) = C.guard_trades([self._trade()], bars, 0.5, 1.0, daily, 0.005)
+        assert t["status"] == "guarded" and t["exit"] == T0 + 2 * DAY
+        assert t["net"] == pytest.approx(0.01 - 0.005)          # one day of funding
+
+    def test_a_day_through_liquidation_is_a_liquidation_without_a_guard(self):
+        bars = {"A": self._bars([1.0, 1.0, 2.1, 1.0, 1.0, 1.0, 1.0])}
+        (t,) = C.guard_trades([self._trade()], bars, None, 1.0, {}, 0.0)
+        assert t["status"] == "liquidated"
+
+    def test_same_day_guard_and_liquidation_counts_as_liquidation(self):
+        # conservative: the day could have jumped straight through both
+        bars = {"A": self._bars([1.0, 1.0, 2.1, 1.0, 1.0, 1.0, 1.0])}
+        (t,) = C.guard_trades([self._trade()], bars, 0.5, 1.0, {}, 0.0)
+        assert t["status"] == "liquidated"
+
+    def test_opening_past_the_guard_but_below_liquidation_is_guarded(self):
+        bars = {"A": self._bars([1.0, 1.0, 2.1, 1.0, 1.0, 1.0, 1.0],
+                                opens=[1.0, 1.0, 1.6, 1.0, 1.0, 1.0, 1.0])}
+        (t,) = C.guard_trades([self._trade()], bars, 0.5, 1.0, {}, 0.0)
+        assert t["status"] == "guarded"
+
+    def test_return_on_capital_halves_notional_yield_at_1x(self):
+        trades = [{"entry": T0 + DAY, "net": 0.30}]
+        start, end = T0, T0 + 365 * DAY
+        oc1 = C.on_capital(trades, 1.0, 1, start, end)
+        oc3 = C.on_capital(trades, 3.0, 1, start, end)
+        (y,) = oc1
+        assert oc1[y] == pytest.approx(0.15, rel=0.05)
+        assert oc3[y] == pytest.approx(0.30 * 0.75, rel=0.05)

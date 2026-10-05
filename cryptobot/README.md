@@ -949,6 +949,51 @@ python -m cryptobot.hypotheses --similar "sell 60% at 2x and hold a moonbag"
 python -m cryptobot.hypotheses --verdict alive
 ```
 
+## Carry on capital, and the 50/50 split
+
+**A correction.** Carry yields quoted above (+13% to +45% a year) are per
+dollar of *position*. A carry position needs money on both venues, the
+spot on Kraken and the perp margin on Hyperliquid, so at 1x a $100
+position ties up $200 and the return on capital is about half. The bot
+now sizes that way (`slot_fraction` is capital per slot, both legs).
+
+**Liquidation risk, measured.** High-funding coins are the ones that
+pump. Over 187 historical carry trades (median hold 8 days) one in ten
+rose 80%+ during the hold and the largest single day was +67%. At 1x
+with no guard, 16 would have liquidated the short, leaving the spot leg
+unhedged right after a pump. Replaying those trades on daily perp
+candles (a day that reaches the liquidation level counts as a
+liquidation, the conservative reading):
+
+| perp leverage, guard | liquidations | worst year on capital |
+|---|---|---|
+| 1x, none | 16 | (liquidations not charged) |
+| **1x, close both legs at +50%** | **0** | **+3.8%** |
+| 1.5x, +50% | 12 | |
+| 2x, +35% | 14 | |
+| 3x, +25% | 36 | |
+
+Leverage never pays once liquidations are counted. The bot now runs the
+perp leg at 1x with a **+50% margin guard** (`margin_guard`): when the
+coin trades 50% above entry, both legs close. The hedge makes the rally
+itself cost nothing; the guard gives up only the funding not yet
+collected.
+
+**The two survivors, on the same footing** (return on capital):
+
+| | 2023 | 2024 | 2025 | 2026 | |
+|---|---|---|---|---|---|
+| carry, 1x, +50% guard | +6.9% | **+12.2%** | +3.8% | +5.8% | hedged |
+| bounce-short, 1/18 of capital per coin | +5.2% | **+1.4%** | **+35.8%** | +11.2% | max drawdown −15.5% |
+| **50 / 50** | **+6.1%** | **+6.8%** | **+19.8%** | **+8.5%** | |
+
+The bounce-short earns more on average and much less evenly; carry is
+steadier and earns most in manias, exactly when the bounce-short
+struggles. The default `allocation:` splits capital 50/50, and each bot
+sizes from its share. The bounce-short now uses one equal slot per coin
+at 1x (its 2022-23 figures understate it: only 3-7 coins existed while
+capital is split 18 ways).
+
 ## The cost reality
 
 Charging realistic round-trip costs (swap fees + price impact vs pool
