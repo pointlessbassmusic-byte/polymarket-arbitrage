@@ -163,6 +163,34 @@ def capital_plan(cfg: dict) -> dict:
     }
 
 
+async def order_previews(env: dict, max_trade_usd: float) -> list[dict]:
+    """With a Coinbase key present, ask the venue to price one contract of
+    each coin without placing anything: proves the key, the futures
+    account and each product's tradability end to end."""
+    from .execution.coinbase_futures import CONTRACTS, CoinbaseExecConfig, CoinbaseFuturesExecutor
+    ex = CoinbaseFuturesExecutor(CoinbaseExecConfig(max_trade_usd=max_trade_usd))
+    ex._name = env["CRYPTOBOT_COINBASE_KEY_NAME"]
+    ex._secret = env["CRYPTOBOT_COINBASE_KEY_SECRET"].replace("\\n", "\n")
+    out = []
+    for coin in CONTRACTS:
+        try:
+            out.append(await ex.preview(coin))
+        except Exception as exc:
+            out.append({"coin": coin, "errs": [str(exc)], "tradable": False})
+    return out
+
+
+def preview_checks(previews: list[dict]) -> list[tuple[str, bool, str]]:
+    checks = []
+    for p in previews:
+        ok = bool(p.get("tradable")) and not p.get("errs")
+        why = "; ".join(str(e) for e in p.get("errs") or []) or f"status {p.get('status')}"
+        detail = (f"1 contract = ${p.get('order_total', 0):,.2f}, fee ${p.get('commission', 0):.2f}, "
+                  f"margin ${p.get('margin', 0):,.2f}") if ok else why
+        checks.append((f"Coinbase will accept a {p['coin']} order", ok, detail))
+    return checks
+
+
 async def contract_prices() -> dict:
     """Live dollar size of one Coinbase contract per coin."""
     from .data.coinbase_futures import CoinbaseMarketData
@@ -298,12 +326,16 @@ async def _main(args) -> int:
         env = dict(os.environ)
         balances = await read_balances(cfg, env)
         sizes = None
+        extra: list = []
         if venue(cfg) == "coinbase":
             try:
                 sizes = await contract_prices()
             except Exception as exc:
                 logger.warning("contract prices unavailable: %s", exc)
-        print(render_preflight(cfg, preflight(cfg, env, balances or None, sizes)))
+            if env.get("CRYPTOBOT_COINBASE_KEY_NAME") and env.get("CRYPTOBOT_COINBASE_KEY_SECRET"):
+                extra = preview_checks(await order_previews(
+                    env, float(cfg.get("perp", {}).get("max_trade_usd", 500))))
+        print(render_preflight(cfg, preflight(cfg, env, balances or None, sizes) + extra))
         return 0
     args.state_dir.mkdir(parents=True, exist_ok=True)
     bots = build(cfg, args.state_dir)

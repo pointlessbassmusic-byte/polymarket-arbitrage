@@ -169,6 +169,30 @@ class CoinbaseFuturesExecutor:
         # Coinbase quotes 1000PEPE / 1000SHIB per thousand tokens, as the bot does.
         return Fill(coin, side, filled * c.units_per_contract, px, order_id=order_id)
 
+    async def preview(self, coin: str, n: int = 1) -> dict:
+        """Ask Coinbase to price an n-contract market sell WITHOUT placing
+        it: the account's real fee, margin and any rejection reason. Needs
+        the key (not arming); the dry-run path never sends anything."""
+        c = self.contract(coin)
+
+        def _get():
+            r = self._c().preview_market_order_sell(product_id=c.product_id, base_size=str(n))
+            d = r.to_dict() if hasattr(r, "to_dict") else dict(r)
+            p = self._c().get_product(c.product_id, get_tradability_status=True)
+            pd = p.to_dict() if hasattr(p, "to_dict") else dict(p)
+            return {
+                "coin": coin, "product_id": c.product_id, "contracts": n,
+                "order_total": float(d.get("order_total") or 0),
+                "commission": float(d.get("commission_total") or 0),
+                "margin": float(d.get("order_margin_total") or 0),
+                "errs": list(d.get("errs") or []),
+                "warnings": list(d.get("warning") or []),
+                "tradable": not (pd.get("trading_disabled") or pd.get("is_disabled")
+                                 or pd.get("view_only") or pd.get("status") not in (None, "online")),
+                "status": pd.get("status"),
+            }
+        return await asyncio.to_thread(_get)
+
     async def balance(self) -> dict:
         """Futures account figures (USD)."""
         def _get():

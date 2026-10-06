@@ -1008,6 +1008,12 @@ tunnel (`ssh -L 8080:localhost:8080 your-server`) rather than opening it.
    plus the bounce-short's capital on Hyperliquid. For a $1,000 real
    bankroll split 50/50 that is $225 on Kraken and $725 on Hyperliquid.
 
+On Coinbase, once the key is in `.env`, `--preflight` also asks the venue
+to price one contract of each coin (a preview, nothing is placed) and
+reports the real fee and margin, or the rejection reason. That is the
+whole order path exercised against the live account before any money
+moves.
+
 Then switch each dashboard's toggle to real. The sim books keep running
 alongside, so the gap between sim and real is measured execution cost.
 

@@ -29,6 +29,13 @@ class FakeClient:
         return {"order": {"filled_size": self.filled, "average_filled_price": self.price,
                           "status": "FILLED"}}
 
+    def preview_market_order_sell(self, product_id, base_size):
+        return {"order_total": "477.5", "commission_total": "0.48", "errs": [], "warning": [],
+                "base_size": base_size, "order_margin_total": "120.1"}
+
+    def get_product(self, product_id, get_tradability_status=False):
+        return {"product_id": product_id, "status": "online", "trading_disabled": False}
+
     def get_futures_balance_summary(self):
         return {"balance_summary": {"total_usd_balance": {"value": "1500.5"},
                                     "cfm_usd_balance": {"value": "1000"},
@@ -143,3 +150,22 @@ async def test_seed_history_prepends_before_first_coinbase_candle(tmp_path):
     rates = await md.funding_rates()
     assert rates["DOGE"] == pytest.approx(0.0001)
     assert (await md.all_mids())["DOGE"] == pytest.approx(0.2)
+
+
+@pytest.mark.asyncio
+async def test_preview_prices_one_contract_without_arming(monkeypatch):
+    monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
+    fake = FakeClient()
+    ex = CoinbaseFuturesExecutor(CoinbaseExecConfig(), client=fake)
+    p = await ex.preview("DOGE")
+    assert p["order_total"] == pytest.approx(477.5) and p["commission"] == pytest.approx(0.48)
+    assert p["tradable"] and p["errs"] == [] and fake.orders == []
+
+
+def test_preview_checks_render_fee_or_rejection():
+    from cryptobot.desk import preview_checks
+    ok, bad = preview_checks([
+        {"coin": "DOGE", "tradable": True, "errs": [], "order_total": 477.5, "commission": 0.48, "margin": 120.1},
+        {"coin": "kPEPE", "tradable": False, "errs": ["PREVIEW_INSUFFICIENT_FUND"], "status": "online"}])
+    assert ok[1] is True and "fee $0.48" in ok[2]
+    assert bad[1] is False and "INSUFFICIENT_FUND" in bad[2]
