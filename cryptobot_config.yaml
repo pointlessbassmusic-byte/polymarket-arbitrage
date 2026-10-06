@@ -192,6 +192,9 @@ carry:
 # or near-zero funding over the past year, and carry's edge needed breadth
 # across ~150 coins. Set carry back to 0.5 and perp.venue to hyperliquid
 # where Hyperliquid is available.
+desk:
+  digest_utc: "00:30"       # daily digest to CRYPTOBOT_ALERT_WEBHOOK, after the 00:10 daily run
+
 allocation:
   carry: 0.0
   bounce_short: 1.0

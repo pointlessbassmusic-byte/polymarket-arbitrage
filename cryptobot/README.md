@@ -1030,6 +1030,12 @@ reconciliation mismatches, daily-loss halts, and startup. Paper-book
 decisions stay in the journal. A failing webhook is counted and logged,
 never allowed to interrupt trading.
 
+Once a day (`desk.digest_utc`, default 00:30 UTC, after the daily run)
+the same webhook gets a digest: equity and return per book, what closed
+with its P&L, what is open, halts and drawdown, the sim-vs-real gap in
+percentage points, and any venue mismatch. `python -m cryptobot.desk
+--digest` prints the same thing from the saved books.
+
 Then switch each dashboard's toggle to real. The sim books keep running
 alongside, so the gap between sim and real is measured execution cost.
 

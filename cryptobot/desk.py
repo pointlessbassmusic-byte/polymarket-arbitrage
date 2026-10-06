@@ -24,6 +24,7 @@ import asyncio
 import logging
 import os
 import secrets
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -52,6 +53,61 @@ def summary(bots: dict) -> dict:
     for book, tot in out["total"].items():
         tot["return_pct"] = (tot["equity"] / tot["start"] - 1.0) if tot["start"] else 0.0
     return out
+
+
+def digest(bots: dict, since: float, at: Optional[float] = None) -> str:
+    """One day in a few lines: equity and return per book, what closed
+    since `since`, what is open, and the sim-vs-real gap (the execution
+    cost the paper book does not pay). Safe to post anywhere."""
+    import datetime as dt
+    at = at if at is not None else time.time()
+    day = dt.datetime.utcfromtimestamp(at).strftime("%Y-%m-%d")
+    lines = [f"desk digest {day} UTC"]
+    for name, bot in bots.items():
+        st = bot.state()
+        books = st["books"]
+        for book in ("sim", "real"):
+            b = books[book]
+            if book == "real" and not st["real_unlocked"]:
+                continue
+            closed = [t for t in b["closed_trades"] if t["closed_at"] >= since]
+            pnl = sum(t["pnl_usd"] for t in closed)
+            flags = []
+            if b.get("halted"):
+                flags.append("HALTED")
+            if b.get("drawdown", 0) >= 0.10:
+                flags.append(f"drawdown {100 * b['drawdown']:.0f}%")
+            lines.append(
+                f"{name}/{book}: ${b['equity']:,.2f} ({100 * b['return_pct']:+.2f}% since start), "
+                f"{len(closed)} closed today {pnl:+,.2f}, {b['summary']['open_positions']} open"
+                + (f" [{'; '.join(flags)}]" if flags else ""))
+            for t in closed:
+                lines.append(f"    {t['symbol']} {t['exit_reason']} {t['pnl_usd']:+,.2f}")
+        if st["real_unlocked"]:
+            s_ret, r_ret = books["sim"]["return_pct"], books["real"]["return_pct"]
+            lines.append(f"{name} sim-vs-real gap: {100 * (r_ret - s_ret):+.2f} pp")
+        rc = st.get("reconcile")
+        if rc and not rc.get("ok"):
+            lines.append(f"{name} VENUE MISMATCH: venue-only {rc['venue_only']} "
+                         f"book-only {rc['book_only']} size {rc['qty_mismatch']}")
+    return "\n".join(lines)
+
+
+async def digest_loop(bots: dict, alerter, hour_utc: int = 0, minute_utc: int = 30) -> None:
+    """Post the digest once a day, after the bounce-short's daily run."""
+    import datetime as dt
+    last = time.time()
+    while True:
+        now_dt = dt.datetime.now(dt.timezone.utc)
+        nxt = now_dt.replace(hour=hour_utc, minute=minute_utc, second=0, microsecond=0)
+        if nxt <= now_dt:
+            nxt += dt.timedelta(days=1)
+        await asyncio.sleep((nxt - now_dt).total_seconds())
+        try:
+            await alerter.send(digest(bots, since=last))
+        except Exception as exc:                        # never let the digest kill the desk
+            logger.warning("digest failed: %s", exc)
+        last = time.time()
 
 
 SUMMARY_PAGE = """<!doctype html><html><head><meta charset="utf-8">
@@ -347,6 +403,11 @@ async def _main(args) -> int:
     args.state_dir.mkdir(parents=True, exist_ok=True)
     bots = build(cfg, args.state_dir)
     alerter = bots.pop("_alerter")
+    if args.digest:
+        print(digest(bots, since=time.time() - 86400))
+        for b in bots.values():
+            await b.close()
+        return 0
     token = args.token or os.environ.get("CRYPTOBOT_DASH_TOKEN") or secrets.token_urlsafe(16)
     import uvicorn
     app = create_desk_app(bots, token, set(args.allow_host or []))
@@ -355,8 +416,13 @@ async def _main(args) -> int:
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning"))
     alerter.fire(f"desk up: {', '.join(bots)}; venue {venue(cfg)}; "
                  f"real {'ARMED' if any(getattr(b, 'real_armed', False) for b in bots.values()) else 'locked'}")
+    tasks = [b.run_forever() for b in bots.values()] + [server.serve()]
+    if alerter.enabled:
+        d = cfg.get("desk", {}).get("digest_utc", "00:30")
+        hh, mm = (int(x) for x in str(d).split(":"))
+        tasks.append(digest_loop(bots, alerter, hh, mm))
     try:
-        await asyncio.gather(*(b.run_forever() for b in bots.values()), server.serve())
+        await asyncio.gather(*tasks)
     finally:
         for b in bots.values():
             await b.close()
@@ -368,6 +434,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="carry + bounce-short trading desk")
     ap.add_argument("--config", type=Path, default=Path("cryptobot_config.yaml"))
     ap.add_argument("--state-dir", type=Path, default=Path("state"))
+    ap.add_argument("--digest", action="store_true",
+                    help="print today's digest from the saved books and exit")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--token", default=None, help="dashboard token (default: random, or $CRYPTOBOT_DASH_TOKEN)")

@@ -130,3 +130,32 @@ def test_coinbase_preflight_drops_carry_and_checks_contract_size():
     assert slot[1] is False and "$1,440" in slot[2]          # 3 × $480 at 100% bounce
     assert next(c for c in checks if c[0].startswith("coinbase_usd"))[1] is True
     assert next(c for c in checks if "max_trade_usd" in c[0])[1] is True
+
+
+def test_digest_reports_books_closed_trades_and_gap():
+    class Bot:
+        def __init__(self, unlocked):
+            self.unlocked = unlocked
+
+        def state(self):
+            book = lambda eq, ret, closed, halted=False: {
+                "equity": eq, "return_pct": ret, "halted": halted, "drawdown": 0.12,
+                "summary": {"open_positions": 1},
+                "closed_trades": closed}
+            return {"real_unlocked": self.unlocked,
+                    "reconcile": {"ok": False, "venue_only": ["kPEPE"], "book_only": [], "qty_mismatch": []},
+                    "books": {
+                        "sim": book(1030.0, 0.03, [{"symbol": "DOGE", "exit_reason": "take_profit",
+                                                    "pnl_usd": 30.0, "closed_at": 1000.0},
+                                                   {"symbol": "kSHIB", "exit_reason": "stop_loss",
+                                                    "pnl_usd": -5.0, "closed_at": 10.0}]),
+                        "real": book(1010.0, 0.01, [], halted=True)}}
+    txt = D.digest({"bounce": Bot(True)}, since=500.0, at=1_700_000_000)
+    assert "desk digest 2023-11-14 UTC" in txt
+    assert "bounce/sim: $1,030.00 (+3.00% since start), 1 closed today +30.00, 1 open [drawdown 12%]" in txt
+    assert "    DOGE take_profit +30.00" in txt and "kSHIB" not in txt
+    assert "bounce/real: $1,010.00" in txt and "HALTED" in txt
+    assert "sim-vs-real gap: -2.00 pp" in txt
+    assert "VENUE MISMATCH: venue-only ['kPEPE']" in txt
+    locked = D.digest({"bounce": Bot(False)}, since=500.0, at=1_700_000_000)
+    assert "bounce/real" not in locked and "gap" not in locked
