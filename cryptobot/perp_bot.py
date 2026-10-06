@@ -362,8 +362,16 @@ class PerpBot:
                 trade = book.portfolio.close(key, price, reason)
                 if trade is None:
                     continue
+                was_halted = book.risk.state.halted
                 book.risk.record_pnl(trade.pnl_usd)
                 book.protections.on_trade_closed(trade)
+                if book.risk.state.halted and not was_halted:
+                    self.journal.record(Decision(
+                        ts=now(), book=book.name, symbol="*", chain=CHAIN,
+                        signal_type=SignalType.BOUNCE_SHORT.value, action="halted",
+                        stage="execution",
+                        reason=f"daily loss {book.risk.state.daily_pnl:+.2f} hit the limit; "
+                               f"no new entries until the day rolls"))
                 if book.name == "sim":
                     self.edges.record(trade)
                 self.journal.record(Decision(

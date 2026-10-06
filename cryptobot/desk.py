@@ -313,9 +313,16 @@ def build(cfg: dict, state_dir: Path) -> dict:
     allocation.carry is 0 and the desk is the bounce-short alone."""
     from . import carry_bot, perp_bot
     from .carry_bot import allocation
+    from .alerts import Alerter
     bots = {"bounce": perp_bot.build(cfg, state_dir)}
     if allocation(cfg, "carry") > 0:
         bots["carry"] = carry_bot.build(cfg, state_dir)
+    alerter = Alerter()
+    if alerter.enabled:
+        for name, bot in bots.items():
+            bot.journal.on_record.append(alerter.hook(name))
+        logger.info("alerts on: real fills, exits, reconcile mismatches, halts")
+    bots["_alerter"] = alerter
     return bots
 
 
@@ -339,17 +346,21 @@ async def _main(args) -> int:
         return 0
     args.state_dir.mkdir(parents=True, exist_ok=True)
     bots = build(cfg, args.state_dir)
+    alerter = bots.pop("_alerter")
     token = args.token or os.environ.get("CRYPTOBOT_DASH_TOKEN") or secrets.token_urlsafe(16)
     import uvicorn
     app = create_desk_app(bots, token, set(args.allow_host or []))
     shown = "localhost" if args.host in ("0.0.0.0", "127.0.0.1") else args.host
     logger.info("desk dashboard: http://%s:%d/?t=%s", shown, args.port, token)
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning"))
+    alerter.fire(f"desk up: {', '.join(bots)}; venue {venue(cfg)}; "
+                 f"real {'ARMED' if any(getattr(b, 'real_armed', False) for b in bots.values()) else 'locked'}")
     try:
         await asyncio.gather(*(b.run_forever() for b in bots.values()), server.serve())
     finally:
         for b in bots.values():
             await b.close()
+        await alerter.close()
     return 0
 
 

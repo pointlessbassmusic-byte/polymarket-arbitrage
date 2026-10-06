@@ -26,6 +26,7 @@ are where the risk controls actually earn their keep.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -37,6 +38,9 @@ from .costs import CostModel
 from .portfolio import Portfolio
 from .protections import ProtectionConfig, ProtectionManager
 from .risk import RiskConfig, RiskManager
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -74,9 +78,15 @@ class DecisionJournal:
 
     def __init__(self, maxlen: int = 400):
         self._entries: deque[Decision] = deque(maxlen=maxlen)
+        self.on_record: list = []          # callbacks(decision), e.g. alerts
 
     def record(self, decision: Decision) -> None:
         self._entries.appendleft(decision)
+        for cb in self.on_record:
+            try:
+                cb(decision)
+            except Exception:              # a listener must never break the bot
+                logger.exception("journal listener failed")
 
     def recent(self, limit: int = 60, book: Optional[str] = None) -> list[dict]:
         out = []

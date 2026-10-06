@@ -1023,6 +1023,13 @@ automatically: a mismatch means an order went through that the bot did
 not record, or a trade was made by hand, and which side is right is
 your call.
 
+**Alerts.** Set `CRYPTOBOT_ALERT_WEBHOOK` in `.env` to a Discord or
+Slack incoming-webhook URL and the desk pushes what a human must hear
+about: every real fill and exit with its P&L, order failures,
+reconciliation mismatches, daily-loss halts, and startup. Paper-book
+decisions stay in the journal. A failing webhook is counted and logged,
+never allowed to interrupt trading.
+
 Then switch each dashboard's toggle to real. The sim books keep running
 alongside, so the gap between sim and real is measured execution cost.
 
