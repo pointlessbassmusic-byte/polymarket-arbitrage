@@ -600,3 +600,46 @@ async def test_reconcile_is_skipped_when_not_armed():
     bot = PerpBot(cfg, risk, risk, ProtectionConfig(), PerpExecConfig(),
                   client=PB.ReplayClient({}), executor=PerpExecutor(PerpExecConfig()))
     assert await bot.reconcile() is None
+
+
+class _FailingClose(PerpExecutor):
+    def __init__(self):
+        super().__init__(PerpExecConfig())
+        self._armed = True
+        self.calls = 0
+
+    async def close(self, coin, qty, mid):
+        self.calls += 1
+        raise RuntimeError("venue down")
+
+
+@pytest.mark.asyncio
+async def test_failed_real_close_is_retried_fast_and_journaled_once():
+    cfg = PerpBotConfig(coins=("DOGE",), state_dir=None)
+    risk = PB.slot_risk({}, 1000.0, 1)
+    ex = _FailingClose()
+    client = PB.ReplayClient({})
+    bot = PerpBot(cfg, risk, risk, ProtectionConfig(), PerpExecConfig(), client=client, executor=ex)
+    bot.mode = "real"
+    sig = Signal(ts=1.0, type=SignalType.BOUNCE_SHORT, key=f"{CHAIN}:DOGE", chain=CHAIN,
+                 symbol="DOGE", side=Side.SHORT, price_usd=0.10, confidence=0.35,
+                 expected_move=0.20, stop_loss_pct=0.10, take_profit_pct=0.20, reason="t",
+                 risk_reward=2.0, liquidity_usd=5e6)
+    bot.books["real"].portfolio.open_from_signal(sig, 500.0)
+    client.mids = {"DOGE": 0.12}                              # +20%: stop breached
+    await bot.monitor()
+    await bot.monitor()
+    assert ex.calls == 2 and bot.pending_closes == {f"{CHAIN}:DOGE"}
+    assert f"{CHAIN}:DOGE" in bot.books["real"].portfolio.positions     # kept, not dropped
+    assert sum(1 for d in bot.journal.recent(10) if d["action"] == "failed") == 1
+
+
+@pytest.mark.asyncio
+async def test_equity_curve_is_hourly_regardless_of_monitor_cadence():
+    cfg = PerpBotConfig(coins=("DOGE",), state_dir=None, monitor_interval_s=300)
+    risk = PB.slot_risk({}, 1000.0, 1)
+    bot = PerpBot(cfg, risk, risk, ProtectionConfig(), PerpExecConfig(),
+                  client=PB.ReplayClient({}), executor=PerpExecutor(PerpExecConfig()))
+    for _ in range(5):
+        await bot.monitor()
+    assert len(bot.equity_curve) == 1

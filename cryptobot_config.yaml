@@ -156,6 +156,7 @@ perp:
   history_seed: state/hl_daily_us3.pkl   # cached daily history to fit cuts before Coinbase's Dec 2025 listing
   private_key_env: CRYPTOBOT_PRIVATE_KEY # Hyperliquid venue only
   max_trade_usd: 500           # per order; must cover one contract (~$480 for DOGE)
+  monitor_interval_s: 300      # stop/target checks; the backtest assumed exits near the level, not at the day's extreme
   max_slippage: 0.01
   target_pct: 0.20             # validated geometry: -20% target,
   stop_pct: 0.10               # +10% stop, 14-day time exit

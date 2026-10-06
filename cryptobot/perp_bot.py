@@ -64,6 +64,7 @@ class PerpBotConfig:
     daily_at_utc_hour: int = 0
     daily_at_utc_minute: int = 10      # candle closes at 00:00; give it time
     monitor_interval_s: int = 3600
+    retry_interval_s: int = 60         # after a real close fails: do not wait a whole monitor cycle
     # Walk-forward hit rate (~35%) at 2:1 is the confidence the sizer sees.
     confidence: float = 0.35
     liquidity_usd: float = 5_000_000   # perp book depth proxy for the cost model
@@ -105,6 +106,8 @@ class PerpBot:
         self.costs = perp_cost_model(cfg.taker_fee)
         self.sub_contract_skips = 0
         self.reconcile_report: Optional[dict] = None
+        self.pending_closes: set[str] = set()   # real positions whose exit order failed
+        self._last_curve_ts: float = 0.0
         # One trade per coin per hold period, measured from ENTRY: a coin
         # becomes eligible again hold_days after it was last entered,
         # whether or not that trade is still open. That is the nearest
@@ -355,9 +358,18 @@ class PerpBot:
                     try:
                         fill = await self.executor.close(pos.symbol, pos.qty, mid)
                         price = fill.price
-                    except Exception:
+                        self.pending_closes.discard(key)
+                    except Exception as exc:
                         logger.exception("real close failed for %s — keeping position",
                                          pos.symbol)
+                        if key not in self.pending_closes:
+                            self.journal.record(Decision(
+                                ts=now(), book=book.name, symbol=pos.symbol, chain=CHAIN,
+                                signal_type=SignalType.BOUNCE_SHORT.value, action="failed",
+                                stage="execution", size_usd=pos.size_usd, price_usd=mid,
+                                reason=f"{reason} close failed: {exc}; retrying every "
+                                       f"{self.cfg.retry_interval_s}s"))
+                        self.pending_closes.add(key)
                         continue
                 trade = book.portfolio.close(key, price, reason)
                 if trade is None:
@@ -384,8 +396,10 @@ class PerpBot:
                 book.portfolio.save()
         prices = {k: self._mids.get(k.split(":")[1], 0.0) for b in self.books.values()
                   for k in b.portfolio.positions}
-        self.equity_curve.append((now(), self.books["sim"].equity(prices),
-                                  self.books["real"].equity(prices)))
+        if now() - self._last_curve_ts >= 3600:          # hourly points whatever the monitor cadence
+            self._last_curve_ts = now()
+            self.equity_curve.append((now(), self.books["sim"].equity(prices),
+                                      self.books["real"].equity(prices)))
 
     # -- dashboard ---------------------------------------------------------
 
@@ -443,7 +457,8 @@ class PerpBot:
             await self.reconcile()
             if self._daily_due():
                 await self.run_daily()
-            await asyncio.sleep(self.cfg.monitor_interval_s)
+            await asyncio.sleep(self.cfg.retry_interval_s if self.pending_closes
+                                else self.cfg.monitor_interval_s)
 
 
 class ReplayClient:
@@ -633,6 +648,7 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
         target_pct=float(perp.get("target_pct", 0.20)),
         stop_pct=float(perp.get("stop_pct", 0.10)),
         hold_days=int(perp.get("hold_days", 14)),
+        monitor_interval_s=int(perp.get("monitor_interval_s", 3600)),
         coins=coins,
         state_dir=state_dir,
         **venue_kw,
