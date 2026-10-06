@@ -39,11 +39,20 @@ class CoinbaseMarketData:
         self._c = client or httpx.AsyncClient(timeout=25)
         self._owns = client is None
         self._seed: dict[str, list[Candle]] = {}
-        if history_seed and Path(history_seed).exists():
-            pools = pickle.loads(Path(history_seed).read_bytes())
-            for _, (meta, cs) in pools.items():
-                if meta.symbol in CONTRACTS:
-                    self._seed[meta.symbol] = list(cs)
+        self.seed_loaded = False
+        if history_seed:
+            if Path(history_seed).exists():
+                pools = pickle.loads(Path(history_seed).read_bytes())
+                for _, (meta, cs) in pools.items():
+                    if meta.symbol in CONTRACTS:
+                        self._seed[meta.symbol] = list(cs)
+                self.seed_loaded = bool(self._seed)
+            if not self.seed_loaded:
+                logger.warning("history seed %s missing or empty: terciles would be fit on "
+                               "Coinbase's own candles only (since Dec 2025), not the history "
+                               "the rule was validated on. Build it: python -m "
+                               "cryptobot.data.coinbase_futures --seed %s", history_seed, history_seed)
+        self._products: tuple[float, dict] = (0.0, {})
 
     async def close(self) -> None:
         if self._owns:
@@ -72,10 +81,20 @@ class CoinbaseMarketData:
         seed = [c for c in self._seed.get(coin, []) if c.ts < first]
         return seed + out
 
-    async def all_mids(self) -> dict[str, float]:
+    async def products(self, max_age_s: float = 10.0) -> dict:
+        """The FUTURE product list keyed by product_id, shared by all_mids
+        and funding_rates so one monitor tick is one request."""
+        ts, cached = self._products
+        if cached and time.time() - ts < max_age_s:
+            return cached
         r = await self._c.get(f"{API}/products", params={"product_type": "FUTURE", "limit": 500})
         r.raise_for_status()
         by_id = {p["product_id"]: p for p in r.json().get("products", [])}
+        self._products = (time.time(), by_id)
+        return by_id
+
+    async def all_mids(self) -> dict[str, float]:
+        by_id = await self.products()
         out = {}
         for coin, c in CONTRACTS.items():
             p = by_id.get(c.product_id)
@@ -85,9 +104,7 @@ class CoinbaseMarketData:
 
     async def funding_rates(self) -> dict[str, float]:
         """Current hourly funding per coin (positive = longs pay shorts)."""
-        r = await self._c.get(f"{API}/products", params={"product_type": "FUTURE", "limit": 500})
-        r.raise_for_status()
-        by_id = {p["product_id"]: p for p in r.json().get("products", [])}
+        by_id = await self.products()
         out = {}
         for coin, c in CONTRACTS.items():
             d = (by_id.get(c.product_id) or {}).get("future_product_details") or {}
@@ -96,7 +113,6 @@ class CoinbaseMarketData:
             except (TypeError, ValueError):
                 continue
         return out
-
 
 async def build_seed(path: Path, days: int = 365 * 5) -> int:
     """Write the history seed: Hyperliquid PUBLIC daily candles (no account,

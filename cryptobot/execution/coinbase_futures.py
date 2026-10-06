@@ -31,6 +31,7 @@ import asyncio
 import logging
 import math
 import os
+import time
 import uuid
 from dataclasses import dataclass
 from typing import Optional
@@ -73,13 +74,22 @@ class CoinbaseExecConfig:
     key_secret_env: str = "CRYPTOBOT_COINBASE_KEY_SECRET"  # the EC private key PEM
     max_trade_usd: float = 500.0
     max_slippage: float = 0.01
+    fill_polls: int = 6              # get_order attempts after placing
+    fill_poll_s: float = 0.5
+
+
+def _as_dict(res) -> dict:
+    """SDK responses are typed objects with to_dict(); fakes may be dicts."""
+    return res.to_dict() if hasattr(res, "to_dict") else dict(res)
 
 
 class CoinbaseFuturesExecutor:
-    def __init__(self, cfg: CoinbaseExecConfig, client=None):
+    def __init__(self, cfg: CoinbaseExecConfig, client=None, *,
+                 key_name: Optional[str] = None, key_secret: Optional[str] = None):
         self.cfg = cfg
-        self._name = os.environ.get(cfg.key_name_env, "")
-        self._secret = os.environ.get(cfg.key_secret_env, "").replace("\\n", "\n")
+        self._name = key_name if key_name is not None else os.environ.get(cfg.key_name_env, "")
+        secret = key_secret if key_secret is not None else os.environ.get(cfg.key_secret_env, "")
+        self._secret = secret.replace("\\n", "\n")          # PEM pasted on one line in .env
         env_armed = os.environ.get("CRYPTOBOT_ARM_LIVE", "").lower() == "yes"
         self._armed = bool(cfg.live and env_armed and self._name and self._secret)
         if cfg.live and env_armed and not (self._name and self._secret):
@@ -109,7 +119,9 @@ class CoinbaseFuturesExecutor:
         max_trade_usd. Zero when one contract is more than the slot."""
         c = self.contract(coin)
         per_contract = c.units_per_contract * mid
-        return int(math.floor(min(notional_usd, self.cfg.max_trade_usd) / per_contract))
+        # +1e-9: the slot was itself computed as n * per_contract, and
+        # floating point can make that ratio 2.9999999999999996.
+        return int(math.floor(min(notional_usd, self.cfg.max_trade_usd) / per_contract + 1e-9))
 
     async def open_short(self, coin: str, notional_usd: float, mid: float) -> Fill:
         c = self.contract(coin)
@@ -147,7 +159,7 @@ class CoinbaseFuturesExecutor:
         return self._fill_from(res, coin, "close", n, mid)
 
     def _fill_from(self, res, coin: str, side: str, n: int, mid: float) -> Fill:
-        d = res.to_dict() if hasattr(res, "to_dict") else dict(res)
+        d = _as_dict(res)
         if not d.get("success", False):
             err = d.get("error_response") or {}
             raise RuntimeError(f"{coin} {side} rejected: "
@@ -157,15 +169,29 @@ class CoinbaseFuturesExecutor:
         c = self.contract(coin)
         filled, px = float(n), mid
         if order_id:
-            try:
-                o = self._c().get_order(order_id)
-                od = (o.to_dict() if hasattr(o, "to_dict") else dict(o)).get("order") or {}
-                filled = float(od.get("filled_size") or n)
-                px = float(od.get("average_filled_price") or 0) or mid
-            except Exception as exc:                       # the order stands either way
-                logger.warning("get_order %s failed: %s", order_id, exc)
-        if filled <= 0:
-            raise RuntimeError(f"{coin} {side}: IOC order did not fill")
+            # A market IOC fills within moments, but get_order right after
+            # placement can still say PENDING with filled_size 0. Poll
+            # briefly; a terminal unfilled state is a real failure, and an
+            # unknown one is treated as filled at mid (reconcile catches it).
+            for attempt in range(self.cfg.fill_polls):
+                try:
+                    od = _as_dict(self._c().get_order(order_id)).get("order") or {}
+                except Exception as exc:                   # the order stands either way
+                    logger.warning("get_order %s failed: %s", order_id, exc)
+                    break
+                got = float(od.get("filled_size") or 0)
+                status = str(od.get("status") or "").upper()
+                if got > 0:
+                    filled = got
+                    px = float(od.get("average_filled_price") or 0) or mid
+                    break
+                if status in ("CANCELLED", "EXPIRED", "FAILED", "REJECTED"):
+                    raise RuntimeError(f"{coin} {side}: order {order_id} ended {status} unfilled")
+                if attempt + 1 < self.cfg.fill_polls:
+                    time.sleep(self.cfg.fill_poll_s)
+            else:
+                logger.warning("%s %s: order %s still pending after %d polls; assuming %d filled",
+                               coin, side, order_id, self.cfg.fill_polls, n)
         # Coinbase quotes 1000PEPE / 1000SHIB per thousand tokens, as the bot does.
         return Fill(coin, side, filled * c.units_per_contract, px, order_id=order_id)
 
@@ -176,10 +202,8 @@ class CoinbaseFuturesExecutor:
         c = self.contract(coin)
 
         def _get():
-            r = self._c().preview_market_order_sell(product_id=c.product_id, base_size=str(n))
-            d = r.to_dict() if hasattr(r, "to_dict") else dict(r)
-            p = self._c().get_product(c.product_id, get_tradability_status=True)
-            pd = p.to_dict() if hasattr(p, "to_dict") else dict(p)
+            d = _as_dict(self._c().preview_market_order_sell(product_id=c.product_id, base_size=str(n)))
+            pd = _as_dict(self._c().get_product(c.product_id, get_tradability_status=True))
             return {
                 "coin": coin, "product_id": c.product_id, "contracts": n,
                 "order_total": float(d.get("order_total") or 0),
@@ -198,8 +222,7 @@ class CoinbaseFuturesExecutor:
         by_pid = {c.product_id: (coin, c.units_per_contract) for coin, c in CONTRACTS.items()}
 
         def _get():
-            r = self._c().list_futures_positions()
-            d = r.to_dict() if hasattr(r, "to_dict") else dict(r)
+            d = _as_dict(self._c().list_futures_positions())
             out: dict[str, float] = {}
             for pos in d.get("positions") or []:
                 hit = by_pid.get(pos.get("product_id"))
@@ -207,16 +230,16 @@ class CoinbaseFuturesExecutor:
                     continue
                 coin, units = hit
                 n = float(pos.get("number_of_contracts") or 0)
-                if n:
-                    out[coin] = -n * units if str(pos.get("side", "")).upper() == "SHORT" else n * units
+                if n:   # side is the enum string FUTURES_POSITION_SIDE_SHORT (or bare SHORT)
+                    short = str(pos.get("side", "")).upper().endswith("SHORT")
+                    out[coin] = -n * units if short else n * units
             return out
         return await asyncio.to_thread(_get)
 
     async def balance(self) -> dict:
         """Futures account figures (USD)."""
         def _get():
-            r = self._c().get_futures_balance_summary()
-            d = r.to_dict() if hasattr(r, "to_dict") else dict(r)
+            d = _as_dict(self._c().get_futures_balance_summary())
             bs = d.get("balance_summary") or d
             return {k: float((bs.get(k) or {}).get("value", bs.get(k)) or 0.0)
                     for k in ("futures_buying_power", "total_usd_balance", "cfm_usd_balance",

@@ -40,6 +40,7 @@ from .analytics import EdgeTracker
 from .book import Decision, DecisionJournal, TradingBook
 from .costs import CostConfig, CostModel
 from .data.hyperliquid import MEMECOINS, TAKER_FEE, HyperliquidClient
+from .execution.coinbase_futures import SizeTooSmall
 from .execution.perp_exchange import PerpExecConfig, PerpExecutor
 from .models import Side, Signal, SignalType, now
 from .perp_study import WARMUP_DAYS, daily_features
@@ -273,7 +274,7 @@ class PerpBot:
         if book.executes_onchain:
             try:
                 fill = await self.executor.open_short(sig.symbol, size, sig.price_usd)
-            except ValueError as exc:            # SizeTooSmall: whole contracts
+            except SizeTooSmall as exc:          # whole contracts: slot too small
                 note("skipped", "sizing", str(exc), size)
                 return
             except Exception as exc:
@@ -352,6 +353,7 @@ class PerpBot:
                 if reason is None and now() - pos.opened_at >= self.cfg.hold_days * 86400:
                     reason = "time_exit"
                 if reason is None:
+                    self.pending_closes.discard(key)        # exit no longer due: stop fast-polling
                     continue
                 price = mid
                 if book.executes_onchain:
@@ -394,6 +396,7 @@ class PerpBot:
                 dirty = False
             if dirty:
                 book.portfolio.save()
+        self.pending_closes &= {k for b in self.books.values() for k in b.portfolio.positions}
         prices = {k: self._mids.get(k.split(":")[1], 0.0) for b in self.books.values()
                   for k in b.portfolio.positions}
         if now() - self._last_curve_ts >= 3600:          # hourly points whatever the monitor cadence

@@ -121,16 +121,17 @@ table{width:100%;border-collapse:collapse}th,td{text-align:right;padding:8px 6px
 th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:500;font-size:13px}
 .up{color:var(--up)}.dn{color:var(--dn)}a{color:inherit}</style></head><body>
 <h1>Trading desk</h1><p>Each strategy on its share of the bankroll.
-Open <a id="lb" href="bounce/">bounce-short</a> · <a id="lc" href="carry/">carry</a></p>
+Open <span id="links"></span></p>
 <table><thead><tr><th>strategy</th><th>mode</th><th>sim equity</th><th>sim open</th>
 <th>real equity</th><th>real open</th></tr></thead><tbody id="rows"></tbody></table>
 <script>
 const T=new URLSearchParams(location.search).get("t")||"";
-for(const id of ["lb","lc"]){const a=document.getElementById(id);if(T)a.href+="?t="+encodeURIComponent(T)}
+const LINKS={bounce:"bounce-short",carry:"carry"};let linked=false;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pct=(e,s)=>{if(!s)return"";const r=e/s-1;return ` <span class="${r>=0?"up":"dn"}">${r>=0?"+":""}${(100*r).toFixed(2)}%</span>`};
 async function tick(){try{
  const r=await fetch("api/summary",{headers:{"x-dashboard-token":T}});const d=await r.json();
+ if(!linked){linked=true;document.getElementById("links").innerHTML=Object.keys(d.strategies).map(n=>`<a href="${esc(n)}/${T?"?t="+encodeURIComponent(T):""}">${esc(LINKS[n]||n)}</a>`).join(" · ")}
  let h="";for(const [n,s] of Object.entries(d.strategies)){
   h+=`<tr><td>${esc(n)}</td><td>${esc(s.mode)}</td><td>$${s.sim.equity.toFixed(2)}${pct(s.sim.equity,s.sim.start)}</td><td>${s.sim.open}</td>`+
      `<td>$${s.real.equity.toFixed(2)}${pct(s.real.equity,s.real.start)}</td><td>${s.real.open}</td></tr>`}
@@ -224,9 +225,9 @@ async def order_previews(env: dict, max_trade_usd: float) -> list[dict]:
     each coin without placing anything: proves the key, the futures
     account and each product's tradability end to end."""
     from .execution.coinbase_futures import CONTRACTS, CoinbaseExecConfig, CoinbaseFuturesExecutor
-    ex = CoinbaseFuturesExecutor(CoinbaseExecConfig(max_trade_usd=max_trade_usd))
-    ex._name = env["CRYPTOBOT_COINBASE_KEY_NAME"]
-    ex._secret = env["CRYPTOBOT_COINBASE_KEY_SECRET"].replace("\\n", "\n")
+    ex = CoinbaseFuturesExecutor(CoinbaseExecConfig(max_trade_usd=max_trade_usd),
+                                 key_name=env["CRYPTOBOT_COINBASE_KEY_NAME"],
+                                 key_secret=env["CRYPTOBOT_COINBASE_KEY_SECRET"])
     out = []
     for coin in CONTRACTS:
         try:
@@ -326,8 +327,9 @@ async def read_balances(cfg: dict, env: dict) -> dict:
     if env.get("CRYPTOBOT_COINBASE_KEY_NAME") and env.get("CRYPTOBOT_COINBASE_KEY_SECRET"):
         try:
             from .execution.coinbase_futures import CoinbaseExecConfig, CoinbaseFuturesExecutor
-            ex = CoinbaseFuturesExecutor(CoinbaseExecConfig())
-            ex._name, ex._secret = env["CRYPTOBOT_COINBASE_KEY_NAME"], env["CRYPTOBOT_COINBASE_KEY_SECRET"].replace("\\n", "\n")
+            ex = CoinbaseFuturesExecutor(CoinbaseExecConfig(),
+                                         key_name=env["CRYPTOBOT_COINBASE_KEY_NAME"],
+                                         key_secret=env["CRYPTOBOT_COINBASE_KEY_SECRET"])
             out["coinbase_usd"] = (await ex.balance())["total_usd_balance"]
         except Exception as exc:
             logger.warning("coinbase balance unavailable: %s", exc)

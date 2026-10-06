@@ -180,3 +180,51 @@ async def test_positions_are_signed_units(monkeypatch):
         {"product_id": "BIP-20DEC30-CDE", "side": "SHORT", "number_of_contracts": "1"}]}
     ex = armed_executor(monkeypatch, fake)
     assert await ex.positions() == {"DOGE": -10_000.0, "kSHIB": 30.0}
+
+
+@pytest.mark.asyncio
+async def test_positions_accept_coinbase_side_enum(monkeypatch):
+    fake = FakeClient()
+    fake.list_futures_positions = lambda: {"positions": [
+        {"product_id": "DOP-20DEC30-CDE", "side": "FUTURES_POSITION_SIDE_SHORT", "number_of_contracts": "2"}]}
+    ex = armed_executor(monkeypatch, fake)
+    assert await ex.positions() == {"DOGE": -10_000.0}
+
+
+def test_contract_rounding_survives_float_noise(monkeypatch):
+    ex = armed_executor(monkeypatch, FakeClient(), max_trade_usd=1e9)
+    mid, units = 0.07, 5000.0
+    slot = 3 * units * mid                       # exactly three contracts, as _consider sizes it
+    assert ex.contracts_for("DOGE", slot, mid) == 3
+
+
+@pytest.mark.asyncio
+async def test_fill_polls_pending_order_then_uses_fill(monkeypatch):
+    fake = FakeClient()
+    seq = iter([{"order": {"status": "PENDING", "filled_size": "0"}},
+                {"order": {"status": "FILLED", "filled_size": "2", "average_filled_price": "0.21"}}])
+    fake.get_order = lambda order_id: next(seq)
+    ex = armed_executor(monkeypatch, fake, max_trade_usd=5000, fill_poll_s=0.0)
+    fill = await ex.open_short("DOGE", 2500, 0.20)
+    assert fill.qty == pytest.approx(10_000.0) and fill.price == pytest.approx(0.21)
+
+
+@pytest.mark.asyncio
+async def test_fill_raises_on_terminal_unfilled_order(monkeypatch):
+    fake = FakeClient()
+    fake.get_order = lambda order_id: {"order": {"status": "CANCELLED", "filled_size": "0"}}
+    ex = armed_executor(monkeypatch, fake, max_trade_usd=5000, fill_poll_s=0.0)
+    with pytest.raises(RuntimeError, match="CANCELLED"):
+        await ex.open_short("DOGE", 2500, 0.20)
+
+
+@pytest.mark.asyncio
+async def test_products_fetched_once_per_tick():
+    calls = []
+    class Http(FakeHttp):
+        async def get(self, path, params=None):
+            calls.append(path)
+            return await super().get(path, params)
+    md = CoinbaseMarketData(client=Http([]))
+    await md.all_mids(); await md.funding_rates()
+    assert len(calls) == 1

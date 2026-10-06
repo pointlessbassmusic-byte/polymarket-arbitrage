@@ -643,3 +643,25 @@ async def test_equity_curve_is_hourly_regardless_of_monitor_cadence():
     for _ in range(5):
         await bot.monitor()
     assert len(bot.equity_curve) == 1
+
+
+@pytest.mark.asyncio
+async def test_pending_close_clears_when_exit_no_longer_due():
+    cfg = PerpBotConfig(coins=("DOGE",), state_dir=None)
+    risk = PB.slot_risk({}, 1000.0, 1)
+    ex = _FailingClose()
+    client = PB.ReplayClient({})
+    bot = PerpBot(cfg, risk, risk, ProtectionConfig(), PerpExecConfig(), client=client, executor=ex)
+    bot.mode = "real"
+    import time as _t
+    sig = Signal(ts=_t.time(), type=SignalType.BOUNCE_SHORT, key=f"{CHAIN}:DOGE", chain=CHAIN,
+                 symbol="DOGE", side=Side.SHORT, price_usd=0.10, confidence=0.35,
+                 expected_move=0.20, stop_loss_pct=0.10, take_profit_pct=0.20, reason="t",
+                 risk_reward=2.0, liquidity_usd=5e6)
+    bot.books["real"].portfolio.open_from_signal(sig, 500.0)
+    client.mids = {"DOGE": 0.12}
+    await bot.monitor()
+    assert bot.pending_closes
+    client.mids = {"DOGE": 0.105}                             # back inside the stop
+    await bot.monitor()
+    assert not bot.pending_closes
