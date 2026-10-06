@@ -1062,6 +1062,26 @@ What changes in practice:
   `_SECRET`). Same arming rule: `perp.live: true` and
   `CRYPTOBOT_ARM_LIVE=yes` and both env vars.
 
+**What a small account actually gets.** The table above is the
+strategy with fractional sizing. The paper book on Coinbase now charges
+Coinbase's fee and rounds every slot down to whole contracts, exactly as
+the real book does, so the sim is what your bankroll can do rather than
+what the rule can do. Replayed 2022-01 to 2026-10 with the deployed
+sizing (one slot per coin, 10% daily-loss halt), 0.10% taker per side:
+
+| bankroll | 2022 | 2023 | 2024 | 2025 | 2026 YTD | signals too small |
+|---|---|---|---|---|---|---|
+| $1,500 | +6.4% | +10.4% | +18.0% | +14.2% | −6.3% | 46 of 164 |
+| $3,000 | +4.1% | +10.1% | +24.9% | −0.2% | −1.1% | 16 of 155 |
+| $10,000 (fractional) | +12.2% | +11.3% | +34.9% | +50.8% | +4.8% | — |
+
+The gap is DOGE: its contract is 5,000 DOGE, so above $0.10 a $500 slot
+cannot hold one, and above $0.20 neither can a $1,000 slot. The 2025
+year was mostly DOGE trades. Under about $5,000 the account trades SHIB
+and PEPE with DOGE only when it is cheap, and the year-to-year numbers
+are lumpier than the fractional table. Reproduce with
+`python -m cryptobot.perp_bot --replay state/hl_daily_us3.pkl --replay-from 2022-01-01 --bankroll 1500 --on-capital --whole-contracts`.
+
 **Carry is shelved in the US.** Carry's edge needed breadth (the
 150-coin universe); US venues list three memecoin perps, and over the
 past year their funding on Kraken Futures averaged DOGE +0.005, PEPE

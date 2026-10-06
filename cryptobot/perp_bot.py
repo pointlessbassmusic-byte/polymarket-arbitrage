@@ -69,12 +69,17 @@ class PerpBotConfig:
     liquidity_usd: float = 5_000_000   # perp book depth proxy for the cost model
     fetch_pause_s: float = 0.2         # between per-coin candle requests
     state_dir: Optional[Path] = None
+    taker_fee: float = TAKER_FEE       # per side; the venue's, so paper fills cost what real ones do
+    # coin -> units per contract. Non-empty means the venue trades whole
+    # contracts: the paper book then rounds every slot down to whole
+    # contracts too, so sim and real can only differ by execution.
+    contract_units: dict = field(default_factory=dict)
 
 
-def perp_cost_model() -> CostModel:
+def perp_cost_model(taker_fee: float = TAKER_FEE) -> CostModel:
     """Exchange friction: taker fee + slippage per side, no gas."""
     return CostModel(CostConfig(
-        dex_fee=TAKER_FEE, extra_slippage=SLIPPAGE,
+        dex_fee=taker_fee, extra_slippage=SLIPPAGE,
         gas_usd={CHAIN: 0.0}, default_gas_usd=0.0,
         min_edge_multiple=4.0, min_net_risk_reward=1.25, max_gas_fraction=1.0,
     ))
@@ -97,7 +102,8 @@ class PerpBot:
         self.cfg = cfg
         self.client = client or HyperliquidClient()
         self.executor = executor or PerpExecutor(exec_cfg)
-        self.costs = perp_cost_model()
+        self.costs = perp_cost_model(cfg.taker_fee)
+        self.sub_contract_skips = 0
         # One trade per coin per hold period, measured from ENTRY: a coin
         # becomes eligible again hold_days after it was last entered,
         # whether or not that trade is still open. That is the nearest
@@ -244,6 +250,16 @@ class PerpBot:
         if size <= 0:
             note("skipped", "sizing", "no size: risk caps or exposure limit")
             return
+        units = self.cfg.contract_units.get(sig.symbol)
+        if units:
+            contract_usd = units * sig.price_usd
+            n = int(size // contract_usd)
+            if n < 1:
+                self.sub_contract_skips += 1
+                note("skipped", "sizing",
+                     f"slot ${size:.0f} is smaller than one contract (${contract_usd:.0f})", size)
+                return
+            size = n * contract_usd
         ok, why = self.costs.entry_allowed(
             sig.expected_move, size, sig.liquidity_usd, sig.chain,
             take_profit_pct=sig.take_profit_pct, stop_loss_pct=sig.stop_loss_pct)
@@ -405,7 +421,8 @@ class ReplayClient:
 
 
 async def replay(pools: dict, start_ts: float, cfg: PerpBotConfig, *,
-                 bankroll: float = 10_000.0, daily_funding: float = 0.0) -> dict:
+                 bankroll: float = 10_000.0, daily_funding: float = 0.0,
+                 on_capital: bool = False) -> dict:
     """Run the bot's own evaluate/consider/monitor through history.
 
     Exits are checked against each day's high (stop side) and then low
@@ -418,10 +435,15 @@ async def replay(pools: dict, start_ts: float, cfg: PerpBotConfig, *,
     import datetime as dt
     client = ReplayClient(pools)
     cfg = dataclasses.replace(cfg, fetch_pause_s=0.0, coins=tuple(client.series))
-    risk = RiskConfig(bankroll_usd=bankroll, risk_per_trade_pct=0.001,
-                      max_position_usd=10.0, max_total_exposure_usd=1e9,
-                      max_daily_loss_usd=1e9, max_open_positions=10_000,
-                      min_position_usd=10.0, min_confidence=0.0)
+    if on_capital:
+        # The deployed sizing: one equal slot per coin, bank never exceeded,
+        # whole contracts if the venue has them. Result is return on the bank.
+        risk = slot_risk({}, bankroll, len(cfg.coins))
+    else:
+        risk = RiskConfig(bankroll_usd=bankroll, risk_per_trade_pct=0.001,
+                          max_position_usd=10.0, max_total_exposure_usd=1e9,
+                          max_daily_loss_usd=1e9, max_open_positions=10_000,
+                          min_position_usd=10.0, min_confidence=0.0)
     prot = ProtectionConfig(cooldown_s=0, stoploss_guard_limit=10_000,
                             low_profit_min_trades=10_000, max_drawdown_pct=1.0)
     bot = PerpBot(cfg, risk, risk, prot, PerpExecConfig(), client=client,
@@ -488,10 +510,15 @@ async def replay(pools: dict, start_ts: float, cfg: PerpBotConfig, *,
     book = bot.books["sim"]
     closed = book.portfolio.closed
     by_year: dict[int, list[float]] = {}
+    pnl_year: dict[int, float] = {}
     for t in closed:
         y = dt.datetime.utcfromtimestamp(t.opened_at).year
         by_year.setdefault(y, []).append(t.pnl_usd / t.size_usd)
+        pnl_year[y] = pnl_year.get(y, 0.0) + t.pnl_usd
     return {
+        "bankroll": bankroll,
+        "on_capital_by_year": {y: pnl_year[y] / bankroll for y in sorted(pnl_year)},
+        "skipped_sub_contract": bot.sub_contract_skips,
         "trades": len(closed),
         "open": len(book.portfolio.positions),
         "mean_net": (sum(t.pnl_usd / t.size_usd for t in closed) / len(closed)) if closed else 0.0,
@@ -539,9 +566,13 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
     sim_bank = share * float(cfg.get("sim", {}).get("bankroll_usd", 200))
     risk_kw = {k: v for k, v in cfg.get("risk", {}).items()
                if k in RiskConfig.__dataclass_fields__}
+    venue_kw: dict = {}
     if venue == "coinbase":
-        from .execution.coinbase_futures import US_COINS
+        from .execution.coinbase_futures import CONTRACTS, US_COINS
+        from .execution.coinbase_futures import TAKER_FEE as CB_FEE
         coins = tuple(perp.get("coins") or US_COINS)
+        venue_kw = {"taker_fee": CB_FEE,
+                    "contract_units": {c: CONTRACTS[c].units_per_contract for c in coins if c in CONTRACTS}}
     else:
         coins = tuple(perp.get("coins") or MEMECOINS)
     real_bank = share * float(risk_kw.get("bankroll_usd", 1000))
@@ -555,6 +586,7 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
         hold_days=int(perp.get("hold_days", 14)),
         coins=coins,
         state_dir=state_dir,
+        **venue_kw,
     )
     exec_cfg = PerpExecConfig(
         live=bool(perp.get("live", False)),
@@ -589,14 +621,27 @@ async def _main(args) -> int:
         start = dt.datetime.fromisoformat(args.replay_from).replace(
             tzinfo=dt.timezone.utc).timestamp()
         perp = cfg.get("perp", {})
+        venue_kw = {}
+        if perp.get("venue") == "coinbase":
+            from .execution.coinbase_futures import CONTRACTS
+            from .execution.coinbase_futures import TAKER_FEE as CB_FEE
+            venue_kw = {"taker_fee": CB_FEE}
+            if args.whole_contracts:
+                venue_kw["contract_units"] = {c: k.units_per_contract for c, k in CONTRACTS.items()}
         rcfg = PerpBotConfig(target_pct=float(perp.get("target_pct", 0.20)),
                              stop_pct=float(perp.get("stop_pct", 0.10)),
-                             hold_days=int(perp.get("hold_days", 14)))
-        rep = await replay(pools, start, rcfg)
+                             hold_days=int(perp.get("hold_days", 14)), **venue_kw)
+        rep = await replay(pools, start, rcfg, bankroll=args.bankroll,
+                           on_capital=args.on_capital)
         print(f"replay from {args.replay_from}: {rep['trades']} closed trades, "
-              f"{rep['open']} still open, mean net {100 * rep['mean_net']:+.2f}%/trade")
+              f"{rep['open']} still open, mean net {100 * rep['mean_net']:+.2f}%/trade"
+              f"; fee {100 * rcfg.taker_fee:.2f}%/side"
+              + (f"; whole contracts, {rep['skipped_sub_contract']} signals too small"
+                 if rcfg.contract_units else ""))
         for y, (n, m) in rep["by_year"].items():
-            print(f"  {y}: n={n:4d}  mean net {100 * m:+.2f}%")
+            cap = rep["on_capital_by_year"].get(y, 0.0)
+            print(f"  {y}: n={n:4d}  mean net {100 * m:+.2f}%"
+                  + (f"   on ${args.bankroll:,.0f}: {100 * cap:+.1f}%" if args.on_capital else ""))
         print(f"  exits: {rep['exits']}")
         return 0
     bot = build(cfg, args.state_dir)
@@ -627,6 +672,11 @@ def main() -> int:
     ap.add_argument("--replay", type=Path, metavar="CACHE",
                     help="drive the bot through cached daily history (pickle)")
     ap.add_argument("--replay-from", default="2025-05-20")
+    ap.add_argument("--bankroll", type=float, default=10_000.0)
+    ap.add_argument("--on-capital", action="store_true",
+                    help="replay with the deployed sizing (one slot per coin) and report return on the bankroll")
+    ap.add_argument("--whole-contracts", action="store_true",
+                    help="coinbase venue: round slots down to whole contracts, as the real book does")
     ap.add_argument("--dashboard", action="store_true")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8082)

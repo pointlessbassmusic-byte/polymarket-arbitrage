@@ -516,3 +516,43 @@ def test_build_coinbase_seed_falls_back_to_state_dir(tmp_path, monkeypatch):
            "allocation": {"carry": 0.0, "bounce_short": 1.0}}
     bot = PB.build(cfg, tmp_path)
     assert "DOGE" in bot.client._seed
+
+
+def test_build_coinbase_sets_venue_fee_and_contract_units(tmp_path, monkeypatch):
+    from cryptobot.execution.coinbase_futures import TAKER_FEE as CB_FEE
+    monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
+    bot = PB.build({"perp": {"venue": "coinbase"}, "allocation": {"carry": 0.0, "bounce_short": 1.0}}, tmp_path)
+    assert bot.cfg.taker_fee == CB_FEE
+    assert bot.cfg.contract_units == {"DOGE": 5000.0, "kPEPE": 100.0, "kSHIB": 10.0}
+    assert bot.costs.cfg.dex_fee == CB_FEE
+
+
+@pytest.mark.asyncio
+async def test_sim_rounds_to_whole_contracts_and_skips_small_slots(tmp_path, monkeypatch):
+    monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
+    cfg = PerpBotConfig(coins=("DOGE",), contract_units={"DOGE": 5000.0}, state_dir=None)
+    risk = PB.slot_risk({}, 1200.0, 1)                     # one $1,200 slot
+    bot = PerpBot(cfg, risk, risk, ProtectionConfig(), PerpExecConfig(),
+                  client=PB.ReplayClient({}), executor=PerpExecutor(PerpExecConfig()))
+    sig = Signal(ts=1.0, type=SignalType.BOUNCE_SHORT, key=f"{CHAIN}:DOGE", chain=CHAIN,
+                 symbol="DOGE", side=Side.SHORT, price_usd=0.20, confidence=0.35,
+                 expected_move=0.20, stop_loss_pct=0.10, take_profit_pct=0.20, reason="t",
+                 risk_reward=2.0, liquidity_usd=5e6)
+    await bot._consider(bot.books["sim"], sig)
+    pos = bot.books["sim"].portfolio.positions[sig.key]
+    assert pos.size_usd == pytest.approx(1000.0)            # 1 contract = 5000 × $0.20, not $1,200
+    bot2 = PerpBot(cfg, risk, risk, ProtectionConfig(), PerpExecConfig(),
+                   client=PB.ReplayClient({}), executor=PerpExecutor(PerpExecConfig()))
+    sig2 = Signal(**{**vars(sig), "price_usd": 0.30})       # contract $1,500 > slot
+    await bot2._consider(bot2.books["sim"], sig2)
+    assert not bot2.books["sim"].portfolio.positions and bot2.sub_contract_skips == 1
+
+
+def test_daily_loss_halt_rolls_when_clock_jumps_backwards(monkeypatch):
+    import cryptobot.risk as R
+    rm = R.RiskManager(R.RiskConfig(bankroll_usd=100, max_daily_loss_usd=10))
+    rm.record_pnl(-20)
+    assert rm.state.halted
+    monkeypatch.setattr(R, "now", lambda: rm.state.day_start - 2 * 86400)
+    rm._roll_day()
+    assert not rm.state.halted

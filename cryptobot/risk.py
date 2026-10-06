@@ -59,7 +59,7 @@ class RiskConfig:
 @dataclass
 class RiskState:
     daily_pnl: float = 0.0
-    day_start: float = field(default_factory=now)
+    day_start: float = field(default_factory=lambda: now())   # late-bound so a patched clock applies
     halted: bool = False
 
 
@@ -80,7 +80,9 @@ class RiskManager:
             self.state.halted = True
 
     def _roll_day(self) -> None:
-        if now() - self.state.day_start >= 86400:
+        # A clock that jumps backwards (replay, or a time correction on the
+        # host) is a new day too; otherwise a halt could outlive the day.
+        if abs(now() - self.state.day_start) >= 86400:
             self.state = RiskState()
 
     def size_position(self, sig: Signal, open_positions: list[Position]) -> float:
