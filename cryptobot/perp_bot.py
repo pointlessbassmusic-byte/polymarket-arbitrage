@@ -104,6 +104,7 @@ class PerpBot:
         self.executor = executor or PerpExecutor(exec_cfg)
         self.costs = perp_cost_model(cfg.taker_fee)
         self.sub_contract_skips = 0
+        self.reconcile_report: Optional[dict] = None
         # One trade per coin per hold period, measured from ENTRY: a coin
         # becomes eligible again hold_days after it was last entered,
         # whether or not that trade is still open. That is the nearest
@@ -283,6 +284,43 @@ class PerpBot:
         self.eligible_at[f"{book.name}:{sig.key}"] = sig.ts + self.cfg.hold_days * 86400
         note("opened", "entry", sig.reason, size)
 
+    # -- reconciliation ----------------------------------------------------
+
+    async def reconcile(self) -> Optional[dict]:
+        """Compare the real book with what the venue says is open. Only
+        meaningful when armed (the dry-run book has no venue positions).
+        Nothing is changed automatically: a mismatch is a human decision,
+        so it is logged, journaled and shown on the dashboard."""
+        if not self.real_armed or not hasattr(self.executor, "positions"):
+            return None
+        try:
+            venue = await self.executor.positions()
+        except Exception as exc:
+            logger.warning("reconcile: venue positions unavailable: %s", exc)
+            return None
+        book = {p.symbol: -p.qty for p in self.books["real"].portfolio.positions.values()}
+        tol = 1e-6
+        report = {
+            "ts": now(),
+            "venue_only": sorted(c for c in venue if c not in book),
+            "book_only": sorted(c for c in book if c not in venue),
+            "qty_mismatch": sorted(c for c in venue if c in book
+                                   and abs(venue[c] - book[c]) > tol * max(1.0, abs(book[c]))),
+        }
+        report["ok"] = not (report["venue_only"] or report["book_only"] or report["qty_mismatch"])
+        if not report["ok"] and (self.reconcile_report is None or self.reconcile_report.get("ok")):
+            logger.warning("reconcile MISMATCH: venue-only %s, book-only %s, qty %s",
+                           report["venue_only"], report["book_only"], report["qty_mismatch"])
+            self.journal.record(Decision(
+                ts=now(), book="real", symbol=",".join(
+                    report["venue_only"] + report["book_only"] + report["qty_mismatch"]),
+                chain=CHAIN, signal_type=SignalType.BOUNCE_SHORT.value, action="mismatch",
+                stage="reconcile",
+                reason=f"venue-only {report['venue_only']}, book-only {report['book_only']}, "
+                       f"size differs {report['qty_mismatch']}"))
+        self.reconcile_report = report
+        return report
+
     # -- monitoring --------------------------------------------------------
 
     async def monitor(self) -> None:
@@ -365,6 +403,7 @@ class PerpBot:
                 "last_daily_run": self.last_daily_run,
                 "funding_hourly": {c: self._funding.get(c, 0.0) for c in self.cfg.coins},
             },
+            "reconcile": self.reconcile_report,
             "books": {n: b.state(prices, self.edges) for n, b in self.books.items()},
             "decisions": self.journal.recent(60),
             "gate_counts": self.journal.counts(),
@@ -389,9 +428,11 @@ class PerpBot:
     async def run_forever(self) -> None:
         logger.info("perp bot up: %d coins, rule %s, mode %s", len(self.cfg.coins),
                     self.cfg.rule, self.mode)
+        await self.reconcile()          # before trading: does the venue agree with the book?
         await self.run_daily()          # evaluate on startup so the book is current
         while True:
             await self.monitor()
+            await self.reconcile()
             if self._daily_due():
                 await self.run_daily()
             await asyncio.sleep(self.cfg.monitor_interval_s)

@@ -169,3 +169,14 @@ def test_preview_checks_render_fee_or_rejection():
         {"coin": "kPEPE", "tradable": False, "errs": ["PREVIEW_INSUFFICIENT_FUND"], "status": "online"}])
     assert ok[1] is True and "fee $0.48" in ok[2]
     assert bad[1] is False and "INSUFFICIENT_FUND" in bad[2]
+
+
+@pytest.mark.asyncio
+async def test_positions_are_signed_units(monkeypatch):
+    fake = FakeClient()
+    fake.list_futures_positions = lambda: {"positions": [
+        {"product_id": "DOP-20DEC30-CDE", "side": "SHORT", "number_of_contracts": "2"},
+        {"product_id": "SHP-20DEC30-CDE", "side": "LONG", "number_of_contracts": "3"},
+        {"product_id": "BIP-20DEC30-CDE", "side": "SHORT", "number_of_contracts": "1"}]}
+    ex = armed_executor(monkeypatch, fake)
+    assert await ex.positions() == {"DOGE": -10_000.0, "kSHIB": 30.0}

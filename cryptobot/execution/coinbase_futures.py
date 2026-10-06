@@ -193,6 +193,25 @@ class CoinbaseFuturesExecutor:
             }
         return await asyncio.to_thread(_get)
 
+    async def positions(self) -> dict[str, float]:
+        """Open venue positions as coin -> signed units (short negative)."""
+        by_pid = {c.product_id: (coin, c.units_per_contract) for coin, c in CONTRACTS.items()}
+
+        def _get():
+            r = self._c().list_futures_positions()
+            d = r.to_dict() if hasattr(r, "to_dict") else dict(r)
+            out: dict[str, float] = {}
+            for pos in d.get("positions") or []:
+                hit = by_pid.get(pos.get("product_id"))
+                if not hit:
+                    continue
+                coin, units = hit
+                n = float(pos.get("number_of_contracts") or 0)
+                if n:
+                    out[coin] = -n * units if str(pos.get("side", "")).upper() == "SHORT" else n * units
+            return out
+        return await asyncio.to_thread(_get)
+
     async def balance(self) -> dict:
         """Futures account figures (USD)."""
         def _get():

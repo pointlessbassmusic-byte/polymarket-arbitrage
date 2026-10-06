@@ -444,9 +444,11 @@ function render(){
   $("bSim").setAttribute("aria-pressed",String(view==="sim"));
   $("bReal").setAttribute("aria-pressed",String(view==="real"));
   $("bReal").disabled=!S.real_unlocked;
-  $("lock").textContent=S.real_unlocked
+  const rc=S.reconcile;
+  const rcTxt=rc?(rc.ok?" · venue positions match the book":" · ⚠ VENUE MISMATCH: venue-only ["+rc.venue_only.join(",")+"] book-only ["+rc.book_only.join(",")+"] size ["+rc.qty_mismatch.join(",")+"]"):"";
+  $("lock").textContent=(S.real_unlocked
     ? (S.mode==="real"?"Real money is ARMED and trading.":"Unlocked — switch when ready.")
-    : "🔒 "+S.real_locked_reason;
+    : "🔒 "+S.real_locked_reason)+rcTxt;
   $("meta").innerHTML=`cycle ${esc(S.cycle)} · ${esc(S.tracked_pairs)} pairs `+
     `tracked · ${esc((S.chains||[]).join(", "))} · up ${ago(S.started_at)}`;
 

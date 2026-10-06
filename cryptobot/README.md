@@ -1014,6 +1014,15 @@ reports the real fee and margin, or the rejection reason. That is the
 whole order path exercised against the live account before any money
 moves.
 
+Once armed, the real book **reconciles** against the venue on start and
+every hour: the positions Coinbase (or Hyperliquid) reports are compared
+with the book, and any difference (a position the venue has that the
+book does not, or the reverse, or a size that disagrees) is logged,
+journaled and shown on the dashboard's mode line. Nothing is fixed
+automatically: a mismatch means an order went through that the bot did
+not record, or a trade was made by hand, and which side is right is
+your call.
+
 Then switch each dashboard's toggle to real. The sim books keep running
 alongside, so the gap between sim and real is measured execution cost.
 

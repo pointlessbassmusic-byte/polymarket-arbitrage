@@ -556,3 +556,47 @@ def test_daily_loss_halt_rolls_when_clock_jumps_backwards(monkeypatch):
     monkeypatch.setattr(R, "now", lambda: rm.state.day_start - 2 * 86400)
     rm._roll_day()
     assert not rm.state.halted
+
+
+class _VenueExec(PerpExecutor):
+    def __init__(self, venue):
+        super().__init__(PerpExecConfig())
+        self._armed = True
+        self.venue = venue
+
+    async def positions(self):
+        return dict(self.venue)
+
+
+@pytest.mark.asyncio
+async def test_reconcile_flags_venue_and_book_differences(monkeypatch):
+    cfg = PerpBotConfig(coins=("DOGE", "kSHIB"), state_dir=None)
+    risk = PB.slot_risk({}, 10_000.0, 2)
+    ex = _VenueExec({"DOGE": -10_000.0, "kPEPE": -5_000.0})
+    bot = PerpBot(cfg, risk, risk, ProtectionConfig(), PerpExecConfig(),
+                  client=PB.ReplayClient({}), executor=ex)
+    bot.mode = "real"
+    sig = Signal(ts=1.0, type=SignalType.BOUNCE_SHORT, key=f"{CHAIN}:DOGE", chain=CHAIN,
+                 symbol="DOGE", side=Side.SHORT, price_usd=0.10, confidence=0.35,
+                 expected_move=0.20, stop_loss_pct=0.10, take_profit_pct=0.20, reason="t",
+                 risk_reward=2.0, liquidity_usd=5e6)
+    bot.books["real"].portfolio.open_from_signal(sig, 1000.0)          # 10,000 DOGE short
+    bot.books["real"].portfolio.open_from_signal(
+        Signal(**{**vars(sig), "key": f"{CHAIN}:kSHIB", "symbol": "kSHIB", "price_usd": 0.005}), 50.0)
+    rep = await bot.reconcile()
+    assert rep["ok"] is False
+    assert rep["venue_only"] == ["kPEPE"] and rep["book_only"] == ["kSHIB"] and rep["qty_mismatch"] == []
+    assert bot.state()["reconcile"] == rep
+    assert any(d["stage"] == "reconcile" for d in bot.journal.recent(5))
+    ex.venue = {"DOGE": -10_000.0}
+    bot.books["real"].portfolio.positions.pop(f"{CHAIN}:kSHIB")
+    assert (await bot.reconcile())["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_reconcile_is_skipped_when_not_armed():
+    cfg = PerpBotConfig(coins=("DOGE",), state_dir=None)
+    risk = PB.slot_risk({}, 1000.0, 1)
+    bot = PerpBot(cfg, risk, risk, ProtectionConfig(), PerpExecConfig(),
+                  client=PB.ReplayClient({}), executor=PerpExecutor(PerpExecConfig()))
+    assert await bot.reconcile() is None

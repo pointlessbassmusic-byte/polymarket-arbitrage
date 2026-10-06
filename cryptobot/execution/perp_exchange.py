@@ -104,6 +104,21 @@ class PerpExecutor:
             return Fill(coin, "close", qty, mid, dry_run=True)
         return await asyncio.to_thread(self._order, coin, True, qty, limit, True)
 
+    async def positions(self) -> dict[str, float]:
+        """Open venue positions as coin -> signed size (short negative)."""
+        def _get():
+            self._connect()
+            from eth_account import Account                  # noqa: WPS433
+            st = self._info.user_state(Account.from_key(self._key).address)
+            out = {}
+            for ap in st.get("assetPositions") or []:
+                pos = ap.get("position") or {}
+                szi = float(pos.get("szi") or 0)
+                if szi:
+                    out[pos["coin"]] = szi
+            return out
+        return await asyncio.to_thread(_get)
+
     def _order(self, coin: str, is_buy: bool, qty: float, limit: float,
                reduce_only: bool) -> Fill:
         self._connect()
