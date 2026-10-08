@@ -129,8 +129,10 @@ def test_dry_run_without_arming(monkeypatch):
 
 
 def test_sign_round_trip_with_ed25519_key():
-    """Skips where the cryptography build is unusable (missing cffi)."""
+    """Skips where the cryptography build is unusable (missing cffi; the
+    failure there is a Rust panic, not a Python exception)."""
     import base64
+    pytest.importorskip("_cffi_backend")
     try:
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric import ed25519
