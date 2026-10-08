@@ -14,9 +14,18 @@ def test_registry_loads_and_validates():
     assert {r["verdict"] for r in rows} <= set(H.VERDICTS)
 
 
-def test_the_two_live_strategies_are_registered_alive():
-    alive = {r["id"] for r in H.load() if r["verdict"] == "alive"}
-    assert {"perp-bounce-short", "funding-carry"} <= alive
+def test_deployed_strategies_carry_their_diagnostics():
+    """The deployed strategies must be registered, and anything selected
+    from a search must record how big the search was. The bounce-short
+    is 'inconclusive' since the Deflated Sharpe run; carry is still
+    'alive' and has not been through the diagnostics."""
+    rows = {r["id"]: r for r in H.load()}
+    assert rows["funding-carry"]["verdict"] == "alive"
+    for rid in ("perp-bounce-short", "bounce-short-us3"):
+        r = rows[rid]
+        assert r["verdict"] == "inconclusive"
+        assert r["trials_run"] >= 4000 and 0 < r["n_eff"] < r["trials_run"]
+        assert 0 <= r["pbo"] <= 1 and 0 <= r["dsr"] <= 1
 
 
 def test_rerun_commands_point_at_real_modules():
