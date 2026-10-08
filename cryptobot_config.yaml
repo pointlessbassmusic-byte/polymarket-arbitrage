@@ -151,8 +151,13 @@ perp:
   # perpetual-style futures (DOGE, 1000PEPE, 1000SHIB), in whole contracts
   # of roughly $480 / $440 / $60. The bounce-short on those three coins is
   # 5/5 years positive and beats the unconditional short 5/5 (see README).
+  # `kalshi` uses Kalshi's CFTC-approved perpetuals (DOGE 100-coin and
+  # SHIB 1M-coin contracts of ~$5-8, 4 bp taker, ~2-3x margin, no
+  # overnight switch; PEPE listed but inactive). Fifty times finer than
+  # Coinbase's contracts, so a $200 account can hold all slots whole.
   venue: coinbase
   data: coinbase               # market data source; `hyperliquid` (public API) also works
+  # kalshi_base_url: https://external-api.demo.kalshi.co/trade-api/v2   # Kalshi demo environment
   history_seed: state/hl_daily_us3.pkl   # cached daily history to fit cuts before Coinbase's Dec 2025 listing
   private_key_env: CRYPTOBOT_PRIVATE_KEY # Hyperliquid venue only
   max_trade_usd: 500           # per order; must cover one contract (~$480 for DOGE)

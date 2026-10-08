@@ -229,6 +229,10 @@ def capital_plan(cfg: dict) -> dict:
         from .execution.coinbase_futures import US_COINS
         n_coins = len(perp.get("coins") or US_COINS)
         default_cap = 500.0
+    elif venue(cfg) == "kalshi":
+        from .execution.kalshi_perps import US_COINS as K_COINS
+        n_coins = len(perp.get("coins") or K_COINS)
+        default_cap = 500.0
     else:
         n_coins = len(perp.get("coins") or range(18))
         default_cap = 50.0
@@ -239,8 +243,9 @@ def capital_plan(cfg: dict) -> dict:
         "bounce_capital": b_share * bank,
         "bounce_slot": slot,
         "kraken_usd": carry_notional,                        # spot leg
-        "hyperliquid_usdc": carry_notional / lev + (b_share * bank if venue(cfg) != "coinbase" else 0.0),
+        "hyperliquid_usdc": carry_notional / lev + (b_share * bank if venue(cfg) == "hyperliquid" else 0.0),
         "coinbase_usd": b_share * bank if venue(cfg) == "coinbase" else 0.0,
+        "kalshi_usd": b_share * bank if venue(cfg) == "kalshi" else 0.0,
         "max_trade_usd": float(perp.get("max_trade_usd", default_cap)),
         "largest_order": max(carry_notional / max(1, int(carry.get("top_n", 3))), slot),
     }
@@ -274,6 +279,34 @@ def preview_checks(previews: list[dict]) -> list[tuple[str, bool, str]]:
     return checks
 
 
+async def kalshi_contract_prices(cfg: dict, env: dict) -> dict:
+    """Live dollar size per Kalshi contract, which markets are inactive,
+    and (with a key) whether perps are enabled for the account."""
+    from .data.kalshi_perps import KalshiMarketData
+    from .execution.kalshi_perps import CONTRACTS, KalshiExecConfig, KalshiPerpsExecutor
+    base = cfg.get("perp", {}).get("kalshi_base_url", KalshiExecConfig.base_url)
+    md = KalshiMarketData(base_url=base)
+    try:
+        mids = await md.all_mids()
+        active = set(await md.universe())
+    finally:
+        await md.close()
+    out = {c: mids[c] * CONTRACTS[c].units_per_contract for c in CONTRACTS if c in mids}
+    out["_inactive"] = [c for c in CONTRACTS if c not in active]
+    out["_enabled"] = None
+    if env.get("CRYPTOBOT_KALSHI_KEY_ID") and env.get("CRYPTOBOT_KALSHI_KEY_PEM"):
+        ex = KalshiPerpsExecutor(KalshiExecConfig(base_url=base), key_id=env["CRYPTOBOT_KALSHI_KEY_ID"],
+                                 key_pem=env["CRYPTOBOT_KALSHI_KEY_PEM"])
+        try:
+            out["_enabled"] = await ex.enabled()
+        except Exception as exc:
+            logger.warning("kalshi /margin/enabled failed: %s", exc)
+            out["_enabled"] = False
+        finally:
+            await ex.close_client()
+    return out
+
+
 async def contract_prices() -> dict:
     """Live dollar size of one Coinbase contract per coin, and the
     overnight short margin rate that decides how much of a slot it uses."""
@@ -303,7 +336,12 @@ def preflight(cfg: dict, env: dict, balances: Optional[dict] = None,
         ("CRYPTOBOT_ARM_LIVE=yes", env.get("CRYPTOBOT_ARM_LIVE", "").lower() == "yes",
          "export CRYPTOBOT_ARM_LIVE=yes"),
     ]
-    if plan["venue"] == "coinbase":
+    if plan["venue"] == "kalshi":
+        checks.append(("Kalshi API key id + private key PEM",
+                       bool(env.get("CRYPTOBOT_KALSHI_KEY_ID") and env.get("CRYPTOBOT_KALSHI_KEY_PEM")),
+                       "export CRYPTOBOT_KALSHI_KEY_ID / _KEY_PEM (Ed25519 or RSA key from "
+                       "kalshi.com/account/profile; perps access is enabled per member)"))
+    elif plan["venue"] == "coinbase":
         checks.append(("Coinbase CDP API key (ES256) name + secret",
                        bool(env.get("CRYPTOBOT_COINBASE_KEY_NAME") and env.get("CRYPTOBOT_COINBASE_KEY_SECRET")),
                        "export CRYPTOBOT_COINBASE_KEY_NAME / _SECRET: a CDP key with trade permission "
@@ -340,9 +378,24 @@ def preflight(cfg: dict, env: dict, balances: Optional[dict] = None,
                            fee <= 0.0015,
                            f"the $0.20 per-contract floor on a ${v:,.0f} contract is {100 * fee:.2f}% per side; "
                            f"the rule's +2.76%/trade edge is measured at 0.20-0.30% round trip"))
+    if plan["venue"] == "kalshi" and contract_usd:
+        from .execution.kalshi_perps import CONTRACTS as K_CONTRACTS
+        sizes = {c: v for c, v in contract_usd.items() if c in K_CONTRACTS}
+        if sizes:
+            worst_coin = max(sizes, key=sizes.get)
+            checks.append((f"each slot (${plan['bounce_slot']:.0f}) buys at least one contract",
+                           plan["bounce_slot"] >= sizes[worst_coin],
+                           f"{worst_coin}: ${sizes[worst_coin]:,.2f} per contract"))
+        inactive = contract_usd.get("_inactive") or []
+        if inactive:
+            checks.append((f"inactive Kalshi markets excluded: {', '.join(inactive)}", True, ""))
+        if contract_usd.get("_enabled") is not None:
+            checks.append(("Kalshi perps enabled for this account", bool(contract_usd["_enabled"]),
+                           "GET /margin/enabled says no: perps access is rolled out per member; "
+                           "ask Kalshi support or use the demo environment (perp.kalshi_base_url)"))
     if balances is not None:
         needs = [("kraken_usd", plan["kraken_usd"]), ("hyperliquid_usdc", plan["hyperliquid_usdc"]),
-                 ("coinbase_usd", plan["coinbase_usd"])]
+                 ("coinbase_usd", plan["coinbase_usd"]), ("kalshi_usd", plan["kalshi_usd"])]
         for venue_key, need in needs:
             if need <= 0:
                 continue
@@ -376,6 +429,18 @@ async def read_balances(cfg: dict, env: dict) -> dict:
             out["coinbase_usd"] = (await ex.balance())["total_usd_balance"]
         except Exception as exc:
             logger.warning("coinbase balance unavailable: %s", exc)
+    if env.get("CRYPTOBOT_KALSHI_KEY_ID") and env.get("CRYPTOBOT_KALSHI_KEY_PEM"):
+        try:
+            from .execution.kalshi_perps import KalshiExecConfig, KalshiPerpsExecutor
+            base = cfg.get("perp", {}).get("kalshi_base_url", KalshiExecConfig.base_url)
+            ex = KalshiPerpsExecutor(KalshiExecConfig(base_url=base),
+                                     key_id=env["CRYPTOBOT_KALSHI_KEY_ID"], key_pem=env["CRYPTOBOT_KALSHI_KEY_PEM"])
+            try:
+                out["kalshi_usd"] = (await ex.balance())["total_usd_balance"]
+            finally:
+                await ex.close_client()
+        except Exception as exc:
+            logger.warning("kalshi balance unavailable: %s", exc)
     if env.get("CRYPTOBOT_KRAKEN_KEY") and env.get("CRYPTOBOT_KRAKEN_SECRET"):
         try:
             from .execution.kraken_spot import KrakenSpotExecutor, SpotExecConfig
@@ -399,6 +464,8 @@ def render_preflight(cfg: dict, checks: list) -> str:
         out.append(f"  fund Hyperliquid with >= ${plan['hyperliquid_usdc']:.2f} USDC")
     if plan["coinbase_usd"] > 0:
         out.append(f"  fund Coinbase with >= ${plan['coinbase_usd']:.2f} USD (swept to the futures account automatically)")
+    if plan["kalshi_usd"] > 0:
+        out.append(f"  fund Kalshi with >= ${plan['kalshi_usd']:.2f} USD (transfer to the perps balance)")
     out.append("")
     for name, ok, fix in checks:
         out.append(f"  [{'ok' if ok else '  '}] {name}" + ("" if ok else f"  -> {fix}"))
@@ -435,6 +502,11 @@ async def _main(args) -> int:
         balances = await read_balances(cfg, env)
         sizes = None
         extra: list = []
+        if venue(cfg) == "kalshi":
+            try:
+                sizes = await kalshi_contract_prices(cfg, env)
+            except Exception as exc:
+                logger.warning("kalshi contract prices unavailable: %s", exc)
         if venue(cfg) == "coinbase":
             try:
                 sizes = await contract_prices()

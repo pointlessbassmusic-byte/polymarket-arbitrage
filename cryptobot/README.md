@@ -1204,6 +1204,24 @@ units are now asserted against the recorded `contract_size` values in
 the tests, and `--preflight` prints the live dollar size, fee and
 overnight margin per contract.
 
+**Kalshi as the small-account venue (`perp.venue: kalshi`).** Kalshi,
+a CFTC-regulated exchange, has listed perpetual futures since June 2026:
+DOGE at 100 coins a contract (~$8) and SHIB at one million coins (~$5),
+with PEPE listed but inactive on 2026-10-08. Fees are 4 bp taker / 2 bp
+maker with no per-contract floor, shorts get ~2-3x margin (the bot stays
+at 1x) and there is no intraday/overnight margin switch. Contracts fifty
+times smaller than Coinbase's mean a $200 account holds every slot
+whole, so the whole-contract table above does not apply there. Liquidity
+on 2026-10-08: DOGE ~$2.4M a day with a 0.08% spread, SHIB ~$0.5M. The
+executor (`execution/kalshi_perps.py`) sends immediate-or-cancel limits at
+mid ± 0.5%, so an unfilled order is a definite non-fill; market data
+(`data/kalshi_perps.py`) needs no key and is seeded with the same
+Hyperliquid history. Perps API access is enabled per member
+("rolling out"), which `--preflight` checks via `/margin/enabled`; the demo
+environment is one config line (`perp.kalshi_base_url`). Funding on
+Kalshi's DOGE and SHIB perps averaged about zero over their first 364
+eight-hour periods, so carry stays shelved there as well.
+
 **Carry is shelved in the US.** Carry's edge needed breadth (the
 150-coin universe); US venues list three memecoin perps, and over the
 past year their funding on Kraken Futures averaged DOGE +0.005, PEPE

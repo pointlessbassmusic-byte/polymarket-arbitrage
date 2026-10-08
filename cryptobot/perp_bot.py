@@ -717,7 +717,7 @@ def slot_risk(base: dict, bank: float, n_coins: int) -> RiskConfig:
                          "max_daily_loss_usd": bank * 0.10, "min_confidence": 0.0})
 
 
-VENUES = ("hyperliquid", "coinbase")
+VENUES = ("hyperliquid", "coinbase", "kalshi")
 
 
 def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
@@ -743,6 +743,13 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
         from .execution.coinbase_futures import MIN_FEE_PER_CONTRACT
         venue_kw = {"taker_fee": CB_FEE, "min_fee_per_lot": MIN_FEE_PER_CONTRACT,
                     "contract_units": {c: CONTRACTS[c].units_per_contract for c in coins if c in CONTRACTS}}
+    elif venue == "kalshi":
+        from .execution.kalshi_perps import CONTRACTS as K_CONTRACTS
+        from .execution.kalshi_perps import TAKER_FEE as K_FEE
+        from .execution.kalshi_perps import US_COINS as K_COINS
+        coins = tuple(perp.get("coins") or K_COINS)
+        venue_kw = {"taker_fee": K_FEE,
+                    "contract_units": {c: K_CONTRACTS[c].units_per_contract for c in coins if c in K_CONTRACTS}}
     else:
         coins = tuple(perp.get("coins") or MEMECOINS)
     real_bank = share * float(risk_kw.get("bankroll_usd", 1000))
@@ -780,6 +787,20 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
             if seed_path and not seed_path.exists() and state_dir:
                 seed_path = Path(state_dir) / seed_path.name     # inside Docker, state is /data
             client = CoinbaseMarketData(history_seed=seed_path)
+    elif venue == "kalshi":
+        from .execution.kalshi_perps import KalshiExecConfig, KalshiPerpsExecutor
+        executor = KalshiPerpsExecutor(KalshiExecConfig(
+            live=bool(perp.get("live", False)),
+            base_url=str(perp.get("kalshi_base_url", KalshiExecConfig.base_url)),
+            max_trade_usd=float(perp.get("max_trade_usd", 500)),
+            max_slippage=float(perp.get("max_slippage", 0.005))))
+        if perp.get("data", "kalshi") == "kalshi":
+            from .data.kalshi_perps import KalshiMarketData
+            seed = perp.get("history_seed")
+            seed_path = Path(seed) if seed else None
+            if seed_path and not seed_path.exists() and state_dir:
+                seed_path = Path(state_dir) / seed_path.name
+            client = KalshiMarketData(history_seed=seed_path, base_url=executor.cfg.base_url)
     return PerpBot(bot_cfg, sim_risk, real_risk, ProtectionConfig(**prot_kw), exec_cfg,
                    client=client, executor=executor)
 
