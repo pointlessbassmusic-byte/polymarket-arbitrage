@@ -40,6 +40,7 @@ from .analytics import EdgeTracker
 from .book import Decision, DecisionJournal, TradingBook
 from .costs import CostConfig, CostModel
 from .data.hyperliquid import MEMECOINS, TAKER_FEE, HyperliquidClient
+from .execlog import FILE as EXECLOG_FILE, ExecutionLog
 from .execution.coinbase_futures import SizeTooSmall
 from .execution.perp_exchange import PerpExecConfig, PerpExecutor
 from .models import Side, Signal, SignalType, now
@@ -113,6 +114,8 @@ class PerpBot:
         self.executor = executor or PerpExecutor(exec_cfg)
         self.costs = perp_cost_model(cfg.taker_fee, cfg.min_fee_per_lot)
         self._margin: dict[str, float] = {}   # overnight SHORT margin rate per coin, when the venue publishes it
+        self.execlog = ExecutionLog(Path(cfg.state_dir) / EXECLOG_FILE if cfg.state_dir else None)
+        self._last_margin_snapshot: float = 0.0
         self.sub_contract_skips = 0
         self.reconcile_report: Optional[dict] = None
         self.pending_closes: set[str] = set()   # real positions whose exit order failed
@@ -296,6 +299,9 @@ class PerpBot:
                 self.sub_contract_skips += 1
                 note("skipped", "sizing",
                      f"slot ${size:.0f} is smaller than one contract (${contract_usd:.0f})", size)
+                if book.executes_onchain:
+                    self.execlog.skip(book=book.name, coin=sig.symbol, stage="sizing",
+                                      reason=f"slot ${size:.0f} < one contract ${contract_usd:.0f}", size=size)
                 if self.cfg.basket_mode == "substitute" and substitute:
                     for coin in self.cfg.coins:
                         if coin == sig.symbol or f"{CHAIN}:{coin}" in book.portfolio.positions:
@@ -328,14 +334,43 @@ class PerpBot:
                 note("skipped", "execution", f"order failed: {exc}", size)
                 return
             # The real book records the REAL fill, not the signal price.
+            intended = sig.price_usd
             sig = Signal(**{**vars(sig), "price_usd": fill.price})
             size = fill.qty * fill.price
             if units:
                 lots = fill.qty / units
+            if not fill.dry_run:
+                self.execlog.fill(book=book.name, coin=sig.symbol, side="short", contracts=lots,
+                                  qty=fill.qty, intended=intended, filled=fill.price, notional=size,
+                                  fee_modelled=self._fee_side(size, lots), fee_actual=fill.fee_usd,
+                                  order_id=fill.order_id, reason=sig.reason)
         pos = book.portfolio.open_from_signal(sig, size)
         pos.lots = lots
         self.eligible_at[f"{book.name}:{sig.key}"] = sig.ts + self.cfg.hold_days * 86400
         note("opened", "entry", sig.reason, size)
+
+    def _fee_side(self, notional: float, lots: float) -> float:
+        """The fee the cost model expects for one side of this trade."""
+        c = self.costs.cfg
+        return max(notional * c.dex_fee, lots * c.min_fee_per_lot_usd)
+
+    async def _margin_snapshot(self) -> None:
+        """Hourly margin snapshot of the real account (every tick near the
+        16:00 ET switch), so the execution log shows how close the
+        overnight rate change came to a liquidation."""
+        if not (self.real_armed and self.execlog.enabled and hasattr(self.executor, "balance")):
+            return
+        from .execlog import near_margin_switch
+        t = now()
+        if t - self._last_margin_snapshot < 3600 and not near_margin_switch(t):
+            return
+        try:
+            bal = await self.executor.balance()
+        except Exception as exc:
+            logger.warning("margin snapshot failed: %s", exc)
+            return
+        self._last_margin_snapshot = t
+        self.execlog.margin(balance=bal)
 
     # -- reconciliation ----------------------------------------------------
 
@@ -398,8 +433,13 @@ class PerpBot:
             dirty = False
             for key, pos in list(book.portfolio.positions.items()):
                 if pos.symbol in rates:
+                    before = pos.funding_usd
+                    hours = max(0.0, (t - (pos.funding_accrued_at or pos.opened_at)) / 3600.0)
                     pos.accrue_funding(rates[pos.symbol], t)
                     dirty = True
+                    if book.executes_onchain and self.real_armed and hours > 0:
+                        self.execlog.funding(book=book.name, coin=pos.symbol, rate_hourly=rates[pos.symbol],
+                                             hours=hours, notional=pos.size_usd, usd=pos.funding_usd - before)
                 mid = self._mids.get(pos.symbol)
                 if mid is None:
                     continue
@@ -415,6 +455,12 @@ class PerpBot:
                         fill = await self.executor.close(pos.symbol, pos.qty, mid)
                         price = fill.price
                         self.pending_closes.discard(key)
+                        if not fill.dry_run:
+                            self.execlog.fill(book=book.name, coin=pos.symbol, side="close", contracts=pos.lots,
+                                              qty=fill.qty, intended=mid, filled=fill.price,
+                                              notional=fill.qty * fill.price,
+                                              fee_modelled=self._fee_side(fill.qty * fill.price, pos.lots),
+                                              fee_actual=fill.fee_usd, order_id=fill.order_id, reason=reason)
                     except Exception as exc:
                         logger.exception("real close failed for %s — keeping position",
                                          pos.symbol)
@@ -451,6 +497,7 @@ class PerpBot:
             if dirty:
                 book.portfolio.save()
         self.pending_closes &= {k for b in self.books.values() for k in b.portfolio.positions}
+        await self._margin_snapshot()
         prices = {k: self._mids.get(k.split(":")[1], 0.0) for b in self.books.values()
                   for k in b.portfolio.positions}
         if now() - self._last_curve_ts >= 3600:          # hourly points whatever the monitor cadence

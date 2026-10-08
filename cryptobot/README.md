@@ -1036,6 +1036,17 @@ with its P&L, what is open, halts and drawdown, the sim-vs-real gap in
 percentage points, and any venue mismatch. `python -m cryptobot.desk
 --digest` prints the same thing from the saved books.
 
+**Execution log.** Coinbase keeps no fill history beyond single orders
+and no funding history, so the real book writes its own:
+`state/execution.jsonl` gets every real fill (signal price vs fill
+price as adverse basis points, modelled fee vs the fee the venue
+charged), every funding accrual on a real position, an hourly margin
+snapshot (every tick within half an hour of the 16:00 ET
+intraday-to-overnight switch, flagged), and every real-book skip.
+`python -m cryptobot.execlog --state-dir state [--days 30]` summarises
+it; the daily digest carries a one-line version. That report is what
+the small-real-money gates in `RESEARCH-2026-10.md` ask for.
+
 Then switch each dashboard's toggle to real. The sim books keep running
 alongside, so the gap between sim and real is measured execution cost.
 

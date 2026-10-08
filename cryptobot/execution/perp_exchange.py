@@ -46,6 +46,7 @@ class Fill:
     price: float
     order_id: Optional[int] = None
     dry_run: bool = False
+    fee_usd: Optional[float] = None      # what the venue charged, when it says
 
 
 class PerpExecutor:

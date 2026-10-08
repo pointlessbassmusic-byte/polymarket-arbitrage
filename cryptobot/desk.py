@@ -89,6 +89,12 @@ def digest(bots: dict, since: float, at: Optional[float] = None) -> str:
         trl = track_record_line(books["sim"].get("closed_trades") or [])
         if trl:
             lines.append(f"{name} {trl}")
+        log = getattr(bot, "execlog", None)
+        if log is not None and log.enabled:
+            from .execlog import digest_line
+            ex = digest_line(log.path, since)
+            if ex:
+                lines.append(f"{name} {ex}")
         rc = st.get("reconcile")
         if rc and not rc.get("ok"):
             lines.append(f"{name} VENUE MISMATCH: venue-only {rc['venue_only']} "

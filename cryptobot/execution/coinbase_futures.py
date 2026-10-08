@@ -183,7 +183,7 @@ class CoinbaseFuturesExecutor:
                                f"{err.get('message') or err.get('error_details')}")
         order_id = (d.get("success_response") or {}).get("order_id")
         c = self.contract(coin)
-        filled, px = float(n), mid
+        filled, px, fee = float(n), mid, None
         if order_id:
             # A market IOC fills within moments, but get_order right after
             # placement can still say PENDING with filled_size 0. Poll
@@ -200,6 +200,10 @@ class CoinbaseFuturesExecutor:
                 if got > 0:
                     filled = got
                     px = float(od.get("average_filled_price") or 0) or mid
+                    try:
+                        fee = float(od["total_fees"]) if od.get("total_fees") not in (None, "") else None
+                    except (TypeError, ValueError):
+                        fee = None
                     break
                 if status in ("CANCELLED", "EXPIRED", "FAILED", "REJECTED"):
                     raise RuntimeError(f"{coin} {side}: order {order_id} ended {status} unfilled")
@@ -209,7 +213,7 @@ class CoinbaseFuturesExecutor:
                 logger.warning("%s %s: order %s still pending after %d polls; assuming %d filled",
                                coin, side, order_id, self.cfg.fill_polls, n)
         # Coinbase quotes 1000PEPE / 1000SHIB per thousand tokens, as the bot does.
-        return Fill(coin, side, filled * c.units_per_contract, px, order_id=order_id)
+        return Fill(coin, side, filled * c.units_per_contract, px, order_id=order_id, fee_usd=fee)
 
     async def preview(self, coin: str, n: int = 1) -> dict:
         """Ask Coinbase to price an n-contract market sell WITHOUT placing
