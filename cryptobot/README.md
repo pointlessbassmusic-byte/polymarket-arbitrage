@@ -1039,6 +1039,62 @@ percentage points, and any venue mismatch. `python -m cryptobot.desk
 Then switch each dashboard's toggle to real. The sim books keep running
 alongside, so the gap between sim and real is measured execution cost.
 
+## How credible is the bounce-short? Correcting for the search
+
+Every walk-forward year was positive, and that was presented as strong
+evidence. It is weaker than it looks, for a reason that has nothing to
+do with the data: the rule was the best of a search. Across this
+project 4,512 (feature-pair × tercile band × barrier geometry × side)
+trials were scored on the same 18 coins, and the best of thousands of
+noise trials also has positive years. `cryptobot/stats.py` measures how
+much of the result that explains, using the standard tools (Bailey &
+López de Prado's Probabilistic and Deflated Sharpe ratios, CSCV
+probability of backtest overfitting, combinatorial purged
+cross-validation, minimum track record length):
+
+| | 18 coins (fees + funding) | DOGE/PEPE/SHIB (flat 0.40%) |
+|---|---|---|
+| trials searched / effective independent | 4,512 / 28.7 (short-only 10.5) | 4,512 / 59 (short-only 26) |
+| CSCV probability of overfitting (PBO) | 0.22 (short-only 0.12) | 0.09 (short-only 0.21) |
+| rule's out-of-sample rank in the family | 0.74; never in-sample best; **0.57 within shorts** | 0.90; never in-sample best |
+| rule's own PSR (P(Sharpe > 0)) | 0.91 | 0.99 |
+| Deflated Sharpe at nominal N / at N_eff | 0.00 / 0.18–0.35 | 0.00 / 0.13–0.34 |
+| cross-sectional lift over same-day basket | +0.002%/trade (zero) | −0.001%/trade (zero) |
+| CPCV (6×2, purged, embargoed) | 5/5 paths, 15/15 splits positive | 5/5 paths, 14/15 splits positive |
+| MinTRL to show SR > 0 at 95% | ~104 months | ~32 months |
+
+Reading it plainly:
+
+- **The family is not a CSCV overfit** (PBO well under 0.5) and the
+  rule's performance **is stable under refitting and purging** (every
+  CPCV path positive). Shorting memecoin perps at wide barriers paid in
+  most cells during 2022–23 and 2025–26.
+- **The specific rule's selection is not statistically credible.** It
+  was never the in-sample best in any of 252 splits; within the
+  short-only family on 18 coins it is a median column; its own Sharpe is
+  not significant at 5% on 18 coins; and after deflating for even the
+  most generous count of independent trials (~10–26) the probability
+  that its Sharpe beats what the best null trial would show is 0.18–0.35.
+  A t-stat of 1.3–2.3 is exactly what the best of a few dozen
+  independent noise trials produces.
+- **The edge, where it exists, is timing, not coin selection.** On the
+  days the rule fires, the coins it picks net +0.95% per trade and the
+  coins it does not pick, shorted the same day, net +0.89%. "Beats the
+  unconditional short" is a statement about *which days* to be short
+  the memecoin basket. The one-slot-per-coin logic is not picking coins.
+- **The live record cannot settle it for years.** With ~2 months of
+  paper trades, the sim P&L is noise either way; the desk digest now
+  reports trades logged against the minimum track record needed.
+
+Both bounce-short entries in the registry are therefore
+**inconclusive**, not alive. That is not a kill: the mechanism is
+plausible, costs are realistic, and CPCV is clean. It means expected
+live returns should be shrunk hard toward zero relative to the backtest
+tables above, real capital should stay at a size whose loss is
+tolerable while the record accumulates, and the verdict rule for every
+future idea is written into the registry: *alive* needs DSR ≥ 0.95 at
+N_eff, PBO ≤ 0.5 and ≥ 80% of CPCV paths positive.
+
 ## Running from the US: Coinbase Derivatives instead of Hyperliquid
 
 Hyperliquid blocks US residents. The bot does not route around that: a

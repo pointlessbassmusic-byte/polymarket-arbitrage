@@ -159,3 +159,12 @@ def test_digest_reports_books_closed_trades_and_gap():
     assert "VENUE MISMATCH: venue-only ['kPEPE']" in txt
     locked = D.digest({"bounce": Bot(False)}, since=500.0, at=1_700_000_000)
     assert "bounce/real" not in locked and "gap" not in locked
+
+
+def test_track_record_line_reports_psr_and_min_trl():
+    assert D.track_record_line([{"pnl_usd": 1.0, "size_usd": 100.0}] * 3).startswith("track record: 3 trades (need 10")
+    import random
+    rng = random.Random(7)
+    closed = [{"pnl_usd": rng.gauss(2.0, 10.0), "size_usd": 100.0} for _ in range(60)]
+    line = D.track_record_line(closed)
+    assert line.startswith("track record: 60 trades, PSR(SR>0)=") and "MinTRL=" in line

@@ -86,11 +86,31 @@ def digest(bots: dict, since: float, at: Optional[float] = None) -> str:
         if st["real_unlocked"]:
             s_ret, r_ret = books["sim"]["return_pct"], books["real"]["return_pct"]
             lines.append(f"{name} sim-vs-real gap: {100 * (r_ret - s_ret):+.2f} pp")
+        trl = track_record_line(books["sim"].get("closed_trades") or [])
+        if trl:
+            lines.append(f"{name} {trl}")
         rc = st.get("reconcile")
         if rc and not rc.get("ok"):
             lines.append(f"{name} VENUE MISMATCH: venue-only {rc['venue_only']} "
                          f"book-only {rc['book_only']} size {rc['qty_mismatch']}")
     return "\n".join(lines)
+
+
+def track_record_line(closed: list[dict], min_trades: int = 10) -> str:
+    """How far the paper record is from proving anything: trades logged
+    against the minimum track record (Bailey & López de Prado) needed to
+    show the per-trade Sharpe is above zero at 95%."""
+    from .stats import min_trl, psr
+    rets = [t["pnl_usd"] / t["size_usd"] for t in closed if t.get("size_usd")]
+    if len(rets) < min_trades:
+        return f"track record: {len(rets)} trades (need {min_trades} before PSR means anything)"
+    try:
+        p = psr(rets, 0.0)
+        need = min_trl(rets, 0.0, 0.05)
+    except (ValueError, ZeroDivisionError, OverflowError):
+        return ""
+    need_s = f"{need:,.0f}" if need != float("inf") else "inf"
+    return f"track record: {len(rets)} trades, PSR(SR>0)={p:.2f}, MinTRL={need_s} trades"
 
 
 async def digest_loop(bots: dict, alerter, hour_utc: int = 0, minute_utc: int = 30) -> None:
