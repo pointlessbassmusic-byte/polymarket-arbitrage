@@ -365,3 +365,17 @@
   preregistered: true
   trials_run: 1
   psr: 0.843
+
+- id: btc-beta-hedge-bounce-short
+  title: "Hedge the memecoin bounce-short with a long BTC perp sized to the walk-forward beta"
+  source: "operator question 2026-10-09 (cross-asset hedging); standard beta hedge"
+  claim: "Memecoin shorts lose when BTC rallies; a long BTC perp sized to the prior years' beta of trade P&L to BTC's return over the hold raises the strategy's Sharpe without changing its mean much."
+  test: "Walk-forward trades of short:move_1d[2]&move_3d[0] +20/-10 14d on hl_daily.pkl (18 coins) and hl_daily_us3.pkl; BTC 14-day forward return from hl_all_daily.pkl aligned to each entry day; beta fitted by OLS on trades of prior years only; hedged P&L = trade P&L + beta x BTC return - 0.10% x beta hedge cost; by year: mean, sd, t (entry-day clustered) and Sharpe, hedged vs unhedged."
+  success: "Written before running: hedged Sharpe per trade higher than unhedged in at least 4 of 5 years 2022-2026 on the 18-coin set with the yearly mean not lower by more than the hedge cost; otherwise inconclusive; if hedged Sharpe is lower in 3+ years, killed."
+  data: "hl_daily.pkl, hl_daily_us3.pkl, hl_all_daily.pkl (BTC)"
+  result: "Run 2026-10-09. Trade P&L vs BTC 14d return correlates -0.14 to -0.72 by year (18 coins) and -0.07 to -0.87 (US-3): the strategy carries about -0.5 BTC beta. Walk-forward beta 0.36-0.64. Hedged Sharpe higher in 2 of 5 years on both sets: 18 coins 2023 +0.21->+0.41, 2024 -0.03->+0.05, 2025 +0.10->+0.08, 2026 +0.23->+0.12; US-3 2023 +0.10->+0.32, 2024 +0.16->+0.19, 2025 +0.24->+0.18, 2026 +0.11->-0.12. Criterion (4 of 5) not met"
+  verdict: inconclusive
+  regime: "the hedge lowers variance every year but adds BTC's drift: it helped when BTC rose (2023-24) and hurt when BTC was flat or falling while memecoins fell (2025-26). A hedge turns a memecoin short into a memecoin-vs-BTC relative short; whether that is better is a view on BTC, not an edge"
+  rerun: "python -m cryptobot.hedge_study --cache hl_daily.pkl --all hl_all_daily.pkl"
+  preregistered: true
+  trials_run: 1
