@@ -337,3 +337,14 @@
   verdict: adopted
   regime: "method; applies to every future entry. Rule: alive requires DSR >= 0.95 at N_eff, PBO <= 0.5 and >= 80% CPCV paths positive; otherwise inconclusive. Record trials_run and n_eff on every entry that reaches a verdict."
   rerun: "python -m cryptobot.stats --cache hl_daily.pkl --funding hl_funding.pkl --rule \"short:move_1d[2]&move_3d[0]\" --target 0.20 --stop 0.10 --days 14 [--sides short] [--flat-cost 0.004]"
+
+- id: basket-substitution-us3
+  title: "Basket timing: short another unheld coin when the signalled coin's contract does not fit the slot"
+  source: "2026-10 research sweep (Carver integer-contract idea, narrowed) + stats.py finding of zero cross-sectional lift"
+  claim: "Since the other coins earn the same on a signal day, a small account can take the signal in whichever coin fits."
+  test: "perp_bot --replay --on-capital --whole-contracts --basket substitute|all on hl_daily_us3.pkl, 2022-2026, Coinbase fees and margin"
+  data: "hl_daily_us3.pkl"
+  result: "substitute: $1,500 +5.4/+9.0/+8.4/+5.0/+2.2 vs off +8.9/+9.0/+11.0/+3.4/-2.6; $3,000 +4.5/+9.1/+34.7/-4.7/-2.8 vs +4.5/+9.1/+17.2/-7.8/-2.8. all: worse everywhere ($10k fractional -1.2/+2.2/+18.0/+18.2/+11.0 vs +12.2/+11.3/+34.9/+50.8/+4.8) because substitutes occupy slots the real signals need"
+  verdict: inconclusive
+  regime: "noise at ~30 trades a year; kept as perp.basket_mode (default off)"
+  rerun: "python -m cryptobot.perp_bot --replay state/hl_daily_us3.pkl --replay-from 2022-01-01 --bankroll 3000 --on-capital --whole-contracts --basket substitute"

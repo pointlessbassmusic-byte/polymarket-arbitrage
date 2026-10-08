@@ -1039,6 +1039,17 @@ percentage points, and any venue mismatch. `python -m cryptobot.desk
 Then switch each dashboard's toggle to real. The sim books keep running
 alongside, so the gap between sim and real is measured execution cost.
 
+## Research sweep, October 2026
+
+`cryptobot/RESEARCH-2026-10.md` records a sweep of public repositories,
+papers, practitioner write-ups, free data and the US venue landscape:
+41 candidates, 14 shortlisted, each verified through three lenses. The
+short version: nothing public offers a credible, costed, out-of-sample
+edge a US retail account can trade that this project has not tested;
+the two items that mattered were the selection-bias diagnostics below
+and the Coinbase cost/margin corrections above. The file also holds the
+small-real-money protocol and the no-constraints design.
+
 ## How credible is the bounce-short? Correcting for the search
 
 Every walk-forward year was positive, and that was presented as strong

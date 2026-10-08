@@ -73,6 +73,12 @@ class PerpBotConfig:
     state_dir: Optional[Path] = None
     taker_fee: float = TAKER_FEE       # per side; the venue's, so paper fills cost what real ones do
     min_fee_per_lot: float = 0.0       # exchange minimum per contract per side
+    # Basket timing: the diagnostics (cryptobot.stats) found zero cross-
+    # sectional lift, i.e. on a signal day the OTHER coins earn the same
+    # when shorted. "substitute" shorts another unheld coin when the
+    # signalled coin's contract does not fit the slot; "all" shorts every
+    # unheld coin on any signal day (research only).
+    basket_mode: str = "off"           # off | substitute | all
     # coin -> units per contract. Non-empty means the venue trades whole
     # contracts: the paper book then rounds every slot down to whole
     # contracts too, so sim and real can only differ by execution.
@@ -234,7 +240,25 @@ class PerpBot:
                 await self._consider(book, sig)
         self.last_daily_run = now()
 
-    async def _consider(self, book: TradingBook, sig: Signal) -> None:
+    def _substitute(self, sig: Signal, coin: str, why: str) -> Optional[Signal]:
+        """The same signal re-pointed at another coin at its current mid."""
+        px = self._mids.get(coin)
+        if not px or px <= 0:
+            return None
+        return Signal(**{**vars(sig), "symbol": coin, "key": f"{CHAIN}:{coin}", "price_usd": px,
+                         "reason": f"{why}: {sig.symbol} signal, basket short of {coin}"})
+
+    async def _consider(self, book: TradingBook, sig: Signal, *, substitute: bool = True) -> None:
+        if self.cfg.basket_mode == "all" and substitute:
+            for coin in self.cfg.coins:
+                if coin == sig.symbol or f"{CHAIN}:{coin}" in book.portfolio.positions:
+                    continue
+                alt = self._substitute(sig, coin, "basket")
+                if alt is not None:
+                    await self._consider(book, alt, substitute=False)
+        await self._consider_one(book, sig, substitute=substitute)
+
+    async def _consider_one(self, book: TradingBook, sig: Signal, *, substitute: bool) -> None:
         def note(action, stage, reason, size=0.0):
             self.journal.record(Decision(
                 ts=now(), book=book.name, symbol=sig.symbol, chain=sig.chain,
@@ -272,6 +296,18 @@ class PerpBot:
                 self.sub_contract_skips += 1
                 note("skipped", "sizing",
                      f"slot ${size:.0f} is smaller than one contract (${contract_usd:.0f})", size)
+                if self.cfg.basket_mode == "substitute" and substitute:
+                    for coin in self.cfg.coins:
+                        if coin == sig.symbol or f"{CHAIN}:{coin}" in book.portfolio.positions:
+                            continue
+                        alt = self._substitute(sig, coin, "substitute")
+                        if alt is None:
+                            continue
+                        alt_units = self.cfg.contract_units.get(coin)
+                        if alt_units and size < alt_units * alt.price_usd:
+                            continue
+                        await self._consider_one(book, alt, substitute=False)
+                        break
                 return
             size = n * contract_usd
             lots = float(n)
@@ -672,6 +708,7 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
         stop_pct=float(perp.get("stop_pct", 0.10)),
         hold_days=int(perp.get("hold_days", 14)),
         monitor_interval_s=int(perp.get("monitor_interval_s", 3600)),
+        basket_mode=str(perp.get("basket_mode", "off")),
         coins=coins,
         state_dir=state_dir,
         **venue_kw,
@@ -720,7 +757,7 @@ async def _main(args) -> int:
                 venue_kw["min_fee_per_lot"] = MIN_FEE_PER_CONTRACT
         rcfg = PerpBotConfig(target_pct=float(perp.get("target_pct", 0.20)),
                              stop_pct=float(perp.get("stop_pct", 0.10)),
-                             hold_days=int(perp.get("hold_days", 14)), **venue_kw)
+                             hold_days=int(perp.get("hold_days", 14)), basket_mode=args.basket, **venue_kw)
         rep = await replay(pools, start, rcfg, bankroll=args.bankroll,
                            on_capital=args.on_capital)
         print(f"replay from {args.replay_from}: {rep['trades']} closed trades, "
@@ -768,6 +805,8 @@ def main() -> int:
                     help="replay with the deployed sizing (one slot per coin) and report return on the bankroll")
     ap.add_argument("--whole-contracts", action="store_true",
                     help="coinbase venue: round slots down to whole contracts, as the real book does")
+    ap.add_argument("--basket", default="off", choices=("off", "substitute", "all"),
+                    help="basket timing: substitute another coin when the contract does not fit, or short all unheld coins on a signal day")
     ap.add_argument("--dashboard", action="store_true")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8082)

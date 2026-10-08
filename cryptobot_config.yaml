@@ -157,6 +157,7 @@ perp:
   private_key_env: CRYPTOBOT_PRIVATE_KEY # Hyperliquid venue only
   max_trade_usd: 500           # per order; must cover one contract (~$480 for DOGE)
   monitor_interval_s: 300      # stop/target checks; the backtest assumed exits near the level, not at the day's extreme
+  basket_mode: off             # off | substitute | all; see RESEARCH-2026-10.md (inconclusive, leave off)
   max_slippage: 0.01
   target_pct: 0.20             # validated geometry: -20% target,
   stop_pct: 0.10               # +10% stop, 14-day time exit
