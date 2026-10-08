@@ -59,7 +59,7 @@ checks that could be run on cached data run rather than argued.
 | Execution study (post-only entries, hour of day, boundary) | **do with real money** | This is what the small-real-money phase is for; see §5. |
 | Crowding / positioning features | not pursued | C-grade; the cross-sectional version is already killed (`crowding-factor`); Coinbase publishes no long/short ratios. |
 | COT leveraged-money / 30-day negative funding (BTC) | not pursued | BTC-only, long-horizon regime signals; a different strategy, not an improvement to this one. |
-| BTC outside-US-hours seasonality | untested, lowest priority | B-grade replication record; but one round trip a day at 0.10% (Coinbase) or 0.08% (Kalshi) is the size of the effect (~0.1%/day in sample). Testable in an afternoon on cached 1-minute Coinbase BTC data if ever wanted. |
+| BTC outside-US-hours seasonality | **tested, inconclusive** (pre-registered, `btc-offhours-seasonality`) | 1,504 holdings 2021–2026 on Coinbase hourly data: +0.076%/holding net at 0.08%, PSR 0.84; post-publication window (2024-11 on) +6.9% over 504 holdings, t = 0.14; negative at Coinbase fees. Real through 2024, flat since. |
 
 Dropped at merge (33), grouped: cross-sectional momentum/reversal/carry
 factors on 100+ Binance coins (not tradeable in the US; our 176-coin

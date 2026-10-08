@@ -43,6 +43,38 @@ def validate(rows: list[dict]) -> None:
         if r["id"] in seen:
             raise ValueError(f"duplicate id {r['id']}")
         seen.add(r["id"])
+        if r["verdict"] == "alive":
+            _check_alive_evidence(r)
+
+
+def _check_alive_evidence(r: dict) -> None:
+    """An 'alive' verdict must say how big the search behind it was.
+    See PREREGISTER.md."""
+    has_diag = all(k in r for k in ("trials_run", "n_eff", "pbo", "dsr"))
+    prereg = bool(r.get("preregistered")) and "psr" in r
+    pending = r.get("diagnostics") == "pending" and "trials_run" in r
+    if not (has_diag or prereg or pending):
+        raise ValueError(f"{r['id']}: 'alive' needs trials_run/n_eff/pbo/dsr, or "
+                         f"preregistered: true with psr, or diagnostics: pending with trials_run")
+    if has_diag and (float(r["dsr"]) < 0.95 or float(r["pbo"]) > 0.5):
+        raise ValueError(f"{r['id']}: 'alive' with DSR {r['dsr']} / PBO {r['pbo']} fails the "
+                         f"verdict rule (DSR >= 0.95, PBO <= 0.5); use 'inconclusive'")
+
+
+STUB = """- id: {id}
+  title: ""
+  source: ""
+  claim: ""
+  test: ""
+  success: ""
+  data: ""
+  result: "PRE-REGISTERED {date}; not yet run"
+  verdict: inconclusive
+  regime: ""
+  rerun: ""
+  preregistered: true
+  trials_run: 1
+"""
 
 
 def _words(text: str) -> set[str]:
@@ -80,7 +112,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--verdict", choices=VERDICTS)
     ap.add_argument("--similar", metavar="TEXT")
+    ap.add_argument("--new", metavar="ID", help="print a pre-registration stub (see PREREGISTER.md)")
     args = ap.parse_args()
+    if args.new:
+        import datetime as dt
+        print(STUB.format(id=args.new, date=dt.date.today().isoformat()))
+        return 0
     rows = load()
     if args.similar:
         hits = similar(rows, args.similar)

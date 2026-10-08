@@ -1061,6 +1061,13 @@ the two items that mattered were the selection-bias diagnostics below
 and the Coinbase cost/margin corrections above. The file also holds the
 small-real-money protocol and the no-constraints design.
 
+The first rule tested under the new pre-registration protocol
+(`cryptobot/PREREGISTER.md`) was the sweep's one untested alpha
+candidate, BTC's outside-US-hours seasonality: criterion written first,
+one trial, result inconclusive (PSR 0.84, post-publication window flat).
+The registry now refuses an `alive` verdict that does not record the
+size of the search behind it.
+
 ## How credible is the bounce-short? Correcting for the search
 
 Every walk-forward year was positive, and that was presented as strong

@@ -54,3 +54,24 @@ def test_similar_surfaces_an_already_killed_idea():
 
 def test_similar_returns_nothing_for_unrelated_text():
     assert H.similar(H.load(), "zzz qqq") == []
+
+
+def test_alive_needs_search_evidence_or_preregistration():
+    base = {"id": "x", "title": "t", "source": "s", "claim": "c", "test": "t", "data": "d",
+            "result": "r", "verdict": "alive", "regime": "g", "rerun": "python -m cryptobot.stats"}
+    with pytest.raises(ValueError, match="trials_run"):
+        H.validate([dict(base)])
+    H.validate([dict(base, preregistered=True, psr=0.97)])
+    H.validate([dict(base, diagnostics="pending", trials_run=54)])
+    H.validate([dict(base, trials_run=10, n_eff=5, pbo=0.1, dsr=0.96)])
+    with pytest.raises(ValueError, match="verdict rule"):
+        H.validate([dict(base, trials_run=10, n_eff=5, pbo=0.1, dsr=0.5)])
+    H.validate([dict(base, verdict="inconclusive")])          # no evidence needed to be unsure
+
+
+def test_new_stub_is_a_valid_preregistration(capsys):
+    import sys
+    sys.argv = ["hypotheses", "--new", "my-idea"]
+    assert H.main() == 0
+    out = capsys.readouterr().out
+    assert out.startswith("- id: my-idea") and "preregistered: true" in out and "PRE-REGISTERED" in out

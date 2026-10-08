@@ -102,6 +102,8 @@
   verdict: alive
   regime: "yield follows leverage appetite; near zero on memecoins alone in 2026, positive on the full universe"
   rerun: "python -m cryptobot.carry_study --funding hl_funding_kraken.pkl --top 3 --lookback 14 --enter-min 0.0006"
+  trials_run: 54
+  diagnostics: pending
 
 - id: carry-maker-spot
   title: "Post the carry spot leg as a maker order"
@@ -348,3 +350,18 @@
   verdict: inconclusive
   regime: "noise at ~30 trades a year; kept as perp.basket_mode (default off)"
   rerun: "python -m cryptobot.perp_bot --replay state/hl_daily_us3.pkl --replay-from 2022-01-01 --bankroll 3000 --on-capital --whole-contracts --basket substitute"
+
+- id: btc-offhours-seasonality
+  title: "Long BTC outside US equity hours (16:00 ET to 10:00 ET, weekends held), flat during the session"
+  source: "Quantpedia 'Overnight seasonality in bitcoin' (Gemini hourly 2015-10..2024-10, reported OOS from the Oct-2021 BITO launch); practitioner replications; surfaced by the 2026-10 sweep"
+  claim: "Since ~2021 nearly all of BTC's return accrues outside NYSE hours. Rule: buy at the 16:00 ET hourly close, sell at the 10:00 ET hourly close the next trading day (Friday 16:00 to Monday 10:00 over weekends), one round trip per holding, 1x, no leverage."
+  test: "Coinbase public hourly BTC-USD candles 2020-01..2026-10; per-holding net return at a 0.08% round trip (Kalshi BTC perp, 4 bp/side) and 0.10% (Coinbase); by calendar year; Sharpe and PSR of the daily holding series; the post-publication window 2024-11..2026-10 reported separately; compared with buy-and-hold and with the US-session leg over the same days."
+  success: "Written before running: net Sharpe of the overnight leg > 0 with PSR >= 0.95 over 2021-01..2026-10 at 0.08% AND positive net in the post-publication window 2024-11..2026-10. Anything less is inconclusive; negative in both is killed."
+  data: "scratchpad btc_hourly.pkl (Coinbase ONE_HOUR candles); rebuild with the fetch script in the study module"
+  result: "Run 2026-10-09 on 59,336 Coinbase hourly candles (1,504 weekday holdings 2021-01..2026-10). At 0.08%: overnight leg +0.076%/holding, sum +114%, t=1.01, PSR 0.843; session leg -157% (t=-2.0); buy-and-hold +196%. By year net: +58.6/-57.2/+62.4/+72.1/+7.8/-29.6%. Post-publication window 2024-11..2026-10: +6.9% over 504 holdings, t=0.14, PSR 0.56; at 0.10% the window is -3.2%. Criterion (PSR >= 0.95 AND positive post-publication) not met. Observation only, not a claim: weekend holdings averaged +0.31% vs +0.02% on weekdays; testing that is trial #2"
+  verdict: inconclusive
+  regime: "the effect was real in 2021-2024 (the published sample) and has been flat since; the session leg stays negative, so the result is mostly 'do not hold BTC during NYSE hours', which is a statement about buy-and-hold timing, not a standalone edge after fees"
+  rerun: "python -m cryptobot.seasonality_study --hourly btc_hourly.pkl"
+  preregistered: true
+  trials_run: 1
+  psr: 0.843
