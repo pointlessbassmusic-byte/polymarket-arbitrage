@@ -168,7 +168,143 @@ tick();setInterval(tick,5000);
 </script></body></html>"""
 
 
-def create_desk_app(bots: dict, token: Optional[str], extra_hosts: Optional[set] = None):
+class Desk:
+    """Bots + allocator + the state the dashboard shows."""
+
+    def __init__(self, bots: dict, cfg: dict, state_dir: Optional[Path], alerter=None):
+        from .allocator import FILE as ALLOC_FILE, Allocator, AllocatorConfig
+        self.bots, self.cfg, self.state_dir, self.alerter = bots, cfg, state_dir, alerter
+        akw = {k: v for k, v in (cfg.get("allocator") or {}).items() if k in AllocatorConfig.__dataclass_fields__}
+        self.allocator = Allocator(AllocatorConfig(**akw),
+                                   Path(state_dir) / ALLOC_FILE if state_dir else None)
+        self.strategies = cfg.get("strategies") or {}
+        self.last_capital: dict = {"total": 0.0, "by_bot": {}, "source": "config"}
+        self.alerts: list[dict] = []
+
+    def _note(self, text: str) -> None:
+        self.alerts.append({"ts": time.time(), "text": text})
+        self.alerts = self.alerts[-50:]
+        if self.alerter is not None:
+            self.alerter.fire(f"[desk] {text}")
+
+    def verdict_of(self, name: str) -> tuple[str, str]:
+        rid = (self.strategies.get(name) or {}).get("registry", "")
+        try:
+            from .hypotheses import load
+            for r in load():
+                if r["id"] == rid:
+                    return rid, r["verdict"]
+        except Exception as exc:
+            logger.warning("registry unreadable: %s", exc)
+        return rid, "inconclusive"
+
+    async def real_capital(self, name: str, bot) -> tuple[float, str]:
+        """What the venue says the real account holds; the book's own
+        accounting when the venue cannot be asked."""
+        st = bot.state()
+        if st.get("real_unlocked") and hasattr(bot.executor, "balance"):
+            try:
+                bal = await bot.executor.balance()
+                return float(bal.get("total_usd_balance") or 0.0), "venue"
+            except (KeyboardInterrupt, SystemExit, asyncio.CancelledError):
+                raise
+            except BaseException as exc:          # SDK/crypto panics are BaseException
+                logger.warning("%s balance unavailable: %s", name, exc)
+        return float(st["books"]["real"]["equity"]), "book"
+
+    async def allocation_cycle(self) -> dict:
+        from .allocator import evidence_from_bot
+        from .execlog import load as load_log, summary as exec_summary
+        evidence, capital, sources = {}, {}, set()
+        for name, bot in self.bots.items():
+            scfg = dict(self.strategies.get(name) or {})
+            rid, verdict = self.verdict_of(name)
+            scfg["verdict"] = verdict
+            ex = None
+            log = getattr(bot, "execlog", None)
+            if log is not None and log.enabled:
+                ex = exec_summary(load_log(log.path), time.time() - 30 * 86400)
+            evidence[name] = evidence_from_bot(name, bot, scfg, ex)
+            capital[name], src = await self.real_capital(name, bot)
+            sources.add(src)
+        total = sum(capital.values())
+        self.last_capital = {"total": total, "by_bot": capital, "source": "+".join(sorted(sources)) or "config"}
+        d = self.allocator.decide(evidence)
+        for name, bot in self.bots.items():
+            w = d.weights.get(name, 0.0)
+            usd = min(w * total, capital.get(name, 0.0)) if total > 0 else 0.0
+            if hasattr(bot, "set_real_capital"):
+                bot.set_real_capital(usd)
+        if getattr(d, "changed", False):
+            parts = ", ".join(f"{k} {100 * v:.0f}%" for k, v in d.weights.items()) or "nothing"
+            self._note(f"allocation ({self.allocator.mode}): {parts}, cash {100 * d.cash:.0f}% of ${total:,.2f}")
+        for name, why in d.killed.items():
+            if not any(a["text"].startswith(f"KILL {name}") for a in self.alerts[-10:]):
+                self._note(f"KILL {name}: {why}")
+        return self.allocation_state()
+
+    def allocation_state(self) -> dict:
+        a, d = self.allocator, self.allocator.last
+        return {"mode": a.mode, "manual": a.manual, "config": vars(a.cfg),
+                "weights": d.weights if d else {}, "cash": d.cash if d else 1.0,
+                "reasons": d.reasons if d else {}, "killed": dict(a.killed),
+                "posterior": d.posterior if d else {}, "ts": d.ts if d else 0.0,
+                "history": a.history[-30:], "capital": self.last_capital}
+
+    def state(self) -> dict:
+        from .execlog import load as load_log, render as exec_render, summary as exec_summary
+        out = {"ts": time.time(), "allocation": self.allocation_state(), "strategies": {},
+               "equity": {}, "execution": None, "execution_text": "", "registry": [], "alerts": self.alerts[-20:]}
+        for name, bot in self.bots.items():
+            st = bot.state()
+            rid, verdict = self.verdict_of(name)
+            books = st["books"]
+            out["strategies"][name] = {
+                "title": {"bounce": "Bounce-short", "carry": "Funding carry"}.get(name, name),
+                "venue": venue(self.cfg) if name == "bounce" else "hyperliquid+kraken",
+                "mode": st["mode"], "real_unlocked": st["real_unlocked"],
+                "real_locked_reason": st.get("real_locked_reason", ""),
+                "registry_id": rid, "verdict": verdict,
+                "evidence": self.strategies.get(name) or {},
+                "capital": getattr(bot, "real_capital", None),
+                "real": {k: books["real"].get(k) for k in ("equity", "starting_equity", "return_pct", "halted", "drawdown")}
+                | {"open": books["real"]["summary"]["open_positions"], "trades": books["real"]["summary"]["trades"],
+                   "realized": books["real"]["summary"]["realized_pnl"]},
+                "sim": {k: books["sim"].get(k) for k in ("equity", "starting_equity", "return_pct", "halted", "drawdown")}
+                | {"open": books["sim"]["summary"]["open_positions"], "trades": books["sim"]["summary"]["trades"],
+                   "realized": books["sim"]["summary"]["realized_pnl"]},
+                "track_record": track_record_line(books["sim"].get("closed_trades") or []),
+                "reconcile": st.get("reconcile"),
+                "positions": [dict(p, book=b) for b in ("real", "sim") for p in books[b].get("positions", [])],
+                "decisions": st.get("decisions", [])[:8],
+                "strategy": st.get("strategy", {}),
+            }
+            out["equity"][name] = st.get("equity_curve", [])
+            log = getattr(bot, "execlog", None)
+            if log is not None and log.enabled and out["execution"] is None:
+                s = exec_summary(load_log(log.path), time.time() - 30 * 86400)
+                out["execution"], out["execution_text"] = s, exec_render(s)
+        try:
+            from .hypotheses import load
+            out["registry"] = [{"id": r["id"], "verdict": r["verdict"], "title": r["title"],
+                                "result": str(r["result"])[:220], "dsr": r.get("dsr"), "psr": r.get("psr"),
+                                "trials_run": r.get("trials_run")} for r in load()]
+        except Exception as exc:
+            logger.warning("registry unreadable: %s", exc)
+        return out
+
+
+async def allocation_loop(desk: Desk, every_s: int = 3600) -> None:
+    while True:
+        try:
+            await desk.allocation_cycle()
+        except Exception as exc:
+            logger.exception("allocation cycle failed: %s", exc)
+        await asyncio.sleep(every_s)
+
+
+def create_desk_app(bots: dict, token: Optional[str], extra_hosts: Optional[set] = None,
+                    desk: Optional[Desk] = None):
     import secrets as _s
     from fastapi import FastAPI
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -182,7 +318,7 @@ def create_desk_app(bots: dict, token: Optional[str], extra_hosts: Optional[set]
         host = (request.headers.get("host") or "").split(":")[0].lower()
         if host and host not in allowed:
             return JSONResponse({"error": "host not allowed"}, status_code=421)
-        if token and request.url.path == "/api/summary":
+        if token and request.url.path.startswith("/api/"):
             sent = request.headers.get("x-dashboard-token") or request.query_params.get("t") or ""
             if not _s.compare_digest(sent, token):
                 return JSONResponse({"error": "bad or missing token"}, status_code=401)
@@ -192,9 +328,53 @@ def create_desk_app(bots: dict, token: Optional[str], extra_hosts: Optional[set]
     async def api_summary() -> dict:
         return summary(bots)
 
+    @app.get("/api/desk")
+    async def api_desk() -> dict:
+        return desk.state() if desk else {"error": "no desk"}
+
+    @app.post("/api/allocation")
+    async def api_allocation(request: Request):
+        if desk is None:
+            return JSONResponse({"error": "no desk"}, status_code=400)
+        body = await request.json()
+        mode = body.get("mode")
+        if mode == "manual" or body.get("weights"):
+            ok, why = desk.allocator.set_manual(body.get("weights") or {})
+            if not ok:
+                return JSONResponse({"error": why}, status_code=400)
+        elif mode:
+            ok, why = desk.allocator.set_mode(mode)
+            if not ok:
+                return JSONResponse({"error": why}, status_code=400)
+        return await desk.allocation_cycle()
+
+    @app.post("/api/resume")
+    async def api_resume(request: Request):
+        if desk is None:
+            return JSONResponse({"error": "no desk"}, status_code=400)
+        name = (await request.json()).get("strategy")
+        bot = bots.get(name)
+        if bot is None:
+            return JSONResponse({"error": "unknown strategy"}, status_code=404)
+        desk.allocator.resume(name, float(bot.state()["books"]["real"]["equity"]))
+        desk._note(f"RESUME {name}: operator cleared the drawdown kill")
+        return await desk.allocation_cycle()
+
+    @app.post("/api/strategy_mode")
+    async def api_strategy_mode(request: Request):
+        body = await request.json()
+        bot = bots.get(body.get("strategy"))
+        if bot is None:
+            return JSONResponse({"error": "unknown strategy"}, status_code=404)
+        ok, why = bot.set_mode(body.get("mode", "sim"))
+        if not ok:
+            return JSONResponse({"error": why}, status_code=400)
+        return {"ok": True, "mode": bot.mode}
+
     @app.get("/", response_class=HTMLResponse)
     async def index() -> str:
-        return SUMMARY_PAGE
+        from .desk_page import PAGE
+        return PAGE if desk else SUMMARY_PAGE
 
     def slash_redirect(prefix: str):
         async def _slash(request: Request):
@@ -527,13 +707,14 @@ async def _main(args) -> int:
         return 0
     token = args.token or os.environ.get("CRYPTOBOT_DASH_TOKEN") or secrets.token_urlsafe(16)
     import uvicorn
-    app = create_desk_app(bots, token, set(args.allow_host or []))
+    desk = Desk(bots, cfg, args.state_dir, alerter)
+    app = create_desk_app(bots, token, set(args.allow_host or []), desk=desk)
     shown = "localhost" if args.host in ("0.0.0.0", "127.0.0.1") else args.host
     logger.info("desk dashboard: http://%s:%d/?t=%s", shown, args.port, token)
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning"))
     alerter.fire(f"desk up: {', '.join(bots)}; venue {venue(cfg)}; "
                  f"real {'ARMED' if any(getattr(b, 'real_armed', False) for b in bots.values()) else 'locked'}")
-    tasks = [b.run_forever() for b in bots.values()] + [server.serve()]
+    tasks = [b.run_forever() for b in bots.values()] + [server.serve(), allocation_loop(desk)]
     if alerter.enabled:
         d = cfg.get("desk", {}).get("digest_utc", "00:30")
         hh, mm = (int(x) for x in str(d).split(":"))

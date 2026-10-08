@@ -271,6 +271,7 @@ class CarryBot:
         self.equity_curve: deque = deque(maxlen=2000)
         self._pairs: dict[str, str] = {}
         self._coins: list[str] = []
+        self.real_capital: Optional[float] = None    # allocator override; None = book equity
 
     # -- mode ----------------------------------------------------------------
     @property
@@ -389,7 +390,10 @@ class CarryBot:
                                f"spot and perp prices differ by {100 * (gap or 0):.1f}% — "
                                f"not the same asset, or a broken market")
                     continue
-                notional = self.slot_notional(book.equity(self.perps, self.spots))
+                capital = book.equity(self.perps, self.spots)
+                if book.name == "real" and self.real_capital is not None:
+                    capital = min(capital, self.real_capital)
+                notional = self.slot_notional(capital)
                 if notional < 10:
                     continue
                 perp_qty = spot_vol = 0.0
@@ -412,6 +416,11 @@ class CarryBot:
     def slot_notional(self, equity: float) -> float:
         """Notional per slot, so that spot + perp margin = slot_fraction of capital."""
         return equity * self.cfg.slot_fraction / (1.0 + 1.0 / self.cfg.perp_leverage)
+
+    def set_real_capital(self, usd: float) -> None:
+        """The allocator's deployable capital for the real book; zero stops
+        new entries. Open positions are left to their own exits."""
+        self.real_capital = max(0.0, float(usd))
 
     def guard_tripped(self, pos) -> bool:
         if self.cfg.margin_guard is None:

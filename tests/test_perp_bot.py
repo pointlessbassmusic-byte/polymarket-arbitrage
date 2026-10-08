@@ -694,3 +694,19 @@ async def test_sizing_respects_overnight_short_margin(monkeypatch):
     pos = bot.books["sim"].portfolio.positions[sig.key]
     # $1,000 / 1.14 = $877 of notional -> 2 contracts of $400, not 2.5
     assert pos.size_usd == pytest.approx(800.0) and pos.lots == 2
+
+
+def test_set_real_capital_resizes_slots_and_zero_blocks_entries(tmp_path, monkeypatch):
+    monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
+    bot = PB.build({"perp": {"venue": "kalshi"}, "allocation": {"carry": 0.0, "bounce_short": 1.0},
+                    "risk": {"bankroll_usd": 300}}, tmp_path)
+    assert bot.books["real"].risk.cfg.max_position_usd == pytest.approx(150.0)   # 2 coins
+    bot.set_real_capital(100.0)
+    assert bot.books["real"].risk.cfg.max_position_usd == pytest.approx(50.0)
+    assert bot.real_capital == 100.0 and bot.books["real"].starting_equity == 300.0
+    bot.set_real_capital(0.0)
+    sig = Signal(ts=1.0, type=SignalType.BOUNCE_SHORT, key=f"{CHAIN}:DOGE", chain=CHAIN,
+                 symbol="DOGE", side=Side.SHORT, price_usd=0.085, confidence=0.35,
+                 expected_move=0.20, stop_loss_pct=0.10, take_profit_pct=0.20, reason="t",
+                 risk_reward=2.0, liquidity_usd=5e6)
+    assert bot.books["real"].risk.size_position(sig, []) == 0.0

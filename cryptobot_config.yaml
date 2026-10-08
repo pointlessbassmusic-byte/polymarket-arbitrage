@@ -155,8 +155,8 @@ perp:
   # SHIB 1M-coin contracts of ~$5-8, 4 bp taker, ~2-3x margin, no
   # overnight switch; PEPE listed but inactive). Fifty times finer than
   # Coinbase's contracts, so a $200 account can hold all slots whole.
-  venue: coinbase
-  data: coinbase               # market data source; `hyperliquid` (public API) also works
+  venue: kalshi                # $100-250 fits whole contracts only on Kalshi; see README
+  data: kalshi                 # market data source for the venue; `hyperliquid` (public API) also works
   # kalshi_base_url: https://external-api.demo.kalshi.co/trade-api/v2   # Kalshi demo environment
   history_seed: state/hl_daily_us3.pkl   # cached daily history to fit cuts before Coinbase's Dec 2025 listing
   private_key_env: CRYPTOBOT_PRIVATE_KEY # Hyperliquid venue only
@@ -194,6 +194,31 @@ carry:
 # the bounce-short in the 2025 collapse (+35.8%). 50/50 kept every year
 # between +6% and +20% on capital in the backtests. Each bot sizes from
 # its share of sim.bankroll_usd (paper) and risk.bankroll_usd (real).
+# Live capital allocation (the desk's allocator; README "Running the desk
+# with real money"). Weights come from backtest evidence shrunk by its
+# Deflated Sharpe / PSR, updated slowly by live trades, with hard gates.
+allocator:
+  mode: auto                 # auto | manual (manual weights are set from the dashboard)
+  kelly_fraction: 0.5
+  learning_floor: 0.5        # while learning, never deploy less than half the real capital
+  max_deploy: 1.0            # never more than all of it (no leverage)
+  pseudo_trades: 50          # live trades it takes to halve the backtest's say
+  max_drawdown_real: 0.25    # real equity 25% below its peak: stop new entries until resumed
+  max_slippage_bps: 50       # mean adverse slippage over 10+ fills above this halves the weight
+
+# Evidence per strategy, from the registry (cryptobot/hypotheses.yaml).
+strategies:
+  bounce:
+    registry: bounce-short-us3
+    backtest_mean: 0.020     # net per trade, US-3 walk-forward at 0.40% round trip
+    backtest_sd: 0.131
+    confidence: 0.34         # Deflated Sharpe at N_eff on 14-day blocks
+  carry:
+    registry: funding-carry
+    backtest_mean: 0.0003    # per day on capital
+    backtest_sd: 0.01
+    confidence: 0.0          # diagnostics pending; and shelved in the US
+
 # On Coinbase (US) carry is off: the three listed memecoins paid negative
 # or near-zero funding over the past year, and carry's edge needed breadth
 # across ~150 coins. Set carry back to 0.5 and perp.venue to hyperliquid

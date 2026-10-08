@@ -115,6 +115,10 @@ class PerpBot:
         self.costs = perp_cost_model(cfg.taker_fee, cfg.min_fee_per_lot)
         self._margin: dict[str, float] = {}   # overnight SHORT margin rate per coin, when the venue publishes it
         self.execlog = ExecutionLog(Path(cfg.state_dir) / EXECLOG_FILE if cfg.state_dir else None)
+        # The allocator re-sizes the real book's slots from live capital;
+        # these let it rebuild the risk config the way build() did.
+        self.risk_base: dict = {}
+        self.real_capital: float = real_risk.bankroll_usd
         self._last_margin_snapshot: float = 0.0
         self.sub_contract_skips = 0
         self.reconcile_report: Optional[dict] = None
@@ -348,6 +352,17 @@ class PerpBot:
         pos.lots = lots
         self.eligible_at[f"{book.name}:{sig.key}"] = sig.ts + self.cfg.hold_days * 86400
         note("opened", "entry", sig.reason, size)
+
+    def set_real_capital(self, usd: float) -> None:
+        """Deployable real capital: one equal slot per coin at 1x, exposure
+        never above it. Zero stops new real entries (open positions keep
+        their stops and targets). Accounting (starting_equity) is untouched."""
+        usd = max(0.0, float(usd))
+        book = self.books["real"]
+        halted = book.risk.state
+        book.risk.cfg = slot_risk(self.risk_base, usd, len(self.cfg.coins))
+        book.risk.state = halted
+        self.real_capital = usd
 
     def _fee_side(self, notional: float, lots: float) -> float:
         """The fee the cost model expects for one side of this trade."""
@@ -801,8 +816,10 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
             if seed_path and not seed_path.exists() and state_dir:
                 seed_path = Path(state_dir) / seed_path.name
             client = KalshiMarketData(history_seed=seed_path, base_url=executor.cfg.base_url)
-    return PerpBot(bot_cfg, sim_risk, real_risk, ProtectionConfig(**prot_kw), exec_cfg,
-                   client=client, executor=executor)
+    bot = PerpBot(bot_cfg, sim_risk, real_risk, ProtectionConfig(**prot_kw), exec_cfg,
+                  client=client, executor=executor)
+    bot.risk_base = dict(risk_kw)
+    return bot
 
 
 async def _main(args) -> int:

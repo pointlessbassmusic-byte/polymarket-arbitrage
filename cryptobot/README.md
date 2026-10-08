@@ -1124,6 +1124,69 @@ tolerable while the record accumulates, and the verdict rule for every
 future idea is written into the registry: *alive* needs DSR ≥ 0.95 at
 N_eff, PBO ≤ 0.5 and ≥ 80% of CPCV paths positive.
 
+## Running the desk with real money: allocation, learning, loss limits
+
+You load money; the desk decides how much of it each strategy may use,
+trades, and reports. The design follows what the diagnostics showed:
+
+**What live trading teaches fast** (weeks): execution cost, fill
+quality, venue reliability, reconciliation, drawdown. The desk measures
+all of it (`state/execution.jsonl`, the digest, the dashboard) and acts
+on it: slippage worse than modelled halves a strategy's weight; a venue
+mismatch is flagged; a drawdown past the limit stops new entries.
+
+**What live trading cannot teach fast** (years): whether the edge is
+real. The bounce-short needs 32–104 months of track record to show its
+Sharpe is above zero. So the allocator never chases a good month.
+
+**The allocator** (`cryptobot/allocator.py`, hourly, and on every change
+you make) sets each strategy's weight from
+
+    prior      = backtest mean per trade × confidence
+                 (confidence is the registry's Deflated Sharpe or PSR: 0.34
+                 for the bounce-short, so the backtest is believed a third)
+    posterior  = (50 × prior + n_live × live mean) / (50 + n_live)
+    f*         = posterior / sd²                 (Kelly fraction)
+    weight     = clamp(f* × ½, learning floor 50%, 100%)
+
+and then applies hard gates: registry verdict `killed` → 0; no armed
+executor → 0 (paper only); real equity 25% below its peak → 0 and a
+**KILL** that only you can clear (the dashboard's *resume* button);
+mean adverse slippage above 50 bp over 10+ fills → halved. Every weight
+comes with its reason on the dashboard. Five live trades move the
+posterior by 5/55; a strategy earns more capital by accumulating
+evidence, not by a streak. With one strategy and $200 that means: half
+deployed while learning, all of it only once live evidence has raised
+the posterior, nothing after a 25% drawdown until you look at it.
+
+**Manual mode**: set weights on the dashboard (they must add up to 100%
+or less; the rest is cash). The gates still apply. *Back to auto*
+returns control to the allocator.
+
+**Compounding** comes from reading capital from the venue every hour:
+weights apply to what the account actually holds.
+
+**Changing strategies**: the lab on the dashboard shows every idea in
+the registry with its verdict and evidence. A new strategy gets capital
+when it is pre-registered (`PREREGISTER.md`), tested, given a bot with
+an executor, and listed under `strategies:` in the config with its
+backtest numbers and confidence; the allocator then sizes it against
+the others. Nothing is funded on a backtest alone: the confidence term
+is what the diagnostics say the backtest is worth.
+
+**For $100–250** the venue is Kalshi (`perp.venue: kalshi`): DOGE and
+SHIB contracts of ~$5–8, so every slot fits whole. Coinbase needs
+~$6,000 to hold all three of its contracts; below that it is a SHIB-only
+book. If your Kalshi account does not yet have perps access
+(`--preflight` checks `/margin/enabled`), run Coinbase with SHIB until it
+does.
+
+**The dashboard** (`python -m cryptobot.desk`, or `./deploy.sh` on the
+server): capital and allocation with reasons and controls, real and
+paper equity curves, each strategy's books, evidence and track record,
+venue reconciliation, execution quality from real fills, the registry
+lab, and desk events. One token guards every API route.
+
 ## Running from the US: Coinbase Derivatives instead of Hyperliquid
 
 Hyperliquid blocks US residents. The bot does not route around that: a
