@@ -158,6 +158,9 @@ class Position:
     # which is not a rounding error next to a 1.5% edge.
     funding_usd: float = 0.0
     funding_accrued_at: float = 0.0
+    # Whole contracts on venues that trade them (Coinbase Derivatives);
+    # the fee floor is charged per contract, not per dollar.
+    lots: float = 0.0
 
     def unrealized_pnl(self, price: float) -> float:
         if self.side == Side.LONG:

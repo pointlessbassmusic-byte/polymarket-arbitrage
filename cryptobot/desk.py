@@ -249,15 +249,19 @@ def preview_checks(previews: list[dict]) -> list[tuple[str, bool, str]]:
 
 
 async def contract_prices() -> dict:
-    """Live dollar size of one Coinbase contract per coin."""
+    """Live dollar size of one Coinbase contract per coin, and the
+    overnight short margin rate that decides how much of a slot it uses."""
     from .data.coinbase_futures import CoinbaseMarketData
     from .execution.coinbase_futures import CONTRACTS
     md = CoinbaseMarketData()
     try:
         mids = await md.all_mids()
+        margins = await md.margin_rates()
     finally:
         await md.close()
-    return {c: mids[c] * CONTRACTS[c].units_per_contract for c in CONTRACTS if c in mids}
+    out = {c: mids[c] * CONTRACTS[c].units_per_contract for c in CONTRACTS if c in mids}
+    out["_margin"] = margins
+    return out
 
 
 def preflight(cfg: dict, env: dict, balances: Optional[dict] = None,
@@ -292,11 +296,24 @@ def preflight(cfg: dict, env: dict, balances: Optional[dict] = None,
                    f"largest planned order ${plan['largest_order']:.2f} > perp.max_trade_usd "
                    f"${plan['max_trade_usd']:.2f}: orders would be capped and positions undersized"))
     if plan["venue"] == "coinbase" and contract_usd:
-        worst = max(contract_usd.values())
-        checks.append((f"each slot (${plan['bounce_slot']:.0f}) buys at least one contract",
+        from .execution.coinbase_futures import effective_fee, CONTRACTS
+        margins = contract_usd.get("_margin", {}) or {}
+        sizes = {c: v for c, v in contract_usd.items() if c in CONTRACTS}
+        # A slot must cover one contract's overnight short margin, not just its notional.
+        need = {c: v * max(1.0, margins.get(c, 1.0)) for c, v in sizes.items()}
+        worst_coin = max(need, key=need.get)
+        worst = need[worst_coin]
+        checks.append((f"each slot (${plan['bounce_slot']:.0f}) buys at least one contract after overnight margin",
                        plan["bounce_slot"] >= worst,
-                       f"the largest contract is ${worst:,.0f}; with {len(contract_usd)} coins the "
-                       f"bounce-short needs a bankroll of at least ${worst * len(contract_usd) / max(1e-9, plan['bounce_capital'] / plan['bankroll']):,.0f}"))
+                       f"{worst_coin}: ${sizes[worst_coin]:,.0f} contract x {100 * margins.get(worst_coin, 1.0):.0f}% "
+                       f"overnight short margin = ${worst:,.0f}; with {len(sizes)} coins the bounce-short needs at "
+                       f"least ${worst * len(sizes) / max(1e-9, plan['bounce_capital'] / plan['bankroll']):,.0f}"))
+        for c, v in sizes.items():
+            fee = effective_fee(c, v / CONTRACTS[c].units_per_contract)
+            checks.append((f"{c}: fee {100 * fee:.2f}%/side, overnight short margin {100 * margins.get(c, 0):.0f}%",
+                           fee <= 0.0015,
+                           f"the $0.20 per-contract floor on a ${v:,.0f} contract is {100 * fee:.2f}% per side; "
+                           f"the rule's +2.76%/trade edge is measured at 0.20-0.30% round trip"))
     if balances is not None:
         needs = [("kraken_usd", plan["kraken_usd"]), ("hyperliquid_usdc", plan["hyperliquid_usdc"]),
                  ("coinbase_usd", plan["coinbase_usd"])]

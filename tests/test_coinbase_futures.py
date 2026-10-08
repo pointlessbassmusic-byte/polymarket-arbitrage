@@ -179,7 +179,7 @@ async def test_positions_are_signed_units(monkeypatch):
         {"product_id": "SHP-20DEC30-CDE", "side": "LONG", "number_of_contracts": "3"},
         {"product_id": "BIP-20DEC30-CDE", "side": "SHORT", "number_of_contracts": "1"}]}
     ex = armed_executor(monkeypatch, fake)
-    assert await ex.positions() == {"DOGE": -10_000.0, "kSHIB": 30.0}
+    assert await ex.positions() == {"DOGE": -10_000.0, "kSHIB": 30_000.0}
 
 
 @pytest.mark.asyncio
@@ -228,3 +228,30 @@ async def test_products_fetched_once_per_tick():
     md = CoinbaseMarketData(client=Http([]))
     await md.all_mids(); await md.funding_rates()
     assert len(calls) == 1
+
+
+def test_effective_fee_floor_hits_small_contracts():
+    from cryptobot.execution.coinbase_futures import effective_fee, TAKER_FEE
+    assert effective_fee("DOGE", 0.085) == pytest.approx(TAKER_FEE)          # $425 contract: rate applies
+    assert effective_fee("kSHIB", 0.0053) == pytest.approx(0.20 / 53.0)      # $53 contract: $0.20 floor
+
+
+@pytest.mark.asyncio
+async def test_margin_rates_read_overnight_short():
+    class Http(FakeHttp):
+        async def get(self, path, params=None):
+            return Resp({"products": [{"product_id": "PEP-20DEC30-CDE", "price": "0.0038",
+                                       "future_product_details": {"overnight_margin_rate": {"long_margin_rate": "0.54", "short_margin_rate": "1.143375"}}}]})
+    md = CoinbaseMarketData(client=Http([]))
+    assert await md.margin_rates() == {"kPEPE": pytest.approx(1.143375)}
+
+
+def test_contract_units_match_coinbase_contract_size_field():
+    """Coinbase's product endpoint reports contract_size in the quoted unit
+    (DOGE, 1000PEPE, 1000SHIB), which is the bot's own price unit, so the
+    two numbers must be identical. Recorded 2026-10-08: DOP 5000, PEP
+    100000, SHP 10000. A 1000x slip here once sized a $1,000 slot as 2,600
+    PEPE contracts."""
+    api_contract_size = {"DOP-20DEC30-CDE": 5_000, "PEP-20DEC30-CDE": 100_000, "SHP-20DEC30-CDE": 10_000}
+    for c in CONTRACTS.values():
+        assert c.units_per_contract == api_contract_size[c.product_id]

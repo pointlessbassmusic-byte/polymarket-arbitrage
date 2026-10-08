@@ -45,6 +45,9 @@ DEFAULT_GAS_USD = {
 class CostConfig:
     dex_fee: float = 0.003              # per swap side (0.3% v2-style)
     extra_slippage: float = 0.002       # routing/MEV/latency per side
+    # Exchange minimum per contract per side (Coinbase Derivatives: $0.20).
+    # On a $54 1000SHIB contract that is 0.37%/side, seven times the rate.
+    min_fee_per_lot_usd: float = 0.0
     gas_usd: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_GAS_USD))
     default_gas_usd: float = 5.0        # unknown chain -> assume expensive
     # A trade is only taken when expected_move >= round_trip * this.
@@ -85,8 +88,10 @@ class CostModel:
         return 2.0 * per_side
 
     def round_trip_usd(self, size_usd: float, liquidity_usd: float,
-                       chain: str) -> float:
-        return size_usd * self.round_trip_fraction(size_usd, liquidity_usd, chain)
+                       chain: str, lots: float = 0.0) -> float:
+        base = size_usd * self.round_trip_fraction(size_usd, liquidity_usd, chain)
+        floor = 2.0 * max(0.0, lots * self.cfg.min_fee_per_lot_usd - size_usd * self.cfg.dex_fee)
+        return base + floor
 
     def net_risk_reward(self, take_profit_pct: float, stop_loss_pct: float,
                         size_usd: float, liquidity_usd: float,

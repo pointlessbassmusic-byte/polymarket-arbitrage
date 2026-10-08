@@ -523,7 +523,7 @@ def test_build_coinbase_sets_venue_fee_and_contract_units(tmp_path, monkeypatch)
     monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
     bot = PB.build({"perp": {"venue": "coinbase"}, "allocation": {"carry": 0.0, "bounce_short": 1.0}}, tmp_path)
     assert bot.cfg.taker_fee == CB_FEE
-    assert bot.cfg.contract_units == {"DOGE": 5000.0, "kPEPE": 100.0, "kSHIB": 10.0}
+    assert bot.cfg.contract_units == {"DOGE": 5000.0, "kPEPE": 100_000.0, "kSHIB": 10_000.0}
     assert bot.costs.cfg.dex_fee == CB_FEE
 
 
@@ -665,3 +665,32 @@ async def test_pending_close_clears_when_exit_no_longer_due():
     client.mids = {"DOGE": 0.105}                             # back inside the stop
     await bot.monitor()
     assert not bot.pending_closes
+
+
+def test_cost_model_charges_per_contract_floor():
+    cm = PB.perp_cost_model(0.0005, 0.20)
+    # 3 SHIB contracts, $159 notional: rate would be $0.08/side, floor is $0.60/side
+    costs = cm.round_trip_usd(159.0, 5e6, CHAIN, lots=3)
+    impact = 159.0 * (159.0 / 5e6)
+    assert costs == pytest.approx(2 * (0.60 + 159.0 * PB.SLIPPAGE + impact), rel=1e-6)
+    # 2 DOGE contracts, $850 notional: rate ($0.425/side) exceeds the floor ($0.40)
+    costs = cm.round_trip_usd(850.0, 5e6, CHAIN, lots=2)
+    assert costs == pytest.approx(850.0 * 2 * (0.0005 + PB.SLIPPAGE + 850.0 / 5e6), rel=1e-6)
+
+
+@pytest.mark.asyncio
+async def test_sizing_respects_overnight_short_margin(monkeypatch):
+    monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
+    cfg = PerpBotConfig(coins=("kPEPE",), contract_units={"kPEPE": 100_000.0}, state_dir=None)
+    risk = PB.slot_risk({}, 1000.0, 1)                        # one $1,000 slot
+    bot = PerpBot(cfg, risk, risk, ProtectionConfig(), PerpExecConfig(),
+                  client=PB.ReplayClient({}), executor=PerpExecutor(PerpExecConfig()))
+    bot._margin = {"kPEPE": 1.14}                               # $1.14 margin per $1 short
+    sig = Signal(ts=1.0, type=SignalType.BOUNCE_SHORT, key=f"{CHAIN}:kPEPE", chain=CHAIN,
+                 symbol="kPEPE", side=Side.SHORT, price_usd=0.004, confidence=0.35,
+                 expected_move=0.20, stop_loss_pct=0.10, take_profit_pct=0.20, reason="t",
+                 risk_reward=2.0, liquidity_usd=5e6)
+    await bot._consider(bot.books["sim"], sig)
+    pos = bot.books["sim"].portfolio.positions[sig.key]
+    # $1,000 / 1.14 = $877 of notional -> 2 contracts of $400, not 2.5
+    assert pos.size_usd == pytest.approx(800.0) and pos.lots == 2

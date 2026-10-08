@@ -139,7 +139,7 @@ class Portfolio:
         costs = 0.0
         if self.cost_model is not None:
             costs = self.cost_model.round_trip_usd(
-                pos.size_usd, pos.liquidity_usd, pos.chain)
+                pos.size_usd, pos.liquidity_usd, pos.chain, lots=pos.lots)
             pnl -= costs
             self.total_costs += costs
         trade = ClosedTrade(

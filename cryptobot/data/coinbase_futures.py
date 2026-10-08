@@ -102,6 +102,22 @@ class CoinbaseMarketData:
                 out[coin] = float(p["price"])
         return out
 
+    async def margin_rates(self) -> dict[str, float]:
+        """Overnight SHORT margin rate per coin (fraction of notional). The
+        switch from intraday to overnight shortly after 16:00 ET is where
+        Coinbase says most surprise liquidations happen."""
+        by_id = await self.products()
+        out = {}
+        for coin, c in CONTRACTS.items():
+            d = ((by_id.get(c.product_id) or {}).get("future_product_details") or {})
+            r = (d.get("overnight_margin_rate") or {}).get("short_margin_rate")
+            try:
+                if r is not None:
+                    out[coin] = float(r)
+            except (TypeError, ValueError):
+                continue
+        return out
+
     async def funding_rates(self) -> dict[str, float]:
         """Current hourly funding per coin (positive = longs pay shorts)."""
         by_id = await self.products()

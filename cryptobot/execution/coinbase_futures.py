@@ -50,9 +50,15 @@ class Contract:
 
 # Bot coin name -> Coinbase US perpetual-style future.
 CONTRACTS = {
+    # units_per_contract is in the bot's price units: DOGE per DOGE; kPEPE
+    # and kSHIB are priced per 1,000 coins (Hyperliquid's k-prefix, and
+    # Coinbase's "1000PEPE"/"1000SHIB" products use the same quote), so
+    # Coinbase's contract_size field (100,000 / 10,000) is ALREADY in those
+    # units: one 1000PEPE contract is 100,000 x (1,000 PEPE) = $380-450.
+    # Verified against the public product endpoint (contract_size x price).
     "DOGE": Contract("DOP-20DEC30-CDE", 5_000.0, "DOGE PERP"),
-    "kPEPE": Contract("PEP-20DEC30-CDE", 100.0, "1000PEPE PERP"),
-    "kSHIB": Contract("SHP-20DEC30-CDE", 10.0, "1000SHIB PERP"),
+    "kPEPE": Contract("PEP-20DEC30-CDE", 100_000.0, "1000PEPE PERP"),
+    "kSHIB": Contract("SHP-20DEC30-CDE", 10_000.0, "1000SHIB PERP"),
 }
 US_COINS = tuple(CONTRACTS)
 
@@ -60,7 +66,17 @@ US_COINS = tuple(CONTRACTS)
 # futures fees "as low as 0.02%" per contract side and charged 0.05%
 # during beta; 0.10% a side here is deliberately pessimistic. The rule
 # survives a 0.60% round trip in backtest.
-TAKER_FEE = 0.0010
+# Introductory US futures rate per side, all-in, with a per-contract floor.
+TAKER_FEE = 0.0005
+MIN_FEE_PER_CONTRACT = 0.20
+
+
+def effective_fee(coin: str, mid: float) -> float:
+    """Per-side fee as a fraction of notional for ONE contract at `mid`:
+    the rate, or the floor when the contract is small (1000SHIB)."""
+    c = CONTRACTS[coin]
+    notional = c.units_per_contract * mid
+    return max(TAKER_FEE, MIN_FEE_PER_CONTRACT / notional) if notional > 0 else TAKER_FEE
 
 
 class SizeTooSmall(ValueError):

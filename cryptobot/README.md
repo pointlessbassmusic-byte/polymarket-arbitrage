@@ -1091,24 +1091,40 @@ What changes in practice:
   `CRYPTOBOT_ARM_LIVE=yes` and both env vars.
 
 **What a small account actually gets.** The table above is the
-strategy with fractional sizing. The paper book on Coinbase now charges
-Coinbase's fee and rounds every slot down to whole contracts, exactly as
-the real book does, so the sim is what your bankroll can do rather than
-what the rule can do. Replayed 2022-01 to 2026-10 with the deployed
-sizing (one slot per coin, 10% daily-loss halt), 0.10% taker per side:
+strategy with fractional sizing. The paper book on Coinbase charges
+Coinbase's actual fee (0.05% per side with a **$0.20 per-contract
+floor**, which makes the $53 1000SHIB contract cost 0.38% per side),
+sizes each slot against the **overnight short margin rate** the venue
+publishes (92% DOGE, 114% 1000PEPE, 95% 1000SHIB on 2026-10-08: a $1
+memecoin short needs about $1 of margin, there is no leverage), and
+rounds every slot down to whole contracts, exactly as the real book
+does. Replayed 2022-01 to 2026-10 with the deployed sizing (one slot per
+coin, 10% daily-loss halt):
 
 | bankroll | 2022 | 2023 | 2024 | 2025 | 2026 YTD | signals too small |
 |---|---|---|---|---|---|---|
-| $1,500 | +6.4% | +10.4% | +18.0% | +14.2% | −6.3% | 46 of 164 |
-| $3,000 | +4.1% | +10.1% | +24.9% | −0.2% | −1.1% | 16 of 155 |
+| $1,500 | +8.9% | +9.0% | +11.0% | +3.4% | −2.6% | 98 of 189 |
+| $3,000 | +4.5% | +9.1% | +17.2% | −7.8% | −2.8% | 40 of 167 |
+| $6,000 | +9.8% | +8.9% | +14.6% | +36.6% | −0.4% | 3 of 148 |
 | $10,000 (fractional) | +12.2% | +11.3% | +34.9% | +50.8% | +4.8% | — |
 
-The gap is DOGE: its contract is 5,000 DOGE, so above $0.10 a $500 slot
-cannot hold one, and above $0.20 neither can a $1,000 slot. The 2025
-year was mostly DOGE trades. Under about $5,000 the account trades SHIB
-and PEPE with DOGE only when it is cheap, and the year-to-year numbers
-are lumpier than the fractional table. Reproduce with
+Contracts are 5,000 DOGE (~$420), 100,000 × 1000PEPE (~$380) and
+10,000 × 1000SHIB (~$53); when DOGE or PEPE trade higher, as in 2024-25,
+a $500 or $1,000 slot cannot hold one and the signal is skipped. The
+2025 year was mostly those trades. Under about $6,000 the account is
+effectively a SHIB-plus-whatever-fits bot and the year-to-year numbers
+are lumpier than the fractional table; at $6,000 it tracks the
+strategy. Reproduce with
 `python -m cryptobot.perp_bot --replay state/hl_daily_us3.pkl --replay-from 2022-01-01 --bankroll 1500 --on-capital --whole-contracts`.
+
+A note on how this table was found: an earlier version of the contract
+table had the 1000PEPE and 1000SHIB units 1,000× too small (Coinbase's
+`contract_size` is already in 1000-coin units because the product is
+priced per 1,000 coins). The fee floor exposed it in replay; in a live
+account it would have sized a $1,000 slot as ~2,600 PEPE contracts. The
+units are now asserted against the recorded `contract_size` values in
+the tests, and `--preflight` prints the live dollar size, fee and
+overnight margin per contract.
 
 **Carry is shelved in the US.** Carry's edge needed breadth (the
 150-coin universe); US venues list three memecoin perps, and over the

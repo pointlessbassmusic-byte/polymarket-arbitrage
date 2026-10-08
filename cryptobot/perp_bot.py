@@ -72,16 +72,17 @@ class PerpBotConfig:
     fetch_pause_s: float = 0.2         # between per-coin candle requests
     state_dir: Optional[Path] = None
     taker_fee: float = TAKER_FEE       # per side; the venue's, so paper fills cost what real ones do
+    min_fee_per_lot: float = 0.0       # exchange minimum per contract per side
     # coin -> units per contract. Non-empty means the venue trades whole
     # contracts: the paper book then rounds every slot down to whole
     # contracts too, so sim and real can only differ by execution.
     contract_units: dict = field(default_factory=dict)
 
 
-def perp_cost_model(taker_fee: float = TAKER_FEE) -> CostModel:
+def perp_cost_model(taker_fee: float = TAKER_FEE, min_fee_per_lot: float = 0.0) -> CostModel:
     """Exchange friction: taker fee + slippage per side, no gas."""
     return CostModel(CostConfig(
-        dex_fee=taker_fee, extra_slippage=SLIPPAGE,
+        dex_fee=taker_fee, extra_slippage=SLIPPAGE, min_fee_per_lot_usd=min_fee_per_lot,
         gas_usd={CHAIN: 0.0}, default_gas_usd=0.0,
         min_edge_multiple=4.0, min_net_risk_reward=1.25, max_gas_fraction=1.0,
     ))
@@ -104,7 +105,8 @@ class PerpBot:
         self.cfg = cfg
         self.client = client or HyperliquidClient()
         self.executor = executor or PerpExecutor(exec_cfg)
-        self.costs = perp_cost_model(cfg.taker_fee)
+        self.costs = perp_cost_model(cfg.taker_fee, cfg.min_fee_per_lot)
+        self._margin: dict[str, float] = {}   # overnight SHORT margin rate per coin, when the venue publishes it
         self.sub_contract_skips = 0
         self.reconcile_report: Optional[dict] = None
         self.pending_closes: set[str] = set()   # real positions whose exit order failed
@@ -255,16 +257,24 @@ class PerpBot:
         if size <= 0:
             note("skipped", "sizing", "no size: risk caps or exposure limit")
             return
+        # Overnight short margin above 100% (Coinbase memecoin perps: 92-114%)
+        # means a $1 short needs more than $1 of margin. The slot is the
+        # margin we have, so notional = slot / rate; never above 1x either way.
+        rate = self._margin.get(sig.symbol, 0.0)
+        if rate > 1.0:
+            size = size / rate
+        lots = 0.0
         units = self.cfg.contract_units.get(sig.symbol)
         if units:
             contract_usd = units * sig.price_usd
-            n = int(size // contract_usd)
+            n = int(size // contract_usd + 1e-9)
             if n < 1:
                 self.sub_contract_skips += 1
                 note("skipped", "sizing",
                      f"slot ${size:.0f} is smaller than one contract (${contract_usd:.0f})", size)
                 return
             size = n * contract_usd
+            lots = float(n)
         ok, why = self.costs.entry_allowed(
             sig.expected_move, size, sig.liquidity_usd, sig.chain,
             take_profit_pct=sig.take_profit_pct, stop_loss_pct=sig.stop_loss_pct)
@@ -284,7 +294,10 @@ class PerpBot:
             # The real book records the REAL fill, not the signal price.
             sig = Signal(**{**vars(sig), "price_usd": fill.price})
             size = fill.qty * fill.price
-        book.portfolio.open_from_signal(sig, size)
+            if units:
+                lots = fill.qty / units
+        pos = book.portfolio.open_from_signal(sig, size)
+        pos.lots = lots
         self.eligible_at[f"{book.name}:{sig.key}"] = sig.ts + self.cfg.hold_days * 86400
         note("opened", "entry", sig.reason, size)
 
@@ -339,6 +352,11 @@ class PerpBot:
             logger.warning("funding refresh failed: %s", exc)
             rates = {}
         self._funding = rates
+        if hasattr(self.client, "margin_rates"):
+            try:
+                self._margin = await self.client.margin_rates()
+            except Exception as exc:
+                logger.warning("margin rates refresh failed: %s", exc)
         t = now()
         for book in self.books.values():
             dirty = False
@@ -427,6 +445,7 @@ class PerpBot:
                 "history_days": self.history_days,
                 "last_daily_run": self.last_daily_run,
                 "funding_hourly": {c: self._funding.get(c, 0.0) for c in self.cfg.coins},
+                "short_margin": {c: self._margin.get(c, 0.0) for c in self.cfg.coins},
             },
             "reconcile": self.reconcile_report,
             "books": {n: b.state(prices, self.edges) for n, b in self.books.items()},
@@ -638,7 +657,8 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
         from .execution.coinbase_futures import CONTRACTS, US_COINS
         from .execution.coinbase_futures import TAKER_FEE as CB_FEE
         coins = tuple(perp.get("coins") or US_COINS)
-        venue_kw = {"taker_fee": CB_FEE,
+        from .execution.coinbase_futures import MIN_FEE_PER_CONTRACT
+        venue_kw = {"taker_fee": CB_FEE, "min_fee_per_lot": MIN_FEE_PER_CONTRACT,
                     "contract_units": {c: CONTRACTS[c].units_per_contract for c in coins if c in CONTRACTS}}
     else:
         coins = tuple(perp.get("coins") or MEMECOINS)
@@ -693,9 +713,11 @@ async def _main(args) -> int:
         if perp.get("venue") == "coinbase":
             from .execution.coinbase_futures import CONTRACTS
             from .execution.coinbase_futures import TAKER_FEE as CB_FEE
+            from .execution.coinbase_futures import MIN_FEE_PER_CONTRACT
             venue_kw = {"taker_fee": CB_FEE}
             if args.whole_contracts:
                 venue_kw["contract_units"] = {c: k.units_per_contract for c, k in CONTRACTS.items()}
+                venue_kw["min_fee_per_lot"] = MIN_FEE_PER_CONTRACT
         rcfg = PerpBotConfig(target_pct=float(perp.get("target_pct", 0.20)),
                              stop_pct=float(perp.get("stop_pct", 0.10)),
                              hold_days=int(perp.get("hold_days", 14)), **venue_kw)
@@ -704,6 +726,7 @@ async def _main(args) -> int:
         print(f"replay from {args.replay_from}: {rep['trades']} closed trades, "
               f"{rep['open']} still open, mean net {100 * rep['mean_net']:+.2f}%/trade"
               f"; fee {100 * rcfg.taker_fee:.2f}%/side"
+              + (f" (min ${rcfg.min_fee_per_lot:.2f}/contract)" if rcfg.min_fee_per_lot else "")
               + (f"; whole contracts, {rep['skipped_sub_contract']} signals too small"
                  if rcfg.contract_units else ""))
         for y, (n, m) in rep["by_year"].items():

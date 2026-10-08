@@ -299,9 +299,9 @@
   claim: "The rule keeps its edge on the three coins a US resident can short on a regulated venue."
   test: "Walk-forward, cuts refit on prior years, one slot per coin at 1x, a third of capital each; fees at HL-like, 0.40%, 0.60% round trip."
   data: "Hyperliquid daily perps 2022-2026 for DOGE/kPEPE/kSHIB (Coinbase candles only since 2025-12)"
-  result: "5/5 years positive, beats unconditional short 5/5, +2.76%/trade over 230; on capital at 0.40%: +9.6/+6.9/+20.1/+50.1/+7.0%; max DD about -20%"
+  result: "5/5 years positive, beats unconditional short 5/5, +2.76%/trade over 230; on capital at 0.40%: +9.6/+6.9/+20.1/+50.1/+7.0%; deployed sizing with whole contracts, Coinbase fee floor and overnight short margin: $1,500 +8.9/+9.0/+11.0/+3.4/-2.6, $3,000 +4.5/+9.1/+17.2/-7.8/-2.8, $6,000 +9.8/+8.9/+14.6/+36.6/-0.4; max DD about -20%"
   verdict: alive
-  regime: "2022 bear through 2025 collapse; contracts are whole ($480/$440/$60), so a real bankroll under ~$1,500 trades fewer coins"
+  regime: "2022 bear through 2025 collapse; contracts are whole (~$420 DOGE / ~$380 1000PEPE / ~$53 1000SHIB) and overnight short margin is 92-114%, so under ~$6,000 the account skips DOGE/PEPE when they are expensive"
   rerun: "python -m cryptobot.perp_study --cache hl_daily_us3.pkl --funding hl_funding.pkl --target 0.20 --stop 0.10 --days 14 --walk-forward \"short:move_1d[2]&move_3d[0]\""
 
 - id: carry-us
