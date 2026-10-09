@@ -139,7 +139,8 @@ function lab(){
   rows.map(r=>`<tr><td class="l"><b>${esc(r.id)}</b><br><span class="muted">${esc(r.title)}</span></td><td><span class="chip ${r.verdict==="killed"?"bad":r.verdict==="alive"||r.verdict==="adopted"?"good":"warn"}">${esc(r.verdict)}</span></td><td>${r.trials_run??"–"}</td><td>${r.dsr!=null?Number(r.dsr).toFixed(2):r.psr!=null?Number(r.psr).toFixed(2):"–"}</td><td class="l muted">${esc(r.result)}</td></tr>`).join("")+`</tbody></table>`;
 }
 async function tick(){try{const r=await fetch("api/desk",{headers:H});if(!r.ok){document.getElementById("sub").textContent="token rejected; open the URL from the desk log";return}S=await r.json();
- kpis();alloc();strategies();chart();lab();document.getElementById("exec").textContent=S.execution_text||"no real fills yet";
+ kpis();alloc();strategies();chart();lab();const tune=Object.entries(S.tuning||{}).map(([n,t])=>`IOC limit ${n}: ${(100*t.limit).toFixed(2)}% — ${t.reason}`).join("\n");
+ document.getElementById("exec").textContent=(S.execution_text||"no real fills yet")+(tune?"\n"+tune:"");
  document.getElementById("alerts").innerHTML=(S.alerts||[]).slice().reverse().map(a=>`<div class="alert"><span class="muted">${when(a.ts)}</span> ${esc(a.text)}</div>`).join("")||`<span class="muted">nothing yet</span>`;
 }catch(e){document.getElementById("sub").textContent="desk unreachable: "+e}}
 tick();setInterval(tick,30000);

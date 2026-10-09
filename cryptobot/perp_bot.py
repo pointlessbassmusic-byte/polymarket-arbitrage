@@ -335,6 +335,10 @@ class PerpBot:
             except Exception as exc:
                 logger.exception("real short failed for %s", sig.symbol)
                 note("skipped", "execution", f"order failed: {exc}", size)
+                msg = str(exc).lower()
+                self.execlog.skip(book=book.name, coin=sig.symbol,
+                                  stage="unfilled" if ("not fill" in msg or "unfilled" in msg) else "execution",
+                                  reason=str(exc)[:200], size=size)
                 return
             # The real book records the REAL fill, not the signal price.
             intended = sig.price_usd
@@ -483,6 +487,10 @@ class PerpBot:
                     except Exception as exc:
                         logger.exception("real close failed for %s — keeping position",
                                          pos.symbol)
+                        msg = str(exc).lower()
+                        self.execlog.skip(book=book.name, coin=pos.symbol,
+                                          stage="unfilled" if ("not fill" in msg or "unfilled" in msg) else "close_failed",
+                                          reason=str(exc)[:200], size=pos.size_usd)
                         if pkey not in self.pending_closes:
                             self.journal.record(Decision(
                                 ts=now(), book=book.name, symbol=pos.symbol, chain=CHAIN,

@@ -73,3 +73,18 @@ async def test_drawdown_kill_and_resume_through_desk(desk):
     desk.allocator.resume("bounce", 140.0)
     st = await desk.allocation_cycle()
     assert st["weights"]["bounce"] == 0.5 and bot.real_capital == pytest.approx(70.0)
+
+
+def test_health_watchdog_and_tuning_surface(desk):
+    app = D.create_desk_app(desk.bots, "tok", {"testserver"}, desk=desk)
+    c = TestClient(app)
+    r = c.get("/health")                                           # no token needed
+    assert r.status_code == 200 and r.json()["ok"] is True and "bounce" in r.json()["daily_run_age_s"]
+    assert "total_usd_balance" not in r.text and "tok" not in r.text
+    desk.bots["bounce"].started_at -= 30 * 3600
+    desk.watchdog()
+    assert any(a["text"].startswith("WATCHDOG bounce") for a in desk.alerts)
+    desk.watchdog()
+    assert sum(1 for a in desk.alerts if a["text"].startswith("WATCHDOG bounce")) == 1
+    desk.learn_execution()
+    assert "bounce" in desk.tuning and desk.tuning["bounce"]["reason"].startswith("keep")

@@ -207,6 +207,15 @@ allocator:
   max_drawdown_real: 0.25    # real equity 25% below its peak: stop new entries until resumed
   max_slippage_bps: 50       # mean adverse slippage over 10+ fills above this halves the weight
 
+# Execution tuner: learns the IOC limit distance from real fills (widen on
+# unfilled orders, tighten when fills sit well inside the limit).
+exec_tuner:
+  min_attempts: 10
+  widen_at: 0.20
+  tighten_at: 0.05
+  min_limit: 0.001
+  max_limit: 0.02
+
 # Evidence per strategy, from the registry (cryptobot/hypotheses.yaml).
 strategies:
   bounce:

@@ -1170,6 +1170,17 @@ evidence, not by a streak. With one strategy and $200 that means: half
 deployed while learning, all of it only once live evidence has raised
 the posterior, nothing after a 25% drawdown until you look at it.
 
+**Execution is tuned from live fills** (`cryptobot/exec_tuner.py`,
+hourly): the executors send immediate-or-cancel limits at mid ± a
+distance; unfilled orders above 20% of attempts widen it by a quarter,
+fills sitting well inside the limit with almost no misses tighten it,
+one change a day, floor 0.1%, cap 2%, persisted across restarts and
+explained on the dashboard's execution card. This is the one parameter
+live data can settle in days rather than years. A watchdog raises an
+alert when a bot's daily run is more than 26 hours overdue, and
+`GET /health` (no token; no balances or secrets) lets an uptime monitor
+notice a dead desk.
+
 **Manual mode**: set weights on the dashboard (they must add up to 100%
 or less; the rest is cash). The gates still apply. *Back to auto*
 returns control to the allocator.

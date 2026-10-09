@@ -142,7 +142,9 @@ def summary(rows: list[dict], since: float = 0.0) -> dict:
     usages = [float(r.get("usage") or 0.0) for r in margins]
     switch = [float(r.get("usage") or 0.0) for r in margins if r.get("near_switch")]
     skips = [r for r in rows if r.get("kind") == "skip" and r.get("book") == "real"]
+    unfilled = sum(1 for r in skips if r.get("stage") == "unfilled")
     return {
+        "unfilled": unfilled,
         "fills": len(fills),
         "slippage_bps_by_coin": by_coin,
         "slippage_bps_all": [x for xs in by_coin.values() for x in xs],
@@ -181,7 +183,7 @@ def render(s: dict) -> str:
                       if s["margin_peak_near_switch"] is not None else "")
                    + (f", {s['margin_over_90']} above 90%" if s["margin_over_90"] else ""))
     if s["skips"]:
-        out.append(f"real-book skips: {s['skips']}")
+        out.append(f"real-book skips: {s['skips']}" + (f" ({s['unfilled']} unfilled IOC orders)" if s.get("unfilled") else ""))
     return "\n".join(out)
 
 

@@ -182,6 +182,11 @@ class Desk:
         self.alerts: list[dict] = []
         self._registry_cache: tuple[float, list] = (-1.0, [])
         self._exec_cache: dict = {}            # path -> (ts, summary)
+        from .exec_tuner import FILE as TUNE_FILE, ExecTuner, TunerConfig
+        tkw = {k: v for k, v in (cfg.get("exec_tuner") or {}).items() if k in TunerConfig.__dataclass_fields__}
+        self.tuner = ExecTuner(TunerConfig(**tkw), Path(state_dir) / TUNE_FILE if state_dir else None)
+        self.tuning: dict = {}
+        self._overdue_noted: set = set()
 
     def registry(self) -> list[dict]:
         """hypotheses.yaml, re-read only when its mtime changes."""
@@ -249,6 +254,8 @@ class Desk:
             sources.add(src)
         total = sum(capital.values())
         self.last_capital = {"total": total, "by_bot": capital, "source": "+".join(sorted(sources)) or "config"}
+        self.learn_execution()
+        self.watchdog()
         d = self.allocator.decide(evidence)
         for name, bot in self.bots.items():
             w = d.weights.get(name, 0.0)
@@ -263,6 +270,40 @@ class Desk:
                 self._note(f"KILL {name}: {why}")
         return self.allocation_state()
 
+    def learn_execution(self) -> None:
+        """Tune each armed executor's IOC limit from its fill log."""
+        for name, bot in self.bots.items():
+            ex = getattr(bot, "executor", None)
+            log = getattr(bot, "execlog", None)
+            if ex is None or not hasattr(ex, "cfg") or not hasattr(ex.cfg, "max_slippage"):
+                continue
+            summ = self.exec_summary(log.path) if (log is not None and log.enabled) else None
+            t = self.tuner.apply(name, ex, summ)
+            self.tuning[name] = vars(t)
+            if getattr(t, "changed", False):
+                self._note(f"execution {name}: {t.reason}")
+
+    def watchdog(self, overdue_s: float = 26 * 3600) -> None:
+        """A bot whose daily run is overdue is a dead bot; say so once."""
+        for name, bot in self.bots.items():
+            last = float(getattr(bot, "last_daily_run", 0.0) or 0.0)
+            started = float(getattr(bot, "started_at", time.time()))
+            ref = last or started
+            if time.time() - ref > overdue_s:
+                if name not in self._overdue_noted:
+                    self._overdue_noted.add(name)
+                    self._note(f"WATCHDOG {name}: no daily run for {(time.time() - ref) / 3600:.0f}h")
+            else:
+                self._overdue_noted.discard(name)
+
+    def health(self) -> dict:
+        """Unauthenticated liveness for an uptime monitor: no balances, no secrets."""
+        now_ts = time.time()
+        runs = {n: (now_ts - float(getattr(b, "last_daily_run", 0.0) or getattr(b, "started_at", now_ts)))
+                for n, b in self.bots.items()}
+        return {"ok": all(age < 26 * 3600 for age in runs.values()),
+                "daily_run_age_s": {n: int(a) for n, a in runs.items()}, "ts": int(now_ts)}
+
     def allocation_state(self) -> dict:
         a, d = self.allocator, self.allocator.last
         return {"mode": a.mode, "manual": a.manual, "config": vars(a.cfg),
@@ -274,7 +315,8 @@ class Desk:
     def state(self) -> dict:
         from .execlog import render as exec_render
         out = {"ts": time.time(), "allocation": self.allocation_state(), "strategies": {},
-               "equity": {}, "execution": None, "execution_text": "", "registry": [], "alerts": self.alerts[-20:]}
+               "equity": {}, "execution": None, "execution_text": "", "tuning": self.tuning,
+               "registry": [], "alerts": self.alerts[-20:]}
         for name, bot in self.bots.items():
             st = bot.state()
             rid, verdict = self.verdict_of(name)
@@ -347,6 +389,10 @@ def create_desk_app(bots: dict, token: Optional[str], extra_hosts: Optional[set]
     @app.get("/api/desk")
     async def api_desk() -> dict:
         return desk.state() if desk else {"error": "no desk"}
+
+    @app.get("/health")
+    async def health() -> dict:
+        return desk.health() if desk else {"ok": True}
 
     @app.post("/api/allocation")
     async def api_allocation(request: Request):
