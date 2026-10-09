@@ -37,7 +37,7 @@ TOKEN="$(grep '^CRYPTOBOT_DASH_TOKEN=' .env | cut -d= -f2-)"
 echo
 echo "running. From your laptop:"
 echo "  ssh -L 8080:localhost:8080 $USER@$(hostname -I 2>/dev/null | awk '{print $1}')"
-echo "then open  http://localhost:8080/?token=$TOKEN"
+echo "then open  http://localhost:8080/?t=$TOKEN"
 echo
 echo "logs:       $DC logs -f"
 echo "preflight:  $DC run --rm desk python -m cryptobot.desk --preflight"

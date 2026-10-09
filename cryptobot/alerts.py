@@ -63,7 +63,10 @@ class Alerter:
             return True
         except Exception as exc:
             self.failed += 1
-            logger.warning("alert webhook failed: %s", exc)
+            # The webhook URL is the secret; httpx error messages embed it.
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            logger.warning("alert webhook failed: %s%s", type(exc).__name__,
+                           f" (HTTP {status})" if status else "")
             return False
 
     def fire(self, text: str) -> None:

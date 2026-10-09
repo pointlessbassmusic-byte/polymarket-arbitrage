@@ -38,6 +38,9 @@ class ModeRequest(BaseModel):
 
 def create_app(scanner, token: str | None = None,
                extra_hosts: set[str] | None = None) -> FastAPI:
+    if not token:
+        raise ValueError("dashboard token required: /api/mode can switch a bot to real money, "
+                         "so the API is never served without one")
     """Build the dashboard app.
 
     `token` guards every /api/* route. It is not a login system — it is

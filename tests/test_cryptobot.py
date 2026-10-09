@@ -804,14 +804,19 @@ class TestDashboard:
         from cryptobot.dashboard import create_app
 
         sc = self.make_scanner()
-        app = create_app(sc)
+        import pytest
+        with pytest.raises(ValueError):              # the API is never served untokened
+            create_app(sc)
+        app = create_app(sc, token="tok")
 
         async def run():
             transport = httpx.ASGITransport(app=app)
             # Loopback origin: the app pins the Host header, so a made-up
             # hostname is (correctly) refused as a rebinding attempt.
-            async with httpx.AsyncClient(transport=transport,
-                                         base_url="http://localhost") as client:
+            async with httpx.AsyncClient(transport=transport, base_url="http://localhost",
+                                         headers={"x-dashboard-token": "tok"}) as client:
+                assert (await httpx.AsyncClient(transport=transport, base_url="http://localhost")
+                        .get("/api/state")).status_code == 401
                 r = await client.get("/api/state")
                 assert r.status_code == 200
                 assert r.json()["cycle"] == 0

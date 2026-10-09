@@ -875,7 +875,12 @@ async def _main(args) -> int:
     if args.dashboard:
         import uvicorn
         from .dashboard import create_app
-        app = create_app(bot, token=args.token)
+        import os as _os
+        import secrets as _secrets
+        token = args.token or _os.environ.get("CRYPTOBOT_DASH_TOKEN") or _secrets.token_urlsafe(16)
+        app = create_app(bot, token=token)
+        shown = "localhost" if args.host in ("0.0.0.0", "127.0.0.1") else args.host
+        logger.info("dashboard: http://%s:%d/?t=%s", shown, args.port, token)
         server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port,
                                                log_level="warning"))
         await asyncio.gather(bot.run_forever(), server.serve())
