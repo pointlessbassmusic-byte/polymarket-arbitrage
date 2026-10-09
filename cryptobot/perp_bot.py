@@ -751,7 +751,10 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
     if venue not in VENUES:
         raise ValueError(f"perp.venue must be one of {VENUES}")
     share = allocation(cfg, "bounce_short")
-    sim_bank = share * float(cfg.get("sim", {}).get("bankroll_usd", 200))
+    # Paper is free: every strategy's paper book gets the full sim bankroll
+    # so the lab compares them on equal footing; the allocator decides the
+    # real split.
+    sim_bank = float(cfg.get("sim", {}).get("bankroll_usd", 200))
     risk_kw = {k: v for k, v in cfg.get("risk", {}).items()
                if k in RiskConfig.__dataclass_fields__}
     venue_kw: dict = {}

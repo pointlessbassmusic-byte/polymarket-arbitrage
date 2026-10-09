@@ -679,12 +679,13 @@ def render_preflight(cfg: dict, checks: list) -> str:
 # --------------------------------------------------------------------- main
 
 def build(cfg: dict, state_dir: Path) -> dict:
-    """Carry is only built when it has capital; on Coinbase-only US setups
-    allocation.carry is 0 and the desk is the bounce-short alone."""
+    """Every strategy runs a paper book (the lab); the allocator decides
+    which get real capital. Carry stays paper-only in the US: its real
+    legs need Hyperliquid and Kraken keys that are never armed here, and
+    the allocator gives an unarmed strategy nothing."""
     from . import carry_bot, perp_bot
-    from .carry_bot import allocation
     bots = {"bounce": perp_bot.build(cfg, state_dir)}
-    if allocation(cfg, "carry") > 0:
+    if cfg.get("carry", {}).get("paper", True):
         bots["carry"] = carry_bot.build(cfg, state_dir)
     return bots
 

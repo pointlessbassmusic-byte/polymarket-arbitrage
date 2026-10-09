@@ -186,7 +186,8 @@ class CarryBook:
         eq = self.equity(perps, spots)
         return {
             "name": self.name, "starting_equity": self.starting_equity,
-            "equity": round(eq, 2), "return_pct": eq / self.starting_equity - 1.0,
+            "equity": round(eq, 2),
+            "return_pct": (eq / self.starting_equity - 1.0) if self.starting_equity else 0.0,
             "executes_onchain": self.executes, "halted": False, "drawdown": 0.0,
             "summary": {"realized_pnl": round(self.realized, 2),
                         "unrealized_pnl": round(eq - self.starting_equity - self.realized, 2),
@@ -641,7 +642,7 @@ def build(cfg: dict, state_dir: Optional[Path]) -> CarryBot:
                               max_trade_usd=float(perp.get("max_trade_usd", 50)),
                               max_slippage=float(carry.get("max_slippage", 0.01)))
     share = allocation(cfg, "carry")
-    return CarryBot(ccfg, share * float(cfg.get("sim", {}).get("bankroll_usd", 200)),
+    return CarryBot(ccfg, float(cfg.get("sim", {}).get("bankroll_usd", 200)),    # paper: full sim bankroll
                     share * float(cfg.get("risk", {}).get("bankroll_usd", 1000)), exec_cfg,
                     spot_cfg=spot_cfg)
 

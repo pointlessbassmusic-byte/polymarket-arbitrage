@@ -301,13 +301,13 @@ class TestAllocation:
         cfg = {"sim": {"bankroll_usd": 200}, "risk": {"bankroll_usd": 1000},
                "allocation": {"carry": 0.5, "bounce_short": 0.5}}
         carry = CB.build(cfg, tmp_path)
-        assert carry.books["sim"].starting_equity == 100.0
+        assert carry.books["sim"].starting_equity == 200.0        # paper: full sim bankroll
         assert carry.books["real"].starting_equity == 500.0
         perp = PB.build(cfg, tmp_path)
         sim = perp.books["sim"].risk.cfg
-        assert sim.bankroll_usd == 100.0
-        assert sim.max_total_exposure_usd == 100.0
-        assert sim.max_position_usd == pytest.approx(100.0 / 18)
+        assert sim.bankroll_usd == 200.0
+        assert sim.max_total_exposure_usd == 200.0
+        assert sim.max_position_usd == pytest.approx(200.0 / 18)
 
 
 def test_bounce_short_signal_gets_exactly_one_slot():
