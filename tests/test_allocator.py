@@ -74,3 +74,12 @@ def test_scales_down_when_total_exceeds_max_deploy(tmp_path):
     a = Allocator(AllocatorConfig(learning_floor=0.6, max_deploy=1.0), tmp_path / "a.json")
     d = a.decide({"a": ev(name="a"), "b": ev(name="b")})
     assert d.weights["a"] == pytest.approx(0.5) and d.weights["b"] == pytest.approx(0.5) and d.cash == 0.0
+
+
+def test_state_survives_restart_after_mode_change(tmp_path):
+    path = tmp_path / "a.json"
+    a = Allocator(AllocatorConfig(), path)
+    a.decide({"bounce": ev()})
+    a.set_mode("manual")                                 # saves 'last' after decide
+    b = Allocator(AllocatorConfig(), path)               # must not raise
+    assert b.last is not None and b.last.weights["bounce"] == 0.5 and b.mode == "manual"

@@ -31,7 +31,7 @@ class KalshiMarketData:
                  client: Optional[httpx.AsyncClient] = None, base_url: str = BASE):
         self._c = client or httpx.AsyncClient(timeout=25)
         self._owns = client is None
-        self.base = base_url
+        self.base = base_url.rstrip("/")
         self._seed: dict[str, list[Candle]] = {}
         self.seed_loaded = False
         if history_seed:

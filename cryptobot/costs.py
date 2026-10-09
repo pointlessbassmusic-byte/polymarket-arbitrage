@@ -78,24 +78,24 @@ class CostModel:
         return size_usd / liquidity_usd
 
     def round_trip_fraction(self, size_usd: float, liquidity_usd: float,
-                            chain: str) -> float:
-        """Total round-trip cost as a fraction of notional."""
+                            chain: str, lots: float = 0.0) -> float:
+        """Total round-trip cost as a fraction of notional, including the
+        per-contract fee floor when the venue has one and `lots` is known."""
         if size_usd <= 0:
             return 0.0
-        per_side = (self.cfg.dex_fee + self.cfg.extra_slippage
+        fee = max(self.cfg.dex_fee, lots * self.cfg.min_fee_per_lot_usd / size_usd) if lots else self.cfg.dex_fee
+        per_side = (fee + self.cfg.extra_slippage
                     + self.price_impact(size_usd, liquidity_usd)
                     + self.gas_usd(chain) / size_usd)
         return 2.0 * per_side
 
     def round_trip_usd(self, size_usd: float, liquidity_usd: float,
                        chain: str, lots: float = 0.0) -> float:
-        base = size_usd * self.round_trip_fraction(size_usd, liquidity_usd, chain)
-        floor = 2.0 * max(0.0, lots * self.cfg.min_fee_per_lot_usd - size_usd * self.cfg.dex_fee)
-        return base + floor
+        return size_usd * self.round_trip_fraction(size_usd, liquidity_usd, chain, lots=lots)
 
     def net_risk_reward(self, take_profit_pct: float, stop_loss_pct: float,
                         size_usd: float, liquidity_usd: float,
-                        chain: str) -> float:
+                        chain: str, lots: float = 0.0) -> float:
         """Reward:risk AFTER costs — the number that actually decides.
 
         Costs are paid on the winner and the loser alike, so they shrink
@@ -108,7 +108,7 @@ class CostModel:
         gate. Tight stops suffer most, since the cost is a large fraction
         of a small stop.
         """
-        rt = self.round_trip_fraction(size_usd, liquidity_usd, chain)
+        rt = self.round_trip_fraction(size_usd, liquidity_usd, chain, lots=lots)
         net_win = take_profit_pct - rt
         net_loss = stop_loss_pct + rt
         if net_win <= 0 or net_loss <= 0:
@@ -118,7 +118,7 @@ class CostModel:
     def entry_allowed(self, expected_move: float, size_usd: float,
                       liquidity_usd: float, chain: str,
                       take_profit_pct: float | None = None,
-                      stop_loss_pct: float | None = None) -> tuple[bool, str]:
+                      stop_loss_pct: float | None = None, lots: float = 0.0) -> tuple[bool, str]:
         """Gate: does this trade's edge survive its own costs?"""
         if size_usd <= 0:
             return False, "zero size"
@@ -127,14 +127,13 @@ class CostModel:
             return False, (f"gas ${self.gas_usd(chain):.2f} is "
                            f"{gas_frac:.1%} of ${size_usd:.0f} position "
                            f"(max {self.cfg.max_gas_fraction:.1%}/side)")
-        cost = self.round_trip_fraction(size_usd, liquidity_usd, chain)
+        cost = self.round_trip_fraction(size_usd, liquidity_usd, chain, lots=lots)
         if expected_move < cost * self.cfg.min_edge_multiple:
             return False, (f"edge {expected_move:.1%} < "
                            f"{self.cfg.min_edge_multiple:.0f}x round-trip "
                            f"cost {cost:.1%}")
         if take_profit_pct is not None and stop_loss_pct is not None:
-            net_rr = self.net_risk_reward(take_profit_pct, stop_loss_pct,
-                                          size_usd, liquidity_usd, chain)
+            net_rr = self.net_risk_reward(take_profit_pct, stop_loss_pct, size_usd, liquidity_usd, chain, lots=lots)
             if net_rr < self.cfg.min_net_risk_reward:
                 return False, (f"net reward:risk {net_rr:.2f} < "
                                f"{self.cfg.min_net_risk_reward:.2f} "

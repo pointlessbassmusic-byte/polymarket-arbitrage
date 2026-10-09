@@ -34,7 +34,7 @@ from typing import Optional
 
 import httpx
 
-from .perp_exchange import Fill
+from .perp_exchange import Fill, SizeTooSmall  # noqa: F401 (re-exported)
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +62,6 @@ US_COINS = ("DOGE", "kSHIB")          # active markets; add kPEPE in config when
 TICK = 0.0001
 
 
-class SizeTooSmall(ValueError):
-    pass
 
 
 @dataclass
@@ -145,11 +143,11 @@ class KalshiPerpsExecutor:
 
     async def _request(self, method: str, path: str, *, params: Optional[dict] = None,
                        json: Optional[dict] = None, auth: bool = True) -> dict:
-        prefix = self.cfg.base_url[len(self.cfg.base_url) - len("/trade-api/v2"):]
-        full_path = prefix + path                      # "/trade-api/v2/margin/..."
+        from urllib.parse import urlparse
+        base = self.cfg.base_url.rstrip("/")
+        full_path = urlparse(base).path + path         # "/trade-api/v2/margin/..."
         headers = self.headers(method, full_path) if auth else {}
-        r = await self._c.request(method, self.cfg.base_url + path, params=params, json=json,
-                                  headers=headers)
+        r = await self._c.request(method, base + path, params=params, json=json, headers=headers)
         if r.status_code >= 400:
             raise RuntimeError(f"kalshi {method} {path} -> {r.status_code}: {r.text[:300]}")
         return r.json() if r.content else {}

@@ -14,7 +14,9 @@ if ! command -v docker >/dev/null 2>&1; then
   sudo usermod -aG docker "$USER" || true
 fi
 DC="docker compose"
-docker compose version >/dev/null 2>&1 || DC="sudo docker compose"
+# `docker compose version` never talks to the daemon; probe it, since the
+# docker group added above is not effective in this shell yet.
+docker info >/dev/null 2>&1 || DC="sudo docker compose"
 
 if [ ! -f .env ]; then
   TOKEN="$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))' 2>/dev/null || openssl rand -hex 32)"

@@ -79,6 +79,7 @@ class Decision:
     killed: dict                       # strategy -> reason
     posterior: dict                    # strategy -> {"mean", "f_star", "n_live"}
     ts: float = 0.0
+    changed: bool = False              # weights moved since the previous decision (not persisted)
 
 
 def posterior_mean(ev: Evidence, cfg: AllocatorConfig) -> tuple[float, int]:
@@ -116,7 +117,11 @@ class Allocator:
         self.killed = dict(d.get("killed") or {})
         self.history = list(d.get("history") or [])[-200:]
         if d.get("last"):
-            self.last = Decision(**d["last"])
+            fields = Decision.__dataclass_fields__
+            try:
+                self.last = Decision(**{k: v for k, v in d["last"].items() if k in fields and k != "changed"})
+            except TypeError:
+                logger.exception("allocation 'last' unreadable; ignored")
 
     def save(self) -> None:
         if not self.path:
@@ -126,7 +131,8 @@ class Allocator:
             self.path.write_text(json.dumps({
                 "mode": self.mode, "manual": self.manual, "peaks": self.peaks,
                 "killed": self.killed, "history": self.history[-200:],
-                "last": vars(self.last) if self.last else None}, indent=2))
+                "last": {k: v for k, v in vars(self.last).items() if k != "changed"} if self.last else None},
+                indent=2))
         except OSError:
             logger.exception("allocation state write failed")
 
@@ -211,13 +217,12 @@ class Allocator:
             total = cfg.max_deploy
         d = Decision(weights=weights, cash=max(0.0, 1.0 - total), reasons=reasons,
                      killed=dict(self.killed), posterior=posterior, ts=time.time())
-        changed = self.last is None or any(abs(d.weights.get(k, 0) - self.last.weights.get(k, 0)) > 0.01
-                                           for k in set(d.weights) | set(self.last.weights))
-        if changed:
+        d.changed = self.last is None or any(abs(d.weights.get(k, 0) - self.last.weights.get(k, 0)) > 0.01
+                                             for k in set(d.weights) | set(self.last.weights))
+        if d.changed:
             self.history.append({"ts": d.ts, "weights": d.weights, "mode": self.mode})
         self.last = d
         self.save()
-        d.changed = changed  # type: ignore[attr-defined]
         return d
 
 

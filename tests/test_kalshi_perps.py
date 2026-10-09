@@ -208,7 +208,26 @@ def test_kalshi_preflight_lines():
                          {"DOGE": 8.44, "kSHIB": 5.32, "_inactive": ["kPEPE"], "_enabled": True})
     names = {n: ok for n, ok, _ in checks}
     assert names["Kalshi API key id + private key PEM"] is True
-    assert names["each slot ($100) buys at least one contract"] is True
+    assert names["each live slot ($50 at 50% deployed) buys at least one contract"] is True
     assert names["Kalshi perps enabled for this account"] is True
     assert names["kalshi_usd >= $200.00"] is True
     assert not any("Coinbase" in n or "Hyperliquid" in n for n in names)
+
+
+@pytest.mark.asyncio
+async def test_signed_path_tolerates_trailing_slash_in_base_url(monkeypatch):
+    seen = {}
+    def fake_sign(pem, msg):
+        seen["msg"] = msg
+        return "sig"
+    monkeypatch.setattr("cryptobot.execution.kalshi_perps.sign", fake_sign)
+    http = FakeHttp({("GET", "/margin/enabled"): {"enabled": True}})
+    ex = armed(monkeypatch, http, base_url="https://external-api.demo.kalshi.co/trade-api/v2/")
+    assert await ex.enabled() is True
+    assert seen["msg"].endswith("GET/trade-api/v2/margin/enabled")
+    assert http.calls[0][1] == "https://external-api.demo.kalshi.co/trade-api/v2/margin/enabled"
+
+
+def test_size_too_small_is_shared_across_venues():
+    from cryptobot.execution import coinbase_futures, kalshi_perps, perp_exchange
+    assert coinbase_futures.SizeTooSmall is kalshi_perps.SizeTooSmall is perp_exchange.SizeTooSmall

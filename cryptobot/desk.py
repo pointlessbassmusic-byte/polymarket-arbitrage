@@ -180,6 +180,31 @@ class Desk:
         self.strategies = cfg.get("strategies") or {}
         self.last_capital: dict = {"total": 0.0, "by_bot": {}, "source": "config"}
         self.alerts: list[dict] = []
+        self._registry_cache: tuple[float, list] = (-1.0, [])
+        self._exec_cache: dict = {}            # path -> (ts, summary)
+
+    def registry(self) -> list[dict]:
+        """hypotheses.yaml, re-read only when its mtime changes."""
+        from .hypotheses import PATH, load
+        try:
+            mtime = PATH.stat().st_mtime
+        except OSError:
+            return self._registry_cache[1]
+        if mtime != self._registry_cache[0]:
+            try:
+                self._registry_cache = (mtime, load())
+            except Exception as exc:
+                logger.warning("registry unreadable: %s", exc)
+        return self._registry_cache[1]
+
+    def exec_summary(self, path, max_age_s: float = 60.0) -> Optional[dict]:
+        from .execlog import load as load_log, summary as exec_summary
+        ts, cached = self._exec_cache.get(str(path), (0.0, None))
+        if time.time() - ts < max_age_s and cached is not None:
+            return cached
+        s = exec_summary(load_log(path), time.time() - 30 * 86400)
+        self._exec_cache[str(path)] = (time.time(), s)
+        return s
 
     def _note(self, text: str) -> None:
         self.alerts.append({"ts": time.time(), "text": text})
@@ -189,13 +214,9 @@ class Desk:
 
     def verdict_of(self, name: str) -> tuple[str, str]:
         rid = (self.strategies.get(name) or {}).get("registry", "")
-        try:
-            from .hypotheses import load
-            for r in load():
-                if r["id"] == rid:
-                    return rid, r["verdict"]
-        except Exception as exc:
-            logger.warning("registry unreadable: %s", exc)
+        for r in self.registry():
+            if r["id"] == rid:
+                return rid, r["verdict"]
         return rid, "inconclusive"
 
     async def real_capital(self, name: str, bot) -> tuple[float, str]:
@@ -214,7 +235,6 @@ class Desk:
 
     async def allocation_cycle(self) -> dict:
         from .allocator import evidence_from_bot
-        from .execlog import load as load_log, summary as exec_summary
         evidence, capital, sources = {}, {}, set()
         for name, bot in self.bots.items():
             scfg = dict(self.strategies.get(name) or {})
@@ -223,7 +243,7 @@ class Desk:
             ex = None
             log = getattr(bot, "execlog", None)
             if log is not None and log.enabled:
-                ex = exec_summary(load_log(log.path), time.time() - 30 * 86400)
+                ex = self.exec_summary(log.path)
             evidence[name] = evidence_from_bot(name, bot, scfg, ex)
             capital[name], src = await self.real_capital(name, bot)
             sources.add(src)
@@ -252,7 +272,7 @@ class Desk:
                 "history": a.history[-30:], "capital": self.last_capital}
 
     def state(self) -> dict:
-        from .execlog import load as load_log, render as exec_render, summary as exec_summary
+        from .execlog import render as exec_render
         out = {"ts": time.time(), "allocation": self.allocation_state(), "strategies": {},
                "equity": {}, "execution": None, "execution_text": "", "registry": [], "alerts": self.alerts[-20:]}
         for name, bot in self.bots.items():
@@ -282,15 +302,11 @@ class Desk:
             out["equity"][name] = st.get("equity_curve", [])
             log = getattr(bot, "execlog", None)
             if log is not None and log.enabled and out["execution"] is None:
-                s = exec_summary(load_log(log.path), time.time() - 30 * 86400)
+                s = self.exec_summary(log.path)
                 out["execution"], out["execution_text"] = s, exec_render(s)
-        try:
-            from .hypotheses import load
-            out["registry"] = [{"id": r["id"], "verdict": r["verdict"], "title": r["title"],
-                                "result": str(r["result"])[:220], "dsr": r.get("dsr"), "psr": r.get("psr"),
-                                "trials_run": r.get("trials_run")} for r in load()]
-        except Exception as exc:
-            logger.warning("registry unreadable: %s", exc)
+        out["registry"] = [{"id": r["id"], "verdict": r["verdict"], "title": r["title"],
+                            "result": str(r["result"])[:220], "dsr": r.get("dsr"), "psr": r.get("psr"),
+                            "trials_run": r.get("trials_run")} for r in self.registry()]
         return out
 
 
@@ -417,8 +433,12 @@ def capital_plan(cfg: dict) -> dict:
         n_coins = len(perp.get("coins") or range(18))
         default_cap = 50.0
     slot = b_share * bank / n_coins
+    alloc = cfg.get("allocator") or {}
+    floor = float(alloc.get("learning_floor", 0.5)) if alloc.get("mode", "auto") == "auto" else 1.0
     return {
         "bankroll": bank, "venue": venue(cfg),
+        # what the allocator actually deploys per slot while learning
+        "live_slot": slot * floor, "deploy_fraction": floor,
         "carry_capital": c_share * bank,
         "bounce_capital": b_share * bank,
         "bounce_slot": slot,
@@ -547,11 +567,12 @@ def preflight(cfg: dict, env: dict, balances: Optional[dict] = None,
         need = {c: v * max(1.0, margins.get(c, 1.0)) for c, v in sizes.items()}
         worst_coin = max(need, key=need.get)
         worst = need[worst_coin]
-        checks.append((f"each slot (${plan['bounce_slot']:.0f}) buys at least one contract after overnight margin",
-                       plan["bounce_slot"] >= worst,
+        checks.append((f"each live slot (${plan['live_slot']:.0f} at {100 * plan['deploy_fraction']:.0f}% deployed) "
+                       f"buys at least one contract after overnight margin",
+                       plan["live_slot"] >= worst,
                        f"{worst_coin}: ${sizes[worst_coin]:,.0f} contract x {100 * margins.get(worst_coin, 1.0):.0f}% "
                        f"overnight short margin = ${worst:,.0f}; with {len(sizes)} coins the bounce-short needs at "
-                       f"least ${worst * len(sizes) / max(1e-9, plan['bounce_capital'] / plan['bankroll']):,.0f}"))
+                       f"least ${worst * len(sizes) / max(1e-9, plan['bounce_capital'] / plan['bankroll']) / max(1e-9, plan['deploy_fraction']):,.0f}"))
         for c, v in sizes.items():
             fee = effective_fee(c, v / CONTRACTS[c].units_per_contract)
             checks.append((f"{c}: fee {100 * fee:.2f}%/side, overnight short margin {100 * margins.get(c, 0):.0f}%",
@@ -563,8 +584,9 @@ def preflight(cfg: dict, env: dict, balances: Optional[dict] = None,
         sizes = {c: v for c, v in contract_usd.items() if c in K_CONTRACTS}
         if sizes:
             worst_coin = max(sizes, key=sizes.get)
-            checks.append((f"each slot (${plan['bounce_slot']:.0f}) buys at least one contract",
-                           plan["bounce_slot"] >= sizes[worst_coin],
+            checks.append((f"each live slot (${plan['live_slot']:.0f} at {100 * plan['deploy_fraction']:.0f}% deployed) "
+                           f"buys at least one contract",
+                           plan["live_slot"] >= sizes[worst_coin],
                            f"{worst_coin}: ${sizes[worst_coin]:,.2f} per contract"))
         inactive = contract_usd.get("_inactive") or []
         if inactive:
@@ -661,17 +683,21 @@ def build(cfg: dict, state_dir: Path) -> dict:
     allocation.carry is 0 and the desk is the bounce-short alone."""
     from . import carry_bot, perp_bot
     from .carry_bot import allocation
-    from .alerts import Alerter
     bots = {"bounce": perp_bot.build(cfg, state_dir)}
     if allocation(cfg, "carry") > 0:
         bots["carry"] = carry_bot.build(cfg, state_dir)
+    return bots
+
+
+def attach_alerts(bots: dict):
+    """The webhook alerter, hooked into every bot's journal."""
+    from .alerts import Alerter
     alerter = Alerter()
     if alerter.enabled:
         for name, bot in bots.items():
             bot.journal.on_record.append(alerter.hook(name))
         logger.info("alerts on: real fills, exits, reconcile mismatches, halts")
-    bots["_alerter"] = alerter
-    return bots
+    return alerter
 
 
 async def _main(args) -> int:
@@ -699,11 +725,12 @@ async def _main(args) -> int:
         return 0
     args.state_dir.mkdir(parents=True, exist_ok=True)
     bots = build(cfg, args.state_dir)
-    alerter = bots.pop("_alerter")
+    alerter = attach_alerts(bots)
     if args.digest:
         print(digest(bots, since=time.time() - 86400))
         for b in bots.values():
             await b.close()
+        await alerter.close()
         return 0
     token = args.token or os.environ.get("CRYPTOBOT_DASH_TOKEN") or secrets.token_urlsafe(16)
     import uvicorn

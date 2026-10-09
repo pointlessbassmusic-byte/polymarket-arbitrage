@@ -71,7 +71,7 @@ def study(trades: list[dict], btc_fwd: dict[int, float], cost: float) -> list[di
     trades = [r for r in trades if r["btc"] is not None]
     out = []
     for y in sorted({r["year"] for r in trades}):
-        prior = [(-(r["pnl"]) if False else r["pnl"], r["btc"]) for r in trades if r["year"] < y]
+        prior = [(r["pnl"], r["btc"]) for r in trades if r["year"] < y]
         beta = -_beta(prior)                       # trades lose when BTC rises: hedge is LONG BTC
         beta = max(0.0, beta)
         g = [r for r in trades if r["year"] == y]

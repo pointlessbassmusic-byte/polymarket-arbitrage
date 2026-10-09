@@ -126,8 +126,8 @@ def test_coinbase_preflight_drops_carry_and_checks_contract_size():
                             {"DOGE": 480.0, "kPEPE": 440.0, "kSHIB": 60.0})
     names = [n for n, _, _ in checks]
     assert not any("Kraken" in n or "Hyperliquid" in n or "carry.live" in n for n in names)
-    slot = next(c for c in checks if c[0].startswith("each slot"))
-    assert slot[1] is False and "$1,440" in slot[2]          # 3 × $480 at 100% bounce
+    slot = next(c for c in checks if c[0].startswith("each live slot"))
+    assert slot[1] is False and "$2,880" in slot[2]          # 3 x $480 at 100% bounce, 50% learning floor
     assert next(c for c in checks if c[0].startswith("coinbase_usd"))[1] is True
     assert next(c for c in checks if "max_trade_usd" in c[0])[1] is True
 

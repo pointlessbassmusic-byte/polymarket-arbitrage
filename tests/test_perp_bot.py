@@ -629,7 +629,7 @@ async def test_failed_real_close_is_retried_fast_and_journaled_once():
     client.mids = {"DOGE": 0.12}                              # +20%: stop breached
     await bot.monitor()
     await bot.monitor()
-    assert ex.calls == 2 and bot.pending_closes == {f"{CHAIN}:DOGE"}
+    assert ex.calls == 2 and bot.pending_closes == {f"real:{CHAIN}:DOGE"}
     assert f"{CHAIN}:DOGE" in bot.books["real"].portfolio.positions     # kept, not dropped
     assert sum(1 for d in bot.journal.recent(10) if d["action"] == "failed") == 1
 
@@ -710,3 +710,35 @@ def test_set_real_capital_resizes_slots_and_zero_blocks_entries(tmp_path, monkey
                  expected_move=0.20, stop_loss_pct=0.10, take_profit_pct=0.20, reason="t",
                  risk_reward=2.0, liquidity_usd=5e6)
     assert bot.books["real"].risk.size_position(sig, []) == 0.0
+
+
+
+def test_set_real_capital_zero_blocks_entries_without_tripping_the_halt(tmp_path, monkeypatch):
+    monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
+    bot = PB.build({"perp": {"venue": "kalshi"}, "allocation": {"carry": 0.0, "bounce_short": 1.0},
+                    "risk": {"bankroll_usd": 300}}, tmp_path)
+    limit = bot.books["real"].risk.cfg.max_daily_loss_usd
+    bot.set_real_capital(0.0)
+    assert bot.books["real"].risk.cfg.max_daily_loss_usd == limit
+    bot.books["real"].risk.record_pnl(-0.01)
+    assert not bot.books["real"].risk.state.halted
+    bot.set_real_capital(150.0)
+    assert bot.books["real"].risk.cfg.max_total_exposure_usd == 150.0
+
+
+def test_sim_contract_count_matches_executor_at_exact_multiples():
+    from cryptobot.execution.coinbase_futures import CoinbaseExecConfig, CoinbaseFuturesExecutor
+    ex = CoinbaseFuturesExecutor(CoinbaseExecConfig(max_trade_usd=1e9), client=object())
+    for mid in (0.07, 0.083, 0.0953, 0.11):
+        contract_usd = 5000.0 * mid
+        for n in (1, 2, 3, 7):
+            size = n * contract_usd
+            assert int(size / contract_usd + 1e-9) == ex.contracts_for("DOGE", size, mid) == n
+
+
+def test_entry_gate_sees_the_per_contract_fee_floor():
+    cm = PB.perp_cost_model(0.0005, 0.20)
+    # 3 SHIB contracts, $159: fee floor 0.38%/side -> round trip ~0.86% incl. slippage
+    rt = cm.round_trip_fraction(159.0, 5e6, CHAIN, lots=3)
+    assert rt == pytest.approx(2 * (0.60 / 159.0 + PB.SLIPPAGE + 159.0 / 5e6), rel=1e-6)
+    assert cm.net_risk_reward(0.20, 0.10, 159.0, 5e6, CHAIN, lots=3) < cm.net_risk_reward(0.20, 0.10, 159.0, 5e6, CHAIN)

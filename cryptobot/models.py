@@ -167,11 +167,14 @@ class Position:
             return (price - self.entry_price) * self.qty + self.funding_usd
         return (self.entry_price - price) * self.qty + self.funding_usd
 
+    def funding_hours(self, at: float) -> float:
+        since = self.funding_accrued_at or self.opened_at
+        return max(0.0, (at - since) / 3600.0)
+
     def accrue_funding(self, hourly_rate: float, at: float) -> float:
         """Charge or credit funding for the hours since the last accrual.
-        Positive rates are paid by longs to shorts."""
-        since = self.funding_accrued_at or self.opened_at
-        hours = max(0.0, (at - since) / 3600.0)
+        Positive rates are paid by longs to shorts. Returns the amount."""
+        hours = self.funding_hours(at)
         sign = 1.0 if self.side == Side.SHORT else -1.0
         amount = sign * self.size_usd * hourly_rate * hours
         self.funding_usd += amount

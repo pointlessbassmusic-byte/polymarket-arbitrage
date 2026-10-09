@@ -38,6 +38,10 @@ class PerpExecConfig:
                                         # which is what the stop is for
 
 
+class SizeTooSmall(ValueError):
+    """The slot cannot hold one whole contract on this venue."""
+
+
 @dataclass
 class Fill:
     coin: str

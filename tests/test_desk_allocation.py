@@ -17,7 +17,6 @@ def desk(tmp_path, monkeypatch):
     monkeypatch.delenv("CRYPTOBOT_ARM_LIVE", raising=False)
     cfg = cfg_for(tmp_path)
     bots = D.build(cfg, tmp_path)
-    bots.pop("_alerter")
 
     async def fake_balance():
         bot = bots["bounce"]

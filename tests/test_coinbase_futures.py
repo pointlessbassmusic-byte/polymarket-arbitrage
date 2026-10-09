@@ -255,3 +255,12 @@ def test_contract_units_match_coinbase_contract_size_field():
     api_contract_size = {"DOP-20DEC30-CDE": 5_000, "PEP-20DEC30-CDE": 100_000, "SHP-20DEC30-CDE": 10_000}
     for c in CONTRACTS.values():
         assert c.units_per_contract == api_contract_size[c.product_id]
+
+
+@pytest.mark.asyncio
+async def test_order_unfilled_after_polls_is_not_booked(monkeypatch):
+    fake = FakeClient()
+    fake.get_order = lambda order_id: {"order": {"status": "OPEN", "filled_size": "0"}}
+    ex = armed_executor(monkeypatch, fake, max_trade_usd=5000, fill_poll_s=0.0, fill_polls=2)
+    with pytest.raises(RuntimeError, match="unfilled after"):
+        await ex.open_short("DOGE", 2500, 0.20)

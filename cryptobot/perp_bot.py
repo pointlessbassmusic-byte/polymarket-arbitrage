@@ -41,8 +41,7 @@ from .book import Decision, DecisionJournal, TradingBook
 from .costs import CostConfig, CostModel
 from .data.hyperliquid import MEMECOINS, TAKER_FEE, HyperliquidClient
 from .execlog import FILE as EXECLOG_FILE, ExecutionLog
-from .execution.coinbase_futures import SizeTooSmall
-from .execution.perp_exchange import PerpExecConfig, PerpExecutor
+from .execution.perp_exchange import PerpExecConfig, PerpExecutor, SizeTooSmall
 from .models import Side, Signal, SignalType, now
 from .perp_study import WARMUP_DAYS, daily_features
 from .protections import ProtectionConfig
@@ -298,7 +297,7 @@ class PerpBot:
         units = self.cfg.contract_units.get(sig.symbol)
         if units:
             contract_usd = units * sig.price_usd
-            n = int(size // contract_usd + 1e-9)
+            n = int(size / contract_usd + 1e-9)
             if n < 1:
                 self.sub_contract_skips += 1
                 note("skipped", "sizing",
@@ -323,7 +322,7 @@ class PerpBot:
             lots = float(n)
         ok, why = self.costs.entry_allowed(
             sig.expected_move, size, sig.liquidity_usd, sig.chain,
-            take_profit_pct=sig.take_profit_pct, stop_loss_pct=sig.stop_loss_pct)
+            take_profit_pct=sig.take_profit_pct, stop_loss_pct=sig.stop_loss_pct, lots=lots)
         if not ok:
             note("skipped", "costs", why, size)
             return
@@ -359,9 +358,14 @@ class PerpBot:
         their stops and targets). Accounting (starting_equity) is untouched."""
         usd = max(0.0, float(usd))
         book = self.books["real"]
-        halted = book.risk.state
-        book.risk.cfg = slot_risk(self.risk_base, usd, len(self.cfg.coins))
-        book.risk.state = halted
+        prev = book.risk.cfg
+        new_cfg = slot_risk(self.risk_base, usd, len(self.cfg.coins))
+        if usd <= 0:
+            # Zero capital must block entries, not trip the daily-loss halt
+            # on the next close: keep the previous loss limit, zero exposure.
+            new_cfg.max_daily_loss_usd = prev.max_daily_loss_usd
+            new_cfg.max_total_exposure_usd = 0.0
+        book.risk.cfg = new_cfg
         self.real_capital = usd
 
     def _fee_side(self, notional: float, lots: float) -> float:
@@ -448,28 +452,28 @@ class PerpBot:
             dirty = False
             for key, pos in list(book.portfolio.positions.items()):
                 if pos.symbol in rates:
-                    before = pos.funding_usd
-                    hours = max(0.0, (t - (pos.funding_accrued_at or pos.opened_at)) / 3600.0)
-                    pos.accrue_funding(rates[pos.symbol], t)
+                    hours = pos.funding_hours(t)
+                    usd = pos.accrue_funding(rates[pos.symbol], t)
                     dirty = True
                     if book.executes_onchain and self.real_armed and hours > 0:
                         self.execlog.funding(book=book.name, coin=pos.symbol, rate_hourly=rates[pos.symbol],
-                                             hours=hours, notional=pos.size_usd, usd=pos.funding_usd - before)
+                                             hours=hours, notional=pos.size_usd, usd=usd)
                 mid = self._mids.get(pos.symbol)
                 if mid is None:
                     continue
                 reason = book.portfolio.check_exit(key, mid)
                 if reason is None and now() - pos.opened_at >= self.cfg.hold_days * 86400:
                     reason = "time_exit"
+                pkey = f"{book.name}:{key}"
                 if reason is None:
-                    self.pending_closes.discard(key)        # exit no longer due: stop fast-polling
+                    self.pending_closes.discard(pkey)       # exit no longer due: stop fast-polling
                     continue
                 price = mid
                 if book.executes_onchain:
                     try:
                         fill = await self.executor.close(pos.symbol, pos.qty, mid)
                         price = fill.price
-                        self.pending_closes.discard(key)
+                        self.pending_closes.discard(pkey)
                         if not fill.dry_run:
                             self.execlog.fill(book=book.name, coin=pos.symbol, side="close", contracts=pos.lots,
                                               qty=fill.qty, intended=mid, filled=fill.price,
@@ -479,14 +483,14 @@ class PerpBot:
                     except Exception as exc:
                         logger.exception("real close failed for %s — keeping position",
                                          pos.symbol)
-                        if key not in self.pending_closes:
+                        if pkey not in self.pending_closes:
                             self.journal.record(Decision(
                                 ts=now(), book=book.name, symbol=pos.symbol, chain=CHAIN,
                                 signal_type=SignalType.BOUNCE_SHORT.value, action="failed",
                                 stage="execution", size_usd=pos.size_usd, price_usd=mid,
                                 reason=f"{reason} close failed: {exc}; retrying every "
                                        f"{self.cfg.retry_interval_s}s"))
-                        self.pending_closes.add(key)
+                        self.pending_closes.add(pkey)
                         continue
                 trade = book.portfolio.close(key, price, reason)
                 if trade is None:
@@ -511,7 +515,7 @@ class PerpBot:
                 dirty = False
             if dirty:
                 book.portfolio.save()
-        self.pending_closes &= {k for b in self.books.values() for k in b.portfolio.positions}
+        self.pending_closes &= {f"{b.name}:{k}" for b in self.books.values() for k in b.portfolio.positions}
         await self._margin_snapshot()
         prices = {k: self._mids.get(k.split(":")[1], 0.0) for b in self.books.values()
                   for k in b.portfolio.positions}

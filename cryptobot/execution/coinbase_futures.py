@@ -36,7 +36,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional
 
-from .perp_exchange import Fill
+from .perp_exchange import Fill, SizeTooSmall  # noqa: F401 (re-exported)
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +79,6 @@ def effective_fee(coin: str, mid: float) -> float:
     return max(TAKER_FEE, MIN_FEE_PER_CONTRACT / notional) if notional > 0 else TAKER_FEE
 
 
-class SizeTooSmall(ValueError):
-    pass
 
 
 @dataclass
@@ -188,7 +186,7 @@ class CoinbaseFuturesExecutor:
             # A market IOC fills within moments, but get_order right after
             # placement can still say PENDING with filled_size 0. Poll
             # briefly; a terminal unfilled state is a real failure, and an
-            # unknown one is treated as filled at mid (reconcile catches it).
+            # order still unfilled after the polls is NOT booked.
             for attempt in range(self.cfg.fill_polls):
                 try:
                     od = _as_dict(self._c().get_order(order_id)).get("order") or {}
@@ -210,8 +208,10 @@ class CoinbaseFuturesExecutor:
                 if attempt + 1 < self.cfg.fill_polls:
                     time.sleep(self.cfg.fill_poll_s)
             else:
-                logger.warning("%s %s: order %s still pending after %d polls; assuming %d filled",
-                               coin, side, order_id, self.cfg.fill_polls, n)
+                # Still not filled after the polls: book nothing. If it fills
+                # later, reconcile shows it as venue-only and alerts.
+                raise RuntimeError(f"{coin} {side}: order {order_id} unfilled after "
+                                   f"{self.cfg.fill_polls} polls; not booked (check reconcile)")
         # Coinbase quotes 1000PEPE / 1000SHIB per thousand tokens, as the bot does.
         return Fill(coin, side, filled * c.units_per_contract, px, order_id=order_id, fee_usd=fee)
 
