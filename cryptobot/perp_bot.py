@@ -750,7 +750,18 @@ def slot_risk(base: dict, bank: float, n_coins: int) -> RiskConfig:
                          "max_daily_loss_usd": bank * 0.10, "min_confidence": 0.0})
 
 
-VENUES = ("hyperliquid", "coinbase", "kalshi")
+VENUES = ("hyperliquid", "coinbase", "kalshi", "kraken")
+
+
+def kraken_costs(perp: dict) -> tuple[float, float]:
+    """(fee per side, daily funding for the short) on Kraken spot margin:
+    the tier's taker fee plus half the opening fee per side, and the
+    rollover fee (6 a day) as negative funding. `perp.kraken_fee_tier`
+    (1-12) and `perp.kraken_rollover_4h` override the defaults."""
+    from .data.kraken import fees_for_tier, margin_fee_4h
+    _maker, taker = fees_for_tier(int(perp.get("kraken_fee_tier", 1)))
+    roll = float(perp.get("kraken_rollover_4h", margin_fee_4h("DOGE")))
+    return taker + roll / 2, -6.0 * roll
 
 
 def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
@@ -786,6 +797,10 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
         coins = tuple(perp.get("coins") or K_COINS)
         venue_kw = {"taker_fee": K_FEE,
                     "contract_units": {c: K_CONTRACTS[c].units_per_contract for c in coins if c in K_CONTRACTS}}
+    elif venue == "kraken":
+        from .execution.kraken_margin import US_COINS as KR_COINS
+        coins = tuple(perp.get("coins") or KR_COINS)
+        venue_kw = {"taker_fee": kraken_costs(perp)[0]}
     else:
         coins = tuple(perp.get("coins") or MEMECOINS)
     real_bank = share * float(risk_kw.get("bankroll_usd", 1000))
@@ -837,6 +852,22 @@ def build(cfg: dict, state_dir: Optional[Path]) -> PerpBot:
             if seed_path and not seed_path.exists() and state_dir:
                 seed_path = Path(state_dir) / seed_path.name
             client = KalshiMarketData(history_seed=seed_path, base_url=executor.cfg.base_url)
+    elif venue == "kraken":
+        from .execution.kraken_margin import KrakenMarginConfig, KrakenMarginExecutor
+        executor = KrakenMarginExecutor(KrakenMarginConfig(
+            live=bool(perp.get("live", False)),
+            max_trade_usd=float(perp.get("max_trade_usd", 500)),
+            max_slippage=float(perp.get("max_slippage", 0.005)),
+            leverage=int(perp.get("kraken_leverage", 2))), coins=coins)
+        if perp.get("data", "kraken") == "kraken":
+            from .data.kraken_margin import KrakenMarginData
+            seed = perp.get("history_seed")
+            seed_path = Path(seed) if seed else None
+            if seed_path and not seed_path.exists() and state_dir:
+                seed_path = Path(state_dir) / seed_path.name
+            roll = -kraken_costs(perp)[1] / 6.0
+            client = KrakenMarginData(history_seed=seed_path, coins=coins,
+                                      borrow_per_4h={c: roll for c in coins})
     bot = PerpBot(bot_cfg, sim_risk, real_risk, ProtectionConfig(**prot_kw), exec_cfg,
                   client=client, executor=executor)
     bot.risk_base = dict(risk_kw)
@@ -851,7 +882,11 @@ async def _main(args) -> int:
         pools = pickle.loads(args.replay.read_bytes())
         start = dt.datetime.fromisoformat(args.replay_from).replace(
             tzinfo=dt.timezone.utc).timestamp()
-        perp = cfg.get("perp", {})
+        perp = dict(cfg.get("perp", {}))
+        if args.venue:
+            perp["venue"] = args.venue
+        if args.kraken_tier:
+            perp["kraken_fee_tier"] = args.kraken_tier
         venue_kw = {}
         if perp.get("venue") == "coinbase":
             from .execution.coinbase_futures import CONTRACTS
@@ -861,14 +896,22 @@ async def _main(args) -> int:
             if args.whole_contracts:
                 venue_kw["contract_units"] = {c: k.units_per_contract for c, k in CONTRACTS.items()}
                 venue_kw["min_fee_per_lot"] = MIN_FEE_PER_CONTRACT
+        daily_funding = 0.0
+        if perp.get("venue") == "kraken":
+            fee, daily_funding = kraken_costs(perp)
+            venue_kw = {"taker_fee": fee}
+        elif perp.get("venue") == "kalshi":
+            from .execution.kalshi_perps import TAKER_FEE as K_FEE
+            venue_kw = {"taker_fee": K_FEE}
         rcfg = PerpBotConfig(target_pct=float(perp.get("target_pct", 0.20)),
                              stop_pct=float(perp.get("stop_pct", 0.10)),
                              hold_days=int(perp.get("hold_days", 14)), basket_mode=args.basket, **venue_kw)
-        rep = await replay(pools, start, rcfg, bankroll=args.bankroll,
+        rep = await replay(pools, start, rcfg, bankroll=args.bankroll, daily_funding=daily_funding,
                            on_capital=args.on_capital)
         print(f"replay from {args.replay_from}: {rep['trades']} closed trades, "
               f"{rep['open']} still open, mean net {100 * rep['mean_net']:+.2f}%/trade"
               f"; fee {100 * rcfg.taker_fee:.2f}%/side"
+              + (f", borrow {-100 * daily_funding:.2f}%/day" if daily_funding < 0 else "")
               + (f" (min ${rcfg.min_fee_per_lot:.2f}/contract)" if rcfg.min_fee_per_lot else "")
               + (f"; whole contracts, {rep['skipped_sub_contract']} signals too small"
                  if rcfg.contract_units else ""))
@@ -918,6 +961,10 @@ def main() -> int:
                     help="coinbase venue: round slots down to whole contracts, as the real book does")
     ap.add_argument("--basket", default="off", choices=("off", "substitute", "all"),
                     help="basket timing: substitute another coin when the contract does not fit, or short all unheld coins on a signal day")
+    ap.add_argument("--venue", choices=VENUES, default=None,
+                    help="replay at this venue's costs instead of perp.venue (kraken adds the margin borrow)")
+    ap.add_argument("--kraken-tier", type=int, default=None,
+                    help="kraken venue: Kraken Pro fee tier 1-12 for the replay (default perp.kraken_fee_tier or 1)")
     ap.add_argument("--dashboard", action="store_true")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8082)

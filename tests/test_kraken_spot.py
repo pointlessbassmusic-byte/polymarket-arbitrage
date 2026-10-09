@@ -413,8 +413,9 @@ class TestTwoLegs:
         assert perp.calls[-1][0] == "close" and spot.calls[-1][0] == "sell_maker"
 
     def test_maker_fees_in_the_round_trip(self):
-        assert CB.round_trip_fraction(True) == pytest.approx(2 * (0.00035 + 0.0005) + 2 * 0.0016)
-        assert CB.round_trip_fraction(False) == pytest.approx(0.0079)
+        # Kraken tier 1 since 2026-07-09: 0.40% maker / 0.80% taker (was 0.16% / 0.26%)
+        assert CB.round_trip_fraction(True) == pytest.approx(2 * (0.00035 + 0.0005) + 2 * 0.0040)
+        assert CB.round_trip_fraction(False) == pytest.approx(2 * (0.00035 + 0.0005) + 2 * (0.0080 + 0.0005))
 
     def test_pending_sells_survive_restart(self, tmp_path):
         b = CB.CarryBook("real", 1000.0, executes=True, state_file=tmp_path / "r.json")

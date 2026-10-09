@@ -35,7 +35,7 @@ from typing import Optional
 
 from .book import Decision, DecisionJournal
 from .data.hyperliquid import TAKER_FEE, HyperliquidClient
-from .data.kraken import KrakenClient, TAKER_FEE as KRAKEN_TAKER
+from .data.kraken import KrakenClient, MAKER_FEE as KRAKEN_MAKER, TAKER_FEE as KRAKEN_TAKER
 from .execution.kraken_spot import KrakenSpotExecutor, SpotExecConfig
 from .execution.perp_exchange import PerpExecConfig, PerpExecutor
 from .models import now
@@ -75,19 +75,17 @@ class CarryConfig:
     # LIT is a different token (~$4). A "hedge" across two assets is two
     # naked positions. Normal spot/perp gaps are a few tenths of a percent.
     max_price_gap: float = 0.03
-    # Spot leg as a post-only maker order (Kraken 0.16%, no spread) rather
-    # than a taker (0.26% + spread). On the 70 trades priced on both
-    # venues this takes the round trip from 0.79% to 0.49% and the
-    # median trade from -0.07% to +0.23%. The sim book assumes maker
-    # fills; the real book records what actually filled as maker.
+    # Spot leg as a post-only maker order rather than a taker. Measured at
+    # the pre-July-2026 fees (0.16% maker vs 0.26% + spread): on the 70
+    # trades priced on both venues the round trip fell from 0.79% to 0.49%.
+    # Kraken's entry tier is 0.40% / 0.80% since 2026-07-09, so maker is
+    # still the cheaper side and the round trip is now about 1.0%. The sim
+    # book assumes maker fills; the real book records what actually filled.
     maker_spot: bool = True
     daily_at_utc_hour: int = 0
     daily_at_utc_minute: int = 20
     monitor_interval_s: int = 3600
     state_dir: Optional[Path] = None
-
-
-KRAKEN_MAKER = 0.0016
 
 
 def round_trip_fraction(maker_spot: bool = False) -> float:

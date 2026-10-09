@@ -474,3 +474,109 @@ bounce-short either (a filter is one more selected rule).
 **Plumbing added:** the Kalshi executor's contract table now knows the
 BTC (0.0001) and ETH (0.001) perps for the follow-ups; neither is in
 any universe.
+
+## Addendum, 2026-10-09 (7): Kraken Pro as a venue, broker plumbing, and promotion stacking
+
+**Kraken Pro: the API exists, the costs rule it out.** Kraken opened spot
+margin to US retail on 2026-05-06 through Kraken Derivatives US, long or
+short, with DOGE up to 10x and PEPE and SHIB up to 5x
+([launch](https://blog.kraken.com/product/margin/cftc-regulated-spot);
+[US margin page](https://support.kraken.com/articles/getting-started-us-margin)).
+The global margin list also covers BONK, FLOKI, WIF and others, but the
+US retail list does not. The order endpoint takes `leverage`,
+`reduce_only` and `validate`
+([AddOrder](https://docs.kraken.com/api/docs/rest-api/add-order)), so
+the venue is wired (`perp.venue: kraken`). Costs since 2026-07-09: tier 1
+pays 0.40% maker and 0.80% taker
+([fee schedule](https://www.kraken.com/features/fee-schedule);
+[tier change](https://support.kraken.com/in/articles/cross-platform-fee-tier-changes)).
+A margin position adds an opening fee and a rollover every 4 hours, each
+0.02-0.04% on these coins
+([US margin fees](https://support.kraken.com/articles/us-margin-fees)).
+That is about 0.18% a day, or 66% a year, which a week-long short cannot
+carry. Replay, registry `kraken-margin-venue` (killed):
+
+| venue | mean net per trade | on $250, 2022 / 23 / 24 / 25 / 26 |
+|---|---|---|
+| Kalshi perps | +1.92% | +8.5 / +9.4 / +27.5 / +49.4 / −0.9% |
+| Kraken tier 1, 0.12%/day borrow | −0.56% | −9.5 / −11.1 / −5.5 / +17.5 / −19.1% |
+| Kraken tier 1, 0.18%/day (CLI default) | −1.03% | |
+| Kraken tier 6 | +0.07% | −4.8 / −6.4 / +4.9 / +25.4 / −15.8% |
+| Kraken tier 12, 0.12%/day | +0.85% | +0.8 / +0.1 / +14.7 / +35.4 / −9.7% |
+
+Kraken's US perpetuals are a different product
+([launch](https://www.businesswire.com/news/home/20260615010932/en/Kraken-Launches-Perpetual-Futures-for-US-Clients);
+[contracts](https://support.kraken.com/articles/us-perpetual-futures)).
+They are listed on Bitnomial, include DOGE (PDOGUK) and SHIB (PSHBUN),
+cost $0.15 a contract a side
+([US futures fees](https://support.kraken.com/articles/us-futures-fees)),
+and settle funding daily. If the DOGE contract is the 1,000-coin "Kilo"
+size in [Bitnomial's rulebook](https://bitnomial.com/exchange/rulebook/chapter/5/),
+about $85, the fee is about 18 bp a side and the replay gives +1.64% per
+trade. Two facts are unconfirmed: the contract size, and whether a retail
+API key can trade these perpetuals. Neither is documented
+([contract specifications](https://support.kraken.com/articles/contract-specifications)),
+so no executor is written (`kraken-us-perps-venue`, inconclusive).
+
+One general conclusion: **borrow through a perp, not through spot
+margin.** Kraken's rollover costs about 66% a year on memecoins and 33%
+on BTC. Kalshi perps cost 4 bp a side plus funding, which has averaged
+near zero on these coins.
+
+**Brokers added as plumbing**, none trading on its own:
+
+- **Alpaca:** stocks, ETFs and options, with paper and live endpoints,
+  IOC whole-share orders, flattening through the positions endpoint, and
+  free IEX bars for the ORB pilot.
+- **tastytrade:** OAuth2 token refresh, balances, positions, CME micro
+  Bitcoin lookup, and dry-run orders for the options item.
+- **`python -m cryptobot.brokers --probe`** reads every account that has
+  keys and never places an order.
+
+**Promotions: what "bounce around until maxed" can and cannot do.**
+`promo-capture-hedged` in the registry, `python -m cryptobot.promos` for
+the arithmetic. No "$250 on a $1,000 buy" offer was live on Kraken on
+2026-10-09. The current Kraken referral pays a fixed $20
+([support](https://support.kraken.com/articles/kraken-app-referral-program)).
+Kraken's deposit matches ran in October 2025 and February 2026 and
+carried clawbacks ([Oct terms](https://www.kraken.com/legal/october-deposit-match-terms),
+[Feb terms](https://www.kraken.com/legal/february-deposit-match-terms)).
+Other live or recent offers:
+
+- **Gemini:** $50 after a $100 trade.
+- **Coinbase:** a randomized BTC reward after a first purchase
+  ([Finder](https://www.finder.com/cryptocurrency/crypto-bonuses);
+  [College Investor](https://thecollegeinvestor.com/37016/best-crypto-bonus-offers/)).
+- **Cash-back portals:** a Kraken sign-up through
+  [Rakuten](https://www.rakuten.com/shop/kraken) pays on top of the
+  referral.
+- **Brokerage transfer matches:** 1-4%, with 1-5 year clawbacks and
+  "no outflows" terms ([Robinhood](https://robinhood.com/us/en/support/articles/account-transfer-bonus-faq-jax),
+  [Public](https://help.public.com/en/articles/6499808-cash-bonus-to-transfer-account),
+  [NerdWallet](https://www.nerdwallet.com/best/investing/brokerage-account-promotions-and-bonuses)).
+- **Kalshi:** 3.50% variable APY on balances of $250 or more, accrued
+  daily on net value ([help](https://help.kalshi.com/en/articles/13823847-apy-on-kalshi)).
+  Its page does not say whether perps collateral counts, so the first
+  monthly statement will show it.
+
+| offer (hedged where it needs a coin held) | net after costs and 24% tax |
+|---|---|
+| hypothetical $250 for a $1,000 buy, held 30 days | ~$170 |
+| Gemini $50 on a $100 trade | ~$36 |
+| Kraken referral $20 | ~$13 |
+| 1% transfer match on $10,000, 2-year clawback | ~$76 (0.4% a year) |
+| Kalshi APY on the $250 desk balance | ~$7 a year |
+
+The hedge is a same-size perp short. On a 30-day hold it costs about
+$11 per $1,000, while an unhedged coin's 30-day standard deviation is
+around $140 per $1,000 for BTC and two to three times that for
+memecoins. The binding limit is the number of distinct
+one-per-person offers, not capital. The total is a one-off few hundred
+dollars of ordinary income. What turns it into a terms or legal
+problem:
+
+- multiple accounts per person, or someone else's identity
+- self-referral
+- wash trades to meet a volume requirement (prohibited on CFTC venues,
+  Kalshi and Coinbase Derivatives included)
+- moving money out during a clawback window, which forfeits the bonus

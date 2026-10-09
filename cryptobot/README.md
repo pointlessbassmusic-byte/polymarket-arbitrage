@@ -1321,6 +1321,47 @@ environment is one config line (`perp.kalshi_base_url`). Funding on
 Kalshi's DOGE and SHIB perps averaged about zero over their first 364
 eight-hour periods, so carry stays shelved there as well.
 
+**Kraken Pro spot margin (`perp.venue: kraken`): wired, not recommended.**
+Kraken opened spot margin to US retail on 2026-05-06, long or short:
+DOGE up to 10x, PEPE and SHIB up to 5x, through Kraken Derivatives US.
+It is the same REST API the carry leg already signs, so the venue is
+built (`execution/kraken_margin.py`, `data/kraken_margin.py`): IOC
+limit shorts with `leverage` (2x, Kraken's minimum to open on margin),
+reduce-only buy-backs, positions from `OpenPositions`, equity from
+`TradeBalance`, and a validate-only short per coin in `--preflight`, so
+the key and the margin unlock are proven before money moves. Order
+minimums are $4-6 per coin and the books are tight (a $1,000 sell fills
+within 0.2 bp on DOGE, 1.9 bp on PEPE, 3.1 bp on SHIB). The cost is what
+rules it out: tier-1 fees are 0.40% maker / 0.80% taker since
+2026-07-09, and a margin short pays 0.02-0.04% to open plus the same
+every 4 hours, about 0.18% a day. The paper book charges both (the
+borrow as negative funding), and the replay says:
+
+| venue (bounce-short, DOGE/PEPE/SHIB, 2022-2026) | mean net per trade |
+|---|---|
+| Kalshi perps, 4 bp a side | +1.92% |
+| Kraken margin, tier 1 ($0-2.5k a month) | -1.03% |
+| Kraken margin, tier 6 ($100k a month) | about 0% |
+| Kraken margin, tier 12 ($10M a month) | +0.37% |
+
+```bash
+python -m cryptobot.perp_bot --replay state/hl_daily_us3.pkl --replay-from 2022-01-01 --venue kraken --kraken-tier 1
+```
+
+Kraken's US perpetuals (listed on Bitnomial since 2026-06-15, DOGE and
+SHIB among 16 contracts, $0.15 per contract per side) would replay at
++1.64% per trade if the DOGE contract is the 1,000-coin size, but
+Kraken documents no API for them yet; `kraken-us-perps-venue` in the
+registry says what has to be confirmed before an executor is written.
+
+**Other brokers (`python -m cryptobot.brokers`).** One inventory of
+every venue the desk can reach, which keys each needs, and with
+`--probe` a read of every account whose keys are set (never an order):
+Alpaca for US stocks, ETFs and options with a paper endpoint and free
+IEX bars (`execution/alpaca.py`, `data/alpaca.py`), tastytrade for
+options, futures and CME micro Bitcoin (`execution/tastytrade.py`).
+Fidelity has no retail trading API; it stays a human account.
+
 **Carry is shelved in the US.** Carry's edge needed breadth (the
 150-coin universe); US venues list three memecoin perps, and over the
 past year their funding on Kraken Futures averaged DOGE +0.005, PEPE

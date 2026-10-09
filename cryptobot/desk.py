@@ -475,6 +475,10 @@ def capital_plan(cfg: dict) -> dict:
         from .execution.kalshi_perps import US_COINS as K_COINS
         n_coins = len(perp.get("coins") or K_COINS)
         default_cap = 500.0
+    elif venue(cfg) == "kraken":
+        from .execution.kraken_margin import US_COINS as KR_COINS
+        n_coins = len(perp.get("coins") or KR_COINS)
+        default_cap = 500.0
     else:
         n_coins = len(perp.get("coins") or range(18))
         default_cap = 50.0
@@ -488,7 +492,8 @@ def capital_plan(cfg: dict) -> dict:
         "carry_capital": c_share * bank,
         "bounce_capital": b_share * bank,
         "bounce_slot": slot,
-        "kraken_usd": carry_notional,                        # spot leg
+        # carry's spot leg, plus the bounce-short when it shorts on Kraken margin
+        "kraken_usd": carry_notional + (b_share * bank if venue(cfg) == "kraken" else 0.0),
         "hyperliquid_usdc": carry_notional / lev + (b_share * bank if venue(cfg) == "hyperliquid" else 0.0),
         "coinbase_usd": b_share * bank if venue(cfg) == "coinbase" else 0.0,
         "kalshi_usd": b_share * bank if venue(cfg) == "kalshi" else 0.0,
@@ -553,6 +558,40 @@ async def kalshi_contract_prices(cfg: dict, env: dict) -> dict:
     return out
 
 
+async def kraken_margin_prices(cfg: dict, env: dict) -> dict:
+    """Kraken spot-margin preflight inputs: the dollar value of each
+    coin's minimum order, the venue's cost at the configured tier, and
+    (with a key) a validate-only short per coin."""
+    from .data.kraken_margin import KrakenMarginData
+    from .execution.kraken_margin import US_COINS as KR_COINS, KrakenMarginConfig, KrakenMarginExecutor
+    from .perp_bot import kraken_costs
+    perp = cfg.get("perp", {})
+    coins = tuple(perp.get("coins") or KR_COINS)
+    md = KrakenMarginData(coins=coins)
+    ex = KrakenMarginExecutor(KrakenMarginConfig(max_trade_usd=float(perp.get("max_trade_usd", 500)),
+                                                 leverage=int(perp.get("kraken_leverage", 2))),
+                              key=env.get("CRYPTOBOT_KRAKEN_KEY", ""), secret=env.get("CRYPTOBOT_KRAKEN_SECRET", ""),
+                              coins=coins)
+    out: dict = {}
+    try:
+        mids = await md.all_mids()
+        from .execution.kraken_margin import units
+        for c in coins:
+            if c in mids:
+                info = await ex._pair_info(c)
+                out[c] = info["ordermin"] * mids[c] / units(c)
+        fee, fund = kraken_costs(perp)
+        out["_costs"] = {"tier": int(perp.get("kraken_fee_tier", 1)), "fee": fee, "borrow_day": -fund}
+        if ex.has_key:
+            plan = capital_plan(cfg)
+            out["_validate"] = [await ex.validate_short(c, max(plan["live_slot"], out.get(c, 0.0) * 1.05), mids[c])
+                                for c in coins if c in mids]
+    finally:
+        await md.close()
+        await ex.close_client()
+    return out
+
+
 async def contract_prices() -> dict:
     """Live dollar size of one Coinbase contract per coin, and the
     overnight short margin rate that decides how much of a slot it uses."""
@@ -587,6 +626,11 @@ def preflight(cfg: dict, env: dict, balances: Optional[dict] = None,
                        bool(env.get("CRYPTOBOT_KALSHI_KEY_ID") and env.get("CRYPTOBOT_KALSHI_KEY_PEM")),
                        "export CRYPTOBOT_KALSHI_KEY_ID / _KEY_PEM (Ed25519 or RSA key from "
                        "kalshi.com/account/profile; perps access is enabled per member)"))
+    elif plan["venue"] == "kraken":
+        checks.append(("Kraken API key + secret for spot margin",
+                       bool(env.get("CRYPTOBOT_KRAKEN_KEY") and env.get("CRYPTOBOT_KRAKEN_SECRET")),
+                       "export CRYPTOBOT_KRAKEN_KEY / _SECRET: query funds, query orders, create & modify "
+                       "orders, NEVER withdrawal; US margin unlocked in Kraken Pro (Kraken Derivatives US)"))
     elif plan["venue"] == "coinbase":
         checks.append(("Coinbase CDP API key (ES256) name + secret",
                        bool(env.get("CRYPTOBOT_COINBASE_KEY_NAME") and env.get("CRYPTOBOT_COINBASE_KEY_SECRET")),
@@ -641,6 +685,24 @@ def preflight(cfg: dict, env: dict, balances: Optional[dict] = None,
             checks.append(("Kalshi perps enabled for this account", bool(contract_usd["_enabled"]),
                            "GET /margin/enabled says no: perps access is rolled out per member; "
                            "ask Kalshi support or use the demo environment (perp.kalshi_base_url)"))
+    if plan["venue"] == "kraken" and contract_usd:
+        mins = {c: v for c, v in contract_usd.items() if not c.startswith("_")}
+        if mins:
+            worst_coin = max(mins, key=mins.get)
+            checks.append((f"each live slot (${plan['live_slot']:.0f} at {100 * plan['deploy_fraction']:.0f}% deployed) "
+                           f"clears Kraken's order minimum",
+                           plan["live_slot"] >= mins[worst_coin],
+                           f"{worst_coin}: minimum order ${mins[worst_coin]:,.2f}"))
+        for v in contract_usd.get("_validate") or []:
+            checks.append((f"Kraken accepts a margin short on {v['coin']} (validate only, nothing traded)", v["ok"],
+                           v.get("error") or "unlock US margin in Kraken Pro; the pair may not be margin-eligible for US retail"))
+        cost = contract_usd.get("_costs")
+        if cost:
+            checks.append((f"Kraken costs at tier {cost['tier']}: {100 * cost['fee']:.2f}%/side + "
+                           f"{100 * cost['borrow_day']:.2f}%/day borrow keep the bounce-short positive",
+                           False,
+                           "replayed 2022-2026 on DOGE/PEPE/SHIB: -1.03%/trade at tier 1 and +0.37% at tier 12, "
+                           "vs +1.92% on Kalshi (registry kraken-margin-venue). Use perp.venue: kalshi"))
     if balances is not None:
         needs = [("kraken_usd", plan["kraken_usd"]), ("hyperliquid_usdc", plan["hyperliquid_usdc"]),
                  ("coinbase_usd", plan["coinbase_usd"]), ("kalshi_usd", plan["kalshi_usd"])]
@@ -695,8 +757,13 @@ async def read_balances(cfg: dict, env: dict) -> dict:
             ex = KrakenSpotExecutor(SpotExecConfig())
             ex._key, ex._secret = env["CRYPTOBOT_KRAKEN_KEY"], env["CRYPTOBOT_KRAKEN_SECRET"]
             bal = await ex.balance()
-            await ex.close()
             out["kraken_usd"] = float(bal.get("ZUSD", 0.0)) + float(bal.get("USD", 0.0))
+            if venue(cfg) == "kraken":           # margin collateral counts at equity, not just cash
+                from .execution.kraken_margin import KrakenMarginConfig, KrakenMarginExecutor
+                mx = KrakenMarginExecutor(KrakenMarginConfig(), client=ex._client,
+                                          key=ex._key, secret=ex._secret)
+                out["kraken_usd"] = (await mx.balance())["total_usd_balance"] or out["kraken_usd"]
+            await ex.close()
         except Exception as exc:
             logger.warning("kraken balance unavailable: %s", exc)
     return out
@@ -707,7 +774,8 @@ def render_preflight(cfg: dict, checks: list) -> str:
     out = [f"real bankroll ${plan['bankroll']:.2f}: carry ${plan['carry_capital']:.2f}, "
            f"bounce-short ${plan['bounce_capital']:.2f} on {plan['venue']}"]
     if plan["kraken_usd"] > 0:
-        out.append(f"  fund Kraken with >= ${plan['kraken_usd']:.2f} USD (carry spot leg)")
+        what = "carry spot leg" + (" + bounce-short margin collateral" if plan["venue"] == "kraken" else "")
+        out.append(f"  fund Kraken with >= ${plan['kraken_usd']:.2f} USD ({what})")
     if plan["hyperliquid_usdc"] > 0:
         out.append(f"  fund Hyperliquid with >= ${plan['hyperliquid_usdc']:.2f} USDC")
     if plan["coinbase_usd"] > 0:
@@ -760,6 +828,11 @@ async def _main(args) -> int:
                 sizes = await kalshi_contract_prices(cfg, env)
             except Exception as exc:
                 logger.warning("kalshi contract prices unavailable: %s", exc)
+        if venue(cfg) == "kraken":
+            try:
+                sizes = await kraken_margin_prices(cfg, env)
+            except Exception as exc:
+                logger.warning("kraken margin checks unavailable: %s", exc)
         if venue(cfg) == "coinbase":
             try:
                 sizes = await contract_prices()

@@ -546,3 +546,43 @@
   rerun: "python -m cryptobot.crossasset_study --dir xasset (section 4, 2026-10-10 onward)"
   preregistered: true
   trials_run: 1
+
+- id: kraken-margin-venue
+  title: "Kraken Pro spot margin as the bounce-short's venue (US retail shorts on DOGE, PEPE, SHIB)"
+  source: "operator request 2026-10-09 ('look at adding kraken pro as a venue for trades if api exists'); Kraken US spot margin launch 2026-05-06 (blog.kraken.com/product/margin/cftc-regulated-spot; support 'Getting started with US margin trading': DOGE up to 10x, PEPE and SHIB up to 5x); Kraken fee schedule from 2026-07-09 (tier 1 0.40% maker / 0.80% taker; margin opening and rollover 0.02-0.04% per 4h on DOGE/PEPE/SHIB)"
+  claim: "Shorting DOGE/PEPE/SHIB on Kraken spot margin runs the bounce-short at least as profitably as the Kalshi perps, and adds PEPE (inactive on Kalshi) with $4-6 order minimums instead of contracts."
+  test: "The bot's own replay (perp_bot --replay, hl_daily_us3.pkl, 2022-01-01 to 2026-10, conservative barrier fills), fee per side = Kraken tier taker + half the opening fee, borrow charged as negative funding of 6 x the rollover per day; tiers 1, 3, 6, 12, maker-in/taker-out on tier 1, borrow 0.12/0.18/0.24% a day; compared with Kalshi (4 bp, no funding). Live public data checked the same day: Kraken books fill $1,000 within 0.2 bp (DOGE), 1.9 bp (PEPE), 3.1 bp (SHIB) of mid; Kraken and cached Hyperliquid closes agree to a 0.9995 median ratio."
+  success: "Written before running: replay mean net per trade within 0.5 points of Kalshi's at the tier a $100-$1,000 account reaches (tier 1-2), and positive on capital in at least 4 of 5 years."
+  data: "state/hl_daily_us3.pkl; Kraken public AssetPairs, Ticker, Depth, OHLC (2026-10-09)"
+  result: "Kalshi +1.92%/trade (147 trades; on $250: +8.5/+9.4/+27.5/+49.4/-0.9% for 2022-26). Kraken tier 1 taker with 0.12%/day borrow -0.56%/trade (on $250: -9.5/-11.1/-5.5/+17.5/-19.1%, max drawdown -42%); 0.24%/day -1.51%; tier 1 maker-in -0.63%; tier 3 -0.19%; tier 6 +0.07%; tier 12 ($10M a month) +0.85% with 0.12%/day borrow and +0.37% with 0.18%/day. The borrow (0.18%/day at the midpoint, about 66% a year) on a ~week-long short costs more than the edge. The API does support it (AddOrder leverage/reduce_only/validate, OpenPositions, TradeBalance), so the venue is wired and selectable (perp.venue: kraken) with its true costs in the paper book, and preflight fails its cost line on purpose"
+  verdict: killed
+  regime: "Kraken fees as of 2026-07-09; a fee cut or a borrow below ~0.03%/day would reopen it; leverage through a perp is far cheaper than through spot margin"
+  rerun: "python -m cryptobot.perp_bot --replay state/hl_daily_us3.pkl --replay-from 2022-01-01 --venue kraken --kraken-tier 1"
+  trials_run: 10
+
+- id: kraken-us-perps-venue
+  title: "Kraken's US perpetuals (Bitnomial-listed, via Kraken Derivatives US) as a second perp venue for DOGE and SHIB"
+  source: "Kraken US perpetual futures launch 2026-06-15 (support 'US Perpetual Futures': 16 contracts incl. PDOGUK and PSHBUN, daily funding at 3pm CT, USD collateral); 'US Futures Fees': $0.15 per contract per side all-in; Bitnomial rulebook ch. 5 lists 'Dogecoin US Dollar Hecto/Kilo Perpetual Futures'"
+  claim: "If the DOGE contract is the 1,000-DOGE 'Kilo' size (~$85) and the account can trade it by API, Kraken's US perps run the bounce-short within a few tenths of Kalshi and give a second venue for redundancy."
+  test: "Replay as for kraken-margin-venue with the fee per side = $0.15 / contract notional and no borrow: 1,000-DOGE contract (~18 bp a side) and 100-DOGE (~176 bp a side)."
+  success: "Written before running: replay within 0.5 points of Kalshi per trade at the actual contract size, AND a documented API that a retail key can trade; both are needed before any executor is written."
+  data: "state/hl_daily_us3.pkl"
+  result: "At ~18 bp a side +1.64%/trade (on $250: +6.5/+7.2/+23.5/+45.8/-2.8%, max drawdown -17%) vs Kalshi +1.92%; at ~176 bp the bot's own cost gate refuses every entry. Contract size is inferred from Bitnomial's product names, not confirmed; Kraken documents no API for US perps (its futures API pages cover the non-US platform). No executor written"
+  verdict: inconclusive
+  regime: "pending: confirm PDOGUK / PSHBUN contract sizes on the Kraken Pro contract page and whether Kraken Pro API keys can trade US perps"
+  rerun: "python -m cryptobot.perp_bot --replay state/hl_daily_us3.pkl --replay-from 2022-01-01 --venue kalshi (then set taker_fee to 0.15 / contract notional)"
+  trials_run: 2
+
+- id: promo-capture-hedged
+  title: "Capture exchange and brokerage sign-up, referral, deposit-match and transfer bonuses with the price risk hedged on a perp"
+  source: "operator question 2026-10-09 ('if you get $250 for a $1000 crypto buy on kraken, is that an offer on other places you could bounce around until maxed?'); offers seen 2026-10: Kraken app referral $20 fixed (support, updated 2026-10-01), Gemini $50 after a $100 trade, Coinbase randomized BTC reward after a first $50 buy, Rakuten cashback on Kraken sign-up, Robinhood/Public/Webull transfer matches 1-4% with 1-5 year clawbacks, Kalshi 3.50% APY on balances of $250+; Kraken deposit matches ran Oct 2025 and Feb 2026 and have ended"
+  claim: "Each new-customer offer can be taken once per person; holding the required crypto with a same-size perp short removes price risk for a few percent of the bonus, so the net is roughly the bonus less fees, funding and tax, and capital can move to the next offer when each hold or clawback window ends."
+  test: "cryptobot.promos arithmetic: spot round trip at Kraken tier-1 maker plus spread, perp hedge at Kalshi 4 bp a side with 0.01% per 8h funding paid, 24% marginal tax on the bonus; annualised on capital over the longer of the hold and clawback windows."
+  success: "Not a trading rule: an operator checklist. Worth doing when the net after tax is positive and the annualised return on locked capital beats T-bills; never via multiple accounts, someone else's identity, self-referral or wash trades."
+  data: "promotion terms read 2026-10-09 (sources in RESEARCH-2026-10.md addendum 7)"
+  result: "$250 on a $1,000 buy held 30 days, hedged: net ~$170 after $9 spot, $11 hedge, $60 tax. Gemini $50 on $100: net ~$36. Kraken referral $20: ~$13. 1% transfer match on $10,000 with a 2-year clawback: ~$76, 0.4% a year, worth it only on money that would sit at that broker anyway. Kalshi APY on the $250 desk: ~$7 a year, needs the balance at or above $250. No $250-on-$1,000 offer was live on 2026-10-09. The ceiling is the number of distinct one-per-person offers, not capital: a one-off few hundred dollars, taxable as ordinary income"
+  verdict: inconclusive
+  regime: "offers change monthly; clawbacks and 'no withdrawals during the window' terms bind the capital, not the hedge"
+  rerun: "python -m cryptobot.promos --bonus 250 --required 1000 --hold-days 30 --tax-rate 0.24"
+  trials_run: 1
+
