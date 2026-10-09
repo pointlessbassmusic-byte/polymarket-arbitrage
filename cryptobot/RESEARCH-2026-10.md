@@ -394,3 +394,83 @@ is held there.
 
 Nothing is added now: queue item 1 runs on Kalshi, which is wired. An
 Alpaca paper account is the zero-cost step when item 3 or 5 starts.
+
+## Addendum, 2026-10-09 (6): cross-asset regressions (stocks, foreign stocks, rates, dollar, VIX, oil vs crypto)
+
+Pre-registered as `cross-asset-crypto-leadlag`; module
+`cryptobot/crossasset_study.py`; 2,818 US business days from 2015-07 to
+2026-10. BTC is sampled at 16:00 and 09:00 New York time from Coinbase
+hourly bars; stocks and macro series are FRED daily closes; the
+memecoin and all-perp baskets are equal-weight Hyperliquid daily closes.
+Every regression looked at was counted: 69 trials.
+
+**Same-day comovement is strong and recent.** Correlation of BTC's
+16:00-to-16:00 return with each series, by era:
+
+| series | 2015-19 | 2020-21 | 2022-23 | 2024-26 |
+|---|---|---|---|---|
+| S&P 500 | +0.02 | +0.36 | +0.49 | +0.42 |
+| Nasdaq | +0.02 | +0.39 | +0.52 | +0.43 |
+| VIX change | −0.04 | −0.37 | −0.42 | −0.38 |
+| broad dollar | −0.00 | −0.23 | −0.21 | −0.15 |
+| 10y yield change | −0.02 | +0.09 | −0.10 | +0.03 |
+| 10y real yield change | −0.04 | +0.02 | −0.14 | −0.02 |
+| Nikkei 225 | −0.06 | +0.16 | +0.06 | +0.06 |
+
+By half-year the S&P correlation jumped from about zero to 0.48 in
+2020H1, peaked at 0.60–0.64 in 2022H1, dipped to 0.16 in 2023H2 and has
+been 0.31–0.57 since. Crypto trades as a high-beta risk asset; rates and
+the dollar matter only through that channel; foreign stocks barely
+register once the US session is accounted for.
+
+**Nothing leads at the daily horizon.** Newey-West t of the next
+period's target on today's predictor, full sample then the last two eras:
+
+| predictor → target | full | 2022-23 | 2024-26 |
+|---|---|---|---|
+| S&P → BTC next 24h | −1.10 | −1.42 | −1.75 |
+| Nasdaq → BTC next 24h | −0.90 | −1.24 | −1.62 |
+| 10y real yield → BTC next 5d | −2.57 | −2.02 | −0.60 |
+| 10y yield → BTC next 5d | −1.77 | −2.07 | +0.13 |
+| breakeven → BTC next 24h | +1.83 | +0.90 | +0.68 |
+| anything → memecoin basket | ≤ 1.8 in magnitude | | |
+| anything → all-perp basket | ≤ 1.7 (one 2.06 in 2020-21) | | |
+
+The bar was |t| ≥ 2.5 full sample and the same sign at |t| ≥ 1.5 in both
+latest eras; nothing clears it. The real-yield relation (BTC falls in
+the week after real yields rise) was real in 2020–23 and has faded; the
+"BTC follows stocks next day" idea is, if anything, slightly reversed.
+Multivariate R² is 0.003–0.03.
+
+**The operator's divergence case.** After a US session with stocks up
+more than 0.5% and BTC down more than 0.5% (194 days), BTC's next 24
+hours averaged +0.41% (t 1.5): +0.62% in 2015–19, +0.43% in 2020–21,
+−0.57% in 2022–23, +0.82% (t 2.3, n 47) in 2024–26. The mirror case
+(stocks down, BTC up) averaged +0.52% (t 1.5). Convergence exists on
+average, with a sign flip in 2022–23 and a t that does not meet the
+bar. It is the one pattern with an economic story, so it is
+pre-registered as `divergence-catchup-btc` on out-of-sample days only
+(after 2026-10-09; about 15–20 qualifying days a year, so years to
+decide). Not traded.
+
+**The reverse direction is comovement, not a lead.** BTC's move from the
+US close to 09:00 ET "predicts" that day's S&P close-to-close with t 3.9
+(7.9 in 2024–26, correlation 0.21). The S&P close-to-close contains the
+overnight futures gap, which BTC moved with; without a free S&P open
+series the two cannot be separated, and the Kalshi US500 perp has 76
+hours of hourly history, so the intraday test (does the BTC perp lead
+the US500 perp hour to hour while the cash market is closed?) waits for
+data; `xasset/kalshi_hourly.pkl` is the start of that cache.
+
+**Rules, walk-forward on BTC next-24h at 8 bp (Kalshi BTC perp, 0.0001
+BTC a contract, ~$56M a day):** follow-the-S&P sign rule Sharpe −0.42
+(net negative in 2024–26, killed as a sub-rule); OLS on stocks only
++0.25 (PSR 0.77); rates and VIX only +0.06; all same-day-known
+predictors +0.03 (−0.31 at 20 bp). Best rule's deflated Sharpe at 69
+trials: 0.14. Verdict: inconclusive. The desk's baskets do not respond
+to any of it with a lag, so no cross-asset filter goes on the
+bounce-short either (a filter is one more selected rule).
+
+**Plumbing added:** the Kalshi executor's contract table now knows the
+BTC (0.0001) and ETH (0.001) perps for the follow-ups; neither is in
+any universe.

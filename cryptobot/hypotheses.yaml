@@ -518,3 +518,31 @@
   rerun: "not yet written: cryptobot.pead_study"
   preregistered: true
   trials_run: 1
+
+- id: cross-asset-crypto-leadlag
+  title: "Cross-asset lead-lag: do US stocks, foreign stocks, rates, the dollar, VIX and oil predict BTC, memecoins and the perp universe (and the reverse)?"
+  source: "operator request 2026-10-09 ('cross asset correlation: us stocks, foreign stocks, bonds, rates vs price up bitcoin down; run regressions across asset classes to look for patterns and build new strategies'); the 2022-2024 BTC-Nasdaq correlation literature (IMF 2022 'Crypto and equity markets are increasingly correlated'; Fed FEDS notes on crypto-equity comovement)"
+  claim: "Daily moves in the S&P 500, Nasdaq, Nikkei 225, 10-year and 2-year yields, the 10-year real yield, breakeven inflation, the broad dollar, VIX and WTI predict the next 24 hours' (and next 5 days') return of BTC, of the 18-memecoin basket and of the 150-perp basket, measured from the US close, over and above BTC's own lag, with a stable sign across eras; divergence days (stocks up, BTC down, and the reverse) are followed by convergence; and BTC's move between the US close and the next US open predicts that day's S&P 500 return."
+  test: "BTC hourly (Coinbase, 2015-07 to 2026-10) sampled at 16:00 and 09:00 ET; FRED daily SP500 (2016-10+), NASDAQCOM, NIKKEI225, DGS10, DGS2, DFII10, T10YIE, DTWEXBGS, VIXCLS, DCOILWTICO; Hyperliquid daily closes for the baskets (2020-08+). Univariate OLS of each target on each predictor with Newey-West (5 lags) t, full sample and by era (2015-2019, 2020-2021, 2022-2023, 2024-2026); a multivariate OLS; rolling 90-day correlations by half-year; divergence conditionals at a 0.5% threshold; a walk-forward rule (fit on all prior years, trade BTC next-24h at 8 bp round trip for the Kalshi BTC perp, 20 bp sensitivity for Coinbase futures) and the simplest named variant 'follow the S&P'. Every (predictor, target, horizon) regression looked at is one trial; divergence and reverse-direction tests are trials too."
+  success: "Written before running: a pattern is a candidate only if its full-sample Newey-West |t| >= 2.5 AND it keeps the same sign with |t| >= 1.5 in each of the two latest eras (2022-2023 and 2024-2026); a rule built from a candidate is alive only with walk-forward net Sharpe > 0.5, PSR >= 0.95 and DSR >= 0.95 at the recorded trials_run; no pattern clearing the bar means inconclusive; a rule net negative in 2024-2026 is killed."
+  data: "scratch xasset/ (FRED CSVs, btc_hourly_2015_2019.pkl, cb_daily_btc_eth.pkl, kalshi_hourly.pkl), btc_hourly.pkl, hl_daily.pkl, hl_all_daily.pkl"
+  result: "Run 2026-10-09 on 2,818 US business days 2015-07 to 2026-10. Contemporaneous: BTC-S&P correlation 0.02 (2015-19), 0.36 (2020-21), 0.49 (2022-23), 0.42 (2024-26); Nasdaq the same; VIX change -0.37 to -0.42; broad dollar -0.15 to -0.23; 10y and 2y yield changes within +-0.13; Nikkei +0.06; by half-year the S&P correlation has not been below 0.16 since 2020H1 (peak 0.60-0.64 in 2022H1). Lead-lag: none of the 52 (predictor, target) regressions clears the bar; strongest is 10y real yield -> BTC next 5 days (NW t -2.57 full, -2.02 in 2022-23, -0.60 in 2024-26, so it fails the latest-era test); S&P -> BTC next 24h is mildly negative (t -1.42 / -1.75 in the last two eras), i.e. no lagged follow-through; memecoin and all-perp baskets: nothing above |t| 1.8. Multivariate R2 0.003-0.03. Divergence: stocks up / BTC down is followed by +0.41% next 24h (t 1.5, n 194; +0.82% t 2.3 in 2024-26 but -0.57% in 2022-23); stocks down / BTC up +0.52% (t 1.5, n 141). Reverse: BTC's 16:00-09:00 ET move 'predicts' the next S&P close-to-close with t 3.9 (7.9 in 2024-26, corr 0.21), which is the overnight futures gap the cash close already contains, not a lead; the Kalshi US500 perp has 76 hours of history so the intraday version cannot be run yet. Walk-forward BTC rules at 8 bp: follow-the-S&P sign rule Sharpe -0.42 (net negative 2024-26: killed as a sub-rule); OLS stocks-only +0.25 (PSR 0.77); rates+VIX +0.06; all predictors +0.03 (-0.31 at 20 bp). Best rule DSR 0.14 at 69 trials"
+  verdict: inconclusive
+  regime: "crypto has been a high-beta risk asset since 2020 (same-day comovement with the Nasdaq and inverse with VIX), with no exploitable lag at the daily horizon; rates and the dollar co-move weakly and publish late; the baskets the desk trades do not respond to any of it with a lag. One follow-up registered: divergence-catchup-btc"
+  rerun: "python -m cryptobot.crossasset_study --dir xasset --hourly btc_hourly.pkl --memes hl_daily.pkl --perps hl_all_daily.pkl"
+  preregistered: true
+  trials_run: 69
+
+- id: divergence-catchup-btc
+  title: "BTC catches up the day after it diverges from stocks (stocks up > 0.5%, BTC down > 0.5%)"
+  source: "the one pattern with an economic story in cross-asset-crypto-leadlag (2026-10-09): +0.41%/24h after a divergence day, t 1.5 on 194 days, sign unstable across eras"
+  claim: "After a US session in which the S&P 500 rose more than 0.5% while BTC (16:00-16:00 ET) fell more than 0.5%, BTC's next 24 hours from the US close return more than the 8 bp round trip on the Kalshi BTC perp, on average, because the crypto leg lags the risk-on move rather than disagreeing with it."
+  test: "Out-of-sample only: US business days after 2026-10-09, the same definitions as cross-asset-crypto-leadlag (FRED SP500, Coinbase hourly BTC at 16:00 ET), 8 bp cost; nothing before that date counts because the rule was found in it."
+  success: "Written before running: at least 60 qualifying days after 2026-10-09 with mean next-24h BTC return >= +0.30% net and t >= 2.0, and the mirror case (stocks down, BTC up) not negative; otherwise killed. Not traded before that; the in-sample +0.41% (t 1.5) does not meet the registry's bar."
+  data: "cryptobot.crossasset_study rows filtered to day > 2026-10-09"
+  result: "PRE-REGISTERED 2026-10-09; waiting for out-of-sample days (about 15-20 qualifying days a year at the 0.5% threshold, so 3-4 years at the current rate)"
+  verdict: inconclusive
+  regime: "to be run"
+  rerun: "python -m cryptobot.crossasset_study --dir xasset (section 4, 2026-10-10 onward)"
+  preregistered: true
+  trials_run: 1

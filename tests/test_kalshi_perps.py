@@ -62,6 +62,8 @@ def test_contract_units_match_kalshi_market_listing():
     assert CONTRACTS["kSHIB"].units_per_contract == 1_000.0
     assert CONTRACTS["kPEPE"].units_per_contract == 1_000.0
     assert CONTRACTS["US500"].units_per_contract == 0.001 and CONTRACTS["GOLD"].units_per_contract == 0.001
+    assert CONTRACTS["BTC"].units_per_contract == 0.0001 and CONTRACTS["ETH"].units_per_contract == 0.001
+    assert CONTRACTS["BTC"].ticker == "KXBTCPERP" and "BTC" not in US_COINS
     assert US_COINS == ("DOGE", "kSHIB")                                     # index/metals are not in the universe
 
 
@@ -111,7 +113,7 @@ async def test_positions_and_balance(monkeypatch):
         ("GET", "/margin/positions"): {"positions": [
             {"market_ticker": "KXDOGEPERP", "position": "-35.00", "entry_price": "8.39"},
             {"market_ticker": "KXKSHIBPERP", "position": "10.00"},
-            {"market_ticker": "KXBTCPERP", "position": "-1.00"}]},
+            {"market_ticker": "KXSOLPERP", "position": "-1.00"}]},   # not in the contract table: ignored
         ("GET", "/margin/balance"): {"settled_funds": "900.0000", "subaccount_balances": [
             {"subaccount": 0, "account_equity": "950.00", "available_balance": "600.00",
              "maintenance_margin": "120.00", "initial_margin": "300.00", "position_value": "-294.00"}]},

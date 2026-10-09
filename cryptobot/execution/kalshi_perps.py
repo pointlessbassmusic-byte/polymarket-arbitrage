@@ -62,6 +62,10 @@ CONTRACTS = {
     # ~$4.1 (gold). Plumbing only: no registered rule trades them yet.
     "US500": Contract("KXUS500PERP", 0.001, "US500"),
     "GOLD": Contract("KXGOLDPERP", 0.001, "Gold"),
+    # Majors: 0.0001 BTC (~$8) and 0.001 ETH a contract on 2026-10-09; the
+    # BTC perp did ~$56M a day. Plumbing for the cross-asset follow-ups.
+    "BTC": Contract("KXBTCPERP", 0.0001, "BTC"),
+    "ETH": Contract("KXETHPERP", 0.001, "ETH"),
 }
 US_COINS = ("DOGE", "kSHIB")          # the bounce-short universe; add kPEPE in config when it opens
 TICK = 0.0001
