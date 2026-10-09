@@ -254,3 +254,33 @@ every up year to avoid 2018 and 2022. Inconclusive: a slow regime
 variable, not a trading signal. The week of the question illustrates
 why: the same week reads as +$82B on the weekly-average TGA series and
 −$48B on a daily-TGA measure, and the S&P rose about 1% regardless.
+
+## Addendum, 2026-10-09 (3): the IOC limit, the stop width, and a stock sleeve
+
+**IOC limit, measured instead of guessed.** Walking Kalshi's live books
+with the bot's order sizes: $50–$2,000 orders fill 4.3–4.6 bp from mid
+on DOGE and SHIB (half the 8–9 bp spread; books of ~$700k a side) and
+0.3–1.3 bp on the US500 perp. The shipped config had a 1% limit, twenty
+times what the book needs; it is now 0.5%, and the tuner will tighten
+it further from real fills. Widening cannot help: the only effect of a
+looser limit is to accept a bad print in a fast market.
+
+**Stop width (risk tolerance).** Recorded as `stop-width-risk-tolerance`.
+A 20% stop raises the mean and the Sharpe per trade on both universes
+(US-3 0.173 → 0.202; 18 coins 0.090 → 0.119) but doubles the size of
+every loser and makes the worst year on 18 coins three times deeper
+(−15% vs −5.7%); 15% is worse than 10% on both. The deployed 10% stays:
+the gain is inside the rule family's noise, and the bot's own Kelly gate
+rejects the wider geometries at the registered 35% confidence.
+
+**Stocks.** Two pre-registered candidates, neither earns capital:
+Fed net liquidity (`fed-liquidity-equities`, inconclusive: no weekly
+signal, a modest monthly one) and vol-targeted trend
+(`index-trend-voltarget`, killed as a return source: Sharpe below
+buy-and-hold in 3 of 4 Nasdaq eras; it halves drawdowns by halving
+returns). The plumbing is in place for when something passes: the
+Kalshi executor and data client know the US500 and gold perps (0.001
+of the index level a contract, ~$13.7 and ~$4.1; US500 book ~$1.5M a
+side, 0.6 bp spread, ~$6.7M a day), and `index_trend_study.py` /
+`fedliq_study.py` are the harness for index rules. They are not in any
+bot's universe.

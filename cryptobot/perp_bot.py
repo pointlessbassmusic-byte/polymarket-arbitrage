@@ -711,9 +711,15 @@ async def replay(pools: dict, start_ts: float, cfg: PerpBotConfig, *,
         y = dt.datetime.utcfromtimestamp(t.opened_at).year
         by_year.setdefault(y, []).append(t.pnl_usd / t.size_usd)
         pnl_year[y] = pnl_year.get(y, 0.0) + t.pnl_usd
+    eq = [e[1] for e in bot.equity_curve] or [bankroll]
+    peak, mdd = eq[0], 0.0
+    for v in eq:
+        peak = max(peak, v)
+        mdd = min(mdd, v / peak - 1.0) if peak > 0 else mdd
     return {
         "bankroll": bankroll,
         "on_capital_by_year": {y: pnl_year[y] / bankroll for y in sorted(pnl_year)},
+        "max_drawdown": mdd,
         "skipped_sub_contract": bot.sub_contract_skips,
         "trades": len(closed),
         "open": len(book.portfolio.positions),
@@ -870,7 +876,7 @@ async def _main(args) -> int:
             cap = rep["on_capital_by_year"].get(y, 0.0)
             print(f"  {y}: n={n:4d}  mean net {100 * m:+.2f}%"
                   + (f"   on ${args.bankroll:,.0f}: {100 * cap:+.1f}%" if args.on_capital else ""))
-        print(f"  exits: {rep['exits']}")
+        print(f"  exits: {rep['exits']}" + (f"; max drawdown {100 * rep['max_drawdown']:.1f}%" if args.on_capital else ""))
         return 0
     bot = build(cfg, args.state_dir)
     if args.once:

@@ -61,7 +61,8 @@ def test_contract_units_match_kalshi_market_listing():
     assert CONTRACTS["DOGE"].units_per_contract == 100.0
     assert CONTRACTS["kSHIB"].units_per_contract == 1_000.0
     assert CONTRACTS["kPEPE"].units_per_contract == 1_000.0
-    assert US_COINS == ("DOGE", "kSHIB")
+    assert CONTRACTS["US500"].units_per_contract == 0.001 and CONTRACTS["GOLD"].units_per_contract == 0.001
+    assert US_COINS == ("DOGE", "kSHIB")                                     # index/metals are not in the universe
 
 
 @pytest.mark.asyncio

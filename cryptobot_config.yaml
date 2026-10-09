@@ -163,7 +163,7 @@ perp:
   max_trade_usd: 500           # per order; must cover one contract (~$480 for DOGE)
   monitor_interval_s: 300      # stop/target checks; the backtest assumed exits near the level, not at the day's extreme
   basket_mode: off             # off | substitute | all; see RESEARCH-2026-10.md (inconclusive, leave off)
-  max_slippage: 0.01
+  max_slippage: 0.005         # IOC limit from mid. Live books fill $50-$500 orders 4-5 bp from mid (DOGE/SHIB) and ~1 bp (US500); the tuner tightens or widens from real fills
   target_pct: 0.20             # validated geometry: -20% target,
   stop_pct: 0.10               # +10% stop, 14-day time exit
   hold_days: 14

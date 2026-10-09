@@ -421,3 +421,30 @@
   rerun: "python -m cryptobot.fedliq_study --dir fedliq"
   preregistered: true
   trials_run: 1
+
+- id: index-trend-voltarget
+  title: "Vol-targeted time-series trend on the S&P 500 (long/flat) as a stock sleeve for the desk"
+  source: "Moskowitz, Ooi & Pedersen (2012); Hurst, Ooi & Pedersen 'A Century of Evidence on Trend-Following'; the sweep's A-grade pre-registered crypto-trend-research repo; operator request 2026-10-09 to add stocks"
+  claim: "Long the index when it is above its 50/100/200-day moving averages (ensemble vote), flat otherwise, exposure scaled to a 12% annual vol target (cap 1x), costs 8 bp per unit of position change (Kalshi US500 perp, 4 bp taker per side). Sharpe at least that of buy-and-hold with a materially smaller drawdown."
+  test: "FRED S&P 500 daily closes 2016-2026 and Nasdaq Composite 1971-2026 (for the earlier eras); fixed parameters, no fitting; by era (2009-14, 2015-19, 2020-21, 2022-26): annual return, vol, Sharpe, max drawdown, time in market, costs; vs buy-and-hold."
+  success: "Written before running: Sharpe >= buy-and-hold in at least 3 of 4 Nasdaq eras including 2022-26 AND max drawdown at least 30% smaller in those eras, with the S&P 2016-2026 result consistent; otherwise inconclusive (a drawdown cutter is not alpha); Sharpe below buy-and-hold in 3+ eras is killed."
+  data: "scratchpad fedliq/SP500.csv, NASDAQCOM.csv (FRED)"
+  result: "Run 2026-10-09. S&P 500 2016-2026: rule Sharpe 0.33 / 1.09 / 0.72 vs buy-and-hold 1.06 / 0.88 / 0.69 by era (2015-19, 2020-21, 2022-26); max drawdown -15 / -8 / -15% vs -20 / -34 / -25%; in the market 56-71% of days; returns 2.2 / 11.7 / 6.2%/yr vs 13.3 / 21.4 / 10.8%. Nasdaq 2009-2026: Sharpe 0.81 / 0.50 / 0.86 / 0.89 vs 1.02 / 0.87 / 1.13 / 0.62 (above buy-and-hold in 1 of 4 eras); drawdown cut by more than 30% in 4 of 4 (-11 / -16 / -9 / -9% vs -23 / -24 / -30 / -36%). Criterion (Sharpe >= hold in 3 of 4 Nasdaq eras) not met; Sharpe below buy-and-hold in 3 eras"
+  verdict: killed
+  regime: "killed as a return source for the desk: it halves drawdowns by halving returns, with Sharpe no better than holding the index in most eras. It is a risk overlay for someone who already owns the index, which this desk does not"
+  rerun: "python -m cryptobot.index_trend_study --dir fedliq"
+  preregistered: true
+  trials_run: 1
+
+- id: stop-width-risk-tolerance
+  title: "Wider stop (risk tolerance) on the bounce-short: 5 / 10 / 15 / 20% stops at the 20% target"
+  source: "operator question 2026-10-09 ('test wider limit / risk tolerance')"
+  claim: "A wider stop lets more bounces complete and raises the strategy's risk-adjusted return."
+  test: "Walk-forward trades (cuts refit on prior years) 2022-2026 on hl_daily_us3.pkl (0.40%) and hl_daily.pkl (0.17%) for stops 0.05/0.10/0.15/0.20 with the 0.20 target and 14-day hold: mean, sd, Sharpe per trade, hit rate, worst calendar year with one slot per coin. These geometries are part of the 4,512-trial search already counted; this is a re-read, not new evidence."
+  success: "Not a pre-registered rule change: the deployed 10% stop stays unless a wider stop improves Sharpe per trade AND worst year on both universes."
+  data: "hl_daily_us3.pkl, hl_daily.pkl, hl_funding.pkl"
+  result: "US-3: mean +1.38 / +2.25 / +2.25 / +3.07% per trade, sd 10.3 / 13.0 / 14.4 / 15.2%, Sharpe per trade 0.134 / 0.173 / 0.157 / 0.202, hit 33 / 50 / 57 / 63%, worst year +5.6 / +10.8 / +5.8 / +11.9%. 18 coins: mean +0.60 / +1.23 / +1.39 / +2.03%, Sharpe 0.059 / 0.090 / 0.089 / 0.119, worst year -4.7 / -5.7 / -17.9 / -15.0%. The 20% stop raises Sharpe per trade on both sets but makes the worst year on 18 coins three times deeper (-15% vs -5.7%); 15% is worse than 10% on both. The bot's own Kelly gate also rejects stops above ~12% at the registered 35% confidence (reward:risk under 1.86)."
+  verdict: inconclusive
+  regime: "keep the 10% stop: the gain at 20% is inside the family's noise (the DSR run showed the chosen cell is a median column), the loser is twice as large, and choosing the best stop after the fact is one more selection step"
+  rerun: "python -m cryptobot.perp_study --cache hl_daily_us3.pkl --funding hl_funding.pkl --target 0.20 --stop 0.20 --days 14 --walk-forward \"short:move_1d[2]&move_3d[0]\""
+  trials_run: 4512

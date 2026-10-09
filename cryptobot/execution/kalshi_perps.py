@@ -57,8 +57,13 @@ CONTRACTS = {
     "DOGE": Contract("KXDOGEPERP", 100.0, "100 DOGE"),
     "kSHIB": Contract("KXKSHIBPERP", 1_000.0, "1K kSHIB"),
     "kPEPE": Contract("KXKPEPEPERP", 1_000.0, "1K kPEPE"),   # listed, inactive on 2026-10-08
+    # Index and metals perps: contract_size 0.001 of the index level, so a
+    # bot price unit is one index point and a contract is ~$13.7 (US500),
+    # ~$4.1 (gold). Plumbing only: no registered rule trades them yet.
+    "US500": Contract("KXUS500PERP", 0.001, "US500"),
+    "GOLD": Contract("KXGOLDPERP", 0.001, "Gold"),
 }
-US_COINS = ("DOGE", "kSHIB")          # active markets; add kPEPE in config when it opens
+US_COINS = ("DOGE", "kSHIB")          # the bounce-short universe; add kPEPE in config when it opens
 TICK = 0.0001
 
 
