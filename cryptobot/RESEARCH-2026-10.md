@@ -230,3 +230,27 @@ The article's other structures map to registry entries: fair-value taker
 latency (`polymarket-latency`, untested: it is a race against market
 makers). The wallets it screenshots are not reproducible from the
 public quote; their edge, if real, is queue position and speed.
+
+## Addendum, 2026-10-09 (2): stocks in the same bot, and Fed liquidity
+
+**Instrument.** Kalshi lists a CFTC-regulated S&P 500 perpetual,
+`KXUS500PERP` (about $13.7 a contract, ~$6.7M a day on 2026-10-08), plus
+gold, silver, copper, platinum, palladium and aluminium perps; a Nasdaq
+100 perp is listed but inactive. So an index sleeve fits the existing
+executor and desk with no new venue. What it does not have is a rule
+with evidence: the bounce-short is a memecoin mechanism and does not
+transfer, and the sweep's only A-grade index candidate was vol-targeted
+trend, a drawdown cutter rather than alpha.
+
+**Fed money injection as a signal** (`fed-liquidity-equities`,
+pre-registered, data from FRED H.4.1 series and the FRED S&P / Nasdaq
+series): weekly changes in net liquidity (Fed assets − TGA − reverse
+repo) do not predict next-week index returns (correlation 0.02–0.17,
+t ≤ 0.7 in every era since 2015). The 4-week change has a modest
+relation to the next 4 weeks (t 2.5 in 2022–26 on the S&P, 1–2
+elsewhere). A long-only "hold after a rise" rule never beats
+buy-and-hold on Sharpe by more than 0.01 and gives up about half of
+every up year to avoid 2018 and 2022. Inconclusive: a slow regime
+variable, not a trading signal. The week of the question illustrates
+why: the same week reads as +$82B on the weekly-average TGA series and
+−$48B on a daily-TGA measure, and the S&P rose about 1% regardless.

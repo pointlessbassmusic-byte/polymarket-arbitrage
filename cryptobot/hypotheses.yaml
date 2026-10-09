@@ -407,3 +407,17 @@
   rerun: "python -m cryptobot.updown_study --data updown_15m.pkl --near-resolution"
   preregistered: true
   trials_run: 1
+
+- id: fed-liquidity-equities
+  title: "Fed money injection as a predictor of US equity returns (net liquidity = Fed assets - TGA - reverse repo)"
+  source: "operator question 2026-10-09 ('does fed money injection correlate in a predictable enough way; use today's price action and work backwards'); the net-liquidity framing popularised by practitioners (Howell, Au79 Macro, 42 Macro)"
+  claim: "Weeks in which the Fed's net liquidity rises are followed by higher S&P 500 returns than weeks in which it falls, by enough to trade after costs; the relationship holds out of sample, not only in 2020-2021."
+  test: "FRED weekly WALCL, WTREGEN (TGA), RRPONTSYD (ON RRP, summed to weekly), WRESBAL; S&P 500 daily (Stooq). Net liquidity = WALCL - TGA - RRP, Wednesday weekly. Signal known at Thursday's H.4.1 release, applied from Friday's close: next-week (and 4- and 13-week) S&P return conditional on the sign and decile of the weekly change in net liquidity and of the 4-week change; correlation and t by era (2009-2014, 2015-2019, 2020-2021, 2022-2026); a long-only rule 'hold S&P only in weeks after net liquidity rose' vs buy-and-hold, walk-forward by year, 0.02% round trip (MES/SPY); and the worked example of the week of 2026-10-09."
+  success: "Written before running: the long-only liquidity rule beats buy-and-hold on Sharpe in at least 3 of the 4 eras including 2022-2026, with the next-week return difference (rise vs fall) having t >= 2 over 2015-2026; otherwise inconclusive; a negative or zero difference in 2022-2026 is killed for trading purposes."
+  data: "FRED CSVs (WALCL, WTREGEN, RRPONTSYD, WRESBAL, DFF) and Stooq ^spx, fetched 2026-10-09"
+  result: "Run 2026-10-09. S&P 500 (FRED, 521 H.4.1 weeks 2016-2026): weeks after a net-liquidity RISE returned +0.34% vs +0.19% after a fall in 2015-19 (t 0.5), +0.44 vs +0.35 in 2020-21 (t 0.1), +0.33 vs +0.12 in 2022-26 (t 0.7); weekly correlation 0.02-0.17. The 4-week change vs the next 4 weeks is the only relation with any weight: diff +0.8/+1.4/+1.4%, t 1.6/1.1/2.5, corr 0.12-0.27. Long-only-after-rise Sharpe vs buy-and-hold: 1.09 vs 1.08, 0.69 vs 0.89, 0.71 vs 0.73 (beats in 1 of 3 eras, by 0.01); the rule keeps 2018 (+3.4 vs -6.4%) and 2022 (+2.9 vs -15.7%) but gives up about half of every up year. Nasdaq since 2003 (1,238 weeks) says the same: diff t 0.3/1.1/-0.1/1.1 by era. Criterion (Sharpe better in 3 of 4 eras incl. 2022-26, t >= 2 on the weekly difference) not met"
+  verdict: inconclusive
+  regime: "net liquidity is a slow regime variable (monthly horizon, modest), not a weekly trading signal; 2009-2014 could only be run on the Nasdaq (FRED's S&P history is 10 years; Stooq was unreachable). Worked example: the H.4.1 of 2026-10-07 shows net liquidity +$82B on the weekly-average TGA series while a daily-TGA newsletter measure shows -$48B the same week; the S&P rose about 1% either way. The sign of an 'injection' depends on the measurement window, which is why the weekly correlation is near zero"
+  rerun: "python -m cryptobot.fedliq_study --dir fedliq"
+  preregistered: true
+  trials_run: 1
