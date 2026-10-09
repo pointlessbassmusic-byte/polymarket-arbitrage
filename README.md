@@ -17,6 +17,10 @@
 
 ---
 
+> 🌊 **New:** this repo now also ships a [**crypto volatility / memecoin swing bot**](cryptobot/README.md) alongside the prediction-market engine — it scans DEX tokens (DexScreener + CoinGecko) for wild 5m/30m/1h/24h volatility, detects breakouts, mean reversions, regime shifts and cross-DEX arbitrage, gates everything on asymmetric risk/reward, and learns per-pattern expectancy from its own closed trades. Paper trading by default; opt-in live buys/sells sign with a MetaMask-compatible key via the 0x aggregator. Run it with `python run_cryptobot.py`.
+
+---
+
 ## 🎬 Demo
 
 ### 🎥 Video Demo

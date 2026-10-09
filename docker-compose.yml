@@ -1,0 +1,13 @@
+# docker compose up -d        start (paper trading both strategies)
+# docker compose logs -f      watch; the dashboard URL with its token is logged
+# docker compose run --rm desk python -m cryptobot.desk --preflight
+services:
+  desk:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./state:/data
+      - ./cryptobot_config.yaml:/app/cryptobot_config.yaml:ro
+    ports:
+      - "127.0.0.1:8080:8080"     # local only; reach it remotely through an SSH tunnel

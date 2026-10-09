@@ -1,0 +1,450 @@
+# Every strategy idea this project has tested, including the ones that
+# failed. Negative results are kept on purpose: a hypothesis killed in one
+# regime should not be re-tested from scratch, and one that is re-tested
+# should be checked against the conditions it died in.
+#
+# verdict: alive | adopted | killed | inconclusive
+# Optional on any entry that reached a verdict from a search: trials_run
+# (how many rules/geometries were tried), n_eff (effective independent
+# trials), pbo, dsr — see the selection-bias-diagnostics entry. "alive"
+# needs DSR >= 0.95 at n_eff, PBO <= 0.5 and >= 80% CPCV paths positive.
+# Run `python -m cryptobot.hypotheses --similar "idea text"` before testing
+# something new.
+
+- id: dex-breakout
+  title: "DEX 5-minute volatility breakout, long"
+  source: "original design"
+  claim: "Buy memecoins breaking out on volume over 5m/30m windows."
+  test: "Walk-forward, 6 windows, realistic DEX round trip."
+  data: "18 DEX memecoin pools, 21 days, 2026-09"
+  result: "2 trades, gross -$3.04 on $200, net -$4.05"
+  verdict: killed
+  regime: "memecoin bear, Sep 2026"
+  rerun: "python -m cryptobot.study --cache pools.pkl --windows 6"
+
+- id: dex-regime-shift
+  title: "DEX volatility regime shift (quiet coin waking up), long"
+  source: "original design"
+  claim: "A 5m z-score > 4 on a quiet coin predicts continuation."
+  test: "Walk-forward; per-trade t-statistic."
+  data: "18 DEX memecoin pools, 21 days, 2026-09"
+  result: "gross +0.82%/trade (t=1.00) vs ~1.2% DEX round trip; net -$8.49"
+  verdict: killed
+  regime: "memecoin bear, Sep 2026"
+  rerun: "python -m cryptobot.study --cache pools.pkl --windows 6"
+
+- id: intraday-feature-rules
+  title: "Two-feature rules on intraday price/volume features"
+  source: "original research"
+  claim: "Some combination of 5m-24h moves, volume surge, vol, z-score predicts a +T before -S barrier."
+  test: "183 rules ranked on half 1, scored on half 2 as lift over each half's baseline."
+  data: "18 DEX pools, 21 days, 5m candles"
+  result: "in-sample vs out-of-sample lift correlation -0.27; top-10 rules +6.2pp -> -2.0pp"
+  verdict: killed
+  regime: "memecoin bear, Sep 2026"
+  rerun: "python -m cryptobot.research validate --cache pools.pkl"
+
+- id: market-breadth-regime
+  title: "Cross-sectional breadth as a regime signal"
+  source: "original research"
+  claim: "Market breadth persists and predicts forward memecoin returns."
+  test: "Persistence at the first non-overlapping lag; bucket prediction fitted on half 1."
+  data: "17 tokens, 6 months hourly + 1 year daily"
+  result: "clean autocorrelation -0.16..+0.16 at 1-14d; no out-of-sample prediction"
+  verdict: killed
+  regime: "2025-26, basket -69.6% over the year"
+  rerun: "python -m cryptobot.regime --cache daily.pkl --candle-hours 24 --lookback 168 --horizon 24"
+
+- id: perp-bounce-short
+  title: "Short a one-day bounce inside a decline (Hyperliquid perps)"
+  source: "original research"
+  claim: "move_1d top tercile AND move_3d bottom tercile -> short, -20% target / +10% stop / 14d."
+  test: "Yearly walk-forward (cuts refit on prior years); bot replay reconciled trade for trade."
+  data: "18 memecoin perps, daily, 2022-2026"
+  result: "5/5 years positive, beats unconditional short 5/5, +1.47%/trade over 938; replay +1.24%; on capital with one 1/18 slot per coin: +5.2% / +1.4% / +35.8% / +11.2% for 2023-26, max drawdown -15.5%. SELECTION-BIAS DIAGNOSTICS (cryptobot.stats, 2026-10-08): 4,512 trials searched, N_eff 28.7 (short-only family 10.5); CSCV PBO 0.22 (short-only 0.12) but the rule was IS-best in 0% of splits and is a median column within the short family (OOS rank 0.57); PSR 0.91 (not significant at 5%); DSR 0.00 at nominal N, 0.18-0.35 at N_eff; cross-sectional lift over the same-day basket +0.002% (zero: the edge is WHEN to short the basket, not WHICH coin); CPCV 5/5 paths and 15/15 splits positive net and lift; MinTRL(SR*=0) about 104 months"
+  verdict: inconclusive
+  regime: "survives the 2024 mania and 2025-26 collapse in walk-forward and CPCV, but after correcting for the ~4,500-rule search its t-stat (1.3) is what the best of a few dozen independent null trials shows; live P&L cannot confirm or refute it for years"
+  trials_run: 4512
+  n_eff: 28.7
+  pbo: 0.22
+  dsr: 0.18
+  rerun: "python -m cryptobot.perp_study --cache hl_daily.pkl --funding hl_funding.pkl --target 0.20 --stop 0.10 --days 14 --walk-forward \"short:move_1d[2]&move_3d[0]\""
+
+- id: perp-rally-short
+  title: "Short a top-tercile 7-day rally in mid volatility"
+  source: "original research"
+  claim: "move_7d top tercile AND rvol_7d middle tercile -> short."
+  test: "Yearly walk-forward."
+  data: "18 memecoin perps, daily, 2022-2026"
+  result: "looked 6/6 with first-half cuts (leak); honest walk-forward loses 2024 (-2.27%)"
+  verdict: killed
+  regime: "fails in manias"
+  rerun: "python -m cryptobot.perp_study --cache hl_daily.pkl --funding hl_funding.pkl --target 0.20 --stop 0.10 --days 14 --walk-forward \"short:move_7d[2]&rvol_7d[1]\""
+
+- id: bounce-short-all-perps
+  title: "Bounce-short on all 176 Hyperliquid perps"
+  source: "user question (more volume)"
+  claim: "The memecoin rule generalises to every perp."
+  test: "Same yearly walk-forward."
+  data: "176 perps, daily, 2022-2026"
+  result: "3/5 years, beats benchmark 2/5; non-memes the same shape"
+  verdict: killed
+  regime: "edge is memecoin-specific"
+  rerun: "python -m cryptobot.perp_study --cache hl_all_daily.pkl --target 0.20 --stop 0.10 --days 14 --walk-forward \"short:move_1d[2]&move_3d[0]\""
+
+- id: funding-carry
+  title: "Funding carry, short perp + long spot, top 3 by 14d funding"
+  source: "original research"
+  claim: "Holding the top-3 funding payers (enter > 0.06%/day, exit when 3d rate < 0) is market-neutral income."
+  test: "Per calendar year on realised hourly funding; basis measured on both venues."
+  data: "150 Kraken-tradeable perps, 2023-2026; Kraken daily spot for basis"
+  result: "on CAPITAL (both legs), 1x, +50% margin guard, maker spot: +6.9% / +12.2% / +3.8% / +5.8% for 2023-26, zero liquidations (per-notional yields of +13-45% quoted earlier counted only one leg); basis mean +0.02%/trade"
+  verdict: alive
+  regime: "yield follows leverage appetite; near zero on memecoins alone in 2026, positive on the full universe"
+  rerun: "python -m cryptobot.carry_study --funding hl_funding_kraken.pkl --top 3 --lookback 14 --enter-min 0.0006"
+  trials_run: 54
+  diagnostics: pending
+
+- id: carry-maker-spot
+  title: "Post the carry spot leg as a maker order"
+  source: "original research"
+  claim: "Maker spot cuts the round trip enough to flip the median carry trade."
+  test: "Same 70 trades re-costed."
+  data: "Kraken + Hyperliquid, 2024-10 to 2026-09"
+  result: "round trip 0.79% -> 0.49%; median trade -0.07% -> +0.23%; 34 -> 46 of 70 beat fees"
+  verdict: adopted
+  regime: "assumes maker fills; real book records maker share"
+  rerun: "python -m cryptobot.basis_study --funding hl_funding_kraken.pkl --perps hl_all_daily.pkl --spots kraken_spot_daily.pkl"
+
+- id: cross-venue-spot-arb
+  title: "Spot price arbitrage across Kraken / Coinbase / OKX / Hyperliquid"
+  source: "user question"
+  claim: "Memecoin prices differ across venues by more than fees."
+  test: "Live 2-minute sample, best executable pair per tick."
+  data: "8 memecoins, 4 venues"
+  result: "net of taker fees negative 91% of the time; best moments +0.06-0.09% for seconds"
+  verdict: killed
+  regime: "market-maker territory"
+  rerun: "none (live sample)"
+
+- id: weekly-momentum
+  title: "Weekly cross-sectional momentum (and illiquid reversal)"
+  source: "Liu & Tsyvinski, NBER w25882"
+  claim: "Long top quintile of 1-week return, short bottom; ~3%/week."
+  test: "As published, weekly, fees + funding."
+  data: "176 perps, mid-2023 to 2026-09"
+  result: "-0.26%/wk (t=-0.45); liquid-only and illiquid-reversal variants also fail"
+  verdict: killed
+  regime: "paper's 2014-18 effect not present on perps 2023-26"
+  rerun: "python -m cryptobot.factor_study --perps hl_all_daily.pkl --funding hl_funding_all.pkl"
+
+- id: crowded-funding-reversal
+  title: "Short high-funding coins, long low-funding coins"
+  source: "common trading claim"
+  claim: "Persistently high funding precedes corrections."
+  test: "Weekly long/short, as published."
+  data: "176 perps, mid-2023 to 2026-09"
+  result: "-0.38%/wk; gross negative (high-funding coins kept outperforming)"
+  verdict: killed
+  regime: "2023-26"
+  rerun: "python -m cryptobot.factor_study --perps hl_all_daily.pkl --funding hl_funding_all.pkl"
+
+- id: fomo-volume-spike
+  title: "Meme-coin volume-spike buy signal (vol > 2x 10d, SMA5 > SMA20, BTC > SMA20)"
+  source: "open-source TradingView indicator"
+  claim: "Buy volume spikes in an uptrend."
+  test: "Lift over the same-day average coin, clustered by day."
+  data: "176 perps, mid-2023 to 2026-09"
+  result: "lift +0.14-0.33% (t <= 1.1), hedged ~0; it times the market, not coins"
+  verdict: killed
+  regime: "2023-26"
+  rerun: "python -m cryptobot.factor_study --perps hl_all_daily.pkl --funding hl_funding_all.pkl"
+
+- id: short-new-listings
+  title: "Short new perp listings"
+  source: "common trading claim"
+  claim: "New listings bleed after launch."
+  test: "Short from first close, 7/14/30d."
+  data: "112 Hyperliquid listings after 2023-07"
+  result: "mean -14% to -21% (rare 5x listing pumps); long side lottery-shaped and decaying"
+  verdict: killed
+  regime: "2023-26"
+  rerun: "python -m cryptobot.factor_study --perps hl_all_daily.pkl --funding hl_funding_all.pkl"
+
+- id: btc-trend-filter-bounce-short
+  title: "Only take the bounce-short when BTC < SMA50"
+  source: "derived from the volume-spike result"
+  claim: "Shorts work better in BTC downtrends."
+  test: "Split the walk-forward by BTC regime."
+  data: "18 memecoin perps, 2022-2026"
+  result: "better in uptrends some years, worse in others, all within one standard error"
+  verdict: killed
+  regime: "rule is regime-independent; filter adds nothing"
+  rerun: "see README \"Published strategies\""
+
+- id: fomo-desk-filter
+  title: "\"FOMO desk\" fresh-launch hard filter (@savipww)"
+  source: "X article, 2026-09-23"
+  claim: "Age/liquidity/volume/mcap/trades thresholds select launches worth buying."
+  test: "Shadow logger vs every trending launch; 1/4/24h marks; exit replay picked on day 1, tested on day 2."
+  data: "162 launches, two evenings, 2026-10-02/03"
+  result: "24h median -21% (baseline -42%); in exit replay the filter beats no filter in 20 of 36 rules (coin flip)"
+  verdict: killed
+  regime: "two evenings only"
+  rerun: "python -m cryptobot.launch_shadow --state launches.jsonl --exits candles.pkl"
+
+- id: launch-early-exit
+  title: "Buy trending launches, sell at +100% or after 4h"
+  source: "derived from the FOMO desk replay"
+  claim: "Early exits turn launch losses into gains."
+  test: "Rule picked on day 1, scored on day 2."
+  data: "139 launches, two evenings"
+  result: "+11.7% picked, +13.8% tested (filtered); unfiltered +18.1%; lottery-shaped"
+  verdict: inconclusive
+  regime: "one market mood; venue fees and real entry prices not included"
+  rerun: "python -m cryptobot.launch_shadow --state launches.jsonl --exits candles.pkl"
+
+- id: moonbag-scale-out
+  title: "Sell 60% at 2x, keep a 40% moonbag (@0xNevsky)"
+  source: "X post, 2026-10-05"
+  claim: "Partial take-profit plus a free moonbag captures runners and closes green."
+  test: "Scaled-exit replay on every launch, per scan batch, with and without the top trades."
+  data: "139 launches, two evenings"
+  result: "mean +53.5% but top 3 trades = 109% of net profit; without them -4.9%/trade; median -30.7%"
+  verdict: killed
+  regime: "lottery-shaped; moonbags raise the mean and lower consistency"
+  rerun: "python -m cryptobot.launch_shadow --state launches.jsonl --exits candles.pkl"
+
+- id: polymarket-updown-fair-value
+  title: "Polymarket BTC Up/Down fair-value taker (@RetroValix, \"mo-money\")"
+  source: "X post, 2026-10-04"
+  claim: "A random-walk fair value beats the market price."
+  test: "No-look-ahead: model uses BTC before the quote; trades fill at the next quote; fee 0.07*p*(1-p)."
+  data: "2,100 BTC 15m markets, 2026-09-13 to 10-05"
+  result: "model adds no information (log loss worse); taker -7% to -19% per $"
+  verdict: killed
+  regime: "market is calibrated; apparent edge was stale-quote look-ahead"
+  rerun: "python -m cryptobot.updown_study --data updown_15m.pkl"
+
+- id: polymarket-hedge-to-lock
+  title: "Complete the Up/Down pair under $1 after entry"
+  source: "X post, 2026-10-04"
+  claim: "Hedging into complete sets makes returns consistent."
+  test: "Overlay on the fair-value entries."
+  data: "2,100 BTC 15m markets"
+  result: "win rate up (56-67%), return -9% to -21% per $"
+  verdict: killed
+  regime: "consistency illusion: many small wins, rare large losses"
+  rerun: "python -m cryptobot.updown_study --data updown_15m.pkl"
+
+- id: polymarket-maker-fair-value
+  title: "Rest maker bids below fair value on Up/Down"
+  source: "derived from the fee structure"
+  claim: "Makers pay no fee, so fair-value bids should profit."
+  test: "Filled only when the price later trades through the bid."
+  data: "2,100 BTC 15m markets"
+  result: "-17% to -55% per $ (adverse selection)"
+  verdict: killed
+  regime: "fills arrive when the price moves against you"
+  rerun: "python -m cryptobot.updown_study --data updown_15m.pkl"
+
+- id: polymarket-dmi-adx
+  title: "DMI/ADX > 25 on Polymarket BTC Up/Down (@Dan1ro0)"
+  source: "X post, 2026-10-04"
+  claim: "Buy the side with the dominant directional index when ADX > 25."
+  test: "As posted, at 10/5/2 minutes before the end, next-quote fills."
+  data: "2,100 BTC 15m markets"
+  result: "hit rate 59-81%, but -1% to -6% per $ after fees"
+  verdict: killed
+  regime: "the price already reflects the trend"
+  rerun: "python -m cryptobot.updown_study --data updown_15m.pkl"
+
+- id: polymarket-latency
+  title: "Trade Up/Down quotes faster than they update"
+  source: "inferred from the stale-quote artefact"
+  claim: "Quotes lag BTC; sub-second traders can capture it."
+  test: "Not testable on minute history."
+  data: "none"
+  result: "untested; competes with professional market makers"
+  verdict: inconclusive
+  regime: "needs live order book + sub-second BTC feed"
+  rerun: "none"
+
+- id: carry-leverage
+  title: "Lever the carry perp leg (1.5x-3x) to raise return on capital"
+  source: "original research"
+  claim: "Less perp margin per position frees capital for a bigger position."
+  test: "Replay 187 carry trades on daily perp candles with guards; a day reaching liquidation counts as one."
+  data: "150 Kraken-tradeable perps, 2023-2026"
+  result: "every leverage above 1x either liquidates (2x: 7-29 trades) or needs a guard so tight it exits too often; best is 1x"
+  verdict: killed
+  regime: "high-funding coins are the ones that pump: one in ten holds rose 80%+, largest single day +67%"
+  rerun: "see README 'Carry on capital'"
+
+- id: carry-margin-guard
+  title: "Close both carry legs when the coin rallies 50% above entry"
+  source: "original research"
+  claim: "A guard removes liquidation risk at little cost, because the hedge makes the rally itself P&L-neutral."
+  test: "Same replay, guards +15% to +50%."
+  data: "187 carry trades, 2023-2026"
+  result: "1x + 50%: zero liquidations (16 without a guard), worst year +3.8% on capital vs +5.1% unguarded-but-uncharged"
+  verdict: adopted
+  regime: "hourly monitoring; daily data cannot rule out an intra-hour jump straight through both levels"
+  rerun: "see README 'Carry on capital'"
+
+- id: carry-plus-bounce-short
+  title: "Split capital 50/50 between carry and the bounce-short"
+  source: "original research"
+  claim: "The two survivors are complementary across regimes."
+  test: "Per-year return on capital of each, combined."
+  data: "2023-2026"
+  result: "+6.1% / +6.8% / +19.8% / +8.5%; carry carries the 2024 mania, the bounce-short the 2025 collapse"
+  verdict: adopted
+  regime: "every year positive in backtest; two strategies, both tested on the same coins"
+  rerun: "see README 'Carry on capital'"
+
+- id: bounce-short-us3
+  title: "Bounce-short restricted to the three memecoin perps on US venues (DOGE, 1000PEPE, 1000SHIB)"
+  source: "constraint: Hyperliquid blocks US residents; Coinbase Derivatives lists these three"
+  claim: "The rule keeps its edge on the three coins a US resident can short on a regulated venue."
+  test: "Walk-forward, cuts refit on prior years, one slot per coin at 1x, a third of capital each; fees at HL-like, 0.40%, 0.60% round trip."
+  data: "Hyperliquid daily perps 2022-2026 for DOGE/kPEPE/kSHIB (Coinbase candles only since 2025-12)"
+  result: "5/5 years positive, beats unconditional short 5/5, +2.76%/trade over 230; on capital at 0.40%: +9.6/+6.9/+20.1/+50.1/+7.0%; deployed sizing with whole contracts, Coinbase fee floor and overnight short margin: $1,500 +8.9/+9.0/+11.0/+3.4/-2.6, $3,000 +4.5/+9.1/+17.2/-7.8/-2.8, $6,000 +9.8/+8.9/+14.6/+36.6/-0.4; max DD about -20%"
+  verdict: inconclusive
+  regime: "2022 bear through 2025 collapse; contracts are whole (~$420 DOGE / ~$380 1000PEPE / ~$53 1000SHIB) and overnight short margin is 92-114%, so under ~$6,000 the account skips DOGE/PEPE when they are expensive. Diagnostics (short-only family, flat 0.40%): N_eff 26, PBO 0.21, named rule OOS rank 0.88 and never IS-best, PSR 0.99 but DSR 0.13 daily / 0.34 on 14-day blocks at N_eff (0.00 at nominal N), cross-sectional lift zero, CPCV 5/5 paths positive, MinTRL(SR*=0) 32 months"
+  trials_run: 4512
+  n_eff: 26.1
+  pbo: 0.21
+  dsr: 0.34
+  rerun: "python -m cryptobot.perp_study --cache hl_daily_us3.pkl --funding hl_funding.pkl --target 0.20 --stop 0.10 --days 14 --walk-forward \"short:move_1d[2]&move_3d[0]\""
+
+- id: carry-us
+  title: "Funding carry on US venues (Coinbase Derivatives / Kraken Futures US)"
+  source: "constraint: Hyperliquid blocks US residents"
+  claim: "Short perp + long spot still collects funding on the memecoin perps US venues list."
+  test: "Kraken Futures v4 historical funding, past year, on the coins both venues list; universe count."
+  data: "Kraken Futures funding history 2025-10 to 2026-10; Coinbase product list"
+  result: "DOGE +0.005, PEPE -0.006, SHIB -0.015 %/day average (HL about +0.01); only 3 memecoin perps, carry needed ~150 coins of breadth"
+  verdict: killed
+  regime: "post-mania; funding near zero or negative on majors-adjacent memecoins"
+  rerun: "see README 'Running from the US'"
+
+- id: selection-bias-diagnostics
+  title: "Correct every 'alive' verdict for the size of the search that produced it (CSCV/PBO, Deflated Sharpe, CPCV, MinTRL)"
+  source: "Bailey & Lopez de Prado (PSR 2012, DSR 2014), Bailey, Borwein, Lopez de Prado & Zhu (PBO 2014), Lopez de Prado (CPCV 2018); surfaced by the 2026-10 research sweep"
+  claim: "A rule chosen from thousands of (features x bands x barrier geometry x side) trials needs a far higher backtest Sharpe than a pre-specified one; without the correction, walk-forward years can all be positive and the rule still be the best of noise."
+  test: "cryptobot/stats.py: trial matrix of all 4,512 trials actually searched; N_eff from the correlation participation ratio; CSCV with time-contiguous blocks and a 14-day purge; DSR on raw P&L and on the lift over the unconditional basket; CPCV 6x2 with purge and embargo; PSR and MinTRL for the sim book."
+  data: "hl_daily.pkl (18 coins), hl_daily_us3.pkl (3 coins), hl_funding.pkl"
+  result: "Both bounce-short entries downgraded alive -> inconclusive. The rule family is not a CSCV overfit (PBO 0.09-0.22) and CPCV paths are all positive, but the specific rule was never IS-best, its PSR is 0.87-0.99, DSR is 0.00 at nominal N and at most 0.18-0.35 at N_eff, cross-sectional lift is zero (basket timing, not coin selection), and the sim book would need 32-104 months to confirm SR>0."
+  verdict: adopted
+  regime: "method; applies to every future entry. Rule: alive requires DSR >= 0.95 at N_eff, PBO <= 0.5 and >= 80% CPCV paths positive; otherwise inconclusive. Record trials_run and n_eff on every entry that reaches a verdict."
+  rerun: "python -m cryptobot.stats --cache hl_daily.pkl --funding hl_funding.pkl --rule \"short:move_1d[2]&move_3d[0]\" --target 0.20 --stop 0.10 --days 14 [--sides short] [--flat-cost 0.004]"
+
+- id: basket-substitution-us3
+  title: "Basket timing: short another unheld coin when the signalled coin's contract does not fit the slot"
+  source: "2026-10 research sweep (Carver integer-contract idea, narrowed) + stats.py finding of zero cross-sectional lift"
+  claim: "Since the other coins earn the same on a signal day, a small account can take the signal in whichever coin fits."
+  test: "perp_bot --replay --on-capital --whole-contracts --basket substitute|all on hl_daily_us3.pkl, 2022-2026, Coinbase fees and margin"
+  data: "hl_daily_us3.pkl"
+  result: "substitute: $1,500 +5.4/+9.0/+8.4/+5.0/+2.2 vs off +8.9/+9.0/+11.0/+3.4/-2.6; $3,000 +4.5/+9.1/+34.7/-4.7/-2.8 vs +4.5/+9.1/+17.2/-7.8/-2.8. all: worse everywhere ($10k fractional -1.2/+2.2/+18.0/+18.2/+11.0 vs +12.2/+11.3/+34.9/+50.8/+4.8) because substitutes occupy slots the real signals need"
+  verdict: inconclusive
+  regime: "noise at ~30 trades a year; kept as perp.basket_mode (default off)"
+  rerun: "python -m cryptobot.perp_bot --replay state/hl_daily_us3.pkl --replay-from 2022-01-01 --bankroll 3000 --on-capital --whole-contracts --basket substitute"
+
+- id: btc-offhours-seasonality
+  title: "Long BTC outside US equity hours (16:00 ET to 10:00 ET, weekends held), flat during the session"
+  source: "Quantpedia 'Overnight seasonality in bitcoin' (Gemini hourly 2015-10..2024-10, reported OOS from the Oct-2021 BITO launch); practitioner replications; surfaced by the 2026-10 sweep"
+  claim: "Since ~2021 nearly all of BTC's return accrues outside NYSE hours. Rule: buy at the 16:00 ET hourly close, sell at the 10:00 ET hourly close the next trading day (Friday 16:00 to Monday 10:00 over weekends), one round trip per holding, 1x, no leverage."
+  test: "Coinbase public hourly BTC-USD candles 2020-01..2026-10; per-holding net return at a 0.08% round trip (Kalshi BTC perp, 4 bp/side) and 0.10% (Coinbase); by calendar year; Sharpe and PSR of the daily holding series; the post-publication window 2024-11..2026-10 reported separately; compared with buy-and-hold and with the US-session leg over the same days."
+  success: "Written before running: net Sharpe of the overnight leg > 0 with PSR >= 0.95 over 2021-01..2026-10 at 0.08% AND positive net in the post-publication window 2024-11..2026-10. Anything less is inconclusive; negative in both is killed."
+  data: "scratchpad btc_hourly.pkl (Coinbase ONE_HOUR candles); rebuild with the fetch script in the study module"
+  result: "Run 2026-10-09 on 59,336 Coinbase hourly candles (1,504 weekday holdings 2021-01..2026-10). At 0.08%: overnight leg +0.076%/holding, sum +114%, t=1.01, PSR 0.843; session leg -157% (t=-2.0); buy-and-hold +196%. By year net: +58.6/-57.2/+62.4/+72.1/+7.8/-29.6%. Post-publication window 2024-11..2026-10: +6.9% over 504 holdings, t=0.14, PSR 0.56; at 0.10% the window is -3.2%. Criterion (PSR >= 0.95 AND positive post-publication) not met. Observation only, not a claim: weekend holdings averaged +0.31% vs +0.02% on weekdays; testing that is trial #2"
+  verdict: inconclusive
+  regime: "the effect was real in 2021-2024 (the published sample) and has been flat since; the session leg stays negative, so the result is mostly 'do not hold BTC during NYSE hours', which is a statement about buy-and-hold timing, not a standalone edge after fees"
+  rerun: "python -m cryptobot.seasonality_study --hourly btc_hourly.pkl"
+  preregistered: true
+  trials_run: 1
+  psr: 0.843
+
+- id: btc-beta-hedge-bounce-short
+  title: "Hedge the memecoin bounce-short with a long BTC perp sized to the walk-forward beta"
+  source: "operator question 2026-10-09 (cross-asset hedging); standard beta hedge"
+  claim: "Memecoin shorts lose when BTC rallies; a long BTC perp sized to the prior years' beta of trade P&L to BTC's return over the hold raises the strategy's Sharpe without changing its mean much."
+  test: "Walk-forward trades of short:move_1d[2]&move_3d[0] +20/-10 14d on hl_daily.pkl (18 coins) and hl_daily_us3.pkl; BTC 14-day forward return from hl_all_daily.pkl aligned to each entry day; beta fitted by OLS on trades of prior years only; hedged P&L = trade P&L + beta x BTC return - 0.10% x beta hedge cost; by year: mean, sd, t (entry-day clustered) and Sharpe, hedged vs unhedged."
+  success: "Written before running: hedged Sharpe per trade higher than unhedged in at least 4 of 5 years 2022-2026 on the 18-coin set with the yearly mean not lower by more than the hedge cost; otherwise inconclusive; if hedged Sharpe is lower in 3+ years, killed."
+  data: "hl_daily.pkl, hl_daily_us3.pkl, hl_all_daily.pkl (BTC)"
+  result: "Run 2026-10-09. Trade P&L vs BTC 14d return correlates -0.14 to -0.72 by year (18 coins) and -0.07 to -0.87 (US-3): the strategy carries about -0.5 BTC beta. Walk-forward beta 0.36-0.64. Hedged Sharpe higher in 2 of 5 years on both sets: 18 coins 2023 +0.21->+0.41, 2024 -0.03->+0.05, 2025 +0.10->+0.08, 2026 +0.23->+0.12; US-3 2023 +0.10->+0.32, 2024 +0.16->+0.19, 2025 +0.24->+0.18, 2026 +0.11->-0.12. Criterion (4 of 5) not met"
+  verdict: inconclusive
+  regime: "the hedge lowers variance every year but adds BTC's drift: it helped when BTC rose (2023-24) and hurt when BTC was flat or falling while memecoins fell (2025-26). A hedge turns a memecoin short into a memecoin-vs-BTC relative short; whether that is better is a view on BTC, not an edge"
+  rerun: "python -m cryptobot.hedge_study --cache hl_daily.pkl --all hl_all_daily.pkl"
+  preregistered: true
+  trials_run: 1
+
+- id: stop-and-reverse
+  title: "When a bounce-short is stopped out (+10%), flip to a long from the stop price with the mirrored geometry"
+  source: "operator proposal 2026-10-09: 'if we deem the trade wrong, buy into the correct position before the edge is lost'"
+  claim: "A memecoin that rallies 10% through the short's stop keeps going: a long opened at the stop (+20% target / -10% stop / 14 days) earns more than its costs. Variant B: exit the short at +5% adverse and reverse there."
+  test: "Walk-forward trades of short:move_1d[2]&move_3d[0] +20/-10 14d (cuts refit on prior years) on hl_daily.pkl (18 coins) and hl_daily_us3.pkl; for each trade find the stop day (first day high >= entry x 1.10, conservative ordering); open a long at the stop price and score it with perp_study.outcome(long, +20/-10, 14d) net of the round trip (0.17% HL-like / 0.40% US-3); by year: n, hit rate, mean, t clustered by entry day. Variant B at +5%."
+  success: "Written before running: variant A reversal leg net mean > 0 with t >= 2 over 2022-2026 on the 18-coin set AND positive in at least 4 of 5 years; otherwise inconclusive; mean < 0 on both caches is killed."
+  data: "hl_daily.pkl, hl_daily_us3.pkl"
+  result: "Run 2026-10-09. 18 coins: 515 of 938 walk-forward shorts reached the +10% stop; a long from the stop price (+20/-10, 14d) netted -1.33%/trade (hit 30%, t=-1.44), positive in 1 of 5 years (2024 +0.21%). US-3 at 0.40%: 104 of 230 stopped; reversal -4.71%/trade (hit 20%, t=-3.93), 0 of 5 years. Variant B (exit and reverse at +5%): -1.25% (18 coins, 1/5), -2.95% (US-3, 0/5)"
+  verdict: killed
+  regime: "after a stop-out the bounce fades: both the short and the reversed long lose over the next 14 days. The profitable action after a stop is to be flat, which the bot already does"
+  rerun: "python -m cryptobot.reverse_study --cache hl_daily.pkl"
+  preregistered: true
+  trials_run: 2
+
+- id: near-resolution-capture
+  title: "Buy the near-certain side of a 15-minute BTC Up/Down market in its last 1-2 minutes (the 'near-resolution capture' structure from Dan1ro0's article)"
+  source: "https://x.com/dan1ro0/status/2085766554407317704 (article: 50+ Polymarket bots, BTC Up/Down 5m); tested on our 15-minute Polymarket data"
+  claim: "In the final minutes the favourite trades below its true probability; buying it at the ask and holding to settlement earns the gap after fees."
+  test: "updown_15m.pkl snapshots at 2 and 1 minutes before resolution; buy the favourite when its ask >= 0.85 at the next quote after the snapshot; settle at 1 or 0; taker fee 0.07 x p(1-p); mean net per $ and hit rate vs the implied probability, by ask bucket."
+  success: "Written before running: mean net per $ > 0 with t >= 2 at both horizons; otherwise inconclusive; negative at both is killed."
+  data: "scratchpad updown_15m.pkl (Polymarket CLOB price histories + outcomes)"
+  result: "Run 2026-10-09 on 2,100 resolved 15-minute markets. 2 min before: 1,591 favourites bought, implied 97.2% vs hit 97.0%, net -0.77% per $ (t=-0.21); every price bucket negative (0.85: -4.7%, 0.90: -3.1%, 0.95: -1.3%, 0.99: -0.1%). 1 min before: 1,831 bought, implied 98.6% vs hit 99.3%, net +0.41% per $ (t=+0.22); the 0.85 bucket's +10% is 27 trades. Criterion (t >= 2 at both horizons) not met"
+  verdict: inconclusive
+  regime: "the market is calibrated to within noise in its last minutes; whatever the article's wallets earn comes from speed and queue position, not from a price the public quote shows"
+  rerun: "python -m cryptobot.updown_study --data updown_15m.pkl --near-resolution"
+  preregistered: true
+  trials_run: 1
+
+- id: fed-liquidity-equities
+  title: "Fed money injection as a predictor of US equity returns (net liquidity = Fed assets - TGA - reverse repo)"
+  source: "operator question 2026-10-09 ('does fed money injection correlate in a predictable enough way; use today's price action and work backwards'); the net-liquidity framing popularised by practitioners (Howell, Au79 Macro, 42 Macro)"
+  claim: "Weeks in which the Fed's net liquidity rises are followed by higher S&P 500 returns than weeks in which it falls, by enough to trade after costs; the relationship holds out of sample, not only in 2020-2021."
+  test: "FRED weekly WALCL, WTREGEN (TGA), RRPONTSYD (ON RRP, summed to weekly), WRESBAL; S&P 500 daily (Stooq). Net liquidity = WALCL - TGA - RRP, Wednesday weekly. Signal known at Thursday's H.4.1 release, applied from Friday's close: next-week (and 4- and 13-week) S&P return conditional on the sign and decile of the weekly change in net liquidity and of the 4-week change; correlation and t by era (2009-2014, 2015-2019, 2020-2021, 2022-2026); a long-only rule 'hold S&P only in weeks after net liquidity rose' vs buy-and-hold, walk-forward by year, 0.02% round trip (MES/SPY); and the worked example of the week of 2026-10-09."
+  success: "Written before running: the long-only liquidity rule beats buy-and-hold on Sharpe in at least 3 of the 4 eras including 2022-2026, with the next-week return difference (rise vs fall) having t >= 2 over 2015-2026; otherwise inconclusive; a negative or zero difference in 2022-2026 is killed for trading purposes."
+  data: "FRED CSVs (WALCL, WTREGEN, RRPONTSYD, WRESBAL, DFF) and Stooq ^spx, fetched 2026-10-09"
+  result: "Run 2026-10-09. S&P 500 (FRED, 521 H.4.1 weeks 2016-2026): weeks after a net-liquidity RISE returned +0.34% vs +0.19% after a fall in 2015-19 (t 0.5), +0.44 vs +0.35 in 2020-21 (t 0.1), +0.33 vs +0.12 in 2022-26 (t 0.7); weekly correlation 0.02-0.17. The 4-week change vs the next 4 weeks is the only relation with any weight: diff +0.8/+1.4/+1.4%, t 1.6/1.1/2.5, corr 0.12-0.27. Long-only-after-rise Sharpe vs buy-and-hold: 1.09 vs 1.08, 0.69 vs 0.89, 0.71 vs 0.73 (beats in 1 of 3 eras, by 0.01); the rule keeps 2018 (+3.4 vs -6.4%) and 2022 (+2.9 vs -15.7%) but gives up about half of every up year. Nasdaq since 2003 (1,238 weeks) says the same: diff t 0.3/1.1/-0.1/1.1 by era. Criterion (Sharpe better in 3 of 4 eras incl. 2022-26, t >= 2 on the weekly difference) not met"
+  verdict: inconclusive
+  regime: "net liquidity is a slow regime variable (monthly horizon, modest), not a weekly trading signal; 2009-2014 could only be run on the Nasdaq (FRED's S&P history is 10 years; Stooq was unreachable). Worked example: the H.4.1 of 2026-10-07 shows net liquidity +$82B on the weekly-average TGA series while a daily-TGA newsletter measure shows -$48B the same week; the S&P rose about 1% either way. The sign of an 'injection' depends on the measurement window, which is why the weekly correlation is near zero"
+  rerun: "python -m cryptobot.fedliq_study --dir fedliq"
+  preregistered: true
+  trials_run: 1
+
+- id: index-trend-voltarget
+  title: "Vol-targeted time-series trend on the S&P 500 (long/flat) as a stock sleeve for the desk"
+  source: "Moskowitz, Ooi & Pedersen (2012); Hurst, Ooi & Pedersen 'A Century of Evidence on Trend-Following'; the sweep's A-grade pre-registered crypto-trend-research repo; operator request 2026-10-09 to add stocks"
+  claim: "Long the index when it is above its 50/100/200-day moving averages (ensemble vote), flat otherwise, exposure scaled to a 12% annual vol target (cap 1x), costs 8 bp per unit of position change (Kalshi US500 perp, 4 bp taker per side). Sharpe at least that of buy-and-hold with a materially smaller drawdown."
+  test: "FRED S&P 500 daily closes 2016-2026 and Nasdaq Composite 1971-2026 (for the earlier eras); fixed parameters, no fitting; by era (2009-14, 2015-19, 2020-21, 2022-26): annual return, vol, Sharpe, max drawdown, time in market, costs; vs buy-and-hold."
+  success: "Written before running: Sharpe >= buy-and-hold in at least 3 of 4 Nasdaq eras including 2022-26 AND max drawdown at least 30% smaller in those eras, with the S&P 2016-2026 result consistent; otherwise inconclusive (a drawdown cutter is not alpha); Sharpe below buy-and-hold in 3+ eras is killed."
+  data: "scratchpad fedliq/SP500.csv, NASDAQCOM.csv (FRED)"
+  result: "Run 2026-10-09. S&P 500 2016-2026: rule Sharpe 0.33 / 1.09 / 0.72 vs buy-and-hold 1.06 / 0.88 / 0.69 by era (2015-19, 2020-21, 2022-26); max drawdown -15 / -8 / -15% vs -20 / -34 / -25%; in the market 56-71% of days; returns 2.2 / 11.7 / 6.2%/yr vs 13.3 / 21.4 / 10.8%. Nasdaq 2009-2026: Sharpe 0.81 / 0.50 / 0.86 / 0.89 vs 1.02 / 0.87 / 1.13 / 0.62 (above buy-and-hold in 1 of 4 eras); drawdown cut by more than 30% in 4 of 4 (-11 / -16 / -9 / -9% vs -23 / -24 / -30 / -36%). Criterion (Sharpe >= hold in 3 of 4 Nasdaq eras) not met; Sharpe below buy-and-hold in 3 eras"
+  verdict: killed
+  regime: "killed as a return source for the desk: it halves drawdowns by halving returns, with Sharpe no better than holding the index in most eras. It is a risk overlay for someone who already owns the index, which this desk does not"
+  rerun: "python -m cryptobot.index_trend_study --dir fedliq"
+  preregistered: true
+  trials_run: 1
+
+- id: stop-width-risk-tolerance
+  title: "Wider stop (risk tolerance) on the bounce-short: 5 / 10 / 15 / 20% stops at the 20% target"
+  source: "operator question 2026-10-09 ('test wider limit / risk tolerance')"
+  claim: "A wider stop lets more bounces complete and raises the strategy's risk-adjusted return."
+  test: "Walk-forward trades (cuts refit on prior years) 2022-2026 on hl_daily_us3.pkl (0.40%) and hl_daily.pkl (0.17%) for stops 0.05/0.10/0.15/0.20 with the 0.20 target and 14-day hold: mean, sd, Sharpe per trade, hit rate, worst calendar year with one slot per coin. These geometries are part of the 4,512-trial search already counted; this is a re-read, not new evidence."
+  success: "Not a pre-registered rule change: the deployed 10% stop stays unless a wider stop improves Sharpe per trade AND worst year on both universes."
+  data: "hl_daily_us3.pkl, hl_daily.pkl, hl_funding.pkl"
+  result: "US-3: mean +1.38 / +2.25 / +2.25 / +3.07% per trade, sd 10.3 / 13.0 / 14.4 / 15.2%, Sharpe per trade 0.134 / 0.173 / 0.157 / 0.202, hit 33 / 50 / 57 / 63%, worst year +5.6 / +10.8 / +5.8 / +11.9%. 18 coins: mean +0.60 / +1.23 / +1.39 / +2.03%, Sharpe 0.059 / 0.090 / 0.089 / 0.119, worst year -4.7 / -5.7 / -17.9 / -15.0%. The 20% stop raises Sharpe per trade on both sets but makes the worst year on 18 coins three times deeper (-15% vs -5.7%); 15% is worse than 10% on both. The bot's own Kelly gate also rejects stops above ~12% at the registered 35% confidence (reward:risk under 1.86)."
+  verdict: inconclusive
+  regime: "keep the 10% stop: the gain at 20% is inside the family's noise (the DSR run showed the chosen cell is a median column), the loser is twice as large, and choosing the best stop after the fact is one more selection step"
+  rerun: "python -m cryptobot.perp_study --cache hl_daily_us3.pkl --funding hl_funding.pkl --target 0.20 --stop 0.20 --days 14 --walk-forward \"short:move_1d[2]&move_3d[0]\""
+  trials_run: 4512
