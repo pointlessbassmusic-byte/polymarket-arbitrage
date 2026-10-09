@@ -284,3 +284,81 @@ of the index level a contract, ~$13.7 and ~$4.1; US500 book ~$1.5M a
 side, 0.6 bp spread, ~$6.7M a day), and `index_trend_study.py` /
 `fedliq_study.py` are the harness for index rules. They are not in any
 bot's universe.
+
+## Addendum, 2026-10-09 (4): investigation queue from automated-trading evidence, crypto and stocks
+
+Every candidate below passed, or is listed as failing, the same four
+tests: (1) a costed out-of-sample result in a paper or an independent
+replication, not a 2020–21 backtest; (2) executable by a US resident on a
+venue this desk can reach (Kalshi perps, Coinbase Derivatives, Kraken or
+Coinbase spot, listed US options or futures through a US broker);
+(3) testable with free data; (4) not already in the registry. Each
+queued item has a pre-registered stub in `hypotheses.yaml` with its
+success criterion written before the run, per `PREREGISTER.md`.
+
+### Queued, in order
+
+| # | id | asset | rule | evidence | cost on our venue |
+|---|---|---|---|---|---|
+| 1 | `overnight-index-perp` | stocks | hold the Kalshi US500 perp 16:00→09:30 ET, flat intraday; weekday subsets as named variants | Lou, Polk & Skouras (JFE 2019): strategy returns accrue overnight; 2025 ETF seasonality (Mon→Tue positive, Fri→Mon negative); no post-2019 replication of the full design | 4 bp taker / 2 bp maker a side, 0.6 bp spread, 8-hour funding |
+| 2 | `pairs-doge-shib-us` | crypto | daily log-price spread between DOGE and SHIB (PEPE on Coinbase), rolling hedge ratio, enter at z ≥ 2, exit at 0, stop at 4 or 20 days | mixed: one peer-reviewed test lost out of sample at every threshold; a 2026 paper reports BTC-ETH Sharpe 2.4 out of sample without verifiable costs; practitioner repos mostly flat | about 34 bp per pair round trip at Kalshi taker plus half-spread, both legs |
+| 3 | `orb-qqq-pilot` | stocks | 5-minute opening-range breakout on QQQ, ATR stop, 1-R target, flat at close; gate for the "stocks in play" version | Zarattini & Aziz (2023) gross reproduced by two replications, net about zero at 2.2 ¢/share; the 2024 stocks-in-play variant's edge comes from relative-volume selection; no 2023–25 out-of-sample record | needs an equity broker API; not executable on the desk's venues |
+| 4 | `btc-vrp-listed-options` | crypto | sell 30-day ~25-delta IBIT or CME micro BTC strangles when implied exceeds realised by a margin set in advance | Bitcoin variance risk premium documented on Deribit 2017–22 and found to shrink in high-vol regimes; no evidence on any US-listed instrument; 2025 vendor months show IBIT implied below realised in 3 of 4 months sampled | collect data first: no free history of IBIT option prices; needs an options-approved broker |
+| 5 | `pead-revisit` | stocks | buy top-decile earnings surprises at the next open, hold 20 days, short bottom decile | contested: gone in large caps by 2022 per one study, revived in 2025 papers; cost-sensitive in small caps | commission-free single-stock broker plus a free earnings-surprise feed |
+
+Why this order: item 1 needs only daily open/close history and the
+executor that is already running, and its criterion is the cost
+question (an overnight premium of a few basis points a day survives
+only as a maker order or on a weekday subset). Item 2 is the one
+crypto structure whose two legs both exist on a US venue, and where
+funding on the short leg partly cancels funding on the long leg. Items
+3 and 5 need an equity broker and intraday or earnings data the desk
+does not have, so a pilot on free QQQ bars decides whether the broker
+is worth adding. Item 4 cannot be tested until a year of option prices
+has been collected; the collector is cheap, the test is not.
+
+### Found and not queued
+
+- **Short volatility (VIX roll-down, 0DTE, covered calls).** XIV lost
+  96% in one session in February 2018; a 2024 working paper finds
+  0DTE put ratio spreads with a net Sharpe of 0.93 and baskets near
+  0.82 out of sample, but retail 0DTE traders lose 4.7% relative to
+  the market (t −10), and Dim, Eraker & Vilkov find the premium high
+  and the average gain small. A margin-intensive options book with
+  tail risk is not a $250 strategy. Revisit only after item 4's data
+  exists, since the infrastructure is the same.
+- **Index inclusion.** Greenwood & Sammon (JoF 2025): the inclusion
+  return fell from 7.4% in the 1990s to under 1%; a 2025 retail-driven
+  rebound has no post-inclusion continuation to trade.
+- **Turn of the month.** Maberly & Waggoner (Atlanta Fed, 2000): gone
+  from S&P futures after 1990; Liu (2011): concentrated on the first
+  trading day, and the switching strategy underperforms buy-and-hold;
+  CXO: one of 188 calendar effects persisted across subperiods. Our
+  own calendar test on BTC (`btc-offhours-seasonality`) is already
+  inconclusive.
+- **Crypto cash-and-carry basis, Binance cross-sectional factors,
+  Deribit volatility selling, trend as a drawdown cutter:** covered in
+  §2 and §6; nothing new since.
+- **Overnight-vs-intraday in crypto:** `btc-offhours-seasonality` is
+  the crypto analogue and is inconclusive; item 1 is the index version
+  on an instrument that trades through the night.
+
+Sources: [Lou, Polk & Skouras, "A tug of war: overnight versus intraday expected returns" (JFE 2019)](https://www.sciencedirect.com/science/article/pii/S0304405X18303008);
+[Zarattini & Aziz, "Can Day Trading Really Be Profitable?" (SSRN 4416622)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4416622);
+[Zarattini, Aziz & Barbon, "A Profitable Day Trading Strategy for the U.S. Equity Market" (SSRN 4729284)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4729284);
+[ORB replication on QQQ (giovannibrusco)](https://github.com/giovannibrusco/zarattini-2023-orb-qqq);
+[Springer, "On cointegration and cryptocurrency dynamics"](https://link.springer.com/article/10.1007/s42521-021-00027-5);
+[IJSRA 2026, cointegration stat-arb BTC-ETH](https://ijsra.net/sites/default/files/fulltext_pdf/IJSRA-2026-0283.pdf);
+[crypto-stat-arb (aman3599)](https://github.com/aman3599/crypto-stat-arb);
+[pairs-trading-backtester (al7arbi-111)](https://github.com/al7arbi-111/pairs-trading-backtester);
+[Survey of statistical arbitrage pairs (WNE UW 2025)](https://www.wne.uw.edu.pl/download_file/6095/0);
+[Alexander & Imeraj, "The Bitcoin VIX and Its Variance Risk Premium" (SSRN 3383734)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3383734);
+[Almeida, Grith & Miftachov, "Risk Premia in the Bitcoin Market" (arXiv 2410.15195)](https://arxiv.org/pdf/2410.15195);
+[IBIT IV/HV history (OptionsAnalysisSuite)](https://www.optionsanalysissuite.com/etf/ibit/iv-hv-history);
+[IVolatility on IBIT options](https://www.ivolatility.com/news/3056);
+[Maberly & Waggoner, turn-of-the-month in S&P futures (Atlanta Fed WP 2000-11)](https://www.atlantafed.org/research/publications/wp/2000/11.aspx);
+[Liu, "The Turn-of-the-Month Anomaly in the Age of ETFs" (JFP 2011)](https://www.financialplanningassociation.org/article/journal/APR11-turn-month-anomaly-age-etfs-reexamination-return-enhancement-strategies);
+[CXO Advisory, calendar effects in S&P futures](https://www.cxoadvisory.com/?p=17701);
+[Quantpedia, turn of the month in equity indexes](https://quantpedia.com/strategies/turn-of-the-month-in-equity-indexes);
+[Quantpedia, volatility risk premium effect](https://quantpedia.com/strategies/volatility-risk-premium-effect);
+[Dew-Becker, "The decline of the variance risk premium"](https://www.dew-becker.org/documents/synth_opt.pdf).

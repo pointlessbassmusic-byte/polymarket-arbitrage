@@ -53,7 +53,7 @@ def test_similar_surfaces_an_already_killed_idea():
 
 
 def test_similar_returns_nothing_for_unrelated_text():
-    assert H.similar(H.load(), "zzz qqq") == []
+    assert H.similar(H.load(), "zzz zzy") == []  # "qqq" is now a ticker in the registry
 
 
 def test_alive_needs_search_evidence_or_preregistration():

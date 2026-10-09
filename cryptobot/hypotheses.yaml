@@ -448,3 +448,73 @@
   regime: "keep the 10% stop: the gain at 20% is inside the family's noise (the DSR run showed the chosen cell is a median column), the loser is twice as large, and choosing the best stop after the fact is one more selection step"
   rerun: "python -m cryptobot.perp_study --cache hl_daily_us3.pkl --funding hl_funding.pkl --target 0.20 --stop 0.20 --days 14 --walk-forward \"short:move_1d[2]&move_3d[0]\""
   trials_run: 4512
+
+- id: overnight-index-perp
+  title: "Overnight-only S&P 500 exposure on the Kalshi US500 perp (hold 16:00-09:30 ET, flat intraday)"
+  source: "Lou, Polk & Skouras, 'A tug of war: overnight versus intraday expected returns', JFE 2019, https://www.sciencedirect.com/science/article/pii/S0304405X18303008; 2025 ETF day-of-week seasonality notes (Mon-Tue positive, Fri-Mon negative); operator question 2026-10-09 on strategies from automated-trading evidence"
+  claim: "The S&P 500's return accrues between the close and the next open; holding the US500 perp only overnight (long at 16:00 ET, flat at 09:30 ET) earns most of buy-and-hold's return with less than half its variance, and after Kalshi fees and funding beats buy-and-hold on Sharpe. Variants, each counted as a trial: all nights; skip Fri->Mon; Mon->Tue only."
+  test: "SPY daily open/close 1993-2026 (Stooq spy.us or Alpaca free data), close-to-open vs open-to-close by era (1993-2007, 2008-2014, 2015-2019, 2020-2026); then the same rule on Kalshi KXUS500PERP candles for the months they exist. Costs: 2 bp maker or 4 bp taker a side as two separate runs, 0.3 bp half-spread, funding at the realised 8-hour rate (0 before the perp existed). Walk-forward by year; PSR on the net overnight series; DSR at trials_run."
+  success: "Written before running: net (4 bp a side) overnight-only Sharpe exceeds buy-and-hold Sharpe in at least 3 of 4 eras including 2020-2026, with PSR >= 0.95 on the 2015-2026 net series; if only the 2 bp maker run passes, the rule is 'alive only as maker' and the executor must post resting orders before it is armed; otherwise inconclusive. Negative net 2020-2026 at 2 bp is killed."
+  data: "SPY daily OHLC (to be fetched); Kalshi candles via cryptobot.data.kalshi_perps"
+  result: "PRE-REGISTERED 2026-10-09; not yet run"
+  verdict: inconclusive
+  regime: "to be run"
+  rerun: "not yet written: cryptobot.overnight_study --symbol spy --fee-bps 4"
+  preregistered: true
+  trials_run: 3
+
+- id: pairs-doge-shib-us
+  title: "Cointegration spread mean reversion between DOGE and SHIB (and PEPE) on US perps"
+  source: "Springer 'On cointegration and cryptocurrency dynamics' (out-of-sample loss at every threshold), https://link.springer.com/article/10.1007/s42521-021-00027-5; IJSRA 2026 BTC-ETH stat-arb (Sharpe 2.4 OOS, costs unverified), https://ijsra.net/sites/default/files/fulltext_pdf/IJSRA-2026-0283.pdf; github.com/aman3599/crypto-stat-arb (2025-26 OOS at 20 bp costs, most pairs flat); WNE UW survey 2025"
+  claim: "The log-price spread DOGE - beta*SHIB (beta from a 90-day rolling OLS, Engle-Granger p < 0.05 required) mean-reverts: enter when the 60-day z-score is >= 2 (short the rich leg, long the cheap leg, dollar-neutral), exit at z = 0, stop at z = 4 or after 20 days. PEPE joins the pair set on Coinbase where it is listed."
+  test: "Daily closes 2021-2026 from hl_all_daily.pkl (Hyperliquid history as the public-data seed) and Coinbase/Kalshi candles for 2025-26; walk-forward with the hedge ratio and z-window fixed before each year; costs 4 bp a side plus 4.5 bp half-spread on each of four executions (about 34 bp a pair round trip) and realised funding on both legs; CPCV over the pair-year panel; one trial per (z-entry, window, stop, pair) looked at."
+  success: "Written before running: net Sharpe > 0.5 with PSR >= 0.95 over 2022-2026 walk-forward AND net positive in 2025-2026 AND at least 30 round trips; DSR >= 0.95 at the recorded trials_run; otherwise inconclusive; net negative in 2025-2026 is killed."
+  data: "hl_all_daily.pkl (scratch), Kalshi and Coinbase candles"
+  result: "PRE-REGISTERED 2026-10-09; not yet run"
+  verdict: inconclusive
+  regime: "to be run"
+  rerun: "not yet written: cryptobot.pairs_study --cache hl_all_daily.pkl --pairs DOGE/SHIB,DOGE/PEPE,SHIB/PEPE"
+  preregistered: true
+  trials_run: 1
+
+- id: orb-qqq-pilot
+  title: "5-minute opening-range breakout on QQQ as the gate for a stocks-in-play version"
+  source: "Zarattini & Aziz 2023, SSRN 4416622; Zarattini, Aziz & Barbon 2024, SSRN 4729284 (stocks in play); replication github.com/giovannibrusco/zarattini-2023-orb-qqq (gross reproduced, net ~0 at 2.2 c/share)"
+  claim: "Buy (sell) QQQ when the first 5-minute bar closes up (down), stop at 0.1 x 14-day ATR, target 10R, flat at the close; sized to risk 1% per day. The replications say this is zero net on QQQ; the point of the pilot is to confirm that with our own cost model before deciding whether to add an equity broker and a full-market intraday feed for the relative-volume (stocks in play) version, where the published edge lives."
+  test: "QQQ 5-minute bars 2016-2026 (Alpaca free IEX feed or an equivalent free source), 1 c/share commission-free slippage and a 2.2 c/share sensitivity, walk-forward by year; compare to the replication's gross figures to confirm the harness."
+  success: "Written before running: net Sharpe > 0.5 at 1 c/share with PSR >= 0.95 over 2016-2026 and net positive in 2023-2026 keeps the family open and justifies the broker and feed; net <= 0 at 1 c/share kills the QQQ version and closes the family unless a free full-market intraday feed becomes available for the stocks-in-play test."
+  data: "QQQ 5-minute bars (to be fetched)"
+  result: "PRE-REGISTERED 2026-10-09; not yet run"
+  verdict: inconclusive
+  regime: "to be run"
+  rerun: "not yet written: cryptobot.orb_study --symbol QQQ --slippage-cents 1"
+  preregistered: true
+  trials_run: 1
+
+- id: btc-vrp-listed-options
+  title: "Bitcoin variance risk premium through US-listed options (IBIT or CME micro BTC), data collection first"
+  source: "Alexander & Imeraj, 'The Bitcoin VIX and Its Variance Risk Premium', SSRN 3383734; Almeida, Grith & Miftachov, 'Risk Premia in the Bitcoin Market', arXiv 2410.15195 (Deribit 2017-22; premium falls in high-vol regimes); OptionsAnalysisSuite IBIT IV/HV monthly 2025 (Jan +4.1, Mar -6.3, Apr -9.1, Dec -6.0 vol points); IVolatility note on IBIT"
+  claim: "Selling 30-day ~25-delta IBIT strangles, delta-hedged daily with IBIT shares, only when 30-day implied volatility exceeds trailing 20-day realised by >= 5 vol points, earns the variance risk premium after commissions and hedging costs with a maximum drawdown under 20% of the capital committed."
+  test: "Cannot be run today: there is no free history of IBIT option prices. Step 1 (now): a daily collector of the IBIT ATM 30-day implied volatility surface and 20-day realised volatility from free delayed chains, into state/options/. Step 2 (after 12 months, or sooner with purchased history): backtest the rule with 0.65 USD a contract commission, half the quoted spread as slippage, and daily hedge costs at 1 bp; PSR on the monthly P&L."
+  success: "Written before running: net Sharpe > 0.7 with PSR >= 0.95 over the available window, worst month better than -15% of committed capital, and the 2025 months the vendor shows as negative IV-HV being flat or skipped by the gate; otherwise inconclusive. Not executable from the desk until an options-approved broker is added."
+  data: "to be collected: IBIT option chains (delayed), IBIT daily closes"
+  result: "PRE-REGISTERED 2026-10-09; collector not yet built, test not yet run"
+  verdict: inconclusive
+  regime: "to be run"
+  rerun: "not yet written: cryptobot.vrp_collect (daily collector), then cryptobot.vrp_study"
+  preregistered: true
+  trials_run: 1
+
+- id: pead-revisit
+  title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
+  source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
+  claim: "Buying the top decile of standardised earnings surprises at the next open and holding 20 trading days (shorting the bottom decile where borrow is cheap) earns a net positive spread in stocks below the Russell 1000 cut-off, after 5 bp a side and the realised half-spread."
+  test: "Earnings surprise history from a free feed (Alpha Vantage EARNINGS or equivalent) 2015-2026, daily prices from Stooq or Alpaca; decile portfolios rebalanced on announcement, long-only and long-short; walk-forward by year; PSR on the monthly spread."
+  success: "Written before running: long-only top-decile net Sharpe above the equal-weight small-cap benchmark by >= 0.3 with PSR >= 0.95 over 2015-2026 and net positive in 2022-2026; otherwise inconclusive. Queued behind overnight-index-perp, pairs-doge-shib-us and orb-qqq-pilot; do not start before those are resolved."
+  data: "to be fetched: earnings surprises and daily prices"
+  result: "PRE-REGISTERED 2026-10-09; not yet run"
+  verdict: inconclusive
+  regime: "to be run"
+  rerun: "not yet written: cryptobot.pead_study"
+  preregistered: true
+  trials_run: 1
