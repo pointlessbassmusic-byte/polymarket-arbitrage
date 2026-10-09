@@ -1115,6 +1115,17 @@ Reading it plainly:
   paper trades, the sim P&L is noise either way; the desk digest now
   reports trades logged against the minimum track record needed.
 
+One more caveat the diagnostics do not cover: **the universe is chosen
+with hindsight.** The 18 memecoins are the ones listed on Hyperliquid
+in 2026. Coins that were delisted after collapsing are missing, which
+for a short strategy hides its best trades and biases the backtest
+against the rule; coins that survived because they rallied (PEPE in
+2023) are over-represented, which biases it the other way. The nearest
+test is the registry's `bounce-short-all-perps` run on all 176 current
+perps: 3 of 5 years positive and the benchmark beaten in 2, weaker than
+the memecoin subset. Until a point-in-time listing history exists, the
+18-coin numbers should be read as the optimistic end of the range.
+
 Both bounce-short entries in the registry are therefore
 **inconclusive**, not alive. That is not a kill: the mechanism is
 plausible, costs are realistic, and CPCV is clean. It means expected
