@@ -1181,6 +1181,13 @@ alert when a bot's daily run is more than 26 hours overdue, and
 `GET /health` (no token; no balances or secrets) lets an uptime monitor
 notice a dead desk.
 
+**Taxes.** `python -m cryptobot.taxlots --state-dir state --year 2026
+--out lots.csv` writes one row per closed real trade (quantity, open and
+close times, proceeds, cost basis, modelled and venue-reported fees,
+funding, net P&L). These contracts are not Section 1256 instruments and
+1099-DA reports proceeds without basis, so this file is the basis
+record.
+
 **Manual mode**: set weights on the dashboard (they must add up to 100%
 or less; the rest is cash). The gates still apply. *Back to auto*
 returns control to the allocator.
