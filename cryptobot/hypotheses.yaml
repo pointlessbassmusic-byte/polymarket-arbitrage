@@ -379,3 +379,31 @@
   rerun: "python -m cryptobot.hedge_study --cache hl_daily.pkl --all hl_all_daily.pkl"
   preregistered: true
   trials_run: 1
+
+- id: stop-and-reverse
+  title: "When a bounce-short is stopped out (+10%), flip to a long from the stop price with the mirrored geometry"
+  source: "operator proposal 2026-10-09: 'if we deem the trade wrong, buy into the correct position before the edge is lost'"
+  claim: "A memecoin that rallies 10% through the short's stop keeps going: a long opened at the stop (+20% target / -10% stop / 14 days) earns more than its costs. Variant B: exit the short at +5% adverse and reverse there."
+  test: "Walk-forward trades of short:move_1d[2]&move_3d[0] +20/-10 14d (cuts refit on prior years) on hl_daily.pkl (18 coins) and hl_daily_us3.pkl; for each trade find the stop day (first day high >= entry x 1.10, conservative ordering); open a long at the stop price and score it with perp_study.outcome(long, +20/-10, 14d) net of the round trip (0.17% HL-like / 0.40% US-3); by year: n, hit rate, mean, t clustered by entry day. Variant B at +5%."
+  success: "Written before running: variant A reversal leg net mean > 0 with t >= 2 over 2022-2026 on the 18-coin set AND positive in at least 4 of 5 years; otherwise inconclusive; mean < 0 on both caches is killed."
+  data: "hl_daily.pkl, hl_daily_us3.pkl"
+  result: "Run 2026-10-09. 18 coins: 515 of 938 walk-forward shorts reached the +10% stop; a long from the stop price (+20/-10, 14d) netted -1.33%/trade (hit 30%, t=-1.44), positive in 1 of 5 years (2024 +0.21%). US-3 at 0.40%: 104 of 230 stopped; reversal -4.71%/trade (hit 20%, t=-3.93), 0 of 5 years. Variant B (exit and reverse at +5%): -1.25% (18 coins, 1/5), -2.95% (US-3, 0/5)"
+  verdict: killed
+  regime: "after a stop-out the bounce fades: both the short and the reversed long lose over the next 14 days. The profitable action after a stop is to be flat, which the bot already does"
+  rerun: "python -m cryptobot.reverse_study --cache hl_daily.pkl"
+  preregistered: true
+  trials_run: 2
+
+- id: near-resolution-capture
+  title: "Buy the near-certain side of a 15-minute BTC Up/Down market in its last 1-2 minutes (the 'near-resolution capture' structure from Dan1ro0's article)"
+  source: "https://x.com/dan1ro0/status/2085766554407317704 (article: 50+ Polymarket bots, BTC Up/Down 5m); tested on our 15-minute Polymarket data"
+  claim: "In the final minutes the favourite trades below its true probability; buying it at the ask and holding to settlement earns the gap after fees."
+  test: "updown_15m.pkl snapshots at 2 and 1 minutes before resolution; buy the favourite when its ask >= 0.85 at the next quote after the snapshot; settle at 1 or 0; taker fee 0.07 x p(1-p); mean net per $ and hit rate vs the implied probability, by ask bucket."
+  success: "Written before running: mean net per $ > 0 with t >= 2 at both horizons; otherwise inconclusive; negative at both is killed."
+  data: "scratchpad updown_15m.pkl (Polymarket CLOB price histories + outcomes)"
+  result: "Run 2026-10-09 on 2,100 resolved 15-minute markets. 2 min before: 1,591 favourites bought, implied 97.2% vs hit 97.0%, net -0.77% per $ (t=-0.21); every price bucket negative (0.85: -4.7%, 0.90: -3.1%, 0.95: -1.3%, 0.99: -0.1%). 1 min before: 1,831 bought, implied 98.6% vs hit 99.3%, net +0.41% per $ (t=+0.22); the 0.85 bucket's +10% is 27 trades. Criterion (t >= 2 at both horizons) not met"
+  verdict: inconclusive
+  regime: "the market is calibrated to within noise in its last minutes; whatever the article's wallets earn comes from speed and queue position, not from a price the public quote shows"
+  rerun: "python -m cryptobot.updown_study --data updown_15m.pkl --near-resolution"
+  preregistered: true
+  trials_run: 1

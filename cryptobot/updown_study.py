@@ -419,12 +419,65 @@ def report(data: dict) -> str:
     return "\n".join(out)
 
 
+def near_resolution(data: dict, minutes_before: int, min_price: float = 0.85) -> dict:
+    """Pre-registered `near-resolution-capture`: in the last minutes buy
+    the favourite as a taker (UP at its quote, or DOWN at 1 - quote) when
+    it trades at `min_price` or above, hold to settlement. Net per dollar
+    after the taker fee and half-spread, hit rate, and the price bucket."""
+    rows = snapshots(data, minutes_before)
+    trades = []
+    for r in rows:
+        p_up = r["entry"]
+        if p_up >= min_price:
+            cost, win = taker_cost(p_up), r["up"]
+        elif p_up <= 1 - min_price:
+            cost, win = taker_cost(1 - p_up), 1 - r["up"]
+        else:
+            continue
+        trades.append({"day": r["day"], "price": max(p_up, 1 - p_up), "cost": cost, "win": win,
+                       "net": (win - cost) / cost})
+    out = {"minutes_before": minutes_before, "n": len(trades), "markets": len(rows)}
+    if trades:
+        nets = [t["net"] for t in trades]
+        m = statistics.mean(nets)
+        sd = statistics.stdev(nets) if len(nets) > 1 else 0.0
+        days = len({t["day"] for t in trades})
+        out.update({"hit": sum(t["win"] for t in trades) / len(trades), "mean_net": m,
+                    "t": (m / sd * math.sqrt(days)) if sd else 0.0,
+                    "implied": statistics.mean(t["price"] for t in trades)})
+        buckets = {}
+        for t in trades:
+            b = round(min(0.99, t["price"]) * 20) / 20
+            buckets.setdefault(b, []).append(t)
+        out["buckets"] = {b: {"n": len(g), "hit": sum(x["win"] for x in g) / len(g),
+                              "mean_net": statistics.mean(x["net"] for x in g)} for b, g in sorted(buckets.items())}
+    return out
+
+
+def render_near_resolution(res: dict) -> str:
+    if not res.get("n"):
+        return f"{res['minutes_before']} min before: no favourite at or above the threshold in {res['markets']} markets"
+    out = [f"{res['minutes_before']} min before resolution: {res['n']} favourites bought of {res['markets']} markets; "
+           f"implied {100 * res['implied']:.1f}% vs hit {100 * res['hit']:.1f}%; net {100 * res['mean_net']:+.2f}% per $ "
+           f"(t={res['t']:+.2f}, days clustered)"]
+    for b, g in res["buckets"].items():
+        out.append(f"   price ~{b:.2f}: n={g['n']:4d} hit {100 * g['hit']:5.1f}% net {100 * g['mean_net']:+.2f}%")
+    return "\n".join(out)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data", type=Path, required=True)
+    ap.add_argument("--near-resolution", action="store_true",
+                    help="pre-registered test: buy the favourite in the last 2 and 1 minutes")
     args = ap.parse_args()
     from cryptobot.updown_data import load
-    print(report(load(args.data)))
+    data = load(args.data)
+    if args.near_resolution:
+        for mb in (2, 1):
+            print(render_near_resolution(near_resolution(data, mb)))
+        return 0
+    print(report(data))
     return 0
 
 

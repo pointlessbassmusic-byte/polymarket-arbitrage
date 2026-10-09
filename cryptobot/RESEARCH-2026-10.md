@@ -214,3 +214,19 @@ order-book wall and liquidation signals (negative after fees);
 LightGBM/LSTM directional models on 15-minute perps (deflated Sharpe
 ≈ 0); Coinbase fee pages (HTTP 403 to fetches; the $0.20 floor comes
 from Coinbase's blog and should be confirmed on the first real fill).
+
+## Addendum, 2026-10-09: two operator proposals and one article, tested
+
+| test | result | verdict |
+|---|---|---|
+| `btc-beta-hedge-bounce-short`: long BTC sized to the walk-forward beta | hedged Sharpe higher in 2 of 5 years on both universes; the strategy carries about −0.5 BTC beta, the hedge swaps BTC's drift for lower variance | inconclusive |
+| `stop-and-reverse`: flip to a long when the short is stopped at +10% (and at +5%) | reversal leg −1.3%/trade on 18 coins (1 of 5 years positive), −4.7% on US-3 (0 of 5, t = −3.9); after a stop the bounce fades and both sides lose | **killed** |
+| `near-resolution-capture` (Dan1ro0 article): buy the favourite in the last minutes of a 15-min BTC Up/Down market | 2 min: −0.77% per $ (t −0.21); 1 min: +0.41% per $ (t +0.22); implied and realised probabilities match to within noise | inconclusive |
+
+The article's other structures map to registry entries: fair-value taker
+(`polymarket-updown-fair-value`, killed), hedged/temporal pairs
+(`polymarket-hedge-to-lock`, killed), maker side
+(`polymarket-maker-fair-value`, killed on adverse selection), and
+latency (`polymarket-latency`, untested: it is a race against market
+makers). The wallets it screenshots are not reproducible from the
+public quote; their edge, if real, is queue position and speed.
