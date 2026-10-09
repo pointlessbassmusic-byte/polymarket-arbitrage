@@ -362,3 +362,35 @@ Sources: [Lou, Polk & Skouras, "A tug of war: overnight versus intraday expected
 [Quantpedia, turn of the month in equity indexes](https://quantpedia.com/strategies/turn-of-the-month-in-equity-indexes);
 [Quantpedia, volatility risk premium effect](https://quantpedia.com/strategies/volatility-risk-premium-effect);
 [Dew-Becker, "The decline of the variance risk premium"](https://www.dew-becker.org/documents/synth_opt.pdf).
+
+## Addendum, 2026-10-09 (5): Fidelity, and which broker APIs the equity items need
+
+**Fidelity has no retail API.** Fidelity offers FIX connectivity to
+institutions and advisor/workplace integrations, nothing for an
+individual account ([TradersPost, Sept 2025](https://blog.traderspost.io/article/does-fidelity-have-an-api);
+[FintegrationFS](https://www.fintegrationfs.com/fintechapisusa/fidelity-investments)).
+The aggregator [SnapTrade](https://snaptrade.com/brokerage-integrations/fidelity-api)
+reads Fidelity positions and balances but states it cannot place
+trades. The community libraries
+([fidelity-api](https://github.com/kennyboy106/fidelity-api),
+[fidelipy](https://github.com/KuphJr/fidelipy)) drive the website with a
+Playwright browser, hold the login and 2FA in a script, and are
+unsupported; secondary sources say browser scripting breaks Fidelity's
+account terms ([TradersPost](https://blog.traderspost.io/article/does-fidelity-allow-trading-bots),
+[InvestorTrip](https://www.investortrip.com/reviews/robinhood/automated-trading-systems)).
+Fidelity's own agreement text was not retrievable here. Decision: the
+executor never drives a Fidelity account. Fidelity stays the human
+account; read-only aggregation is worth wiring only if strategy capital
+is held there.
+
+**Brokers with an official API, mapped to the queue.**
+
+| broker | API covers | cost (per sources, verify) | fits |
+|---|---|---|---|
+| Alpaca | US stocks, ETFs, options, crypto; paper trading; free IEX bars | $0 commission ([Alpaca](https://thewearify.com/alpaca-vs-interactive-brokers/)) | `orb-qqq-pilot`, `pead-revisit`; the free bars are the pilot's data source |
+| Schwab Trader API (Individual) | stocks, ETFs, options, streaming quotes; no futures listed | free; refresh token expires every 7 days ([TradersPost](https://blog.traderspost.io/article/thinkorswim-api); [schwabr](https://r-packages.io/packages/schwabr)) | same two, plus the options leg of `btc-vrp-listed-options` |
+| tastytrade Open API | equities, options, futures and futures options, spot crypto; futures product list queryable ([docs](https://developer.tastytrade.com/api-overview), [orders](https://developer.tastytrade.com/open-api-spec/orders/)) | options $1/contract to open, $0 to close, $10/leg cap ([stockbrokers.com](https://www.stockbrokers.com/compare/interactivebrokers-vs-tastytrade)) | `btc-vrp-listed-options` via IBIT or CME micro BTC options; /MBT presence to be confirmed through the product-list endpoint |
+| Interactive Brokers | stocks, options, futures incl. CME micros, 11 crypto coins; TWS/Gateway, Web API, FIX | $0 stocks (US), ~$0.65/option, ~$0.85/futures contract ([stockbrokers.com](https://www.stockbrokers.com/compare/interactivebrokers-vs-tastytrade); [curvedtrading](https://curvedtrading.com/articles/en/reviews/tastytrade-vs-interactive-brokers-options/)) | everything above; the most setup |
+
+Nothing is added now: queue item 1 runs on Kalshi, which is wired. An
+Alpaca paper account is the zero-cost step when item 3 or 5 starts.
