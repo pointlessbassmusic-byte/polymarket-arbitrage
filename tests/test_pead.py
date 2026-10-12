@@ -117,6 +117,7 @@ def test_window_return_enters_next_open_and_charges_two_sides():
     assert w["entry_date"] == "2026-10-09" and w["exit_date"] == "2026-10-12"
     assert w["gross"] == pytest.approx(12.5 / 11.0 - 1) and w["net_long"] == pytest.approx(w["gross"] - 0.001)
     assert P.window_return(rows, "2026-10-12", 2, 0.0005) is None                  # no session after the report
+    assert P.window_return(rows, "2026-09-01", 2, 0.0005) is None                  # history starts weeks later: no window
 
 
 def test_planted_drift_is_detected_and_noise_is_not():

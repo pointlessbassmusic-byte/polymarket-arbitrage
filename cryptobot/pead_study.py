@@ -42,12 +42,23 @@ def load_prices(d: Path, symbols: set[str]) -> dict[str, list[dict]]:
     return out
 
 
-def window_return(rows: list[dict], report_date: str, hold_days: int, cost_side: float) -> dict | None:
+MAX_ENTRY_GAP_DAYS = 5
+
+
+def window_return(rows: list[dict], report_date: str, hold_days: int, cost_side: float,
+                  max_gap_days: int = MAX_ENTRY_GAP_DAYS) -> dict | None:
     """Open of the first session after `report_date` to the close
-    `hold_days` sessions later, net of two executions."""
+    `hold_days` sessions later, net of two executions. The entry must fall
+    within `max_gap_days` of the report: a history that only begins later
+    (ten-year windows, re-used tickers, delisted-and-relisted names) gives
+    no window rather than one from years away."""
+    import datetime as _dt
     dates = [r["date"] for r in rows]
     i = next((k for k, d in enumerate(dates) if d > report_date), None)
     if i is None or i + hold_days - 1 >= len(rows):
+        return None
+    gap = (_dt.date.fromisoformat(dates[i]) - _dt.date.fromisoformat(report_date)).days
+    if gap > max_gap_days:
         return None
     entry = rows[i]["open"]
     exit_ = rows[i + hold_days - 1]["close"]
