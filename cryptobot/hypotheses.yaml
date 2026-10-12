@@ -483,11 +483,11 @@
   claim: "Buy (sell) QQQ when the first 5-minute bar closes up (down), stop at 0.1 x 14-day ATR, target 10R, flat at the close; sized to risk 1% per day. The replications say this is zero net on QQQ; the point of the pilot is to confirm that with our own cost model before deciding whether to add an equity broker and a full-market intraday feed for the relative-volume (stocks in play) version, where the published edge lives."
   test: "QQQ 5-minute bars 2016-2026 (Alpaca free IEX feed or an equivalent free source), 1 c/share commission-free slippage and a 2.2 c/share sensitivity, walk-forward by year; compare to the replication's gross figures to confirm the harness."
   success: "Written before running: net Sharpe > 0.5 at 1 c/share with PSR >= 0.95 over 2016-2026 and net positive in 2023-2026 keeps the family open and justifies the broker and feed; net <= 0 at 1 c/share kills the QQQ version and closes the family unless a free full-market intraday feed becomes available for the stocks-in-play test."
-  data: "QQQ 5-minute bars (to be fetched)"
-  result: "PRE-REGISTERED 2026-10-09; not yet run"
+  data: "QQQ 5-minute bars 2016-2026 from Alpaca's IEX feed via cryptobot.orb_study --fetch (paper keys suffice); not yet fetched"
+  result: "PRE-REGISTERED 2026-10-09; harness built 2026-10-12 (cryptobot/orb_study.py: regular-hours sessions, prior-day ATR, first-bar direction, 0.1 ATR stop, 10 R target, 1% risk sizing capped at 4x, per-share slippage, the pre-registered verdict rule), tested on synthetic bars; waiting on Alpaca keys for the data"
   verdict: inconclusive
-  regime: "to be run"
-  rerun: "not yet written: cryptobot.orb_study --symbol QQQ --slippage-cents 1"
+  regime: "blocked on data: CRYPTOBOT_ALPACA_KEY_ID / _SECRET_KEY"
+  rerun: "python -m cryptobot.orb_study --fetch --cache qqq_5m.pkl --slip 0.01"
   preregistered: true
   trials_run: 1
 
