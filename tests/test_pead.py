@@ -130,3 +130,14 @@ def test_planted_drift_is_detected_and_noise_is_not():
     assert abs(s0["mean_spread_month"]) < abs(s["mean_spread_month"])
     assert "PEAD" in P.render(res)
     assert P.passes({"months": 10})[0] == "inconclusive"
+
+
+def test_coverage_reports_missing_histories_by_year():
+    cal, prices = _panel(months=24, names=30, drift_per_surprise=0.0, seed=2)
+    res = P.run(cal, prices)
+    assert res["coverage"]["share"] == 1.0 and set(res["coverage"]["by_year"]) == {2017, 2018}
+    gone = {k: v for k, v in prices.items() if k != "S000"}
+    res2 = P.run(cal, gone)
+    assert res2["coverage"]["with_prices"] == res2["coverage"]["announcements"] - 24
+    assert "price coverage" in P.render(res2)
+

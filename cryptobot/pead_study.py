@@ -75,9 +75,28 @@ def cohorts(cal: list[dict], min_estimates: int = 3, max_cap: float | None = Non
     return out
 
 
+def coverage(months: dict[str, list[dict]], prices: dict[str, list[dict]]) -> dict:
+    """Share of qualifying announcements whose symbol has a price history,
+    by year. Nasdaq serves histories for CURRENT listings only, so names
+    delisted since (acquisitions, bankruptcies) are missing: the panel has
+    survivorship bias, worst for the bottom decile, and the share says how much."""
+    by_year: dict[int, list[int]] = {}
+    for m, rows in months.items():
+        y = int(m[:4])
+        b = by_year.setdefault(y, [0, 0])
+        for r in rows:
+            b[0] += 1
+            b[1] += r["symbol"] in prices
+    total = sum(v[0] for v in by_year.values())
+    have = sum(v[1] for v in by_year.values())
+    return {"announcements": total, "with_prices": have, "share": have / total if total else 0.0,
+            "by_year": {y: (v[1] / v[0] if v[0] else 0.0) for y, v in sorted(by_year.items())}}
+
+
 def run(cal: list[dict], prices: dict[str, list[dict]], *, hold_days: int = 20, cost_side: float = 0.0005,
         min_estimates: int = 3, max_cap: float | None = None, decile: float = 0.10) -> dict:
     months = cohorts(cal, min_estimates, max_cap)
+    cov = coverage(months, prices)
     monthly = []
     for m in sorted(months):
         rows = months[m]
@@ -102,8 +121,8 @@ def run(cal: list[dict], prices: dict[str, list[dict]], *, hold_days: int = 20, 
         monthly.append({"month": m, "n_top": len(rets["top"]), "n_all": len(rets["all"]),
                         "top_net": top_net, "all_net": all_net, "long_minus_all": top_net - all_net,
                         "long_short": (top_net + bottom_short) / 2 if bottom_short is not None else None})
-    return {"months": monthly, "summary": summarize(monthly), "params": {"hold_days": hold_days, "cost_side": cost_side,
-                                                                        "min_estimates": min_estimates, "max_cap": max_cap}}
+    return {"months": monthly, "summary": summarize(monthly), "coverage": cov,
+            "params": {"hold_days": hold_days, "cost_side": cost_side, "min_estimates": min_estimates, "max_cap": max_cap}}
 
 
 def summarize(monthly: list[dict]) -> dict:
@@ -157,6 +176,11 @@ def render(res: dict) -> str:
     o.append("  by year (spread / top / all, summed months): " + " ".join(
         f"{y}:{b['spread']*100:+.1f}/{b['top']*100:+.1f}/{b['all']*100:+.1f}%" for y, b in s["by_year"].items()))
     o.append(f"  2022 on: {s['net_2022_on']*100:+.1f}%; positive years {s['positive_years']}/{s['years']}")
+    c = res.get("coverage") or {}
+    if c:
+        o.append(f"  price coverage {c['share']*100:.0f}% of {c['announcements']} qualifying announcements "
+                 f"(current listings only: delisted names are missing, so the bottom decile is understated); by year "
+                 + " ".join(f"{y}:{v*100:.0f}%" for y, v in c["by_year"].items()))
     v, why = passes(s)
     o.append(f"verdict: {v} ({why})")
     return "\n".join(o)
