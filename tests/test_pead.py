@@ -140,7 +140,7 @@ def test_coverage_reports_missing_histories_by_year():
     gone = {k: v for k, v in prices.items() if k != "S000"}
     res2 = P.run(cal, gone)
     assert res2["coverage"]["with_prices"] == res2["coverage"]["announcements"] - 24
-    assert "price coverage" in P.render(res2)
+    assert "usable price windows" in P.render(res2)
 
 
 def test_merge_state_folds_parallel_streams(tmp_path):
