@@ -11,6 +11,8 @@
    the Nasdaq data API on the first run). Appended to
    state/options/ibit.jsonl, one JSON object per trading day.
 
+3. The out-of-sample tracker for `divergence-catchup-btc` (cryptobot.oos_track).
+
 2. Kalshi hourly candles for the BTC and US500 perps
    (`cross-asset-crypto-leadlag` follow-up: does the BTC perp lead the
    US500 perp hour to hour while the cash market is closed?). The
@@ -298,7 +300,39 @@ class Collector:
             logger.warning("options snapshot failed: %s", exc)
             out["options"] = f"ERROR {type(exc).__name__}"
         out["kalshi_hourly"] = await self.kalshi_hourly()
+        try:
+            from .oos_track import update as oos_update
+            s = await oos_update(self.state, client=self._c)
+            out["divergence_oos"] = {k: s[k] for k in ("days_tracked", "pending", "verdict")} | {"qualifying": s["qualifying"]["n"]}
+        except Exception as exc:                      # noqa: BLE001
+            logger.warning("divergence OOS tracker failed: %s", exc)
+            out["divergence_oos"] = f"ERROR {type(exc).__name__}"
         return out
+
+
+def status(state_dir: Path, symbol: str = "IBIT") -> dict:
+    """What the collectors hold, for the desk's research card."""
+    sd = Path(state_dir)
+    opts = read_jsonl(sd / "options" / f"{symbol.lower()}.jsonl")
+    last = opts[-1] if opts else {}
+    hourly = {}
+    for p in sorted((sd / "kalshi_hourly").glob("*.jsonl")) if (sd / "kalshi_hourly").exists() else []:
+        rows = read_jsonl(p)
+        hourly[p.stem] = {"rows": len(rows), "last": dt.datetime.fromtimestamp(rows[-1]["end_ts"], dt.timezone.utc).isoformat()
+                          if rows else None}
+    gated = [r for r in opts if r.get("gate_open") is not None]
+    out = {"options": {"symbol": symbol, "days": len(opts), "first": opts[0]["date"] if opts else None,
+                       "last": last.get("date"), "spot": last.get("spot"), "iv30": last.get("iv30_atm"),
+                       "rv20": last.get("rv20"), "iv_minus_rv20": last.get("iv_minus_rv20"),
+                       "gate_open": last.get("gate_open"),
+                       "gate_open_days": sum(1 for r in gated if r["gate_open"]), "gated_days": len(gated)},
+           "kalshi_hourly": hourly}
+    try:
+        from .oos_track import read_rows, summary
+        out["divergence_oos"] = summary(read_rows(sd))
+    except Exception:                                 # noqa: BLE001
+        out["divergence_oos"] = None
+    return out
 
 
 def report(state_dir: Path, symbol: str = "IBIT") -> str:

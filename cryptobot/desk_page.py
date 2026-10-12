@@ -47,6 +47,7 @@ details summary{cursor:pointer;color:var(--fg2)}
   <details><summary>table view</summary><div id="eqtable"></div></details></div>
  <div id="strats" style="display:contents"></div>
  <div class="card" style="grid-column:1/-1"><h2>Execution (real fills, last 30 days)</h2><pre id="exec">no real fills yet</pre></div>
+ <div class="card" style="grid-column:1/-1"><h2>Research data: what the collectors hold</h2><div id="research" class="muted">collectors off, or nothing stored yet</div></div>
  <div class="card" style="grid-column:1/-1"><h2>Lab: every idea tested, with its verdict</h2><div id="lab"></div></div>
  <div class="card" style="grid-column:1/-1"><h2>Desk events</h2><div id="alerts"></div></div>
 </div></div>
@@ -133,13 +134,22 @@ function chart(){
  svg.onmouseleave=()=>{tip.style.display="none";document.getElementById("xh").style.display="none"};
  document.getElementById("eqtable").innerHTML=`<table><thead><tr><th>time</th>${show.map(s=>`<th>${esc(s.name)}</th>`).join("")}</tr></thead><tbody>${show[0].pts.slice(-12).map((p,i)=>`<tr><td class="l">${when(p[0])}</td>${show.map(s=>{const q=s.pts[s.pts.length-12+i]||s.pts[s.pts.length-1];return `<td>${usd(q[1])}</td>`}).join("")}</tr>`).join("")}</tbody></table>`;
 }
+function research(){
+ const R=S.research;const el=document.getElementById("research");if(!R){el.textContent="collectors off, or nothing stored yet";return}
+ const o=R.options||{};const rows=[];
+ if(o.days){rows.push(`<tr><td class="l"><b>${esc(o.symbol)} option surface</b><br><span class="muted">btc-vrp-listed-options, step 1</span></td><td>${o.days} days</td><td class="l">${esc(o.first)} .. ${esc(o.last)}</td><td class="l">IV30 ${o.iv30!=null?(100*o.iv30).toFixed(1)+"%":"–"}, RV20 ${o.rv20!=null?(100*o.rv20).toFixed(1)+"%":"–"}, IV−RV ${o.iv_minus_rv20!=null?(o.iv_minus_rv20>=0?"+":"")+(100*o.iv_minus_rv20).toFixed(1)+" pts":"–"}; gate ${o.gate_open==null?"–":o.gate_open?"open":"shut"} (${o.gate_open_days}/${o.gated_days} days open)</td></tr>`)}
+ else rows.push(`<tr><td class="l"><b>${esc(o.symbol||"IBIT")} option surface</b></td><td>0 days</td><td class="l" colspan="2">no snapshot yet</td></tr>`);
+ for(const [t,h] of Object.entries(R.kalshi_hourly||{}))rows.push(`<tr><td class="l"><b>${esc(t)} hourly</b><br><span class="muted">cross-asset follow-up</span></td><td>${h.rows} bars</td><td class="l" colspan="2">last ${esc(h.last||"–")}</td></tr>`);
+ const d=R.divergence_oos;if(d){const q=d.qualifying||{};rows.push(`<tr><td class="l"><b>divergence catch-up, out of sample</b><br><span class="muted">divergence-catchup-btc</span></td><td>${q.n||0} of ${d.target_days}</td><td class="l">${esc(d.first||"–")} .. ${esc(d.last||"–")}, ${d.days_tracked} sessions, ${d.pending} pending</td><td class="l">${q.n?`mean next-24h ${(q.mean>=0?"+":"")+(100*q.mean).toFixed(2)}%${q.t!=null?", t "+q.t.toFixed(1):""}; `:""}status <span class="chip ${d.verdict==="killed"?"bad":d.verdict==="alive"?"good":""}">${esc(d.verdict)}</span></td></tr>`)}
+ el.innerHTML=`<table><thead><tr><th class="l">series</th><th>size</th><th class="l">range</th><th class="l">latest</th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
+}
 function lab(){
  const order={alive:0,adopted:1,inconclusive:2,killed:3};const rows=(S.registry||[]).slice().sort((a,b)=>(order[a.verdict]??9)-(order[b.verdict]??9));
  document.getElementById("lab").innerHTML=`<table><thead><tr><th>id</th><th>verdict</th><th>trials</th><th>DSR / PSR</th><th class="l">result</th></tr></thead><tbody>`+
   rows.map(r=>`<tr><td class="l"><b>${esc(r.id)}</b><br><span class="muted">${esc(r.title)}</span></td><td><span class="chip ${r.verdict==="killed"?"bad":r.verdict==="alive"||r.verdict==="adopted"?"good":"warn"}">${esc(r.verdict)}</span></td><td>${r.trials_run??"–"}</td><td>${r.dsr!=null?Number(r.dsr).toFixed(2):r.psr!=null?Number(r.psr).toFixed(2):"–"}</td><td class="l muted">${esc(r.result)}</td></tr>`).join("")+`</tbody></table>`;
 }
 async function tick(){try{const r=await fetch("api/desk",{headers:H});if(!r.ok){document.getElementById("sub").textContent="token rejected; open the URL from the desk log";return}S=await r.json();
- kpis();alloc();strategies();chart();lab();const tune=Object.entries(S.tuning||{}).map(([n,t])=>`IOC limit ${n}: ${(100*t.limit).toFixed(2)}% — ${t.reason}`).join("\n");
+ kpis();alloc();strategies();chart();research();lab();const tune=Object.entries(S.tuning||{}).map(([n,t])=>`IOC limit ${n}: ${(100*t.limit).toFixed(2)}% — ${t.reason}`).join("\n");
  document.getElementById("exec").textContent=(S.execution_text||"no real fills yet")+(tune?"\n"+tune:"");
  document.getElementById("alerts").innerHTML=(S.alerts||[]).slice().reverse().map(a=>`<div class="alert"><span class="muted">${when(a.ts)}</span> ${esc(a.text)}</div>`).join("")||`<span class="muted">nothing yet</span>`;
 }catch(e){document.getElementById("sub").textContent="desk unreachable: "+e}}

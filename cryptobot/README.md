@@ -1143,8 +1143,12 @@ history, so the desk collects it once a day after the US close
 from Cboe's delayed chain (30-day ATM implied vol, 25-delta put and
 call vol, spreads, realised vol) for the Bitcoin volatility-premium
 test, and the Kalshi BTC/ETH/US500 perps' hourly candles for the
-intraday lead-lag follow-up. Rows accumulate in `state/options/` and
-`state/kalshi_hourly/` inside the Docker volume. By hand:
+intraday lead-lag follow-up, plus the out-of-sample tracker for the
+divergence catch-up rule (`cryptobot.oos_track`: every S&P session
+since 2026-10-10 with its class and the BTC return that followed). Rows
+accumulate in `state/options/`, `state/kalshi_hourly/` and `state/oos/`
+inside the Docker volume, and the dashboard's "Research data" card
+shows what each holds. By hand:
 
 ```bash
 python -m cryptobot.vrp_collect --state state            # one snapshot of both

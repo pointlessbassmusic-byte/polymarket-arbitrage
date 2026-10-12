@@ -539,11 +539,11 @@
   claim: "After a US session in which the S&P 500 rose more than 0.5% while BTC (16:00-16:00 ET) fell more than 0.5%, BTC's next 24 hours from the US close return more than the 8 bp round trip on the Kalshi BTC perp, on average, because the crypto leg lags the risk-on move rather than disagreeing with it."
   test: "Out-of-sample only: US business days after 2026-10-09, the same definitions as cross-asset-crypto-leadlag (FRED SP500, Coinbase hourly BTC at 16:00 ET), 8 bp cost; nothing before that date counts because the rule was found in it."
   success: "Written before running: at least 60 qualifying days after 2026-10-09 with mean next-24h BTC return >= +0.30% net and t >= 2.0, and the mirror case (stocks down, BTC up) not negative; otherwise killed. Not traded before that; the in-sample +0.41% (t 1.5) does not meet the registry's bar."
-  data: "cryptobot.crossasset_study rows filtered to day > 2026-10-09"
-  result: "PRE-REGISTERED 2026-10-09; waiting for out-of-sample days (about 15-20 qualifying days a year at the 0.5% threshold, so 3-4 years at the current rate)"
+  data: "state/oos/divergence.jsonl: one row per S&P session from 2026-10-10 (FRED SP500 close-to-close, Coinbase hourly BTC at 16:00 ET, the class, the next-24h BTC return once its print exists), kept by cryptobot.oos_track inside the desk's daily collector run"
+  result: "PRE-REGISTERED 2026-10-09; tracker running since 2026-10-12. About 15-20 qualifying days a year at the 0.5% threshold, so 3-4 years to the 60-day bar; the dashboard's research card shows the count"
   verdict: inconclusive
-  regime: "to be run"
-  rerun: "python -m cryptobot.crossasset_study --dir xasset (section 4, 2026-10-10 onward)"
+  regime: "collecting out of sample"
+  rerun: "python -m cryptobot.oos_track --state state --report"
   preregistered: true
   trials_run: 1
 

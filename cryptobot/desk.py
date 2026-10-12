@@ -187,6 +187,7 @@ class Desk:
         self.tuner = ExecTuner(TunerConfig(**tkw), Path(state_dir) / TUNE_FILE if state_dir else None)
         self.tuning: dict = {}
         self._overdue_noted: set = set()
+        self._research_cache: tuple[float, Optional[dict]] = (-1.0, None)
 
     def registry(self) -> list[dict]:
         """hypotheses.yaml, re-read only when its mtime changes."""
@@ -349,7 +350,24 @@ class Desk:
         out["registry"] = [{"id": r["id"], "verdict": r["verdict"], "title": r["title"],
                             "result": str(r["result"])[:220], "dsr": r.get("dsr"), "psr": r.get("psr"),
                             "trials_run": r.get("trials_run")} for r in self.registry()]
+        out["research"] = self.research()
         return out
+
+    def research(self, max_age_s: float = 60.0) -> Optional[dict]:
+        """Collector and out-of-sample tracker status, read from state."""
+        if not self.state_dir:
+            return None
+        ts, cached = self._research_cache
+        if cached is not None and time.time() - ts < max_age_s:
+            return cached
+        try:
+            from .vrp_collect import status
+            cached = status(Path(self.state_dir))
+        except Exception as exc:                  # noqa: BLE001
+            logger.warning("research status unavailable: %s", exc)
+            cached = None
+        self._research_cache = (time.time(), cached)
+        return cached
 
 
 async def allocation_loop(desk: Desk, every_s: int = 3600) -> None:
