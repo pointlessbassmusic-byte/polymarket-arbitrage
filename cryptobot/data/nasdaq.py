@@ -64,9 +64,15 @@ def parse_closes(payload: dict) -> list[tuple[dt.date, float]]:
 
 
 def payload_ok(payload: dict) -> bool:
-    """Nasdaq answers 200 with data=null when it throttles or does not
-    know the symbol; such a payload must not be stored as 'empty'."""
-    return isinstance(payload, dict) and payload.get("data") is not None
+    """Nasdaq answers HTTP 200 with data=null in two cases that must be
+    told apart by the body's own rCode: 200 means a genuinely empty
+    answer (a market holiday's calendar, a symbol with no rows), anything
+    else is a throttle or an unknown symbol and must not be stored."""
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("data") is not None:
+        return True
+    return ((payload.get("status") or {}).get("rCode")) == 200
 
 
 # -- JSON lines, used by every collector --------------------------------------

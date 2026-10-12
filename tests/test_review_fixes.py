@@ -25,6 +25,7 @@ def test_nasdaq_money_handles_display_strings():
     assert N.parse_closes({"data": {"tradesTable": {"rows": [{"date": "10/09/2026", "close": "$1.5"}]}}}) == \
         [(dt.date(2026, 10, 9), 1.5)]
     assert not N.payload_ok({"data": None, "status": {"rCode": 400}}) and N.payload_ok({"data": {"rows": []}})
+    assert N.payload_ok({"data": None, "status": {"rCode": 200}})          # a holiday: empty, not throttled
 
 
 def test_weekend_and_stale_quotes_are_never_stored(tmp_path):
