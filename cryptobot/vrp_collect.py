@@ -167,12 +167,26 @@ from .data.nasdaq import append_jsonl, read_jsonl  # noqa: E402 (shared by every
 
 # ------------------------------------------------------------- collectors
 
+from zoneinfo import ZoneInfo  # noqa: E402
+
+ET = ZoneInfo("America/New_York")
+CLOSE_MINUTES = 16 * 60 + 5                        # 16:05 New York: the closing prints are in
+
+
+def market_closed_for_today(now: Optional[dt.datetime] = None) -> bool:
+    """True once today's regular session is over (or it is a weekend), so
+    a snapshot taken now stores the day's close, not an intraday print."""
+    t = (now or dt.datetime.now(dt.timezone.utc)).astimezone(ET)
+    return t.weekday() >= 5 or (t.hour * 60 + t.minute) >= CLOSE_MINUTES
+
+
 class Collector:
     def __init__(self, state_dir: Path, client: Optional[httpx.AsyncClient] = None, symbol: str = "IBIT",
-                 gate_vol_points: float = 5.0):
+                 gate_vol_points: float = 5.0, now: Optional[callable] = None):
         self.state = Path(state_dir)
         self.symbol = symbol
         self.gate = gate_vol_points
+        self._now = now or (lambda: dt.datetime.now(dt.timezone.utc))
         self._c = client or httpx.AsyncClient(timeout=60, headers=UA, follow_redirects=True)
         self._owns = client is None
 
@@ -225,8 +239,13 @@ class Collector:
 
     async def options_snapshot(self, asof: Optional[dt.date] = None, chain: Optional[dict] = None) -> Optional[dict]:
         """One row for `asof` (today), skipped if that day is already stored."""
-        asof = asof or dt.date.today()
+        now = self._now()
+        asof = asof or now.astimezone(ET).date()
         if any(r.get("date") == asof.isoformat() for r in read_jsonl(self.options_file)):
+            return None
+        if asof == now.astimezone(ET).date() and not market_closed_for_today(now):
+            logger.info("%s: session still open at %s ET; the snapshot waits for the close",
+                        self.symbol, now.astimezone(ET).strftime("%H:%M"))
             return None
         chain = chain or await self._get_json(CBOE_URL.format(symbol=self.symbol))
         qd = quote_date(chain) if isinstance(chain, dict) else None

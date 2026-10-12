@@ -29,7 +29,7 @@ def test_nasdaq_money_handles_display_strings():
 
 def test_weekend_and_stale_quotes_are_never_stored(tmp_path):
     fake = FakeClient(_chain(), _closes_payload(), [])
-    c = V.Collector(tmp_path, client=fake)
+    c = V.Collector(tmp_path, client=fake, now=lambda: dt.datetime(2026, 10, 12, 21, 15, tzinfo=dt.timezone.utc))
     assert asyncio.run(c.options_snapshot(dt.date(2026, 10, 10))) is None          # Saturday
     assert not c.options_file.exists() and not c.closes_file.exists()
     stale = {"timestamp": "2026-10-09T20:00:00", "data": _chain(asof=dt.date(2026, 10, 12))}

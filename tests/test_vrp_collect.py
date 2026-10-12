@@ -97,7 +97,8 @@ def test_snapshot_writes_once_per_day_and_gates_on_iv_minus_rv(tmp_path):
     candles = [{"end_period_ts": 1_000_000 + 3600 * i, "price": {"open": "1", "high": "1", "low": "1", "close": "1"},
                 "volume": "5"} for i in range(3)]
     fake = FakeClient(_chain(), _closes_payload(), candles)
-    c = V.Collector(tmp_path, client=fake, symbol="IBIT")
+    after_close = dt.datetime(2026, 10, 12, 21, 15, tzinfo=dt.timezone.utc)
+    c = V.Collector(tmp_path, client=fake, symbol="IBIT", now=lambda: after_close)
     asof = dt.date(2026, 10, 12)
     row = asyncio.run(c.options_snapshot(asof))
     assert row and row["date"] == "2026-10-12" and row["iv30_cboe"] == pytest.approx(0.364)
@@ -123,3 +124,18 @@ def test_run_once_survives_a_failing_source(tmp_path):
     c = V.Collector(tmp_path, client=Boom(_chain(), _closes_payload(), []))
     out = asyncio.run(c.run_once())
     assert out["options"].startswith("ERROR") and out["kalshi_hourly"]
+
+
+def test_snapshot_waits_for_the_close_on_a_trading_day(tmp_path):
+    fake = FakeClient(_chain(), _closes_payload(), [])
+    mid_session = dt.datetime(2026, 10, 12, 15, 0, tzinfo=dt.timezone.utc)      # 11:00 New York
+    c = V.Collector(tmp_path, client=fake, now=lambda: mid_session)
+    assert asyncio.run(c.options_snapshot()) is None and not c.options_file.exists()
+    assert not V.market_closed_for_today(mid_session)
+    assert V.market_closed_for_today(dt.datetime(2026, 10, 12, 20, 6, tzinfo=dt.timezone.utc))   # 16:06 New York (EDT)
+    assert V.market_closed_for_today(dt.datetime(2026, 10, 10, 15, 0, tzinfo=dt.timezone.utc))   # Saturday
+    # yesterday's date can be stored at any hour (a catch-up run); the quote date must still match
+    old_chain = {"timestamp": "2026-10-09T20:05:00", "data": _chain(asof=dt.date(2026, 10, 9))}
+    row = asyncio.run(c.options_snapshot(dt.date(2026, 10, 9), chain=old_chain))
+    assert row and row["date"] == "2026-10-09"
+
