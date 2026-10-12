@@ -47,18 +47,9 @@ VARIANTS = ("all nights", "skip Fri->Mon", "Mon->Tue only")
 # ------------------------------------------------------------------ loading
 
 def load_nasdaq(path: Path) -> list[dict]:
-    d = json.loads(Path(path).read_text())
-    rows = []
-    for r in (d.get("data") or {}).get("tradesTable", {}).get("rows", []):
-        try:
-            day = dt.datetime.strptime(r["date"], "%m/%d/%Y").date()
-            o, c = float(str(r["open"]).replace(",", "")), float(str(r["close"]).replace(",", ""))
-        except (KeyError, ValueError):
-            continue
-        if o > 0 and c > 0:
-            rows.append({"day": day, "open": o, "close": c, "adj": None})
-    rows.sort(key=lambda r: r["day"])
-    return rows
+    from .data.nasdaq import parse_history
+    return [{"day": dt.date.fromisoformat(r["date"]), "open": r["open"], "close": r["close"], "adj": None}
+            for r in parse_history(json.loads(Path(path).read_text()))]
 
 
 def load_eodhd(path: Path) -> list[dict]:

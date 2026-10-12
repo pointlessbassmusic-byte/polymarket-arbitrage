@@ -111,7 +111,7 @@ def signal_on(y_log: list[float], x_log: list[float], rule: PairRule) -> dict | 
     m, sd = statistics.fmean(zw), statistics.pstdev(zw)
     if sd <= 0:
         return None
-    return {"alpha": alpha, "beta": beta, "z": (e[-1] - m) / sd, "adf_t": adf_t(e), "sd": sd}
+    return {"alpha": alpha, "beta": beta, "z": (e[-1] - m) / sd, "adf_t": adf_t(e), "sd": sd, "mean": m}
 
 
 def spread_z(y_log_now: float, x_log_now: float, sig: dict) -> float:
@@ -180,9 +180,6 @@ def simulate(closes: dict[str, dict[int, float]], funding: dict[str, dict[int, f
             continue
         # z > 0: y is rich -> short y, long x
         side_y = -1.0 if sig["z"] > 0 else 1.0
-        w = rule.beta_window
-        _a, _b, e = ols(y_log[i + 1 - w: i + 1], x_log[i + 1 - w: i + 1])
-        sig["mean"] = statistics.fmean(e[-rule.z_window:])
         open_pos = {"pair": f"{y}/{x}", "entry_day": d, "prev_day": d, "side_y": side_y, "entry_z": sig["z"],
                     "beta": sig["beta"], "adf_t": sig["adf_t"], "sig": sig, "days": 0,
                     "gross": 0.0, "funding": 0.0, "fees": 2 * cost_exec}

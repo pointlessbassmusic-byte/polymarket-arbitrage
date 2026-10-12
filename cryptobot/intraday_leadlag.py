@@ -92,16 +92,25 @@ def follow_rule(rows: list[dict], session: str = "closed", cost_rt: float = COST
                 threshold: float = 0.001) -> dict:
     """Long (short) the US500 perp for the next hour when BTC's hourly
     return exceeds +threshold (-threshold), cash market closed only."""
-    sub = [r for r in rows if (r["open"] if session == "open" else not r["open"])]
+    in_session = (lambda r: r["open"]) if session == "open" else (lambda r: not r["open"])
     pnl = []
     pos_prev = 0.0
-    for r in sub:
+    trades = 0
+    for r in rows:
+        # flat whenever the hour is outside the traded session (and after
+        # any gap in the data), so every evening starts from zero
+        if not in_session(r):
+            if pos_prev:
+                pnl.append(-abs(pos_prev) * cost_rt / 2)
+            pos_prev = 0.0
+            continue
         pos = 1.0 if r["ra"] > threshold else -1.0 if r["ra"] < -threshold else 0.0
+        trades += pos != 0.0
         pnl.append(pos * r["rb_next"] - abs(pos - pos_prev) * cost_rt / 2)
         pos_prev = pos
-    trades = sum(1 for r in sub if abs(r["ra"]) > threshold)
-    hrs = len(pnl)
-    sd = statistics.pstdev(pnl) if hrs > 2 else 0.0
+    sub = [r for r in rows if in_session(r)]
+    hrs = len(sub)
+    sd = statistics.pstdev(pnl) if len(pnl) > 2 else 0.0
     return {"hours": hrs, "trades": trades, "mean_bp": statistics.fmean(pnl) * 1e4 if pnl else 0.0,
             "sharpe": statistics.fmean(pnl) / sd * math.sqrt(24 * 365) if sd > 0 else 0.0,
             "psr": S.psr(pnl) if hrs > 2 else 0.0, "total": sum(pnl)}
@@ -120,10 +129,11 @@ def run(btc: dict[int, float], us500: dict[int, float]) -> dict:
     f = out["follow_closed"]
     if not out["enough"]:
         out["verdict"] = ("collecting", f"{len(rows)} shared hours, {MIN_HOURS} needed")
-    elif lead and lead["t"] >= 2.5 and f["mean_bp"] > 0 and f["psr"] >= 0.95:
+    elif lead and abs(lead["t"]) >= 2.5 and lead["beta"] > 0 and f["mean_bp"] > 0 and f["psr"] >= 0.95:
         out["verdict"] = ("candidate", "BTC leads the US500 perp off-session and the follow rule is net positive")
-    elif lead and lead["t"] >= 2.5:
-        out["verdict"] = ("inconclusive", "a lead in the regression that the follow rule does not keep after costs")
+    elif lead and abs(lead["t"]) >= 2.5:
+        out["verdict"] = ("inconclusive", "a lead in the regression (sign %s) that the pre-registered follow rule does not keep after costs"
+                          % ("+" if lead["beta"] > 0 else "-"))
     else:
         out["verdict"] = ("killed", "no off-session lead at |t| >= 2.5")
     return out

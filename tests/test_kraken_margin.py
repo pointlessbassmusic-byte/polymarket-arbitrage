@@ -23,8 +23,9 @@ TICKER = {"XDGUSD": ("0.0853", "0.0854"), "PEPEUSD": ("0.000003950", "0.00000396
 
 
 class FakeKraken:
-    def __init__(self, fill_ratio=1.0, fee="0.05", error=None):
+    def __init__(self, fill_ratio=1.0, fee="0.05", error=None, position_vol=1170.0):
         self.fill_ratio, self.fee, self.error = fill_ratio, fee, error
+        self.position_vol = position_vol       # what a volume-0 "close the position" order fills
         self.private = []          # (method, body)
         self.orders = {}
 
@@ -50,7 +51,8 @@ class FakeKraken:
             if body.get("validate") == "true":
                 return httpx.Response(200, json={"error": [], "result": {"descr": {"order": "ok"}}})
             txid = f"O{len(self.orders) + 1}"
-            self.orders[txid] = {"status": "closed", "vol_exec": str(float(body["volume"]) * self.fill_ratio),
+            vol = float(body["volume"]) or self.position_vol
+            self.orders[txid] = {"status": "closed", "vol_exec": str(vol * self.fill_ratio),
                                  "price": body["price"], "fee": self.fee}
             return httpx.Response(200, json={"error": [], "result": {"txid": [txid]}})
         if method == "QueryOrders":
@@ -113,15 +115,15 @@ def test_leverage_is_clamped_to_us_maximum_and_kraken_minimum(monkeypatch):
     assert ex._leverage_for("DOGE") == 2
 
 
-def test_close_is_a_reduce_only_buy(monkeypatch):
-    api = FakeKraken()
+def test_close_is_a_reduce_only_buy_of_the_whole_position(monkeypatch):
+    api = FakeKraken(position_vol=1170.0)
     ex = _ex(monkeypatch, api)
-    fill = asyncio.run(ex.close("DOGE", 1170.0, 0.08535))
+    fill = asyncio.run(ex.close("DOGE", 1169.99, 0.08535))        # a stale qty cannot leave dust behind
     _, body = api.private[0]
     assert body["type"] == "buy" and body["reduce_only"] == "true" and body["pair"] == "XDGUSD"
-    assert float(body["volume"]) == pytest.approx(1170.0)
+    assert body["volume"] == "0"                                    # Kraken: close the margin position in full
     assert float(body["price"]) == pytest.approx(0.08535 * 1.005, abs=1e-7)
-    assert fill.side == "close" and fill.qty == pytest.approx(1170.0)
+    assert fill.side == "close" and fill.qty == pytest.approx(1170.0)   # what the venue reports filled
 
 
 def test_below_minimum_raises_without_sending(monkeypatch):

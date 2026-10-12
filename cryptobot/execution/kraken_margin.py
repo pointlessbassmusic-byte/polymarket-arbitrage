@@ -149,18 +149,19 @@ class KrakenMarginExecutor(KrakenSpotExecutor):
         return await self._margin_order(coin, info, body, "short")
 
     async def close(self, coin: str, qty: float, mid: float) -> Fill:   # type: ignore[override]
-        """Buy back a short: reduce-only, so a stale state file can only
-        flatten, never open a long."""
+        """Buy back the short. Volume 0 is Kraken's own form for "close
+        the margin position on this pair in full", so rounding, dust under
+        the order minimum and a stale state file cannot leave a remainder
+        open; reduce_only makes it impossible to flip long."""
         info = await self._pair_info(coin)
         k = units(coin)
-        vol = round(abs(qty) * k, info["lot_decimals"])
         base_px = mid / k
         limit = _ceil_to(base_px * (1.0 + self.mcfg.max_slippage), info["pair_decimals"])
         if not self._armed:
-            logger.info("DRY-RUN kraken margin close %s %s", info["name"], vol)
+            logger.info("DRY-RUN kraken margin close %s (whole position, ~%s coins)", info["name"], abs(qty) * k)
             return Fill(coin, "close", abs(qty), mid, dry_run=True)
         body = {"pair": info["name"], "type": "buy", "ordertype": "limit",
-                "price": f"{limit:.{info['pair_decimals']}f}", "volume": f"{vol:.{info['lot_decimals']}f}",
+                "price": f"{limit:.{info['pair_decimals']}f}", "volume": "0",
                 "leverage": str(self._leverage_for(coin)), "timeinforce": "IOC", "reduce_only": "true"}
         return await self._margin_order(coin, info, body, "close")
 

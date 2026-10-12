@@ -41,12 +41,11 @@ class OrbRule:
     target_r: float = 10.0
     risk_per_day: float = 0.01
     max_leverage: float = 4.0
-    bar_minutes: int = 5
 
 
 # ------------------------------------------------------------------ sessions
 
-def sessions(bars: list[Candle], bar_minutes: int = 5) -> dict[dt.date, list[Candle]]:
+def sessions(bars: list[Candle]) -> dict[dt.date, list[Candle]]:
     """Regular-hours bars (09:30-16:00 New York) grouped by session date,
     sorted; a session needs its 09:30 bar to count."""
     out: dict[dt.date, list[Candle]] = {}
@@ -126,7 +125,7 @@ def simulate_day(bars: list[Candle], atr_today: float, rule: OrbRule, slip: floa
 
 def run(bars: list[Candle], rule: OrbRule = OrbRule(), slip: float = 0.01, capital: float = 25_000.0,
         compound: bool = False) -> dict:
-    sess = sessions(bars, rule.bar_minutes)
+    sess = sessions(bars)
     daily = daily_ohlc(sess)
     atrs = atr(daily, rule.atr_days)
     trades = []
@@ -153,7 +152,7 @@ def summarize(trades: list[dict], capital: float) -> dict:
         y["net_pct"] += t["net_pct"]
         y["gross_pct"] += t["gross"] / capital
         y["wins"] += t["net"] > 0
-    years = len({t["day"].year for t in trades}) or 1
+    years = max((trades[-1]["day"] - trades[0]["day"]).days, 1) / 365.25 if len(trades) > 1 else 1.0
     sd = statistics.pstdev(rets) if len(rets) > 2 else 0.0
     return {"trades": len(trades), "by_year": by_year,
             "mean_r": statistics.fmean(t["r"] for t in trades) if trades else 0.0,
@@ -165,7 +164,7 @@ def summarize(trades: list[dict], capital: float) -> dict:
             "net_2023_on": sum(y["net_pct"] for yr, y in by_year.items() if yr >= 2023)}
 
 
-def passes(m: dict, cheap_slip_result: dict | None = None) -> tuple[str, str]:
+def passes(m: dict) -> tuple[str, str]:
     """Written before running: net Sharpe > 0.5 at 1 c/share with PSR >= 0.95
     over 2016-2026 and net positive in 2023-2026 keeps the family open;
     net <= 0 at 1 c/share kills the QQQ version."""

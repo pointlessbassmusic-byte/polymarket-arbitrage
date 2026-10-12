@@ -32,33 +32,9 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-CAL_URL = "https://api.nasdaq.com/api/calendar/earnings"
-HIST_URL = "https://api.nasdaq.com/api/quote/{symbol}/historical"
-UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-      "Accept": "application/json", "Accept-Language": "en-US,en;q=0.9"}
+from .data.nasdaq import CAL_URL, HEADERS as UA, HIST_URL, append_jsonl, money as _money, parse_history, payload_ok, read_jsonl  # noqa: E402,F401
 
-
-def _money(s) -> Optional[float]:
-    """'$1.72' -> 1.72, '($0.13)' -> -0.13, '' -> None."""
-    if s in (None, "", "N/A"):
-        return None
-    t = str(s).replace("$", "").replace(",", "").strip()
-    neg = t.startswith("(") and t.endswith(")")
-    t = t.strip("()")
-    try:
-        v = float(t)
-    except ValueError:
-        return None
-    return -v if neg else v
-
-
-def _num(s) -> Optional[float]:
-    if s in (None, "", "N/A"):
-        return None
-    try:
-        return float(str(s).replace(",", "").replace("%", ""))
-    except ValueError:
-        return None
+_num = _money
 
 
 def parse_calendar(payload: dict, day: dt.date) -> list[dict]:
@@ -75,33 +51,6 @@ def parse_calendar(payload: dict, day: dt.date) -> list[dict]:
     return rows
 
 
-def parse_history(payload: dict) -> list[dict]:
-    out = []
-    for r in ((payload.get("data") or {}).get("tradesTable") or {}).get("rows") or []:
-        try:
-            day = dt.datetime.strptime(r["date"], "%m/%d/%Y").date()
-        except (KeyError, ValueError):
-            continue
-        o, c = _money(r.get("open")), _money(r.get("close"))
-        if o and c and o > 0 and c > 0:
-            out.append({"date": day.isoformat(), "open": o, "close": c,
-                        "high": _money(r.get("high")), "low": _money(r.get("low")),
-                        "volume": _num(r.get("volume"))})
-    out.sort(key=lambda x: x["date"])
-    return out
-
-
-def read_jsonl(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    out = []
-    for line in path.read_text().splitlines():
-        if line.strip():
-            try:
-                out.append(json.loads(line))
-            except ValueError:
-                continue
-    return out
 
 
 class PeadCollector:
@@ -129,17 +78,24 @@ class PeadCollector:
         with p.open("a") as f:
             f.write(day.isoformat() + "\n")
 
-    async def _get(self, url: str, params: Optional[dict] = None, tries: int = 4) -> dict:
+    async def _get(self, url: str, params: Optional[dict] = None, tries: int = 5) -> dict:
+        """A payload with data=null (Nasdaq's throttle and unknown-symbol
+        answer) counts as a failure and is retried with backoff."""
         last: Exception | None = None
         for i in range(tries):
             try:
                 r = await self._c.get(url, params=params)
                 if r.status_code == 200:
-                    return r.json()
-                last = RuntimeError(f"{url.split('?')[0]} -> {r.status_code}")
+                    payload = r.json()
+                    if payload_ok(payload):
+                        return payload
+                    code = ((payload.get("status") or {}).get("rCode") if isinstance(payload, dict) else None)
+                    last = RuntimeError(f"{url.split('?')[0]} -> data=null (rCode {code})")
+                else:
+                    last = RuntimeError(f"{url.split('?')[0]} -> {r.status_code}")
             except Exception as exc:              # noqa: BLE001
                 last = exc
-            await asyncio.sleep(self.pause * (2 ** i))
+            await asyncio.sleep(max(self.pause, 0.5) * (2 ** i))
         raise RuntimeError(f"gave up: {last}")
 
     async def calendar(self, start: dt.date, end: dt.date, log_every: int = 50) -> int:
@@ -166,6 +122,17 @@ class PeadCollector:
             day += dt.timedelta(days=1)
         return added
 
+    def empty_days(self) -> list[str]:
+        """Weekdays marked done with no rows: holidays, or days a throttled
+        answer was once mistaken for an empty calendar. `--refetch-empty`
+        fetches them again; a real holiday just comes back empty."""
+        have = {r["date"] for r in read_jsonl(self.calendar_file)}
+        return sorted(d for d in self.days_done() if d not in have)
+
+    def unmark_days(self, days: list[str]) -> None:
+        keep = [d for d in sorted(self.days_done()) if d not in set(days)]
+        (self.state / "calendar_days.txt").write_text("".join(d + "\n" for d in keep))
+
     def symbols_needed(self, min_estimates: int = 3, max_cap: Optional[float] = None) -> list[str]:
         syms = set()
         for r in read_jsonl(self.calendar_file):
@@ -188,11 +155,11 @@ class PeadCollector:
                 payload = await self._get(HIST_URL.format(symbol=sym),
                                           {"assetclass": "stocks", "fromdate": start.isoformat(),
                                            "todate": end.isoformat(), "limit": 9999})
-                rows = parse_history(payload)
             except Exception as exc:              # noqa: BLE001
-                logger.warning("prices %s: %s", sym, exc)
-                rows = []
-            p.write_text(json.dumps(rows))
+                logger.warning("prices %s: %s (will retry on the next run)", sym, exc)
+                await asyncio.sleep(self.pause)
+                continue                          # nothing written: a rerun fetches it again
+            p.write_text(json.dumps(parse_history(payload)))   # [] only when Nasdaq really has no rows
             got += 1
             if i % log_every == 0:
                 logger.info("prices: %d of %d symbols", i, len(symbols))
@@ -209,6 +176,7 @@ def main(argv=None) -> int:
     ap.add_argument("--min-estimates", type=int, default=3)
     ap.add_argument("--max-cap", type=float, default=None, help="only symbols at or under this market cap (USD)")
     ap.add_argument("--pause", type=float, default=0.3)
+    ap.add_argument("--refetch-empty", action="store_true", help="calendar: fetch again the days that came back empty")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -216,6 +184,10 @@ def main(argv=None) -> int:
         c = PeadCollector(a.state, pause_s=a.pause)
         try:
             if a.what == "calendar":
+                if a.refetch_empty:
+                    empty = c.empty_days()
+                    c.unmark_days(empty)
+                    print(f"refetching {len(empty)} empty days")
                 n = await c.calendar(dt.date.fromisoformat(a.start), dt.date.fromisoformat(a.end))
                 print(f"calendar: {n} rows added; {len(read_jsonl(c.calendar_file))} on file")
             else:

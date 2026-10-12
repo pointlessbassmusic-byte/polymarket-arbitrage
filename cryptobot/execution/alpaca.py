@@ -203,12 +203,15 @@ class AlpacaExecutor:
                           fallback_px: float, first: Optional[dict] = None) -> Fill:
         d = first or {}
         for i in range(self.cfg.fill_polls):
-            if d.get("status") in TERMINAL or (i and d.get("status") == "partially_filled"):
-                break
+            if d.get("status") in TERMINAL:
+                break                                  # partially_filled is transient for an IOC: keep polling
             if i:
                 await asyncio.sleep(self.cfg.fill_poll_s)
             d = await self._request("GET", f"/v2/orders/{order_id}") if order_id else d
         filled = _f(d.get("filled_qty"))
+        if d.get("status") not in TERMINAL:
+            logger.warning("%s %s: order %s still %s after %d polls; recording %s filled so far",
+                           symbol, label, order_id, d.get("status"), self.cfg.fill_polls, filled)
         if filled <= 0:
             raise RuntimeError(f"{symbol} {label}: IOC order {order_id} did not fill (status {d.get('status')})")
         return Fill(symbol, label, filled, _f(d.get("filled_avg_price"), fallback_px), order_id=order_id)

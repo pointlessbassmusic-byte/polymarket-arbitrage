@@ -48,9 +48,7 @@ NASDAQ_URL = ("https://api.nasdaq.com/api/quote/{symbol}/historical?assetclass=e
               "&fromdate={start}&todate={end}&limit=9999")
 KALSHI_CANDLES = "https://external-api.kalshi.com/trade-api/v2/margin/markets/{ticker}/candlesticks"
 KALSHI_TICKERS = ("KXBTCPERP", "KXUS500PERP", "KXETHPERP")
-# Nasdaq's edge drops connections from non-browser agents; Cboe and Kalshi do not care.
-UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-      "Accept": "application/json", "Accept-Language": "en-US,en;q=0.9"}
+from .data.nasdaq import HEADERS as UA  # noqa: E402  (Nasdaq drops non-browser agents; Cboe and Kalshi do not care)
 
 
 # ------------------------------------------------------------- option chain
@@ -140,36 +138,31 @@ def realised_vol(closes: list[float], window: int) -> Optional[float]:
 
 
 def parse_nasdaq_closes(payload: dict) -> list[tuple[dt.date, float]]:
-    rows = []
-    for r in (payload.get("data") or {}).get("tradesTable", {}).get("rows", []):
+    from .data.nasdaq import parse_closes
+    return parse_closes(payload)
+
+
+def quote_date(chain: dict) -> Optional[dt.date]:
+    """The trading day the chain's quotes belong to: the wrapper's
+    timestamp, else the latest option trade time."""
+    for src in (chain.get("timestamp"), ):
+        if src:
+            try:
+                return dt.datetime.fromisoformat(str(src).replace("Z", "+00:00")).date()
+            except ValueError:
+                pass
+    times = [o.get("last_trade_time") for o in (chain.get("data") or chain).get("options", []) if o.get("last_trade_time")]
+    if times:
         try:
-            rows.append((dt.datetime.strptime(r["date"], "%m/%d/%Y").date(),
-                         float(str(r["close"]).replace(",", "").lstrip("$"))))
-        except (KeyError, ValueError):
-            continue
-    return sorted(rows)
+            return dt.datetime.fromisoformat(max(times)).date()
+        except ValueError:
+            return None
+    return None
 
 
 # ------------------------------------------------------------- storage
 
-def read_jsonl(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    out = []
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if line:
-            try:
-                out.append(json.loads(line))
-            except ValueError:
-                continue
-    return out
-
-
-def append_jsonl(path: Path, row: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as f:
-        f.write(json.dumps(row, default=str) + "\n")
+from .data.nasdaq import append_jsonl, read_jsonl  # noqa: E402 (shared by every collector)
 
 
 # ------------------------------------------------------------- collectors
@@ -236,8 +229,15 @@ class Collector:
         if any(r.get("date") == asof.isoformat() for r in read_jsonl(self.options_file)):
             return None
         chain = chain or await self._get_json(CBOE_URL.format(symbol=self.symbol))
+        qd = quote_date(chain) if isinstance(chain, dict) else None
         if isinstance(chain, dict) and "data" in chain and "options" not in chain:
-            chain = chain["data"]                     # some Cboe responses wrap the quote
+            chain = chain["data"]                     # Cboe wraps the quote
+        # A weekend or holiday run sees the last session's quotes under
+        # today's date; storing them would duplicate that session in the
+        # surface history and put flat prints into the realised vol.
+        if asof.weekday() >= 5 or (qd is not None and qd != asof):
+            logger.info("%s: quotes are from %s, not %s; nothing stored", self.symbol, qd, asof)
+            return None
         surf = surface(chain, asof, self.symbol)
         if surf["spot"] <= 0 or not surf["expiries"]:
             raise RuntimeError(f"{self.symbol} chain had no usable quotes (spot {surf['spot']}, "

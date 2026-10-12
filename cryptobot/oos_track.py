@@ -146,7 +146,11 @@ def write_rows(state_dir: Path, rows: list[dict]) -> None:
     p.write_text("".join(json.dumps(r) + "\n" for r in rows))
 
 
-async def fetch_inputs(client: httpx.AsyncClient, days_back: int = 10) -> tuple[dict, dict]:
+REBUILD_DAYS = 12
+FETCH_DAYS = REBUILD_DAYS + 5          # each rebuilt day needs the previous session's 16:00 print too
+
+
+async def fetch_inputs(client: httpx.AsyncClient, days_back: int = FETCH_DAYS) -> tuple[dict, dict]:
     r = await client.get(FRED_URL)
     if r.status_code >= 400:
         raise RuntimeError(f"FRED SP500 -> {r.status_code}")
@@ -175,8 +179,12 @@ async def update(state_dir: Path, client: Optional[httpx.AsyncClient] = None) ->
     finally:
         if own:
             await c.aclose()
-    first_day = max(START, dt.date.today() - dt.timedelta(days=12))
+    first_day = max(START, dt.date.today() - dt.timedelta(days=REBUILD_DAYS))
     fresh = build_rows(spx, hourly, start=first_day)
+    expected = [d for d in spx if first_day <= d]
+    missing = sorted(set(d.isoformat() for d in expected) - {r["day"] for r in fresh})
+    if missing:
+        logger.warning("divergence tracker: no BTC print for %s", ", ".join(missing))
     rows = merge(read_rows(state_dir), fresh)
     write_rows(state_dir, rows)
     return summary(rows)
