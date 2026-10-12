@@ -43,10 +43,12 @@ def test_weekend_and_stale_quotes_are_never_stored(tmp_path):
 
 
 class ThrottledNasdaq:
-    """First N answers are Nasdaq's 200-with-data=null throttle."""
+    """First N answers are Nasdaq's 200-with-data=null throttle (rCode
+    other than 200/400); `unknown` makes every answer the definitive
+    rCode-400 'no such symbol'."""
 
-    def __init__(self, throttles: int, rows):
-        self.left, self.rows, self.calls = throttles, rows, 0
+    def __init__(self, throttles: int, rows, unknown: bool = False):
+        self.left, self.rows, self.calls, self.unknown = throttles, rows, 0, unknown
 
     async def get(self, url, params=None):
         self.calls += 1
@@ -59,9 +61,11 @@ class ThrottledNasdaq:
 
             def json(self):
                 return self._b
+        if self.unknown:
+            return R({"data": None, "status": {"rCode": 400, "bCodeMessage": [{"code": 1001}]}})
         if self.left > 0:
             self.left -= 1
-            return R({"data": None, "status": {"rCode": 400}})
+            return R({"data": None, "status": {"rCode": 500}})
         if "calendar" in url:
             return R({"data": {"rows": self.rows}})
         return R({"data": {"tradesTable": {"rows": self.rows}}})
@@ -134,3 +138,15 @@ def test_follow_rule_is_flat_through_the_session():
     assert f["hours"] == len(closed_hours) and f["trades"] == len(closed_hours)
     # two evenings' worth of entries plus the exits at each session open: more than one round trip
     assert f["total"] < -0.001 * 1.5
+
+
+def test_delisted_symbol_is_recorded_once_without_retries(tmp_path, monkeypatch):
+    async def nosleep(*_a, **_k):
+        return None
+    monkeypatch.setattr(asyncio, "sleep", nosleep)
+    fake = ThrottledNasdaq(0, [], unknown=True)
+    c = C.PeadCollector(tmp_path, client=fake, pause_s=0.0)
+    assert asyncio.run(c.prices(["GONE"])) == 1
+    assert (tmp_path / "earnings" / "prices" / "GONE.json").read_text() == "[]"
+    assert fake.calls == 1                                                   # no retry loop
+

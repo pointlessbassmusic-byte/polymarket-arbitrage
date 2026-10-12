@@ -53,6 +53,11 @@ def parse_calendar(payload: dict, day: dt.date) -> list[dict]:
 
 
 
+class UnknownSymbol(RuntimeError):
+    """Nasdaq's definitive 'no such symbol' (data=null with rCode 400):
+    a delisted name, not a throttle, so there is nothing to retry."""
+
+
 class PeadCollector:
     def __init__(self, state_dir: Path, client: Optional[httpx.AsyncClient] = None, pause_s: float = 0.3):
         self.state = Path(state_dir) / "earnings"
@@ -90,9 +95,13 @@ class PeadCollector:
                     if payload_ok(payload):
                         return payload
                     code = ((payload.get("status") or {}).get("rCode") if isinstance(payload, dict) else None)
+                    if code == 400:
+                        raise UnknownSymbol(f"{url.split('?')[0]} -> data=null (rCode 400)")
                     last = RuntimeError(f"{url.split('?')[0]} -> data=null (rCode {code})")
                 else:
                     last = RuntimeError(f"{url.split('?')[0]} -> {r.status_code}")
+            except UnknownSymbol:
+                raise                             # definitive: no retry
             except Exception as exc:              # noqa: BLE001
                 last = exc
             await asyncio.sleep(max(self.pause, 0.5) * (2 ** i))
@@ -159,6 +168,9 @@ class PeadCollector:
                     payload = await self._get(HIST_URL.format(symbol=sym),
                                               {"assetclass": "stocks", "fromdate": start.isoformat(),
                                                "todate": end.isoformat(), "limit": 9999})
+                except UnknownSymbol:
+                    (d / f"{sym}.json").write_text("[]")      # delisted: no history exists; counted as missing
+                    done["got"] += 1
                 except Exception as exc:          # noqa: BLE001
                     logger.warning("prices %s: %s (will retry on the next run)", sym, exc)
                 else:
