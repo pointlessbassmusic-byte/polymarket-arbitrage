@@ -69,20 +69,42 @@ def window_return(rows: list[dict], report_date: str, hold_days: int, cost_side:
             "net_long": gross - 2 * cost_side, "net_short": -gross - 2 * cost_side}
 
 
+def price_before(rows: list[dict], report_date: str) -> float | None:
+    """Last close on or before the report date."""
+    last = None
+    for r in rows:
+        if r["date"] > report_date:
+            break
+        last = r["close"]
+    return last
+
+
 def cohorts(cal: list[dict], min_estimates: int = 3, max_cap: float | None = None,
-            min_names: int = 20) -> dict[str, list[dict]]:
-    """Qualifying announcements by calendar month (YYYY-MM), ranked by surprise."""
+            min_names: int = 20, rank_by: str = "surprise_pct",
+            prices: dict[str, list[dict]] | None = None) -> dict[str, list[dict]]:
+    """Qualifying announcements by calendar month (YYYY-MM), ranked by the
+    percentage surprise (the pre-registered sort) or, with
+    rank_by='per_price', by (EPS - consensus) / last close: the academic
+    SUE-style scaling that is immune to tiny-denominator percentages."""
     by: dict[str, list[dict]] = {}
     for r in cal:
         if r.get("surprise_pct") is None or (r.get("n_est") or 0) < min_estimates:
             continue
         if max_cap is not None and (r.get("market_cap") or float("inf")) > max_cap:
             continue
+        if rank_by == "per_price":
+            px = prices.get(r["symbol"]) if prices else None
+            p0 = price_before(px, r["date"]) if px else None
+            if not p0 or r.get("eps") is None or r.get("forecast") is None:
+                continue
+            r = dict(r, rank_key=(r["eps"] - r["forecast"]) / p0)
+        else:
+            r = dict(r, rank_key=r["surprise_pct"])
         by.setdefault(r["date"][:7], []).append(r)
     out = {}
     for m, rows in by.items():
         if len(rows) >= min_names:
-            out[m] = sorted(rows, key=lambda r: r["surprise_pct"])
+            out[m] = sorted(rows, key=lambda r: r["rank_key"])
     return out
 
 
@@ -108,9 +130,12 @@ def coverage(months: dict[str, list[dict]], prices: dict[str, list[dict]], hold_
 
 
 def run(cal: list[dict], prices: dict[str, list[dict]], *, hold_days: int = 20, cost_side: float = 0.0005,
-        min_estimates: int = 3, max_cap: float | None = None, decile: float = 0.10) -> dict:
-    months = cohorts(cal, min_estimates, max_cap)
-    cov = coverage(months, prices, hold_days)
+        min_estimates: int = 3, max_cap: float | None = None, decile: float = 0.10,
+        rank_by: str = "surprise_pct") -> dict:
+    months = cohorts(cal, min_estimates, max_cap, rank_by=rank_by, prices=prices)
+    # coverage is judged on every qualifying announcement, before any ranking
+    # variant drops the ones it cannot price
+    cov = coverage(cohorts(cal, min_estimates, max_cap), prices, hold_days)
     monthly = []
     for m in sorted(months):
         rows = months[m]
@@ -136,7 +161,8 @@ def run(cal: list[dict], prices: dict[str, list[dict]], *, hold_days: int = 20, 
                         "top_net": top_net, "all_net": all_net, "long_minus_all": top_net - all_net,
                         "long_short": (top_net + bottom_short) / 2 if bottom_short is not None else None})
     return {"months": monthly, "summary": summarize(monthly), "coverage": cov,
-            "params": {"hold_days": hold_days, "cost_side": cost_side, "min_estimates": min_estimates, "max_cap": max_cap}}
+            "params": {"hold_days": hold_days, "cost_side": cost_side, "min_estimates": min_estimates, "max_cap": max_cap,
+                       "rank_by": rank_by}}
 
 
 def summarize(monthly: list[dict]) -> dict:
@@ -183,7 +209,7 @@ def render(res: dict) -> str:
     if not s.get("months"):
         return "pead: no cohort months with prices yet"
     o = [f"PEAD (hold {p['hold_days']}d, {p['cost_side']*1e4:.0f} bp a side, >= {p['min_estimates']} estimates, "
-         f"cap <= {p['max_cap'] if p['max_cap'] else 'any'}): {s['months']} months"]
+         f"cap <= {p['max_cap'] if p['max_cap'] else 'any'}, ranked by {p.get('rank_by', 'surprise_pct')}): {s['months']} months"]
     o.append(f"  top decile minus all announcers: {s['mean_spread_month']*100:+.2f}%/month, Sharpe {s['sharpe_spread']:+.2f}, "
              f"PSR {s['psr_spread']:.2f}; long-short Sharpe {s['sharpe_long_short']:+.2f}" if s["sharpe_long_short"] is not None
              else f"  top decile minus all announcers: {s['mean_spread_month']*100:+.2f}%/month, Sharpe {s['sharpe_spread']:+.2f}, PSR {s['psr_spread']:.2f}")
@@ -208,13 +234,15 @@ def main(argv=None) -> int:
     ap.add_argument("--cost-bp", type=float, default=5.0)
     ap.add_argument("--min-estimates", type=int, default=3)
     ap.add_argument("--max-cap", type=float, default=None)
+    ap.add_argument("--rank-by", choices=("surprise_pct", "per_price"), default="surprise_pct",
+                    help="per_price: (EPS - consensus) / last close instead of the percentage surprise")
     a = ap.parse_args(argv)
     d = Path(a.state) / "earnings"
     cal = read_jsonl(d / "calendar.jsonl")
     syms = {r["symbol"] for r in cal}
     prices = load_prices(d / "prices", syms)
     res = run(cal, prices, hold_days=a.hold_days, cost_side=a.cost_bp / 1e4,
-              min_estimates=a.min_estimates, max_cap=a.max_cap)
+              min_estimates=a.min_estimates, max_cap=a.max_cap, rank_by=a.rank_by)
     print(f"calendar rows {len(cal)}, symbols with prices {len(prices)} of {len(syms)}")
     print(render(res))
     return 0

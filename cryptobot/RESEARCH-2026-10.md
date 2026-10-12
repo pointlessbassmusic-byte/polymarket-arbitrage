@@ -722,3 +722,54 @@ design decisions to make in sight of the result:
 
 The dashboard's research card and the daily digest show where each
 stands.
+
+## Addendum, 2026-10-12 (12): queue item 5 run, post-earnings-announcement drift
+
+Pre-registered as `pead-revisit`; `cryptobot/pead_collect.py` and
+`cryptobot/pead_study.py`. The panel came from Nasdaq's free data API:
+the earnings calendar for every trading day 2015–2026 (167,004 rows;
+the source has gaps, 18 days in June 2016 among them) and ten years of
+daily prices for the 1,977 announcers under $5B with at least three
+estimates. Prices are split-adjusted. Two biases are built into the
+source and are stated with every result: histories exist for current
+listings only, so names delisted since are missing (worst for the
+bottom decile), and the market cap is today's, so "small" means small
+now. Usable windows cover 85% of qualifying announcements, 2017–2026 in
+practice.
+
+**The pre-registered sort loses.** Ranking by Nasdaq's percentage
+surprise, the top decile bought at the next open for 20 sessions
+*underperforms* the equal-weight basket of all announcers:
+
+| ranked by % surprise | spread per month | Sharpe | PSR | 2022–26 |
+|---|---|---|---|---|
+| cap ≤ $5B | −0.65% | −0.53 | 0.06 | −37% |
+| cap ≤ $2B | −0.82% | −0.59 | 0.06 | −41% |
+
+Percentage surprises are dominated by tiny-denominator names (a cent
+against a consensus of zero), so the decile is noise.
+
+**The academic scaling looks different, and that is the problem.**
+Ranking by (EPS − consensus) / price, the standard surprise measure and
+a variant chosen after seeing the first result:
+
+| ranked by surprise / price | spread per month | Sharpe | PSR | years positive | 2022–26 |
+|---|---|---|---|---|---|
+| cap ≤ $5B | +0.65% | +0.42 | 0.89 | 5 of 11 | +58% |
+| cap ≤ $2B | +1.32% | +0.83 | 0.99 | 10 of 11 | +76% |
+
+The long-short Sharpe is negative in both (−0.56, −0.43): shorting the
+bottom decile loses, which is what survivorship does to a panel of
+survivors. Across the five full-panel runs looked at, the best
+variant's deflated Sharpe is 0.68 and its minimum track record 45
+months. The written bar is cleared only by the sort that was not
+registered, on a panel whose two biases both push the same way.
+
+**Verdict: inconclusive.** The variant is pre-registered as
+`pead-per-price-smallcap` and judged out of sample from November 2026,
+collected month by month so the cap and the listing are point-in-time;
+24 months decide. Nothing trades on it before then.
+
+What it took: three parallel calendar streams and two price streams
+over about three hours, with the throttle-versus-holiday answer,
+delisted symbols and a window-alignment bug found and fixed on the way.

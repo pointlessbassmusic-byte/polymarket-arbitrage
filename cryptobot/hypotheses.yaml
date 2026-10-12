@@ -512,12 +512,12 @@
   test: "Earnings surprise history from a free feed (Alpha Vantage EARNINGS or equivalent) 2015-2026, daily prices from Stooq or Alpaca; decile portfolios rebalanced on announcement, long-only and long-short; walk-forward by year; PSR on the monthly spread."
   success: "Written before running: long-only top-decile net Sharpe above the equal-weight small-cap benchmark by >= 0.3 with PSR >= 0.95 over 2015-2026 and net positive in 2022-2026; otherwise inconclusive. Queued behind overnight-index-perp, pairs-doge-shib-us and orb-qqq-pilot; do not start before those are resolved."
   data: "Nasdaq data API, no key: the daily earnings calendar for every weekday 2015-2026 (symbol, reported EPS, consensus, % surprise, number of estimates, market cap) and ten years of daily OHLC per symbol, collected by cryptobot.pead_collect into state/earnings/. Limits: past calendars do not say before/after the open, so entries are at the NEXT session's open (day one is given up for pre-market reporters); the market cap is the current one, a slow size filter"
-  result: "PRE-REGISTERED 2026-10-09; collectors and harness built 2026-10-12 (cryptobot.pead_collect, cryptobot.pead_study: monthly cohorts ranked by surprise, top decile long at the next open for 20 sessions, bottom decile short, equal-weight announcer benchmark, 5 bp a side), tested on a synthetic panel; the calendar collection is running"
+  result: "Run 2026-10-12 on 167,004 calendar rows (3,072 trading days 2015-2026; Nasdaq's calendar has gaps, 18 days in June 2016) and 1,977 price histories; usable windows for 85% of the 33,384 qualifying announcements under $5B, effectively 2017-2026 (ten-year histories; 2016 at 23%). The pre-registered sort (percentage surprise): top decile MINUS all announcers -0.65%/month at <= $5B (Sharpe -0.53, PSR 0.06, 2022-26 -36.9%, 4 of 11 years positive), -0.82%/month at <= $2B (Sharpe -0.59), -0.25% with no cap (39% coverage, so not a real no-cap test); long-short Sharpe -0.27 / -0.32. Ranking by (EPS - consensus) / price instead, the academic scaling and a post-hoc variant: +0.65%/month at <= $5B (Sharpe +0.42, PSR 0.89) and +1.32%/month at <= $2B (Sharpe +0.83, PSR 0.99, 10 of 11 years, 2022-26 +76%), with the long-short Sharpe still negative (-0.43: the bottom-decile short loses, which is what survivorship does to it). Across the 5 full-panel runs looked at the best variant's DSR is 0.68 (MinTRL 45 months). The written bar (Sharpe >= 0.3 with PSR >= 0.95) is cleared only by the variant that was not pre-registered, on a panel with two known biases: current listings only (delisted names missing) and today's market cap as the size filter (look-ahead on who is small)"
   verdict: inconclusive
-  regime: "collecting: about 3,000 calendar days then prices for the qualifying symbols"
-  rerun: "python -m cryptobot.pead_collect calendar --state state --start 2015-01-01 && python -m cryptobot.pead_collect prices --state state --max-cap 5e9 && python -m cryptobot.pead_study --state state --max-cap 5e9"
+  regime: "percentage surprises are noise (tiny-denominator names dominate the deciles); price-scaled surprises in today's sub-$2B names show a drift that the panel's biases could manufacture. Judged out of sample from 2026-11 as pead-per-price-smallcap"
+  rerun: "python -m cryptobot.pead_collect calendar --state state --start 2015-01-01 && python -m cryptobot.pead_collect prices --state state --max-cap 5e9 --workers 3 && python -m cryptobot.pead_study --state state --max-cap 5e9 (add --rank-by per_price, --max-cap 2e9 for the variants)"
   preregistered: true
-  trials_run: 1
+  trials_run: 7
 
 - id: cross-asset-crypto-leadlag
   title: "Cross-asset lead-lag: do US stocks, foreign stocks, rates, the dollar, VIX and oil predict BTC, memecoins and the perp universe (and the reverse)?"
@@ -599,4 +599,18 @@
   rerun: "python -m cryptobot.intraday_leadlag --state state"
   preregistered: true
   trials_run: 8
+
+- id: pead-per-price-smallcap
+  title: "Post-earnings drift in sub-$2B names, surprises scaled by price, judged out of sample"
+  source: "the post-hoc variant of pead-revisit (2026-10-12): +1.32%/month over all announcers in-sample, DSR 0.68 at 5 trials, on a survivorship-biased panel with a current-cap size filter"
+  claim: "Each month, among announcers with at least 3 estimates and a market cap at or under $2B AT THE TIME, the top decile by (reported EPS - consensus) / last close, bought at the next session's open and held 20 sessions, beats the equal-weight return of all such announcers over the same windows by at least 0.5% a month after 5 bp a side."
+  test: "Out of sample only: calendar months from 2026-11 on, collected as they happen (python -m cryptobot.pead_collect calendar --start <month> and prices for the new symbols), so the market cap and the listing status are point-in-time and nothing delisted is lost. Same study code (pead_study --rank-by per_price --max-cap 2e9)."
+  success: "Written before running: after 24 out-of-sample months, mean spread >= +0.5%/month with PSR >= 0.95 and at least 16 of 24 months positive; otherwise inconclusive; a mean spread at or below zero is killed. Not traded before then; the in-sample figure is the reason to look, not evidence."
+  data: "state/earnings/ from 2026-11; collected monthly by hand or by a scheduled run"
+  result: "PRE-REGISTERED 2026-10-12; waiting for out-of-sample months"
+  verdict: inconclusive
+  regime: "to be run; 2027-11 at the earliest"
+  rerun: "python -m cryptobot.pead_study --state state --max-cap 2e9 --rank-by per_price (rows from 2026-11 only)"
+  preregistered: true
+  trials_run: 1
 

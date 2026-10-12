@@ -159,3 +159,17 @@ def test_merge_state_folds_parallel_streams(tmp_path):
     assert (a / "earnings" / "prices" / "BBB.json").exists()
     assert C.merge_state(a, b)["calendar_rows_added"] == 0
 
+
+def test_per_price_ranking_uses_eps_gap_over_last_close():
+    cal, prices = _panel(months=14, names=40, drift_per_surprise=0.0, seed=5)   # a decile of 4: the study needs >= 3
+    for r in cal:                                   # give every row an EPS and a consensus
+        r["eps"], r["forecast"] = 1.0 + r["surprise_pct"] / 100.0, 1.0
+    months = P.cohorts(cal, 3, None, rank_by="per_price", prices=prices)
+    m = next(iter(months.values()))
+    keys = [r["rank_key"] for r in m]
+    assert keys == sorted(keys) and all(abs(k) < 0.05 for k in keys)   # a cent-sized gap over a ~$50 price
+    assert P.price_before(prices["S000"], "2017-01-10") is not None
+    assert P.price_before(prices["S000"], "2000-01-01") is None
+    res = P.run(cal, prices, rank_by="per_price")
+    assert res["params"]["rank_by"] == "per_price" and "per_price" in P.render(res)
+
