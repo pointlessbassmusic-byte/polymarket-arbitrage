@@ -469,13 +469,13 @@
   claim: "The log-price spread DOGE - beta*SHIB (beta from a 90-day rolling OLS, Engle-Granger p < 0.05 required) mean-reverts: enter when the 60-day z-score is >= 2 (short the rich leg, long the cheap leg, dollar-neutral), exit at z = 0, stop at z = 4 or after 20 days. PEPE joins the pair set on Coinbase where it is listed."
   test: "Daily closes 2021-2026 from hl_all_daily.pkl (Hyperliquid history as the public-data seed) and Coinbase/Kalshi candles for 2025-26; walk-forward with the hedge ratio and z-window fixed before each year; costs 4 bp a side plus 4.5 bp half-spread on each of four executions (about 34 bp a pair round trip) and realised funding on both legs; CPCV over the pair-year panel; one trial per (z-entry, window, stop, pair) looked at."
   success: "Written before running: net Sharpe > 0.5 with PSR >= 0.95 over 2022-2026 walk-forward AND net positive in 2025-2026 AND at least 30 round trips; DSR >= 0.95 at the recorded trials_run; otherwise inconclusive; net negative in 2025-2026 is killed."
-  data: "hl_all_daily.pkl (scratch), Kalshi and Coinbase candles"
-  result: "PRE-REGISTERED 2026-10-09; not yet run"
-  verdict: inconclusive
-  regime: "to be run"
-  rerun: "not yet written: cryptobot.pairs_study --cache hl_all_daily.pkl --pairs DOGE/SHIB,DOGE/PEPE,SHIB/PEPE"
+  data: "hl_all_daily.pkl (Hyperliquid daily closes: DOGE 2020-08, kSHIB 2021-05, kPEPE 2023-05 to 2026-09; Kraken closes agree with these to 0.9995 median, so no separate venue candles were added), hl_funding.pkl (hourly funding 2023-05 on; zero before)"
+  result: "Run 2026-10-12, 2022-01 to 2026-09. Registered rule, combined over the three pairs: 34 round trips, mean net -1.47%/trade (t -0.7, hit 47%), Sharpe -0.68 on the daily book, PSR 0.26, by year +10.9 / -46.0 / +7.0 / -7.3 / -14.5% of one leg's notional for 2022-26, 2025-26 net -21.8%, 2 of 5 years positive, 20% of two-year test sets positive. Exits: 16 stops, 10 targets, 8 time. Per pair: DOGE/kSHIB 13 trades +0.06%; DOGE/kPEPE 7 trades +3.78% (t 2.4, too few to mean anything); kSHIB/kPEPE 14 trades -5.52% (two -25% and -41% stop-outs in Oct 2023 and Mar 2024 when PEPE ran). Sensitivity grid (z 1.5/2/2.5 x EG on/off, 18 trials): every cell negative, best Sharpe -0.52; without the EG filter 190-234 trades and -1.2 to -1.9%/trade. DSR of the registered rule 0.06. Funding was a second-order term (+-1% a trade at most)"
+  verdict: killed
+  regime: "memecoin pairs are not cointegrated in any usable way: the spread trends when one coin runs, the z = 4 stop fires within days (16 of 34 trades), and the EG filter that is supposed to screen this out passes windows that break the next week. Agrees with the Springer out-of-sample result; the 2026 BTC-ETH Sharpe 2.4 claim is not reproduced on these coins"
+  rerun: "python -m cryptobot.pairs_study --cache hl_all_daily.pkl --funding hl_funding.pkl --trades"
   preregistered: true
-  trials_run: 1
+  trials_run: 18
 
 - id: orb-qqq-pilot
   title: "5-minute opening-range breakout on QQQ as the gate for a stocks-in-play version"

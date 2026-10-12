@@ -641,3 +641,38 @@ python -m cryptobot.overnight_study --fetch --dir overnight
 Queue items 2 (DOGE/SHIB pairs) and 3 (ORB pilot on QQQ) are next.
 Item 2 needs nothing new. Item 3 needs Alpaca keys for the 5-minute
 bars.
+
+## Addendum, 2026-10-12 (9): queue item 2 run, DOGE/SHIB/PEPE spread mean reversion
+
+Pre-registered as `pairs-doge-shib-us`; `cryptobot/pairs_study.py`;
+Hyperliquid daily closes 2022–2026 with realised hourly funding from
+2023-05. The rule as registered: 90-day rolling hedge ratio, an
+Engle–Granger residual test, enter at a 60-day z-score of 2, exit at
+zero, stop at 4 or after 20 days, $1 long and $1 short, 8.5 bp per
+execution.
+
+| registered rule | trades | mean net / trade | Sharpe | PSR | 2025–26 |
+|---|---|---|---|---|---|
+| DOGE / SHIB | 13 | +0.06% | +0.04 | 0.51 | −5.3% |
+| DOGE / PEPE | 7 | +3.78% | +1.74 | 0.80 | +4.2% |
+| SHIB / PEPE | 14 | −5.52% | −1.99 | 0.08 | −20.7% |
+| combined | 34 | −1.47% | −0.68 | 0.26 | −21.8% |
+
+By year, combined: +10.9 / −46.0 / +7.0 / −7.3 / −14.5% of one leg's
+notional. Sixteen of the 34 trades ended at the stop, usually within
+days: when one memecoin runs, the "spread" is a trend, and the
+cointegration test that should screen those windows out passes them a
+week before they break. The sensitivity grid (entry z of 1.5, 2 or 2.5,
+with or without the Engle–Granger filter, 18 trials) has no positive
+cell; dropping the filter multiplies the trades by six and keeps the
+sign. Funding moved single trades by a percent at most.
+
+**Verdict: killed** (net negative in 2025–2026, the pre-registered kill
+condition). The seven DOGE/PEPE trades at +3.8% are the kind of
+sub-sample the registry's rule exists to ignore. This agrees with the
+peer-reviewed out-of-sample result the sweep found and not with the
+2026 paper's BTC-ETH Sharpe of 2.4, which is not reproduced on coins a
+US account can trade.
+
+What remains in the queue: the ORB pilot (needs Alpaca keys for 5-minute
+bars), the IBIT options collector, and PEAD.
