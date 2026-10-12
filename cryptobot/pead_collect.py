@@ -167,9 +167,37 @@ class PeadCollector:
         return got
 
 
+def merge_state(into: Path, other: Path) -> dict:
+    """Fold another state directory's earnings panel into `into` (parallel
+    collection streams): calendar rows deduplicated on (date, symbol),
+    done-days unioned, price files copied where missing."""
+    a, b = Path(into) / "earnings", Path(other) / "earnings"
+    a.mkdir(parents=True, exist_ok=True)
+    have = {(r["date"], r["symbol"]) for r in read_jsonl(a / "calendar.jsonl")}
+    added = 0
+    for r in read_jsonl(b / "calendar.jsonl"):
+        if (r["date"], r["symbol"]) not in have:
+            append_jsonl(a / "calendar.jsonl", r)
+            have.add((r["date"], r["symbol"]))
+            added += 1
+    days_a = set((a / "calendar_days.txt").read_text().split()) if (a / "calendar_days.txt").exists() else set()
+    days_b = set((b / "calendar_days.txt").read_text().split()) if (b / "calendar_days.txt").exists() else set()
+    (a / "calendar_days.txt").write_text("".join(d + "\n" for d in sorted(days_a | days_b)))
+    copied = 0
+    if (b / "prices").exists():
+        (a / "prices").mkdir(exist_ok=True)
+        for f in (b / "prices").glob("*.json"):
+            dst = a / "prices" / f.name
+            if not dst.exists():
+                dst.write_bytes(f.read_bytes())
+                copied += 1
+    return {"calendar_rows_added": added, "days": len(days_a | days_b), "prices_copied": copied}
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("what", choices=("calendar", "prices"))
+    ap.add_argument("what", choices=("calendar", "prices", "merge"))
+    ap.add_argument("--from-state", type=Path, help="merge: the other state directory to fold in")
     ap.add_argument("--state", type=Path, default=Path("state"))
     ap.add_argument("--start", default="2015-01-01")
     ap.add_argument("--end", default=dt.date.today().isoformat())
@@ -179,6 +207,12 @@ def main(argv=None) -> int:
     ap.add_argument("--refetch-empty", action="store_true", help="calendar: fetch again the days that came back empty")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    if a.what == "merge":
+        if not a.from_state:
+            ap.error("merge needs --from-state")
+        print(merge_state(a.state, a.from_state))
+        return 0
 
     async def go():
         c = PeadCollector(a.state, pause_s=a.pause)

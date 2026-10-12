@@ -141,3 +141,20 @@ def test_coverage_reports_missing_histories_by_year():
     assert res2["coverage"]["with_prices"] == res2["coverage"]["announcements"] - 24
     assert "price coverage" in P.render(res2)
 
+
+def test_merge_state_folds_parallel_streams(tmp_path):
+    a, b = tmp_path / "a", tmp_path / "b"
+    for root, rows, days in ((a, [{"date": "2016-01-04", "symbol": "AAA"}], ["2016-01-04"]),
+                             (b, [{"date": "2016-01-04", "symbol": "AAA"}, {"date": "2021-06-01", "symbol": "BBB"}],
+                              ["2021-06-01"])):
+        for r in rows:
+            C.append_jsonl(root / "earnings" / "calendar.jsonl", r)
+        (root / "earnings" / "calendar_days.txt").write_text("".join(d + "\n" for d in days))
+    (b / "earnings" / "prices").mkdir()
+    (b / "earnings" / "prices" / "BBB.json").write_text("[]")
+    out = C.merge_state(a, b)
+    assert out == {"calendar_rows_added": 1, "days": 2, "prices_copied": 1}
+    assert len(C.read_jsonl(a / "earnings" / "calendar.jsonl")) == 2
+    assert (a / "earnings" / "prices" / "BBB.json").exists()
+    assert C.merge_state(a, b)["calendar_rows_added"] == 0
+
