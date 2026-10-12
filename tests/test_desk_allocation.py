@@ -88,3 +88,20 @@ def test_health_watchdog_and_tuning_surface(desk):
     assert sum(1 for a in desk.alerts if a["text"].startswith("WATCHDOG bounce")) == 1
     desk.learn_execution()
     assert "bounce" in desk.tuning and desk.tuning["bounce"]["reason"].startswith("keep")
+
+
+def test_api_desk_carries_the_research_block_and_the_page_has_the_card(desk, tmp_path):
+    from cryptobot import vrp_collect as V
+    V.append_jsonl(tmp_path / "options" / "ibit.jsonl",
+                   {"date": "2026-10-12", "spot": 46.6, "iv30_atm": 0.366, "rv20": 0.375,
+                    "iv_minus_rv20": -0.009, "gate_open": False})
+    (tmp_path / "oos").mkdir()
+    (tmp_path / "oos" / "divergence.jsonl").write_text(
+        '{"day": "2026-10-13", "spx": 0.01, "btc": -0.01, "kind": "stocks up, BTC down", "btc_next24": 0.004}\n')
+    app = D.create_desk_app(desk.bots, "tok", {"testserver"}, desk=desk)
+    c = TestClient(app)
+    r = c.get("/api/desk", headers={"x-dashboard-token": "tok"}).json()["research"]
+    assert r["options"]["days"] == 1 and r["options"]["gate_open"] is False
+    assert r["divergence_oos"]["qualifying"]["n"] == 1 and r["divergence_oos"]["verdict"] == "collecting"
+    page = c.get("/").text
+    assert 'id="research"' in page and "function research()" in page
