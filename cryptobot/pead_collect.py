@@ -141,30 +141,36 @@ class PeadCollector:
                     syms.add(r["symbol"])
         return sorted(syms)
 
-    async def prices(self, symbols: list[str], years: int = 11, log_every: int = 100) -> int:
+    async def prices(self, symbols: list[str], years: int = 11, log_every: int = 100, workers: int = 1) -> int:
+        """Fetch ten years of daily OHLC per symbol not yet on file, `workers`
+        requests in flight at once. A failed fetch writes nothing, so the
+        next run retries it; [] is written only when Nasdaq has no rows."""
         d = self.state / "prices"
         d.mkdir(parents=True, exist_ok=True)
-        got = 0
         end = dt.date.today()
         start = end.replace(year=end.year - years)
-        for i, sym in enumerate(symbols, 1):
-            p = d / f"{sym}.json"
-            if p.exists():
-                continue
-            try:
-                payload = await self._get(HIST_URL.format(symbol=sym),
-                                          {"assetclass": "stocks", "fromdate": start.isoformat(),
-                                           "todate": end.isoformat(), "limit": 9999})
-            except Exception as exc:              # noqa: BLE001
-                logger.warning("prices %s: %s (will retry on the next run)", sym, exc)
+        todo = [sym for sym in symbols if not (d / f"{sym}.json").exists()]
+        sem = asyncio.Semaphore(max(1, workers))
+        done = {"n": 0, "got": 0}
+
+        async def one(sym: str) -> None:
+            async with sem:
+                try:
+                    payload = await self._get(HIST_URL.format(symbol=sym),
+                                              {"assetclass": "stocks", "fromdate": start.isoformat(),
+                                               "todate": end.isoformat(), "limit": 9999})
+                except Exception as exc:          # noqa: BLE001
+                    logger.warning("prices %s: %s (will retry on the next run)", sym, exc)
+                else:
+                    (d / f"{sym}.json").write_text(json.dumps(parse_history(payload)))
+                    done["got"] += 1
+                done["n"] += 1
+                if done["n"] % log_every == 0:
+                    logger.info("prices: %d of %d symbols", done["n"], len(todo))
                 await asyncio.sleep(self.pause)
-                continue                          # nothing written: a rerun fetches it again
-            p.write_text(json.dumps(parse_history(payload)))   # [] only when Nasdaq really has no rows
-            got += 1
-            if i % log_every == 0:
-                logger.info("prices: %d of %d symbols", i, len(symbols))
-            await asyncio.sleep(self.pause)
-        return got
+
+        await asyncio.gather(*(one(sym) for sym in todo))
+        return done["got"]
 
 
 def merge_state(into: Path, other: Path) -> dict:
@@ -205,6 +211,7 @@ def main(argv=None) -> int:
     ap.add_argument("--max-cap", type=float, default=None, help="only symbols at or under this market cap (USD)")
     ap.add_argument("--pause", type=float, default=0.3)
     ap.add_argument("--refetch-empty", action="store_true", help="calendar: fetch again the days that came back empty")
+    ap.add_argument("--workers", type=int, default=1, help="prices: requests in flight at once")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -226,7 +233,7 @@ def main(argv=None) -> int:
                 print(f"calendar: {n} rows added; {len(read_jsonl(c.calendar_file))} on file")
             else:
                 syms = c.symbols_needed(a.min_estimates, a.max_cap)
-                n = await c.prices(syms)
+                n = await c.prices(syms, workers=a.workers)
                 print(f"prices: {n} symbols fetched of {len(syms)} needed")
         finally:
             await c.close()

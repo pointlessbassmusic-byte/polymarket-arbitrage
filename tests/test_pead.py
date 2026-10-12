@@ -71,7 +71,7 @@ def test_calendar_collection_is_resumable_and_skips_weekends(tmp_path):
 def test_prices_collection_writes_one_file_per_symbol(tmp_path):
     hist = [{"date": "10/09/2026", "close": "$10", "open": "$9"}]
     c = C.PeadCollector(tmp_path, client=FakeHttp({}, hist), pause_s=0.0)
-    assert asyncio.run(c.prices(["AAA", "BBB"])) == 2
+    assert asyncio.run(c.prices(["AAA", "BBB"], workers=3)) == 2
     assert json.loads((tmp_path / "earnings" / "prices" / "AAA.json").read_text())[0]["close"] == 10.0
     assert asyncio.run(c.prices(["AAA"])) == 0                                       # already on file
 
