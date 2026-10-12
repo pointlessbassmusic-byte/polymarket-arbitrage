@@ -586,3 +586,17 @@
   rerun: "python -m cryptobot.promos --bonus 250 --required 1000 --hold-days 30 --tax-rate 0.24"
   trials_run: 1
 
+- id: btc-leads-us500-intraday
+  title: "Does the Kalshi BTC perp lead the US500 perp hour to hour while the cash market is closed?"
+  source: "follow-up to cross-asset-crypto-leadlag (2026-10-09): BTC's close-to-open move 'predicted' the S&P close-to-close with t 3.9, which is the overnight futures gap, not a lead; both perps trade 24/7 so the hourly version separates the two"
+  claim: "Off-session (outside 09:30-16:00 New York on weekdays), the BTC perp's hourly log return predicts the US500 perp's NEXT hourly return, and a rule that goes long (short) the US500 perp for the next hour when BTC moved more than +0.1% (-0.1%) is net positive after 8.6 bp a round trip."
+  test: "cryptobot.intraday_leadlag on the collector's hourly caches (state/kalshi_hourly, from 2026-10-10): OLS with Newey-West (3 lags) of US500 next-hour on BTC this-hour, split cash-open vs cash-closed, plus the same-hour regression (comovement) and the reverse direction; the follow rule's net per hour, Sharpe and PSR. Seven regressions and one rule looked at per run."
+  success: "Written before running: at least 500 shared consecutive hours; off-session lead with t >= 2.5 AND the follow rule net positive with PSR >= 0.95 is a candidate for a pre-registered live test; a lead without a profitable rule is inconclusive; no lead at |t| >= 2.5 is killed."
+  data: "state/kalshi_hourly/KXBTCPERP.jsonl and KXUS500PERP.jsonl (collector, 48 hours a day appended, deduplicated)"
+  result: "PRE-REGISTERED 2026-10-12; harness built and tested on synthetic hours; 20 shared hours on file, collecting"
+  verdict: inconclusive
+  regime: "collecting; about three weeks of hourly rows to the 500-hour bar"
+  rerun: "python -m cryptobot.intraday_leadlag --state state"
+  preregistered: true
+  trials_run: 8
+

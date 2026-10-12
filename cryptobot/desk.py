@@ -55,7 +55,35 @@ def summary(bots: dict) -> dict:
     return out
 
 
-def digest(bots: dict, since: float, at: Optional[float] = None) -> str:
+def research_lines(state_dir: Optional[Path]) -> list[str]:
+    """What the collectors hold, for the digest; empty when there is nothing."""
+    if not state_dir:
+        return []
+    try:
+        from .vrp_collect import status
+        st = status(Path(state_dir))
+    except Exception:                                 # noqa: BLE001
+        return []
+    out = []
+    o = st.get("options") or {}
+    if o.get("days"):
+        iv, rv = o.get("iv30"), o.get("rv20")
+        out.append(f"research: {o['symbol']} surface {o['days']} days"
+                   + (f", IV30 {100 * iv:.1f}% vs RV20 {100 * rv:.1f}%" if iv is not None and rv is not None else "")
+                   + f", gate {'open' if o.get('gate_open') else 'shut'} ({o['gate_open_days']}/{o['gated_days']} days open)")
+    hourly = st.get("kalshi_hourly") or {}
+    if hourly:
+        out.append("research: Kalshi hourly " + ", ".join(f"{t} {h['rows']} bars" for t, h in hourly.items()))
+    d = st.get("divergence_oos")
+    if d and d.get("days_tracked"):
+        q = d["qualifying"]
+        out.append(f"research: divergence catch-up OOS {q['n']}/{d['target_days']} qualifying days"
+                   + (f", mean next-24h {100 * q['mean']:+.2f}%" if q.get("mean") is not None else "")
+                   + f", {d['verdict']}")
+    return out
+
+
+def digest(bots: dict, since: float, at: Optional[float] = None, state_dir: Optional[Path] = None) -> str:
     """One day in a few lines: equity and return per book, what closed
     since `since`, what is open, and the sim-vs-real gap (the execution
     cost the paper book does not pay). Safe to post anywhere."""
@@ -99,6 +127,7 @@ def digest(bots: dict, since: float, at: Optional[float] = None) -> str:
         if rc and not rc.get("ok"):
             lines.append(f"{name} VENUE MISMATCH: venue-only {rc['venue_only']} "
                          f"book-only {rc['book_only']} size {rc['qty_mismatch']}")
+    lines.extend(research_lines(state_dir))
     return "\n".join(lines)
 
 
@@ -119,7 +148,8 @@ def track_record_line(closed: list[dict], min_trades: int = 10) -> str:
     return f"track record: {len(rets)} trades, PSR(SR>0)={p:.2f}, MinTRL={need_s} trades"
 
 
-async def digest_loop(bots: dict, alerter, hour_utc: int = 0, minute_utc: int = 30) -> None:
+async def digest_loop(bots: dict, alerter, hour_utc: int = 0, minute_utc: int = 30,
+                      state_dir: Optional[Path] = None) -> None:
     """Post the digest once a day, after the bounce-short's daily run."""
     import datetime as dt
     last = time.time()
@@ -130,7 +160,7 @@ async def digest_loop(bots: dict, alerter, hour_utc: int = 0, minute_utc: int = 
             nxt += dt.timedelta(days=1)
         await asyncio.sleep((nxt - now_dt).total_seconds())
         try:
-            await alerter.send(digest(bots, since=last))
+            await alerter.send(digest(bots, since=last, state_dir=state_dir))
         except Exception as exc:                        # never let the digest kill the desk
             logger.warning("digest failed: %s", exc)
         last = time.time()
@@ -865,7 +895,7 @@ async def _main(args) -> int:
     bots = build(cfg, args.state_dir)
     alerter = attach_alerts(bots)
     if args.digest:
-        print(digest(bots, since=time.time() - 86400))
+        print(digest(bots, since=time.time() - 86400, state_dir=args.state_dir))
         for b in bots.values():
             await b.close()
         await alerter.close()
@@ -889,7 +919,7 @@ async def _main(args) -> int:
     if alerter.enabled:
         d = cfg.get("desk", {}).get("digest_utc", "00:30")
         hh, mm = (int(x) for x in str(d).split(":"))
-        tasks.append(digest_loop(bots, alerter, hh, mm))
+        tasks.append(digest_loop(bots, alerter, hh, mm, state_dir=args.state_dir))
     try:
         await asyncio.gather(*tasks)
     finally:

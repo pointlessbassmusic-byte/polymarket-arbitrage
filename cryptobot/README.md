@@ -1153,7 +1153,12 @@ shows what each holds. By hand:
 ```bash
 python -m cryptobot.vrp_collect --state state            # one snapshot of both
 python -m cryptobot.vrp_collect --state state --report   # the IBIT series so far
+python -m cryptobot.oos_track --state state --report     # the divergence rule, out of sample
+python -m cryptobot.intraday_leadlag --state state       # BTC-leads-US500, once 500 hours exist
 ```
+
+The daily digest carries one line per collector, so the webhook shows
+the counts without opening the dashboard.
 
 ## Running the desk with real money: allocation, learning, loss limits
 

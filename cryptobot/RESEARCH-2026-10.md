@@ -707,3 +707,18 @@ Queue status after this session: item 1 (overnight index) inconclusive,
 item 2 (memecoin pairs) killed, item 4 (IBIT volatility) collecting,
 item 3 (ORB pilot) waiting on Alpaca keys for 5-minute bars, item 5
 (PEAD) queued behind it.
+
+## Addendum, 2026-10-12 (11): harnesses waiting on their data
+
+Three pre-registered tests now have their code written and tested on
+synthetic data, so each runs the day its inputs exist, with no further
+design decisions to make in sight of the result:
+
+| registry id | harness | runs when |
+|---|---|---|
+| `orb-qqq-pilot` | `cryptobot/orb_study.py` | Alpaca keys are in `.env` (`--fetch` pulls ten years of 5-minute bars) |
+| `btc-leads-us500-intraday` | `cryptobot/intraday_leadlag.py` | the hourly cache holds 500 shared hours, about three weeks |
+| `divergence-catchup-btc` | `cryptobot/oos_track.py` | 60 qualifying days, which is years |
+
+The dashboard's research card and the daily digest show where each
+stands.
