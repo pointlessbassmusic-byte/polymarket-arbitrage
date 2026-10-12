@@ -173,3 +173,14 @@ def test_per_price_ranking_uses_eps_gap_over_last_close():
     res = P.run(cal, prices, rank_by="per_price")
     assert res["params"]["rank_by"] == "per_price" and "per_price" in P.render(res)
 
+
+def test_monthly_collects_last_month_once(tmp_path):
+    cal = {f"2026-10-{d:02d}": [{"symbol": "AAA", "eps": "$1", "epsForecast": "$0.9", "surprise": "11.1",
+                                 "noOfEsts": "4", "marketCap": "$1,000"}] for d in range(1, 32)}
+    http = FakeHttp(cal, [{"date": "10/09/2026", "close": "$10", "open": "$9"}])
+    out = asyncio.run(C.monthly(tmp_path, client=http, today=dt.date(2026, 11, 4)))
+    assert out["month"] == "2026-10" and out["symbols"] == 1 and out["prices"] == 1 and out["calendar_rows"] == 22
+    assert (tmp_path / "earnings" / "prices" / "AAA.json").exists()
+    assert asyncio.run(C.monthly(tmp_path, client=http, today=dt.date(2026, 11, 20))) is None   # already done
+    assert asyncio.run(C.monthly(tmp_path, client=http, today=dt.date(2026, 12, 1))) is None    # November not closed 3 days
+

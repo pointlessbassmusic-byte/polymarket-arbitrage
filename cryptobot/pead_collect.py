@@ -185,6 +185,39 @@ class PeadCollector:
         return done["got"]
 
 
+async def monthly(state_dir: Path, client: Optional[httpx.AsyncClient] = None, today: Optional[dt.date] = None,
+                  max_cap: float = 5e9) -> Optional[dict]:
+    """Once a month, after the month has ended: fetch its calendar days
+    and prices for its new symbols, so the out-of-sample panel for
+    `pead-per-price-smallcap` is point-in-time (the market cap and the
+    listing are as of the fetch, days after the month closes). Returns
+    what was added, or None when the month is already on file."""
+    today = today or dt.date.today()
+    first_this = today.replace(day=1)
+    last_month_end = first_this - dt.timedelta(days=1)
+    if (today - last_month_end).days < 3:          # give the last reports a couple of days to post
+        return None
+    month = last_month_end.strftime("%Y-%m")
+    c = PeadCollector(state_dir, client=client)
+    marker = c.state / "months_done.txt"
+    done = set(marker.read_text().split()) if marker.exists() else set()
+    if month in done:
+        return None
+    try:
+        start = last_month_end.replace(day=1)
+        rows = await c.calendar(start, last_month_end)
+        syms = [sym for sym in c.symbols_needed(3, max_cap)
+                if any(r["date"].startswith(month) and r["symbol"] == sym for r in read_jsonl(c.calendar_file))]
+        got = await c.prices(syms, workers=2)
+    finally:
+        if client is None:
+            await c.close()
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    with marker.open("a") as f:
+        f.write(month + "\n")
+    return {"month": month, "calendar_rows": rows, "symbols": len(syms), "prices": got}
+
+
 def merge_state(into: Path, other: Path) -> dict:
     """Fold another state directory's earnings panel into `into` (parallel
     collection streams): calendar rows deduplicated on (date, symbol),
