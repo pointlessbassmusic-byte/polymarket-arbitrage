@@ -497,11 +497,11 @@
   claim: "Selling 30-day ~25-delta IBIT strangles, delta-hedged daily with IBIT shares, only when 30-day implied volatility exceeds trailing 20-day realised by >= 5 vol points, earns the variance risk premium after commissions and hedging costs with a maximum drawdown under 20% of the capital committed."
   test: "Cannot be run today: there is no free history of IBIT option prices. Step 1 (now): a daily collector of the IBIT ATM 30-day implied volatility surface and 20-day realised volatility from free delayed chains, into state/options/. Step 2 (after 12 months, or sooner with purchased history): backtest the rule with 0.65 USD a contract commission, half the quoted spread as slippage, and daily hedge costs at 1 bp; PSR on the monthly P&L."
   success: "Written before running: net Sharpe > 0.7 with PSR >= 0.95 over the available window, worst month better than -15% of committed capital, and the 2025 months the vendor shows as negative IV-HV being flat or skipped by the gate; otherwise inconclusive. Not executable from the desk until an options-approved broker is added."
-  data: "to be collected: IBIT option chains (delayed), IBIT daily closes"
-  result: "PRE-REGISTERED 2026-10-09; collector not yet built, test not yet run"
+  data: "state/options/ibit.jsonl (one row a day from Cboe's free delayed chain: 30-day ATM IV interpolated in variance-time between the bracketing expiries, 25-delta put and call IV, spreads at the ATM strikes, 20/30-day realised vol from IBIT closes seeded via the Nasdaq data API), collected by cryptobot.vrp_collect; the desk runs it daily at 21:15 UTC when collectors.enabled is true"
+  result: "Step 1 done 2026-10-12: the collector is built and the first snapshot stored. IBIT 2026-10-12: spot 46.64, 30-day ATM IV 36.6% (Cboe's own iv30 36.4%), 20-day realised 37.5%, IV minus RV -0.9 vol points, 25-delta skew +2.0 points (puts over calls), 2,619 quoted contracts across 8 near expiries. The entry gate (IV at least 5 points over realised) is shut on day one, in line with the vendor months that showed implied below realised through 2025. Step 2 (the backtest) waits for the history"
   verdict: inconclusive
-  regime: "to be run"
-  rerun: "not yet written: cryptobot.vrp_collect (daily collector), then cryptobot.vrp_study"
+  regime: "collecting; a year of daily rows, or purchased history, before the rule is tested"
+  rerun: "python -m cryptobot.vrp_collect --state state --report (step 2: cryptobot.vrp_study, not yet written)"
   preregistered: true
   trials_run: 1
 

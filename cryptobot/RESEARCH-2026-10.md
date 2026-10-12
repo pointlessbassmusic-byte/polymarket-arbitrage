@@ -676,3 +676,34 @@ US account can trade.
 
 What remains in the queue: the ORB pilot (needs Alpaca keys for 5-minute
 bars), the IBIT options collector, and PEAD.
+
+## Addendum, 2026-10-12 (10): the collectors are running
+
+Two of the queue's items are blocked on data nobody sells for free, so
+the desk now collects it (`cryptobot/vrp_collect.py`, run daily by the
+desk when `collectors.enabled` is true, or by hand):
+
+- **IBIT option surface** for `btc-vrp-listed-options`. Cboe publishes a
+  delayed quote for every IBIT option with its implied volatility and
+  delta, free. One row a day: 30-day at-the-money IV interpolated between
+  the bracketing expiries, 25-delta put and call IV, spreads at the ATM
+  strike, and 20- and 30-day realised volatility from IBIT closes. First
+  row, 2026-10-12: spot 46.64, IV 36.6% (Cboe's own 30-day figure 36.4%),
+  realised 37.5%, so implied sits 0.9 points *below* realised and the
+  rule's entry gate (implied at least 5 points over realised) is shut.
+  Skew is 2.0 points, puts over calls. The backtest needs about a year
+  of these rows.
+- **Kalshi hourly candles** for the BTC, ETH and US500 perps, for the
+  `cross-asset-crypto-leadlag` follow-up (does the BTC perp lead the
+  US500 perp hour to hour while the cash market is closed?). The public
+  endpoint keeps a few days of hourly history, so the last 48 hours are
+  appended daily and deduplicated.
+
+Both write under the desk's state directory, which the Docker volume
+keeps across restarts. `python -m cryptobot.vrp_collect --state state
+--report` prints the series so far.
+
+Queue status after this session: item 1 (overnight index) inconclusive,
+item 2 (memecoin pairs) killed, item 4 (IBIT volatility) collecting,
+item 3 (ORB pilot) waiting on Alpaca keys for 5-minute bars, item 5
+(PEAD) queued behind it.

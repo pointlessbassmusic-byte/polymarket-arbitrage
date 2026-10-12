@@ -862,6 +862,12 @@ async def _main(args) -> int:
     alerter.fire(f"desk up: {', '.join(bots)}; venue {venue(cfg)}; "
                  f"real {'ARMED' if any(getattr(b, 'real_armed', False) for b in bots.values()) else 'locked'}")
     tasks = [b.run_forever() for b in bots.values()] + [server.serve(), allocation_loop(desk)]
+    coll = cfg.get("collectors") or {}
+    if coll.get("enabled"):
+        from .vrp_collect import collector_loop
+        hh, mm = (str(coll.get("at_utc", "21:15")).split(":") + ["0"])[:2]
+        tasks.append(collector_loop(args.state_dir, int(hh), int(mm)))
+        logger.info("collectors on: IBIT option surface and Kalshi hourly candles daily at %s:%s UTC", hh, mm)
     if alerter.enabled:
         d = cfg.get("desk", {}).get("digest_utc", "00:30")
         hh, mm = (int(x) for x in str(d).split(":"))

@@ -1135,6 +1135,22 @@ tolerable while the record accumulates, and the verdict rule for every
 future idea is written into the registry: *alive* needs DSR ≥ 0.95 at
 N_eff, PBO ≤ 0.5 and ≥ 80% of CPCV paths positive.
 
+## Data collectors (`cryptobot.vrp_collect`)
+
+Two queue items need data that is free to read daily but not sold as
+history, so the desk collects it once a day after the US close
+(`collectors.enabled`, 21:15 UTC by default): the IBIT option surface
+from Cboe's delayed chain (30-day ATM implied vol, 25-delta put and
+call vol, spreads, realised vol) for the Bitcoin volatility-premium
+test, and the Kalshi BTC/ETH/US500 perps' hourly candles for the
+intraday lead-lag follow-up. Rows accumulate in `state/options/` and
+`state/kalshi_hourly/` inside the Docker volume. By hand:
+
+```bash
+python -m cryptobot.vrp_collect --state state            # one snapshot of both
+python -m cryptobot.vrp_collect --state state --report   # the IBIT series so far
+```
+
 ## Running the desk with real money: allocation, learning, loss limits
 
 You load money; the desk decides how much of it each strategy may use,

@@ -255,3 +255,11 @@ brokers:
   tastytrade:
     live: false
 
+# Daily data collectors (python -m cryptobot.vrp_collect): the IBIT option
+# surface for btc-vrp-listed-options and Kalshi hourly candles for the
+# BTC-leads-US500 follow-up. Free sources, no keys; one snapshot a day
+# after the US close into state/options and state/kalshi_hourly.
+collectors:
+  enabled: true
+  at_utc: "21:15"
+
