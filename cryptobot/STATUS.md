@@ -20,12 +20,15 @@ Manual override is on the dashboard.
 1. On the server: `./deploy.sh` (Docker, `.env` with a dashboard token, the
    history seed, paper trading up).
 2. Kalshi: enable perpetuals on the account, create an API key, fund the
-   perps balance with the amount, and put the key id and PEM in `.env`
-   (`CRYPTOBOT_KALSHI_KEY_ID`, `CRYPTOBOT_KALSHI_KEY_PEM`).
-3. `docker compose run --rm desk python -m cryptobot.desk --preflight`
-   until every line is `[ok]`.
-4. Set `perp.live: true` in the config and `CRYPTOBOT_ARM_LIVE=yes` in
-   `.env`; restart. The dashboard's real toggle unlocks.
+   perps balance with the amount, then `./desk.sh keys` and paste the key
+   id and PEM when prompted.
+3. `./desk.sh status` until every preflight line is `[ok]`.
+4. `./desk.sh arm` (sets `perp.live: true` and `CRYPTOBOT_ARM_LIVE=yes`,
+   restarts). The dashboard's real toggle unlocks. `./desk.sh disarm`
+   goes back to paper.
+
+All of it works from a phone's SSH app; `cryptobot/PHONE.md` is the
+step-by-step, including the tunnel to the dashboard.
 
 Never a key with withdrawal permission. Never the Hyperliquid wallet
 from the US.

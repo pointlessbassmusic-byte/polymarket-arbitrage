@@ -993,6 +993,10 @@ docker compose run --rm desk python -m cryptobot.desk --preflight
 The port is published on 127.0.0.1 only. From elsewhere, use an SSH
 tunnel (`ssh -L 8080:localhost:8080 your-server`) rather than opening it.
 
+Day to day, `./desk.sh` does the rest without a file editor (keys by
+prompt, arm/disarm, status with preflight, update, logs, the tunnel
+instructions); `PHONE.md` walks through all of it from a phone.
+
 **Going live** is a checklist, and `--preflight` checks every line:
 
 1. `perp.live: true` (and `carry.live: true` when carry has capital);
