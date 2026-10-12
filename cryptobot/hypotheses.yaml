@@ -455,13 +455,13 @@
   claim: "The S&P 500's return accrues between the close and the next open; holding the US500 perp only overnight (long at 16:00 ET, flat at 09:30 ET) earns most of buy-and-hold's return with less than half its variance, and after Kalshi fees and funding beats buy-and-hold on Sharpe. Variants, each counted as a trial: all nights; skip Fri->Mon; Mon->Tue only."
   test: "SPY daily open/close 1993-2026 (Stooq spy.us or Alpaca free data), close-to-open vs open-to-close by era (1993-2007, 2008-2014, 2015-2019, 2020-2026); then the same rule on Kalshi KXUS500PERP candles for the months they exist. Costs: 2 bp maker or 4 bp taker a side as two separate runs, 0.3 bp half-spread, funding at the realised 8-hour rate (0 before the perp existed). Walk-forward by year; PSR on the net overnight series; DSR at trials_run."
   success: "Written before running: net (4 bp a side) overnight-only Sharpe exceeds buy-and-hold Sharpe in at least 3 of 4 eras including 2020-2026, with PSR >= 0.95 on the 2015-2026 net series; if only the 2 bp maker run passes, the rule is 'alive only as maker' and the executor must post resting orders before it is armed; otherwise inconclusive. Negative net 2020-2026 at 2 bp is killed."
-  data: "SPY daily OHLC (to be fetched); Kalshi candles via cryptobot.data.kalshi_perps"
-  result: "PRE-REGISTERED 2026-10-09; not yet run"
+  data: "VTI daily OHLC + adjusted close 2001-06 to 2026-10 (EODHD demo token; dividends recovered from the adjustment factor and credited to the overnight holder), SPY 2016-10 to 2026-10 (Nasdaq data API, 10-year cap; Stooq and Yahoo were unreachable), Nasdaq-100 index 1996-06 to 2026-10 (Nasdaq data API); Kalshi KXUS500PERP funding history (6 daily prints, listed 2026-10-06)"
+  result: "Run 2026-10-12. The premium is real and almost entirely overnight: VTI gross overnight +21.6 / -0.6 / +12.6 / +13.5%/yr (Sharpe 2.47 / -0.02 / 1.53 / 0.99) vs intraday -16.4 / -1.8 / -2.0 / +0.5% for 2001-07 / 2008-14 / 2015-19 / 2020-26; same shape on SPY and the Nasdaq-100. But it is 4-5 bp a night, so the costs eat it: all nights at 4 bp taker + 0.3 bp half-spread nets -4.0 bp/night on VTI (Sharpe -0.56, beats buy-and-hold in 0 of 4 eras; SPY -5.1 bp, NDX -4.7 bp); at 2 bp maker about 0 bp/night (VTI -0.02, SPY -1.07, NDX -0.72; 2020-26 Sharpe +0.14 / -0.30 / +0.01). The weekday subset Mon->Tue at 2 bp maker is the only run that clears the bar, on VTI alone: +5.1 bp/night, Sharpe 0.53, PSR 0.98, 3 of 4 eras incl. 2020-26; it fails on SPY (0 of 2) and the Nasdaq-100 (1 of 4) and its DSR is 0.54 at the 24 trials per instrument. Kalshi's US500 funding over its first 6 days ran 0.019-0.030%/day, 2-4x the fair basis, which alone exceeds the premium"
   verdict: inconclusive
-  regime: "to be run"
-  rerun: "not yet written: cryptobot.overnight_study --symbol spy --fee-bps 4"
+  regime: "the overnight premium is a 25-year fact at zero cost and a non-trade at 4.6-8.6 bp a night; the Mon->Tue maker survivor is the selected variant the DSR warns about, kept for out-of-sample reading only; the all-nights rule at 2 bp is net negative on SPY 2020-26 and killed as a trade. Reopens if the perp's maker fee falls below ~1 bp or funding is reliably at or below the fair basis"
+  rerun: "python -m cryptobot.overnight_study --fetch --dir overnight"
   preregistered: true
-  trials_run: 3
+  trials_run: 72
 
 - id: pairs-doge-shib-us
   title: "Cointegration spread mean reversion between DOGE and SHIB (and PEPE) on US perps"

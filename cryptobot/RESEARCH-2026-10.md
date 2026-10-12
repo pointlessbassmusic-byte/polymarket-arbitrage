@@ -580,3 +580,64 @@ problem:
 - wash trades to meet a volume requirement (prohibited on CFTC venues,
   Kalshi and Coinbase Derivatives included)
 - moving money out during a clawback window, which forfeits the bonus
+
+## Addendum, 2026-10-12 (8): queue item 1 run, the overnight-only index rule
+
+Pre-registered as `overnight-index-perp`, run on 2026-10-12 with
+`cryptobot/overnight_study.py`. Data: VTI daily open, close and adjusted
+close since 2001 (the free EODHD demo token; dividends recovered from the
+adjustment factor and credited to the overnight holder), SPY for the ten
+years the Nasdaq data API serves, the Nasdaq-100 index since 1996, and
+the Kalshi US500 perp's funding since its listing on 2026-10-06. Stooq
+and Yahoo, the sources named in the pre-registration, were unreachable
+from the server.
+
+**The premium is real.** Gross, almost all of the index's return accrues
+between the close and the next open:
+
+| VTI, annualised log return (Sharpe) | overnight | intraday |
+|---|---|---|
+| 2001–2007 | +21.6% (2.47) | −16.4% (−1.15) |
+| 2008–2014 | −0.6% (−0.02) | −1.8% (−0.10) |
+| 2015–2019 | +12.6% (1.53) | −2.0% (−0.18) |
+| 2020–2026 | +13.5% (0.99) | +0.5% (0.03) |
+
+SPY and the Nasdaq-100 have the same shape. The literature result
+(Lou, Polk & Skouras) replicates through 2026.
+
+**It does not survive the round trip.** The premium is 4–5 basis points
+a night; the Kalshi perp costs 8.6 bp a night as a taker (two 4 bp fees
+and two 0.3 bp half-spreads) or 4.6 bp as a maker.
+
+| VTI, net per night | 4 bp taker | 2 bp maker |
+|---|---|---|
+| all nights | −4.0 bp, Sharpe −0.56, beats buy-and-hold 0/4 eras | −0.0 bp, Sharpe −0.00, 1/4 |
+| skip Fri→Mon | −4.0 bp, 0/4 | +0.0 bp, 1/4 |
+| Mon→Tue only | +1.1 bp, 1/4 | +5.1 bp, Sharpe 0.53, PSR 0.98, 3/4 |
+
+The Mon→Tue maker variant is the only run that clears the pre-registered
+bar, and only on VTI: on SPY it beats buy-and-hold in 0 of 2 eras, on the
+Nasdaq-100 in 1 of 4, and its deflated Sharpe is 0.54 at the 24 runs
+looked at per instrument. That is the selected-variant pattern the
+registry's rule exists to catch. The all-nights rule at 2 bp is net
+negative on SPY in 2020–2026 and is killed as a trade.
+
+**Funding makes it worse.** The US500 perp's first six daily funding
+prints averaged 0.030% a day (median 0.019%), two to four times the
+fair basis of about 0.008% (short rates less dividends). A long held
+overnight pays it. At the observed median, even the Mon→Tue maker
+variant falls to a PSR of 0.92 on VTI and 0.89 on SPY.
+
+**Verdict: inconclusive**, with 72 trials recorded. The rule reopens if
+the perp's maker fee drops below about 1 bp or funding settles at or
+below the fair basis for a few months. Nothing to build on the
+executor: a maker path (resting orders at the close) is only worth
+writing for a rule that is alive. The study refetches its own inputs:
+
+```bash
+python -m cryptobot.overnight_study --fetch --dir overnight
+```
+
+Queue items 2 (DOGE/SHIB pairs) and 3 (ORB pilot on QQQ) are next.
+Item 2 needs nothing new. Item 3 needs Alpaca keys for the 5-minute
+bars.
