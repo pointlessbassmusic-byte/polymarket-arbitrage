@@ -511,11 +511,11 @@
   claim: "Buying the top decile of standardised earnings surprises at the next open and holding 20 trading days (shorting the bottom decile where borrow is cheap) earns a net positive spread in stocks below the Russell 1000 cut-off, after 5 bp a side and the realised half-spread."
   test: "Earnings surprise history from a free feed (Alpha Vantage EARNINGS or equivalent) 2015-2026, daily prices from Stooq or Alpaca; decile portfolios rebalanced on announcement, long-only and long-short; walk-forward by year; PSR on the monthly spread."
   success: "Written before running: long-only top-decile net Sharpe above the equal-weight small-cap benchmark by >= 0.3 with PSR >= 0.95 over 2015-2026 and net positive in 2022-2026; otherwise inconclusive. Queued behind overnight-index-perp, pairs-doge-shib-us and orb-qqq-pilot; do not start before those are resolved."
-  data: "to be fetched: earnings surprises and daily prices"
-  result: "PRE-REGISTERED 2026-10-09; not yet run"
+  data: "Nasdaq data API, no key: the daily earnings calendar for every weekday 2015-2026 (symbol, reported EPS, consensus, % surprise, number of estimates, market cap) and ten years of daily OHLC per symbol, collected by cryptobot.pead_collect into state/earnings/. Limits: past calendars do not say before/after the open, so entries are at the NEXT session's open (day one is given up for pre-market reporters); the market cap is the current one, a slow size filter"
+  result: "PRE-REGISTERED 2026-10-09; collectors and harness built 2026-10-12 (cryptobot.pead_collect, cryptobot.pead_study: monthly cohorts ranked by surprise, top decile long at the next open for 20 sessions, bottom decile short, equal-weight announcer benchmark, 5 bp a side), tested on a synthetic panel; the calendar collection is running"
   verdict: inconclusive
-  regime: "to be run"
-  rerun: "not yet written: cryptobot.pead_study"
+  regime: "collecting: about 3,000 calendar days then prices for the qualifying symbols"
+  rerun: "python -m cryptobot.pead_collect calendar --state state --start 2015-01-01 && python -m cryptobot.pead_collect prices --state state --max-cap 5e9 && python -m cryptobot.pead_study --state state --max-cap 5e9"
   preregistered: true
   trials_run: 1
 

@@ -1155,6 +1155,8 @@ python -m cryptobot.vrp_collect --state state            # one snapshot of both
 python -m cryptobot.vrp_collect --state state --report   # the IBIT series so far
 python -m cryptobot.oos_track --state state --report     # the divergence rule, out of sample
 python -m cryptobot.intraday_leadlag --state state       # BTC-leads-US500, once 500 hours exist
+python -m cryptobot.pead_collect calendar --state state  # earnings surprises 2015-2026 (Nasdaq data API)
+python -m cryptobot.pead_study --state state --max-cap 5e9   # post-earnings drift, once prices are in
 ```
 
 The daily digest carries one line per collector, so the webhook shows
