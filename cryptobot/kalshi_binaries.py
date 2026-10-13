@@ -174,8 +174,9 @@ class KalshiBinaries:
                 "last": dt.datetime.fromtimestamp(max(m["close_ts"] for m in ms), dt.timezone.utc).isoformat() if ms else None}
 
 
-async def collect(state_dir: Path, days: int = 30, client=None, limit: Optional[int] = None, pace_s: float = PACE_S) -> dict:
-    c = KalshiBinaries(state_dir, client=client, pace_s=pace_s)
+async def collect(state_dir: Path, days: int = 30, client=None, limit: Optional[int] = None, pace_s: float = PACE_S,
+                  series: str = SERIES) -> dict:
+    c = KalshiBinaries(state_dir, client=client, pace_s=pace_s, series=series)
     try:
         since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
         listed = await c.list_settled(since)
@@ -191,13 +192,14 @@ def main(argv=None) -> int:
     ap.add_argument("--days", type=int, default=30)
     ap.add_argument("--limit", type=int, default=None, help="at most this many candle fetches this run")
     ap.add_argument("--pace", type=float, default=PACE_S, help="seconds between public requests")
+    ap.add_argument("--series", default=SERIES, help="Kalshi series ticker (KXBTCD hourly ladder, KXBTC15M 15-minute up/down, KXETHD, ...)")
     ap.add_argument("--status", action="store_true")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if a.status:
         print(KalshiBinaries(a.state).status())
         return 0
-    print(asyncio.run(collect(a.state, a.days, limit=a.limit, pace_s=a.pace)))
+    print(asyncio.run(collect(a.state, a.days, limit=a.limit, pace_s=a.pace, series=a.series)))
     return 0
 
 

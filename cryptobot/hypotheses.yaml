@@ -675,6 +675,20 @@
   preregistered: true
   trials_run: 549
 
+- id: binary-conditional-vol-2026-10
+  title: "Pairing the range profile with Kalshi's crypto binaries: does a conditional dispersion model price the hourly BTC strike ladder and the 15-minute up/down market better than the market does?"
+  source: "operator question 2026-10-13 (how the swing/range profile pairs with Kalshi's 15-minute and hourly crypto markets); addendum 25 (direction is unpredictable, dispersion is: hour of day, recent range, VIX level); kalshi-btc-hourly-tails (longshots overpriced, favourites +0.6%/$ at t 1)"
+  claim: "A binary pays on dispersion, not direction. The empirical distribution of BTC's remaining-horizon log return, built from two years of Coinbase 5-minute bars strictly before the binaries sample and conditioned on the decision hour (UTC) and the recent range (the last 60 minutes' high-low over its trailing median, in terciles), gives a probability for every KXBTCD contract (strike ladder, at 30 and 15 minutes before the hourly print) and every KXBTC15M contract (up/down against the slot's opening BRTI, at 10 and 5 minutes before the print) that is better calibrated than Kalshi's mid (lower Brier score), and buying the side whose model probability exceeds its price by more than the quadratic fee (0.07 x p x (1-p)) plus one cent earns a positive net return per dollar."
+  test: "cryptobot.binary_vol_study: for each contract and decision time, spot = the Coinbase 5-minute close at that minute, model p = share of the conditioning bucket's historical log returns over the remaining minutes that carry spot past the strike (greater / less by strike_type; for KXBTC15M the strike is the slot's opening BRTI and the remaining-horizon return starts from the current spot); quotes from the market's minute candlesticks (YES bid/ask closes); the trade buys YES at the ask when p - ask > fee + 0.01, NO at 1 - bid when (1 - p) - (1 - bid) > fee + 0.01, settles on the result, pays the fee; net per dollar with t clustered by event (every strike in an hour settles on one print), by half; Brier of model vs mid on every quoted contract; calibration deciles. Variants, each a trial: unconditional, hour only, hour x range tercile; x 2 decision times x 2 series = 12 trials. Basis between Coinbase and BRTI is measured as settle minus the Coinbase close at the print and reported."
+  success: "Written before running: CANDIDATE if, for the hour x range variant on a series, the model's Brier beats the mid's and the net is >= +1% per dollar at a cluster t >= 2.5 with both halves positive; then it goes to a paper rule on that series for 200 contracts before any real money. KILLED for a series if the model's Brier is worse than the mid's at both decision times (the market already knows the profile). Otherwise inconclusive."
+  data: "scratch btc5m/btc_5m.json (model, bars before 2026-09-13 only), state_collect/kalshi_binaries (KXBTCD, 17,614 markets, 2026-09-13 to 2026-10-13), state_binaries_15m (KXBTC15M, ten days)"
+  result: "PRE-REGISTERED 2026-10-13; KXBTC15M pull running"
+  verdict: inconclusive
+  regime: "running"
+  rerun: "python -m cryptobot.binary_vol_study --scratch <dir>"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
