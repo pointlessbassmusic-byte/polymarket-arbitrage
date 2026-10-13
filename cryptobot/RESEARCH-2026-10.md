@@ -909,3 +909,28 @@ twelve months, not traded before then and not below that capital.
 
 Trials this addendum: fifteen, all counted in the registered rule's
 deflated Sharpe.
+
+## Addendum, 2026-10-13 (16): the premium's small-money form, pre-registered
+
+The volatility premium in addendum 15 needs $25,000 of options margin
+to harvest the way the backtest did. Kalshi sells the same risk in $1
+pieces: its hourly "BTC above/below" series (KXBTCD) lists about 190
+strikes an hour, 30–35 of them trade, and the top-of-hour print settles
+them all. A far strike quoted at 5¢ is a one-hour digital option; if
+tails are overpriced the way 30-day volatility is, the favourite side
+(85–97¢) resolves more often than its price says, and buying it half an
+hour before the print earns the gap after Kalshi's fee of
+0.07 × p × (1 − p) a contract.
+
+The public API serves every settled market and its minute quotes with
+no key. The pull (`cryptobot/kalshi_binaries.py`, paced at one request
+a second) covers 30 days, about 17,000 traded markets. The rule, the
+two decision times (30 and 15 minutes out), the price band, the spread
+cap, the clustering by hour and the bar were written into the registry
+(`kalshi-btc-hourly-tails`) before any quote was read: net per dollar
+positive with cluster t ≥ 2 at both decision times and in both halves
+of the sample, or inconclusive; negative at both, killed. The mirror
+(buy the longshot), a resting-bid maker fill and the 0.97–0.99 bucket
+are counted as trials. The Polymarket 15-minute markets tested earlier
+were calibrated in their last two minutes; this is a longer horizon, a
+different venue and the one the desk already has a key for.

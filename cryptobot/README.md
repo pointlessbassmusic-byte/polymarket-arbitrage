@@ -1159,6 +1159,8 @@ python -m cryptobot.vrp_collect --state state            # one snapshot of both
 python -m cryptobot.vrp_collect --state state --report   # the IBIT series so far, and DVOL
 python -m cryptobot.vrp_study --state state --fetch --wings 0.10 --overlap --close-dte 7   # the premium, 2021 on
 python -m cryptobot.vrp_study --state state --source ibit --overlap   # the ladder on the IBIT rows, out of sample
+python -m cryptobot.kalshi_binaries --state state --days 30   # Kalshi hourly BTC binaries, settled, minute quotes (hours)
+python -m cryptobot.binary_tails_study --state state          # the favourite at 85-97 cents, 30 and 15 minutes out
 python -m cryptobot.oos_track --state state --report     # the divergence rule, out of sample
 python -m cryptobot.intraday_leadlag --state state --fetch   # BTC-leads-US500, pulls the hours itself; 500 needed
 python -m cryptobot.pead_collect calendar --state state  # earnings surprises 2015-2026 (Nasdaq data API)
