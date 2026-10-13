@@ -93,6 +93,13 @@ and dispersion is already in the price. Also closed: the post-gap drift
 in BTC proxies (the exact 09:30 predictor leaves t ≤ 1.2) and the
 397-name universe screen (no sort clears the bar; standouts are a watch
 list).
+Inconclusive (addendum 27): shorting meme and small-alt froth (volume
+shock plus 7-day run-up) earned +244 bp a week on Hyperliquid, mostly
+listing decay, and loses on the 19 coins Kalshi lists; not tradeable
+from a US account. One-minute bars: no minute-of-hour, autocorrelation
+or within-hour return signal; only range persists. A forward hype
+scanner (CoinGecko trending, meme volumes, StockTwits rate, Fear &
+Greed) now runs hourly in the desk as a data build.
 Searched and empty: 6,096 one- and two-feature barrier rules over Kalshi's
 hourly perps (closed: the in-sample winners lose every month), eleven
 years of hourly BTC and ten years of nine macro ETFs (inconclusive: the

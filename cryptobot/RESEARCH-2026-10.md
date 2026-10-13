@@ -1400,3 +1400,94 @@ chosen on today's volume does), volume shock +19 bp (t 0.5), and no
 short-interest sort (15 names covered). The standouts list (WFF 396%
 vol, MRNA, AXTI, NBIS, CIFR; SOUN 9.7 days to cover) is a watch
 list, not a signal.
+
+## Addendum, 2026-10-13 (27): one-minute bars inside the hour, and meme-coin froth
+
+**One-minute bars.** The operator asked for 1-minute intervals within
+the hour in the regressions. `range_profile --source coinbase1m` runs
+90 days of Coinbase 1-minute candles (BTC first; ETH, SOL and DOGE as
+they land) and adds `minute_structure`: signed return, range and
+volume share by minute of the hour; autocorrelation at 1, 2, 3 and 5
+minutes and at one 5-minute bar; and, inside each hour, the rest of the
+hour's return and range regressed on the return and range so far at
+:15, :30 and :45 (the state an hourly binary is priced on).
+
+BTC, 129,600 minutes, July to October 2026:
+
+| horizon | median move | median range | share of moves > 18 bp |
+|---|---|---|---|
+| 1m | 2 bp | 4 bp | 1% |
+| 5m | 4 | 10 | 7% |
+| 15m | 8 | 19 | 19% |
+| 1h | 15 | 40 | 43% |
+| 1d | 82 | 237 | 84% |
+
+- **Minute of the hour.** Ranges are widest at :00, :01, :02 and :30
+  (5.9–6.3 bp against a 5.1 bp median), when hourly and half-hourly
+  products print and reset. Signed return: 2 of 60 minutes reach |t|
+  2.5 (:41 +0.27 bp, :58 +0.21 bp), the null rate, at a quarter of a
+  basis point.
+- **Autocorrelation.** None: 1-minute lags 1–5 between −0.006 and +0.010
+  (t −0.9 to +1.2); 5-minute lag 1 −0.007 (t −0.5). No reversal or
+  momentum at the shortest scale to scalp.
+- **Inside the hour.** The rest of the hour's return on the return so
+  far: +0.05 at :15 (t 0.6), −0.02 at :30 (t −0.6), +0.005 at :45 (t
+  0.2). The rest of the hour's range on the range so far: +0.87, +0.51,
+  +0.33 (t 9–11). A path that has moved does not keep moving or reverse;
+  a path that has been wide stays wide. The remaining-hour sd is 31 bp
+  at :15, 26 at :30, 17 at :45.
+
+That is the 1-minute version of addendum 25's finding, and it is why
+addendum 26 found the hourly and 15-minute binaries efficient: the only
+predictable thing inside the hour is dispersion, and the market prices
+it.
+
+**Meme-coin froth (`meme-froth-2026-10`, pre-registered).** The
+operator asked for a hype / froth / volume arbitrage on meme coins
+that scrapes online mentions. Mention history is not available from a
+compliant source: Reddit, Wikipedia pageviews, Google Trends, GDELT and
+Bluesky refused automated requests from the desk (403/404/429, robot
+policies), and the desk does not route around a refusal. What has
+history is volume (Hyperliquid daily, 176 perps with volume, 2023–2026)
+and the Fear & Greed index (daily since 2018). Fourteen trials:
+
+| trial | events | net per trade | t | halves |
+|---|---|---|---|---|
+| froth short 3d, all coins | 3,208 | +96 bp | 2.9 | +46 / +146 |
+| froth short 7d, all coins | 2,136 | +244 bp | 4.4 | +156 / +334 |
+| froth short 3d / 7d, 27 meme coins | 505 / 327 | −57 / +4 bp | −0.6 / 0.0 | |
+| capitulation long 3d / 7d, all | 695 / 583 | −67 / −115 bp | −1.1 / −1.3 | |
+| continuation 1d, all | 8,375 | −52 bp | −3.4 | −22 / −81 |
+| Fear & Greed ≤ 20, long BTC 7d / 30d | 99 / 39 | +47 / +127 bp | 0.5 / 0.5 | |
+| Fear & Greed ≥ 80, short BTC 7d / 30d | 34 / 14 | −228 / −836 bp | −1.0 / −1.7 | |
+
+Froth is a volume shock in the day's top decile together with a 7-day
+run-up in the top decile. The froth short passes the registered bar on
+"all coins" and fails it on substance:
+
+- **Most of it is listing decay.** Shorting every coin-day for 7 days,
+  with no signal, earned +104 bp (t 2.7). Froth adds about 140 bp on top.
+- **Kalshi's coins lose.** On the 19 coins Kalshi lists as perps, the
+  froth short loses at 3 days (−90 bp, t −1.4) and at 7 days (−67 bp,
+  t −0.6). The coins outside Kalshi carry it all (+293 bp, t 5.1), and
+  those trade on Hyperliquid, which is closed to a US account.
+- **2023 lost**, at −140 bp a trade at 7 days.
+- **Squeeze risk.** The worst trade lost 136% of notional (kPEPE,
+  February 2024). A +25% stop keeps +188 bp.
+
+Recorded inconclusive: real in the data, not tradeable from here.
+Continuation after a volume shock is killed. A volume shock predicts
+the next day's range (t 5.0), the same vol-clustering as everywhere
+else. The froth shorts overlap the live bounce-short on 1–2% of days.
+
+**The forward scanner.** `cryptobot.hype_scanner` runs inside the desk
+once an hour (config `collectors.hype`). It records CoinGecko's trending
+searches, the top 100 meme tokens by volume, the StockTwits message
+rate and bull/bear tags for 14 coins (the Kalshi meme and major coins
+plus PEPE, BONK, WIF, FLOKI), and Fear & Greed. It scores each coin on
+its message rate and volume against their own 7-day medians, plus
+trending. The dashboard's research card shows the top scores. It is a
+data build: a mention-rate rule gets its own pre-registration once 90
+days are on file. The first snapshot showed thin StockTwits traffic,
+0.3–2.3 messages an hour on the meme coins, so the trending list and
+the volume ratio will likely carry more information than mentions.
