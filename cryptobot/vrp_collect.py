@@ -16,12 +16,16 @@
    until that hypothesis was killed on 2026-10-13; cryptobot.pead_collect
    monthly is still callable by hand.)
 
-2. Kalshi hourly candles for the BTC and US500 perps
+2. Kalshi hourly candles for the BTC, ETH and US500 perps
    (`cross-asset-crypto-leadlag` follow-up: does the BTC perp lead the
    US500 perp hour to hour while the cash market is closed?). The
-   public candlestick endpoint keeps little hourly history, so the last
-   48 hours are appended daily to state/kalshi_hourly/<ticker>.jsonl,
-   deduplicated on the bar's end time.
+   public candlestick endpoint serves the whole hourly history of a
+   perp (checked 2026-10-13: BTC back to its July listing in one
+   request), so each run appends everything after the last stored bar
+   to state/kalshi_hourly/<ticker>.jsonl, deduplicated on the bar's end
+   time, and a first run backfills BACKFILL_DAYS. A missed day is
+   recovered by the next run; the cache is for the dashboard and the
+   harness, not the only copy.
 
     python -m cryptobot.vrp_collect --state state            # one snapshot of both
     python -m cryptobot.vrp_collect --state state --report   # the series so far
@@ -51,6 +55,8 @@ NASDAQ_URL = ("https://api.nasdaq.com/api/quote/{symbol}/historical?assetclass=e
               "&fromdate={start}&todate={end}&limit=9999")
 KALSHI_CANDLES = "https://external-api.kalshi.com/trade-api/v2/margin/markets/{ticker}/candlesticks"
 KALSHI_TICKERS = ("KXBTCPERP", "KXUS500PERP", "KXETHPERP")
+BACKFILL_DAYS = 120          # first pull per ticker; the endpoint answered 90 days in one call
+OVERLAP_HOURS = 6            # re-request the last bars so a late-finalised one is corrected
 from .data.nasdaq import HEADERS as UA  # noqa: E402  (Nasdaq drops non-browser agents; Cboe and Kalshi do not care)
 
 
@@ -283,16 +289,24 @@ class Collector:
         append_jsonl(self.options_file, row)
         return row
 
-    async def kalshi_hourly(self, tickers=KALSHI_TICKERS, hours: int = 48) -> dict[str, int]:
-        """Append the last `hours` of hourly candles per ticker; returns new rows per ticker."""
+    async def kalshi_hourly(self, tickers=KALSHI_TICKERS, hours: Optional[int] = None) -> dict[str, int]:
+        """Append every hourly candle after the last stored one per ticker
+        (`hours` back instead when given; BACKFILL_DAYS on an empty
+        cache); returns new rows per ticker."""
         now = int(time.time())
         added = {}
         for t in tickers:
             path = self.state / "kalshi_hourly" / f"{t}.jsonl"
             have = {int(r["end_ts"]) for r in read_jsonl(path)}
+            if hours is not None:
+                start = now - hours * 3600
+            elif have:
+                start = max(have) - OVERLAP_HOURS * 3600
+            else:
+                start = now - BACKFILL_DAYS * 86400
             try:
                 d = await self._get_json(KALSHI_CANDLES.format(ticker=t),
-                                         {"period_interval": 60, "start_ts": now - hours * 3600, "end_ts": now})
+                                         {"period_interval": 60, "start_ts": start, "end_ts": now})
             except Exception as exc:                  # noqa: BLE001 - one ticker down must not stop the rest
                 logger.warning("kalshi hourly %s: %s", t, exc)
                 added[t] = 0

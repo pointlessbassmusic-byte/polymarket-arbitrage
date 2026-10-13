@@ -9,12 +9,15 @@ return predicts the US500 perp's NEXT hourly return after the cash
 close, that is a trade on the existing executor; if it only moves with
 it in the same hour, it is comovement.
 
-Data: the collector's hourly caches (state/kalshi_hourly/<ticker>.jsonl).
-Pre-registered as `btc-leads-us500-intraday`; the bar is in the
-registry. Costs for the follow rule: 4 bp a side plus 0.3 bp half-spread
-on the US500 perp (8.6 bp a round trip, one trade an hour at most).
+Data: the collector's hourly caches (state/kalshi_hourly/<ticker>.jsonl);
+`--fetch` fills them first from Kalshi's public candlestick endpoint,
+which serves a perp's whole hourly history, so the study needs no
+running desk. Pre-registered as `btc-leads-us500-intraday`; the bar is
+in the registry. Costs for the follow rule: 4 bp a side plus 0.3 bp
+half-spread on the US500 perp (8.6 bp a round trip, one trade an hour
+at most).
 
-    python -m cryptobot.intraday_leadlag --state state
+    python -m cryptobot.intraday_leadlag --state state --fetch
 """
 from __future__ import annotations
 
@@ -157,10 +160,28 @@ def render(res: dict) -> str:
     return "\n".join(o)
 
 
+def fetch(state_dir: Path, collector_cls=None) -> dict[str, int]:
+    """Fill state/kalshi_hourly from the public endpoint (the collector's
+    own routine, so the desk and the study share one cache)."""
+    import asyncio
+    from .vrp_collect import Collector
+
+    async def go():
+        c = (collector_cls or Collector)(state_dir)
+        try:
+            return await c.kalshi_hourly()
+        finally:
+            await c.close()
+    return asyncio.run(go())
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--state", type=Path, default=Path("state"))
+    ap.add_argument("--fetch", action="store_true", help="pull the hourly candles from Kalshi first (public, no key)")
     a = ap.parse_args(argv)
+    if a.fetch:
+        print("fetched " + ", ".join(f"{t}: {n} new bars" for t, n in fetch(a.state).items()))
     d = a.state / "kalshi_hourly"
     res = run(read_closes(d / "KXBTCPERP.jsonl"), read_closes(d / "KXUS500PERP.jsonl"))
     print(render(res))

@@ -38,7 +38,7 @@ from the US.
 | series | for | state |
 |---|---|---|
 | IBIT option surface, daily | Bitcoin volatility-premium test | since 2026-10-12; a year of rows before the test |
-| Kalshi BTC / ETH / US500 hourly candles | does BTC lead the index perp off-session | 500 shared hours needed, about three weeks |
+| Kalshi BTC / ETH / US500 hourly candles | does BTC lead the index perp off-session | 100 of 500 shared hours on 2026-10-13; Kalshi serves the whole history, so `python -m cryptobot.intraday_leadlag --state state --fetch` runs it any day, desk or no desk; about 2026-10-30 |
 | S&P-vs-BTC divergence days | the one cross-asset pattern, out of sample | 60 qualifying days needed, years |
 
 `python -m cryptobot.vrp_collect --state state --report` and the

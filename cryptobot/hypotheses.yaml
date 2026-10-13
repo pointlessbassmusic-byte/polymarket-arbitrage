@@ -592,8 +592,8 @@
   claim: "Off-session (outside 09:30-16:00 New York on weekdays), the BTC perp's hourly log return predicts the US500 perp's NEXT hourly return, and a rule that goes long (short) the US500 perp for the next hour when BTC moved more than +0.1% (-0.1%) is net positive after 8.6 bp a round trip."
   test: "cryptobot.intraday_leadlag on the collector's hourly caches (state/kalshi_hourly, from 2026-10-10): OLS with Newey-West (3 lags) of US500 next-hour on BTC this-hour, split cash-open vs cash-closed, plus the same-hour regression (comovement) and the reverse direction; the follow rule's net per hour, Sharpe and PSR. Seven regressions and one rule looked at per run."
   success: "Written before running: at least 500 shared consecutive hours; off-session lead with t >= 2.5 AND the follow rule net positive with PSR >= 0.95 is a candidate for a pre-registered live test; a lead without a profitable rule is inconclusive; no lead at |t| >= 2.5 is killed."
-  data: "state/kalshi_hourly/KXBTCPERP.jsonl and KXUS500PERP.jsonl (collector, 48 hours a day appended, deduplicated)"
-  result: "PRE-REGISTERED 2026-10-12; harness built and tested on synthetic hours; 20 shared hours on file, collecting"
+  data: "state/kalshi_hourly/KXBTCPERP.jsonl and KXUS500PERP.jsonl: Kalshi's public candlestick endpoint serves a perp's whole hourly history (BTC from its 2026-06 listing, US500 from 2026-10-06), so the collector appends from the last stored bar and intraday_leadlag --fetch fills the cache without the desk"
+  result: "PRE-REGISTERED 2026-10-12; harness built and tested on synthetic hours. 2026-10-13: 100 shared consecutive hours on file (the US500 perp listed 2026-10-06 15:00 UTC and prints no candle in a no-trade hour); 500 about 2026-10-30. Not read before then"
   verdict: inconclusive
   regime: "collecting; about three weeks of hourly rows to the 500-hour bar"
   rerun: "python -m cryptobot.intraday_leadlag --state state"

@@ -62,3 +62,21 @@ def test_too_little_data_is_collecting(tmp_path):
     (d / "KXBTCPERP.jsonl").write_text("".join(json.dumps({"end_ts": k, "close": v}) + "\n" for k, v in btc.items()))
     assert L.read_closes(d / "KXBTCPERP.jsonl") == btc
     assert L.read_closes(d / "missing.jsonl") == {}
+
+
+def test_fetch_fills_the_cache_through_the_collector(tmp_path, capsys):
+    class Stub:
+        def __init__(self, state_dir):
+            self.state = state_dir
+
+        async def kalshi_hourly(self):
+            d = self.state / "kalshi_hourly"
+            d.mkdir(parents=True)
+            for t in ("KXBTCPERP", "KXUS500PERP"):
+                (d / f"{t}.jsonl").write_text("")
+            return {"KXBTCPERP": 7, "KXUS500PERP": 5}
+
+        async def close(self):
+            pass
+    assert L.fetch(tmp_path, collector_cls=Stub) == {"KXBTCPERP": 7, "KXUS500PERP": 5}
+    assert (tmp_path / "kalshi_hourly" / "KXBTCPERP.jsonl").exists()

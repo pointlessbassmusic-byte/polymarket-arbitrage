@@ -68,6 +68,8 @@ class FakeClient:
 
     async def get(self, url, params=None):
         self.calls.append(url)
+        if hasattr(self, "params"):
+            self.params.append(params)
 
         class R:
             status_code = 200
@@ -108,9 +110,15 @@ def test_snapshot_writes_once_per_day_and_gates_on_iv_minus_rv(tmp_path):
     assert len(V.read_jsonl(c.options_file)) == 1
     closes = V.read_jsonl(c.closes_file)
     assert closes[-1]["date"] == "2026-10-12" and closes[-1]["close"] == 46.6   # today's spot appended
+    fake.params = []
     added = asyncio.run(c.kalshi_hourly(tickers=("KXBTCPERP",)))
     assert added == {"KXBTCPERP": 3}
     assert asyncio.run(c.kalshi_hourly(tickers=("KXBTCPERP",))) == {"KXBTCPERP": 0}   # deduplicated
+    first, second = [p for p in fake.params if p and "period_interval" in p]
+    assert second["end_ts"] - first["start_ts"] >= V.BACKFILL_DAYS * 86400 - 60          # empty cache: backfill
+    assert second["start_ts"] == 1_000_000 + 3600 * 2 - V.OVERLAP_HOURS * 3600          # then from the last bar
+    assert asyncio.run(c.kalshi_hourly(tickers=("KXBTCPERP",), hours=48)) == {"KXBTCPERP": 0}
+    assert fake.params[-1]["end_ts"] - fake.params[-1]["start_ts"] == 48 * 3600
     text = V.report(tmp_path)
     assert "1 days" in text and "2026-10-12" in text
 

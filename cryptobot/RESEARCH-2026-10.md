@@ -836,3 +836,19 @@ and a clean panel would be the first step, not a rule.
 
 Trials this addendum: ten (three size runs, four placebos, three
 denominator runs).
+
+## Addendum, 2026-10-13 (14): Kalshi serves the whole hourly history
+
+Addendum 10 said the Kalshi candlestick endpoint keeps a few days of
+hourly history, so the collector appended 48 hours a day and a missed
+day was lost. Checked again with longer windows: one request returns
+the BTC perp's hourly candles back to its June listing (2,852 bars)
+and the US500 perp's since it listed on 2026-10-06 (106 bars; an hour
+with no trade prints no candle). The collector now appends from the
+last stored bar (a 120-day backfill on an empty cache, a 6-hour
+overlap otherwise), and `intraday_leadlag --fetch` fills the cache
+itself, so the lead-lag test runs on any machine with no desk and no
+key. 100 shared hours on file today; 500 around 2026-10-30. The IBIT
+option surface is the one series that still has to be caught on the
+day: Cboe's delayed quotes have no history, so that one needs the desk
+(or any daily runner) up at 21:15 UTC.
