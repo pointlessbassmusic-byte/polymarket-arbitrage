@@ -1176,3 +1176,42 @@ by a month, is also the best of 48 trials, so the bar sends it to
 paper: `macro_bot` holds XLF long or short on Alpaca's paper account
 for 20 trading days per signal, 20 trades before any money. At one
 position and 20-day holds that is slow by design.
+
+## Addendum, 2026-10-13 (24): BTC and its proxies, meme squeezes, short interest
+
+Registered as `crypto-proxy-crossref-2026-10` and run on ten years of
+daily OHLC for MSTR, COIN, MARA, RIOT, CLSK, GME, AMC, HOOD and TSLA,
+BTC hourly and daily, and Nasdaq's short-interest prints. 43 trials.
+
+**BTC after hours → the proxies.** BTC's move from the stock close to
+09:00 ET explains the next open gap with t between 12 and 30 on every
+name: that is the proxies' beta, visible at the open, not a lead. What
+happens after the open is the interesting line: when BTC rose
+overnight, the stock keeps drifting up from open to close, +44 to +60
+bp a session on all five names with both halves positive (t 2.2–4.1
+on the rule). Two things stop it being a candidate. The regression
+loses significance in the second half on every name, and the
+predictor ends at 09:00 ET, so it contains the gap's last half hour.
+It is also a day trade. The clean test needs BTC at 09:30 to the
+minute; the hourly series cannot give it. The following close-to-close
+(what a $1,000 account can hold) is flat to negative on all five.
+
+**Pairs against BTC.** The residual of a proxy against beta × BTC
+reverts with the right sign on COIN (20 days: t −2.3, +402 bp a trade
+over 51 trades, both halves positive), weakly on MSTR and CLSK, not on
+the miners. Under the 2.5 bar; the trade would run on the desk's two
+venues (stock at Alpaca, BTC perp at Kalshi) if it ever clears it.
+
+**Squeezes.** 52 events of +30% in ten days on three times normal
+volume. The registered claim was reversal; the data say continuation,
++882 bp over the next ten days on average, the short losing in both
+halves. Killed as written. The opposite sign is post-hoc and is not
+registered.
+
+**Short interest.** Nasdaq's feed holds a year of bi-monthly prints
+for Nasdaq-listed names only (GME and AMC are NYSE); 110 observations
+of days-to-cover changes say nothing (t −0.6).
+
+**Verdict: inconclusive**, with two threads worth a cleaner follow-up
+when the data exist: BTC at 09:30 to the minute for the post-gap
+drift, and more COIN history for the pairs.

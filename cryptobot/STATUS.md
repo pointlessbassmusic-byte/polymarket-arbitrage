@@ -66,7 +66,12 @@ stop-and-reverse, vol-targeted index trend, follow-the-S&P in BTC, and
 the price-scaled small-cap earnings drift (its placebo, entering a
 month after the report, beat the real entry: the names win whenever
 you buy them, which is survivorship, not drift).
-Inconclusive, recorded: a monthly IBIT iron condor (the one options
+Inconclusive, recorded: BTC against its listed proxies (MSTR, COIN, MARA,
+RIOT, CLSK: the overnight BTC move is the open gap, a 50 bp intraday
+drift follows it on every name but cannot be separated from the gap's
+last half hour with hourly data, COIN's residual reverts under the bar;
+meme-squeeze reversal killed, squeezes continued +9% on average; short
+interest nothing on a year of prints), a monthly IBIT iron condor (the one options
 structure that fits $1,000: credit collected 71% of the time, one wipe
 in five, Sharpe 0.37) and eight macro-to-asset leads from FRED and ETF
 data (one candidate, the 2s10s slope into XLF over 20 days, best of 48
