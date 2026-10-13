@@ -14,6 +14,7 @@
 #   ./desk.sh url         the dashboard URL(s) to bookmark
 #   ./desk.sh digest      today's digest, as the webhook would get it
 #   ./desk.sh bankroll N  the real-money bankroll in USD (risk.bankroll_usd), then restart
+#   ./desk.sh kalshi ID FILE   the Kalshi key id and private-key file, no prompts, then restart
 #   ./desk.sh rotate      new dashboard token (after the old one was shown somewhere), then restart
 #
 # `keys`, `arm` and `disarm` edit files only; the restart is skipped when
@@ -119,6 +120,22 @@ set_live() {
     /^[a-z]/ && !/^perp:/ {inperp=0}
     {print}' "$CFG" > "$tmp"
   cat "$tmp" > "$CFG"; rm -f "$tmp"
+}
+
+cmd_kalshi() {
+  # Non-interactive: ./desk.sh kalshi <access key id> <private key file>
+  local id="${1:-}" file="${2:-}"
+  ensure_env
+  if [ -z "$id" ] || [ -z "$file" ] || [ ! -f "$file" ]; then
+    echo "usage: ./desk.sh kalshi ACCESS-KEY-ID kalshi.pem   (the file must exist)"; exit 1
+  fi
+  if ! grep -q "BEGIN" "$file"; then
+    echo "$file does not look like a private key (no BEGIN line)"; exit 1
+  fi
+  set_env CRYPTOBOT_KALSHI_KEY_ID "$(printf '%s' "$id" | tr -d '\r\n ')"
+  set_env CRYPTOBOT_KALSHI_KEY_PEM "$(tr -d '\r' < "$file")"
+  echo "Kalshi key id and private key saved to $ENV_FILE (mode 600). You can delete $file now."
+  restart_if_running
 }
 
 cmd_bankroll() {
@@ -270,7 +287,8 @@ case "${1:-}" in
   remote) cmd_remote ;;
   url) cmd_url ;;
   bankroll) cmd_bankroll "${2:-}" ;;
+  kalshi) cmd_kalshi "${2:-}" "${3:-}" ;;
   rotate) cmd_rotate ;;
   digest) dc run --rm desk python -m cryptobot.desk --digest --state-dir /data ;;
-  *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
