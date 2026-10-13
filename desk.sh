@@ -236,8 +236,20 @@ cmd_status() {
 }
 
 cmd_update() {
+  # The config carries local settings (armed, bankroll) that desk.sh wrote;
+  # keep them across the pull.
+  if ! git diff --quiet -- cryptobot_config.yaml 2>/dev/null; then
+    git stash push -q -- cryptobot_config.yaml && local stashed=1
+  fi
   git pull --ff-only
-  if have_docker; then dc build >/dev/null && dc up -d && echo "rebuilt and restarted"; else echo "pulled; ./deploy.sh to start"; fi
+  if [ "${stashed:-}" = 1 ]; then
+    git stash pop -q || { echo "config merge needs a hand: git stash pop"; exit 1; }
+  fi
+  if have_docker; then
+    dc build && dc up -d && echo "rebuilt and restarted"
+  else
+    echo "docker is not running; code updated only"
+  fi
 }
 
 tailscale_name() {
