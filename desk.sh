@@ -231,6 +231,7 @@ cmd_status() {
     echo "preflight:"; dc run --rm desk python -m cryptobot.desk --preflight 2>/dev/null | sed 's/^/  /'
     echo
     echo "research data:"; dc run --rm desk python -m cryptobot.vrp_collect --state /data --report 2>/dev/null | head -4 | sed 's/^/  /'
+    dc run --rm desk python -m cryptobot.orb_bot --state /data --report 2>/dev/null | sed 's/^/  /'
   fi
 }
 

@@ -41,6 +41,7 @@ from the US.
 | Deribit DVOL and BTC closes, daily | the volatility-premium backtest's history and the IBIT basis | 2021-03 to date, refreshed daily |
 | Kalshi BTC / ETH / US500 hourly candles | does BTC lead the index perp off-session | 100 of 500 shared hours on 2026-10-13; Kalshi serves the whole history, so `python -m cryptobot.intraday_leadlag --state state --fetch` runs it any day, desk or no desk; about 2026-10-30 |
 | S&P-vs-BTC divergence days | the one cross-asset pattern, out of sample | 60 qualifying days needed, years |
+| QQQ opening-range paper pilot (Alpaca paper, inside the desk) | the alive backtest against live quotes | 60 traded sessions decide (about three months); `python -m cryptobot.orb_bot --report` |
 | Kalshi hourly BTC above/below markets, settled, minute quotes (one-off pull, `python -m cryptobot.kalshi_binaries`) | are far strikes overpriced: buy the favourite at 85–97¢ half an hour before the print (`kalshi-btc-hourly-tails`, pre-registered) | 30 days, about 17,000 markets; the study runs when the pull ends |
 
 `python -m cryptobot.vrp_collect --state state --report` and the

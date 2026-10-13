@@ -55,6 +55,17 @@ def summary(bots: dict) -> dict:
     return out
 
 
+def orb_state(state_dir: Optional[Path]) -> Optional[dict]:
+    """The opening-range paper pilot's record, for the research card."""
+    if not state_dir:
+        return None
+    try:
+        from .orb_bot import report, sessions_file
+        return report(state_dir) if sessions_file(state_dir).exists() else None
+    except Exception:                                     # noqa: BLE001
+        return None
+
+
 def research_lines(state_dir: Optional[Path]) -> list[str]:
     """What the collectors hold, for the digest; empty when there is nothing."""
     if not state_dir:
@@ -80,6 +91,12 @@ def research_lines(state_dir: Optional[Path]) -> list[str]:
         out.append(f"research: divergence catch-up OOS {q['n']}/{d['target_days']} qualifying days"
                    + (f", mean next-24h {100 * q['mean']:+.2f}%" if q.get("mean") is not None else "")
                    + f", {d['verdict']}")
+    orb = orb_state(state_dir)
+    if orb and orb.get("sessions"):
+        v, why = orb["verdict"]
+        out.append(f"research: ORB paper pilot {orb['traded']} traded of {orb['sessions']} sessions"
+                   + (f", mean {orb['mean_r']:+.2f} R, net {100 * orb['net_pct']:+.1f}%" if orb.get("traded") else "")
+                   + f"; {v}")
     return out
 
 
@@ -393,6 +410,7 @@ class Desk:
         try:
             from .vrp_collect import status
             cached = status(Path(self.state_dir))
+            cached["orb"] = orb_state(self.state_dir)
         except Exception as exc:                  # noqa: BLE001
             logger.warning("research status unavailable: %s", exc)
             cached = None
@@ -925,6 +943,12 @@ async def _main(args) -> int:
         hh, mm = (str(coll.get("at_utc", "21:15")).split(":") + ["0"])[:2]
         tasks.append(collector_loop(args.state_dir, int(hh), int(mm)))
         logger.info("collectors on: IBIT option surface and Kalshi hourly candles daily at %s:%s UTC", hh, mm)
+    orb_cfg = (cfg.get("brokers") or {}).get("alpaca", {}).get("orb") or {}
+    if orb_cfg.get("enabled", True) and os.environ.get("CRYPTOBOT_ALPACA_KEY_ID") and os.environ.get("CRYPTOBOT_ALPACA_SECRET_KEY"):
+        from .orb_bot import OrbBot
+        orb = OrbBot(args.state_dir, orb_cfg)
+        tasks.append(orb.run_forever())
+        logger.info("opening-range paper pilot on %s: %s mode", orb.symbol, orb.mode)
     if alerter.enabled:
         d = cfg.get("desk", {}).get("digest_utc", "00:30")
         hh, mm = (int(x) for x in str(d).split(":"))

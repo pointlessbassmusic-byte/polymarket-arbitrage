@@ -252,6 +252,15 @@ allocation:
 brokers:
   alpaca:
     live: false                # false = paper endpoint when keys are set
+    # Opening-range breakout paper pilot (python -m cryptobot.orb_bot): runs
+    # inside the desk whenever an Alpaca key is present, on the PAPER
+    # account only (a leveraged day-trading rule; the pattern-day-trader
+    # rule keeps it out of accounts under $25,000). 60 sessions decide.
+    orb:
+      enabled: true
+      symbol: QQQ
+      capital_usd: 25000       # the paper account's sizing basis
+      poll_s: 30
   tastytrade:
     live: false
 
