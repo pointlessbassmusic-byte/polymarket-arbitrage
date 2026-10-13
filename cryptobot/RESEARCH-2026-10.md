@@ -1449,6 +1449,17 @@ BTC, 129,600 minutes, July to October 2026:
   a path that has been wide stays wide. The remaining-hour sd is 31 bp
   at :15, 26 at :30, 17 at :45.
 
+ETH, SOL and DOGE over the same 90 days give the same answer. The
+widest minutes are :00, :01, :02 and :30 on every coin (8–11 bp against
+7–9 bp medians). Autocorrelation at 1–5 minutes stays within ±0.04 (t
+under 1.5). Inside the hour, the rest of the hour's return on the
+return so far runs −0.05 to +0.04 (t −1.5 to +0.4). The rest of the
+hour's range on the range so far runs +0.23 to +0.69 (t 4–17). On
+signed return by minute, 10 of 240 coin-minutes reach |t| 2.5, against
+about 3 expected by chance: BTC 2, ETH 3, SOL 4, DOGE 1. SOL's four are
+all positive, near +0.45 bp. Each is under half a basis point, about 2%
+of the 18 bp round trip, so it cannot be traded even if it is real.
+
 That is the 1-minute version of addendum 25's finding, and it is why
 addendum 26 found the hourly and 15-minute binaries efficient: the only
 predictable thing inside the hour is dispersion, and the market prices
