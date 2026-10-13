@@ -51,7 +51,7 @@ dashboard's research card show the counts.
 | key | unlocks |
 |---|---|
 | Kalshi (needed) | the live venue |
-| Alpaca paper (free) | the opening-range pilot on ten years of 5-minute QQQ bars (`python -m cryptobot.orb_study --fetch`) and daily bars for any stock test |
+| Alpaca paper (in) | the opening-range pilot ran on six years of 5-minute QQQ bars: alive in backtest (+33%/yr at 1 c/share, Sharpe 1.05); next a 60-session paper pilot; live needs a $25,000 margin account (pattern-day-trader rule) |
 | tastytrade | options and CME micro Bitcoin; the volatility-premium ladder needs about $25,000 of options margin ($6,000 for a weekly version), so not at the desk's size |
 | Kraken | the carry spot leg (shelved) and spot-margin shorts, which replay negative at retail fees |
 
@@ -75,5 +75,9 @@ Deribit's index; the one-straddle version a small account can run had an
 −88% month on a weekend gap into expiry, the 21-rung ladder that fixes it
 needs about $25,000 of options margin and is judged out of sample from
 the IBIT rows), Fed-liquidity timing, cross-asset lead-lag, stop width,
-BTC beta hedge, near-resolution capture on Polymarket. Nothing new is
-alive.
+BTC beta hedge, near-resolution capture on Polymarket.
+Alive: the QQQ opening-range breakout (pre-registered, one rule, 2020–2026
+on Alpaca's IEX bars: +33%/yr of capital at 1 c/share, Sharpe 1.05, PSR
+1.00, 2023 the one losing year). It is a leveraged day-trading rule, so
+it needs a $25,000 margin account to run live; it goes to a paper pilot
+on the Alpaca paper account first.

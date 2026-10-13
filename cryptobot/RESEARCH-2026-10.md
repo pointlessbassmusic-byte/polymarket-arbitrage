@@ -978,3 +978,39 @@ positive in sample), and nothing here trades. The honest version of
 slippage model to argue about; its 30-day sample is still being
 pulled, and the first 120 hours read +1.0% per dollar at 30 minutes
 out with a t of 0.7, which is noise until the rest arrives.
+
+## Addendum, 2026-10-13 (18): the opening-range pilot ran, and it is alive
+
+The Alpaca paper key arrived tonight and `orb_study --fetch` pulled
+137,377 five-minute QQQ bars from the free IEX feed: 1,543 regular
+sessions from August 2020 to October 2026. The rule was registered on
+2026-10-09, before any bar was seen: first 5-minute bar up, buy at the
+second bar's open (down, sell short); stop 0.1 × 14-day ATR; target
+10 R; flat at the close; 1% of capital at risk a day, at most 4×
+leverage.
+
+| cost per share, each side | net per year of capital | Sharpe | PSR | years positive |
+|---|---|---|---|---|
+| 1.0 c (registered) | +32.6% | 1.05 | 1.00 | 6 of 7 |
+| 2.2 c (replications' break-even) | +26.8% | 0.86 | 0.99 | 6 of 7 |
+| none | +37.5% | 1.21 | 1.00 | 6 of 7 |
+
+Mean +0.26 R a session with a 20% hit rate: 1,239 stops, 65 targets,
+239 flat at the close. By year at 1 c: 2020 (Aug on) +10%, 2021 +60%,
+2022 +60%, 2023 −8%, 2024 +44%, 2025 +27%, 2026 +8%.
+
+**Verdict: alive**, by the bar written in advance (Sharpe above 0.5
+with PSR at least 0.95, and 2023–2026 net positive). One rule, so the
+deflated Sharpe is the PSR. The caveats, stated before anyone trades
+it:
+
+- The window is six years, not ten: the free feed starts in 2020 and
+  misses 2016–2019, where the replication found QQQ thin. The strong
+  2021–2022 carry the average; 2023 lost.
+- IEX bars are a fraction of consolidated volume. The opening range
+  and the fills are a thin-tape view; a paper pilot against live
+  quotes is the check.
+- It is leveraged day trading. The pattern-day-trader rule needs a
+  margin account above $25,000, so the desk's $250 cannot run it live.
+  The next step is a 60-session paper pilot on the Alpaca paper
+  account, an `orb_bot` inside the desk, scored against this backtest.
