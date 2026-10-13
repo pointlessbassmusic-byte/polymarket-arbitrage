@@ -1046,3 +1046,29 @@ and the arithmetic comes to pennies with wide error bars. The structure
 is the right shape for a small account; the edge at this venue is
 simply thin. A 60-day pull is one command if a longer look is ever
 wanted.
+
+## Addendum, 2026-10-13 (20): monthly trend-following on the macro perps
+
+Kalshi's new perps on the S&P 500, Nasdaq 100, gold, silver, copper,
+platinum, palladium and WTI make the most replicated factor in the
+literature, time-series momentum, tradable in $4–14 pieces at 4 bp a
+side. Pre-registered as `tsmom-kalshi-macro-perps` and run on ten years
+of the ETFs that track the same prices (GLD, SLV, CPER, PPLT, PALL,
+USO, SPY, QQQ from the Nasdaq data API, 2016–2026):
+
+| variant | per year | Sharpe | PSR | max drawdown | full years positive |
+|---|---|---|---|---|---|
+| 12-month, long-short, 5%/yr carry (registered) | +3.2% | 0.28 | 0.79 | −31% | 4 of 8 |
+| the same, no carry drag | +8.2% | 0.70 | 0.98 | −22% | 5 of 8 |
+| 12-month, long-only | +7.4% | 0.67 | 0.98 | −19% | 5 of 8 |
+| 1 / 3 / 6-month, long-short | −0.7 / −1.0 / +1.0% | about 0 | | | |
+
+The rule is positive on seven of the eight instruments and beats
+buying and holding on none of them: this was a decade in which nearly
+everything went up, so the long side carries the result and shorting
+the losers (2021–2023) cost 29 points. **Verdict: inconclusive.** The
+number that decides it is the one assumed, not measured: the carry on
+Kalshi's index and metal perps. The 5%/yr drag turns a 0.70 Sharpe
+into 0.28. Measuring that funding is the next step and takes one pull
+from the public API; at near-zero funding the family is worth a second
+look with longer histories, and at 5% it is not.

@@ -1160,6 +1160,7 @@ python -m cryptobot.vrp_collect --state state --report   # the IBIT series so fa
 python -m cryptobot.vrp_study --state state --fetch --wings 0.10 --overlap --close-dte 7   # the premium, 2021 on
 python -m cryptobot.vrp_study --state state --source ibit --overlap   # the ladder on the IBIT rows, out of sample
 python -m cryptobot.orb_bot --state state --report            # the QQQ opening-range paper pilot so far (runs inside the desk)
+python -m cryptobot.tsmom_study --dir tsmom                    # monthly trend rule on Kalshi's index/metal/oil perps (ETF proxies)
 python -m cryptobot.perp_hourly_study --state state --fetch   # hourly rules on every Kalshi perp at real costs (seconds)
 python -m cryptobot.kalshi_binaries --state state --days 30   # Kalshi hourly BTC binaries, settled, minute quotes (hours)
 python -m cryptobot.binary_tails_study --state state          # the favourite at 85-97 cents, 30 and 15 minutes out

@@ -64,7 +64,11 @@ stop-and-reverse, vol-targeted index trend, follow-the-S&P in BTC, and
 the price-scaled small-cap earnings drift (its placebo, entering a
 month after the report, beat the real entry: the names win whenever
 you buy them, which is survivorship, not drift).
-Inconclusive, recorded: Kalshi's hourly BTC binaries (17,614 markets, 30
+Inconclusive, recorded: monthly trend-following on Kalshi's index, metal
+and oil perps (ten years of ETF proxies: +3%/yr after a 5%/yr carry
+assumption, +8%/yr without it, long-only +6–7%/yr but every instrument
+beat by buy-and-hold over a bull decade; Kalshi's real funding on those
+perps is the open number), Kalshi's hourly BTC binaries (17,614 markets, 30
 days: longshots overpriced and lose 35–40% per dollar, favourites
 underpriced by 1.5 points, +0.4–0.6% per dollar after fees at t ≤ 1.0;
 not traded), hourly rules on Kalshi's perps (26 reversal,

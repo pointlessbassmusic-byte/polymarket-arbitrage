@@ -549,6 +549,20 @@
   preregistered: true
   trials_run: 26
 
+- id: tsmom-kalshi-macro-perps
+  title: "Time-series momentum on the index, metal and oil perps Kalshi lists: go with the sign of the trailing 12-month return, monthly"
+  source: "Moskowitz, Ooi & Pedersen 2012 (Time series momentum, JFE), Hurst, Ooi & Pedersen 2017 (a century of evidence); Kalshi perps listed 2026-09/10: KXUS500PERP, KXUSTECH100PERP, KXGOLDPERP, KXSILVERPERP, KXCOPPERPERP, KXPLATINUMPERP, KXPALLADIUMPERP, KXWTIFUTURE, in $4-14 contracts at 4 bp a side; operator direction 2026-10-13 (more instruments with real money)"
+  claim: "At each month end, long each instrument whose trailing 12-month return is positive and short each whose is negative, equal weight across the eight, held a month, earns a net Sharpe above 0.5 after Kalshi's costs and the perps' carry, on the ETF histories that stand in for the perps (GLD, SLV, CPER, PPLT, PALL, USO, SPY, QQQ, 2016-2026 from the Nasdaq data API)."
+  test: "cryptobot.tsmom_study: monthly closes from the daily ETF closes; signal = sign of the k-month trailing return with k = 12 registered and 1, 3, 6 as sensitivities; long-short (registered) and long-only; 8 bp a round trip charged on every sign flip; carry drag of 5% a year on the whole book as the registered cost case (perps funding and ETF expense), 0 as the sensitivity. One monthly series per variant, pooled across the eight instruments at 1/8 each, no leverage; 2 directions x 4 lookbacks = 8 trials; per-instrument contribution reported for the registered variant."
+  success: "Written before running: alive if the registered variant (12-month, long-short, 8 bp, 5%/yr drag) has net Sharpe >= 0.5 with PSR >= 0.95 over 2017-2026, DSR >= 0.95 at 8 trials, and is positive in at least 6 of the 9 full calendar years; killed if its net is at or below zero; otherwise inconclusive. If alive: paper on the desk's Kalshi book for two monthly rebalances with real quotes, then real money sized by the allocator."
+  data: "scratch tsmom/<SYM>.json, ten years of daily closes per ETF from the Nasdaq data API (2016-10-13 to 2026-10-12); IBIT 2024-01 on, not in the pooled test"
+  result: "Run 2026-10-13, 108 months 2017-10 to 2026-10. Registered variant (12-month, long-short, 8 bp a flip, 5%/yr carry drag): +3.2% a year, Sharpe 0.28, PSR 0.79, DSR 0.00 at 8 trials, max drawdown -31%, positive in 4 of 8 full years (2021 -6%, 2022 -14%, 2023 -9%, 2025 +39%). Without the carry drag +8.2%, Sharpe 0.70, PSR 0.98. Long-only variants +5.6% to +7.4% a year (Sharpe 0.60-0.67, PSR 0.97-0.98) with drawdowns of 12-19%, and every one trails buying and holding the same instrument (QQQ +20.5%/yr, GLD +12.6%, SPY +14.2% over a bull decade). Per instrument the rule is positive on seven of eight (platinum -5.5%) and beats buy-and-hold on none. The lookback sensitivities (1, 3, 6 months) are flat to negative long-short. The decade's trend was mostly up, which is why long-only works and shorting the losers does not; the carry assumption decides the registered number, and Kalshi's actual funding on these perps has not been measured yet"
+  verdict: inconclusive
+  regime: "2017-2026: a monthly trend rule on indices and metals is positive but thin after the perps' carry, below the bar on every count but net; not traded. If Kalshi's funding on the index and metal perps measures near zero, the no-drag case (+8%/yr, Sharpe 0.7) is the relevant one and the family is worth a second look with more history"
+  rerun: "python -m cryptobot.tsmom_study --dir tsmom (and --carry 0 for the no-drag case)"
+  preregistered: true
+  trials_run: 8
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
