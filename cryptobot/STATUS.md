@@ -64,6 +64,11 @@ stop-and-reverse, vol-targeted index trend, follow-the-S&P in BTC, and
 the price-scaled small-cap earnings drift (its placebo, entering a
 month after the report, beat the real entry: the names win whenever
 you buy them, which is survivorship, not drift).
+Searched and empty: 6,096 one- and two-feature barrier rules over Kalshi's
+hourly perps (closed: the in-sample winners lose every month), eleven
+years of hourly BTC and ten years of nine macro ETFs (inconclusive: the
+walk-forward earns the market's own drift, the best in-sample Sharpe is
+what the best of N null trials gives).
 Inconclusive, recorded: monthly trend-following on Kalshi's index, metal
 and oil perps (ten years of ETF proxies: +3%/yr after a 5%/yr carry
 assumption, +8%/yr without it, long-only +6–7%/yr but every instrument

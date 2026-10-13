@@ -1096,3 +1096,42 @@ candidate above the noise, platinum at 17.6%, on twenty days of
 history; at $250 of capital that is $40 a year before the hedge's
 costs, which is not a strategy, it is a rounding error. Re-read when
 the metal and index perps have months of prints, not weeks.
+
+## Addendum, 2026-10-13 (22): the systematic search, 6,096 rules, three datasets
+
+The operator asked for every possibility in the data to be tried. The
+way to do that without fooling ourselves is the way the bounce-short
+was found and then deflated: build every candidate, score the whole
+family, and ask what the best of a search this size looks like when
+nothing is there. `cryptobot/family_search.py` does that for any
+dataset: returns over four windows, rolling volatility, position in
+the range, volume ratio and the clock, in terciles; every single band
+and every two-feature cell, long and short; four target/stop/time
+exits; one position per instrument; the venue's round trip charged.
+Then the T × N daily P&L matrix, the effective number of trials, CSCV
+probability of overfitting, the best rule's deflated Sharpe at N_eff,
+and a walk-forward that each period trades whatever was best on
+everything before it, with the terciles refitted on the training days.
+
+| family | rules | N_eff | PBO | best in-sample | best DSR | walk-forward | verdict |
+|---|---|---|---|---|---|---|---|
+| Kalshi hourly perps, 20 instruments, 133 days, 18 bp | 2,208 | 5 | 0.17 | Sharpe 1.65, +14 bp/trade | 0.00 | −138% in 74 days, every month negative | closed |
+| BTC hourly 2015–2026, 10 bp | 2,208 | 21 | 0.00 | Sharpe 1.06, +22 bp/trade | 0.00 | +24.5% over 11 years, Sharpe 0.10, PSR 0.63 | inconclusive |
+| nine macro ETFs daily 2016–2026, 8 bp | 1,680 | 55 | 0.04 | Sharpe 1.32, +83 bp/trade | 0.00 | +156% over 10 years, Sharpe 0.50, PSR 0.93 | inconclusive |
+
+What the three say together. On the hourly perps the in-sample winners
+do not survive the next month; the rule the walk-forward picks changes
+sign every period, which is what noise does. On BTC hourly and the
+ETFs every top rule is a long rule with a wide profit target, and the
+walk-forward earns about what being long earned over those years: the
+search rediscovered the drift of the decade, not a timing edge, and
+equal-weight buy-and-hold of the same ETFs beat it with a 2018 and a
+2021 that lost 21% and 36%. In every family the best in-sample Sharpe
+is within what the best of N_eff null trials produces (deflated Sharpe
+0.00). No candidate.
+
+The honest reading of tonight: price-and-volume history at these
+horizons has been mined to its floor with this family of rules. The
+next edge, if there is one for this desk, comes from a different kind
+of data (order-book depth, funding, cross-market basis, event
+calendars), not from more combinations of the same closes.
