@@ -59,11 +59,12 @@ def compact(m: dict) -> dict:
 
 
 class KalshiBinaries:
-    def __init__(self, state_dir: Path, client=None, pace_s: float = PACE_S, series: str = SERIES):
+    def __init__(self, state_dir: Path, client=None, pace_s: float = PACE_S, series: str = SERIES, interval: int = 1):
         self.dir = Path(state_dir) / "kalshi_binaries"
         self.markets_file = self.dir / "markets.jsonl"
         self.candles_dir = self.dir / "candles"
         self.series = series
+        self.interval = interval   # candle minutes: 1 for intraday markets, 60 for daily/weekly, 1440 for monthly and longer
         self._c = client or httpx.AsyncClient(timeout=60, headers=UA)
         self._owns = client is None
         self.pace_s = pace_s
@@ -146,7 +147,7 @@ class KalshiBinaries:
         for m in todo[:limit]:
             try:
                 j = await self._get(f"/series/{m['series']}/markets/{m['ticker']}/candlesticks",
-                                    {"start_ts": m["open_ts"] - 60, "end_ts": m["close_ts"] + 60, "period_interval": 1})
+                                    {"start_ts": m["open_ts"] - 60 * self.interval, "end_ts": m["close_ts"] + 60, "period_interval": self.interval})
             except RuntimeError as exc:                   # one market the endpoint refuses must not stop the pull
                 logger.warning("candles %s: %s (stored empty)", m["ticker"], exc)
                 j = {"candlesticks": [], "error": str(exc)}
@@ -175,8 +176,8 @@ class KalshiBinaries:
 
 
 async def collect(state_dir: Path, days: int = 30, client=None, limit: Optional[int] = None, pace_s: float = PACE_S,
-                  series: str = SERIES) -> dict:
-    c = KalshiBinaries(state_dir, client=client, pace_s=pace_s, series=series)
+                  series: str = SERIES, interval: int = 1) -> dict:
+    c = KalshiBinaries(state_dir, client=client, pace_s=pace_s, series=series, interval=interval)
     try:
         since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
         listed = await c.list_settled(since)
@@ -193,13 +194,14 @@ def main(argv=None) -> int:
     ap.add_argument("--limit", type=int, default=None, help="at most this many candle fetches this run")
     ap.add_argument("--pace", type=float, default=PACE_S, help="seconds between public requests")
     ap.add_argument("--series", default=SERIES, help="Kalshi series ticker (KXBTCD hourly ladder, KXBTC15M 15-minute up/down, KXETHD, ...)")
+    ap.add_argument("--interval", type=int, default=1, help="candle minutes (1, 60 or 1440)")
     ap.add_argument("--status", action="store_true")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if a.status:
         print(KalshiBinaries(a.state).status())
         return 0
-    print(asyncio.run(collect(a.state, a.days, limit=a.limit, pace_s=a.pace, series=a.series)))
+    print(asyncio.run(collect(a.state, a.days, limit=a.limit, pace_s=a.pace, series=a.series, interval=a.interval)))
     return 0
 
 
