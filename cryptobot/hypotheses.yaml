@@ -703,6 +703,20 @@
   preregistered: true
   trials_run: 14
 
+- id: kalshi-crypto-binaries-all-horizons
+  title: "Kalshi's crypto event contracts at every horizon (15-minute, hourly, daily, weekly, monthly and yearly; above/below, range, one-touch max/min, head-to-head): where is the favourite-longshot bias big enough to buy the favourite after the fee?"
+  source: "operator direction 2026-10-13 (Kalshi's full-day, week and longer crypto contracts, study all time horizons); kalshi-btc-hourly-tails (hourly ladder: longshots -35%/$, favourite +0.6%/$ at t 1.0); binary-conditional-vol-2026-10 (the mid beats a dispersion model at 15 minutes and an hour); Snowberg & Wolfers 2010; Burgi, Deng & Whelan 2024 (Kalshi favourite-longshot bias)"
+  claim: "On settled Kalshi crypto markets with volume, grouped by horizon class (15m, hourly, daily, weekly, monthly-or-longer), at decision points 50%, 25% and 10% of the market's life before close, contracts priced 0.85-0.97 (by mid, favourite side) resolve in their favour more often than the price implies, so buying the favourite at the ask net of the quadratic fee 0.07 x p x (1-p) earns > 0 per dollar."
+  test: "cryptobot.binary_horizons_study over every series pulled into scratch state_bin/<SERIES> plus the KXBTCD and KXBTC15M sets: quote = last candle at or before the decision time within one candle interval; two-sided quote and spread <= 5 cents required; favourite bought at the ask (YES) or 1 - bid (NO); net per dollar, hit vs implied; t clustered by event; halves by close date; longshots (0.03-0.15) and calibration by price decile reported descriptively. Trials: 5 horizon classes x 3 decision points = 15."
+  success: "Written before running: CANDIDATE if a horizon class shows net >= +1% per dollar at cluster t >= 2.5 with both halves positive and at least 30 independent events; it then goes to a paper rule on that class for 100 contracts. KILLED for a class if net per dollar is negative at all three decision points. Otherwise inconclusive. Classes with fewer than 30 events are reported as too few to test."
+  data: "scratch state_bin/<SERIES>/kalshi_binaries (monthly one-touch for BTC, ETH, SOL, DOGE, XRP; yearly BTC/ETH/DOGE; weekly max and directional; daily above/below for SHIB, LINK, LTC, XRP, AVAX, BCH, DOT, XLM; hourly ETH, SOL, DOGE, XRP; 15-minute ETH, SOL, DOGE, XRP), state_collect (KXBTCD), state_binaries_15m (KXBTC15M)"
+  result: "PRE-REGISTERED 2026-10-13; pull running"
+  verdict: inconclusive
+  regime: "pending"
+  rerun: "python -m cryptobot.binary_horizons_study --scratch <dir>"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
