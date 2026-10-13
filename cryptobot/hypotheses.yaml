@@ -710,10 +710,24 @@
   test: "cryptobot.binary_horizons_study over every series pulled into scratch state_bin/<SERIES> plus the KXBTCD and KXBTC15M sets: quote = last candle at or before the decision time within one candle interval; two-sided quote and spread <= 5 cents required; favourite bought at the ask (YES) or 1 - bid (NO); net per dollar, hit vs implied; t clustered by event; halves by close date; longshots (0.03-0.15) and calibration by price decile reported descriptively. Trials: 5 horizon classes x 3 decision points = 15."
   success: "Written before running: CANDIDATE if a horizon class shows net >= +1% per dollar at cluster t >= 2.5 with both halves positive and at least 30 independent events; it then goes to a paper rule on that class for 100 contracts. KILLED for a class if net per dollar is negative at all three decision points. Otherwise inconclusive. Classes with fewer than 30 events are reported as too few to test."
   data: "scratch state_bin/<SERIES>/kalshi_binaries (monthly one-touch for BTC, ETH, SOL, DOGE, XRP; yearly BTC/ETH/DOGE; weekly max and directional; daily above/below for SHIB, LINK, LTC, XRP, AVAX, BCH, DOT, XLM; hourly ETH, SOL, DOGE, XRP; 15-minute ETH, SOL, DOGE, XRP), state_collect (KXBTCD), state_binaries_15m (KXBTC15M)"
-  result: "PRE-REGISTERED 2026-10-13; pull running"
+  result: "Run 2026-10-13 on 20,640 settled markets in 14 series. Kalshi lists 276 crypto series, but most daily altcoin above/below series (LINK, LTC, XRP, AVAX, BCH, DOT, XLM) and the weekly max/directional and head-to-head series had no settled market with volume in the window; yearly series hold one event. Favourite at 0.85-0.97 bought at the ask, at 50 / 25 / 10% of life left: 15-minute BTC (952 slots) +0.2% / +1.1% / -1.4% per $ (t 0.1 / 0.8 / -0.7); hourly BTC ladder (16,475 markets, 566-677 hours) +0.5% / +0.3% / -0.0% (t 0.7 / 0.5 / 0.0); daily (BTC 17:00 ET contracts plus SHIB, 45-52 days; BTC's daily pull stopped at its two-hour cap with 2,691 of 3,062 contracts priced) +1.3% / +3.2% / +2.4% (t 0.7 / 1.8 / 1.6), both halves positive at every decision point, hit 95.5-97.2% against 93.8-94.1% paid; weekly 8-9 events and monthly one-touch 12-16 events, too few to test (monthly favourites lost 12-39% on October's move). Longshots lose at every horizon with enough events (-27% to -72% per $). The daily result was +4.6% at t 3.7 on the first 29 days and fell to t 1.8 on 52, the shape of an early run. No class meets the bar; none is killed"
   verdict: inconclusive
-  regime: "pending"
+  regime: "2026-08 to 2026-10: the favourite-longshot bias is in every Kalshi crypto horizon, longshots overpriced; it pays the favourite after the fee only possibly on the daily contracts, unproven at 52 days. Forward test pre-registered as kalshi-btc-daily-favourite-oos"
   rerun: "python -m cryptobot.binary_horizons_study --scratch <dir>"
+  preregistered: true
+  trials_run: 15
+
+- id: kalshi-btc-daily-favourite-oos
+  title: "Forward test: buy the favourite on Kalshi's daily BTC above/below contract with a quarter of the day left"
+  source: "kalshi-crypto-binaries-all-horizons (daily class: +3.2% per $ at t 1.8 on 52 days, positive in both halves at all three decision points)"
+  claim: "On KXBTCD daily contracts (the 17:00 ET settlement, open about 25 hours) closing on or after 2026-10-14, buying the side priced 0.85-0.97 at the ask when 25% of the contract's life is left (about 11:00 ET), with a spread of at most 5 cents and the quadratic fee, nets > 0 per dollar."
+  test: "The desk's daily collector (vrp_collect.run_once) pulls each day's settled KXBTCD daily contracts with hourly candles into state/binaries_daily/KXBTCD; python -m cryptobot.binary_horizons_study --scratch state/binaries_daily --since 2026-10-14 reads the daily class at 25% of life left. One decision point, one horizon, no parameter changes: 1 trial."
+  success: "Written before any forward data: after 60 independent days, CANDIDATE if net >= +1% per $ at cluster t >= 2.0 with both 30-day halves positive, then a paper rule for 30 more days before real money at the allocator's size; KILLED if net per $ is negative at 60 days; otherwise inconclusive and read again at 120."
+  data: "state/binaries_daily/KXBTCD (desk collector, daily from 2026-10-14)"
+  result: "PRE-REGISTERED 2026-10-13; collecting from 2026-10-14; not read before 60 days"
+  verdict: inconclusive
+  regime: "collecting"
+  rerun: "python -m cryptobot.binary_horizons_study --scratch state/binaries_daily --since 2026-10-14"
   preregistered: true
   trials_run: 0
 

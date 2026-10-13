@@ -346,6 +346,14 @@ class Collector:
             logger.warning("DVOL / BTC close fetch failed: %s", exc)
             out["dvol"] = f"ERROR {type(exc).__name__}"
         try:
+            from .kalshi_binaries import collect as binaries_collect
+            r = await binaries_collect(self.state / "binaries_daily" / "KXBTCD", days=4, series="KXBTCD",
+                                       interval=60, min_span_s=7200, client=self._c)
+            out["btc_daily_binaries"] = {k: r.get(k) for k in ("listed", "candles", "markets", "events", "last")}
+        except Exception as exc:                      # noqa: BLE001
+            logger.warning("Kalshi daily BTC binaries failed: %s", exc)
+            out["btc_daily_binaries"] = f"ERROR {type(exc).__name__}"
+        try:
             from .oos_track import update as oos_update
             s = await oos_update(self.state, client=self._c)
             out["divergence_oos"] = {k: s[k] for k in ("days_tracked", "pending", "verdict")} | {"qualifying": s["qualifying"]["n"]}

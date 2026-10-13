@@ -1514,3 +1514,55 @@ data build: a mention-rate rule gets its own pre-registration once 90
 days are on file. The first snapshot showed thin StockTwits traffic,
 0.3–2.3 messages an hour on the meme coins, so the trending list and
 the volume ratio will likely carry more information than mentions.
+
+## Addendum, 2026-10-13 (28): Kalshi's crypto contracts at every horizon
+
+The operator asked for all of Kalshi's crypto contract horizons, not
+only the 15-minute and hourly ones. Kalshi lists 276 crypto series:
+15-minute up/down on 12 coins; hourly above/below ladders and ranges;
+daily above/below on BTC (the 17:00 ET contract) and a dozen altcoins;
+weekly highs, weekly directional and head-to-head (BTC vs ETH, SOL,
+HYPE); monthly "will it touch" highs and lows; yearly highs, lows and
+year-end ranges; plus one-off events (all-time highs, airdrops, token
+valuations). Volume is concentrated. Most daily altcoin series (LINK,
+LTC, XRP, AVAX, BCH, DOT, XLM) and the weekly and head-to-head series
+had no settled market with volume between August and October. The
+monthly and yearly series started in August, so they hold 1 to 3
+independent outcomes each.
+
+`binary_horizons_study` (pre-registered as
+`kalshi-crypto-binaries-all-horizons`) groups every settled market by
+its own lifetime, takes the quote at 50%, 25% and 10% of life left, and
+buys the favourite (0.85–0.97) at the ask with the fee. It ran on
+20,640 markets. The daily BTC pull stopped at its two-hour cap with
+2,691 of 3,062 contracts priced.
+
+| horizon | independent events | favourite net per $ at 50 / 25 / 10% left | t | longshots |
+|---|---|---|---|---|
+| 15-minute BTC | 252–332 | +0.2% / +1.1% / −1.4% | 0.1 / 0.8 / −0.7 | −30% to 0% |
+| hourly BTC ladder | 566–677 | +0.5% / +0.3% / 0.0% | 0.7 / 0.5 / 0.0 | −27% to −36% |
+| daily (BTC 17:00 ET, SHIB) | 45–52 | +1.3% / +3.2% / +2.4% | 0.7 / 1.8 / 1.6 | −53% to −72% |
+| weekly | 8–9 | too few | | |
+| monthly one-touch | 12–16 | too few (favourites −12% to −39% on October's move) | | |
+
+The favourite-longshot bias is present at every horizon. Longshots are
+overpriced everywhere there are enough events. The favourite side pays
+after the fee only on the daily contracts, and not yet provably: the
+first 29 days showed +4.6% at t 3.7, and 52 days show +3.2% at t 1.8.
+That shrinkage is what an early lucky run looks like. Both halves are
+positive at all three decision points, so it is not killed either.
+
+**What happens next.** The desk's daily collector now pulls each day's
+settled BTC daily contracts with hourly quotes. A forward test is
+pre-registered (`kalshi-btc-daily-favourite-oos`): one decision point
+(a quarter of the day left, about 11:00 ET), from 2026-10-14, read at
+60 independent days. It is a candidate at +1% per dollar with t ≥ 2.0
+and both halves positive, then 30 days on paper before real money.
+That is about mid-December. Nothing trades on it before then.
+
+**What a trade looks like if it passes.** One contract pays $1. At a
+93-cent favourite the fee is 0.07 × 0.93 × 0.07 = 0.46 cents. A +3%
+edge per dollar is about 2.8 cents a contract. At $1,000 that is
+roughly $30 a day on a winning day, against the 1-in-15 day the
+favourite loses and takes 93 cents a contract. Sizing would come from
+the allocator, as for every other rule.

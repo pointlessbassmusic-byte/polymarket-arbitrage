@@ -101,6 +101,12 @@ from a US account. One-minute bars: no minute-of-hour, autocorrelation
 or within-hour return signal; only range persists. A forward hype
 scanner (CoinGecko trending, meme volumes, StockTwits rate, Fear &
 Greed) now runs hourly in the desk as a data build.
+Inconclusive, forward test running (addendum 28): Kalshi's crypto
+contracts at every horizon. Longshots are overpriced at every horizon;
+the favourite pays after the fee only on the daily BTC contract, +3.2%
+per dollar at t 1.8 on 52 days. A one-decision forward test starts
+2026-10-14 and is read at 60 days (mid-December); the desk's daily
+collector gathers it.
 Searched and empty: 6,096 one- and two-feature barrier rules over Kalshi's
 hourly perps (closed: the in-sample winners lose every month), eleven
 years of hourly BTC and ten years of nine macro ETFs (inconclusive: the

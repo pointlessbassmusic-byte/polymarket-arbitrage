@@ -17,6 +17,7 @@ reported descriptively.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import statistics
 from collections import defaultdict
@@ -64,18 +65,19 @@ def bar_step(bars: list) -> float:
     return float(gaps[len(gaps) // 2]) if gaps else 60.0
 
 
-def collect(scratch: Path) -> tuple[list[dict], dict[str, list]]:
+def collect(scratch: Path, since_ts: int = 0) -> tuple[list[dict], dict[str, list]]:
     dirs = [scratch / "state_collect", scratch / "state_binaries_15m"]
     sb = scratch / "state_bin"
     if sb.exists():
         dirs += sorted(p for p in sb.iterdir() if p.is_dir())
+    dirs += [scratch] + sorted(p for p in scratch.iterdir() if p.is_dir() and (p / "kalshi_binaries").exists())
     markets, bars, seen = [], {}, set()
     for d in dirs:
         if not (d / "kalshi_binaries" / "markets.jsonl").exists():
             continue
         ms, bs = load_binaries(d)
         for m in ms:
-            if m["ticker"] in seen or m.get("result") not in ("yes", "no"):
+            if m["ticker"] in seen or m.get("result") not in ("yes", "no") or m["close_ts"] < since_ts:
                 continue
             seen.add(m["ticker"])
             markets.append(m)
@@ -159,8 +161,9 @@ def summarize(ts: list[dict]) -> dict:
     return out
 
 
-def run(scratch: Path) -> dict:
-    markets, bars = collect(scratch)
+def run(scratch: Path, since: str = "") -> dict:
+    since_ts = int(dt.datetime.fromisoformat(since).replace(tzinfo=dt.timezone.utc).timestamp()) if since else 0
+    markets, bars = collect(scratch, since_ts)
     res = evaluate(markets, bars)
     res["markets"] = len(markets)
     res["series"] = len({m["series"] for m in markets})
@@ -190,8 +193,9 @@ def render(res: dict) -> str:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--scratch", type=Path, default=Path("."))
+    ap.add_argument("--since", default="", help="only markets closing on or after this date (the forward test)")
     a = ap.parse_args(argv)
-    res = run(a.scratch)
+    res = run(a.scratch, a.since)
     print(render(res))
     (a.scratch / "binary_horizons_study.json").write_text(json.dumps(res, default=str))
     return 0
