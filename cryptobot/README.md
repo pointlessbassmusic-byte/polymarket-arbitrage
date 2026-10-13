@@ -1167,6 +1167,7 @@ python -m cryptobot.family_search --set etf_daily --scratch .  # every 1-2 featu
 python -m cryptobot.condor_study --state state                 # monthly IBIT iron condor on the DVOL history
 python -m cryptobot.data.macro --state state                   # FRED daily macro series + 26 ETFs, ten years
 python -m cryptobot.macro_study --state state                  # eight macro-to-asset leads, pre-registered
+python -m cryptobot.macro_bot --state state --report           # the 2s10s -> XLF paper pilot (runs inside the desk)
 python -m cryptobot.perp_hourly_study --state state --fetch   # hourly rules on every Kalshi perp at real costs (seconds)
 python -m cryptobot.kalshi_binaries --state state --days 30   # Kalshi hourly BTC binaries, settled, minute quotes (hours)
 python -m cryptobot.binary_tails_study --state state          # the favourite at 85-97 cents, 30 and 15 minutes out

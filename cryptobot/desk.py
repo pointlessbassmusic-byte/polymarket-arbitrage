@@ -98,6 +98,14 @@ def research_lines(state_dir: Optional[Path]) -> list[str]:
         books = {}
     if books:
         out.append("research: order books " + ", ".join(f"{t} {b['rows']} rows/{b['days']}d" for t, b in books.items()))
+    try:
+        from .macro_bot import report as macro_report, trades_file as macro_file
+        mp = macro_report(state_dir) if macro_file(state_dir).exists() else None
+    except Exception:                                 # noqa: BLE001
+        mp = None
+    if mp and mp.get("trades"):
+        out.append(f"research: macro pilot {mp['closed']} closed of {mp['target']}"
+                   + (f", mean {mp['mean_bp']:+.0f} bp" if mp.get("closed") else "") + (", one open" if mp.get("open") else "") + f"; {mp['verdict'][0]}")
     orb = orb_state(state_dir)
     if orb and orb.get("sessions"):
         v, why = orb["verdict"]
@@ -419,6 +427,11 @@ class Desk:
             from .vrp_collect import status
             cached = status(Path(self.state_dir))
             cached["orb"] = orb_state(self.state_dir)
+            try:
+                from .macro_bot import report as macro_report, trades_file as macro_file
+                cached["macro"] = macro_report(self.state_dir) if macro_file(self.state_dir).exists() else None
+            except Exception:                         # noqa: BLE001
+                cached["macro"] = None
             try:
                 from .book_recorder import status as book_status
                 cached["books"] = book_status(Path(self.state_dir))
@@ -963,6 +976,12 @@ async def _main(args) -> int:
                            interval_s=float(ob.get("interval_s", 15)))
         tasks.append(rec.run_forever())
         logger.info("order-book recorder on: %d tickers every %ss", len(rec.tickers), ob.get("interval_s", 15))
+    macro_cfg = (cfg.get("brokers") or {}).get("alpaca", {}).get("macro") or {}
+    if macro_cfg.get("enabled", True) and os.environ.get("CRYPTOBOT_ALPACA_KEY_ID") and os.environ.get("CRYPTOBOT_ALPACA_SECRET_KEY"):
+        from .macro_bot import MacroBot
+        mbot = MacroBot(args.state_dir, macro_cfg)
+        tasks.append(mbot.run_forever())
+        logger.info("macro paper pilot on %s: %s mode", mbot.symbol, mbot.mode)
     orb_cfg = (cfg.get("brokers") or {}).get("alpaca", {}).get("orb") or {}
     if orb_cfg.get("enabled", True) and os.environ.get("CRYPTOBOT_ALPACA_KEY_ID") and os.environ.get("CRYPTOBOT_ALPACA_SECRET_KEY"):
         from .orb_bot import OrbBot

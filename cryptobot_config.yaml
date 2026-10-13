@@ -261,6 +261,13 @@ brokers:
       symbol: QQQ
       capital_usd: 25000       # the paper account's sizing basis
       poll_s: 30
+    # Macro paper pilot (python -m cryptobot.macro_bot): the 2s10s slope's
+    # 20-day change into XLF for 20 sessions, one position, PAPER until 20
+    # trades meet the bar (macro-relations-2026-10).
+    macro:
+      enabled: true
+      symbol: XLF
+      notional_usd: 1000
   tastytrade:
     live: false
 
