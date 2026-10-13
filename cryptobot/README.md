@@ -1165,6 +1165,11 @@ python -m cryptobot.book_study --state state                  # imbalance vs the
 python -m cryptobot.tsmom_study --dir tsmom                    # monthly trend rule on Kalshi's index/metal/oil perps (ETF proxies)
 python -m cryptobot.family_search --set etf_daily --scratch .  # every 1-2 feature barrier rule on a dataset, scored as a family
 python -m cryptobot.condor_study --state state                 # monthly IBIT iron condor on the DVOL history
+python -m cryptobot.range_profile --source coinbase1m --scratch <dir>   # swings, ranges, minute/hour/weekday, volume, macro
+python -m cryptobot.binary_vol_study --scratch <dir>            # Kalshi hourly and 15-minute BTC binaries vs a dispersion model
+python -m cryptobot.binary_horizons_study --scratch <dir>       # favourite-longshot bias on Kalshi crypto contracts by horizon
+python -m cryptobot.hype_study --scratch <dir> --fetch          # meme froth, capitulation, volume continuation, Fear & Greed
+python -m cryptobot.hype_scanner --state state --status         # the hourly attention snapshots and froth scores
 python -m cryptobot.data.macro --state state                   # FRED daily macro series + 26 ETFs, ten years
 python -m cryptobot.macro_study --state state                  # eight macro-to-asset leads, pre-registered
 python -m cryptobot.macro_bot --state state --report           # the 2s10s -> XLF paper pilot (runs inside the desk)
