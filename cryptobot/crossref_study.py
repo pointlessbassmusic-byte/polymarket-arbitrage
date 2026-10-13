@@ -162,16 +162,27 @@ def pairs_relation(stock: list[dict], btc: dict[str, float], horizons=(5, 20)) -
     return out
 
 
-def afterhours_relation(stock: list[dict], hourly: dict[int, float]) -> dict:
-    """BTC 16:00-20:00 ET and 16:00-09:00 ET moves -> the next session."""
+def load_btc_open(scratch: Path) -> dict[str, float]:
+    """BTC at exactly 09:30 ET by session date (scratch btc_open/btc_0930.json), if pulled."""
+    p = scratch / "btc_open" / "btc_0930.json"
+    if not p.exists():
+        return {}
+    return {k: float(v) for k, v in json.loads(p.read_text()).items() if v}
+
+
+def afterhours_relation(stock: list[dict], hourly: dict[int, float], btc_open: Optional[dict[str, float]] = None) -> dict:
+    """BTC 16:00-20:00 ET, 16:00-09:00 ET and (with the minute series) 16:00-09:30 ET moves -> the next session."""
     rows = [r for r in stock if r["date"] >= START]
     out = {}
-    for pname, h_end, next_day in (("afterclose", 20, False), ("overnight", 9, True)):
+    windows = [("afterclose", 20, False), ("overnight", 9, True)]
+    if btc_open:
+        windows.append(("to_0930", 930, True))
+    for pname, h_end, next_day in windows:
         pairs = {"gap": [], "drift": [], "swing": []}
         for i in range(1, len(rows) - 2):
             d0, d1, d2 = rows[i - 1], rows[i], rows[i + 1]
             a = btc_at(hourly, d0["date"], 16)
-            b = btc_at(hourly, d1["date"] if next_day else d0["date"], h_end)
+            b = btc_open.get(d1["date"]) if h_end == 930 else btc_at(hourly, d1["date"] if next_day else d0["date"], h_end)
             if not a or not b:
                 continue
             x = math.log(b / a)
@@ -237,6 +248,7 @@ def candidate(st: dict, sign: int) -> bool:
 def run(scratch: Path, si: Optional[dict] = None) -> dict:
     stocks = load_stocks(scratch)
     btc_d, btc_h = load_btc_daily(scratch), load_btc_hourly(scratch)
+    btc_o = load_btc_open(scratch)
     out = {"pairs": {}, "afterhours": {}, "squeeze": {}, "shortint": {}, "candidates": [], "trials": 0}
     for sym in PROXIES:
         if sym in stocks:
@@ -245,7 +257,7 @@ def run(scratch: Path, si: Optional[dict] = None) -> dict:
             for h, st in out["pairs"][sym].items():
                 if candidate(st, -1):
                     out["candidates"].append(f"pairs {sym} {h}d")
-            out["afterhours"][sym] = afterhours_relation(stocks[sym], btc_h)
+            out["afterhours"][sym] = afterhours_relation(stocks[sym], btc_h, btc_o)
             for pname, d in out["afterhours"][sym].items():
                 for tname, st in d.items():
                     out["trials"] += 1
