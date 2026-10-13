@@ -1315,8 +1315,20 @@ on two. Macro-to-BTC direction: killed as a daily lead, for the
 fourth time this month (addenda 14, 23, 24, here). Macro-to-BTC
 range: real, and it is a sizing input, not a trade.
 
-**12 alt coins at 5 minutes.** PENDING, filled in below when the
-Coinbase pull lands.
+**13 coins at 5 minutes** (BTC, ETH, SOL, XRP, DOGE, ADA, LINK, LTC,
+BCH, SHIB, AVAX, SUI, two years each, and NEAR, partial). Medians across
+coins: a 5-minute bar moves 12 bp with a 24 bp range, and 34% of bars
+move more than the 18 bp round trip. At 15 minutes the figures are
+20 / 45 bp and 55%, at an hour 39 / 94 bp and 75%, at a day 222 / 541 bp
+and 95%. Annualised vol runs 69% (ETH) to 101% (NEAR) against BTC's 44%.
+The busiest hours are 14:00 and 15:00 UTC on all 13 coins. Saturday is the
+quietest day (498 bp median daily range against 632–731 on weekdays).
+On signed return by hour, 3 of 312 coin-hours reach |t| 2.5 (LTC 10:00,
+SHIB 21:00, SUI 23:00, scattered hours and signs), the null rate. The
+volume ratio predicts the next 5-minute range on every coin (t 19 to 47).
+It predicts the next bar's return at |t| 2.5 on 2 of 13 coins, at a
+fraction of a basis point. The same answer as BTC: dispersion is
+forecastable, direction is not.
 
 **What it changes on the desk.** Nothing in the live book. The
 bounce-short's hourly cadence and daily horizon are where the move
