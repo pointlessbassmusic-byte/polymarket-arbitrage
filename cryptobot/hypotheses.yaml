@@ -587,7 +587,7 @@
   result: "PRE-REGISTERED 2026-10-13; recorder deployed with the desk; the first live snapshot read DOGE 9.8 bp spread, SHIB 10.5 bp, BTC 0.2 bp, with imbalances between -0.31 and +0.22 at 25 bp"
   verdict: inconclusive
   regime: "collecting; 30 days from the deploy"
-  rerun: "python -m cryptobot.book_recorder --state state --report (the study: cryptobot.book_study, to be written when the data exists)"
+  rerun: "python -m cryptobot.book_study --state state (collecting until 30 days; the regression is readable after a week)"
   preregistered: true
   trials_run: 0
 

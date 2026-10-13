@@ -1161,6 +1161,7 @@ python -m cryptobot.vrp_study --state state --fetch --wings 0.10 --overlap --clo
 python -m cryptobot.vrp_study --state state --source ibit --overlap   # the ladder on the IBIT rows, out of sample
 python -m cryptobot.orb_bot --state state --report            # the QQQ opening-range paper pilot so far (runs inside the desk)
 python -m cryptobot.book_recorder --state state --report      # order-book rows per perp (recorder runs inside the desk)
+python -m cryptobot.book_study --state state                  # imbalance vs the next minutes, the pre-registered test
 python -m cryptobot.tsmom_study --dir tsmom                    # monthly trend rule on Kalshi's index/metal/oil perps (ETF proxies)
 python -m cryptobot.family_search --set etf_daily --scratch .  # every 1-2 feature barrier rule on a dataset, scored as a family
 python -m cryptobot.perp_hourly_study --state state --fetch   # hourly rules on every Kalshi perp at real costs (seconds)
