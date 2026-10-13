@@ -689,6 +689,20 @@
   preregistered: true
   trials_run: 16
 
+- id: meme-froth-2026-10
+  title: "Hype, froth and volume shocks in meme coins: fade the frenzy, buy the capitulation, or ride the attention?"
+  source: "operator direction 2026-10-13 (hype / froth / volume arbitrage on meme coins, scrape online mentions and other signs of volatility); Liu & Tsyvinski 2021 (crypto attention and momentum); Da, Engelberg & Gao 2011 (attention spikes, short-term rise then reversal); Li et al. 2021 and Hamrick et al. 2021 (pump-and-dump reversals); addendum 25 (volume predicts range, not direction, at one bar)"
+  claim: "On Hyperliquid daily perps 2023-2026 (163 coins; a meme subset of 27), a volume shock (today's dollar volume over the trailing 30-day median, cross-sectional top decile of the day): (1) with a top-decile 7-day run-up (froth) is followed by a negative 3-day and 7-day return, so shorting it nets > 0 after 18 bp a round trip; (2) with a bottom-decile 7-day return (capitulation) is followed by a positive 3- and 7-day return; (3) with a positive day continues the next day; and (4) the Fear & Greed index at extremes is contrarian for BTC over 7 and 30 days (long at <= 20, short at >= 80)."
+  test: "cryptobot.hype_study: features at the daily close use only that day and earlier; cross-sectional deciles among coins with 30 days of volume that day; entries at the close, exits at the close k days later; one event per coin per k days (no overlap); net of 18 bp; t clustered by entry date; halves by date; meme subset and all coins both reported. Fear & Greed from alternative.me (daily since 2018) against Coinbase BTC daily closes. Trials: froth short {3d,7d} x {meme, all} = 4; capitulation long {3d,7d} x {meme, all} = 4; continuation {1d} x {meme, all} = 2; F&G {<=20 long, >=80 short} x {7d, 30d} = 4; total 14. Descriptive, not trials: next-day range on the volume shock; overlap with the live bounce-short signal."
+  success: "Written before running: CANDIDATE if net >= +50 bp a trade at clustered t >= 2.5 with both halves positive, on a set that includes a coin Kalshi lists as a perp; it then goes to the desk as a paper rule (sim book only) for 30 trades, sized by the allocator, before any real money. KILLED for a claim if its sign is wrong in both halves. Otherwise inconclusive. The forward collector (CoinGecko trending and meme markets, StockTwits message rate, Fear & Greed) is a data build, not a test: mention-rate claims get their own pre-registration when 90 days are on file."
+  data: "scratch hl_all_daily.pkl (Hyperliquid daily, volume from 2023), hype/fng.json (alternative.me), btc5m/btc_5m.json and state_collect/btc_daily.jsonl"
+  result: "PRE-REGISTERED 2026-10-13; not run"
+  verdict: inconclusive
+  regime: "pending"
+  rerun: "python -m cryptobot.hype_study --scratch <dir>"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"

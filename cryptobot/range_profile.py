@@ -13,6 +13,7 @@ dollar, WTI, SPY and QQQ, same day (comovement) and prior day (lead).
 
     python -m cryptobot.range_profile --source kalshi_hourly --scratch <dir>
     python -m cryptobot.range_profile --source coinbase5m --scratch <dir>
+    python -m cryptobot.range_profile --source coinbase1m --scratch <dir>   # adds the minute-within-the-hour regressions
     python -m cryptobot.range_profile --source hl_daily --scratch <dir>
 """
 from __future__ import annotations
@@ -31,7 +32,7 @@ from .crossasset_study import ols
 from .data.nasdaq import read_jsonl
 
 COST_BP = 18.0
-HORIZONS = (("5m", 300), ("15m", 900), ("30m", 1800), ("1h", 3600), ("2h", 7200), ("4h", 14400), ("12h", 43200),
+HORIZONS = (("1m", 60), ("2m", 120), ("5m", 300), ("10m", 600), ("15m", 900), ("30m", 1800), ("1h", 3600), ("2h", 7200), ("4h", 14400), ("12h", 43200),
             ("1d", 86400), ("3d", 3 * 86400), ("7d", 7 * 86400), ("14d", 14 * 86400), ("30d", 30 * 86400), ("37d", 37 * 86400))
 Bar = tuple  # (ts, open, high, low, close, volume)
 
@@ -40,7 +41,13 @@ Bar = tuple  # (ts, open, high, low, close, volume)
 
 def load(source: str, scratch: Path, coins: Optional[list[str]] = None) -> tuple[dict[str, list[Bar]], int]:
     out = {}
-    if source == "coinbase5m":
+    if source == "coinbase1m":
+        for p in sorted((scratch / "m1").glob("*_1m.json")):
+            rows = json.loads(p.read_text())
+            if len(rows) > 2000:
+                out[p.stem.split("_")[0].upper()] = [tuple(r) for r in rows]
+        base = 60
+    elif source == "coinbase5m":
         for p in sorted((scratch / "btc5m").glob("*_5m.json")) + sorted((scratch / "btc5m").glob("btc_5m.json")):
             name = p.stem.split("_")[0].upper()
             rows = json.loads(p.read_text())
@@ -185,6 +192,77 @@ def volume_signal(bars: list[Bar], base: int) -> dict:
     return out
 
 
+def minute_structure(bars: list[Bar], base: int) -> dict:
+    """1-minute data only. (1) By minute of the hour: mean signed return
+    with t, mean range, volume share. (2) Autocorrelation of 1-minute
+    returns at lags 1-5 and of 5-minute returns at lag 1 (reversal or
+    momentum at the shortest scale). (3) Within the hour: the rest of the
+    hour's return regressed on the return so far, at minutes 15, 30 and 45
+    (what an hourly binary is pricing), and the rest of the hour's range on
+    the range so far. (4) Next minute's range and return on the volume ratio."""
+    if base != 60:
+        return {}
+    out: dict = {}
+    by_m: dict[int, list] = defaultdict(list)
+    rets = []
+    for b in bars:
+        if b[1] <= 0 or b[4] <= 0:
+            continue
+        r = math.log(b[4] / b[1])
+        rets.append((b[0], r))
+        by_m[(b[0] // 60) % 60].append((r, (b[2] - b[3]) / b[1] * 1e4, b[5]))
+    tot = sum(v for g in by_m.values() for _, _, v in g) or 1.0
+    mins = {}
+    for m, g in sorted(by_m.items()):
+        xs = [r for r, _, _ in g]
+        sd = statistics.pstdev(xs)
+        mins[m] = {"n": len(xs), "ret_bp": statistics.fmean(xs) * 1e4,
+                   "t": statistics.fmean(xs) / (sd / math.sqrt(len(xs))) if sd > 0 else 0.0,
+                   "range_bp": statistics.fmean(x for _, x, _ in g), "vol_share": sum(v for _, _, v in g) / tot}
+    out["minute"] = mins
+    # autocorrelation on contiguous minutes
+    idx = {t: r for t, r in rets}
+    ac = {}
+    for lag in (1, 2, 3, 5):
+        pairs = [(idx[t - 60 * lag], r) for t, r in rets if t - 60 * lag in idx]
+        if len(pairs) > 1000:
+            reg = ols([y * 1e4 for _, y in pairs], [[x * 1e4] for x, _ in pairs], nw_lags=5)
+            ac[f"1m lag {lag}"] = {"n": len(pairs), "beta": reg["beta"][1], "t": reg["t"][1]}
+    r5 = resample(bars, 300)
+    p5 = [(math.log(r5[i - 1][4] / r5[i - 1][1]) * 1e4, math.log(r5[i][4] / r5[i][1]) * 1e4)
+          for i in range(1, len(r5)) if r5[i][0] - r5[i - 1][0] == 300 and min(r5[i][1], r5[i][4], r5[i - 1][1], r5[i - 1][4]) > 0]
+    if len(p5) > 1000:
+        reg = ols([y for _, y in p5], [[x] for x, _ in p5], nw_lags=5)
+        ac["5m lag 1"] = {"n": len(p5), "beta": reg["beta"][1], "t": reg["t"][1]}
+    out["autocorr"] = ac
+    # within the hour
+    hours: dict[int, dict[int, Bar]] = defaultdict(dict)
+    for b in bars:
+        hours[(b[0] // 3600) * 3600][(b[0] // 60) % 60] = b
+    within = {}
+    for k in (15, 30, 45):
+        pr, pg = [], []
+        for h, mm in hours.items():
+            if len(mm) < 58 or 0 not in mm or k - 1 not in mm or k not in mm or 59 not in mm:
+                continue
+            o0, ck, c59 = mm[0][1], mm[k - 1][4], mm[59][4]
+            if min(o0, ck, c59) <= 0:
+                continue
+            so_far = math.log(ck / o0) * 1e4
+            rest = math.log(c59 / ck) * 1e4
+            hi1 = max(mm[i][2] for i in mm if i < k); lo1 = min(mm[i][3] for i in mm if i < k)
+            hi2 = max(mm[i][2] for i in mm if i >= k); lo2 = min(mm[i][3] for i in mm if i >= k)
+            pr.append((so_far, rest))
+            pg.append(((hi1 - lo1) / o0 * 1e4, (hi2 - lo2) / ck * 1e4))
+        if len(pr) > 300:
+            a = ols([y for _, y in pr], [[x] for x, _ in pr], nw_lags=3)
+            g = ols([y for _, y in pg], [[x] for x, _ in pg], nw_lags=3)
+            within[k] = {"n": len(pr), "ret_beta": a["beta"][1], "ret_t": a["t"][1], "range_beta": g["beta"][1], "range_t": g["t"][1],
+                         "rest_sd_bp": statistics.pstdev(y for _, y in pr)}
+    out["within_hour"] = within
+    return out
+
+
 def macro_regressions(bars: list[Bar], base: int, scratch: Path) -> dict:
     """Daily BTC return and range on macro variables, same day and prior day."""
     from .data.macro import read_series
@@ -235,7 +313,8 @@ def run(source: str, scratch: Path, coins: Optional[list[str]] = None, macro_coi
     data, base = load(source, scratch, coins)
     out = {"source": source, "base": base, "coins": {}, "pooled": {}}
     for coin, bars in data.items():
-        out["coins"][coin] = {"profile": horizon_profile(bars, base), "season": seasonality(bars, base), "volume": volume_signal(bars, base)}
+        out["coins"][coin] = {"profile": horizon_profile(bars, base), "season": seasonality(bars, base), "volume": volume_signal(bars, base),
+                              "minute": minute_structure(bars, base)}
     # pooled profile: median across coins per horizon
     for name, _ in HORIZONS:
         vals = [c["profile"][name] for c in out["coins"].values() if name in c["profile"]]
@@ -267,6 +346,18 @@ def render(res: dict, detail_coins: int = 6) -> str:
             ws = s["weekday"]
             o.append(f"  {coin}: weekday range " + ", ".join(f"{'MTWTFSS'[k]} {v['range_bp']:.0f}bp" for k, v in ws.items())
                      + "; signed " + ", ".join(f"{'MTWTFSS'[k]} {v['ret_bp']:+.0f}bp(t{v['t']:+.1f})" for k, v in ws.items()))
+        ms = c.get("minute") or {}
+        if ms.get("minute"):
+            mm = ms["minute"]
+            top = sorted(mm.items(), key=lambda kv: kv[1]["range_bp"], reverse=True)[:4]
+            sig = [(m, v) for m, v in mm.items() if abs(v["t"]) >= 2.5]
+            o.append(f"  {coin}: minute of hour, widest " + ", ".join(f":{m:02d} {v['range_bp']:.1f}bp ({v['vol_share']*100:.1f}% vol)" for m, v in top)
+                     + f"; median {statistics.median(v['range_bp'] for v in mm.values()):.1f}bp; "
+                     + (f"{len(sig)} of 60 minutes with |t|>=2.5 on signed return: " + ", ".join(f":{m:02d} {v['ret_bp']:+.2f}bp t{v['t']:+.1f}" for m, v in sig) if sig else "no minute with |t|>=2.5 on signed return"))
+            o.append(f"  {coin}: autocorrelation " + ", ".join(f"{k} {v['beta']:+.3f} (t {v['t']:+.1f})" for k, v in ms["autocorr"].items()))
+            for k, v in ms["within_hour"].items():
+                o.append(f"  {coin}: within the hour at :{k:02d}, rest-of-hour return on return so far {v['ret_beta']:+.3f} (t {v['ret_t']:+.1f}); "
+                         f"rest range on range so far {v['range_beta']:+.2f} (t {v['range_t']:+.1f}); rest sd {v['rest_sd_bp']:.0f}bp, n {v['n']}")
         for k, v in c["volume"].items():
             o.append(f"  {coin}: volume ratio -> next {k} bar: range {v['range_beta']:+.0f} bp per log-unit (t {v['range_t']:+.1f}); return {v['ret_beta']:+.1f} bp (t {v['ret_t']:+.1f})")
     if res.get("macro"):
@@ -283,7 +374,7 @@ def render(res: dict, detail_coins: int = 6) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--source", choices=("coinbase5m", "kalshi_hourly", "btc_hourly", "hl_daily"), required=True)
+    ap.add_argument("--source", choices=("coinbase1m", "coinbase5m", "kalshi_hourly", "btc_hourly", "hl_daily"), required=True)
     ap.add_argument("--scratch", type=Path, default=Path("."))
     ap.add_argument("--coins", nargs="*", default=None)
     ap.add_argument("--detail", type=int, default=6)

@@ -39,3 +39,22 @@ def test_seasonality_volume_and_render():
             res["pooled"][name] = {k: val for k, val in res["coins"]["X"]["profile"][name].items() if k != "n"} | {"coins": 1}
     text = R.render(res)
     assert "busiest UTC hours" in text and "volume ratio" in text
+
+
+def test_minute_structure_on_synthetic_minutes():
+    import math, random
+    from cryptobot import range_profile as R
+    rng = random.Random(3)
+    p, bars = 100.0, []
+    t0 = 1_700_000_000 - 1_700_000_000 % 3600
+    for i in range(60 * 24 * 20):
+        o = p
+        p *= math.exp(rng.gauss(0, 0.0005))
+        bars.append((t0 + 60 * i, o, max(o, p) * 1.0001, min(o, p) * 0.9999, p, 1.0 + rng.random()))
+    ms = R.minute_structure(bars, 60)
+    assert len(ms["minute"]) == 60
+    assert abs(ms["autocorr"]["1m lag 1"]["t"]) < 4
+    assert set(ms["within_hour"]) == {15, 30, 45}
+    assert R.minute_structure(bars, 300) == {}
+    prof = R.horizon_profile(bars, 60)
+    assert "1m" in prof and "10m" in prof
