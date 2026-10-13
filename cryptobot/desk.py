@@ -99,6 +99,14 @@ def research_lines(state_dir: Optional[Path]) -> list[str]:
     if books:
         out.append("research: order books " + ", ".join(f"{t} {b['rows']} rows/{b['days']}d" for t, b in books.items()))
     try:
+        from .hype_scanner import status as hype_status
+        hy = hype_status(Path(state_dir))
+    except Exception:                                 # noqa: BLE001
+        hy = {}
+    if hy:
+        out.append(f"research: hype scanner {hy['rows']} snapshots/{hy['days']}d, F&G {hy.get('fng')}, froth "
+                   + ", ".join(f"{c} {f['score']:+.1f}" for c, f in list(hy['froth'].items())[:4]))
+    try:
         from .macro_bot import report as macro_report, trades_file as macro_file
         mp = macro_report(state_dir) if macro_file(state_dir).exists() else None
     except Exception:                                 # noqa: BLE001
@@ -437,6 +445,11 @@ class Desk:
                 cached["books"] = book_status(Path(self.state_dir))
             except Exception:                         # noqa: BLE001
                 cached["books"] = {}
+            try:
+                from .hype_scanner import status as hype_status
+                cached["hype"] = hype_status(Path(self.state_dir))
+            except Exception:                         # noqa: BLE001
+                cached["hype"] = {}
         except Exception as exc:                  # noqa: BLE001
             logger.warning("research status unavailable: %s", exc)
             cached = None
@@ -976,6 +989,12 @@ async def _main(args) -> int:
                            interval_s=float(ob.get("interval_s", 15)))
         tasks.append(rec.run_forever())
         logger.info("order-book recorder on: %d tickers every %ss", len(rec.tickers), ob.get("interval_s", 15))
+    hy = (coll.get("hype") or {}) if coll.get("enabled") else {}
+    if hy.get("enabled"):
+        from .hype_scanner import HypeScanner
+        hs = HypeScanner(args.state_dir, interval_s=float(hy.get("interval_s", 3600)))
+        tasks.append(hs.run_forever())
+        logger.info("hype scanner on: %d coins every %ss", len(hs.tracked), hy.get("interval_s", 3600))
     macro_cfg = (cfg.get("brokers") or {}).get("alpaca", {}).get("macro") or {}
     if macro_cfg.get("enabled", True) and os.environ.get("CRYPTOBOT_ALPACA_KEY_ID") and os.environ.get("CRYPTOBOT_ALPACA_SECRET_KEY"):
         from .macro_bot import MacroBot
