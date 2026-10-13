@@ -45,7 +45,8 @@ def load(state_dir: Path) -> tuple[list[dict], dict[str, list]]:
     bars: dict[str, list] = {}
     for p in sorted((d / "candles").glob("*.jsonl")) if (d / "candles").exists() else []:
         for r in read_jsonl(p):
-            bars[r["ticker"]] = r["bars"]
+            if r.get("bars"):
+                bars[r["ticker"]] = r["bars"]
     return [m for m in markets if m["ticker"] in bars], bars
 
 

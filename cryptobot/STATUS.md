@@ -64,8 +64,12 @@ stop-and-reverse, vol-targeted index trend, follow-the-S&P in BTC, and
 the price-scaled small-cap earnings drift (its placebo, entering a
 month after the report, beat the real entry: the names win whenever
 you buy them, which is survivorship, not drift).
-Inconclusive, recorded: overnight-only index exposure (real premium, eaten
-by fees), post-earnings drift (the registered sort loses), the Bitcoin
+Inconclusive, recorded: hourly rules on Kalshi's perps (26 reversal,
+momentum and hour-of-day rules across 20 coins: 0–6 bp of gross edge per
+hour against a 16–18 bp round trip, walk-forward −45 bp a trade; many
+small trades a day lose the fee on this venue), overnight-only index
+exposure (real premium, eaten by fees), post-earnings drift (the
+registered sort loses), the Bitcoin
 volatility premium (real, +5 vol points a month at the gate, 2021–2026 on
 Deribit's index; the one-straddle version a small account can run had an
 −88% month on a weekend gap into expiry, the 21-rung ladder that fixes it

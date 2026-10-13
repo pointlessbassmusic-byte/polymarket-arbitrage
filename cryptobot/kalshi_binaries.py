@@ -80,7 +80,13 @@ class KalshiBinaries:
             wait = self.pace_s - (time.monotonic() - self._last)
             if wait > 0:
                 await asyncio.sleep(wait)
-            r = await self._c.get(BASE + path, params=params)
+            try:
+                r = await self._c.get(BASE + path, params=params)
+            except httpx.HTTPError as exc:                # a dropped connection is retried like a throttle
+                logger.warning("%s: %s; retrying", path, type(exc).__name__)
+                self._last = time.monotonic()
+                await asyncio.sleep(2.0 * (i + 1))
+                continue
             self._last = time.monotonic()
             self.requests += 1
             if r.status_code == 200:
@@ -138,15 +144,22 @@ class KalshiBinaries:
         todo.sort(key=lambda m: m["close_ts"], reverse=newest_first)
         n = 0
         for m in todo[:limit]:
-            j = await self._get(f"/series/{m['series']}/markets/{m['ticker']}/candlesticks",
-                                {"start_ts": m["open_ts"] - 60, "end_ts": m["close_ts"] + 60, "period_interval": 1})
+            try:
+                j = await self._get(f"/series/{m['series']}/markets/{m['ticker']}/candlesticks",
+                                    {"start_ts": m["open_ts"] - 60, "end_ts": m["close_ts"] + 60, "period_interval": 1})
+            except RuntimeError as exc:                   # one market the endpoint refuses must not stop the pull
+                logger.warning("candles %s: %s (stored empty)", m["ticker"], exc)
+                j = {"candlesticks": [], "error": str(exc)}
             bars = []
             for c in j.get("candlesticks", []):
                 bars.append([int(c.get("end_period_ts") or 0), _f((c.get("yes_bid") or {}).get("close_dollars")),
                              _f((c.get("yes_ask") or {}).get("close_dollars")), _f((c.get("price") or {}).get("close_dollars")),
                              _f(c.get("volume_fp")) or 0.0])
             day = dt.datetime.fromtimestamp(m["close_ts"], dt.timezone.utc).date().isoformat()
-            append_jsonl(self.candles_dir / f"{day}.jsonl", {"ticker": m["ticker"], "bars": bars})
+            row = {"ticker": m["ticker"], "bars": bars}
+            if j.get("error"):
+                row["error"] = j["error"]
+            append_jsonl(self.candles_dir / f"{day}.jsonl", row)
             n += 1
             if n % 200 == 0:
                 logger.info("candles: %d fetched, %d to go, pace %.2fs", n, len(todo) - n, self.pace_s)

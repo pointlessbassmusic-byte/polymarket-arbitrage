@@ -934,3 +934,47 @@ of the sample, or inconclusive; negative at both, killed. The mirror
 are counted as trials. The Polymarket 15-minute markets tested earlier
 were calibrated in their last two minutes; this is a longer horizon, a
 different venue and the one the desk already has a key for.
+
+## Addendum, 2026-10-13 (17): many small trades a day, measured on the desk's own venue
+
+The operator's direction: trade many times a day for small profits
+that add up, rather than once a day. The arithmetic first. On Kalshi's
+perps a round trip costs 16–18 basis points (4 bp taker a side plus
+the 4–5 bp from mid the desk measured on $50–500 orders). A rule that
+trades every hour needs more than that per trade, on average, after
+the hours it is wrong. Daily candles were chosen in the first place
+because the daily bounce-short earns about +190 bp a trade gross; a
+trade that size pays the fee ten times over.
+
+Kalshi serves hourly candles for every one of its 28 perps back to
+June 2026, so the question could be measured tonight rather than
+argued. Pre-registered as `kalshi-perps-hourly-rules`: 24 grid rules
+(fade or follow a 1-hour or 24-hour move beyond 1.5, 2 or 3 sigma,
+hold 1 or 4 hours) and the best long and short hour of the day, pooled
+across the 20 coins with at least two weeks of history, 45,419 hours,
+t-statistics clustered by hour.
+
+| rule family | trades a day | gross per trade | net at 18 bp |
+|---|---|---|---|
+| fade a 1-hour move (best of six) | 5–29 | +0.7 to +5.7 bp | −12 to −17 bp |
+| follow a 1-hour move (best of six) | 5–29 | −0.7 to −5.7 bp | −19 to −24 bp |
+| fade a 24-hour move | 2–32 | −2 to −26 bp | −20 to −44 bp |
+| follow a 24-hour move, hold 4 h, 2 sigma | 8 | +26 bp | +8 bp (t 0.9) |
+| best hour of the day, long (11 UTC) | 15 | +9 bp | −9 bp |
+
+Walk-forward, each month trading whichever rule had been best on all
+the months before it: 364 trades, −45 bp a trade, every one of the
+four months negative, with the pick flipping between 24-hour reversal
+and 24-hour momentum from month to month. One-hour moves on this venue
+carry under 6 bp of predictable follow-through or reversal in either
+direction; the fee is three times that. The one gross edge above the
+cost (24-hour momentum) is the best of 26 and does not survive being
+chosen in advance.
+
+**Verdict: inconclusive** by the written rule (one rule is net
+positive in sample), and nothing here trades. The honest version of
+"many small trades" on Kalshi is the hourly binaries test in addendum
+16, where each hour's trade is a few cents on a dollar with no
+slippage model to argue about; its 30-day sample is still being
+pulled, and the first 120 hours read +1.0% per dollar at 30 minutes
+out with a t of 0.7, which is noise until the rest arrives.

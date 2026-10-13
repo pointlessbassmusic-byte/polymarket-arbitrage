@@ -39,6 +39,8 @@ class FakeKalshi:
             if not self._throttled:
                 self._throttled = True
                 return R(429, {"error": "too_many_requests"})
+            if "REFUSED" in url:
+                return R(400, {"error": "bad range"})
             return R(200, {"candlesticks": self.candles})
 
     async def aclose(self):
@@ -47,28 +49,29 @@ class FakeKalshi:
 
 def test_collector_lists_traded_settled_markets_and_fetches_candles_resumably(tmp_path):
     now = 1_791_856_800
-    pages = [[_market("KXBTCD-A-T1", "KXBTCD-A", now, "yes"), _market("KXBTCD-A-T2", "KXBTCD-A", now, "no", volume=0.0)],
+    pages = [[_market("KXBTCD-A-T1", "KXBTCD-A", now, "yes"), _market("KXBTCD-A-T2", "KXBTCD-A", now, "no", volume=0.0),
+              _market("KXBTCD-A-REFUSED", "KXBTCD-A", now, "no")],
              [_market("KXBTCD-B-T1", "KXBTCD-B", now - 3600, "no"), _market("KXBTCD-OLD-T1", "KXBTCD-OLD", now - 40 * 86400, "no")]]
     candles = [{"end_period_ts": now - 3600 + 60 * i, "yes_bid": {"close_dollars": "0.9000"}, "yes_ask": {"close_dollars": "0.9300"},
                 "price": {"close_dollars": "0.9100"} if i % 2 else {}, "volume_fp": "3.00"} for i in range(61)]
     fake = FakeKalshi(pages, candles)
     c = K.KalshiBinaries(tmp_path, client=fake, pace_s=0.0)
     since = dt.datetime.fromtimestamp(now - 30 * 86400, dt.timezone.utc)
-    assert asyncio.run(c.list_settled(since)) == 2                       # zero-volume and too-old rows skipped
+    assert asyncio.run(c.list_settled(since)) == 3                       # zero-volume and too-old rows skipped
     ms = c.markets()
-    assert [m["ticker"] for m in ms] == ["KXBTCD-A-T1", "KXBTCD-B-T1"]
+    assert [m["ticker"] for m in ms] == ["KXBTCD-A-T1", "KXBTCD-A-REFUSED", "KXBTCD-B-T1"]
     assert ms[0]["series"] == "KXBTCD" and ms[0]["settle"] == 82349.5 and ms[0]["close_ts"] - ms[0]["open_ts"] == 3600
     assert asyncio.run(c.list_settled(since)) == 0                       # idempotent
     assert asyncio.run(c.fetch_candles(limit=1)) == 1                    # newest first, survives one 429
     assert c.pace_s > 0.0                                                # slowed down after the 429
     slowed = c.pace_s
     assert c.candles_done() == {"KXBTCD-A-T1"}
-    assert asyncio.run(c.fetch_candles()) == 1                           # the other one, no refetch
+    assert asyncio.run(c.fetch_candles()) == 2                           # the others, no refetch; the refused one stored empty
     assert 0.0 <= c.pace_s < slowed                                      # and eases back toward the base pace
     st = c.status()
-    assert st == {"markets": 2, "with_candles": 2, "events": 2, "first": st["first"], "last": st["last"]}
+    assert st == {"markets": 3, "with_candles": 3, "events": 2, "first": st["first"], "last": st["last"]}
     markets, bars = T.load(tmp_path)
-    assert len(markets) == 2 and len(bars["KXBTCD-A-T1"]) == 61
+    assert len(markets) == 2 and len(bars["KXBTCD-A-T1"]) == 61         # the empty one is not a market to study
     b = bars["KXBTCD-A-T1"][1]
     assert b[1] == 0.9 and b[2] == 0.93 and b[3] == 0.91 and b[4] == 3.0
     assert bars["KXBTCD-A-T1"][0][3] is None                              # no trade that minute
