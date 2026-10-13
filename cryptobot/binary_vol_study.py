@@ -11,7 +11,10 @@ price by more than the quadratic fee plus a cent.
 Series: KXBTCD (hourly strike ladder; decisions 30 and 15 minutes
 before the print) and KXBTC15M (15-minute up/down against the slot's
 opening index; decisions 10 and 5 minutes before). Variants, each a
-trial: unconditional, hour only, hour x range tercile.
+trial: unconditional, hour only, hour x range tercile; and, added
+after the first run showed the sample month 25% calmer than the
+history, hour x range with the distribution scaled by the trailing
+7-day realised vol over the history's (post-hoc, counted as a trial).
 
     python -m cryptobot.binary_vol_study --scratch <dir>
 """
@@ -36,7 +39,8 @@ SERIES = {  # series -> (state subdir, decision minutes before close)
     "KXBTCD": ("state_collect", (30, 15)),
     "KXBTC15M": ("state_binaries_15m", (10, 5)),
 }
-CONDITIONS = ("none", "hour", "hour_range")
+CONDITIONS = ("none", "hour", "hour_range", "hour_range_vol")
+VOL_WINDOW = 7 * 24 * 12  # trailing 7 days of 5-minute bars
 
 
 class Model:
@@ -90,6 +94,20 @@ class Model:
         t = self.tercile(ts)
         return None if t is None else (hour_of(ts), t)
 
+    def vol_scale(self, ts: int) -> Optional[float]:
+        """Trailing 7-day 5-minute realised sd over the history's, using
+        only bars that closed at or before `ts` (post-hoc variant)."""
+        if not hasattr(self, "_hist_sd"):
+            xs = [math.log(self.close_at[t] / self.close_at[t - STEP]) for t in self.times
+                  if t < self.cutoff and t - STEP in self.close_at]
+            self._hist_sd = statistics.pstdev(xs)
+        i = bisect.bisect_right(self.times, ts)
+        win = self.times[max(0, i - VOL_WINDOW):i]
+        xs = [math.log(self.close_at[t] / self.close_at[t - STEP]) for t in win if t - STEP in self.close_at]
+        if len(xs) < VOL_WINDOW // 2:
+            return None
+        return statistics.pstdev(xs) / self._hist_sd
+
     def dist(self, cond: str, horizon_s: int, key: tuple) -> list[float]:
         k = (cond, horizon_s, key)
         if k not in self._dist:
@@ -107,13 +125,19 @@ class Model:
         return self._dist[k]
 
     def prob(self, cond: str, ts: int, horizon_s: int, spot: float, strike_type: str, strike: float) -> Optional[float]:
+        scale = 1.0
+        if cond == "hour_range_vol":
+            cond = "hour_range"
+            scale = self.vol_scale(ts)
+            if scale is None:
+                return None
         key = self.key(cond, ts)
         if key is None:
             return None
         d = self.dist(cond, horizon_s, key)
         if len(d) < 200:
             return None
-        x = math.log(strike / spot)
+        x = math.log(strike / spot) / scale
         if strike_type in ("greater", "greater_or_equal"):
             return 1.0 - bisect.bisect_right(d, x) / len(d)
         return bisect.bisect_left(d, x) / len(d)

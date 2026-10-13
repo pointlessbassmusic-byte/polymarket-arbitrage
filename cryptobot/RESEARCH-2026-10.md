@@ -1325,3 +1325,78 @@ UTC, when the books and ranges are busiest; VIX level goes on the list
 of range conditioners for the book study and the allocator's vol
 input. Reproduce: `python -m cryptobot.range_profile --source
 {coinbase5m,kalshi_hourly,btc_hourly,hl_daily} --scratch <dir>`.
+
+## Addendum, 2026-10-13 (26): pairing the profile with Kalshi's 15-minute and hourly crypto markets
+
+The operator asked how the swing and range profile pairs with Kalshi's
+short-dated crypto markets. Kalshi lists, on BTC alone: a 15-minute
+up/down market (KXBTC15M, one contract a slot, settles on whether the
+BRTI index's 60-second average at the end of the slot is at or above
+the start's; about $1.5M of volume a slot), an hourly strike ladder
+(KXBTCD, above/below a strike at the hour), and an hourly range
+market (KXBTC); ETH has the same pair, SOL, XRP and DOGE the hourly
+ladder. A binary pays on dispersion, and addendum 25 says dispersion
+is the one thing the profile predicts (hour of day, recent range,
+VIX), so the pairing is a pricing model: take the empirical
+distribution of BTC's remaining-horizon return from two years of
+5-minute bars that end before the binaries sample, condition it on
+the decision hour and the last hour's range, price every contract,
+and compare with the market's mid. Registered before running as
+`binary-conditional-vol-2026-10`; killed if the mid's Brier beats the
+model's at both decision times on a series.
+
+**Data.** 17,614 settled hourly-ladder markets (30 days) with minute
+quotes; 952 settled 15-minute markets (ten days, every slot). Coinbase
+spot against the BRTI settlement differs by +0.2 bp with a 2.0–2.4 bp
+sd, so the spot feed is not a source of error.
+
+**Result: the market is the better forecaster, on both series, at
+every decision time, on every variant.**
+
+| series, decision | quoted | Brier, mid | Brier, model (best of 4) | model's trades, net per $ |
+|---|---|---|---|---|
+| hourly ladder, 30 min before | 7,696 | 0.0855 | 0.0872 | −8.7% to −21% (t −2.6 to −3.3) |
+| hourly ladder, 15 min before | 4,896 | 0.0849 | 0.0861 | −3.6% to −24% |
+| 15-minute, 10 min before | 952 | 0.1841 | 0.1858 | −1% to −12% |
+| 15-minute, 5 min before | 951 | 0.1331 | 0.1367 | −8% to +7% (t within 0.8) |
+
+The model is calibrated in shape (its 0.9 decile resolves 94–97%,
+its 0.1 decile 10–12%) but too wide: the sample month ran a quarter
+calmer than the two-year history (30-minute sd 26 bp against 34, and
+the monthly figure has ranged 20–52 bp over two years). Scaling the
+distribution by the trailing week's realised vol, a post-hoc variant
+counted as a trial, closes most of the gap and still loses to the
+mid. On the hourly ladder the model's trades are longshot buys at an
+average 0.27–0.33 that the market has already discounted (the
+favourite/longshot finding of addendum 18 from the other side). On
+the 15-minute market the one positive line, +5.1% per dollar at 5
+minutes with vol scaling, is 666 trades over ten days at t 0.6.
+
+**What this means for trading those markets.** Direction is
+unpredictable (addendum 25), and the dispersion is already in the
+price, so there is no edge from forecasting in either market at
+$1,000 or at any size we have. The 15-minute market's fee at a 50
+cent price is 1.75 cents a contract, 3.5% of stake per round trip,
+which is the whole expected return of a coin flip. What remains open,
+and is not a forecasting question: the favourite side of the hourly
+ladder at 0.90–0.95 earned +0.5 to +1.5% per dollar on 30 days at
+t ≤ 1.0 (addendum 18, still collecting), and the order-book study on
+the perps (addendum 21, decisive window 13:00–17:00 UTC per addendum
+25). The binaries collector now takes `--series`, so the 15-minute
+and the ETH, SOL, XRP and DOGE ladders can be pulled when either
+thread needs them. Reproduce: `python -m cryptobot.binary_vol_study
+--scratch <dir>`.
+
+**Also closed today.** The post-gap drift in BTC's listed proxies
+(addendum 24) rerun with BTC at exactly 09:30 ET on 2,547 sessions:
+the open-to-close drift after an overnight BTC move is +19 bp per sd
+on MSTR (t 1.1) and −11 to −24 bp on COIN, MARA, RIOT and CLSK (t
+−0.6 to −1.2), against +8 to +51 bp with the 09:00 predictor. The
+drift was the gap's last half hour; thread closed. The universe
+screen (addendum 24's follow-up): 397 names, decile sorts over 117
+months give the high-volatility decile +65 bp a month over the low
+(t 0.6, the literature's sign reversed, which is what a universe
+chosen on today's volume does), volume shock +19 bp (t 0.5), and no
+short-interest sort (15 names covered). The standouts list (WFF 396%
+vol, MRNA, AXTI, NBIS, CIFR; SOUN 9.7 days to cover) is a watch
+list, not a signal.

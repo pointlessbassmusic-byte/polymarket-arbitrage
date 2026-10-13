@@ -85,6 +85,14 @@ macro signal gives direction (the null's hit rate on 549 trials);
 volume and the VIX level predict the next bar's range, which is a
 sizing input, not a trade. Same-day comovement with the Nasdaq is about
 110 bp per sd.
+Killed (addendum 26): pricing Kalshi's hourly BTC ladder and 15-minute
+up/down market from the profile's conditional dispersion; the mid's
+Brier beats the model's at every decision time, vol-scaled or not, and
+the model's trades lose 1–24% per dollar. Direction is unpredictable
+and dispersion is already in the price. Also closed: the post-gap drift
+in BTC proxies (the exact 09:30 predictor leaves t ≤ 1.2) and the
+397-name universe screen (no sort clears the bar; standouts are a watch
+list).
 Searched and empty: 6,096 one- and two-feature barrier rules over Kalshi's
 hourly perps (closed: the in-sample winners lose every month), eleven
 years of hourly BTC and ten years of nine macro ETFs (inconclusive: the
