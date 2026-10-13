@@ -20,6 +20,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 ENV_FILE=.env
+dash_port() { local p; p="$(get_env CRYPTOBOT_DASH_PORT)"; echo "${p:-8080}"; }
 CFG=cryptobot_config.yaml
 
 dc() {
@@ -184,7 +185,7 @@ cmd_url() {
   local token name
   token="$(get_env CRYPTOBOT_DASH_TOKEN)"
   name="$(get_env CRYPTOBOT_DASH_HOSTS | cut -d, -f1)"
-  echo "through an SSH tunnel (./desk.sh tunnel):  http://localhost:8080/?t=$token"
+  echo "through an SSH tunnel (./desk.sh tunnel):  http://localhost:$(dash_port)/?t=$token"
   if [ -n "$name" ]; then
     echo "from any device on your tailnet:            https://$name/?t=$token"
   else
@@ -211,7 +212,7 @@ cmd_remote() {
     echo "tailscale is not signed in yet; run ./desk.sh remote again afterwards"; exit 1
   fi
   set_env CRYPTOBOT_DASH_HOSTS "$name"
-  sudo tailscale serve --bg 8080 >/dev/null 2>&1 || sudo tailscale serve --bg http://127.0.0.1:8080 >/dev/null
+  sudo tailscale serve --bg "$(dash_port)" >/dev/null 2>&1 || sudo tailscale serve --bg "http://127.0.0.1:$(dash_port)" >/dev/null
   restart_if_running
   echo "install Tailscale on the phone and the desktop, sign in with the same account, then bookmark:"
   echo "  https://$name/?t=$(get_env CRYPTOBOT_DASH_TOKEN)"
@@ -224,8 +225,8 @@ cmd_tunnel() {
   cat <<EOF
 The dashboard listens on the server's localhost only. Reach it through SSH:
 
-  laptop:   ssh -L 8080:localhost:8080 $USER@$ip
-  Termius:  open the host > Port Forwarding > Local: port 8080 to localhost:8080,
+  laptop:   ssh -L 8080:localhost:$(dash_port) $USER@$ip
+  Termius:  open the host > Port Forwarding > Local: port 8080 to localhost:$(dash_port),
             connect, then open the URL below in the phone's browser
 
   http://localhost:8080/?t=$token
