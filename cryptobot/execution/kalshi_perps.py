@@ -272,10 +272,10 @@ async def check(env: Optional[dict] = None, base_url: Optional[str] = None) -> l
         return out + ["no key in the environment: ./desk.sh kalshi ID FILE"]
     ex = KalshiPerpsExecutor(KalshiExecConfig(base_url=base_url or BASE), key_id=key_id, key_pem=pem)
     try:
-        for path in ("/margin/enabled", "/margin/balance", "/margin/positions"):
+        for path in ("/margin/enabled", "/margin/balance", "/margin/positions", "/portfolio/balance", "/margin/subaccounts"):
             try:
                 d = await ex._request("GET", path)
-                out.append(f"GET {path} -> {str(d)[:400]}")
+                out.append(f"GET {path} -> {str(d)[:3000]}")
             except Exception as exc:                      # noqa: BLE001
                 out.append(f"GET {path} -> {exc}")
     finally:
