@@ -563,6 +563,20 @@
   preregistered: true
   trials_run: 8
 
+- id: family-search-2026-10
+  title: "Systematic rule search over every dataset the desk holds, with the selection-bias machinery applied to the whole family, not the winner"
+  source: "operator direction 2026-10-13 ('experiment with all possibilities within the data to build new working models'); the method that produced and then deflated the bounce-short (cryptobot.stats: trial matrix, N_eff, CSCV PBO, DSR, CPCV)"
+  claim: "Somewhere in the price-and-volume history on hand there is a one- or two-feature threshold rule with a barrier exit that earns more than the venue's costs and survives deflation for the size of the search that found it."
+  test: "cryptobot.family_search, one family per dataset, each written here before it runs. Features from closes and volume only (returns over 1, 4-5, 20-24 and 60-168 bars, rolling volatility, position in the rolling range, volume ratio, clock), terciles fitted in-sample for the matrix and refitted on the training window for the walk-forward; every single band and every two-feature cell, both sides, over a fixed grid of target/stop/time exits; one position per instrument per rule; net of the venue's round trip. Sets: (A) Kalshi hourly perps, 28 instruments, 2026-06 to 2026-10, 18 bp; (B) BTC hourly 2015-2026 at the Kalshi BTC perp's 10 bp; (C) the eight macro ETFs plus IBIT, daily, 2016-2026, 8 bp. Per family: the T x N daily P&L matrix, N nominal and N_eff, CSCV PBO over the family, the in-sample best rule's Sharpe, PSR and DSR at N_eff, and an expanding-window walk-forward that trades each period the rule that was best on everything before it."
+  success: "Written before running: a rule is a CANDIDATE only if its family's walk-forward series has PSR >= 0.95, the family's CSCV PBO <= 0.5, and the rule's DSR at N_eff >= 0.95; a candidate then gets its own CPCV and a paper period before any money; a family whose walk-forward is net negative is closed. Everything else is recorded as the size of the search it was."
+  data: "scratch state_collect/kalshi_hourly (A), btc_hourly.pkl + xasset/btc_hourly_2015_2019.pkl (B), tsmom/<SYM>.json (C)"
+  result: "PRE-REGISTERED 2026-10-13; running"
+  verdict: inconclusive
+  regime: "running"
+  rerun: "python -m cryptobot.family_search --set kalshi_hourly|btc_hourly|etf_daily"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
