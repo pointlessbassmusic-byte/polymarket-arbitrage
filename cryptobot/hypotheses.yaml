@@ -591,6 +591,20 @@
   preregistered: true
   trials_run: 0
 
+- id: ibit-iron-condor-monthly
+  title: "Defined-risk volatility premium at small size: a monthly IBIT iron condor (25-delta strangle sold, 10-delta wings bought), unhedged, held to expiry"
+  source: "btc-vrp-listed-options (2026-10-13: implied 5 points over realised at 30 days every year since 2021; the hedged versions fail on pin risk); operator direction 2026-10-13 ('covered calls, non-naked shorts etc'); capital $1,000, so only structures whose worst case is the wing width fit"
+  claim: "Selling the 25-delta call and put 30 days out and buying the 10-delta call and put, when 30-day implied vol exceeds 20-day realised by 5 points, held to expiry with no hedging, earns a positive net return on the capital at risk (the wing width less the credit) with a worst month better than -60% of that capital, on the DVOL history 2021-2026 with Black-Scholes pricing at DVOL."
+  test: "cryptobot.condor_study on the DVOL and BTC daily closes already on file: one condor at a time, entered at a weekday close with the gate open (5 points; none and 10 as sensitivities), strikes from BS deltas at DVOL (flat skew: the one known bias, IBIT's 25-delta skew ran +2 points puts over calls on day one), credit net of 2.5% half-spread a leg and 0.65 USD a contract on 100 IBIT shares, payoff at expiry from the terminal close; capital = wing width minus net credit; monthly series; also the 30-delta/15-delta and 20-delta/5-delta geometries as trials (3 gates x 3 geometries = 9 trials)."
+  success: "Written before running: alive if the registered variant (gate 5, 25/10 delta) has net Sharpe >= 0.7 with PSR >= 0.95, DSR >= 0.95 at 9 trials, worst month better than -60% of capital at risk and 2024-2026 net positive; killed if net at or below zero; otherwise inconclusive. If alive: paper on tastytrade or Alpaca options for two expiries, then one contract real."
+  data: "scratch state_collect/options/dvol_btc.jsonl and btc_daily.jsonl (2021-03 to date)"
+  result: "Run 2026-10-13 on DVOL 2021-03 to 2026-10. Registered variant (25-delta strangle sold, 10-delta wings, gate 5): 56 condors, credit 3.4% of spot on a 9.1% width, 71% win (34 expire at max profit, 11 partial, 11 wiped to the wing), +7.3% a month of the capital at risk, Sharpe 0.37, PSR 0.79, DSR 0.06 at 9 trials, worst month -168% (two condors can settle in one month), max drawdown -336%, by year +145/+222/-126/+110/+158/-14%. Ungated the same per month with a 2024 of -127%; at a 10-point gate about zero. Tighter wings (30/15) earn +10.4% a month at Sharpe 0.42 with 16 wipes; wider (20/5) +1.9%. The premium is real (credit collected 71% of the time) and the wipes, about one in five, are the whole story: each costs 27 months of max-profit credit. On $1,000 one IBIT condor is 2 contracts' width, so a wipe is a 50% drawdown of the account"
+  verdict: inconclusive
+  regime: "2021-2026: a defined-risk short-vol structure on BTC earns its credit most months and gives it back in the one-in-five months BTC moves 10%+; Sharpe 0.37 at this width, not a 0.7. Not traded; the only options structure that fits $1,000 does not clear the bar"
+  rerun: "python -m cryptobot.condor_study --state state"
+  preregistered: true
+  trials_run: 9
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
