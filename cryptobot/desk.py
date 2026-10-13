@@ -297,7 +297,8 @@ class Desk:
             log = getattr(bot, "execlog", None)
             if log is not None and log.enabled:
                 ex = self.exec_summary(log.path)
-            evidence[name] = evidence_from_bot(name, bot, scfg, ex)
+            evidence[name] = evidence_from_bot(name, bot, scfg, ex,
+                                               bankroll=float((self.cfg.get("risk") or {}).get("bankroll_usd", 0.0)))
             capital[name], src = await self.real_capital(name, bot)
             sources.add(src)
         total = sum(capital.values())

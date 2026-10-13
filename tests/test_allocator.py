@@ -44,16 +44,28 @@ def test_gates_killed_unarmed_and_slippage(tmp_path):
 def test_drawdown_kill_persists_until_resumed(tmp_path):
     path = tmp_path / "a.json"
     a = Allocator(AllocatorConfig(max_drawdown_real=0.25), path)
-    a.decide({"bounce": ev(real_equity=200.0)})
-    d = a.decide({"bounce": ev(real_equity=140.0)})           # -30%
+    a.decide({"bounce": ev(real_equity=200.0, live_returns=[0.01])})
+    d = a.decide({"bounce": ev(real_equity=140.0, live_returns=[0.01, -0.3])})   # -30% after live trades
     assert d.weights["bounce"] == 0.0 and d.reasons["bounce"].startswith("KILLED")
     b = Allocator(AllocatorConfig(max_drawdown_real=0.25), path)   # restart keeps the kill
     assert "bounce" in b.killed
     d = b.decide({"bounce": ev(real_equity=190.0)})           # recovered, still killed until resumed
     assert d.weights["bounce"] == 0.0
     b.resume("bounce", 190.0)
-    d = b.decide({"bounce": ev(real_equity=190.0)})
+    d = b.decide({"bounce": ev(real_equity=190.0, live_returns=[0.01, -0.3])})
     assert d.weights["bounce"] > 0 and b.peaks["bounce"] == 190.0
+
+
+def test_changing_the_bankroll_resets_the_peak_instead_of_killing(tmp_path):
+    path = tmp_path / "a.json"
+    a = Allocator(AllocatorConfig(max_drawdown_real=0.25), path)
+    a.decide({"bounce": ev(real_equity=1000.0, bankroll=1000.0)})      # configured bankroll, nothing traded
+    d = a.decide({"bounce": ev(real_equity=250.0, bankroll=250.0)})     # operator sets the real bankroll
+    assert d.weights["bounce"] > 0 and "bounce" not in a.killed and a.peaks["bounce"] == 250.0
+    b = Allocator(AllocatorConfig(max_drawdown_real=0.25), path)         # the bankroll is remembered
+    assert b.bankrolls["bounce"] == 250.0
+    d = b.decide({"bounce": ev(real_equity=180.0, bankroll=250.0)})     # a real -28% with the same bankroll: kill
+    assert d.weights["bounce"] == 0.0 and "bounce" in b.killed
 
 
 def test_manual_mode_and_validation(tmp_path):

@@ -66,6 +66,7 @@ class Evidence:
     verdict: str = "inconclusive"
     live_returns: list = field(default_factory=list)
     real_equity: float = 0.0
+    bankroll: float = 0.0              # the configured real bankroll; a change resets the drawdown peak
     armed: bool = False
     exec_slippage_bps: Optional[float] = None
     exec_fills: int = 0
@@ -96,6 +97,7 @@ class Allocator:
         self.mode = cfg.mode
         self.manual: dict[str, float] = {}
         self.peaks: dict[str, float] = {}
+        self.bankrolls: dict[str, float] = {}
         self.killed: dict[str, str] = {}
         self.last: Optional[Decision] = None
         self.history: list[dict] = []
@@ -114,6 +116,7 @@ class Allocator:
         self.mode = d.get("mode", self.mode)
         self.manual = {k: float(v) for k, v in (d.get("manual") or {}).items()}
         self.peaks = {k: float(v) for k, v in (d.get("peaks") or {}).items()}
+        self.bankrolls = {k: float(v) for k, v in (d.get("bankrolls") or {}).items()}
         self.killed = dict(d.get("killed") or {})
         self.history = list(d.get("history") or [])[-200:]
         if d.get("last"):
@@ -129,7 +132,7 @@ class Allocator:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(json.dumps({
-                "mode": self.mode, "manual": self.manual, "peaks": self.peaks,
+                "mode": self.mode, "manual": self.manual, "peaks": self.peaks, "bankrolls": self.bankrolls,
                 "killed": self.killed, "history": self.history[-200:],
                 "last": {k: v for k, v in vars(self.last).items() if k != "changed"} if self.last else None},
                 indent=2))
@@ -174,7 +177,12 @@ class Allocator:
         cfg = self.cfg
         weights, reasons, posterior = {}, {}, {}
         for name, ev in evidence.items():
-            # drawdown kill, checked in every mode
+            # drawdown kill, checked in every mode. A change of the configured
+            # bankroll is the operator's doing, not a loss: the peak resets.
+            if ev.bankroll and self.bankrolls.get(name) and ev.bankroll != self.bankrolls[name]:
+                self.peaks[name] = ev.real_equity
+            if ev.bankroll:
+                self.bankrolls[name] = ev.bankroll
             peak = max(self.peaks.get(name, 0.0), ev.real_equity)
             self.peaks[name] = peak
             if peak > 0 and ev.real_equity < peak * (1.0 - cfg.max_drawdown_real) and name not in self.killed:
@@ -226,7 +234,8 @@ class Allocator:
         return d
 
 
-def evidence_from_bot(name: str, bot, strat_cfg: dict, exec_summary: Optional[dict] = None) -> Evidence:
+def evidence_from_bot(name: str, bot, strat_cfg: dict, exec_summary: Optional[dict] = None,
+                      bankroll: float = 0.0) -> Evidence:
     """Assemble a strategy's evidence from its registry/config numbers,
     its real book and the execution log."""
     st = bot.state()
@@ -243,5 +252,5 @@ def evidence_from_bot(name: str, bot, strat_cfg: dict, exec_summary: Optional[di
                     backtest_sd=float(strat_cfg.get("backtest_sd", 0.1)),
                     confidence=float(strat_cfg.get("confidence", 0.0)),
                     verdict=str(strat_cfg.get("verdict", "inconclusive")),
-                    live_returns=live, real_equity=float(real["equity"]),
+                    live_returns=live, real_equity=float(real["equity"]), bankroll=float(bankroll),
                     armed=bool(st.get("real_unlocked")), exec_slippage_bps=slip, exec_fills=fills)
