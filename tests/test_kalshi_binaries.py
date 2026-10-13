@@ -61,8 +61,10 @@ def test_collector_lists_traded_settled_markets_and_fetches_candles_resumably(tm
     assert asyncio.run(c.list_settled(since)) == 0                       # idempotent
     assert asyncio.run(c.fetch_candles(limit=1)) == 1                    # newest first, survives one 429
     assert c.pace_s > 0.0                                                # slowed down after the 429
+    slowed = c.pace_s
     assert c.candles_done() == {"KXBTCD-A-T1"}
     assert asyncio.run(c.fetch_candles()) == 1                           # the other one, no refetch
+    assert 0.0 <= c.pace_s < slowed                                      # and eases back toward the base pace
     st = c.status()
     assert st == {"markets": 2, "with_candles": 2, "events": 2, "first": st["first"], "last": st["last"]}
     markets, bars = T.load(tmp_path)

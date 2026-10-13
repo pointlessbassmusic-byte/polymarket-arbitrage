@@ -67,6 +67,7 @@ class KalshiBinaries:
         self._c = client or httpx.AsyncClient(timeout=60, headers=UA)
         self._owns = client is None
         self.pace_s = pace_s
+        self.base_pace_s = pace_s
         self._last = 0.0
         self.requests = 0
 
@@ -83,6 +84,7 @@ class KalshiBinaries:
             self._last = time.monotonic()
             self.requests += 1
             if r.status_code == 200:
+                self.pace_s = max(self.base_pace_s, self.pace_s * 0.97)   # ease back after a throttle
                 return r.json()
             if r.status_code == 429:
                 self.pace_s = min(5.0, self.pace_s * 1.5 + 0.2)

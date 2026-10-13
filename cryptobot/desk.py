@@ -409,6 +409,15 @@ async def allocation_loop(desk: Desk, every_s: int = 3600) -> None:
         await asyncio.sleep(every_s)
 
 
+def dash_hosts(flags, env: dict) -> set[str]:
+    """Hosts the dashboard answers to besides loopback: --allow-host flags
+    and CRYPTOBOT_DASH_HOSTS (comma-separated; `./desk.sh remote` writes
+    the Tailscale name there so one HTTPS address serves phone and desktop)."""
+    out = {h.strip().lower() for h in (flags or []) if h.strip()}
+    out |= {h.strip().lower() for h in (env.get("CRYPTOBOT_DASH_HOSTS") or "").split(",") if h.strip()}
+    return out
+
+
 def create_desk_app(bots: dict, token: Optional[str], extra_hosts: Optional[set] = None,
                     desk: Optional[Desk] = None):
     import secrets as _s
@@ -903,7 +912,7 @@ async def _main(args) -> int:
     token = args.token or os.environ.get("CRYPTOBOT_DASH_TOKEN") or secrets.token_urlsafe(16)
     import uvicorn
     desk = Desk(bots, cfg, args.state_dir, alerter)
-    app = create_desk_app(bots, token, set(args.allow_host or []), desk=desk)
+    app = create_desk_app(bots, token, dash_hosts(args.allow_host, os.environ), desk=desk)
     shown = "localhost" if args.host in ("0.0.0.0", "127.0.0.1") else args.host
     logger.info("desk dashboard: http://%s:%d/?t=%s", shown, args.port, token)
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning"))

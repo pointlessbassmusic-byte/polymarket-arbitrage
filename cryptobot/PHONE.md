@@ -33,6 +33,18 @@ Local, port 8080 to localhost:8080; connect; open
 `http://localhost:8080/?t=…` in the phone's browser. The port is never
 open to the internet.
 
+## One address for the phone and the desktop
+
+```bash
+./desk.sh remote
+```
+
+installs Tailscale on the server, signs it in (a login link prints
+once) and proxies the dashboard to `https://SERVER.TAILNET.ts.net/?t=…`.
+With the Tailscale app signed in on the phone and the desktop, that one
+bookmark works on both, no tunnel, no port open to the internet.
+`./desk.sh url` prints it again.
+
 ## Add keys (prompts, paste-friendly)
 
 ```bash

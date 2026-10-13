@@ -6,6 +6,9 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }   # unattended for months without filling the disk
     volumes:
       - ./state:/data
       - ./cryptobot_config.yaml:/app/cryptobot_config.yaml:ro

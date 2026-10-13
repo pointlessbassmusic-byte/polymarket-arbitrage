@@ -10,6 +10,8 @@
 #   ./desk.sh update      git pull, rebuild, restart
 #   ./desk.sh logs        follow the desk log
 #   ./desk.sh tunnel      how to reach the dashboard from this phone or laptop
+#   ./desk.sh remote      one private HTTPS address for the dashboard (Tailscale), phone and desktop alike
+#   ./desk.sh url         the dashboard URL(s) to bookmark
 #   ./desk.sh digest      today's digest, as the webhook would get it
 #
 # `keys`, `arm` and `disarm` edit files only; the restart is skipped when
@@ -157,7 +159,7 @@ cmd_status() {
   echo
   echo "armed: perp.live=$(grep -A40 '^perp:' "$CFG" | grep -m1 '^  live:' | awk '{print $2}'), CRYPTOBOT_ARM_LIVE=$(get_env CRYPTOBOT_ARM_LIVE | sed 's/^$/(blank)/')"
   echo "keys: kalshi=$([ -n "$(get_env CRYPTOBOT_KALSHI_KEY_ID)" ] && echo yes || echo no) alpaca=$([ -n "$(get_env CRYPTOBOT_ALPACA_KEY_ID)" ] && echo yes || echo no) webhook=$([ -n "$(get_env CRYPTOBOT_ALERT_WEBHOOK)" ] && echo yes || echo no)"
-  echo "dashboard (through the tunnel): http://localhost:8080/?t=$token"
+  cmd_url | sed 's/^/dashboard /'
   echo
   if have_docker && dc ps --status running 2>/dev/null | grep -q desk; then
     echo "preflight:"; dc run --rm desk python -m cryptobot.desk --preflight 2>/dev/null | sed 's/^/  /'
@@ -169,6 +171,50 @@ cmd_status() {
 cmd_update() {
   git pull --ff-only
   if have_docker; then dc build >/dev/null && dc up -d && echo "rebuilt and restarted"; else echo "pulled; ./deploy.sh to start"; fi
+}
+
+tailscale_name() {
+  command -v tailscale >/dev/null 2>&1 || return 0
+  tailscale status --json 2>/dev/null | python3 -c 'import json,sys
+d=json.load(sys.stdin); print((d.get("Self") or {}).get("DNSName","").rstrip("."))' 2>/dev/null || true
+}
+
+cmd_url() {
+  ensure_env
+  local token name
+  token="$(get_env CRYPTOBOT_DASH_TOKEN)"
+  name="$(get_env CRYPTOBOT_DASH_HOSTS | cut -d, -f1)"
+  echo "through an SSH tunnel (./desk.sh tunnel):  http://localhost:8080/?t=$token"
+  if [ -n "$name" ]; then
+    echo "from any device on your tailnet:            https://$name/?t=$token"
+  else
+    echo "(./desk.sh remote gives one HTTPS address that works from the phone and the desktop)"
+  fi
+}
+
+cmd_remote() {
+  # Tailscale Serve: the dashboard stays on the server's localhost; Tailscale
+  # proxies it to https://<server>.<tailnet>.ts.net for devices signed into
+  # your tailnet only. No port is opened to the internet.
+  ensure_env
+  if ! command -v tailscale >/dev/null 2>&1; then
+    echo "installing tailscale…"
+    curl -fsSL https://tailscale.com/install.sh | sh
+  fi
+  if [ -z "$(tailscale_name)" ]; then
+    echo "sign this server into your tailnet (a login link prints once; open it on any device):"
+    sudo tailscale up
+  fi
+  local name
+  name="$(tailscale_name)"
+  if [ -z "$name" ]; then
+    echo "tailscale is not signed in yet; run ./desk.sh remote again afterwards"; exit 1
+  fi
+  set_env CRYPTOBOT_DASH_HOSTS "$name"
+  sudo tailscale serve --bg 8080 >/dev/null 2>&1 || sudo tailscale serve --bg http://127.0.0.1:8080 >/dev/null
+  restart_if_running
+  echo "install Tailscale on the phone and the desktop, sign in with the same account, then bookmark:"
+  echo "  https://$name/?t=$(get_env CRYPTOBOT_DASH_TOKEN)"
 }
 
 cmd_tunnel() {
@@ -194,6 +240,8 @@ case "${1:-}" in
   update) cmd_update ;;
   logs) dc logs -f --tail 100 ;;
   tunnel) cmd_tunnel ;;
+  remote) cmd_remote ;;
+  url) cmd_url ;;
   digest) dc run --rm desk python -m cryptobot.desk --digest --state-dir /data ;;
-  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac

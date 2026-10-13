@@ -70,15 +70,33 @@ The lines that matter and what fixes them:
 | orders fit under max_trade_usd | leave `max_trade_usd: 500` as is |
 | each live slot buys at least one contract | fund at least $100 |
 
-## 6. See the dashboard on the phone
+## 6. One dashboard address for the desktop and the phone
+
+The dashboard listens on the server's localhost only. Two ways in; the
+second is the one to set up tonight.
+
+**SSH tunnel** (works now, per device):
 
 ```bash
-./desk.sh tunnel
+./desk.sh tunnel      # prints the URL and the Termius / ssh -L steps
 ```
 
-Prints the URL and the Termius port-forward steps (local 8080 to
-localhost:8080). The port is never open to the internet; the token in
-the URL is the only way in.
+From the desktop: `ssh -L 8080:localhost:8080 user@SERVER-IP`, then
+open `http://localhost:8080/?t=TOKEN`. The tunnel must be up each time.
+
+**Tailscale** (one private HTTPS address, same bookmark everywhere):
+
+```bash
+./desk.sh remote      # installs Tailscale on the server, signs it in, proxies the dashboard
+```
+
+It prints `https://SERVER.TAILNET.ts.net/?t=TOKEN`. Install the
+Tailscale app on the phone and the desktop, sign in with the same
+account, and that address works on both with no tunnel and no port open
+to the internet. Save it as a desktop bookmark and a phone home-screen
+icon. `./desk.sh url` prints it again any time.
+
+The token in the URL is the only way in; keep the bookmark private.
 
 ## 7. Arm (tomorrow morning, or tonight if preflight is green)
 
@@ -104,6 +122,33 @@ back to paper at any time.
   dashboard.
 - `./desk.sh digest` is the day in one screen; `./desk.sh logs`
   follows the log.
+
+## Runs on its own
+
+Nothing needs a hand day to day once it is armed:
+
+- The container restarts itself (`restart: unless-stopped`), survives a
+  server reboot, and rotates its logs.
+- The signal runs after 00:00 UTC (8 pm ET) on closed daily candles;
+  stops and targets are checked hourly; the collectors run at 21:15 UTC.
+- The daily digest and every fill, exit and halt go to the Discord
+  webhook if one is set (`./desk.sh keys`); that is the phone's view
+  during the day.
+
+The two things that do wait for you, by design:
+
+- A **halt** (four stop-outs in two hours, or real equity 25% below its
+  peak) stops new entries until you press resume on the dashboard.
+- **Code updates**: `./desk.sh update` pulls, rebuilds and restarts;
+  nothing updates itself.
+
+## Daily rhythm
+
+| when | where | what |
+|---|---|---|
+| morning, phone | dashboard bookmark or the Discord digest | equity, open positions, any halt |
+| during the day | Discord alerts | fills and exits; nothing to do |
+| evening, desktop | dashboard | the day's fills, the allocator's weights, `./desk.sh status` once a week |
 
 ## Not for tomorrow
 
