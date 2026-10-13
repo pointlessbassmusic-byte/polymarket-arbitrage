@@ -1072,3 +1072,27 @@ Kalshi's index and metal perps. The 5%/yr drag turns a 0.70 Sharpe
 into 0.28. Measuring that funding is the next step and takes one pull
 from the public API; at near-zero funding the family is worth a second
 look with longer histories, and at 5% it is not.
+
+## Addendum, 2026-10-13 (21): what Kalshi's perps actually pay in funding
+
+Pulled from the public funding history, daily prints, annualised
+(positive means longs pay):
+
+| perp | days of history | funding a year | share of prints positive |
+|---|---|---|---|
+| gold | 32 | +3.7% | 47% |
+| silver | 32 | +3.2% | 41% |
+| palladium | 20 | +4.8% | 55% |
+| platinum | 20 | +17.6% | 80% |
+| US500 | 7 | +10.1% | 71% |
+| copper | 6 | −17.9% | 17% |
+| BTC | 395 | +8.2% | 48% (median zero) |
+| ETH, DOGE, SHIB, SOL, XRP, LINK, ADA, LTC, BCH, HYPE, SUI, NEAR, ZEC | 128–395 | −3.5% to +6% | mostly zero prints |
+
+Two things follow. The 5%/yr carry drag assumed in addendum 20 is
+about what a long metals book pays, so that verdict stands. And a
+funding-capture carry (short the perp, hold the ETF at Alpaca) has one
+candidate above the noise, platinum at 17.6%, on twenty days of
+history; at $250 of capital that is $40 a year before the hedge's
+costs, which is not a strategy, it is a rounding error. Re-read when
+the metal and index perps have months of prints, not weeks.
