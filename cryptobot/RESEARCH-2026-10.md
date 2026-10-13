@@ -1561,8 +1561,10 @@ and both halves positive, then 30 days on paper before real money.
 That is about mid-December. Nothing trades on it before then.
 
 **What a trade looks like if it passes.** One contract pays $1. At a
-93-cent favourite the fee is 0.07 × 0.93 × 0.07 = 0.46 cents. A +3%
-edge per dollar is about 2.8 cents a contract. At $1,000 that is
-roughly $30 a day on a winning day, against the 1-in-15 day the
-favourite loses and takes 93 cents a contract. Sizing would come from
-the allocator, as for every other rule.
+93-cent favourite the fee is 0.07 × 0.93 × 0.07, about 0.46 cents. A
+winning day returns about 6.5 cents on 93.5 cents paid. A losing day,
+about 1 in 15, loses the whole 93.5 cents. A +3% edge per dollar is the
+average across both. With $100 staked a day, that averages about $3 a
+day, but a single loss wipes out roughly 14 winning days. Sizing would
+come from the allocator, as for every other rule, and would stay a
+small slice of the $1,000.
