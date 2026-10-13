@@ -255,3 +255,41 @@ class KalshiPerpsExecutor:
     async def fills(self, limit: int = 100) -> list[dict]:
         d = await self._request("GET", "/margin/fills", params={"limit": limit})
         return list(d.get("fills") or [])
+
+
+# ------------------------------------------------------------ diagnostics
+
+async def check(env: Optional[dict] = None, base_url: Optional[str] = None) -> list[str]:
+    """What Kalshi answers the account's key, raw, for the preflight's
+    questions: /margin/enabled, /margin/balance, /margin/positions. No
+    secrets are in the answers; the key id is shown truncated."""
+    import os
+    env = env or dict(os.environ)
+    key_id, pem = env.get("CRYPTOBOT_KALSHI_KEY_ID", ""), env.get("CRYPTOBOT_KALSHI_KEY_PEM", "")
+    out = [f"key id: {key_id[:8]}... ({len(key_id)} chars); private key: {'present' if pem else 'MISSING'}"
+           f"{', Ed25519' if 'BEGIN PRIVATE KEY' in pem else ', RSA' if 'RSA' in pem else ''}"]
+    if not key_id or not pem:
+        return out + ["no key in the environment: ./desk.sh kalshi ID FILE"]
+    ex = KalshiPerpsExecutor(KalshiExecConfig(base_url=base_url or BASE), key_id=key_id, key_pem=pem)
+    try:
+        for path in ("/margin/enabled", "/margin/balance", "/margin/positions"):
+            try:
+                d = await ex._request("GET", path)
+                out.append(f"GET {path} -> {str(d)[:400]}")
+            except Exception as exc:                      # noqa: BLE001
+                out.append(f"GET {path} -> {exc}")
+    finally:
+        await ex.close_client()
+    return out
+
+
+if __name__ == "__main__":
+    import argparse
+    import asyncio
+
+    ap = argparse.ArgumentParser(description="Kalshi perps key diagnostics")
+    ap.add_argument("--check", action="store_true", help="print Kalshi's raw answers for the preflight questions")
+    ap.add_argument("--base-url", default=None)
+    a = ap.parse_args()
+    if a.check:
+        print("\n".join(asyncio.run(check(base_url=a.base_url))))

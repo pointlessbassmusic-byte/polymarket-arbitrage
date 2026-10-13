@@ -17,6 +17,7 @@
 #   ./desk.sh kalshi ID FILE   the Kalshi key id and private-key file, no prompts, then restart
 #   ./desk.sh alpaca ID SECRET the Alpaca (paper or live) key, no prompts, then restart
 #   ./desk.sh webhook URL      the Discord/Slack webhook, no prompts, then restart
+#   ./desk.sh check            Kalshi's raw answers to the preflight questions (no secrets printed)
 #   ./desk.sh rotate      new dashboard token (after the old one was shown somewhere), then restart
 #
 # `keys`, `arm` and `disarm` edit files only; the restart is skipped when
@@ -311,7 +312,8 @@ case "${1:-}" in
   kalshi) cmd_kalshi "${2:-}" "${3:-}" ;;
   alpaca) cmd_alpaca "${2:-}" "${3:-}" ;;
   webhook) cmd_webhook "${2:-}" ;;
+  check) dc run --rm desk python -m cryptobot.execution.kalshi_perps --check ;;
   rotate) cmd_rotate ;;
   digest) dc run --rm desk python -m cryptobot.desk --digest --state-dir /data ;;
-  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
