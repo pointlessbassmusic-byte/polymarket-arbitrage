@@ -1156,7 +1156,9 @@ shows what each holds. By hand:
 
 ```bash
 python -m cryptobot.vrp_collect --state state            # one snapshot of both
-python -m cryptobot.vrp_collect --state state --report   # the IBIT series so far
+python -m cryptobot.vrp_collect --state state --report   # the IBIT series so far, and DVOL
+python -m cryptobot.vrp_study --state state --fetch --wings 0.10 --overlap --close-dte 7   # the premium, 2021 on
+python -m cryptobot.vrp_study --state state --source ibit --overlap   # the ladder on the IBIT rows, out of sample
 python -m cryptobot.oos_track --state state --report     # the divergence rule, out of sample
 python -m cryptobot.intraday_leadlag --state state --fetch   # BTC-leads-US500, pulls the hours itself; 500 needed
 python -m cryptobot.pead_collect calendar --state state  # earnings surprises 2015-2026 (Nasdaq data API)

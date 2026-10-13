@@ -37,7 +37,8 @@ from the US.
 
 | series | for | state |
 |---|---|---|
-| IBIT option surface, daily | Bitcoin volatility-premium test | since 2026-10-12; a year of rows before the test |
+| IBIT option surface, daily | the volatility-premium ladder, out of sample (`btc-vrp-ladder-oos`) | since 2026-10-12; 12 months decide; the backtest itself is done (below) |
+| Deribit DVOL and BTC closes, daily | the volatility-premium backtest's history and the IBIT basis | 2021-03 to date, refreshed daily |
 | Kalshi BTC / ETH / US500 hourly candles | does BTC lead the index perp off-session | 100 of 500 shared hours on 2026-10-13; Kalshi serves the whole history, so `python -m cryptobot.intraday_leadlag --state state --fetch` runs it any day, desk or no desk; about 2026-10-30 |
 | S&P-vs-BTC divergence days | the one cross-asset pattern, out of sample | 60 qualifying days needed, years |
 
@@ -50,7 +51,7 @@ dashboard's research card show the counts.
 |---|---|
 | Kalshi (needed) | the live venue |
 | Alpaca paper (free) | the opening-range pilot on ten years of 5-minute QQQ bars (`python -m cryptobot.orb_study --fetch`) and daily bars for any stock test |
-| tastytrade | options and CME micro Bitcoin, only if the volatility test ever passes |
+| tastytrade | options and CME micro Bitcoin; the volatility-premium ladder needs about $25,000 of options margin ($6,000 for a weekly version), so not at the desk's size |
 | Kraken | the carry spot leg (shelved) and spot-margin shorts, which replay negative at retail fees |
 
 Fidelity has no API; it stays a human account.
@@ -63,6 +64,11 @@ the price-scaled small-cap earnings drift (its placebo, entering a
 month after the report, beat the real entry: the names win whenever
 you buy them, which is survivorship, not drift).
 Inconclusive, recorded: overnight-only index exposure (real premium, eaten
-by fees), post-earnings drift (the registered sort loses), Fed-liquidity
-timing, cross-asset lead-lag, stop width, BTC beta hedge, near-resolution
-capture on Polymarket. Nothing new is alive.
+by fees), post-earnings drift (the registered sort loses), the Bitcoin
+volatility premium (real, +5 vol points a month at the gate, 2021–2026 on
+Deribit's index; the one-straddle version a small account can run had an
+−88% month on a weekend gap into expiry, the 21-rung ladder that fixes it
+needs about $25,000 of options margin and is judged out of sample from
+the IBIT rows), Fed-liquidity timing, cross-asset lead-lag, stop width,
+BTC beta hedge, near-resolution capture on Polymarket. Nothing new is
+alive.

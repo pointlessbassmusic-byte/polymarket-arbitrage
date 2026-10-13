@@ -12,6 +12,9 @@
    state/options/ibit.jsonl, one JSON object per trading day.
 
 3. The out-of-sample tracker for `divergence-catchup-btc` (cryptobot.oos_track).
+4. Deribit's DVOL index and Coinbase BTC closes (cryptobot.vrp_study.fetch):
+   the history the volatility-premium backtest ran on, kept current so
+   the IBIT rows can be compared with it (the basis) day by day.
    (A monthly earnings-panel step ran here for `pead-per-price-smallcap`
    until that hypothesis was killed on 2026-10-13; cryptobot.pead_collect
    monthly is still callable by hand.)
@@ -337,6 +340,12 @@ class Collector:
             out["options"] = f"ERROR {type(exc).__name__}"
         out["kalshi_hourly"] = await self.kalshi_hourly()
         try:
+            from .vrp_study import fetch as vrp_fetch
+            out["dvol"] = await vrp_fetch(self.state, client=self._c)
+        except Exception as exc:                      # noqa: BLE001
+            logger.warning("DVOL / BTC close fetch failed: %s", exc)
+            out["dvol"] = f"ERROR {type(exc).__name__}"
+        try:
             from .oos_track import update as oos_update
             s = await oos_update(self.state, client=self._c)
             out["divergence_oos"] = {k: s[k] for k in ("days_tracked", "pending", "verdict")} | {"qualifying": s["qualifying"]["n"]}
@@ -357,11 +366,17 @@ def status(state_dir: Path, symbol: str = "IBIT") -> dict:
         hourly[p.stem] = {"rows": len(rows), "last": dt.datetime.fromtimestamp(rows[-1]["end_ts"], dt.timezone.utc).isoformat()
                           if rows else None}
     gated = [r for r in opts if r.get("gate_open") is not None]
+    dvol = read_jsonl(sd / "options" / "dvol_btc.jsonl")
+    dv = {r["date"]: r["close"] for r in dvol}
+    basis = [(r["iv30_atm"] * 100 - dv[r["date"]]) for r in opts if r.get("iv30_atm") and r["date"] in dv]
     out = {"options": {"symbol": symbol, "days": len(opts), "first": opts[0]["date"] if opts else None,
                        "last": last.get("date"), "spot": last.get("spot"), "iv30": last.get("iv30_atm"),
                        "rv20": last.get("rv20"), "iv_minus_rv20": last.get("iv_minus_rv20"),
                        "gate_open": last.get("gate_open"),
                        "gate_open_days": sum(1 for r in gated if r["gate_open"]), "gated_days": len(gated)},
+           "dvol": {"days": len(dvol), "last": dvol[-1]["date"] if dvol else None,
+                    "close": dvol[-1]["close"] if dvol else None,
+                    "ibit_minus_dvol_points": (sum(basis) / len(basis)) if basis else None, "basis_days": len(basis)},
            "kalshi_hourly": hourly}
     try:
         from .oos_track import read_rows, summary
@@ -386,6 +401,11 @@ def report(state_dir: Path, symbol: str = "IBIT") -> str:
     gated = [r for r in rows if r.get("gate_open") is not None]
     if gated:
         o.append(f"gate open on {sum(1 for r in gated if r['gate_open'])} of {len(gated)} days")
+    dv = status(state_dir, symbol).get("dvol") or {}
+    if dv.get("days"):
+        o.append(f"DVOL (Deribit 30-day BTC implied vol): {dv['days']} days to {dv['last']}, last {dv['close']:.1f}"
+                 + (f"; IBIT ATM IV minus DVOL {dv['ibit_minus_dvol_points']:+.1f} points over {dv['basis_days']} shared days"
+                    if dv.get("ibit_minus_dvol_points") is not None else ""))
     return "\n".join(o)
 
 

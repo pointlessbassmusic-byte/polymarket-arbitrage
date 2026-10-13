@@ -852,3 +852,60 @@ key. 100 shared hours on file today; 500 around 2026-10-30. The IBIT
 option surface is the one series that still has to be caught on the
 day: Cboe's delayed quotes have no history, so that one needs the desk
 (or any daily runner) up at 21:15 UTC.
+
+## Addendum, 2026-10-13 (15): the Bitcoin volatility premium, backtested now
+
+`btc-vrp-listed-options` was waiting a year for IBIT surface rows. Its
+pre-registration allowed an earlier run "with purchased history"; a free
+one exists. Deribit's 30-day BTC implied-volatility index (DVOL) is
+public, daily since 2021-03-24, and on the one shared day IBIT's own
+30-day ATM implied vol sat 1.2 points under it. `cryptobot/vrp_study.py`
+runs the registered rule on DVOL and Coinbase BTC closes; the deviation
+is in the registry, and the collector now stores DVOL daily next to the
+IBIT rows so the basis is measured as they accrue.
+
+**The premium is real.** Short 30-day variance at DVOL, settled on the
+next 30 days' realised vol, one position at a time, after 1.5 vol
+points of friction:
+
+| entry gate (IV − 20-day realised) | trades | per trade, vol points | t | years positive |
+|---|---|---|---|---|
+| none | 64 | +4.8 | 2.3 | 5 of 6 |
+| ≥ 5 points (registered) | 56 | +5.3 | 2.8 | 6 of 6 |
+| ≥ 10 points | 48 | +4.2 | 1.9 | 6 of 6 |
+
+**The registered trade fails its own risk bar.** One short ATM straddle
+at a time at the 5-point gate, Black-Scholes marked at DVOL, delta-
+hedged at weekday closes (IBIT cannot be hedged at the weekend), held
+to expiry, charged $0.65 a contract, 2.5% half-spread and 1 bp per
+hedge, on margin of 25% of notional:
+
+| execution, gate 5 | per month | Sharpe | PSR | worst month | max drawdown |
+|---|---|---|---|---|---|
+| one straddle at a time, to expiry (registered) | +5.8% | 1.02 | 0.97 | −88% | −105% |
+| same, bought back 7 days before expiry | +3.4% | 0.70 | 0.94 | −48% | −50% |
+| same, with 10-delta wings bought | +4.5% | 0.91 | 0.95 | −85% | −98% |
+| ladder: one rung a weekday at 1/21 size | +3.25% | 1.21 | 1.00 | −14.7% | −23.6% |
+| ladder with wings | +2.45% | 1.28 | 1.00 | −13.3% | −21.2% |
+
+The −88% month is 2023-02-10 to 03-13: BTC fell under the strike into
+the last week, the hedge went to a full short, and the 20% weekend gap
+into expiry (the banking-crisis rally) was paid twice, on the straddle
+and on the hedge. That is pin gamma on a 24-hour underlying hedged in
+US hours, and neither the early buy-back nor the wings remove it; only
+diluting each expiry to 1/21 of the book does. The 2025 months the
+vendor showed as implied-below-realised: April skipped by the gate,
+March −6%, December +10%.
+
+**Verdict: inconclusive.** The registered rule clears Sharpe and PSR
+and fails the worst-month bar; its deflated Sharpe is 0.42 at 15
+trials. The ladder clears every written number but is post-hoc (DSR
+0.59), and it needs one IBIT contract per rung: about $1,165 of margin
+each at a $46 share, $25,000 for 21 rungs, $6,000 for a weekly five.
+The desk's $250–1,000 can only run the one-at-a-time version. The
+ladder is pre-registered as `btc-vrp-ladder-oos`, judged on the IBIT
+rows the collector stores (`vrp_study --source ibit --overlap`) after
+twelve months, not traded before then and not below that capital.
+
+Trials this addendum: fifteen, all counted in the registered rule's
+deflated Sharpe.
