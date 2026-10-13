@@ -64,7 +64,9 @@ def load(source: str, scratch: Path, coins: Optional[list[str]] = None) -> tuple
     elif source == "hl_daily":
         d = pickle.load(open(scratch / "hl_all_daily.pkl", "rb"))
         for coin, v in d.items():
-            cs = v[0] if isinstance(v, tuple) else v
+            cs = next((x for x in v if isinstance(x, list)), None) if isinstance(v, tuple) else v
+            if not cs:
+                continue
             try:
                 rows = [(int(c.ts), float(c.open), float(c.high), float(c.low), float(c.close), float(getattr(c, "volume_usd", 0) or 0)) for c in cs]
             except AttributeError:
