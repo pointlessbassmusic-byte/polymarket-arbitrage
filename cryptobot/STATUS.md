@@ -42,7 +42,6 @@ from the US.
 | Kalshi BTC / ETH / US500 hourly candles | does BTC lead the index perp off-session | 100 of 500 shared hours on 2026-10-13; Kalshi serves the whole history, so `python -m cryptobot.intraday_leadlag --state state --fetch` runs it any day, desk or no desk; about 2026-10-30 |
 | S&P-vs-BTC divergence days | the one cross-asset pattern, out of sample | 60 qualifying days needed, years |
 | QQQ opening-range paper pilot (Alpaca paper, inside the desk) | the alive backtest against live quotes | 60 traded sessions decide (about three months); `python -m cryptobot.orb_bot --report` |
-| Kalshi hourly BTC above/below markets, settled, minute quotes (one-off pull, `python -m cryptobot.kalshi_binaries`) | are far strikes overpriced: buy the favourite at 85–97¢ half an hour before the print (`kalshi-btc-hourly-tails`, pre-registered) | 30 days, about 17,000 markets; the study runs when the pull ends |
 
 `python -m cryptobot.vrp_collect --state state --report` and the
 dashboard's research card show the counts.
@@ -65,7 +64,10 @@ stop-and-reverse, vol-targeted index trend, follow-the-S&P in BTC, and
 the price-scaled small-cap earnings drift (its placebo, entering a
 month after the report, beat the real entry: the names win whenever
 you buy them, which is survivorship, not drift).
-Inconclusive, recorded: hourly rules on Kalshi's perps (26 reversal,
+Inconclusive, recorded: Kalshi's hourly BTC binaries (17,614 markets, 30
+days: longshots overpriced and lose 35–40% per dollar, favourites
+underpriced by 1.5 points, +0.4–0.6% per dollar after fees at t ≤ 1.0;
+not traded), hourly rules on Kalshi's perps (26 reversal,
 momentum and hour-of-day rules across 20 coins: 0–6 bp of gross edge per
 hour against a 16–18 bp round trip, walk-forward −45 bp a trade; many
 small trades a day lose the fee on this venue), overnight-only index

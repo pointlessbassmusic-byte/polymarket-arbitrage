@@ -1014,3 +1014,35 @@ it:
   margin account above $25,000, so the desk's $250 cannot run it live.
   The next step is a 60-session paper pilot on the Alpaca paper
   account, an `orb_bot` inside the desk, scored against this backtest.
+
+## Addendum, 2026-10-13 (19): the hourly binaries, judged on 30 days
+
+The pull finished: 17,614 traded hourly BTC above/below markets in 706
+hours, minute quotes for each. The rule registered in addendum 16
+(favourite at 85–97¢ at the ask, fee paid, 30 and 15 minutes before
+the print, t clustered by hour):
+
+| decision time | trades | net per $ | cluster t | hit vs implied | halves |
+|---|---|---|---|---|---|
+| 30 min before | 2,692 | +0.63% | 1.0 | 94.2% vs 92.6% | −0.10% / +1.26% |
+| 15 min before | 1,797 | +0.35% | 0.5 | 94.0% vs 92.7% | +0.74% / +0.01% |
+
+The mirror is the clear result: buying the 3–15¢ side loses 34% and
+41% per dollar (t −3.8, −5.0), resolving 4.9% of the time against 6.0%
+implied. So the longshot bias is there, and the favourite is
+underpriced by about 1.5 points of probability. What is left after the
+fee (about half a cent) and the ask side of a 1–2¢ spread is a few
+tenths of a percent per dollar, with a t-statistic at or below one.
+Resting a bid instead of paying the ask loses 1.7% and 3.4%: the fills
+arrive when the hour is turning against the favourite. The 90–95¢
+bucket is the one positive at both times (+1.5%, +0.5%); 85–90¢ flips
+sign between the two.
+
+**Verdict: inconclusive** by the bar written before the pull (t ≥ 2 at
+both decision times and both halves positive; net negative at both
+would have killed it). Not traded. This was the small-money form of
+"many trades a day": four favourites an hour, 1 to 5 contracts each,
+and the arithmetic comes to pennies with wide error bars. The structure
+is the right shape for a small account; the edge at this venue is
+simply thin. A 60-day pull is one command if a longer look is ever
+wanted.
