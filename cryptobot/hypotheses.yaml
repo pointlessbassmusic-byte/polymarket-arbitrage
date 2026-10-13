@@ -633,6 +633,34 @@
   preregistered: true
   trials_run: 43
 
+- id: us-session-into-btc-afterhours
+  title: "Does the US session in AI, big tech and the Nasdaq carry into BTC after the close? A lead the Kalshi BTC perp can trade at $1,000"
+  source: "operator direction 2026-10-13 (macro trends intertwined with crypto, AI stocks, big tech); the 2022-2026 BTC-Nasdaq comovement (cross-asset-crypto-leadlag: same-day correlation 0.4-0.5, no daily lead); BTC trades after 16:00 ET while the stocks do not, so the session's news may still be being priced into BTC"
+  claim: "A strong US session in QQQ, an AI basket (NVDA, MSFT, META, GOOGL, AMZN, AAPL, PLTR, AMD, AVGO, TSM equal-weight) or NVDA alone, measured close to close, predicts BTC's move over the following 16:00-20:00 ET, 16:00-00:00 ET and 16:00 ET to 09:30 ET windows with the same sign, by more than 8 bp a round trip on the Kalshi BTC perp."
+  test: "cryptobot.session_into_btc: OLS with Newey-West (5 lags) t of each BTC window on the standardised session return, 2017-2026, by half and by era (2017-2020, 2021-2023, 2024-2026); a tercile rule (long BTC after a top-tercile session, short after a bottom-tercile one) net of 8 bp, one trade a day. 3 predictors x 3 windows = 9 trials."
+  success: "Written before running: candidate if full-sample t >= 2.5 with a positive sign, t >= 1.5 in both of the two latest eras, and the rule net positive in both halves at 8 bp, on at least one window; killed if every rule is net negative; otherwise inconclusive. A candidate goes to the desk as a paper rule on the Kalshi BTC perp for 30 trades, then real at the allocator's size."
+  data: "scratch universe/hist/<SYM>.json (Nasdaq data API), macro/QQQ.json, btc_hourly.pkl"
+  result: "Run 2026-10-13, 2017-2026, about 1,700 sessions each, 9 trials: nothing. QQQ -> BTC 16:00-20:00 ET t +1.2 (8 bp per sd of session return), to midnight +1.0, to the next 09:30 -0.7; the AI basket +1.1 / +0.9 / -0.4; NVDA +1.8 / +1.4 / +0.2, with no era above 1.4. Tercile rules at 8 bp: -12 to +3 bp a trade, hit 44-47%. BTC does not carry the US session forward after the close at any horizon up to the next open; the same-day comovement is already in BTC's price by 16:00"
+  verdict: inconclusive
+  regime: "2017-2026: the Nasdaq, the AI names and NVDA do not lead BTC after hours; comovement is intraday and contemporaneous. Not traded"
+  rerun: "python -m cryptobot.session_into_btc --scratch <dir>"
+  preregistered: true
+  trials_run: 9
+
+- id: universe-screen-2026-10
+  title: "The 400 most-traded US stocks plus the AI names: who stands out on volatility, short interest and volume, and do the documented cross-sectional effects hold on this universe?"
+  source: "operator direction 2026-10-13 (most volatile, high short interest, high volume, standouts); Ang, Hodrick, Xing & Zhang 2006 (high idiosyncratic volatility, low returns); Boehmer, Jones & Zhang 2008 (short interest predicts lower returns); Gervais, Kaniel & Mingelgrin 2001 (high-volume return premium)"
+  claim: "On the 400 most-traded names, monthly decile sorts show (1) the highest-volatility decile underperforms the lowest over the next month, (2) the highest days-to-cover decile underperforms, (3) the highest volume-shock decile (20-day over 60-day volume) outperforms, each by more than 20 bp a month after 8 bp a side; and the standouts report (descriptive) lists the names at the extremes today."
+  test: "cryptobot.universe_study: ten years of daily OHLC for the universe (Nasdaq data API) and a year of bi-monthly short interest for the Nasdaq-listed names; month-end decile sorts on 60-day realised vol, 20/60-day volume ratio and days-to-cover; equal-weight decile returns over the next month; the top-minus-bottom spread's mean, t and PSR on monthly series, by half; 3 sorts x 2 (spread, long-only top vs bottom) = 6 trials; the standouts report is descriptive and is not a trial."
+  success: "Written before running: an effect is a CANDIDATE if its monthly spread has |t| >= 2.5 with the literature's sign and is of that sign in both halves; a candidate at $1,000 would be a long-only decile basket of fractional shares at Alpaca, paper first; otherwise inconclusive; the opposite sign in both halves is killed."
+  data: "scratch universe/universe.json, universe/hist/<SYM>.json, universe/si/<SYM>.json"
+  result: "PRE-REGISTERED 2026-10-13; data pull running"
+  verdict: inconclusive
+  regime: "running"
+  rerun: "python -m cryptobot.universe_study --scratch <dir>"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
