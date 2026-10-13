@@ -177,7 +177,8 @@ def render(res: dict) -> str:
                 fs = f"favourite n {st.get('n', 0)}"
             else:
                 fs = (f"favourite {st['n']:5d} trades / {st['events']:4d} events  net {st['net']:+.2%}  t {st['t']:+.1f}  "
-                      f"hit {st['hit']:.1%} vs paid {st['implied']:.1%}  halves {st['h1']:+.2%}/{st['h2']:+.2%}")
+                      f"hit {st['hit']:.1%} vs paid {st['implied']:.1%}  halves {st['h1']:+.2%}/{st['h2']:+.2%}"
+                      + (f"  [too few events: under {MIN_EVENTS}, t not meaningful]" if st["events"] < MIN_EVENTS else ""))
             ls = f"longshot {lg['net']:+.0%} (t {lg['t']:+.1f}, n {lg['n']})" if lg.get("n", 0) >= 5 else f"longshot n {lg.get('n', 0)}"
             o.append(f"    at {int(f * 100):2d}% of life left: {fs}; {ls}")
         if row["calibration"]:
