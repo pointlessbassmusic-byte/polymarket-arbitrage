@@ -129,7 +129,8 @@ def test_run_once_survives_a_failing_source(tmp_path):
             if "cboe" in url:
                 raise RuntimeError("down")
             return await super().get(url, params)
-    c = V.Collector(tmp_path, client=Boom(_chain(), _closes_payload(), []))
+    after_close = dt.datetime(2026, 10, 12, 21, 15, tzinfo=dt.timezone.utc)
+    c = V.Collector(tmp_path, client=Boom(_chain(), _closes_payload(), []), now=lambda: after_close)
     out = asyncio.run(c.run_once())
     assert out["options"].startswith("ERROR") and out["kalshi_hourly"]
 
