@@ -91,6 +91,13 @@ def research_lines(state_dir: Optional[Path]) -> list[str]:
         out.append(f"research: divergence catch-up OOS {q['n']}/{d['target_days']} qualifying days"
                    + (f", mean next-24h {100 * q['mean']:+.2f}%" if q.get("mean") is not None else "")
                    + f", {d['verdict']}")
+    try:
+        from .book_recorder import status as book_status
+        books = book_status(Path(state_dir))
+    except Exception:                                 # noqa: BLE001
+        books = {}
+    if books:
+        out.append("research: order books " + ", ".join(f"{t} {b['rows']} rows/{b['days']}d" for t, b in books.items()))
     orb = orb_state(state_dir)
     if orb and orb.get("sessions"):
         v, why = orb["verdict"]
@@ -412,6 +419,11 @@ class Desk:
             from .vrp_collect import status
             cached = status(Path(self.state_dir))
             cached["orb"] = orb_state(self.state_dir)
+            try:
+                from .book_recorder import status as book_status
+                cached["books"] = book_status(Path(self.state_dir))
+            except Exception:                         # noqa: BLE001
+                cached["books"] = {}
         except Exception as exc:                  # noqa: BLE001
             logger.warning("research status unavailable: %s", exc)
             cached = None
@@ -944,6 +956,13 @@ async def _main(args) -> int:
         hh, mm = (str(coll.get("at_utc", "21:15")).split(":") + ["0"])[:2]
         tasks.append(collector_loop(args.state_dir, int(hh), int(mm)))
         logger.info("collectors on: IBIT option surface and Kalshi hourly candles daily at %s:%s UTC", hh, mm)
+    ob = (coll.get("orderbook") or {}) if coll.get("enabled") else {}
+    if ob.get("enabled"):
+        from .book_recorder import DEFAULT_TICKERS, BookRecorder
+        rec = BookRecorder(args.state_dir, tickers=tuple(ob.get("tickers") or DEFAULT_TICKERS),
+                           interval_s=float(ob.get("interval_s", 15)))
+        tasks.append(rec.run_forever())
+        logger.info("order-book recorder on: %d tickers every %ss", len(rec.tickers), ob.get("interval_s", 15))
     orb_cfg = (cfg.get("brokers") or {}).get("alpaca", {}).get("orb") or {}
     if orb_cfg.get("enabled", True) and os.environ.get("CRYPTOBOT_ALPACA_KEY_ID") and os.environ.get("CRYPTOBOT_ALPACA_SECRET_KEY"):
         from .orb_bot import OrbBot

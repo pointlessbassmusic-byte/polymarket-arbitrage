@@ -272,4 +272,12 @@ brokers:
 collectors:
   enabled: true
   at_utc: "21:15"
+  # Order-book recorder (python -m cryptobot.book_recorder): every interval
+  # the public book of each perp, reduced to spread, banded depth, imbalance
+  # and basis, into state/books/<ticker>/<day>.jsonl. About 7 MB a day for
+  # eight tickers at 15 s. For kalshi-book-imbalance (pre-registered).
+  orderbook:
+    enabled: true
+    interval_s: 15
+    tickers: [KXDOGEPERP, KXKSHIBPERP, KXBTCPERP, KXETHPERP, KXSOLPERP, KXXRPPERP, KXUS500PERP, KXGOLDPERP]
 

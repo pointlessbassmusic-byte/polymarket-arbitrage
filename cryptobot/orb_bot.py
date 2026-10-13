@@ -250,11 +250,13 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if a.once:
-        bot = OrbBot(a.state)
-        try:
-            print(asyncio.run(bot.run_session()))
-        finally:
-            asyncio.run(bot.close())
+        async def once():
+            bot = OrbBot(a.state)
+            try:
+                return await bot.run_session()
+            finally:
+                await bot.close()
+        print(asyncio.run(once()))
         return 0
     print(render(report(a.state)))
     return 0

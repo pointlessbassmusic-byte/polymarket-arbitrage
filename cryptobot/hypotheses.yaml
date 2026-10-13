@@ -577,6 +577,20 @@
   preregistered: true
   trials_run: 6096
 
+- id: kalshi-book-imbalance
+  title: "Order-book imbalance on Kalshi's perps predicts the next minutes' mid beyond the cost of acting on it"
+  source: "Cont, Kukanov & Stoikov 2014 (order flow imbalance); Cartea, Jaimungal & Penalva on queue imbalance; operator direction 2026-10-13 (a new data class); the desk's order-book recorder (cryptobot.book_recorder), on since 2026-10-13"
+  claim: "When the depth within 25 bp of mid is lopsided (imbalance in the top or bottom tercile), the mid moves in that direction over the next 1-5 minutes by more than the round trip (18 bp taker on DOGE/SHIB, 4 bp maker), on at least the two memecoin perps the desk trades."
+  test: "After 30 days of 15-second snapshots on eight perps: per ticker, regress the next 1, 2 and 5-minute log mid change on the 25 bp imbalance (and the 10 and 50 bp bands as sensitivities) with HAC (Newey-West, 20 lags) t-statistics; then a rule, long when imbalance is in the top tercile and short in the bottom, held 1 or 5 minutes, one position per ticker, net of 18 bp taker and separately 4 bp maker; pooled and per ticker, first half against second half. 3 bands x 3 horizons x 2 holds = 18 trials."
+  success: "Written before the first snapshot: alive only if the registered band (25 bp) and horizon (5 minutes) show pooled HAC t >= 3.0 and the taker-cost rule is net positive in both halves on DOGE and SHIB; maker-only positive with taker negative is inconclusive (fills carry adverse selection, see the hourly binaries); negative at both costs is killed."
+  data: "state/books/<TICKER>/<day>.jsonl from the desk's recorder (eight perps, 15 s)"
+  result: "PRE-REGISTERED 2026-10-13; recorder deployed with the desk; the first live snapshot read DOGE 9.8 bp spread, SHIB 10.5 bp, BTC 0.2 bp, with imbalances between -0.31 and +0.22 at 25 bp"
+  verdict: inconclusive
+  regime: "collecting; 30 days from the deploy"
+  rerun: "python -m cryptobot.book_recorder --state state --report (the study: cryptobot.book_study, to be written when the data exists)"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
