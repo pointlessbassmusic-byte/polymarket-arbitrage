@@ -77,6 +77,14 @@ in five, Sharpe 0.37) and eight macro-to-asset leads from FRED and ETF
 data (one candidate, the 2s10s slope into XLF over 20 days, best of 48
 trials, sent to paper; gold vs real yields and gas momentum killed as
 leads).
+Profiled, 5 minutes to 37 days, every coin (addendum 25): the median
+hourly move is 20–31 bp against the 18 bp round trip, a day's is
+117–307 bp, a month's 1,241–1,746 bp; ranges peak 13:00–16:00 UTC and
+weekends run 25–35% quieter; no hour, weekday, volume or prior-day
+macro signal gives direction (the null's hit rate on 549 trials);
+volume and the VIX level predict the next bar's range, which is a
+sizing input, not a trade. Same-day comovement with the Nasdaq is about
+110 bp per sd.
 Searched and empty: 6,096 one- and two-feature barrier rules over Kalshi's
 hourly perps (closed: the in-sample winners lose every month), eleven
 years of hourly BTC and ten years of nine macro ETFs (inconclusive: the

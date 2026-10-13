@@ -661,6 +661,20 @@
   preregistered: true
   trials_run: 0
 
+- id: range-profile-2026-10
+  title: "Swings, ranges, time of day, volume and macro cross-regressions from 5 minutes to 37 days, every coin"
+  source: "operator direction 2026-10-13 (lows, highs, average swings, trading ranges at every interval; regress on time of day, price and volume; cross-regress against macro and stocks; all coins)"
+  claim: "Three testable parts of a descriptive profile: (1) some UTC hour has a signed return with |t| >= 2.5 that is coherent across coins; (2) the volume ratio (bar volume over its trailing mean) predicts the next bar's signed return; (3) a prior-day macro or stock move (SPY, QQQ, VIX level and change, dollar, 10y, WTI) leads BTC's daily return by >= 25 bp per sd at t >= 2.5. The swing/range tables and the range regressions are descriptive, not trials."
+  test: "cryptobot.range_profile on four datasets: Coinbase 5-minute bars (BTC and 12 majors, two years), Kalshi hourly perps (20 coins, four months), BTC hourly 2015-2026, Hyperliquid daily (163 coins); per horizon 5m..37d the median and p90 absolute move and high-low range, share of bars with move > 18 bp; hour-of-day and weekday means with t; Newey-West OLS of next-bar range and return on the log volume ratio; daily BTC return and range on each macro series same day and lagged one day. Trials: 24 hours x coins, 1 volume regression per coin, 7 macro leads per dataset."
+  success: "Written before the Kalshi and daily runs: an hour is a candidate if |t| >= 2.5 on BTC's eleven years and the same sign holds on the majority of the 20 Kalshi perps; volume is a candidate if the return t >= 2.5 on BTC hourly and on the majority of coins; a macro lead is a candidate if >= 25 bp per sd at t >= 2.5 on at least two of the three datasets. Otherwise killed for that part."
+  data: "scratch btc5m/*_5m.json, state_collect/kalshi_hourly/*.jsonl, btc_hourly.pkl + xasset/btc_hourly_2015_2019.pkl, hl_all_daily.pkl, macro/*.json"
+  result: "Run 2026-10-13. Hour of day: 3 coin-hours of 478 at |t| >= 2.5 on the Kalshi perps (different hours, different signs), 2 of 24 on BTC's eleven years (21:00, 22:00 UTC, +3 to +4 bp, loses as a rule), 0 of 24 on two years of 5-minute BTC: the null rate. Volume ratio: next-bar range t +4 to +43 on every coin, next-bar return 0 of 20 Kalshi perps and 4 of 163 daily perps at 2.5 (2.5%, the null), BTC +1.7 to +2.8 at 0.1-1 bp. Macro leads: no prior-day return coefficient >= 25 bp at t 2.5 on any dataset (best: dollar +21 bp t 2.5 on one set, 0 on the others); same-day comovement large (SPY/QQQ +110 to +128 bp per sd, VIX change -83 to -119, dollar -39 to -59); yesterday's VIX level predicts today's BTC range on all three sets (t 1.6/4.4/6.1). Profile: median hourly move 20-31 bp vs an 18 bp round trip, daily 117-307 bp, monthly 1,241-1,746 bp; range peaks 13:00-16:00 UTC, troughs 05:00-07:00 and 10:00-11:00; weekends 25-35% quieter"
+  verdict: killed
+  regime: "2015-2026 BTC, 2024-2026 alts: no hour, weekday, volume or prior-day macro signal gives direction; volume and VIX give range. Nothing traded; VIX level becomes a range conditioner for the order-book study"
+  rerun: "python -m cryptobot.range_profile --source {coinbase5m,kalshi_hourly,btc_hourly,hl_daily} --scratch <dir>"
+  preregistered: true
+  trials_run: 549
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"

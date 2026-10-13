@@ -1215,3 +1215,113 @@ of days-to-cover changes say nothing (t −0.6).
 **Verdict: inconclusive**, with two threads worth a cleaner follow-up
 when the data exist: BTC at 09:30 to the minute for the post-gap
 drift, and more COIN history for the pairs.
+
+## Addendum, 2026-10-13 (25): swings, ranges, time of day, volume and macro, 5 minutes to 37 days, every coin
+
+The operator asked for the lows, highs, average swings and trading
+ranges of crypto at every interval from 5 minutes to a month plus a
+week, with regressions on time of day, price and volume signals, and
+cross-regressions against the macro and stock series, on all coins,
+not only BTC. `cryptobot.range_profile` does that on four datasets:
+Coinbase 5-minute bars (BTC and 12 majors, two years), Kalshi's hourly
+perps (20 coins, four months), BTC hourly 2015–2026 (eleven years) and
+Hyperliquid daily (163 coins, up to four years). The outlier filter
+`clean()` drops the bad prints in the 2015–2019 hourly series. It is
+a profile, not a rule: the only pre-registered claims here are the
+three regressions (hour of day, volume, macro lead), each marked below.
+
+**Swings and ranges.** Medians across coins; move is the absolute
+close-to-open, range is high-to-low, both in bp. The desk's round
+trip on Kalshi is 18 bp.
+
+| horizon | BTC 5m bars (2y) | BTC hourly (11y) | 20 Kalshi perps | 163 perps daily |
+|---|---|---|---|---|
+| 5m | 6 / 13 | | | |
+| 15m | 10 / 25 | | | |
+| 30m | 14 / 35 | | | |
+| 1h | 20 / 51 | 24 / 62 | 31 / 67 | |
+| 4h | 42 / 107 | 48 / 135 | 63 / 154 | |
+| 1d | 117 / 300 | 143 / 381 | 165 / 426 | 307 / 740 |
+| 7d | 310 / 877 | 423 / 1,071 | | 794 / 2,077 |
+| 30d | | 1,241 / 2,699 | | 1,746 / 4,434 |
+| 37d | | 1,306 / 3,036 | | 2,038 / 4,793 |
+
+The share of bars whose move beats the 18 bp round trip: 12% at 5
+minutes, 29% at 15, 42% at 30, 54–68% at an hour, 75–85% at four
+hours, 89–97% at a day, 99% at a month. BTC's two-year annualised vol
+is 45% against 66–72% over eleven years; the 20 Kalshi perps run
+62–75%, the 163 Hyperliquid perps a median 115% (PAXG 27%, BTC 57%,
+FARTCOIN 183%, MOODENG 184%). Every hourly and minute result this
+month sits in the first rows of that table: the median move is the
+fee, so a rule needs direction, and nothing below gives one.
+
+**Time of day (pre-registered as trial: an hour with |t| ≥ 2.5 on
+the signed return, coherent across coins).** Range peaks at 13:00–16:00
+UTC on every coin: BTC 103–111 bp an hour over eleven years (105 bp at
+14:00 on the 5-minute set) with the heaviest volume share, the 20
+Kalshi perps have 14:00 and 15:00 UTC in their top three on 18 and 16
+coins of 20. Troughs are 05:00–07:00 and 10:00–11:00 UTC (BTC 48–75
+bp). On the signed return: 3 coin-hours of 478 reach |t| 2.5 on the
+Kalshi set (AAVE 21:00 −26 bp, NEAR and ZEC 11:00 +23 bp), 2 of 24 on
+eleven years of BTC (21:00 and 22:00 UTC, +3 to +4 bp, already tested
+as a rule in addendum 20 and net negative), 0 of 24 on the 5-minute
+BTC set. That is the null's rate. Nothing on hour of day.
+
+**Weekday.** Weekend ranges are 25–35% lower on every dataset (BTC
+hourly Mon–Fri 501–532 bp a day, Sat 364, Sun 404; 163 perps 893–978
+weekdays, 769–799 weekend). Signed: BTC's best weekday is Monday +35
+bp (t 2.2 over 11 years), under the bar. Across the 163 perps,
+Tuesday and Thursday are negative on 96–98% of coins and Friday
+positive on 74%, which reads like a finding until you remember the
+coins share one factor: 163 coins over the same 200 weeks are one
+observation, and the per-coin median t is −1.3 to −1.5. Not a trial,
+not traded.
+
+**Volume (pre-registered as trial: volume ratio predicts the next
+bar's signed return).** The ratio of a bar's volume to its trailing
+mean predicts the next bar's range on every coin at every horizon
+(BTC 5-minute t +43, hourly +33, daily +4 to +9; 20 Kalshi perps t
+0.1–8.2, median 6.0; 163 perps median 4.4). It predicts the next
+bar's direction on none: return t −1.6 to +1.5 on the 20 Kalshi perps
+(0 of 20 at 2.5), −3.2 to +2.5 on 163 daily (4 of 163 at 2.5, which
+is 2.5%, the null), +1.7 and +2.8 on BTC's 5-minute and hourly bars
+with a coefficient of 0.1–1 bp. Volume says when it will move, not
+which way. Killed as a direction signal; the range effect is the
+vol-clustering already in the order-book study's conditioning.
+
+**Macro cross-regressions (pre-registered as trial: a prior-day macro
+or stock move leads BTC's daily return by ≥ 25 bp per sd at t ≥ 2.5).**
+Per standard deviation of the predictor, daily BTC, three datasets
+(5-minute two years, hourly eleven years, Hyperliquid four years):
+
+| predictor | same day, return | same day, range | prior day, return | prior day, range |
+|---|---|---|---|---|
+| SPY return | +110 to +128 bp (t 4.6–10.4) | ≈ 0 | −10 to +21 (t ≤ 2.5) | −30 (t −2.1) to +0 |
+| QQQ return | +111 to +115 (t 6.1–6.8) | ≈ 0 | −4 to +10 | −36 (t −2.4) |
+| VIX change | −83 to −119 (t −5.9 to −11.4) | ≈ 0 | +1 to +3 | +14 to +35 (t 1.6–3.1) |
+| VIX level | −14 to −19 (t −1 to −2) | +44 to +75 (t 2.3–5.8) | +3 to +18 (t ≤ 1.9) | +38 to +71 (t 1.6–6.1) |
+| dollar change | −39 to −59 (t −2.7 to −5.9) | ≈ 0 | 0 to +21 (t ≤ 2.5) | ≈ 0 |
+| 10y yield change | +1 to +12 | ≈ 0 | −5 to +9 | −15 to −17 |
+| WTI change | −6 to +22 | ≈ 0 | −10 to +5 | ≈ 0 |
+
+Same day is comovement, and it is large: a one-sd Nasdaq day moves
+BTC about 110 bp the same day, a one-sd VIX jump takes 80–120 bp off
+it, a one-sd dollar rally 40–60 bp. Prior day, no return coefficient
+clears 25 bp at t 2.5 on any dataset (the best is the dollar on the
+hourly set, +21 bp, t 2.5, and 0 on the other two). The lead that
+holds is in volatility: yesterday's VIX level predicts today's BTC
+range on all three sets (t 1.6, 4.4, 6.1), and yesterday's VIX change
+on two. Macro-to-BTC direction: killed as a daily lead, for the
+fourth time this month (addenda 14, 23, 24, here). Macro-to-BTC
+range: real, and it is a sizing input, not a trade.
+
+**12 alt coins at 5 minutes.** PENDING, filled in below when the
+Coinbase pull lands.
+
+**What it changes on the desk.** Nothing in the live book. The
+bounce-short's hourly cadence and daily horizon are where the move
+clears the fee; the order-book study's decisive window is 13:00–17:00
+UTC, when the books and ranges are busiest; VIX level goes on the list
+of range conditioners for the book study and the allocator's vol
+input. Reproduce: `python -m cryptobot.range_profile --source
+{coinbase5m,kalshi_hourly,btc_hourly,hl_daily} --scratch <dir>`.
