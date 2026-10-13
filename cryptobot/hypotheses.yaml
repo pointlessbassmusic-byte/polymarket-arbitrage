@@ -605,6 +605,20 @@
   preregistered: true
   trials_run: 9
 
+- id: macro-relations-2026-10
+  title: "Eight documented macro-to-asset relations, tested as leads on the instruments the desk can trade (Kalshi gold perp; sector, miner and energy ETFs at Alpaca)"
+  source: "operator direction 2026-10-13 (macro, precious metals and gas data for stock picking); the literature on gold and real yields (Erb & Harvey 2013), commodity momentum into equity sectors, credit leading equities, VIX-conditioned returns, dollar and emerging markets; cryptobot.data.macro (FRED daily series plus 26 ETFs, 2016-2026)"
+  claim: "At least one of these predicts the next 5 or 20 trading days of its target beyond 8 bp a round trip: (1) the 5-day change in the 10-year real yield -> GLD; (2) the 60-day z-score of log(GDX/GLD) -> GDX minus GLD (pairs reversion); (3) WTI's 20-day momentum -> XLE; (4) Henry Hub's 20-day momentum -> UNG; (5) the broad dollar's 20-day change -> EEM; (6) the 5-day change in the high-yield spread -> IWM; (7) the 20-day change in the 2s10s slope -> XLF; (8) the VIX level -> SPY. Every predictor is taken as of the prior session's close."
+  test: "cryptobot.macro_study: OLS of the forward log return (5 and 20 days; 1 day as a sensitivity) on the standardised predictor with Newey-West t (10 lags), full sample 2017-2026 and by era (2017-2020, 2021-2023, 2024-2026); a tercile rule (top third long, bottom third short, or the reverse where the literature's sign says so) held the horizon, one position at a time, net of 8 bp a round trip, by half. 8 relations x 3 horizons = 24 regression trials plus 16 rule trials."
+  success: "Written before running: a relation is a CANDIDATE only if its full-sample |t| >= 2.5 with the literature's sign, the same sign with |t| >= 1.5 in both of the two latest eras, and its rule net positive in both halves at 8 bp; a candidate goes to paper (Kalshi gold perp or Alpaca) for 20 trades before money. No candidate means inconclusive and the family is recorded; a relation whose rule is net negative at every horizon is killed."
+  data: "state/macro/<ID>.json from cryptobot.data.macro (scratch state_collect/macro)"
+  result: "Run 2026-10-13, 2017-2026, 48 trials. ONE CANDIDATE by the written bar: the 20-day change in the 2s10s slope -> XLF over the next 20 days (t +2.6 full sample; by era +1.3 / +1.6 / +2.1; tercile rule long a steepening, short a flattening, one position at a time: 116 trades, +109 bp net a trade, halves +150 / +68, about +13% a year on one position, rule t 1.7). Near misses: VIX level -> SPY 20 days (t +3.4, the classic high-vol-high-forward-return effect, but 2021-2023 only +0.7, fails the era test; rule +47 bp a trade), GDX/GLD 60-day z -> the pair (t -2.2, right sign in every era but under 2.5; rule +43 bp a trade over 20 days). Killed: real-yield change -> gold (t +0.5, the wrong sign as a lead; the relation is contemporaneous) and gas momentum -> UNG (negative at every horizon). Inconclusive: oil momentum -> XLE (t -1.9, wrong sign), dollar -> EEM (t -1.0, rule +82 bp a trade on 116 trades but no regression support), HY spread -> IWM (2023 on only, t -1.5). Caveat on the candidate: it is the best of 48 trials and its regression t of 2.6 is near what the best of 48 null trials gives; the bar sends it to paper, not to money"
+  verdict: inconclusive
+  regime: "2017-2026 daily ETF and FRED data: macro series published daily do not lead the ETFs at 1-20 days except the slope-into-banks relation, which is a candidate for paper (cryptobot.macro_bot, Alpaca paper, 20 trades of 20 days before money)"
+  rerun: "python -m cryptobot.data.macro --state state && python -m cryptobot.macro_study --state state"
+  preregistered: true
+  trials_run: 48
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"

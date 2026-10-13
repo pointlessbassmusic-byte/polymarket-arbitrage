@@ -1135,3 +1135,44 @@ horizons has been mined to its floor with this family of rules. The
 next edge, if there is one for this desk, comes from a different kind
 of data (order-book depth, funding, cross-market basis, event
 calendars), not from more combinations of the same closes.
+
+## Addendum, 2026-10-13 (23): defined-risk options, and macro as a lead
+
+**The one options structure that fits $1,000.** A covered call or a
+cash-secured put on IBIT needs 100 shares, about $4,700. An iron
+condor risks only the wing width: sell the 25-delta call and put a
+month out, buy the 10-delta wings, hold to expiry, no hedging. On the
+DVOL history (`ibit-iron-condor-monthly`, registered first): 56
+condors since 2021, credit 3.4% of spot on a 9.1% width, 71% expire at
+max profit, one in five is wiped to the wing. +7.3% a month of the
+capital at risk, Sharpe 0.37, PSR 0.79, deflated 0.06 at nine trials,
+2023 −126%. Each wipe costs about 27 months of max-profit credit, and
+on $1,000 one condor's width is half the account. Inconclusive; the
+premium is real and this structure does not harvest it at a Sharpe
+worth the drawdown.
+
+**Macro as a lead.** `cryptobot/data/macro.py` now keeps thirteen
+FRED daily series (fed funds, 2y, 10y, real 10y, breakevens, dollar,
+VIX, WTI, Brent, Henry Hub, HY spread, EURUSD, USDJPY) and 26 ETFs for
+sectors, metals, miners, energy, bonds and foreign markets, ten years
+deep. Eight documented relations were registered as leads, predictor
+as of the prior close, 5- and 20-day horizons, 8 bp a round trip:
+
+| relation | 20-day t | eras 2017–20 / 21–23 / 24–26 | rule, net per trade | verdict |
+|---|---|---|---|---|
+| 2s10s slope change → XLF | +2.6 | +1.3 / +1.6 / +2.1 | +109 bp (116 trades, +13%/yr) | candidate |
+| VIX level → SPY | +3.4 | +3.2 / +0.7 / +2.9 | +47 bp | fails the era test |
+| GDX/GLD z-score → the pair | −2.2 | −1.8 / −1.3 / −1.3 | +43 bp | under the bar |
+| dollar change → EEM | −1.0 | | +82 bp, no regression support | inconclusive |
+| WTI momentum → XLE | −1.9 | wrong sign | −11 bp | inconclusive |
+| HY spread change → IWM | −0.2 (5d: −1.5) | 2023 on only | | inconclusive |
+| real yield change → GLD | +0.4 | wrong sign as a lead | −61 bp | killed |
+| gas momentum → UNG | −1.6 | | −61 bp | killed |
+
+The textbook relations (gold and real yields, oil and energy stocks)
+are contemporaneous: by the time the macro print is on file the ETF
+has moved. The one survivor, a steepening curve leading bank stocks
+by a month, is also the best of 48 trials, so the bar sends it to
+paper: `macro_bot` holds XLF long or short on Alpaca's paper account
+for 20 trading days per signal, 20 trades before any money. At one
+position and 20-day holds that is slow by design.

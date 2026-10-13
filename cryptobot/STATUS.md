@@ -65,6 +65,12 @@ stop-and-reverse, vol-targeted index trend, follow-the-S&P in BTC, and
 the price-scaled small-cap earnings drift (its placebo, entering a
 month after the report, beat the real entry: the names win whenever
 you buy them, which is survivorship, not drift).
+Inconclusive, recorded: a monthly IBIT iron condor (the one options
+structure that fits $1,000: credit collected 71% of the time, one wipe
+in five, Sharpe 0.37) and eight macro-to-asset leads from FRED and ETF
+data (one candidate, the 2s10s slope into XLF over 20 days, best of 48
+trials, sent to paper; gold vs real yields and gas momentum killed as
+leads).
 Searched and empty: 6,096 one- and two-feature barrier rules over Kalshi's
 hourly perps (closed: the in-sample winners lose every month), eleven
 years of hourly BTC and ten years of nine macro ETFs (inconclusive: the

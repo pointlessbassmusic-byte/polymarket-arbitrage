@@ -1164,6 +1164,9 @@ python -m cryptobot.book_recorder --state state --report      # order-book rows 
 python -m cryptobot.book_study --state state                  # imbalance vs the next minutes, the pre-registered test
 python -m cryptobot.tsmom_study --dir tsmom                    # monthly trend rule on Kalshi's index/metal/oil perps (ETF proxies)
 python -m cryptobot.family_search --set etf_daily --scratch .  # every 1-2 feature barrier rule on a dataset, scored as a family
+python -m cryptobot.condor_study --state state                 # monthly IBIT iron condor on the DVOL history
+python -m cryptobot.data.macro --state state                   # FRED daily macro series + 26 ETFs, ten years
+python -m cryptobot.macro_study --state state                  # eight macro-to-asset leads, pre-registered
 python -m cryptobot.perp_hourly_study --state state --fetch   # hourly rules on every Kalshi perp at real costs (seconds)
 python -m cryptobot.kalshi_binaries --state state --days 30   # Kalshi hourly BTC binaries, settled, minute quotes (hours)
 python -m cryptobot.binary_tails_study --state state          # the favourite at 85-97 cents, 30 and 15 minutes out
