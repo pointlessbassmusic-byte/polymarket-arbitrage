@@ -13,6 +13,8 @@
 #   ./desk.sh remote      one private HTTPS address for the dashboard (Tailscale), phone and desktop alike
 #   ./desk.sh url         the dashboard URL(s) to bookmark
 #   ./desk.sh digest      today's digest, as the webhook would get it
+#   ./desk.sh bankroll N  the real-money bankroll in USD (risk.bankroll_usd), then restart
+#   ./desk.sh rotate      new dashboard token (after the old one was shown somewhere), then restart
 #
 # `keys`, `arm` and `disarm` edit files only; the restart is skipped when
 # Docker is not running (so they also work before the first deploy).
@@ -119,6 +121,30 @@ set_live() {
   cat "$tmp" > "$CFG"; rm -f "$tmp"
 }
 
+cmd_bankroll() {
+  local n="${1:-}" tmp
+  case "$n" in ''|*[!0-9.]*) echo "usage: ./desk.sh bankroll 250"; exit 1;; esac
+  tmp="$(mktemp)"
+  # only the risk: block's own `bankroll_usd:` line
+  awk -v n="$n" '
+    /^risk:/ {inrisk=1}
+    inrisk && /^  bankroll_usd:/ && !done {sub(/bankroll_usd: *[0-9.]+/, "bankroll_usd: " n); done=1}
+    /^[a-z]/ && !/^risk:/ {inrisk=0}
+    {print}' "$CFG" > "$tmp"
+  cat "$tmp" > "$CFG"; rm -f "$tmp"
+  echo "real bankroll: \$$n (risk.bankroll_usd). Fund the Kalshi perps balance with at least that."
+  restart_if_running
+}
+
+cmd_rotate() {
+  ensure_env
+  local token
+  token="$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))' 2>/dev/null || openssl rand -hex 32)"
+  set_env CRYPTOBOT_DASH_TOKEN "$token"
+  echo "dashboard token replaced; the old address no longer works. ./desk.sh url prints the new one."
+  restart_if_running
+}
+
 cmd_arm() {
   ensure_env
   if [ -z "$(get_env CRYPTOBOT_KALSHI_KEY_ID)" ] || [ -z "$(get_env CRYPTOBOT_KALSHI_KEY_PEM)" ]; then
@@ -160,7 +186,7 @@ cmd_status() {
   echo
   echo "armed: perp.live=$(grep -A40 '^perp:' "$CFG" | grep -m1 '^  live:' | awk '{print $2}'), CRYPTOBOT_ARM_LIVE=$(get_env CRYPTOBOT_ARM_LIVE | sed 's/^$/(blank)/')"
   echo "keys: kalshi=$([ -n "$(get_env CRYPTOBOT_KALSHI_KEY_ID)" ] && echo yes || echo no) alpaca=$([ -n "$(get_env CRYPTOBOT_ALPACA_KEY_ID)" ] && echo yes || echo no) webhook=$([ -n "$(get_env CRYPTOBOT_ALERT_WEBHOOK)" ] && echo yes || echo no)"
-  cmd_url | sed 's/^/dashboard /'
+  cmd_url | sed "s/?t=.*/?t=<token: .\/desk.sh url>/; s/^/dashboard /"
   echo
   if have_docker && dc ps --status running 2>/dev/null | grep -q desk; then
     echo "preflight:"; dc run --rm desk python -m cryptobot.desk --preflight 2>/dev/null | sed 's/^/  /'
@@ -243,6 +269,8 @@ case "${1:-}" in
   tunnel) cmd_tunnel ;;
   remote) cmd_remote ;;
   url) cmd_url ;;
+  bankroll) cmd_bankroll "${2:-}" ;;
+  rotate) cmd_rotate ;;
   digest) dc run --rm desk python -m cryptobot.desk --digest --state-dir /data ;;
-  *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
