@@ -59,11 +59,12 @@ def compact(m: dict) -> dict:
 
 
 class KalshiBinaries:
-    def __init__(self, state_dir: Path, client=None, pace_s: float = PACE_S, series: str = SERIES, interval: int = 1):
+    def __init__(self, state_dir: Path, client=None, pace_s: float = PACE_S, series: str = SERIES, interval: int = 1, min_span_s: int = 0):
         self.dir = Path(state_dir) / "kalshi_binaries"
         self.markets_file = self.dir / "markets.jsonl"
         self.candles_dir = self.dir / "candles"
         self.series = series
+        self.min_span_s = min_span_s   # list only markets whose open-to-close span is at least this (daily contracts in an hourly series)
         self.interval = interval   # candle minutes: 1 for intraday markets, 60 for daily/weekly, 1440 for monthly and longer
         self._c = client or httpx.AsyncClient(timeout=60, headers=UA)
         self._owns = client is None
@@ -128,7 +129,7 @@ class KalshiBinaries:
                 if (_f(m.get("volume_fp")) or 0) <= 0 or m["ticker"] in have or not m.get("result"):
                     continue
                 row = compact(m)
-                if row["close_ts"] < since_ts:
+                if row["close_ts"] < since_ts or row["close_ts"] - row["open_ts"] < self.min_span_s:
                     continue
                 append_jsonl(self.markets_file, row)
                 have.add(row["ticker"])
@@ -176,8 +177,8 @@ class KalshiBinaries:
 
 
 async def collect(state_dir: Path, days: int = 30, client=None, limit: Optional[int] = None, pace_s: float = PACE_S,
-                  series: str = SERIES, interval: int = 1) -> dict:
-    c = KalshiBinaries(state_dir, client=client, pace_s=pace_s, series=series, interval=interval)
+                  series: str = SERIES, interval: int = 1, min_span_s: int = 0) -> dict:
+    c = KalshiBinaries(state_dir, client=client, pace_s=pace_s, series=series, interval=interval, min_span_s=min_span_s)
     try:
         since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
         listed = await c.list_settled(since)
@@ -195,13 +196,14 @@ def main(argv=None) -> int:
     ap.add_argument("--pace", type=float, default=PACE_S, help="seconds between public requests")
     ap.add_argument("--series", default=SERIES, help="Kalshi series ticker (KXBTCD hourly ladder, KXBTC15M 15-minute up/down, KXETHD, ...)")
     ap.add_argument("--interval", type=int, default=1, help="candle minutes (1, 60 or 1440)")
+    ap.add_argument("--min-span", type=int, default=0, help="list only markets open at least this many seconds")
     ap.add_argument("--status", action="store_true")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if a.status:
         print(KalshiBinaries(a.state).status())
         return 0
-    print(asyncio.run(collect(a.state, a.days, limit=a.limit, pace_s=a.pace, series=a.series, interval=a.interval)))
+    print(asyncio.run(collect(a.state, a.days, limit=a.limit, pace_s=a.pace, series=a.series, interval=a.interval, min_span_s=a.min_span)))
     return 0
 
 
