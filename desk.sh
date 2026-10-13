@@ -15,6 +15,8 @@
 #   ./desk.sh digest      today's digest, as the webhook would get it
 #   ./desk.sh bankroll N  the real-money bankroll in USD (risk.bankroll_usd), then restart
 #   ./desk.sh kalshi ID FILE   the Kalshi key id and private-key file, no prompts, then restart
+#   ./desk.sh alpaca ID SECRET the Alpaca (paper or live) key, no prompts, then restart
+#   ./desk.sh webhook URL      the Discord/Slack webhook, no prompts, then restart
 #   ./desk.sh rotate      new dashboard token (after the old one was shown somewhere), then restart
 #
 # `keys`, `arm` and `disarm` edit files only; the restart is skipped when
@@ -135,6 +137,25 @@ cmd_kalshi() {
   set_env CRYPTOBOT_KALSHI_KEY_ID "$(printf '%s' "$id" | tr -d '\r\n ')"
   set_env CRYPTOBOT_KALSHI_KEY_PEM "$(tr -d '\r' < "$file" | awk 'BEGIN{ORS="\\n"} {print}')"   # one line, \n between
   echo "Kalshi key id and private key saved to $ENV_FILE (mode 600). You can delete $file now."
+  restart_if_running
+}
+
+cmd_alpaca() {
+  local id="${1:-}" secret="${2:-}"
+  ensure_env
+  if [ -z "$id" ] || [ -z "$secret" ]; then echo "usage: ./desk.sh alpaca KEY-ID SECRET"; exit 1; fi
+  set_env CRYPTOBOT_ALPACA_KEY_ID "$(printf '%s' "$id" | tr -d '\r\n ')"
+  set_env CRYPTOBOT_ALPACA_SECRET_KEY "$(printf '%s' "$secret" | tr -d '\r\n ')"
+  echo "Alpaca key saved to $ENV_FILE."
+  restart_if_running
+}
+
+cmd_webhook() {
+  local url="${1:-}"
+  ensure_env
+  case "$url" in https://*) ;; *) echo "usage: ./desk.sh webhook https://discord.com/api/webhooks/..."; exit 1;; esac
+  set_env CRYPTOBOT_ALERT_WEBHOOK "$(printf '%s' "$url" | tr -d '\r\n ')"
+  echo "webhook saved; fills, exits, halts and the daily digest go there."
   restart_if_running
 }
 
@@ -288,7 +309,9 @@ case "${1:-}" in
   url) cmd_url ;;
   bankroll) cmd_bankroll "${2:-}" ;;
   kalshi) cmd_kalshi "${2:-}" "${3:-}" ;;
+  alpaca) cmd_alpaca "${2:-}" "${3:-}" ;;
+  webhook) cmd_webhook "${2:-}" ;;
   rotate) cmd_rotate ;;
   digest) dc run --rm desk python -m cryptobot.desk --digest --state-dir /data ;;
-  *) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
