@@ -133,7 +133,7 @@ cmd_kalshi() {
     echo "$file does not look like a private key (no BEGIN line)"; exit 1
   fi
   set_env CRYPTOBOT_KALSHI_KEY_ID "$(printf '%s' "$id" | tr -d '\r\n ')"
-  set_env CRYPTOBOT_KALSHI_KEY_PEM "$(tr -d '\r' < "$file")"
+  set_env CRYPTOBOT_KALSHI_KEY_PEM "$(tr -d '\r' < "$file" | awk 'BEGIN{ORS="\\n"} {print}')"   # one line, \n between
   echo "Kalshi key id and private key saved to $ENV_FILE (mode 600). You can delete $file now."
   restart_if_running
 }
