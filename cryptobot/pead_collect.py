@@ -188,10 +188,13 @@ class PeadCollector:
 async def monthly(state_dir: Path, client: Optional[httpx.AsyncClient] = None, today: Optional[dt.date] = None,
                   max_cap: float = 5e9) -> Optional[dict]:
     """Once a month, after the month has ended: fetch its calendar days
-    and prices for its new symbols, so the out-of-sample panel for
-    `pead-per-price-smallcap` is point-in-time (the market cap and the
-    listing are as of the fetch, days after the month closes). Returns
-    what was added, or None when the month is already on file."""
+    and prices for its new symbols, so a panel built this way is
+    point-in-time (the market cap and the listing are as of the fetch,
+    days after the month closes). Written for `pead-per-price-smallcap`,
+    which was killed in-sample on 2026-10-13 before its first month; no
+    longer scheduled by the desk, kept for the next earnings test that
+    needs a survivorship-free panel. Returns what was added, or None when
+    the month is already on file."""
     today = today or dt.date.today()
     first_this = today.replace(day=1)
     last_month_end = first_this - dt.timedelta(days=1)

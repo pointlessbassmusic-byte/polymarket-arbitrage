@@ -184,3 +184,41 @@ def test_monthly_collects_last_month_once(tmp_path):
     assert asyncio.run(C.monthly(tmp_path, client=http, today=dt.date(2026, 11, 20))) is None   # already done
     assert asyncio.run(C.monthly(tmp_path, client=http, today=dt.date(2026, 12, 1))) is None    # November not closed 3 days
 
+
+def test_placebo_offset_and_dollar_volume_size():
+    rows = [{"date": f"2026-10-{d:02d}", "open": 10.0 + d, "close": 10.5 + d, "volume": 1000.0} for d in range(1, 30)]
+    w0 = P.window_return(rows, "2026-10-05", 3, 0.0)
+    w5 = P.window_return(rows, "2026-10-05", 3, 0.0, entry_offset=5)
+    assert w0["entry_date"] == "2026-10-06" and w5["entry_date"] == "2026-10-11"
+    assert P.window_return(rows, "2026-10-05", 3, 0.0, entry_offset=40) is None
+    wm = P.window_return(rows, "2026-10-10", 3, 0.0, entry_offset=-5)                # before the report
+    assert wm["entry_date"] == "2026-10-06" and wm["exit_date"] == "2026-10-08"
+    assert P.window_return(rows, "2026-10-05", 3, 0.0, entry_offset=-40) is None      # never wraps to the end
+    dv = P.dollar_volume_before(rows, "2026-10-29", sessions=10)
+    assert dv == pytest.approx(statistics_median([(10.5 + d) * 1000 for d in range(20, 30)]))
+    assert P.dollar_volume_before(rows, "2026-10-03", sessions=10) is None          # too few sessions
+    cal, prices = _panel(months=14, names=40, drift_per_surprise=0.0, seed=8)
+    for r in cal:
+        r["eps"], r["forecast"] = 1.0 + r["surprise_pct"] / 100.0, 1.0
+    for px in prices.values():
+        for r in px:
+            r["volume"] = 1000.0
+    big = P.cohorts(cal, 3, None, prices=prices, max_dollar_volume=1e9)
+    small = P.cohorts(cal, 3, None, prices=prices, max_dollar_volume=1.0)
+    assert big and not small
+    res = P.run(cal, prices, rank_by="per_price", max_dollar_volume=1e9, entry_offset=10)
+    assert res["params"]["entry_offset"] == 10 and "PLACEBO entry 10 sessions late" in P.render(res)
+    early = P.run(cal, prices, rank_by="per_price", max_dollar_volume=1e9, entry_offset=-10)
+    assert "PLACEBO entry 10 sessions EARLY" in P.render(early)
+    # the denominator diagnostic: the close `lag` sessions before the report
+    assert P.price_before(rows, "2026-10-10") == 20.5
+    assert P.price_before(rows, "2026-10-10", lag=3) == 17.5
+    assert P.price_before(rows, "2026-10-10", lag=30) is None
+    lagged = P.run(cal, prices, rank_by="per_price", max_dollar_volume=1e9, price_lag=5)
+    assert lagged["params"]["price_lag"] == 5 and "close 5 sessions before" in P.render(lagged)
+
+
+def statistics_median(xs):
+    import statistics
+    return statistics.median(xs)
+

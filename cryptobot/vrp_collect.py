@@ -12,9 +12,9 @@
    state/options/ibit.jsonl, one JSON object per trading day.
 
 3. The out-of-sample tracker for `divergence-catchup-btc` (cryptobot.oos_track).
-4. Once a month, the previous month's earnings calendar and prices for
-   `pead-per-price-smallcap` (cryptobot.pead_collect.monthly), so that
-   panel is point-in-time.
+   (A monthly earnings-panel step ran here for `pead-per-price-smallcap`
+   until that hypothesis was killed on 2026-10-13; cryptobot.pead_collect
+   monthly is still callable by hand.)
 
 2. Kalshi hourly candles for the BTC and US500 perps
    (`cross-asset-crypto-leadlag` follow-up: does the BTC perp lead the
@@ -322,13 +322,6 @@ class Collector:
             logger.warning("options snapshot failed: %s", exc)
             out["options"] = f"ERROR {type(exc).__name__}"
         out["kalshi_hourly"] = await self.kalshi_hourly()
-        try:
-            from .pead_collect import monthly as pead_monthly
-            m = await pead_monthly(self.state, client=self._c)
-            out["pead_monthly"] = m or "month already on file (or not yet closed)"
-        except Exception as exc:                      # noqa: BLE001
-            logger.warning("PEAD monthly collection failed: %s", exc)
-            out["pead_monthly"] = f"ERROR {type(exc).__name__}"
         try:
             from .oos_track import update as oos_update
             s = await oos_update(self.state, client=self._c)

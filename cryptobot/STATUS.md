@@ -1,4 +1,4 @@
-# Where things stand (2026-10-12)
+# Where things stand (2026-10-13)
 
 One page for the operator. Everything here is in the registry
 (`cryptobot/hypotheses.yaml`) and the research doc
@@ -40,7 +40,6 @@ from the US.
 | IBIT option surface, daily | Bitcoin volatility-premium test | since 2026-10-12; a year of rows before the test |
 | Kalshi BTC / ETH / US500 hourly candles | does BTC lead the index perp off-session | 500 shared hours needed, about three weeks |
 | S&P-vs-BTC divergence days | the one cross-asset pattern, out of sample | 60 qualifying days needed, years |
-| earnings calendar and prices, monthly | post-earnings drift, price-scaled, sub-$2B, out of sample | from 2026-11; 24 months decide |
 
 `python -m cryptobot.vrp_collect --state state --report` and the
 dashboard's research card show the counts.
@@ -59,9 +58,11 @@ Fidelity has no API; it stays a human account.
 ## Decided this month
 
 Killed: Kraken margin as a venue, DOGE/SHIB/PEPE spread reversion,
-stop-and-reverse, vol-targeted index trend, follow-the-S&P in BTC.
+stop-and-reverse, vol-targeted index trend, follow-the-S&P in BTC, and
+the price-scaled small-cap earnings drift (its placebo, entering a
+month after the report, beat the real entry: the names win whenever
+you buy them, which is survivorship, not drift).
 Inconclusive, recorded: overnight-only index exposure (real premium, eaten
-by fees), post-earnings drift (the registered sort loses; a price-scaled
-small-cap variant looks good in a biased panel and is judged out of
-sample), Fed-liquidity timing, cross-asset lead-lag, stop width, BTC
-beta hedge, near-resolution capture on Polymarket. Nothing new is alive.
+by fees), post-earnings drift (the registered sort loses), Fed-liquidity
+timing, cross-asset lead-lag, stop width, BTC beta hedge, near-resolution
+capture on Polymarket. Nothing new is alive.

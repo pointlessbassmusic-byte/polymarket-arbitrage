@@ -773,3 +773,66 @@ collected month by month so the cap and the listing are point-in-time;
 What it took: three parallel calendar streams and two price streams
 over about three hours, with the throttle-versus-holiday answer,
 delisted symbols and a window-alignment bug found and fixed on the way.
+
+## Addendum, 2026-10-13 (13): the earnings-drift variant fails its placebo
+
+The one result in addendum 12 that cleared a bar was the sort that was
+not registered: surprise divided by price, cap at or under $2B, +1.32%
+a month over the other announcers. Two biases were known (survivors
+only; today's cap as the size filter). Before waiting two years for
+the out-of-sample months, the same panel can say whether those biases
+made the result, with three cheap checks (`pead_study` flags
+`--max-dollar-volume`, `--entry-offset`, `--price-lag`).
+
+**Point-in-time size does not remove it.** Filtering on the median
+daily dollar volume over the 60 sessions before each report, which is
+known at the time, instead of today's market cap:
+
+| size filter, surprise / price | spread per month | Sharpe | PSR | 2022–26 |
+|---|---|---|---|---|
+| cap ≤ $2B (today's) | +1.32% | +0.83 | 0.99 | +76% |
+| trailing $ volume ≤ $10M a day | +1.57% | +0.84 | 0.99 | +109% |
+| trailing $ volume ≤ $3M a day | +2.34% | +0.75 | 0.99 | +146% |
+
+**The placebo wins by more than the real entry.** Drift after an
+announcement should be concentrated after the announcement. Entering
+the same names 25 sessions later (sessions 25–45, before the next
+quarterly report) or 60 sessions later, and, as the mirror, 25
+sessions *before* the report:
+
+| entry, cap ≤ $2B | spread per month | Sharpe | years positive |
+|---|---|---|---|
+| next open after the report (the claim) | +1.32% | +0.83 | 10 of 11 |
+| 25 sessions late (no announcement in the window) | +1.77% | +1.13 | 10 of 11 |
+| 60 sessions late | +1.38% | +1.10 | 8 of 11 |
+| 25 sessions early (before the report) | −1.10% | −0.83 | 2 of 11 |
+
+With the dollar-volume filter the same three read +1.57%, +1.68% and
+−0.87%. The top decile outperforms the rest in any window after the
+report and underperforms before it.
+
+**The pre-report sign is the denominator's doing.** Dividing the
+surprise by the last close before the report ranks a name higher the
+further its price fell into the report. Dividing instead by the close
+25 sessions earlier, which cannot see that fall, the early placebo
+flips from −1.10% to +1.86% a month (Sharpe 1.41) while the real entry
+(+1.26%) and the late placebo (+1.62%) barely move. So the names in the
+top decile are not those with news; they are cheap small names on a
+particular price path, and they beat the other announcers before, at
+and a month after the report alike. In a panel of current listings
+only, a set of cheap small names that outperforms whenever you look is
+what survivorship looks like: the ones that went to zero are not in it.
+
+**Decision.** `pead-per-price-smallcap` is killed before its first
+out-of-sample month; the test it registered would have measured this
+characteristic and called it drift. `pead-revisit` stays inconclusive
+under its own written rule (the registered sort lost, at 17 trials
+now), with the mechanism recorded. The monthly earnings collection is
+out of the daily collector; `pead_collect monthly` remains callable
+for a future earnings test that needs a survivorship-free panel. No
+reversal or low-price strategy is registered out of this: the
+characteristic is indistinguishable from survivorship in this data,
+and a clean panel would be the first step, not a rule.
+
+Trials this addendum: ten (three size runs, four placebos, three
+denominator runs).

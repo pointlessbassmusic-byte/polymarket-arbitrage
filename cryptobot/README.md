@@ -1161,6 +1161,7 @@ python -m cryptobot.oos_track --state state --report     # the divergence rule, 
 python -m cryptobot.intraday_leadlag --state state       # BTC-leads-US500, once 500 hours exist
 python -m cryptobot.pead_collect calendar --state state  # earnings surprises 2015-2026 (Nasdaq data API)
 python -m cryptobot.pead_study --state state --max-cap 5e9   # post-earnings drift, once prices are in
+python -m cryptobot.pead_study --state state --max-cap 2e9 --rank-by per_price --entry-offset 25   # its placebo
 ```
 
 The daily digest carries one line per collector, so the webhook shows
