@@ -519,6 +519,20 @@
   preregistered: true
   trials_run: 1
 
+- id: kalshi-btc-hourly-tails
+  title: "Kalshi hourly BTC above/below markets: are far strikes overpriced (longshot bias), so that buying the favourite at 85-97 cents half an hour before settlement earns the gap after the quadratic fee?"
+  source: "the Bitcoin volatility premium measured 2026-10-13 (btc-vrp-listed-options: implied 5 points over realised at 30 days); the longshot-bias literature on betting markets (Thaler & Ziemba 1988; Snowberg & Wolfers 2010); Kalshi's KXBTCD series, about 190 strikes an hour, 30-35 traded, settled on the CF Benchmarks BTC price at the top of the hour; the Polymarket 15-minute markets were calibrated in their last two minutes (near-resolution-capture), which is a different horizon and venue"
+  claim: "At 30 and at 15 minutes before an hourly KXBTCD market settles, contracts whose YES mid is at or under 15 cents resolve YES less often than the mid implies, and those at or above 85 cents more often, so buying the favourite side (NO at 1 minus the YES bid when YES is cheap, YES at the ask when YES is dear) at 85-97 cents earns a positive net return per dollar after Kalshi's taker fee of 0.07 x price x (1 - price) a contract."
+  test: "cryptobot.kalshi_binaries collects every settled KXBTCD market with volume (listing) and its minute candlesticks (YES bid and ask closes, last trade, volume) for the last 30 days, paced at one public request a second; cryptobot.binary_tails_study takes the quote at the bar ending exactly 30 and 15 minutes before close, buys the favourite at its ask when the favourite's price is 0.85-0.97 and the spread is at most 5 cents, settles on the market's result, charges the fee, and reports net per dollar, hit rate against the implied probability by price bucket (0.85-0.90, 0.90-0.95, 0.95-0.97), with t-statistics clustered by event hour (every strike in an hour settles on the same print). Variants counted as trials: the mirror (buying the longshot), a resting-bid maker fill (filled only when the last trade later goes through the bid, no fee), and the 0.97-0.99 bucket."
+  success: "Written before collecting: at both decision times, favourite net per dollar > 0 with cluster t >= 2.0 and positive in both halves of the sample (by event time); otherwise inconclusive; negative net at both decision times is killed. Not traded before a verdict; if alive, paper first on the desk with the Kalshi key, size 1-5 contracts."
+  data: "state/kalshi_binaries/markets.jsonl and candles/<date>.jsonl, public Kalshi API (api.elections.kalshi.com), no key"
+  result: "PRE-REGISTERED 2026-10-13; collecting"
+  verdict: inconclusive
+  regime: "collecting"
+  rerun: "python -m cryptobot.kalshi_binaries --state state --days 30 && python -m cryptobot.binary_tails_study --state state"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
