@@ -91,8 +91,11 @@ def run(scratch: Path) -> dict:
             k += 1
         res["perps"][perp] = {"days": len(all_days), "ann_funding": sum(fd) * 365 / len(fd), "holds": n_hold}
     if len(pairs) > 30:
-        reg = ols([b for _, b, _ in pairs], [[a] for a, _, _ in pairs], nw_lags=HOLD)
-        res["persistence"] = {"n": len(pairs), "slope": reg["beta"][1], "t": reg["t"][1]}
+        try:
+            reg = ols([b for _, b, _ in pairs], [[a] for a, _, _ in pairs], nw_lags=HOLD)
+            res["persistence"] = {"n": len(pairs), "slope": reg["beta"][1], "t": reg["t"][1]}
+        except ValueError:                        # constant funding: no slope to estimate
+            res["persistence"] = None
     # holds start on overlapping days (stepping one day); keep non-overlapping per perp for the verdict
     keep, last = [], {}
     for h in sorted(res["holds"], key=lambda h: (h["perp"], h["start"])):
