@@ -209,6 +209,7 @@ def deribit_book(currency: str, client: httpx.Client, throttle: Throttle) -> lis
         rows.append({"instrument": name, "expiry": parts[1], "strike": float(parts[2]), "type": "call" if parts[3] == "C" else "put",
                      "bid": o.get("bid_price"), "ask": o.get("ask_price"), "mark": o.get("mark_price"), "mark_iv": o.get("mark_iv"),
                      "oi": o.get("open_interest"), "volume": o.get("volume"), "underlying": o.get("underlying_price") or o.get("estimated_delivery_price"),
+                     "underlying_index": o.get("underlying_index"), "index_price": o.get("estimated_delivery_price"),
                      "interest_rate": o.get("interest_rate")})
     return rows
 
@@ -271,7 +272,7 @@ def collect_options_daily(store: ObservationStore, capture_day: Optional[str] = 
             e = store.archive.store(f"deribit-book-{cur}-{day}", "data",
                                     ({"source": "deribit", "kind": "option", "key": r["instrument"], "observed_at": cap, "available_at": cap, "value": r} for r in rows),
                                     recipe=f"deribit /public/get_book_summary_by_currency currency={cur} kind=option (raw kept on local disk)", tags=["options", "crypto", day],
-                                    schema="value = {instrument, expiry, strike, type, bid, ask, mark, mark_iv, oi, volume, underlying}", in_git=False)
+                                    schema="value = {instrument, expiry, strike, type, bid, ask, mark, mark_iv, oi, volume, underlying (expiry forward), underlying_index (future name or SYN.*), index_price (spot index)}", in_git=False)
             out["deribit"][cur] = e.rows
             # committed per-expiry surface for crypto too
             by_exp: dict[str, list[dict]] = defaultdict(list)

@@ -1,6 +1,6 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `5c3a88e7b4e4ab22`). 375 theories. supported 16, not_supported 19, inconclusive 7, untested 216, blocked 109, parked 8.
+Rendered from `registry.json` (hash `0dd8b9c684e3f47d`). 375 theories. supported 16, not_supported 19, inconclusive 7, untested 214, blocked 111, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
@@ -633,7 +633,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-a0277481: inconclusive — in contango (VIX3M/VIX>1.10), VIX 21 days later is below the forward 147/177 = 83% (95% CI 0.77-0.88); mean F - VIX(t+21) +2.90 pts, p=0.0005; data part passes, call-spread simulation not implemented
 - note: from the options-library library: VIX futures roll-down harvest via short VIX call spread; harness suggestion: Extend harness_term_structure with the forward-level proxy F and a VIX-call-spread pricer (bs.price with sigma = VVIX/100, T from the VIX monthly calendar). | verifier pass pending (usage limit); engine-checked | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists
 
-## Untested (216)
+## Untested (214)
 
 ### T-12 · volume-improves-calibration
 
@@ -1557,32 +1557,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Share of |residual| > 5 bp below 5% on day one and over 20 captured days; residual mean within +/- 2 bp.
 - controls: Exclude AM-settled SPX monthlies; use XSP as second control; test strike-invariance of each implied forward.
 - note: from the options-library library: ETF vs index option parity (SPY vs SPX vs XSP); harness suggestion: parity.py cross_venue(spy_chain, spx_chain, xsp_chain) returning residual table; payoff template with qty 10:1. | verifier pass pending (usage limit); engine-checked
-
-### T-195 · crypto-put-call-parity-deribit
-
-**Claim.** For Deribit BTC options with open interest > 100 BTC at strikes within 10% of the future and DTE between 7 and 180, the option-implied forward K + (C_mid - P_mid) x index deviates from the matching future's mark by less than 10 bp in at least 99% of (K,T) pairs, and no pair's deviation exceeds the round-trip fee (about 0.11% of notional), i.e. inverse parity holds to within fees at all times sampled.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://docs.deribit.com/api-reference/market-data/public-ticker, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
-- statistic: |F_impl - F_mark| / F_mark in bp per pair; 99th percentile and max vs fee threshold.
-- null: 99th percentile < 10 bp and max < fee threshold (no exploitable violations).
-- procedure: Poll Deribit public API (get_book_summary_by_currency kind=option and kind=future, ticker for underlying_price) hourly; compute per-pair deviation; accumulate 7 days (24/7) for intraday coverage; bootstrap the exceedance rate.
-- data: Deribit public API (live, reachable now). · min n: 500
-- pass: Exceedance (> fee threshold) rate < 1% and no persistent (> 1 hour) violations; otherwise the claim is falsified and a parity-capture bot is warranted.
-- controls: Use mids and executable bid/ask; filter min_trade_amount and zero-bid quotes; verify underlying_price equals the future's mark; include the 08:00 UTC settlement window separately.
-- note: from the options-library library: Crypto put-call parity vs dated future (Deribit inverse options); harness suggestion: mandel/options/deribit_parity.py polling public endpoints (get_instruments, ticker, get_book_summary_by_currency); payoff engine with inverse payoff mode (divide USD payoff by S_T). | verifier pass pending (usage limit); engine-checked
-
-### T-196 · deribit-inverse-box-spread
-
-**Claim.** The Deribit BTC inverse box-implied USD rate for the two most liquid quarterly expiries (executable prices, after fees) exceeds the FRED 3-month bill by at least 100 bp annualised and matches the same-expiry futures basis within 50 bp, i.e. boxes and futures price the same crypto dollar premium and lending via boxes earns a positive spread over Treasuries.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://docs.deribit.com/api-reference/market-data/public-ticker, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
-- statistic: r_box - r_bill (bp) and r_box - r_basis (bp) per expiry per poll.
-- null: r_box - r_bill <= 0 or |r_box - r_basis| > 50 bp (boxes either offer no premium or are inconsistent with futures).
-- procedure: Hourly polls of Deribit books; build boxes at strikes +/- 20% around the future for the two front quarterlies; compute executable r_box after fees; join FRED and the futures basis; bootstrap over 14 days.
-- data: Deribit public API, FRED DGS3MO. · min n: 200
-- pass: Median r_box - r_bill >= 100 bp and median |r_box - r_basis| <= 50 bp with 95% CI.
-- controls: Mid vs executable; strike-pair invariance; exclude the 08:00 UTC settlement hour; ETH as replication.
-- note: from the options-library library: Deribit inverse box spread (USD lending/borrowing in BTC collateral); harness suggestion: deribit_parity.py box_rate(); inverse payoff mode in payoff engine; join with FRED via existing ingest. | verifier pass pending (usage limit); engine-checked
 
 ### T-197 · cash-and-carry-options
 
@@ -3443,7 +3417,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: candle-close execution after the signal candle; both venues timestamped UTC. Survivorship: n/a. Costs: Coinbase 0.25-0.6% taker / Kraken 0.16-0.26% taker (maker lower), plus inventory financing; a 30 bps threshold may be below realistic all-in cost at low fee tiers (report by tier). Multiple testing: 8 cells. Regime: volatility spikes (|hourly return| > 3%) vs calm.
 - note: from the underlying-library library: Cross-exchange BTC price discovery (Coinbase vs Kraken premium); harness suggestion: coinbase_candles() and kraken_ohlc() in mandel/data/fetch.py; information-share estimator shared across lead-lag entries; arbitrage trigger simulation with fee tiers as inputs in backtest_eval. | verifier pass pending (usage limit)
 
-## Blocked (109)
+## Blocked (111)
 
 ### T-05 · cross-venue-arbitrage
 
@@ -4052,6 +4026,34 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Control for size, short interest if available, and momentum; exclude ex-div months; placebo with randomised deciles.
 - blocked on: daily chain capture across ~500 single names, >= 12 months for monthly sorts (cross-sectional dispersion measurable today)
 - note: from the options-library library: Hard-to-borrow synthetic (implied borrow extraction and lending via conversion); harness suggestion: parity.py implied_borrow across symbol universe -> mandel/experiments/implied_borrow_sort.py using existing walk-forward and deflated Sharpe. | verifier pass pending (usage limit); engine-checked
+
+### T-195 · crypto-put-call-parity-deribit
+
+**Claim.** For Deribit BTC options with open interest > 100 BTC at strikes within 10% of the future and DTE between 7 and 180, the option-implied forward K + (C_mid - P_mid) x index deviates from the matching future's mark by less than 10 bp in at least 99% of (K,T) pairs, and no pair's deviation exceeds the round-trip fee (about 0.11% of notional), i.e. inverse parity holds to within fees at all times sampled.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://docs.deribit.com/api-reference/market-data/public-ticker, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
+- statistic: |F_impl - F_mark| / F_mark in bp per pair; 99th percentile and max vs fee threshold.
+- null: 99th percentile < 10 bp and max < fee threshold (no exploitable violations).
+- procedure: Poll Deribit public API (get_book_summary_by_currency kind=option and kind=future, ticker for underlying_price) hourly; compute per-pair deviation; accumulate 7 days (24/7) for intraday coverage; bootstrap the exceedance rate.
+- data: Deribit public API (live, reachable now). · min n: 500
+- pass: Exceedance (> fee threshold) rate < 1% and no persistent (> 1 hour) violations; otherwise the claim is falsified and a parity-capture bot is warranted.
+- controls: Use mids and executable bid/ask; filter min_trade_amount and zero-bid quotes; verify underlying_price equals the future's mark; include the 08:00 UTC settlement window separately.
+- blocked on: Deribit captures with the spot index and the underlying_index field (added 2026-10-14; the first capture lacked them). Parity must use only expiries with a listed future: for SYN.* underlyings Deribit derives the forward from parity itself, which would make the test circular.
+- note: from the options-library library: Crypto put-call parity vs dated future (Deribit inverse options); harness suggestion: mandel/options/deribit_parity.py polling public endpoints (get_instruments, ticker, get_book_summary_by_currency); payoff engine with inverse payoff mode (divide USD payoff by S_T). | verifier pass pending (usage limit); engine-checked
+
+### T-196 · deribit-inverse-box-spread
+
+**Claim.** The Deribit BTC inverse box-implied USD rate for the two most liquid quarterly expiries (executable prices, after fees) exceeds the FRED 3-month bill by at least 100 bp annualised and matches the same-expiry futures basis within 50 bp, i.e. boxes and futures price the same crypto dollar premium and lending via boxes earns a positive spread over Treasuries.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://docs.deribit.com/api-reference/market-data/public-ticker, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
+- statistic: r_box - r_bill (bp) and r_box - r_basis (bp) per expiry per poll.
+- null: r_box - r_bill <= 0 or |r_box - r_basis| > 50 bp (boxes either offer no premium or are inconsistent with futures).
+- procedure: Hourly polls of Deribit books; build boxes at strikes +/- 20% around the future for the two front quarterlies; compute executable r_box after fees; join FRED and the futures basis; bootstrap over 14 days.
+- data: Deribit public API, FRED DGS3MO. · min n: 200
+- pass: Median r_box - r_bill >= 100 bp and median |r_box - r_basis| <= 50 bp with 95% CI.
+- controls: Mid vs executable; strike-pair invariance; exclude the 08:00 UTC settlement hour; ETH as replication.
+- blocked on: Deribit captures with the spot index and the underlying_index field (added 2026-10-14; the first capture lacked them). Parity must use only expiries with a listed future: for SYN.* underlyings Deribit derives the forward from parity itself, which would make the test circular.
+- note: from the options-library library: Deribit inverse box spread (USD lending/borrowing in BTC collateral); harness suggestion: deribit_parity.py box_rate(); inverse payoff mode in payoff engine; join with FRED via existing ingest. | verifier pass pending (usage limit); engine-checked
 
 ### T-200 · gc-vs-gld-options-basis
 

@@ -4277,8 +4277,8 @@
    },
    "experiments": [],
    "testable_now": true,
-   "status": "untested",
-   "blocked_on": "",
+   "status": "blocked",
+   "blocked_on": "Deribit captures with the spot index and the underlying_index field (added 2026-10-14; the first capture lacked them). Parity must use only expiries with a listed future: for SYN.* underlyings Deribit derives the forward from parity itself, which would make the test circular.",
    "results": [],
    "notes": "from the options-library library: Crypto put-call parity vs dated future (Deribit inverse options); harness suggestion: mandel/options/deribit_parity.py polling public endpoints (get_instruments, ticker, get_book_summary_by_currency); payoff engine with inverse payoff mode (divide USD payoff by S_T). | verifier pass pending (usage limit); engine-checked"
   },
@@ -4303,8 +4303,8 @@
    },
    "experiments": [],
    "testable_now": true,
-   "status": "untested",
-   "blocked_on": "",
+   "status": "blocked",
+   "blocked_on": "Deribit captures with the spot index and the underlying_index field (added 2026-10-14; the first capture lacked them). Parity must use only expiries with a listed future: for SYN.* underlyings Deribit derives the forward from parity itself, which would make the test circular.",
    "results": [],
    "notes": "from the options-library library: Deribit inverse box spread (USD lending/borrowing in BTC collateral); harness suggestion: deribit_parity.py box_rate(); inverse payoff mode in payoff engine; join with FRED via existing ingest. | verifier pass pending (usage limit); engine-checked"
   },
