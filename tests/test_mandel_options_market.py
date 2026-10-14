@@ -88,3 +88,22 @@ def test_forward_premium_detects_rich_implied():
     assert rep["verdict"] == "supported" and rep["mean_gap_vol_pts"] > 4
     fair = om.forward_variance_premium(_idx(days, np.full(n, 15.0)), _idx(days, np.full(n, 15.0)), _px(days, closes))
     assert fair["verdict"] == "not_supported"
+
+
+def test_v2_boxes_parity_and_forward_adjustment():
+    day = "2026-10-14"; spot = 5000.0; r = 0.045
+    rows = _chain(spot, day, r, 0.2, 0.0, [90, 300], range(4300, 5701, 100))
+    for row in rows:                                    # give rows an OCC-like symbol so roots split
+        row["value"]["sym"] = "SPXW" + row["value"]["expiry"].replace("-", "")[2:] + ("C" if row["value"]["type"] == "call" else "P")
+    dtb3 = [{"value": {"day": day, "value": (math.exp(r) - 1) * 100}}]
+    mid = om.box_mid_v2([(day, spot, rows)], dtb3)
+    assert abs(mid["days"][0]["median_bp"]) < 1 and mid["verdict"] == "not_supported"     # 0 bp spread is outside [15, 80]
+    rows_sp = _chain(spot, day, r, 0.2, 0.05, [90, 300], range(4300, 5701, 100))
+    for row in rows_sp:
+        row["value"]["sym"] = "SPXW" + row["value"]["expiry"].replace("-", "")[2:]
+    par = om.parity_v2([(day, spot, rows_sp)], dtb3)
+    assert par["days"][0]["share"] == 0.0 and par["verdict"] == "inconclusive"
+    days = _days(400)
+    vix = _idx(days, np.full(400, 15.0)); v3 = _idx(days, np.full(400, 18.0)); vv = _idx(days, np.full(400, 90.0))
+    rep = om.contango_forward_v2(vix, v3, vv)
+    assert rep["freq_adj"] == 1.0 and rep["mean_gap"] > 0          # flat VIX at 15, forward ~19.5 adjusted ~18.9 -> always below

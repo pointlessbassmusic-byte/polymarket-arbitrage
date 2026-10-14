@@ -417,3 +417,230 @@ def btc_weekend_variance(btc_rows, start_year: int = 2017, n_boot: int = 2000, s
     share = passing / len(out) if out else 0.0
     return {"by_year": out, "years_passing": passing, "years": len(out), "verdict": "supported" if share >= 0.7 else "not_supported",
             "reason": f"weekend (Fri->Mon) variance / 3x weekday variance: CI below 0.9 in {passing}/{len(out)} years (need 70%); ratios " + ", ".join(f"{y}:{v['ratio']:.2f}" for y, v in out.items())}
+
+
+# ===================================================== verifier-corrected restatements =====
+
+import re as _re
+
+_ROOT = _re.compile(r"^([A-Z]+)")
+
+
+def _chain_by_root_expiry(rows) -> dict:
+    by = defaultdict(lambda: {"call": {}, "put": {}})
+    for r in rows:
+        v = r["value"]
+        if v.get("bid") is None or v.get("ask") is None:
+            continue
+        m = _ROOT.match(v.get("sym", "")); root = m.group(1) if m else "?"
+        by[(root, v["expiry"])][v["type"]][float(v["strike"])] = (float(v["bid"]), float(v["ask"]))
+    return by
+
+
+def _bill_cont(dtb3: dict, day: str) -> float:
+    return math.log(1 + dtb3[max(d for d in dtb3 if d <= day)] / 100)
+
+
+def _boxes_v2(rows, spot, day, dte_range, moneyness=0.15, min_width_frac=0.05, step=None):
+    cap = datetime.strptime(day, "%Y-%m-%d"); out = []
+    for (root, exp), legs in _chain_by_root_expiry(rows).items():
+        dte = (datetime.strptime(exp, "%Y-%m-%d") - cap).days
+        if not (dte_range[0] <= dte <= dte_range[1]):
+            continue
+        T = dte / 365.0
+        ks = sorted(k for k in legs["call"] if k in legs["put"] and abs(k / spot - 1) <= moneyness and legs["call"][k][0] > 0 and legs["put"][k][0] > 0 and (step is None or k % step == 0))
+        for i, k1 in enumerate(ks):
+            for k2 in ks[i + 1:]:
+                if k2 - k1 < min_width_frac * spot:
+                    continue
+                (c1b, c1a), (c2b, c2a) = legs["call"][k1], legs["call"][k2]; (p1b, p1a), (p2b, p2a) = legs["put"][k1], legs["put"][k2]
+                W = k2 - k1
+                mid = (c1b + c1a) / 2 - (c2b + c2a) / 2 - (p1b + p1a) / 2 + (p2b + p2a) / 2
+                borrow = c1b - c2a - p1a + p2b
+                out.append({"root": root, "expiry": exp, "T": T, "r_mid": math.log(W / mid) / T if mid > 0 else None,
+                            "r_borrow": math.log(W / borrow) / T if borrow > 0 else None})
+    return out
+
+
+def box_mid_v2(captures, dtb3_rows, n_boot: int = 2000, seed: int = 0) -> dict:
+    """T-503: median mid box lending rate (60-120 DTE, |K/S-1| <= 15%) minus the 3-month bill in [15, 80] bp with the 95% bootstrap CI
+    inside [0, 120] bp on day one; persistence over 20 capture days (until then the verdict can only be not_supported or inconclusive)."""
+    d3 = index_closes(dtb3_rows); rng = np.random.default_rng(seed); days = []
+    for day, spot, rows in captures:
+        bx = [b for b in _boxes_v2(rows, spot, day, (60, 120), step=25) if b["r_mid"] is not None]
+        if not bx:
+            continue
+        sp = np.array([(b["r_mid"] - _bill_cont(d3, day)) * 1e4 for b in bx])
+        bs = np.array([np.median(rng.choice(sp, sp.size)) for _ in range(n_boot)]); lo, hi = np.quantile(bs, [0.025, 0.975])
+        days.append({"day": day, "n_boxes": len(bx), "median_bp": float(np.median(sp)), "ci_bp": [float(lo), float(hi)], "pass": bool(15 <= np.median(sp) <= 80 and lo >= 0 and hi <= 120)})
+    if not days:
+        return {"n_days": 0, "verdict": "inconclusive", "reason": "no SPX captures with 60-120 DTE boxes on this machine"}
+    d0 = days[0]; persist = (sum(d["pass"] for d in days) / len(days) >= 0.8) if len(days) >= 20 else None
+    verdict = "not_supported" if not d0["pass"] else ("inconclusive" if persist is None else ("supported" if persist else "not_supported"))
+    return {"n_days": len(days), "days": days, "verdict": verdict,
+            "reason": f"day one {d0['day']}: {d0['n_boxes']} boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median {d0['median_bp']:+.0f} bp (95% CI {d0['ci_bp'][0]:+.0f} to {d0['ci_bp'][1]:+.0f}); needs [15, 80] with CI in [0, 120]" + ("" if persist is not None else f"; persistence needs 20 capture days ({len(days)} so far)") + "; the CI resamples boxes that share strikes, so it understates uncertainty"}
+
+
+def box_borrow_v2(captures, dtb3_rows) -> dict:
+    """T-506: median executable short-box borrowing rate (180-730 DTE) minus the bill < 50 bp on day one and on >= 80% of capture days."""
+    d3 = index_closes(dtb3_rows); days = []
+    for day, spot, rows in captures:
+        bx = [b for b in _boxes_v2(rows, spot, day, (180, 730), step=25) if b["r_borrow"] is not None]
+        if bx:
+            m = float(np.median([(b["r_borrow"] - _bill_cont(d3, day)) * 1e4 for b in bx])); days.append({"day": day, "n_boxes": len(bx), "median_bp": m, "pass": m < 50})
+    if not days:
+        return {"n_days": 0, "verdict": "inconclusive", "reason": "no SPX captures with 180-730 DTE boxes on this machine"}
+    d0 = days[0]; share = sum(d["pass"] for d in days) / len(days)
+    verdict = "not_supported" if not d0["pass"] else ("supported" if len(days) >= 20 and share >= 0.8 else "inconclusive")
+    return {"n_days": len(days), "days": days, "verdict": verdict,
+            "reason": f"day one {d0['day']}: executable short-box borrowing rate is bill {d0['median_bp']:+.0f} bp over {d0['n_boxes']} boxes (needs < +50 bp)"}
+
+
+def parity_v2(captures, dtb3_rows, n_side: int = 5, n_boot: int = 2000, seed: int = 0) -> dict:
+    """T-505: SPX chain split by root (SPX, SPXW); per (root, expiry) the 2*n_side strikes nearest spot; F_impl = K + (C_mid - P_mid) e^{rT};
+    exceedance when |F_impl - median F_impl| > 0.5 e^{rT} (spread_c + spread_p). Day-one share < 2% with a one-sided 95% bootstrap bound
+    < 2%; still < 2% on >= 16 of the first 20 capture days."""
+    d3 = index_closes(dtb3_rows); rng = np.random.default_rng(seed); days = []
+    for day, spot, rows in captures:
+        r = _bill_cont(d3, day); cap = datetime.strptime(day, "%Y-%m-%d"); flags = []
+        for (root, exp), legs in _chain_by_root_expiry(rows).items():
+            dte = (datetime.strptime(exp, "%Y-%m-%d") - cap).days
+            if dte < 1:
+                continue
+            T = dte / 365.0; g = math.exp(r * T)
+            ks = sorted((k for k in legs["call"] if k in legs["put"] and legs["call"][k][0] > 0 and legs["put"][k][0] > 0), key=lambda k: abs(k - spot))[:2 * n_side]
+            if len(ks) < 4:
+                continue
+            F = np.array([k + ((sum(legs["call"][k]) - sum(legs["put"][k])) / 2) * g for k in ks]); med = np.median(F)
+            band = np.array([0.5 * g * ((legs["call"][k][1] - legs["call"][k][0]) + (legs["put"][k][1] - legs["put"][k][0])) for k in ks])
+            flags += list(np.abs(F - med) > band)
+        if flags:
+            f = np.array(flags, float); bs = np.array([rng.choice(f, f.size).mean() for _ in range(n_boot)])
+            days.append({"day": day, "pairs": int(f.size), "share": float(f.mean()), "upper95": float(np.quantile(bs, 0.95)), "pass": bool(f.mean() < 0.02 and np.quantile(bs, 0.95) < 0.02)})
+    if not days:
+        return {"n_days": 0, "verdict": "inconclusive", "reason": "no SPX captures on this machine"}
+    d0 = days[0]
+    verdict = "not_supported" if not d0["pass"] else ("inconclusive" if len(days) < 20 else ("supported" if sum(d["share"] < 0.02 for d in days[:20]) >= 16 else "not_supported"))
+    return {"n_days": len(days), "days": days, "verdict": verdict,
+            "reason": f"day one {d0['day']}: {d0['share']*100:.1f}% of {d0['pairs']} SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound {d0['upper95']*100:.1f}%; needs < 2%)"}
+
+
+def btc_weekend_ratio_v2(btc_rows, start_year: int = 2017, n_boot: int = 2000, seed: int = 0) -> dict:
+    """T-515: mean squared Sat+Sun daily return < 0.9 x mean squared Mon-Fri daily return: pooled 95% CI (block 4 weeks) entirely < 0.9, and
+    ratio < 1 in >= 70% of years."""
+    px = price_closes(btc_rows, "BTC-USD"); days = sorted(px)
+    r, wd, yr = [], [], []
+    for i in range(1, len(days)):
+        d = date.fromisoformat(days[i])
+        if d.year >= start_year:
+            r.append(math.log(px[days[i]] / px[days[i - 1]])); wd.append(d.weekday() >= 5); yr.append(d.year)
+    r, wd, yr = np.array(r) ** 2, np.array(wd), np.array(yr)
+    ratio = float(r[wd].mean() / r[~wd].mean())
+    rng = np.random.default_rng(seed); n = len(r); B = 28; nb = math.ceil(n / B); bs = []
+    for _ in range(n_boot):
+        idx = ((rng.integers(0, n, nb)[:, None] + np.arange(B)[None, :]).ravel()[:n]) % n
+        bs.append(r[idx][wd[idx]].mean() / r[idx][~wd[idx]].mean())
+    lo, hi = np.quantile(bs, [0.025, 0.975])
+    per = {int(y): float(r[(yr == y) & wd].mean() / r[(yr == y) & ~wd].mean()) for y in sorted(set(yr)) if ((yr == y) & wd).sum() > 20}
+    share = sum(v < 1 for v in per.values()) / len(per)
+    ok = hi < 0.9 and share >= 0.7
+    return {"n": int(n), "ratio": ratio, "ci": [float(lo), float(hi)], "per_year": per, "share_years_below_1": share, "verdict": "supported" if ok else "not_supported",
+            "reason": f"BTC weekend/weekday squared-return ratio {ratio:.2f} (95% CI {lo:.2f}-{hi:.2f}, needs entirely < 0.9); below 1 in {share*100:.0f}% of years (needs 70%)"}
+
+
+def conditional_forward_v2(vix_rows, vix3m_rows, spy_rows) -> dict:
+    """T-530: conditional on VIX3M/VIX > 1.10, F^2 = (93*VIX3M^2 - 30*VIX^2)/63 minus SPY variance over trading days 22-63 > 0 with the 95% CI
+    excluding zero, positive in both halves (non-overlapping 63-day entries)."""
+    days, (vix, v3), S = _aligned_index_and_price([vix_rows, vix3m_rows], spy_rows, "SPY")
+    r = np.diff(np.log(S)); x = []
+    t = 0
+    while t + 63 <= len(r):
+        if v3[t] / vix[t] > 1.10:
+            f2 = (93 * (v3[t] / 100) ** 2 - 30 * (vix[t] / 100) ** 2) / 63
+            x.append(f2 - _rv_annual(r, t + 21, t + 63)); t += 63
+        else:
+            t += 1
+    x = np.array(x)
+    p = block_bootstrap_pvalue(x, np.zeros_like(x), n_boot=2000, block_len=2)
+    h = len(x) // 2; halves = [float(x[:h].mean()), float(x[h:].mean())]
+    ok = x.mean() > 0 and p < 0.025 and all(z > 0 for z in halves)
+    return {"n": int(len(x)), "mean_var": float(x.mean()), "p": p, "halves": halves, "verdict": "supported" if ok else "not_supported",
+            "reason": f"{len(x)} contango entries: forward variance minus realised (days 22-63) {x.mean():+.4f} (p={p:.4f}), halves {halves[0]:+.4f}/{halves[1]:+.4f}"}
+
+
+def vix9d_v2(vix9d_rows, spy_rows) -> dict:
+    """T-533: conditional on VIX9D < trailing 10-day realised SPY vol, SPY variance realised over the next 9 calendar days exceeds VIX9D^2
+    on average (95% CI excluding zero). Non-overlapping signals."""
+    days, (v9,), S = _aligned_index_and_price([vix9d_rows], spy_rows, "SPY")
+    r = np.diff(np.log(S)); dts = [date.fromisoformat(d) for d in days]; x = []
+    t = 10
+    while t < len(r) - 8:
+        end = t
+        while end + 1 < len(dts) and (dts[end + 1] - dts[t]).days <= 9:
+            end += 1
+        trailing = math.sqrt(_rv_annual(r, t - 10, t)) * 100
+        if v9[t] < trailing and end > t:
+            x.append(_rv_annual(r, t, end) - (v9[t] / 100) ** 2); t = end + 1
+        else:
+            t += 1
+    x = np.array(x)
+    p = block_bootstrap_pvalue(x, np.zeros_like(x), n_boot=2000, block_len=2)
+    ok = x.mean() > 0 and p < 0.025
+    return {"n_signals": int(len(x)), "mean": float(x.mean()), "p": p, "verdict": "supported" if ok else "not_supported",
+            "reason": f"{len(x)} signals: next-9-calendar-day RV^2 - VIX9D^2 mean {x.mean():+.4f} (realised larger in {(x > 0).mean()*100:.0f}%), p={p:.3f}"}
+
+
+def _f93(vix, v3):
+    return np.sqrt(np.maximum((93 * v3 ** 2 - 30 * vix ** 2) / 63, 1e-9))
+
+
+def contango_forward_v2(vix_rows, vix3m_rows, vvix_rows) -> dict:
+    """T-534: when VIX3M/VIX > 1.10, VIX(t+21) < F_adj in > 60% of non-overlapping months: the exact lower 95% bound of the frequency > 0.60
+    on F_adj = F exp(-(VVIX/100)^2 T/2), T = 1/12, and mean F_adj - VIX(t+21) > 0 at p < 0.05. F (unadjusted) reported."""
+    vx, v3, vv = index_closes(vix_rows), index_closes(vix3m_rows), index_closes(vvix_rows)
+    days = sorted(d for d in vx if d in v3 and d in vv)
+    VX = np.array([vx[d] for d in days]); V3 = np.array([v3[d] for d in days]); VV = np.array([vv[d] for d in days])
+    F = _f93(VX, V3); Fa = F * np.exp(-((VV / 100) ** 2) * (1 / 12) / 2)
+    hit, hitF, gap = [], [], []
+    t = 0
+    while t + 21 < len(VX):
+        if V3[t] / VX[t] > 1.10:
+            hit.append(VX[t + 21] < Fa[t]); hitF.append(VX[t + 21] < F[t]); gap.append(Fa[t] - VX[t + 21]); t += 21
+        else:
+            t += 1
+    n, k = len(hit), int(sum(hit)); lo, hi = _binom_two_sided_ci(k, n); g = np.array(gap)
+    p = block_bootstrap_pvalue(g, np.zeros_like(g), n_boot=2000, block_len=2)
+    ok = lo > 0.60 and g.mean() > 0 and p < 0.05
+    return {"n": n, "freq_adj": k / n, "ci": [lo, hi], "freq_unadj": float(np.mean(hitF)), "mean_gap": float(g.mean()), "p": p, "verdict": "supported" if ok else "not_supported",
+            "reason": f"contango months: VIX 21 days later below F_adj in {k}/{n} = {k/n:.0%} (95% CI {lo:.2f}-{hi:.2f}, needs lower > 0.60), below unadjusted F in {np.mean(hitF):.0%}; mean F_adj - VIX(t+21) {g.mean():+.2f}, p={p:.4f}"}
+
+
+def spike_forward_v2(vix_rows, vix3m_rows, vvix_rows) -> dict:
+    """T-535: after VIX > 30 and VIX > VIX3M, P(VIX(t+21) < F_adj) > 0.5 with the exact 95% CI excluding 0.5; otherwise 'the forward is fair'."""
+    vx, v3, vv = index_closes(vix_rows), index_closes(vix3m_rows), index_closes(vvix_rows)
+    days = sorted(d for d in vx if d in v3 and d in vv)
+    VX = np.array([vx[d] for d in days]); V3 = np.array([v3[d] for d in days]); VV = np.array([vv[d] for d in days])
+    F = _f93(VX, V3); Fa = F * np.exp(-((VV / 100) ** 2) * (1 / 12) / 2)
+    a, b, s = [], [], []
+    t = 0
+    while t + 21 < len(VX):
+        if VX[t] > 30 and VX[t] > V3[t]:
+            a.append(VX[t + 21] < Fa[t]); b.append(VX[t + 21] < F[t]); s.append(VX[t + 21] < VX[t]); t += 21
+        else:
+            t += 1
+    n, k = len(a), int(sum(a)); lo, hi = _binom_two_sided_ci(k, n)
+    ok = k / n > 0.5 and lo > 0.5
+    return {"n_events": n, "p_adj": k / n, "ci": [lo, hi], "p_unadj": float(np.mean(b)), "p_spot": float(np.mean(s)), "verdict": "supported" if ok else "not_supported",
+            "reason": f"{n} spike events since {days[0]}: VIX 21 days later below F_adj in {k}/{n} ({lo:.2f}-{hi:.2f}), below unadjusted F in {np.mean(b):.0%}, below spot in {np.mean(s):.0%}" + ("" if ok else "; finding: the forward is fair after spikes")}
+
+
+def vvix_v2(vvix_rows, vix_rows, start: str = "2006-01-01") -> dict:
+    """T-536: non-overlapping months since 2006: VVIX minus realised 21-day vol of daily log changes in spot VIX, lower 99% bound of the
+    mean gap > 10 vol points."""
+    vv = index_closes(vvix_rows); vx = index_closes(vix_rows)
+    days = sorted(d for d in vv if d in vx and d >= start)
+    VV = np.array([vv[d] for d in days]); lr = np.diff(np.log(np.array([vx[d] for d in days])))
+    g = np.array([VV[t] - np.std(lr[t:t + 21], ddof=1) * math.sqrt(252) * 100 for t in range(0, len(lr) - 21, 21)])
+    se = g.std(ddof=1) / math.sqrt(len(g)); lo99 = g.mean() - 2.576 * se
+    return {"n_months": int(len(g)), "mean_gap": float(g.mean()), "lower99": float(lo99), "verdict": "supported" if lo99 > 10 else "not_supported",
+            "reason": f"{len(g)} non-overlapping months: VVIX minus realised spot-VIX vol {g.mean():+.1f} pts (lower 99% {lo99:+.1f}, needs > 10); VVIX prices VIX futures, which move less than spot"}

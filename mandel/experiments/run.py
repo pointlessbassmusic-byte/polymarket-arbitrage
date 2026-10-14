@@ -525,6 +525,28 @@ U2_BUNDLES = {"tom_replication": ["daily-history-QQQ", "daily-history-BTC-USD"],
               "crypto_weekly_v2": ["daily-history-ETH-USD"], "metals_v2": ["daily-history-SLV", "daily-history-SI-F"], "svxy_v2": ["daily-history-SVXY"]}
 
 
+def _om(fn, nkey):
+    def h(archive):
+        rep = fn(archive); return rep, int(rep.get(nkey) or 0), rep["verdict"], rep["reason"]
+    return h
+
+
+OM2_HARNESSES = {
+    "box_mid_v2": _om(lambda a: om.box_mid_v2(_chain_captures(a, "SPX"), a.load("fred-DTB3")), "n_days"),
+    "box_borrow_v2": _om(lambda a: om.box_borrow_v2(_chain_captures(a, "SPX"), a.load("fred-DTB3")), "n_days"),
+    "parity_v2": _om(lambda a: om.parity_v2(_chain_captures(a, "SPX"), a.load("fred-DTB3")), "n_days"),
+    "btc_weekend_ratio_v2": _om(lambda a: om.btc_weekend_ratio_v2(a.load("daily-history-BTC-USD")), "n"),
+    "conditional_forward_v2": _om(lambda a: om.conditional_forward_v2(a.load("cboe-VIX-history"), a.load("cboe-VIX3M-history"), a.load("daily-history-SPY")), "n"),
+    "vix9d_v2": _om(lambda a: om.vix9d_v2(a.load("cboe-VIX9D-history"), a.load("daily-history-SPY")), "n_signals"),
+    "contango_forward_v2": _om(lambda a: om.contango_forward_v2(a.load("cboe-VIX-history"), a.load("cboe-VIX3M-history"), a.load("cboe-VVIX-history")), "n"),
+    "spike_forward_v2": _om(lambda a: om.spike_forward_v2(a.load("cboe-VIX-history"), a.load("cboe-VIX3M-history"), a.load("cboe-VVIX-history")), "n_events"),
+    "vvix_v2": _om(lambda a: om.vvix_v2(a.load("cboe-VVIX-history"), a.load("cboe-VIX-history")), "n_months"),
+}
+OM2_BUNDLES = {"box_mid_v2": ["options-chain-SPX-*", "fred-DTB3"], "box_borrow_v2": ["options-chain-SPX-*", "fred-DTB3"], "parity_v2": ["options-chain-SPX-*", "fred-DTB3"],
+               "btc_weekend_ratio_v2": ["daily-history-BTC-USD"], "conditional_forward_v2": ["cboe-VIX3M-history", "daily-history-SPY"], "vix9d_v2": ["cboe-VIX9D-history"],
+               "contango_forward_v2": ["cboe-VVIX-history", "cboe-VIX3M-history"], "spike_forward_v2": ["cboe-VVIX-history", "cboe-VIX3M-history"], "vvix_v2": ["cboe-VVIX-history"]}
+
+
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     names = sorted(e.name for e in archive.entries())
     return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
@@ -574,6 +596,7 @@ HARNESSES: dict[str, Callable] = {
     "spx_box_lending": harness_box_lend, "spx_box_borrowing": harness_box_borrow, "parity_forward": harness_parity,
     "opex_pinning": harness_pinning, "btc_weekend_variance": harness_btc_weekend_var,
     **U2_HARNESSES,
+    **OM2_HARNESSES,
 }
 BUNDLES_NEEDED = {
     "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -602,6 +625,7 @@ BUNDLES_NEEDED = {
     "spx_box_lending": ["options-chain-SPX-*", "fred-DTB3", "fred-DGS2"], "spx_box_borrowing": ["options-chain-SPX-*", "fred-DTB3", "fred-DGS2"],
     "parity_forward": ["options-chain-SPY-*", "fred-DTB3"], "opex_pinning": ["daily-history-SPY"], "btc_weekend_variance": ["daily-history-BTC-USD"],
     **U2_BUNDLES,
+    **OM2_BUNDLES,
 }
 
 

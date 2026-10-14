@@ -11,6 +11,7 @@ and ``mandel/strategies/``; Markdown lives in ``mandel/knowledge/``.
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Iterable
@@ -198,16 +199,25 @@ def engine_check_strategies(strategies: Iterable[dict], S: float = 100.0) -> dic
         except Exception as e:  # a template the engine cannot draw is itself a finding
             out[s["slug"]] = {"error": repr(e)[:160], "parsed": False}
             continue
+        legs_txt = " ".join(f"{l.get('strike_rule', '')} {l.get('expiry_rule', '')}" for l in s.get("legs", [])).lower()
+        multi_expiry = bool(re.search(r"\b(near|far|front|back|m1|m2|t1|t2|leaps|longer|shorter|next expiry|second month)\b", legs_txt)) and len(s.get("legs", [])) > 1
+        unmodelable = multi_expiry or bool(re.search(r"strip|dynamic|delta hedge|each constituent|every otm|basket|rolling", legs_txt)) or any(l.get("instrument") == "future" for l in s.get("legs", []))
         loss_text = (s.get("max_loss") or "").lower(); profit_text = (s.get("max_profit") or "").lower()
+        both_versions = ("short:" in loss_text or "short " in loss_text[:12] or "long:" in loss_text) and ("long" in loss_text and "short" in loss_text)
         says_unbounded_loss = any(w in loss_text for w in ("unlimited", "unbounded", "theoretically unlimited", "infinite"))
         says_unbounded_profit = any(w in profit_text for w in ("unlimited", "unbounded", "infinite"))
         flags = []
         if not info["parsed"]:
             flags.append("unparsed")
-        if says_unbounded_loss != bool(risk["downside_unbounded"]) and info["parsed"]:
-            flags.append("loss_text_vs_engine")
-        if says_unbounded_profit != bool(risk["upside_unbounded"]) and info["parsed"]:
-            flags.append("profit_text_vs_engine")
+        if unmodelable:
+            flags.append("engine_cannot_model")          # multi-expiry, strips, dynamic hedges, futures legs: one-expiry payoff engine
+        elif both_versions:
+            flags.append("text_covers_long_and_short")   # one sentence states both versions; not comparable to one leg set
+        elif info["parsed"]:
+            if says_unbounded_loss != bool(risk["downside_unbounded"]):
+                flags.append("loss_text_vs_engine")
+            if says_unbounded_profit != bool(risk["upside_unbounded"]):
+                flags.append("profit_text_vs_engine")
         out[s["slug"]] = {"parsed": info["parsed"], "n_legs": info["n_legs"], "defined_risk": risk["defined_risk"], "full_downside": risk["full_downside"],
                           "downside_unbounded": risk["downside_unbounded"], "upside_unbounded": risk["upside_unbounded"], "n_breakevens": len(risk["breakevens"]),
                           "net_debit": round(pos.net_debit(), 4), "max_loss_fraction_of_spot": round(risk["max_loss_fraction_of_spot"], 3), "flags": flags}
