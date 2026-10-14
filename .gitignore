@@ -68,3 +68,7 @@ coverage.xml
 # Sensitive config (use config.yaml.example for template)
 config.live.yaml
 
+
+# Mandel advisory lock files
+mandel/state/*.lock
+mandel/state/**/*.lock
