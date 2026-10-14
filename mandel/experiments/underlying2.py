@@ -514,3 +514,225 @@ def low_vol_tilt(usmv: tuple, spy: tuple, splv: tuple, sphb: tuple) -> dict:
     v, why = _verdict(crit)
     return {"sharpe_usmv": _sr(u, 252), "sharpe_spy": _sr(s, 252), "diff": obs, "lower": lo, "subwindows": subs, "splv_minus_sphb_bps_day": float((l - h).mean() * 1e4), "first_day": d[0], "verdict": v,
             "reason": f"USMV Sharpe {_sr(u,252):.2f} vs SPY {_sr(s,252):.2f} since {d[0]} (diff {obs:+.2f}, lower {lo:+.2f}); sub-windows " + "/".join(f"{x:+.2f}" for x in subs) + f"; SPLV-SPHB {(l-h).mean()*1e4:+.2f} bps/day — {why}"}
+
+
+# ===================================================== verifier-corrected restatements =====
+# Each v2 function tests the superseding theory's wording and pass rule; ids in the docstrings.
+
+def _two_sided_sharpe_ci(a, b, ppy, block, seed=0):
+    obs, lo = _sharpe_diff_lower(a, b, ppy, block, seed=seed, q=0.025)
+    _, hi = _sharpe_diff_lower(a, b, ppy, block, seed=seed, q=0.975)
+    return obs, lo, hi
+
+
+def _hist_mean_strategy(excess: np.ndarray, raw: np.ndarray, min_hist: int) -> np.ndarray:
+    """Huang-Li-Wang-Zhou historical-mean strategy: long in period t when the expanding mean of excess returns up to t-1 is > 0."""
+    out = np.zeros(len(raw))
+    for t in range(min_hist, len(raw)):
+        out[t] = raw[t] if excess[:t].mean() > 0 else 0.0
+    return out
+
+
+def santa_v2(gspc, start_year: int = 1973, n_place: int = 2000, seed: int = 0) -> dict:
+    """T-440: ^GSPC 1973-2026: Santa window excess over the mean 7-day window > 1 pp, placement p < 0.05, both halves positive.
+    The barometer clause concerns variants not run here and does not gate the window claim."""
+    days, c = gspc
+    keep = [i for i, d in enumerate(days) if int(d[:4]) >= start_year - 1]
+    days = [days[i] for i in keep]; c = c[keep]
+    lr = np.log(c); ym = _trading_days_by_year_month(days); py = []
+    for y in range(start_year, int(days[-1][:4])):
+        dec, jan = ym.get((y, 12)), ym.get((y + 1, 1))
+        if dec and jan and len(dec) >= 5 and len(jan) >= 2 and dec[-5] >= 1:
+            py.append(lr[jan[1]] - lr[dec[-5] - 1])
+    all7 = (lr[7:] - lr[:-7]).mean(); ex = np.array(py) - all7
+    rng = np.random.default_rng(seed); n = len(lr) - 7
+    null = np.array([np.mean([lr[k + 7] - lr[k] for k in rng.integers(0, n, len(py))]) - all7 for _ in range(n_place)])
+    p = float((np.sum(null >= ex.mean()) + 1) / (n_place + 1)); h = _halves(ex)
+    v, why = _verdict([("excess > 1 pp", ex.mean() > 0.01), ("placement p < 0.05", p < 0.05), ("both halves positive", h[0] > 0 and h[1] > 0)])
+    return {"n_years": len(py), "excess_pp": float(ex.mean() * 100), "p": p, "halves_pp": [x * 100 for x in h], "verdict": v,
+            "reason": f"post-publication ({start_year}-) Santa excess {ex.mean()*100:+.2f} pp over {len(py)} years (placement p={p:.3f}), halves {h[0]*100:+.2f}/{h[1]*100:+.2f} — {why}"}
+
+
+def sell_in_may_v2(gspc) -> dict:
+    """T-441: ^GSPC 1928-2026 Nov-Apr minus May-Oct > 50 bps/month with p < 0.05, and 2002-2026 difference > 0."""
+    rep = sell_in_may(gspc, gspc)
+    v, why = _verdict([("difference > 50 bps/month", rep["diff_bps_per_month"] > 50), ("p < 0.05", rep["p"] < 0.05), ("2002- difference > 0", rep["post2002_diff_bps"] > 0)])
+    return {**rep, "verdict": v, "reason": f"Nov-Apr minus May-Oct {rep['diff_bps_per_month']:+.0f} bps/month over {rep['n_years']} years (p={rep['p']:.3f}), post-2002 {rep['post2002_diff_bps']:+.0f} — {why}"}
+
+
+def btc_monday_v2(days, c) -> dict:
+    """T-436: BTC Monday minus other days > 20 bps, p < 0.05 (two-sided, uncorrected as restated), both halves positive."""
+    r = c[1:] / c[:-1] - 1; wd = np.array([date.fromisoformat(d).weekday() for d in days[1:]]); m = wd == 0
+    strat = np.where(m, r, 0.0); other = np.where(~m, r, 0.0) * (m.sum() / (~m).sum())
+    p = float(min(1.0, 2 * min(block_bootstrap_pvalue(strat, other, n_boot=2000, block_len=14), block_bootstrap_pvalue(other, strat, n_boot=2000, block_len=14, seed=1))))
+    d = r[m].mean() - r[~m].mean(); h = len(r) // 2
+    halves = [float(r[:h][m[:h]].mean() - r[:h][~m[:h]].mean()), float(r[h:][m[h:]].mean() - r[h:][~m[h:]].mean())]
+    v, why = _verdict([("excess > 20 bps", d > 0.002), ("p < 0.05", p < 0.05), ("both halves positive", all(x > 0 for x in halves))])
+    return {"n_days": int(len(r)), "excess_bps": d * 1e4, "p": p, "halves_bps": [x * 1e4 for x in halves], "verdict": v,
+            "reason": f"BTC Monday {d*1e4:+.1f} bps vs other days (p={p:.3f}), halves {halves[0]*1e4:+.1f}/{halves[1]*1e4:+.1f} — {why}"}
+
+
+def gold_autumn_v2(gld) -> dict:
+    """T-437: GLD 2011-2026 Sep-Nov minus other months > 5 bps/day, p < 0.05, both halves positive (expected to fail)."""
+    days, c = gld
+    keep = [i for i, d in enumerate(days) if d >= "2010-12-31"]
+    rep = gold_autumn(([days[i] for i in keep], c[keep]), ([days[i] for i in keep], c[keep]))
+    v, why = _verdict([("difference > 5 bps/day", rep["diff_bps"] > 5), ("p < 0.05", rep["p"] < 0.05), ("both halves positive", all(x > 0 for x in rep["halves_bps"]))])
+    return {**rep, "verdict": v, "reason": f"GLD 2011- Sep-Nov minus other months {rep['diff_bps']:+.2f} bps/day (p={rep['p']:.3f}), halves {rep['halves_bps'][0]:+.2f}/{rep['halves_bps'][1]:+.2f} — {why}"}
+
+
+def opex_week_v2(days, c) -> dict:
+    """T-438: as T-353 without the Bonferroni factor."""
+    rep = opex_week(days, c, n_arms=1)
+    return {**rep, "reason": rep["reason"].replace("Bonferroni p", "p")}
+
+
+def tom_replication_v2(series, cost_bps, n_boot: int = 1000, seed: int = 0) -> dict:
+    """T-443: count of assets passing (diff > 0, p < 0.05, halves > 0) >= 3, and a joint bootstrap p < 0.05 for the count
+    (null: each asset's TOM flags circularly shifted, recount)."""
+    base = tom_replication(series, cost_bps)
+    k = base["assets_passing"]
+    rng = np.random.default_rng(seed); null = []
+    prepared = {}
+    for s, (days, c) in series.items():
+        r = c[1:] / c[:-1] - 1; months = [d[:7] for d in days[1:]]; pos = {}
+        for i, m in enumerate(months):
+            pos.setdefault(m, []).append(i)
+        tom = np.zeros(len(r), bool)
+        for idxs in pos.values():
+            tom[idxs[:3]] = True; tom[idxs[-4:]] = True
+        prepared[s] = (r, tom)
+    for _ in range(n_boot):
+        cnt = 0
+        for s, (r, tom) in prepared.items():
+            sh = np.roll(tom, int(rng.integers(30, len(r) - 30)))
+            a, b = r[sh], r[~sh]; h = len(r) // 2
+            d = a.mean() - b.mean()
+            se = math.sqrt(a.var() / len(a) + b.var() / len(b))
+            halves_ok = (r[:h][sh[:h]].mean() > r[:h][~sh[:h]].mean()) and (r[h:][sh[h:]].mean() > r[h:][~sh[h:]].mean())
+            cnt += (d / se > 1.645) and halves_ok
+        null.append(cnt)
+    p = float((np.sum(np.array(null) >= k) + 1) / (n_boot + 1))
+    v, why = _verdict([("at least 3 of 5 assets pass", k >= 3), ("joint p < 0.05 for the count", p < 0.05)])
+    return {**base, "joint_p": p, "verdict": v, "reason": base["reason"].split(" — ")[0] + f"; joint p for {k} passes {p:.3f} — {why}"}
+
+
+def low_vol_v2(usmv, spy) -> dict:
+    """T-448: USMV vs SPY Sharpe difference lower 95% bound > 0 over >= 3500 days; family-wide DSR not implemented."""
+    rep = low_vol_tilt(usmv, spy, usmv, spy)
+    n = len(set(usmv[0]) & set(spy[0])) - 1
+    v, why = _verdict([("Sharpe diff lower bound > 0", rep["lower"] > 0), (">= 3500 daily observations", n >= 3500), ("family-wide DSR", None)])
+    return {**rep, "n_days": n, "verdict": v, "reason": f"USMV Sharpe {rep['sharpe_usmv']:.2f} vs SPY {rep['sharpe_spy']:.2f} over {n} days (lower {rep['lower']:+.2f}) — {why}"}
+
+
+def btc_reversal_v2(days, c, cost: float = 0.006, window: int = 250) -> dict:
+    """T-469 (claim of a tradable reversal): next-day return after a day below the trailing-250-day 10th percentile minus the
+    unconditional next-day mean: lower 95% bound > 0.6%, both halves > 0.6%; DSR not implemented (no declared grid)."""
+    r = c[1:] / c[:-1] - 1; ds = days[1:]
+    idx = [i for i in range(window, len(r) - 1) if ds[i] >= "2015-08-01"]
+    sig = [i for i in idx if r[i] < np.quantile(r[i - window:i], 0.10)]
+    mu = r[[i + 1 for i in idx]].mean(); x = np.array([r[i + 1] for i in sig]) - mu
+    lo, hi = _mean_ci(x, 10); h = _halves(x)
+    v, why = _verdict([("lower bound > 0.6%", lo > cost), ("both halves > 0.6%", h[0] > cost and h[1] > cost), ("DSR > 0.95", None)])
+    return {"n_signals": len(sig), "excess_bps": float(x.mean() * 1e4), "ci_bps": [lo * 1e4, hi * 1e4], "halves_bps": [z * 1e4 for z in h], "verdict": v,
+            "reason": f"{len(sig)} signals: next-day excess {x.mean()*1e4:+.1f} bps (95% CI {lo*1e4:+.1f} to {hi*1e4:+.1f}; needs > 60), halves {h[0]*1e4:+.1f}/{h[1]*1e4:+.1f} — {why}"}
+
+
+def sector_rotation_v2(sectors, spy, bill_days, bill_vals) -> dict:
+    """T-475: T-306's criteria plus DSR > 0.95 over the 12-variant grid, window 2000-01 onward."""
+    rep = sector_rotation(sectors, spy, bill_days, bill_vals)
+    crit = [("alpha > 0 with CI excluding 0", rep["alpha_bps_month"] > 0 and rep["ci_bps"][0] > 0), ("above permutation 95th pct", rep["alpha_bps_month"] > rep["null_q95_bps"]),
+            ("PBO < 0.5", rep["pbo"] < 0.5), ("leave-one-out positive", rep["loo_min_bps"] > 0), ("DSR > 0.95", None)]
+    v, why = _verdict(crit)
+    return {**rep, "verdict": v, "reason": rep["reason"].split(" — ")[0] + f" — {why}"}
+
+
+def gem_v2(spy, efa, agg, bill_days, bill_vals) -> dict:
+    """T-480: GEM Sharpe minus 60/40 > 0 with paired 95% interval excluding 0, PBO < 0.5, DSR > 0.95 (n_trials 10 lookbacks)."""
+    rep = gem(spy, efa, agg, bill_days, bill_vals)
+    months, P = _aligned_monthly({"SPY": spy, "EFA": efa, "AGG": agg})
+    v, why = _verdict([("Sharpe diff > 0 with 95% CI excluding 0", rep["sharpe_diff"] > 0 and rep["lower"] > 0), ("PBO < 0.5", rep["pbo"] < 0.5), ("DSR > 0.95", None)])
+    return {**rep, "verdict": v, "reason": rep["reason"].split(" — ")[0] + f" — {why}"}
+
+
+def golden_cross_v2(btc, eth, cost_side: float = 0.0035) -> dict:
+    """T-485: BTC 2015-04-: 50/200 Sharpe minus buy-and-hold > 0 with 95% interval excluding 0, DSR > 0.95 over 4 variants,
+    ETH point estimate > 0."""
+    variants = [(50, 200), (20, 100), (100, 300), (10, 50)]
+    out = {}
+    for name, (days, c) in (("BTC", btc), ("ETH", eth)):
+        R = {f: _apply(_ma_pos(c, *f), c, cost_side) for f in variants}; bh = c[1:] / c[:-1] - 1
+        ds = days[1:]; m = np.array([d >= "2015-04-01" for d in ds]) if name == "BTC" else np.ones(len(ds), bool)
+        m[:300] = False
+        g = R[(50, 200)][m]; b = bh[m]
+        obs, lo, hi = _two_sided_sharpe_ci(g, b, 365, 30)
+        dsr = deflated_sharpe_ratio(g, n_trials=4, trial_sharpes=[sharpe_ratio(R[f][m]) for f in variants])
+        out[name] = {"diff": obs, "ci": [lo, hi], "dsr": float(dsr)}
+    v, why = _verdict([("BTC Sharpe diff > 0 with CI excluding 0", out["BTC"]["diff"] > 0 and out["BTC"]["ci"][0] > 0), ("BTC DSR > 0.95", out["BTC"]["dsr"] > 0.95), ("ETH diff > 0", out["ETH"]["diff"] > 0)])
+    return {**out, "verdict": v, "reason": "; ".join(f"{k}: Sharpe diff {x['diff']:+.2f} (95% CI {x['ci'][0]:+.2f} to {x['ci'][1]:+.2f}), DSR {x['dsr']:.2f}" for k, x in out.items()) + f" — {why}"}
+
+
+def crypto_weekly_v2(btc, eth, cost_side: float = 0.003) -> dict:
+    """T-486: BTC+ETH equal weight, 1-week TSMOM minus the historical-mean strategy > 0 with 95% CI excluding 0, DSR > 0.95 over
+    lookbacks 1/2/4, 2019- mean > 0."""
+    def legs(series, lb):
+        wd, wc = weekly(*series); r = wc[1:] / wc[:-1] - 1
+        pos = np.zeros(len(r))
+        for t in range(lb, len(r)):
+            pos[t] = float(wc[t] / wc[t - lb] - 1 > 0)
+        ch = np.abs(np.diff(np.concatenate([[0.0], pos])))
+        hm = _hist_mean_strategy(r, r, 26)
+        hm_pos = (hm != 0).astype(float); hm -= np.abs(np.diff(np.concatenate([[0.0], hm_pos]))) * cost_side
+        return dict(zip(wd[1:], pos * r - ch * cost_side)), dict(zip(wd[1:], hm))
+    def pooled(lb):
+        (sb, hb), (se, he) = legs(btc, lb), legs(eth, lb)
+        ks = sorted(set(sb) | set(se)); ks = [k for k in ks]
+        s = np.array([np.mean([x[k] for x in (sb, se) if k in x]) for k in ks]); h = np.array([np.mean([x[k] for x in (hb, he) if k in x]) for k in ks])
+        return ks, s, h
+    ks, s, h = pooled(1); d = (s - h)[26:]; ks = ks[26:]
+    lo, hi = _mean_ci(d, 8)
+    dsr = deflated_sharpe_ratio(d, n_trials=3, trial_sharpes=[sharpe_ratio((pooled(lb)[1] - pooled(lb)[2])[26:]) for lb in (1, 2, 4)])
+    post = np.array([x for k, x in zip(ks, d) if k >= "2019-01-01"])
+    v, why = _verdict([("mean d > 0 with CI excluding 0", d.mean() > 0 and lo > 0), ("DSR > 0.95", dsr > 0.95), ("2019- mean d > 0", post.mean() > 0)])
+    return {"n_weeks": int(len(d)), "mean_bps": float(d.mean() * 1e4), "ci_bps": [lo * 1e4, hi * 1e4], "dsr": float(dsr), "post2019_bps": float(post.mean() * 1e4), "verdict": v,
+            "reason": f"weekly TSMOM minus historical-mean strategy {d.mean()*1e4:+.1f} bps/week over {len(d)} weeks (95% CI {lo*1e4:+.1f} to {hi*1e4:+.1f}), DSR {dsr:.2f}, 2019- {post.mean()*1e4:+.1f} — {why}"}
+
+
+def metals_v2(gld, slv, gcf, scf, bill_days, bill_vals, cost_side: float = 0.0004) -> dict:
+    """T-487: 2007-05-: inverse-vol GLD/SLV 12-1 long/flat minus the historical-mean strategy on the same inverse-vol pair > 0 with
+    95% CI excluding 0, DSR > 0.95 over lookbacks 6/9/12, same sign on GC=F/SI=F."""
+    bm = {d[:7]: v / 100 / 12 for d, v in zip(bill_days, bill_vals)}
+    def run(a, b, lb):
+        months, P = _aligned_monthly({"A": a, "B": b}); A, B = P["A"], P["B"]
+        ra, rb = A[1:] / A[:-1] - 1, B[1:] / B[:-1] - 1; rf = np.array([bm.get(m, 0.0) for m in months[1:]])
+        pair = []; strat = []
+        for t in range(12, len(ra)):
+            va, vb = ra[t - 12:t].std(), rb[t - 12:t].std(); wa = (1 / va) / (1 / va + 1 / vb); wb = 1 - wa
+            sa = float(A[t - 1] / A[t - lb] - 1 > 0); sb = float(B[t - 1] / B[t - lb] - 1 > 0)
+            strat.append(wa * sa * ra[t] + wb * sb * rb[t] - cost_side * 0.5); pair.append(wa * ra[t] + wb * rb[t])
+        pair = np.array(pair); ex = pair - rf[12:]
+        hm = _hist_mean_strategy(ex, pair, 12)
+        return months[13:], np.array(strat), hm
+    months, s, hm = run(gld, slv, 12)
+    m = np.array([x >= "2007-05" for x in months]); d = (s - hm)[m]
+    lo, hi = _mean_ci(d, 12)
+    dsr = deflated_sharpe_ratio(d, n_trials=3, trial_sharpes=[sharpe_ratio((run(gld, slv, lb)[1] - run(gld, slv, lb)[2])[m[:len(run(gld, slv, lb)[1])]]) for lb in (6, 9, 12)])
+    _, sf, hf = run(gcf, scf, 12)
+    v, why = _verdict([("mean d > 0 with CI excluding 0", d.mean() > 0 and lo > 0), ("DSR > 0.95", dsr > 0.95), ("futures same sign", np.sign((sf - hf).mean()) == np.sign(d.mean()))])
+    return {"n_months": int(len(d)), "mean_bps": float(d.mean() * 1e4), "ci_bps": [lo * 1e4, hi * 1e4], "dsr": float(dsr), "verdict": v,
+            "reason": f"metals TSMOM minus historical-mean strategy {d.mean()*1e4:+.1f} bps/month over {len(d)} months (95% CI {lo*1e4:+.1f} to {hi*1e4:+.1f}), DSR {dsr:.2f}, futures {(sf-hf).mean()*1e4:+.1f} — {why}"}
+
+
+def svxy_v2(svxy, vix, vix3m, cost_switch: float = 0.001, test_from: str = "2018-01-01") -> dict:
+    """T-435: SVXY only after VIX3M/VIX > 1.05 (else cash) vs always SVXY: test-window Sharpe difference > 0 with p < 0.05,
+    DSR > 0.95 with n_trials = 6 thresholds (1.00, 1.025, 1.05, 1.075, 1.10, 1.15)."""
+    days, c = svxy; r = c[1:] / c[:-1] - 1; ds = days[1:]; m = np.array([d >= test_from for d in ds])
+    def strat(th):
+        sig = np.array([float(d in vix and d in vix3m and vix3m[d] / vix[d] > th) for d in days[:-1]])
+        return (sig * r - np.abs(np.diff(np.concatenate([[0.0], sig]))) * cost_switch)[m]
+    s = strat(1.05); b = r[m]
+    obs, lo = _sharpe_diff_lower(s, b, 252, 21, q=0.05)
+    dsr = deflated_sharpe_ratio(s - b, n_trials=6, trial_sharpes=[sharpe_ratio(strat(th) - b) for th in (1.0, 1.025, 1.05, 1.075, 1.10, 1.15)])
+    v, why = _verdict([("Sharpe diff > 0 with one-sided p < 0.05", obs > 0 and lo > 0), ("DSR > 0.95", dsr > 0.95)])
+    return {"n_test_days": int(m.sum()), "sharpe_diff": obs, "lower90": lo, "dsr": float(dsr), "verdict": v,
+            "reason": f"SVXY contango filter vs always, 2018-: Sharpe diff {obs:+.2f} (one-sided 95% lower {lo:+.2f}), DSR {dsr:.2f} — {why}"}

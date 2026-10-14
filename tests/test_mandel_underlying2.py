@@ -58,3 +58,13 @@ def test_quarter_end_planted():
             r[by_month[a][-1] - 1] += 0.006; r[by_month[b][0] - 1] -= 0.006      # r[i-1] is the return ending on day i
     rep = u2.quarter_end_reversal(*_series(days, r))
     assert rep["mean_bps"] > 50 and rep["verdict"] == "supported"
+
+
+def test_hist_mean_strategy_and_santa_window_start():
+    x = np.array([0.01, -0.02, 0.03, 0.01, -0.05, 0.02])
+    hm = u2._hist_mean_strategy(x, x, 2)
+    assert hm[0] == 0 and hm[1] == 0 and hm[2] == 0.0 and hm[3] == 0.01 and hm[4] == -0.05     # expanding mean of x[:t] decides
+    rng = np.random.default_rng(3)
+    days = _bdays(252 * 60, "1960-01-04")
+    rep = u2.santa_v2(_series(days, rng.normal(0.0003, 0.009, len(days))), start_year=1973)
+    assert rep["n_years"] == int(days[-1][:4]) - 1973 and rep["verdict"] == "not_supported"
