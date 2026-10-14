@@ -1,0 +1,73 @@
+"""Tests for the concept graph generator behind the signal map."""
+
+from pathlib import Path
+
+from mandel.graph import build_graph, write_html, PLACEHOLDER
+
+DOC = """# {title}
+- **Coverage confidence:** 0.5
+
+## What it says
+- Shannon entropy and the Brier score; backtest with walk-forward; look-ahead bias is leakage.
+- Precognition and presentiment are discussed{extra}.
+
+## Evidence quality
+**Rating: speculative.**
+
+## What Mandel adopts
+- Use proper scoring rules such as the Brier score.
+
+## What Mandel holds loosely or rejects
+- Precognition as a mechanism.
+
+## Design implications for the RSI predictive substrate
+- Add available_at timestamps (point-in-time).
+"""
+
+
+def _tree(tmp_path: Path, n: int = 4) -> Path:
+    root = tmp_path / "knowledge"
+    (root / "sources").mkdir(parents=True); (root / "adjacent").mkdir()
+    for i in range(1, n + 1):
+        extra = " and Markov chains" if i % 2 else ""
+        (root / "sources" / f"{i:02d}-doc.md").write_text(DOC.format(title=f"Doc {i}", extra=extra))
+    (root / "adjacent" / "A1-paper.md").write_text(DOC.format(title="Paper", extra=""))
+    (root / "SYNTHESIS.md").write_text("# S\n\n## Tensions and contradictions\n- Precognition claims versus pre-registration and replication standards.\n\n## Other\n")
+    return root
+
+
+def test_build_graph_layers_and_edges(tmp_path):
+    g = build_graph(knowledge_root=_tree(tmp_path), children=[{"name": "Julia", "domain": "arb", "status": "active", "report_count": 1, "guidance_count": 0}])
+    ids = {n["id"] for n in g["nodes"]}
+    assert "src:01" in ids and "adj:A1" in ids and "child:Julia" in ids
+    assert all(f"c:{c}" in ids for c in ("store", "proposals", "gate", "ledger", "forecasts", "children", "cycles"))
+    assert g["stats"]["layers"]["principles"] == 13 and g["stats"]["documents"] == 5
+    types = {e["type"] for e in g["edges"]}
+    assert {"provenance", "supports", "flow", "skeptical", "tension"} <= types
+    # precognition is held loosely by every doc: those edges are negative and go to the anticipation concept
+    sk = [e for e in g["edges"] if e["type"] == "skeptical"]
+    assert sk and all(e["sign"] == -1 and e["t"] == "k:anticipation" for e in sk)
+    # the tension bullet links anticipation with replication
+    tn = [e for e in g["edges"] if e["type"] == "tension"]
+    assert any({e["s"], e["t"]} == {"k:anticipation", "k:replication"} for e in tn)
+    # every edge endpoint exists
+    assert all(e["s"] in ids and e["t"] in ids for e in g["edges"])
+    # concept nodes carry excerpts with provenance
+    k = next(n for n in g["nodes"] if n["id"] == "k:proper_scoring")
+    assert k["meta"]["documents"] == 5 and k["meta"]["excerpts"][0]["src"].startswith("src:")
+    pr = next(n for n in g["nodes"] if n["id"] == "p:p02")
+    assert pr["meta"]["short"] == "Pre-register"
+
+
+def test_cooccurrence_pmi(tmp_path):
+    g = build_graph(knowledge_root=_tree(tmp_path, n=6))
+    co = [e for e in g["edges"] if e["type"] == "cooccur"]
+    assert co, "expected co-occurrence edges with 7 documents"
+    assert all("PMI" in e["label"] or "inverse" in e["label"] for e in co)
+
+
+def test_write_html_embeds_json(tmp_path):
+    tpl = tmp_path / "t.html"; tpl.write_text("<title>x</title><script>const G = " + PLACEHOLDER + ";</script>")
+    out = write_html(build_graph(knowledge_root=_tree(tmp_path)), template=tpl, out=tmp_path / "o.html")
+    html = out.read_text()
+    assert PLACEHOLDER not in html and '"nodes":[' in html and "</script>" in html

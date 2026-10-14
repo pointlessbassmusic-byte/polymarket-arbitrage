@@ -22,6 +22,7 @@ Commands
   children                    registry
   names [N]                   suggest names for new children
   ledger [--kind PREFIX] [-n N]
+  graph [--json-only]         rebuild viz/graph.json and viz/index.html (the signal map)
   cycles                      improvement cycles and gains-per-cost efficiency
   ingest                      turn knowledge/*.md "adopts / skeptical / design" bullets into candidate insights
   verify                      recompute the hash chain
@@ -45,6 +46,7 @@ from mandel.validation.gate import (code_change_criteria, evaluate, forecast_imp
 from mandel.store import InsightStore
 from mandel.ingest import ingest_knowledge
 from mandel.cycles import CycleLog
+from mandel.graph import build_graph, write_graph, write_html, TEMPLATE_PATH
 
 
 def _print(obj) -> None:
@@ -147,6 +149,19 @@ def cmd_cycles(_args) -> int:
         state = "open" if c.open else "done"
         print(f"{c.id}  [{state}] {c.started_at[:19]}  gains={c.gains()}  cost={c.cost}  {c.goal}")
     _print(log.efficiency())
+    return 0
+
+
+def cmd_graph(args) -> int:
+    reg = ChildRegistry()
+    kids = [{"name": c.name, "domain": c.domain, "status": c.status, "report_count": c.report_count,
+             "guidance_count": c.guidance_count} for c in reg.all()]
+    g = build_graph(children=kids)
+    out = write_graph(children=kids)
+    print(f"graph: {g['stats']} -> {out}")
+    if TEMPLATE_PATH.exists() and not args.json_only:
+        html = write_html(g)
+        print(f"html: {html} ({html.stat().st_size // 1024} KB)")
     return 0
 
 
@@ -332,6 +347,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--note"); p.set_defaults(fn=cmd_forecast_resolve)
 
     sub.add_parser("cycles").set_defaults(fn=cmd_cycles)
+    p = sub.add_parser("graph"); p.add_argument("--json-only", action="store_true"); p.set_defaults(fn=cmd_graph)
     sub.add_parser("ingest").set_defaults(fn=cmd_ingest)
     sub.add_parser("verify").set_defaults(fn=cmd_verify)
     return ap
