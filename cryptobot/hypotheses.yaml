@@ -910,3 +910,17 @@
   preregistered: true
   trials_run: 10
 
+
+- id: insider-purchases
+  title: "Open-market insider purchases (SEC Form 4, code P) by officers and directors: buy at the open after the filing, hold 20 sessions, judged against the same name's placebo window"
+  source: "Lakonishok & Lee 2001 (RFS, insider purchases predict returns, mostly small caps); Jeng, Metrick & Zeckhauser 2003 (purchases earn ~6%/yr abnormal, sales nothing); Cohen, Malloy & Pomorski 2012 (JF, 'opportunistic' insiders); operator question 2026-10-14 ('public wallets to learn from', for stocks: the trader-level public record is Form 4)"
+  claim: "For every filing of an open-market purchase (Form 4 transaction code P) of at least $25,000 by an officer or director of a US-listed company whose last close before the filing is at least $2, buying at the open of the first session after the FILING date (when the purchase is public) and holding 20 sessions earns more than the same name bought at the same rule's placebo entry (hold + 40 = 60 sessions after the filing, a window with no new filing in the rule) by at least 1.0% per trade after 10 bp a side. Trades are grouped by filing month; one row per (ticker, filing date)."
+  test: "OpenInsider screener rows (a mirror of the SEC's Form 4 filings: filing date, trade date, ticker, insider title, price, quantity, value), officer or director purchases >= $25k, filing dates 2016-01 to 2026-09; Nasdaq's ten-year daily OHLC per current listing (the desk's nasdaq feed). Primary measure: the monthly mean of (event net return - placebo net return); PSR on that monthly series; by-year table. Secondary, reported but not the bar: event net minus SPY over the same window; the pre-filing window (entry hold + 5 = 25 sessions BEFORE the filing) as the 'already outperforming' diagnostic. Four trials are counted up front: {every purchase, cluster purchases (>= 2 distinct insiders in the 30 days to the filing)} x {hold 20, hold 60 (placebo at 100)}."
+  success: "Written before running: for the primary rule (every purchase, hold 20), monthly mean of event minus placebo >= +1.0% with PSR >= 0.95 over 2017-2026, at least 7 of 10 full years positive, and positive in 2023-2026; otherwise inconclusive; a mean at or below zero is killed. A variant can only be promoted by its own pre-registered out-of-sample entry."
+  data: "OpenInsider (openinsider.com/screener, public HTML; the SEC's own structured Form 3/4/5 data sets refuse this environment without a declared contact User-Agent; set SEC_USER_AGENT on the server to collect from the SEC directly) into state/insider/; Nasdaq daily OHLC into state/insider/prices/. Known bias: current listings only (delisted names missing), shared by event and placebo, so the primary difference cancels it and event-minus-SPY does not"
+  result: "PRE-REGISTERED 2026-10-14; not yet run"
+  verdict: inconclusive
+  regime: "not yet run; the evidence will cover 2017-2026 filings, current listings only"
+  rerun: "python -m cryptobot.insider_study collect --state state && python -m cryptobot.insider_study prices --state state && python -m cryptobot.insider_study report --state state"
+  preregistered: true
+  trials_run: 4
