@@ -134,17 +134,20 @@ def load_filings(state: Path) -> list[dict]:
 
 
 def fetch_prices(state: Path, symbols, client=None, years: int = 11, pause: float = 0.4,
-                 sleep=time.sleep) -> int:
-    """Nasdaq daily OHLC per symbol into state/insider/prices/ (on file: skipped)."""
+                 sleep=time.sleep, workers: int = 4) -> int:
+    """Nasdaq daily OHLC per symbol into state/insider/prices/ (on file:
+    skipped). A failed symbol writes nothing and is retried next run;
+    `workers` requests in flight, each followed by `pause`."""
     import httpx
+    from concurrent.futures import ThreadPoolExecutor
     c = client or httpx.Client(timeout=60, headers=HEADERS)
     d = state / "insider" / "prices"
     d.mkdir(parents=True, exist_ok=True)
     end = dt.date.today()
     start = end.replace(year=end.year - years)
-    got = 0
     todo = sorted(s for s in set(symbols) if not (d / f"{s}.json").exists())
-    for i, sym in enumerate(todo):
+
+    def one(sym: str) -> int:
         params = {"assetclass": "etf" if sym == "SPY" else "stocks", "fromdate": start.isoformat(),
                   "todate": end.isoformat(), "limit": 9999}
         try:
@@ -153,12 +156,17 @@ def fetch_prices(state: Path, symbols, client=None, years: int = 11, pause: floa
         except Exception as exc:  # noqa: BLE001 — a failed symbol is retried next run
             logger.warning("prices %s: %s", sym, exc)
             sleep(pause)
-            continue
+            return 0
         (d / f"{sym}.json").write_text(json.dumps(rows))
-        got += 1
-        if i % 200 == 0:
-            logger.info("prices: %d of %d", i, len(todo))
         sleep(pause)
+        return 1
+
+    got = 0
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+        for i, n in enumerate(ex.map(one, todo)):
+            got += n
+            if i % 200 == 0:
+                logger.info("prices: %d of %d", i, len(todo))
     return got
 
 
