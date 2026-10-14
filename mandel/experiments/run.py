@@ -25,6 +25,7 @@ from mandel.experiments.markov import markov_vs_persistence
 from mandel.experiments.msm import msm_vs_rolling
 from mandel.experiments.overfit import overfit_report
 from mandel.experiments.scaling import hurst_with_interval, multifractal_test
+from mandel.experiments.social import attention_vs_abs_return, fear_greed_forward_returns
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
 from mandel.paths import MANDEL_ROOT
@@ -187,6 +188,29 @@ def harness_controls(archive: Archive, ledger: Ledger, n_markets: int = 200) -> 
         f"coin {coin}, oracle {oracle}, market {mkt}: scoring path {'intact' if ok else 'BROKEN'}"
 
 
+def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
+    names = sorted(e.name for e in archive.entries())
+    return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
+
+
+def _load_many(archive: Archive, pattern: str):
+    for name in _bundles_matching(archive, pattern):
+        yield from archive.load(name)
+
+
+def harness_social_attention(archive: Archive) -> tuple[dict, int, str, str]:
+    """Retail attention (standardised mention count per ticker-day) vs next-day absolute return.
+    Inconclusive until 30 distinct collection days exist; the daily capture supplies them."""
+    rep = attention_vs_abs_return(_load_many(archive, "social-derived-*"), _load_many(archive, "social-prices-*"))
+    return rep, rep["n_ticker_days"], rep["verdict"], rep["reason"]
+
+
+def harness_fear_greed(archive: Archive) -> tuple[dict, int, str, str]:
+    """Crypto Fear & Greed extremes vs forward 7-day BTC log return, point in time, block-shift null, split halves."""
+    rep = fear_greed_forward_returns(archive.load("crypto-fear-greed-history"), archive.load("daily-history-BTC-USD"))
+    return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
 HARNESSES: dict[str, Callable] = {
     "market_calibration": harness_market_calibration,
     "multiscale_edge": harness_multiscale_edge,
@@ -197,6 +221,8 @@ HARNESSES: dict[str, Callable] = {
     "msm_volatility": harness_msm,
     "dsr_pbo_harness": harness_overfit,
     "controls": harness_controls,
+    "social_attention": harness_social_attention,
+    "fear_greed_contrarian": harness_fear_greed,
 }
 BUNDLES_NEEDED = {
     "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -205,6 +231,8 @@ BUNDLES_NEEDED = {
     "multifractal_scaling": ["polymarket-price-history-daily"], "hurst_ci": ["polymarket-price-history-daily"],
     "markov_baseline": ["polymarket-price-history-daily"], "msm_volatility": ["polymarket-price-history-daily"],
     "dsr_pbo_harness": ["polymarket-price-history-daily"], "controls": ["polymarket-price-history-daily", "polymarket-closed-markets"],
+    "social_attention": ["social-derived-*", "social-prices-*"],
+    "fear_greed_contrarian": ["crypto-fear-greed-history", "daily-history-BTC-USD"],
 }
 
 
@@ -233,7 +261,7 @@ def run_all(only: Optional[list[str]] = None, ledger: Optional[Ledger] = None, a
             continue
         t0 = time.time()
         needed = BUNDLES_NEEDED[name]
-        missing = [b for b in needed if b not in {e.name for e in archive.entries()}]
+        missing = [b for b in needed if not _bundles_matching(archive, b)]
         if missing:
             res = log.record(name, theories_by_h.get(name, []), {}, "n/a", 0, "inconclusive", f"missing data bundles {missing}", data_bundles=needed)
             out.append(res.as_dict()); continue
@@ -265,4 +293,6 @@ def _null_for(name: str) -> str:
         "msm_volatility": "20-day rolling variance, out-of-sample Gaussian log score",
         "dsr_pbo_harness": "zero-skill best-of-N: DSR < 0.95 and PBO > 0.5 expected",
         "controls": "coin 0.25, oracle 0, market < coin on the same questions",
+        "social_attention": "mentions permuted within ticker: Spearman rho with next-day |return| ~ 0",
+        "fear_greed_contrarian": "Fear & Greed series circularly shifted against returns: conditional mean difference ~ 0",
     }.get(name, "n/a")

@@ -151,6 +151,45 @@ def yahoo_daily(symbol: str, client: httpx.Client, throttle: Throttle, rng: str 
         return []
 
 
+def yahoo_history(symbol: str, client: httpx.Client, throttle: Throttle) -> list[dict]:
+    """Full daily history via period1=0..now. (range=max silently downgrades to monthly bars; it is not used.)
+    Yahoo sometimes answers with an HTML page; that and any non-daily granularity are treated as empty."""
+    throttle.wait()
+    try:
+        r = client.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}", params={"period1": 0, "period2": int(time.time()), "interval": "1d"}, headers=UA, timeout=60)
+        if r.status_code != 200 or not r.headers.get("content-type", "").startswith("application/json"):
+            return []
+        res = r.json()["chart"]["result"][0]
+        if res.get("meta", {}).get("dataGranularity", "1d") != "1d":
+            return []
+        ts = res["timestamp"]; q = res["indicators"]["quote"][0]
+        return [{"t": t, "close": q["close"][i], "volume": q["volume"][i]} for i, t in enumerate(ts) if q["close"][i] is not None]
+    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError):
+        return []
+
+
+def collect_history(store: ObservationStore, symbols: Iterable[str] = ("BTC-USD", "ETH-USD", "SPY", "QQQ")) -> dict:
+    """One-off deep history: full Fear & Greed series (since 2018) and full daily closes for a few anchors.
+    These are the long series the sentiment harnesses need; the daily capture only adds the recent tail."""
+    cap = now_iso()
+    out: dict = {}
+    with httpx.Client() as c:
+        fg = fear_greed(c, Throttle(1.5), limit=0)
+        obs = [Observation("alternative.me", "fear_greed", "crypto", observed_at=iso(int(x["timestamp"])), available_at=iso(int(x["timestamp"]) + 86400), value={"value": int(x["value"]), "label": x.get("value_classification")}) for x in fg if x.get("timestamp")]
+        e = store.write_bundle("crypto-fear-greed-history", obs, recipe="alternative.me /fng/?limit=0 (full history; available_at = day + 24h, the index is published for the day after it closes)",
+                               tags=["sentiment", "crypto", "history"], schema="value = {value 0-100, label}")
+        out["fear_greed"] = e.rows
+        th = Throttle(1.5)
+        for sym in symbols:
+            rows = yahoo_history(sym, c, th)
+            e = store.write_bundle(f"daily-history-{sym}", (Observation("yahoo", "price", sym, observed_at=iso(r["t"]), available_at=iso(r["t"] + 86400), value={"symbol": sym, **r}) for r in rows),
+                                   recipe=f"yahoo /v8/finance/chart/{sym}?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+                                   tags=["prices", "daily", "history"], schema="value = {symbol, t, close, volume}")
+            out[sym] = e.rows
+    out["capture"] = cap
+    return out
+
+
 # ------------------------------------------------------------- congress filings --
 
 def house_ptr_index(year: int, client: httpx.Client, throttle: Throttle) -> list[dict]:

@@ -197,6 +197,96 @@
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {source, ticker, day, mentions, unique_authors, mean_score, bullish, bearish}"
+  },
+  "crypto-fear-greed-history": {
+   "name": "crypto-fear-greed-history",
+   "kind": "data",
+   "path": "mandel/archive/data/crypto-fear-greed-history.jsonl.gz",
+   "created_at": "2026-10-14T10:17:03.965551+00:00",
+   "rows": 3174,
+   "bytes": 23319,
+   "sha256": "f81c47a9de406b2d3fdfb6044d52440320f4d08aa19e948bdf7e980f5391b228",
+   "tags": [
+    "crypto",
+    "history",
+    "sentiment"
+   ],
+   "recipe": "alternative.me /fng/?limit=0 (full history; available_at = day + 24h, the index is published for the day after it closes)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {value 0-100, label}"
+  },
+  "daily-history-BTC-USD": {
+   "name": "daily-history-BTC-USD",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-BTC-USD.jsonl.gz",
+   "created_at": "2026-10-14T10:17:04.635574+00:00",
+   "rows": 4411,
+   "bytes": 104857,
+   "sha256": "b0ce5ae9a37e9d825249e8977ebffe3b494c6d873542e260e5df0f537e321bf8",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/BTC-USD?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
+  },
+  "daily-history-ETH-USD": {
+   "name": "daily-history-ETH-USD",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ETH-USD.jsonl.gz",
+   "created_at": "2026-10-14T10:17:05.770202+00:00",
+   "rows": 3262,
+   "bytes": 84260,
+   "sha256": "250bef4963fea16085fc753857b4f1acac3d535ac33ae144b6304fea097280ac",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ETH-USD?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
+  },
+  "daily-history-SPY": {
+   "name": "daily-history-SPY",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-SPY.jsonl.gz",
+   "created_at": "2026-10-14T10:17:07.364485+00:00",
+   "rows": 8484,
+   "bytes": 161936,
+   "sha256": "29f3f2a3b32a3bc0ee7bf309f7300476a8e5df5b2e12043519b63775f7b763f3",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/SPY?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
+  },
+  "daily-history-QQQ": {
+   "name": "daily-history-QQQ",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-QQQ.jsonl.gz",
+   "created_at": "2026-10-14T10:17:08.895395+00:00",
+   "rows": 6942,
+   "bytes": 134305,
+   "sha256": "a2d1f0192557d089399bddf159f4aaad5e59a04fbbb38c2c07dd50fe18b9c3fc",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/QQQ?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
   }
  }
 }

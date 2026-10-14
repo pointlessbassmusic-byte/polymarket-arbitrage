@@ -358,6 +358,12 @@ def cmd_theories(args) -> int:
     if not reg:
         print(f"no registry at {REGISTRY}; the theory-extraction pass has not run")
         return 1
+    if getattr(args, "render", False):
+        from mandel.theories import write_markdown
+        xp = paths.MANDEL_ROOT / "state" / "experiments.jsonl"
+        exps = [json.loads(l) for l in xp.read_text().splitlines() if l.strip()] if xp.exists() else []
+        print(write_markdown(reg, exps))
+        return 0
     rows = [t for t in reg["theories"] if (args.status is None or t.get("status") == args.status)]
     for t in rows:
         print(f"{t['id']}  [{t.get('status', '?'):13}] {t['kind']:14} {t['slug'][:48]:48} <- {','.join(t.get('origin', []))[:40]}  h={','.join(t.get('experiments', [])) or '-'}")
@@ -399,9 +405,10 @@ def cmd_data_fetch(args) -> int:
 
 def cmd_social_fetch(args) -> int:
     """Capture the social / flow layer for today into point-in-time bundles."""
-    from mandel.data.social import collect_social
+    from mandel.data.social import collect_history, collect_social
     from mandel.data.store import ObservationStore
-    _print(collect_social(ObservationStore(Archive(ledger=Ledger())), capture_day=args.day))
+    store = ObservationStore(Archive(ledger=Ledger()))
+    _print(collect_history(store) if args.history else collect_social(store, capture_day=args.day))
     return 0
 
 
@@ -511,7 +518,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("experiments", cmd_experiments, "List recorded experiment results (the trial math, executed)."); p.add_argument("-n", type=int, default=30)
     p = add("experiment-run", cmd_experiment_run, "Run harnesses on the archived data and record results; updates theory statuses.")
     p.add_argument("harness", nargs="+", help="harness ids or 'all'")
-    p = add("theories", cmd_theories, "List the theory registry with statuses."); p.add_argument("--status")
+    p = add("theories", cmd_theories, "List the theory registry with statuses; --render writes THEORIES.md from it.")
+    p.add_argument("--status"); p.add_argument("--render", action="store_true")
     p = add("theory-park", cmd_theory_park, "Park a theory (kept, not pursued now) with a reason, or --unpark it.")
     p.add_argument("id"); p.add_argument("--reason"); p.add_argument("--unpark", action="store_true")
     p = add("data-fetch", cmd_data_fetch, "Pull resolved markets, price histories, books (Polymarket) and settled markets, candles (Kalshi) into archive bundles.")
@@ -519,6 +527,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--histories", type=int, default=400); p.add_argument("--books", type=int, default=300); p.add_argument("--candles", type=int, default=120)
     p = add("social-fetch", cmd_social_fetch, "Capture Reddit, StockTwits, crypto sentiment, daily prices, House PTR index (and X with X_BEARER_TOKEN) into dated bundles.")
     p.add_argument("--day", help="capture day label (default today, UTC)")
+    p.add_argument("--history", action="store_true", help="instead: one-off deep history (full Fear & Greed series, full daily closes for BTC-USD, ETH-USD, SPY, QQQ)")
     p = add("archive", cmd_archive, "List cold-storage bundles (data, results, knowledge) and their rebuild recipes.")
     p.add_argument("--kind"); p.add_argument("-v", "--verbose", action="store_true")
     add("ingest", cmd_ingest, "Turn knowledge/*.md adopt / skeptical / design bullets into candidate insights (idempotent).")
