@@ -19,6 +19,8 @@
 #   ./desk.sh webhook URL      the Discord/Slack webhook, no prompts, then restart
 #   ./desk.sh check            Kalshi's raw answers to the preflight questions (no secrets printed)
 #   ./desk.sh rotate      new dashboard token (after the old one was shown somewhere), then restart
+#   ./desk.sh polyus      your Polymarket US API key id and secret (typed hidden, stored in .env)
+#   ./desk.sh polyhistory your Polymarket US record: where the losses came from, and the opposite side
 #
 # `keys`, `arm` and `disarm` edit files only; the restart is skipped when
 # Docker is not running (so they also work before the first deploy).
@@ -151,6 +153,18 @@ cmd_alpaca() {
   restart_if_running
 }
 
+cmd_polyus() {
+  # Prompts with hidden input: the secret never lands in shell history or on screen.
+  ensure_env
+  local id sec
+  read -rp "Polymarket US Key ID: " id
+  read -rsp "Polymarket US Secret Key (hidden): " sec; echo
+  id="$(printf '%s' "$id" | tr -d '\r\n ')"; sec="$(printf '%s' "$sec" | tr -d '\r\n ')"
+  if [ -z "$id" ] || [ -z "$sec" ]; then echo "both values are needed"; exit 1; fi
+  set_env POLYMARKET_US_KEY_ID "$id"
+  set_env POLYMARKET_US_SECRET "$sec"
+  echo "saved to $ENV_FILE (mode 600). Run ./desk.sh polyhistory. Revoke the key at polymarket.us/developer when done."
+}
 cmd_webhook() {
   local url="${1:-}"
   ensure_env
@@ -329,6 +343,8 @@ case "${1:-}" in
   webhook) cmd_webhook "${2:-}" ;;
   check) dc run --rm desk python -m cryptobot.execution.kalshi_perps --check ;;
   rotate) cmd_rotate ;;
+  polyus) cmd_polyus ;;
+  polyhistory) dc run --rm desk python -m cryptobot.polymarket_us_history --out /data/polymarket_us_record.json ;;
   digest) dc run --rm desk python -m cryptobot.desk --digest --state-dir /data ;;
-  *) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
