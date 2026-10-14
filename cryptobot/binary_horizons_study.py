@@ -161,10 +161,60 @@ def summarize(ts: list[dict]) -> dict:
     return out
 
 
+MAKER_FEE_RATE = 0.0175
+MAKER_FRACTION = 0.25
+
+
+def maker(markets: list[dict], bars: dict[str, list]) -> dict:
+    """Resting order for the favourite at 25% of life left, filled only if a
+    later candle's last trade goes strictly through the resting price."""
+    res: dict[str, dict] = {}
+    rows: dict[str, list[dict]] = defaultdict(list)
+    tried: dict[str, int] = defaultdict(int)
+    for m in markets:
+        span = m["close_ts"] - m["open_ts"]
+        if span <= 0:
+            continue
+        cls = horizon_class(span)
+        b = bars.get(m["ticker"]) or []
+        if not b:
+            continue
+        t0 = m["close_ts"] - MAKER_FRACTION * span
+        q = quote(b, t0, max(60.0, bar_step(b)))
+        if q is None:
+            continue
+        bid, ask = q
+        mid = (bid + ask) / 2
+        y = 1.0 if m["result"] == "yes" else 0.0
+        later = [x for x in b if t0 < x[0] <= m["close_ts"] and x[3] is not None]
+        if FAV_LO <= mid <= FAV_HI:              # buy YES at the bid
+            price, win = bid, y
+            filled = any(x[3] < bid for x in later)
+        elif FAV_LO <= 1 - mid <= FAV_HI:        # buy NO at 1 - ask (sell YES at the ask)
+            price, win = 1 - ask, 1 - y
+            filled = any(x[3] > ask for x in later)
+        else:
+            continue
+        tried[cls] += 1
+        if filled and 0 < price < 1:
+            rows[cls].append({"event": m["event"], "close_ts": m["close_ts"], "win": win, "implied": price,
+                              "net": (win - price) / price,
+                              "net_fee": (win - price - MAKER_FEE_RATE * price * (1 - price)) / price})
+    for cls, _, _ in CLASSES:
+        st = summarize(rows.get(cls, []))
+        st["tried"] = tried.get(cls, 0)
+        st["fill_rate"] = len(rows.get(cls, [])) / tried[cls] if tried.get(cls) else None
+        if rows.get(cls):
+            st["net_with_maker_fee"] = statistics.fmean(r["net_fee"] for r in rows[cls])
+        res[cls] = st
+    return res
+
+
 def run(scratch: Path, since: str = "") -> dict:
     since_ts = int(dt.datetime.fromisoformat(since).replace(tzinfo=dt.timezone.utc).timestamp()) if since else 0
     markets, bars = collect(scratch, since_ts)
     res = evaluate(markets, bars)
+    res["maker"] = maker(markets, bars)
     res["markets"] = len(markets)
     res["series"] = len({m["series"] for m in markets})
     return res
@@ -186,6 +236,15 @@ def render(res: dict) -> str:
             o.append(f"    at {int(f * 100):2d}% of life left: {fs}; {ls}")
         if row["calibration"]:
             o.append("    calibration at 50% left, mid decile -> realised (n): " + ", ".join(f"{k / 10:.1f}:{v[0]:.2f}({v[1]})" for k, v in row["calibration"].items()))
+    if res.get("maker"):
+        o.append(f"  MAKER: resting order for the favourite at {int(MAKER_FRACTION * 100)}% of life left, filled only if a later trade goes through it")
+        for cls, st in res["maker"].items():
+            if st.get("n", 0) < 5:
+                o.append(f"    {cls:9s} tried {st.get('tried', 0)}, filled {st.get('n', 0)}")
+                continue
+            o.append(f"    {cls:9s} tried {st['tried']:5d}, filled {st['n']:5d} ({st['fill_rate']:.0%}) over {st['events']} events: net {st['net']:+.2%} per $ "
+                     f"(t {st['t']:+.1f}, halves {st['h1']:+.2%}/{st['h2']:+.2%}), with a maker fee {st['net_with_maker_fee']:+.2%}; hit {st['hit']:.1%} vs paid {st['implied']:.1%}"
+                     + ("  [too few events]" if st["events"] < MIN_EVENTS else ""))
     o.append(f"verdict: candidates {res['candidates'] or 'none'}; killed {res['killed'] or 'none'}; {len(CLASSES) * len(FRACTIONS)} trials")
     return "\n".join(o)
 
