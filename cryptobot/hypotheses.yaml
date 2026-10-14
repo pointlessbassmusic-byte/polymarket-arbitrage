@@ -808,12 +808,12 @@
   test: "cryptobot.crossvenue_recorder polls both venues' public books for every matched pair of the current hourly, daily and weekly BTC ladders (Polymarket gateway BBO; Kalshi /markets/{ticker}/orderbook), records the two-sided prices and sizes, and computes the locked edge per contract net of both fees at 10 contracts (Kalshi's fee rounded up per order). Reported: share of snapshots and count of distinct episodes (a pair and direction with edge >= 1 cent, merged while it persists) by family, the edge distribution, the size available, and how long episodes last. A recording of at least 6 hours here, then 7 days on the desk's server. Trials: 3 families (hourly, daily, weekly)."
   success: "Written before recording: CANDIDATE if, over 7 days on the server, a family shows >= 7 episodes with >= 1 cent net per contract at >= 10 contracts on both sides, each lasting >= 30 seconds (slow enough for a polling desk, so not a speed race); then a manual test of 5 real pairs at the minimum size on both venues, settlement checked. KILLED for a family if no such episode appears in 7 days. The 6-hour run here only decides whether the server run is worth doing."
   data: "scratch crossvenue/*.jsonl; then state/crossvenue on the server"
-  result: "PRE-REGISTERED 2026-10-14; recording"
-  verdict: inconclusive
-  regime: "pending"
+  result: "Run 2026-10-14, 1.9 hours, 8,913 pair snapshots every 30 s over 305 matched contracts. Daily (5 PM) and weekly (Friday 5 PM) ladders: the venues' mid prices differ by a median 0.5 cent (p90 1.5); the best locked edge per contract at 10 contracts after both fees is a median -3.4 cents (daily) and -4.6 cents (weekly), maximum -0.9 and -0.1: no snapshot crossed zero, because the two taker fees alone are about 3.5 cents at mid-range prices and the books agree. Hourly: 14 episodes >= 1 cent (2 lasting >= 30 s, median +2.2 cents); 15-minute up/down (not a registered family): 25 episodes, median +5.6 cents, maximum +52 cents. Those fast-market gaps are an artifact: Polymarket US's public /bbo and /book endpoints are snapshots refreshed about every 30 seconds (7 changes in 157 one-second polls against Kalshi's 124 on a 15-minute contract; 4 in 80 against 77 on an hourly one), and the gaps open when Kalshi has moved and Polymarket's snapshot has not. The daily and weekly families show no edge and a 7-day server run is not worth it; the hourly and 15-minute families cannot be measured from public data, and a live measurement (Polymarket's authenticated stream) would be a speed contest near expiry, which the desk does not enter"
+  verdict: killed
+  regime: "2026-10: Kalshi and Polymarket US price the same BRTI contracts within half a cent on the slow ladders; two taker fees (~3.5 cents) keep the locked trade negative; fast-market gaps are stale public snapshots"
   rerun: "python -m cryptobot.crossvenue_recorder --dir <dir> --hours 6 && python -m cryptobot.crossvenue_recorder --dir <dir> --report"
   preregistered: true
-  trials_run: 0
+  trials_run: 3
 
 - id: token-unlock-short
   title: "Short a token into its scheduled unlock, hedged with BTC, on a US venue"

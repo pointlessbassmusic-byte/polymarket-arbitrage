@@ -1651,3 +1651,16 @@ a trade-only US-perps API key can be made.
   unverified. Crypto.com's event contracts settle on a different index,
   so a basis exists there, but only when a strike is at the money at
   expiry.
+
+**Kalshi vs Polymarket US, recorded** (`kalshi-polyus-crossvenue`,
+killed). Over 1.9 hours and 8,913 snapshots of 305 matched contracts,
+the venues priced the 5 PM daily and Friday weekly ladders within a
+median half cent. Two taker fees cost about 3.5 cents at mid-range
+prices, so the best locked edge never crossed zero: −0.9 cents at most
+on the daily ladder and −0.1 on the weekly. The hourly and 15-minute
+markets showed gaps of up to 52 cents, but they are an artifact:
+Polymarket US's public quote and book endpoints are snapshots refreshed
+about every 30 seconds (7 changes in 157 one-second polls against
+Kalshi's 124). The gaps open when Kalshi has moved and Polymarket's
+snapshot has not. Measuring those live needs the authenticated stream
+and is a speed race near expiry, which the desk does not enter.

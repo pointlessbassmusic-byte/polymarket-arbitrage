@@ -16,6 +16,13 @@ at N contracts, net of both taker fees:
 Kalshi's fee is 0.07 x C x p x (1-p), rounded up to the cent per order;
 Polymarket US's taker fee is 0.0695 x C x p x (1-p).
 
+CAUTION: Polymarket US's public /bbo and /book endpoints are snapshots
+refreshed about every 30 seconds (tested 2026-10-14: 7 changes in 157
+one-second polls against Kalshi's 124; the sizes are not the book's).
+Gaps against Kalshi's live book on fast markets (15-minute, hourly near
+expiry) are mostly that staleness. Each row carries `p_ts`, the
+snapshot's own timestamp, and `p_age_s`.
+
     python -m cryptobot.crossvenue_recorder --dir <dir> --hours 6
     python -m cryptobot.crossvenue_recorder --dir <dir> --report
 """
@@ -154,8 +161,16 @@ class Recorder:
                 return float((x or {}).get("value"))
             except (TypeError, ValueError):
                 return None
+        ts = (md.get("lastPriceSample") or {}).get("ts")
+        age = None
+        if ts:
+            try:
+                age = time.time() - dt.datetime.fromisoformat(ts[:26].rstrip("Z") + "+00:00").timestamp()
+            except ValueError:
+                age = None
         return {"p_bid": v(md.get("bestBid")), "p_ask": v(md.get("bestAsk")),
-                "p_bid_sz": float(md.get("bidShares") or 0), "p_ask_sz": float(md.get("askShares") or 0)}
+                "p_bid_sz": float(md.get("bidShares") or 0), "p_ask_sz": float(md.get("askShares") or 0),
+                "p_ts": ts, "p_age_s": round(age, 1) if age is not None else None}
 
     def near(self, limit_per_family: int = 14) -> list[dict]:
         """The pairs worth polling: per family, the soonest expiry and the strikes nearest the middle of the ladder."""
