@@ -44,9 +44,9 @@ ArchiveEntry
   generation_id  Cycle id; created_at; retired_reason
 ```
 
-Admission is code, not judgement. An entry is written when (a) its proposal reached stage 1 or beyond (it compiled, passed tests and produced a descriptor), (b) its evidence was written by the harness, and (c) either the gate accepted it, which makes it `elite` for its niche and demotes the previous elite to `stepping_stone`, or its `novelty >= delta_type`, which makes it a `stepping_stone`. Variants failing (a) stay in the proposal book as rejected and are ledgered as `archive.refused` with the reason; they get no entry. Nothing is deleted: `retire(id, reason)` tombstones. Niche cap: 12 entries; above it, the oldest `stepping_stone` that is dominated on every fitness metric and appears in no elite's lineage is retired with reason `dominated`.
+Admission is code, not judgement. An entry is written when (a) its proposal reached stage 1 or beyond (compiled, passed tests, produced a descriptor), (b) its evidence was written by the harness, and (c) either the gate accepted it, making it `elite` for its niche and demoting the previous elite to `stepping_stone`, or its `novelty >= delta_type`, making it a `stepping_stone`. Variants failing (a) stay in the proposal book as rejected, ledgered as `archive.refused`, with no entry. Nothing is deleted: `retire(id, reason)` tombstones. Niche cap 12; above it, the oldest `stepping_stone` dominated on every metric and in no elite's lineage is retired with reason `dominated`.
 
-Queries: `lineage(id)` returns the path to the root with each ancestor's status and fitness so the dips are visible; `elites()`, `by_niche(key)`, `niche_coverage()`, `stepping_stone_rate()` (fraction of elites with at least one `stepping_stone` ancestor). Ledger kinds added: `archive.admitted`, `archive.elite`, `archive.demoted`, `archive.retired`, `archive.refused`, `archive.parent_sampled`.
+Queries: `lineage(id)` (path to root with each ancestor's status and fitness, so the dips are visible), `elites()`, `by_niche(key)`, `niche_coverage()`, `stepping_stone_rate()` (fraction of elites with a `stepping_stone` ancestor). Ledger kinds: `archive.admitted|elite|demoted|retired|refused|parent_sampled`.
 
 ### 2.2 Parent sampling: `Archive.sample_parents(genome_type, k, seed)`
 
@@ -75,7 +75,7 @@ Dimensions are scaled by the archive's per-dimension IQR; novelty is the L2 dist
 
 Stage 2 can make a `forecaster` or `procedure` entry `elite`. A `strategy` entry becomes `elite` only after stage 3, and `elite` means eligible for the user's decision, never live.
 
-Protected ruler, `mandel/protected.py`: a manifest hash over `mandel/validation/`, `mandel/cascade.py`, the admission code in `mandel/archive.py`, `mandel/ledger.py`, `mandel/forecasts.py`, `core/risk_manager.py`, `core/execution.py`, and the held-out datasets. `preregister` records `harness_hash`; `evaluate` refuses when the live hash differs; the manifest changes only with `actor="human"`; `draft` refuses a `change` whose paths touch it.
+Protected ruler, `mandel/protected.py`: a manifest hash over `mandel/validation/`, `mandel/cascade.py`, the admission code, `mandel/ledger.py`, `mandel/forecasts.py`, `core/risk_manager.py`, `core/execution.py` and the held-out datasets. `preregister` records `harness_hash`; `evaluate` refuses when the live hash differs; the manifest changes only with `actor="human"`; `draft` refuses a `change` touching it.
 
 ### 2.5 Generations: `mandel.cycles`, extended
 
