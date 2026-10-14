@@ -26,6 +26,7 @@ from mandel.experiments.msm import msm_vs_rolling
 from mandel.experiments.overfit import overfit_report
 from mandel.experiments.scaling import hurst_with_interval, multifractal_test
 from mandel.experiments.social import attention_vs_abs_return, fear_greed_forward_returns
+from mandel.experiments.volatility import overlay_backtest, overlay_verdict, skew_tail, term_structure_reversion, variance_risk_premium
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
 from mandel.paths import MANDEL_ROOT
@@ -232,6 +233,96 @@ def harness_point_in_time(archive: Archive) -> tuple[dict, int, str, str]:
         f"naive {naive['verdict']} (d_fear {naive.get('d_fear', float('nan')):+.4f}) vs point-in-time {honest['verdict']} (d_fear {honest.get('d_fear', float('nan')):+.4f}): {'verdict or sign changed' if changed else 'no change on this harness'}"
 
 
+def _vrp(archive: Archive, index_bundle: str, price_bundle: str, symbol: str, window: int, ppy: int) -> tuple[dict, int, str, str]:
+    rep = variance_risk_premium(archive.load(index_bundle), archive.load(price_bundle), window=window, symbol=symbol, periods_per_year=ppy)
+    return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
+def harness_vrp_spx(archive: Archive):
+    """T-48: VIX^2 exceeds the realised variance of SPY over the next 21 trading days (model-free VRP)."""
+    return _vrp(archive, "cboe-VIX-history", "daily-history-SPY", "SPY", 21, 252)
+
+
+def harness_vrp_btc(archive: Archive):
+    """T-49: DVOL^2 exceeds realised BTC variance over the next 30 calendar days (Deribit DVOL is a 30-day index)."""
+    return _vrp(archive, "deribit-dvol-BTC-history", "daily-history-BTC-USD", "BTC-USD", 30, 365)
+
+
+def harness_vrp_gold(archive: Archive):
+    """T-50: GVZ^2 exceeds realised GLD variance over the next 21 days."""
+    return _vrp(archive, "cboe-GVZ-history", "daily-history-GLD", "GLD", 21, 252)
+
+
+def harness_vrp_nasdaq(archive: Archive):
+    """T-51: VXN^2 exceeds realised QQQ variance over the next 21 days."""
+    return _vrp(archive, "cboe-VXN-history", "daily-history-QQQ", "QQQ", 21, 252)
+
+
+def harness_skew_tail(archive: Archive):
+    rep = skew_tail(archive.load("cboe-SKEW-history"), archive.load("daily-history-SPY"), symbol="SPY")
+    return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
+def harness_term_structure(archive: Archive):
+    rep = term_structure_reversion(archive.load("cboe-VIX-history"), archive.load("cboe-VIX3M-history"))
+    return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
+def _sharpe_diff_p(a: np.ndarray, b: np.ndarray, n_boot: int = 2000, block_len: int = 6, seed: int = 0) -> float:
+    """One-sided p for H0: Sharpe(a) <= Sharpe(b), circular block bootstrap of paired cycles (percentile)."""
+    rng = np.random.default_rng(seed); n = len(a)
+    def sr(x): return x.mean() / x.std(ddof=1) if x.std(ddof=1) > 0 else 0.0
+    obs = sr(a) - sr(b); null = np.empty(n_boot)
+    nb = int(np.ceil(n / block_len))
+    for i in range(n_boot):
+        idx = (rng.integers(0, n, nb)[:, None] + np.arange(block_len)[None, :]).ravel()[:n] % n
+        null[i] = sr(a[idx]) - sr(b[idx]) - obs
+    return float((np.sum(null >= obs) + 1) / (n_boot + 1))
+
+
+def _overlay(archive: Archive, strategy: str):
+    return overlay_backtest(archive.load("daily-history-SPY"), archive.load("cboe-VIX-history"), archive.load("fred-DTB3"), strategy, symbol="SPY")
+
+
+def harness_covered_call(archive: Archive):
+    """T-54 (model-priced): monthly 30-delta covered calls on SPY have a higher Sharpe than buy-and-hold."""
+    rep = _overlay(archive, "covered_call")
+    p = _sharpe_diff_p(rep["returns"], rep["benchmark"])
+    out = overlay_verdict(rep); out["p_value_sharpe_diff"] = p
+    ok = rep["sharpe"] > rep["benchmark_sharpe"] and p < 0.05
+    return out, rep["n_cycles"], "supported" if ok else "not_supported", \
+        f"model-priced (VIX as flat IV, upper bound for call selling): Sharpe {rep['sharpe']:.2f} vs buy-and-hold {rep['benchmark_sharpe']:.2f}, CAGR {rep['cagr']*100:.1f}% vs {rep['benchmark_cagr']*100:.1f}%, MDD {rep['max_drawdown']*100:.0f}% vs {rep['benchmark_max_drawdown']*100:.0f}%, Sharpe-diff p={p:.3f}, {rep['n_cycles']} cycles"
+
+
+def harness_csp(archive: Archive):
+    """T-55 (model-priced): monthly ATM cash-secured puts on SPY have a higher Sharpe than buy-and-hold."""
+    rep = _overlay(archive, "cash_secured_put")
+    p = _sharpe_diff_p(rep["returns"], rep["benchmark"])
+    out = overlay_verdict(rep); out["p_value_sharpe_diff"] = p
+    ok = rep["sharpe"] > rep["benchmark_sharpe"] and p < 0.05
+    return out, rep["n_cycles"], "supported" if ok else "not_supported", \
+        f"model-priced: Sharpe {rep['sharpe']:.2f} vs buy-and-hold {rep['benchmark_sharpe']:.2f}, CAGR {rep['cagr']*100:.1f}% vs {rep['benchmark_cagr']*100:.1f}%, MDD {rep['max_drawdown']*100:.0f}% vs {rep['benchmark_max_drawdown']*100:.0f}%, Sharpe-diff p={p:.3f}"
+
+
+def harness_collar(archive: Archive):
+    """T-56 (model-priced): a monthly 30-delta collar cuts SPY max drawdown by at least a third while keeping Sharpe within 0.10 of buy-and-hold."""
+    rep = _overlay(archive, "collar")
+    out = overlay_verdict(rep)
+    ok = rep["max_drawdown"] > rep["benchmark_max_drawdown"] * (2 / 3) and rep["sharpe"] >= rep["benchmark_sharpe"] - 0.10
+    return out, rep["n_cycles"], "supported" if ok else "not_supported", \
+        f"model-priced: MDD {rep['max_drawdown']*100:.0f}% vs {rep['benchmark_max_drawdown']*100:.0f}% (needs < {rep['benchmark_max_drawdown']*2/3*100:.0f}%), Sharpe {rep['sharpe']:.2f} vs {rep['benchmark_sharpe']:.2f}, CAGR {rep['cagr']*100:.1f}% vs {rep['benchmark_cagr']*100:.1f}%"
+
+
+def harness_short_straddle(archive: Archive):
+    """T-57 (model-priced): selling the monthly ATM straddle on SPY priced at VIX has positive mean P&L (the VRP in option form)."""
+    rep = _overlay(archive, "short_straddle")
+    out = overlay_verdict(rep, versus="zero")
+    p = out.get("p_value_mean_excess", 1.0)
+    ok = rep["mean_cycle_return"] > 0 and p < 0.05 and all(h > 0 for h in out.get("halves", [0, 0]))
+    return out, rep["n_cycles"], "supported" if ok else "not_supported", \
+        f"model-priced: mean {rep['mean_cycle_return']*100:+.2f}% of notional per month, Sharpe {rep['sharpe']:.2f}, MDD {rep['max_drawdown']*100:.0f}%, block-bootstrap p={p:.4f}, halves {out['halves'][0]*100:+.2f}%/{out['halves'][1]*100:+.2f}%"
+
+
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     names = sorted(e.name for e in archive.entries())
     return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
@@ -270,6 +361,9 @@ HARNESSES: dict[str, Callable] = {
     "longshot_bias": harness_longshot,
     "horizon_monotone": harness_horizon_monotone,
     "point_in_time_check": harness_point_in_time,
+    "vrp_spx": harness_vrp_spx, "vrp_btc": harness_vrp_btc, "vrp_gold": harness_vrp_gold, "vrp_nasdaq": harness_vrp_nasdaq,
+    "skew_tail": harness_skew_tail, "term_structure_reversion": harness_term_structure,
+    "covered_call_overlay": harness_covered_call, "csp_overlay": harness_csp, "collar_overlay": harness_collar, "short_straddle_model": harness_short_straddle,
 }
 BUNDLES_NEEDED = {
     "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -283,6 +377,11 @@ BUNDLES_NEEDED = {
     "longshot_bias": ["polymarket-price-history-daily", "polymarket-closed-markets"],
     "horizon_monotone": ["polymarket-price-history-daily", "polymarket-closed-markets"],
     "point_in_time_check": ["crypto-fear-greed-history", "daily-history-BTC-USD"],
+    "vrp_spx": ["cboe-VIX-history", "daily-history-SPY"], "vrp_btc": ["deribit-dvol-BTC-history", "daily-history-BTC-USD"],
+    "vrp_gold": ["cboe-GVZ-history", "daily-history-GLD"], "vrp_nasdaq": ["cboe-VXN-history", "daily-history-QQQ"],
+    "skew_tail": ["cboe-SKEW-history", "daily-history-SPY"], "term_structure_reversion": ["cboe-VIX-history", "cboe-VIX3M-history"],
+    "covered_call_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"], "csp_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"],
+    "collar_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"], "short_straddle_model": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"],
 }
 
 
@@ -348,4 +447,11 @@ def _null_for(name: str) -> str:
         "longshot_bias": "calibrated bucket: mean(outcome - price) = 0 (bootstrap 95% interval)",
         "horizon_monotone": "skill flat across horizons",
         "point_in_time_check": "naive and point-in-time runs give the same verdict and sign",
+        "vrp_spx": "implied variance = realised variance (studentized block bootstrap of the daily difference)",
+        "vrp_btc": "implied variance = realised variance (block bootstrap)", "vrp_gold": "implied = realised (block bootstrap)", "vrp_nasdaq": "implied = realised (block bootstrap)",
+        "skew_tail": "SKEW circularly shifted against returns: equal crash probability in top and bottom quintiles",
+        "term_structure_reversion": "VIX/VIX3M ratio circularly shifted against VIX changes",
+        "covered_call_overlay": "Sharpe(covered call) <= Sharpe(buy and hold), block bootstrap of paired cycles; model-priced",
+        "csp_overlay": "Sharpe(put writing) <= Sharpe(buy and hold); model-priced", "collar_overlay": "descriptive thresholds; model-priced",
+        "short_straddle_model": "mean straddle P&L = 0 (block bootstrap); model-priced",
     }.get(name, "n/a")

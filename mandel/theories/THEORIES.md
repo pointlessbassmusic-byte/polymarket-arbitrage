@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `56f081ba23619bc7`). 45 theories. supported 7, not_supported 3, inconclusive 1, untested 3, blocked 23, parked 8.
+Rendered from `registry.json` (hash `16a7ed5ed5c0a64e`). 55 theories. supported 15, not_supported 5, inconclusive 1, untested 3, blocked 23, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (7)
+## Supported (15)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -107,7 +107,119 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-cd5674d2: supported — best of 21 momentum rules: Sharpe -0.031, DSR 0.00, PBO 0.90
 - note: the dsr_pbo verdict (overfit) is the same statement from the other side
 
-## Not Supported (3)
+### T-48 · variance-risk-premium-spx
+
+**Claim.** VIX-implied variance exceeds the realised variance of SPY over the following 21 trading days on average (a positive variance risk premium).
+
+- kind: volatility · origin: literature:carr-wu-2009, cboe:VIX, options-sweep
+- statistic: mean(VIX^2 - RV^2) over all days, vol-point gap, share positive
+- null: implied = realised; studentized circular block bootstrap (block 42) of the daily difference
+- procedure: align VIX close at t with realised variance of returns t+1..t+21; test the mean difference; require both halves positive
+- data: cboe-VIX-history, daily-history-SPY · min n: 2000
+- pass: p < 0.05, mean > 0, both halves > 0
+- controls: overlapping windows handled by the block bootstrap; VIX is SPX IV applied to SPY (tracking error small); point in time by construction
+- harness: vrp_spx
+- result X-c3f695ac: supported — implied 21.0 vs realised 18.6 vol pts over 8459 days (1993-01-29..2026-09-11); VRP positive on 84% of days, block-bootstrap p=0.0140, halves +0.0103/+0.0092
+
+### T-49 · variance-risk-premium-btc
+
+**Claim.** Deribit DVOL-implied variance exceeds realised BTC variance over the following 30 days on average.
+
+- kind: volatility · origin: deribit:DVOL, options-sweep
+- statistic: mean(DVOL^2 - RV^2), 365-day convention
+- null: implied = realised; block bootstrap
+- procedure: same as T-48 with 30-day windows and 7-day weeks
+- data: deribit-dvol-BTC-history, daily-history-BTC-USD · min n: 1000
+- pass: p < 0.05, mean > 0, both halves > 0
+- controls: DVOL history starts 2021-03; crypto trades 24/7 so the window is 30 calendar days
+- harness: vrp_btc
+- result X-c41a0dfb: supported — implied 62.9 vs realised 54.9 vol pts over 2000 days (2021-03-24..2026-09-13); VRP positive on 71% of days, block-bootstrap p=0.0010, halves +0.1535/+0.0345
+
+### T-50 · variance-risk-premium-gold
+
+**Claim.** GVZ-implied variance exceeds realised GLD variance over the following 21 trading days on average.
+
+- kind: volatility · origin: cboe:GVZ, options-sweep
+- statistic: mean(GVZ^2 - RV^2)
+- null: implied = realised; block bootstrap
+- procedure: as T-48 on GLD
+- data: cboe-GVZ-history, daily-history-GLD · min n: 2000
+- pass: p < 0.05, mean > 0, both halves > 0
+- controls: GVZ is the IV of GLD options, so no index-vs-ETF mismatch
+- harness: vrp_gold
+- result X-eb9af641: supported — implied 18.7 vs realised 16.9 vol pts over 4267 days (2009-09-18..2026-09-11); VRP positive on 79% of days, block-bootstrap p=0.0040, halves +0.0084/+0.0040
+
+### T-53 · vix-term-structure-reversion
+
+**Claim.** When VIX is above VIX3M (backwardation), VIX falls over the next 21 trading days by more than it does from contango.
+
+- kind: volatility · origin: cboe:VIX3M, options-sweep
+- statistic: mean 21d change in VIX after backwardation minus after contango
+- null: VIX/VIX3M ratio circularly shifted against VIX changes
+- procedure: state at close t; change t -> t+21; block-shift null; halves agree
+- data: cboe-VIX-history, cboe-VIX3M-history · min n: 2000
+- pass: difference < 0, p < 0.05, both halves < 0
+- controls: mean reversion of VIX is mechanical in part; the test is whether the term structure adds to it (conditional means differ)
+- harness: term_structure_reversion
+- result X-47917835: supported — 21d change in VIX after backwardation -6.09 vs contango +0.45 pts (diff -6.54, block-shift p=0.0005, halves -5.43/-7.53; backwardation on 8% of days)
+
+### T-54 · covered-call-beats-buy-and-hold
+
+**Claim.** Writing monthly 30-delta covered calls on SPY produces a higher Sharpe ratio than holding SPY.
+
+- kind: options-strategy · origin: cboe:BXMD, options-sweep
+- statistic: Sharpe difference over non-overlapping monthly cycles
+- null: Sharpe(covered call) <= Sharpe(buy and hold); circular block bootstrap of paired cycles
+- procedure: every 21 trading days: hold SPY, sell a 30-delta call priced by BSM at VIX; settle at expiry
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
+- pass: Sharpe higher and p < 0.05
+- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it.
+- harness: covered_call_overlay
+- result X-c3d19508: supported — model-priced (VIX as flat IV, upper bound for call selling): Sharpe 1.17 vs buy-and-hold 0.62, CAGR 16.4% vs 8.9%, MDD -42% vs -56%, Sharpe-diff p=0.000, 403 cycles
+
+### T-55 · put-writing-beats-buy-and-hold
+
+**Claim.** Writing monthly ATM cash-secured puts on SPY produces a higher Sharpe ratio than holding SPY.
+
+- kind: options-strategy · origin: cboe:PUT, options-sweep
+- statistic: Sharpe difference over monthly cycles
+- null: Sharpe(put write) <= Sharpe(buy and hold); block bootstrap
+- procedure: every 21 trading days: sell an ATM put priced at VIX, hold the strike in bills
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
+- pass: Sharpe higher and p < 0.05
+- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it.
+- harness: csp_overlay
+- result X-babe2142: supported — model-priced: Sharpe 1.27 vs buy-and-hold 0.62, CAGR 12.9% vs 8.9%, MDD -32% vs -56%, Sharpe-diff p=0.005
+
+### T-56 · collar-cuts-drawdown-cheaply
+
+**Claim.** A monthly 30-delta collar on SPY cuts the maximum drawdown by at least a third while keeping the Sharpe ratio within 0.10 of buy-and-hold.
+
+- kind: options-strategy · origin: cboe:CLL, options-sweep
+- statistic: max drawdown ratio and Sharpe difference
+- null: descriptive thresholds (no sampling null)
+- procedure: every 21 trading days: hold SPY, sell 30-delta call, buy 30-delta put, both priced at VIX
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
+- pass: MDD(collar) < 2/3 MDD(SPY) and Sharpe >= Sharpe(SPY) - 0.10
+- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. A flat VIX under-prices the put, so the collar's cost is understated.
+- harness: collar_overlay
+- result X-70018c19: supported — model-priced: MDD -26% vs -56% (needs < -38%), Sharpe 1.15 vs 0.62, CAGR 10.3% vs 8.9%
+
+### T-57 · short-straddle-earns-the-vrp
+
+**Claim.** Selling the monthly ATM SPY straddle priced at VIX earns a positive mean P&L (the variance risk premium in option form).
+
+- kind: options-strategy · origin: literature:vrp, options-sweep
+- statistic: mean monthly P&L as a share of notional
+- null: mean P&L = 0; studentized block bootstrap
+- procedure: every 21 trading days: sell ATM call and put priced at VIX, settle at |S_T - K|
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
+- pass: mean > 0, p < 0.05, both halves > 0
+- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. ATM pricing at VIX is close to fair (VIX is roughly the ATM-ish 30-day IV), so this one is the least biased of the overlays.
+- harness: short_straddle_model
+- result X-13ef8afe: supported — model-priced: mean +1.10% of notional per month, Sharpe 1.33, MDD -23%, block-bootstrap p=0.0005, halves +1.14%/+1.06%
+
+## Not Supported (5)
 
 ### T-02 · longshot-bias
 
@@ -153,6 +265,35 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: point_in_time_check
 - result X-95aa94c7: not_supported — naive not_supported (d_fear +0.0003) vs point-in-time not_supported (d_fear +0.0001): no change on this harness
 - note: harness point_in_time_check runs the Fear & Greed test naive (lag 0) and honest (lag 1) and asks whether the verdict or sign changes; one harness only so far
+
+### T-51 · variance-risk-premium-nasdaq
+
+**Claim.** VXN-implied variance exceeds realised QQQ variance over the following 21 trading days on average.
+
+- kind: volatility · origin: cboe:VXN, options-sweep
+- statistic: mean(VXN^2 - RV^2)
+- null: implied = realised; block bootstrap
+- procedure: as T-48 on QQQ
+- data: cboe-VXN-history, daily-history-QQQ · min n: 2000
+- pass: p < 0.05, mean > 0, both halves > 0
+- controls: VXN is NDX IV applied to QQQ
+- harness: vrp_nasdaq
+- result X-a052edc2: not_supported — implied 22.6 vs realised 20.6 vol pts over 4275 days (2009-09-14..2026-09-11); VRP positive on 80% of days, block-bootstrap p=0.0950, halves +0.0104/+0.0063
+
+### T-52 · skew-predicts-crashes
+
+**Claim.** When the CBOE SKEW index is in its top quintile, the probability of a 21-day SPY drop worse than -5% is higher than when it is in its bottom quintile.
+
+- kind: volatility · origin: cboe:SKEW, options-sweep
+- statistic: difference in crash probability, top minus bottom quintile
+- null: SKEW circularly shifted against returns
+- procedure: quintiles over the full sample; forward 21d log return; block-shift null; both halves must agree
+- data: cboe-SKEW-history, daily-history-SPY · min n: 2000
+- pass: difference > 0, p < 0.05, both halves > 0
+- controls: quintile edges use the full sample (mild look-ahead on the threshold, none on the signal); overlapping windows via block shift
+- harness: skew_tail
+- result X-4b59c8db: not_supported — P(21d drop < -5%) top SKEW quintile 0.068 vs bottom 0.123 (diff -0.055, block-shift p=0.880, halves +nan/+0.069)
+- note: literature finds SKEW a weak predictor; this is the test, not the belief
 
 ## Inconclusive (1)
 

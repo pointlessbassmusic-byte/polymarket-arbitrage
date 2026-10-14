@@ -73,3 +73,7 @@ config.live.yaml
 mandel/state/*.lock
 mandel/state/**/*.lock
 mandel/**/*.lock
+
+# Mandel raw daily captures kept on local disk only (INDEX.json entries and recipes are committed)
+mandel/archive/data/options-chain-*.jsonl.gz
+mandel/archive/data/deribit-book-*.jsonl.gz

@@ -1194,6 +1194,297 @@
    "blocked_on": "a fresh pull of markets resolved after 2026-10-14 with >= 300 sub-0.10 observations at 7d (about one to two months of resolutions)",
    "results": [],
    "notes": "pre-registered lead from the in-sample longshot_bias run: the classic longshot bias (T-02) was rejected and the sign points the other way. Eight YES events in 284 is far too few to act on; this entry exists so the fresh data decides, not the reading that suggested it."
+  },
+  {
+   "id": "T-48",
+   "slug": "variance-risk-premium-spx",
+   "kind": "volatility",
+   "claim": "VIX-implied variance exceeds the realised variance of SPY over the following 21 trading days on average (a positive variance risk premium).",
+   "origin": [
+    "literature:carr-wu-2009",
+    "cboe:VIX",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean(VIX^2 - RV^2) over all days, vol-point gap, share positive",
+    "null": "implied = realised; studentized circular block bootstrap (block 42) of the daily difference",
+    "procedure": "align VIX close at t with realised variance of returns t+1..t+21; test the mean difference; require both halves positive",
+    "data": "cboe-VIX-history, daily-history-SPY",
+    "min_n": 2000,
+    "pass": "p < 0.05, mean > 0, both halves > 0",
+    "controls": "overlapping windows handled by the block bootstrap; VIX is SPX IV applied to SPY (tracking error small); point in time by construction"
+   },
+   "experiments": [
+    "vrp_spx"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-c3f695ac"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-49",
+   "slug": "variance-risk-premium-btc",
+   "kind": "volatility",
+   "claim": "Deribit DVOL-implied variance exceeds realised BTC variance over the following 30 days on average.",
+   "origin": [
+    "deribit:DVOL",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean(DVOL^2 - RV^2), 365-day convention",
+    "null": "implied = realised; block bootstrap",
+    "procedure": "same as T-48 with 30-day windows and 7-day weeks",
+    "data": "deribit-dvol-BTC-history, daily-history-BTC-USD",
+    "min_n": 1000,
+    "pass": "p < 0.05, mean > 0, both halves > 0",
+    "controls": "DVOL history starts 2021-03; crypto trades 24/7 so the window is 30 calendar days"
+   },
+   "experiments": [
+    "vrp_btc"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-c41a0dfb"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-50",
+   "slug": "variance-risk-premium-gold",
+   "kind": "volatility",
+   "claim": "GVZ-implied variance exceeds realised GLD variance over the following 21 trading days on average.",
+   "origin": [
+    "cboe:GVZ",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean(GVZ^2 - RV^2)",
+    "null": "implied = realised; block bootstrap",
+    "procedure": "as T-48 on GLD",
+    "data": "cboe-GVZ-history, daily-history-GLD",
+    "min_n": 2000,
+    "pass": "p < 0.05, mean > 0, both halves > 0",
+    "controls": "GVZ is the IV of GLD options, so no index-vs-ETF mismatch"
+   },
+   "experiments": [
+    "vrp_gold"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-eb9af641"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-51",
+   "slug": "variance-risk-premium-nasdaq",
+   "kind": "volatility",
+   "claim": "VXN-implied variance exceeds realised QQQ variance over the following 21 trading days on average.",
+   "origin": [
+    "cboe:VXN",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean(VXN^2 - RV^2)",
+    "null": "implied = realised; block bootstrap",
+    "procedure": "as T-48 on QQQ",
+    "data": "cboe-VXN-history, daily-history-QQQ",
+    "min_n": 2000,
+    "pass": "p < 0.05, mean > 0, both halves > 0",
+    "controls": "VXN is NDX IV applied to QQQ"
+   },
+   "experiments": [
+    "vrp_nasdaq"
+   ],
+   "testable_now": true,
+   "status": "not_supported",
+   "blocked_on": "",
+   "results": [
+    "X-a052edc2"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-52",
+   "slug": "skew-predicts-crashes",
+   "kind": "volatility",
+   "claim": "When the CBOE SKEW index is in its top quintile, the probability of a 21-day SPY drop worse than -5% is higher than when it is in its bottom quintile.",
+   "origin": [
+    "cboe:SKEW",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "difference in crash probability, top minus bottom quintile",
+    "null": "SKEW circularly shifted against returns",
+    "procedure": "quintiles over the full sample; forward 21d log return; block-shift null; both halves must agree",
+    "data": "cboe-SKEW-history, daily-history-SPY",
+    "min_n": 2000,
+    "pass": "difference > 0, p < 0.05, both halves > 0",
+    "controls": "quintile edges use the full sample (mild look-ahead on the threshold, none on the signal); overlapping windows via block shift"
+   },
+   "experiments": [
+    "skew_tail"
+   ],
+   "testable_now": true,
+   "status": "not_supported",
+   "blocked_on": "",
+   "results": [
+    "X-4b59c8db"
+   ],
+   "notes": "literature finds SKEW a weak predictor; this is the test, not the belief"
+  },
+  {
+   "id": "T-53",
+   "slug": "vix-term-structure-reversion",
+   "kind": "volatility",
+   "claim": "When VIX is above VIX3M (backwardation), VIX falls over the next 21 trading days by more than it does from contango.",
+   "origin": [
+    "cboe:VIX3M",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean 21d change in VIX after backwardation minus after contango",
+    "null": "VIX/VIX3M ratio circularly shifted against VIX changes",
+    "procedure": "state at close t; change t -> t+21; block-shift null; halves agree",
+    "data": "cboe-VIX-history, cboe-VIX3M-history",
+    "min_n": 2000,
+    "pass": "difference < 0, p < 0.05, both halves < 0",
+    "controls": "mean reversion of VIX is mechanical in part; the test is whether the term structure adds to it (conditional means differ)"
+   },
+   "experiments": [
+    "term_structure_reversion"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-47917835"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-54",
+   "slug": "covered-call-beats-buy-and-hold",
+   "kind": "options-strategy",
+   "claim": "Writing monthly 30-delta covered calls on SPY produces a higher Sharpe ratio than holding SPY.",
+   "origin": [
+    "cboe:BXMD",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "Sharpe difference over non-overlapping monthly cycles",
+    "null": "Sharpe(covered call) <= Sharpe(buy and hold); circular block bootstrap of paired cycles",
+    "procedure": "every 21 trading days: hold SPY, sell a 30-delta call priced by BSM at VIX; settle at expiry",
+    "data": "daily-history-SPY, cboe-VIX-history, fred-DTB3",
+    "min_n": 100,
+    "pass": "Sharpe higher and p < 0.05",
+    "controls": "MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it."
+   },
+   "experiments": [
+    "covered_call_overlay"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-c3d19508"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-55",
+   "slug": "put-writing-beats-buy-and-hold",
+   "kind": "options-strategy",
+   "claim": "Writing monthly ATM cash-secured puts on SPY produces a higher Sharpe ratio than holding SPY.",
+   "origin": [
+    "cboe:PUT",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "Sharpe difference over monthly cycles",
+    "null": "Sharpe(put write) <= Sharpe(buy and hold); block bootstrap",
+    "procedure": "every 21 trading days: sell an ATM put priced at VIX, hold the strike in bills",
+    "data": "daily-history-SPY, cboe-VIX-history, fred-DTB3",
+    "min_n": 100,
+    "pass": "Sharpe higher and p < 0.05",
+    "controls": "MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it."
+   },
+   "experiments": [
+    "csp_overlay"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-babe2142"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-56",
+   "slug": "collar-cuts-drawdown-cheaply",
+   "kind": "options-strategy",
+   "claim": "A monthly 30-delta collar on SPY cuts the maximum drawdown by at least a third while keeping the Sharpe ratio within 0.10 of buy-and-hold.",
+   "origin": [
+    "cboe:CLL",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "max drawdown ratio and Sharpe difference",
+    "null": "descriptive thresholds (no sampling null)",
+    "procedure": "every 21 trading days: hold SPY, sell 30-delta call, buy 30-delta put, both priced at VIX",
+    "data": "daily-history-SPY, cboe-VIX-history, fred-DTB3",
+    "min_n": 100,
+    "pass": "MDD(collar) < 2/3 MDD(SPY) and Sharpe >= Sharpe(SPY) - 0.10",
+    "controls": "MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. A flat VIX under-prices the put, so the collar's cost is understated."
+   },
+   "experiments": [
+    "collar_overlay"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-70018c19"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-57",
+   "slug": "short-straddle-earns-the-vrp",
+   "kind": "options-strategy",
+   "claim": "Selling the monthly ATM SPY straddle priced at VIX earns a positive mean P&L (the variance risk premium in option form).",
+   "origin": [
+    "literature:vrp",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean monthly P&L as a share of notional",
+    "null": "mean P&L = 0; studentized block bootstrap",
+    "procedure": "every 21 trading days: sell ATM call and put priced at VIX, settle at |S_T - K|",
+    "data": "daily-history-SPY, cboe-VIX-history, fred-DTB3",
+    "min_n": 100,
+    "pass": "mean > 0, p < 0.05, both halves > 0",
+    "controls": "MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. ATM pricing at VIX is close to fair (VIX is roughly the ATM-ish 30-day IV), so this one is the least biased of the overlays."
+   },
+   "experiments": [
+    "short_straddle_model"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-13ef8afe"
+   ],
+   "notes": ""
   }
  ]
 }

@@ -98,7 +98,9 @@ class Archive:
 
     # -- bundles -----------------------------------------------------------
     def store(self, name: str, kind: str, rows: Iterable[dict], recipe: str, tags: Iterable[str] = (),
-              parked_reason: str = "", schema: str = "", actor: str = "mandel") -> BundleEntry:
+              parked_reason: str = "", schema: str = "", actor: str = "mandel", in_git: Optional[bool] = None) -> BundleEntry:
+        """``in_git=False`` keeps a bundle on local disk only (daily raw captures that would bloat the repo);
+        the INDEX entry and recipe are still committed, so the bundle can be rebuilt or synced from the server."""
         if kind not in ("data", "results", "knowledge"):
             raise ValueError("kind must be data, results or knowledge")
         safe = "".join(c if c.isalnum() or c in "-_." else "-" for c in name)
@@ -116,7 +118,7 @@ class Archive:
             size = path.stat().st_size
             entry = BundleEntry(name=safe, kind=kind, path=self._rel(path), created_at=utcnow_iso(),
                                 rows=n, bytes=size, sha256=h.hexdigest(), tags=sorted(set(tags)), recipe=recipe,
-                                parked_reason=parked_reason, in_git=size <= INLINE_LIMIT_BYTES, schema=schema)
+                                parked_reason=parked_reason, in_git=(size <= INLINE_LIMIT_BYTES) if in_git is None else bool(in_git), schema=schema)
             self._reload_index()
             self._entries[safe] = entry
             self._flush()

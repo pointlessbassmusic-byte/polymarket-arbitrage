@@ -287,6 +287,908 @@
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {symbol, t, close, volume}"
+  },
+  "cboe-VIX-history": {
+   "name": "cboe-VIX-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VIX-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:19.235864+00:00",
+   "rows": 9293,
+   "bytes": 189499,
+   "sha256": "a545c21392472f2bbe18c2775d722a529c4dffb6323a4c0331747c34c7d5a079",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VIX9D-history": {
+   "name": "cboe-VIX9D-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VIX9D-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:19.479551+00:00",
+   "rows": 3967,
+   "bytes": 82460,
+   "sha256": "6cda49e5e93df2da6358613edf6f57c72df47b7e2c8d9281ad8386d684ef32dd",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX9D_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VIX3M-history": {
+   "name": "cboe-VIX3M-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VIX3M-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:20.179457+00:00",
+   "rows": 4293,
+   "bytes": 86546,
+   "sha256": "2b41fa68bf9b346e0de5fc710cd96d83f3d7ddce2120c56ebd6e4f509cc08bd6",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX3M_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VIX6M-history": {
+   "name": "cboe-VIX6M-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VIX6M-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:20.905575+00:00",
+   "rows": 4725,
+   "bytes": 92910,
+   "sha256": "f3c26321cd1063b5efa292422ce301f4745eda72006ceae059bda09433060b78",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX6M_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VIX1D-history": {
+   "name": "cboe-VIX1D-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VIX1D-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:21.584968+00:00",
+   "rows": 1108,
+   "bytes": 23446,
+   "sha256": "266c074075c8eaf604de2eb41089cc0d17d3f46174e4f2fb20bae782704659a5",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX1D_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VVIX-history": {
+   "name": "cboe-VVIX-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VVIX-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:22.328119+00:00",
+   "rows": 5124,
+   "bytes": 61058,
+   "sha256": "7bb5174be001b0944bca9ef4d4c3ee3b39e6b942633158daac1e95831b8dd1d4",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VVIX_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-SKEW-history": {
+   "name": "cboe-SKEW-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-SKEW-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:23.147892+00:00",
+   "rows": 9247,
+   "bytes": 106745,
+   "sha256": "abb2035a475589fd4e7cbe5b904866e8e2751769a750c370361ae3736589e18a",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/SKEW_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-GVZ-history": {
+   "name": "cboe-GVZ-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-GVZ-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:23.691420+00:00",
+   "rows": 4291,
+   "bytes": 48388,
+   "sha256": "269cdcc0a583c956735e893ac093c588184abfa508df2dc93e6bd2b8e4a1ef56",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/GVZ_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-OVX-history": {
+   "name": "cboe-OVX-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-OVX-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:24.415694+00:00",
+   "rows": 4291,
+   "bytes": 49811,
+   "sha256": "343592dd53521dc772ffbef8e9f25ef8acf7275f51bd10951f0ceeb2af2a17c8",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/OVX_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VXN-history": {
+   "name": "cboe-VXN-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VXN-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:25.162486+00:00",
+   "rows": 4299,
+   "bytes": 88900,
+   "sha256": "5a8213d40952966edc86d1ad58aa74fea5cf9922ea049213f60a786b8d970860",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VXN_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-RVX-history": {
+   "name": "cboe-RVX-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-RVX-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:25.794054+00:00",
+   "rows": 4290,
+   "bytes": 88807,
+   "sha256": "ef72500b71e50006745265870bd57e057ebb1bd70faec7b4e469c1886f860124",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/RVX_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VXD-history": {
+   "name": "cboe-VXD-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VXD-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:26.522758+00:00",
+   "rows": 4293,
+   "bytes": 88381,
+   "sha256": "b974bef4dd0e96b7a285ef8112b27c387eaef4d90894b0c9a1286737a74171dd",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VXD_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VXTLT-history": {
+   "name": "cboe-VXTLT-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VXTLT-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:27.249810+00:00",
+   "rows": 5719,
+   "bytes": 63844,
+   "sha256": "b4c4a16f98d86191ad556c6051b7a644427a4d8e23c0a613182d949117c3b74e",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VXTLT_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VXEEM-history": {
+   "name": "cboe-VXEEM-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VXEEM-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:27.937247+00:00",
+   "rows": 3914,
+   "bytes": 82055,
+   "sha256": "11051c66b892b013b31f0f55293eec3cd5246f036085b587ef3db4df5a7ff29d",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VXEEM_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-COR1M-history": {
+   "name": "cboe-COR1M-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-COR1M-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:28.709253+00:00",
+   "rows": 5227,
+   "bytes": 110573,
+   "sha256": "03dc8bf0243d25d7b523053b0c8a20564b2467c9faff2f6f2b4269ff95897e9d",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/COR1M_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-DSPX-history": {
+   "name": "cboe-DSPX-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-DSPX-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:29.274785+00:00",
+   "rows": 3098,
+   "bytes": 35311,
+   "sha256": "954b7ef172af8842f07511e4232e6a7df8234f72701328446e7352334c64d6a2",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/DSPX_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VXAPL-history": {
+   "name": "cboe-VXAPL-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VXAPL-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:29.994512+00:00",
+   "rows": 3960,
+   "bytes": 84188,
+   "sha256": "9e431f1abc6344e650f7860651c051e03a31401d257a7b0c3c77f21d037fa7f4",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VXAPL_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VXGOG-history": {
+   "name": "cboe-VXGOG-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VXGOG-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:30.737848+00:00",
+   "rows": 3960,
+   "bytes": 84035,
+   "sha256": "7b4dcaf67529666e310b63ee0a25c10a90f4360eb00effe7cf438baebfae97d4",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VXGOG_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "cboe-VXAZN-history": {
+   "name": "cboe-VXAZN-history",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-VXAZN-history.jsonl.gz",
+   "created_at": "2026-10-14T11:10:31.398267+00:00",
+   "rows": 3960,
+   "bytes": 85361,
+   "sha256": "f3ba8102dc7d86f04a6e15015de1a850925ede34515e18f0546212ac801f6ab5",
+   "tags": [
+    "cboe",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VXAZN_History.csv",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, open?, high?, low?, close}"
+  },
+  "fred-DTB3": {
+   "name": "fred-DTB3",
+   "kind": "data",
+   "path": "mandel/archive/data/fred-DTB3.jsonl.gz",
+   "created_at": "2026-10-14T11:10:32.629784+00:00",
+   "rows": 18185,
+   "bytes": 180144,
+   "sha256": "2c508e148118bacdf2977e54f5148390cf901b3b9abfa9435bec813267cdb42e",
+   "tags": [
+    "fred",
+    "history",
+    "rates"
+   ],
+   "recipe": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, value}"
+  },
+  "fred-DGS10": {
+   "name": "fred-DGS10",
+   "kind": "data",
+   "path": "mandel/archive/data/fred-DGS10.jsonl.gz",
+   "created_at": "2026-10-14T11:10:32.996916+00:00",
+   "rows": 16179,
+   "bytes": 163722,
+   "sha256": "031143860bc3469881a90a6ae9bf2245de8864d7fd7f3212ac18a26c6af630fd",
+   "tags": [
+    "fred",
+    "history",
+    "rates"
+   ],
+   "recipe": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, value}"
+  },
+  "fred-DGS2": {
+   "name": "fred-DGS2",
+   "kind": "data",
+   "path": "mandel/archive/data/fred-DGS2.jsonl.gz",
+   "created_at": "2026-10-14T11:10:33.707589+00:00",
+   "rows": 12587,
+   "bytes": 127060,
+   "sha256": "5ae6fdc7138a0a13883ead076e942c12e16d5625a7ce12f006cef3387209509c",
+   "tags": [
+    "fred",
+    "history",
+    "rates"
+   ],
+   "recipe": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS2",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, value}"
+  },
+  "fred-DFF": {
+   "name": "fred-DFF",
+   "kind": "data",
+   "path": "mandel/archive/data/fred-DFF.jsonl.gz",
+   "created_at": "2026-10-14T11:10:34.533588+00:00",
+   "rows": 26402,
+   "bytes": 238081,
+   "sha256": "ddb6e4f3b0f84c7750bfa3f53b69d4ee69706a35d5abeb0e2e52c73fc0605e76",
+   "tags": [
+    "fred",
+    "history",
+    "rates"
+   ],
+   "recipe": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFF",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, value}"
+  },
+  "deribit-dvol-BTC-history": {
+   "name": "deribit-dvol-BTC-history",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-dvol-BTC-history.jsonl.gz",
+   "created_at": "2026-10-14T11:12:21.886036+00:00",
+   "rows": 2031,
+   "bytes": 47724,
+   "sha256": "8dc666b30c38f2201f2e636e814761ab30e8d280a09d62c0eb52cc3da17b9b39",
+   "tags": [
+    "crypto",
+    "history",
+    "volatility"
+   ],
+   "recipe": "deribit /public/get_volatility_index_data currency=BTC resolution=86400 paginated",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {ts_ms, open, high, low, close}"
+  },
+  "deribit-dvol-ETH-history": {
+   "name": "deribit-dvol-ETH-history",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-dvol-ETH-history.jsonl.gz",
+   "created_at": "2026-10-14T11:12:25.483059+00:00",
+   "rows": 2031,
+   "bytes": 48122,
+   "sha256": "36467930741acb9f738fc1fa283f29ff9e13a6def465aa2db1c2b8b5ba67991e",
+   "tags": [
+    "crypto",
+    "history",
+    "volatility"
+   ],
+   "recipe": "deribit /public/get_volatility_index_data currency=ETH resolution=86400 paginated",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {ts_ms, open, high, low, close}"
+  },
+  "options-chain-SPY-2026-10-14": {
+   "name": "options-chain-SPY-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-SPY-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:27.476531+00:00",
+   "rows": 13470,
+   "bytes": 666761,
+   "sha256": "fe8e05cde2a14581e4cfba1620d8e4cde9a8086eef27199b7989e3f403966f64",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/SPY.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-QQQ-2026-10-14": {
+   "name": "options-chain-QQQ-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-QQQ-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:28.564126+00:00",
+   "rows": 11406,
+   "bytes": 568936,
+   "sha256": "8fb495c5659738f4ede33d09147efe8e9e6d00ced6b1c0eff568b339844f1a13",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/QQQ.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-IWM-2026-10-14": {
+   "name": "options-chain-IWM-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-IWM-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:29.274714+00:00",
+   "rows": 5922,
+   "bytes": 281343,
+   "sha256": "d2297b89e3b7e7f243c42a02e65d73b095189a6a966663a1e0b368af749c3750",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/IWM.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-TLT-2026-10-14": {
+   "name": "options-chain-TLT-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-TLT-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:30.116158+00:00",
+   "rows": 3022,
+   "bytes": 154674,
+   "sha256": "5c049dd8943dd779c2e65f3d33231ebd4f461ebef48d6f6f7eb46e585c7ec02a",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/TLT.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-GLD-2026-10-14": {
+   "name": "options-chain-GLD-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-GLD-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:31.420976+00:00",
+   "rows": 8104,
+   "bytes": 375140,
+   "sha256": "27ebe4d80e4761b48417a88396976d5361121f49f826acf6146e7e36a00e3167",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/GLD.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-SLV-2026-10-14": {
+   "name": "options-chain-SLV-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-SLV-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:32.114384+00:00",
+   "rows": 4662,
+   "bytes": 234857,
+   "sha256": "f0b747f8d13ac49b912132b9fa00c109637c781d88c8e574948ecacd22b7ea3d",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/SLV.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-USO-2026-10-14": {
+   "name": "options-chain-USO-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-USO-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:33.276955+00:00",
+   "rows": 6138,
+   "bytes": 311093,
+   "sha256": "538e8cd25c0b68ce0a8296ae2517995af351625827db2cd7d76ab77c87eae6ee",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/USO.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-IBIT-2026-10-14": {
+   "name": "options-chain-IBIT-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-IBIT-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:34.036980+00:00",
+   "rows": 3246,
+   "bytes": 161983,
+   "sha256": "3f5655a7e12b023a06f549595cc7f634d0b12ae55fe2e6ae7ccfed5c3b9ca458",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/IBIT.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-ETHA-2026-10-14": {
+   "name": "options-chain-ETHA-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-ETHA-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:34.902922+00:00",
+   "rows": 940,
+   "bytes": 47503,
+   "sha256": "11437ee48452eb0fc27ccb97a6978cbd53fcff5e1e259a52af3e0d7246467625",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/ETHA.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-TSLA-2026-10-14": {
+   "name": "options-chain-TSLA-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-TSLA-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:36.250010+00:00",
+   "rows": 4940,
+   "bytes": 258086,
+   "sha256": "f938af7640224520e3606c0691c2858554223d064ce5fa63047c4db3f46d64a0",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/TSLA.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-NVDA-2026-10-14": {
+   "name": "options-chain-NVDA-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-NVDA-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:37.067187+00:00",
+   "rows": 4342,
+   "bytes": 223206,
+   "sha256": "1e1936f24f543e3762b253b2400b17aa2ba91bbb1d146538e0f1ae432227dc41",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/NVDA.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-AAPL-2026-10-14": {
+   "name": "options-chain-AAPL-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-AAPL-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:38.106003+00:00",
+   "rows": 3584,
+   "bytes": 187555,
+   "sha256": "ecf47c346d1416cfd92caf4dd8b3fd9e5d298a7005b71397262299ef4f29a6e6",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/AAPL.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-SPX-2026-10-14": {
+   "name": "options-chain-SPX-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-SPX-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:41.362253+00:00",
+   "rows": 29918,
+   "bytes": 1545256,
+   "sha256": "af84865f8deefe5c4d4b4a63df606a6ac19c58713070eaac2bda1be8e5d01dae",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/_SPX.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-chain-VIX-2026-10-14": {
+   "name": "options-chain-VIX-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-chain-VIX-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:41.725343+00:00",
+   "rows": 1520,
+   "bytes": 74622,
+   "sha256": "af21a35ee6d59ec3eb7e502eac6b1353d9014d959db39ac857127a528076d4b9",
+   "tags": [
+    "2026-10-14",
+    "chain",
+    "options"
+   ],
+   "recipe": "https://cdn.cboe.com/api/global/delayed_quotes/options/_VIX.json (delayed 15 min; raw kept on local disk, not in git)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = compact CBOE option row"
+  },
+  "options-surface-2026-10-14": {
+   "name": "options-surface-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/options-surface-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:41.746050+00:00",
+   "rows": 394,
+   "bytes": 33845,
+   "sha256": "fb53ba184c1ba9d8f41c7d76bae1d14eb0f7677da504b9fe8d554fbe4c30963f",
+   "tags": [
+    "2026-10-14",
+    "options",
+    "surface"
+   ],
+   "recipe": "mandel.data.options.surface_summary over the day's CBOE chains",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, expiry, dte, underlying, atm_iv, iv_call25d, iv_put25d, skew25, straddle_mid, implied_move_pct, oi/vol by side, pc ratios}"
+  },
+  "deribit-book-BTC-2026-10-14": {
+   "name": "deribit-book-BTC-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-book-BTC-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:42.287211+00:00",
+   "rows": 890,
+   "bytes": 30057,
+   "sha256": "3d18db74752e7249f5676e77e5c4b09ff025351c27054090a81038289e327c38",
+   "tags": [
+    "2026-10-14",
+    "crypto",
+    "options"
+   ],
+   "recipe": "deribit /public/get_book_summary_by_currency currency=BTC kind=option (raw kept on local disk)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {instrument, expiry, strike, type, bid, ask, mark, mark_iv, oi, volume, underlying}"
+  },
+  "deribit-surface-BTC-2026-10-14": {
+   "name": "deribit-surface-BTC-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-surface-BTC-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:42.293181+00:00",
+   "rows": 11,
+   "bytes": 585,
+   "sha256": "a0488393d1ca851c76bac041aa9a1302fe539f5019820a618bb9cf10edee8dcc",
+   "tags": [
+    "2026-10-14",
+    "crypto",
+    "options",
+    "surface"
+   ],
+   "recipe": "per-expiry ATM mark IV from the day's Deribit book",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {currency, expiry, underlying, atm_strike, atm_mark_iv, oi_total, n_contracts}"
+  },
+  "deribit-book-ETH-2026-10-14": {
+   "name": "deribit-book-ETH-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-book-ETH-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:43.142727+00:00",
+   "rows": 754,
+   "bytes": 23865,
+   "sha256": "082247b5b91863ebd7085158da6f1b1c840265492c21ee9ff387de34c5d3f3fa",
+   "tags": [
+    "2026-10-14",
+    "crypto",
+    "options"
+   ],
+   "recipe": "deribit /public/get_book_summary_by_currency currency=ETH kind=option (raw kept on local disk)",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {instrument, expiry, strike, type, bid, ask, mark, mark_iv, oi, volume, underlying}"
+  },
+  "deribit-surface-ETH-2026-10-14": {
+   "name": "deribit-surface-ETH-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-surface-ETH-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T11:12:43.150963+00:00",
+   "rows": 11,
+   "bytes": 554,
+   "sha256": "ddd9ea93547e26fec47e3bd6aadc71da5b8bcf8fd2fa36478f4575187b56ad55",
+   "tags": [
+    "2026-10-14",
+    "crypto",
+    "options",
+    "surface"
+   ],
+   "recipe": "per-expiry ATM mark IV from the day's Deribit book",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {currency, expiry, underlying, atm_strike, atm_mark_iv, oi_total, n_contracts}"
+  },
+  "daily-history-GLD": {
+   "name": "daily-history-GLD",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-GLD.jsonl.gz",
+   "created_at": "2026-10-14T11:16:46.755538+00:00",
+   "rows": 5509,
+   "bytes": 104568,
+   "sha256": "258cf14fe4919028ef507069f5b6a3305e36ac1d388982a17c43eef1a892e263",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/GLD?period1=0&period2=now&interval=1d (available_at = bar time + 24h)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
+  },
+  "daily-history-SLV": {
+   "name": "daily-history-SLV",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-SLV.jsonl.gz",
+   "created_at": "2026-10-14T11:16:48.215281+00:00",
+   "rows": 5147,
+   "bytes": 97461,
+   "sha256": "6324a870f4f2fd2ee996c407eafab2d45091c6cc9f66bab789aea1b8f27ae89b",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/SLV?period1=0&period2=now&interval=1d (available_at = bar time + 24h)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
+  },
+  "daily-history-TLT": {
+   "name": "daily-history-TLT",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-TLT.jsonl.gz",
+   "created_at": "2026-10-14T11:16:49.732915+00:00",
+   "rows": 6091,
+   "bytes": 113566,
+   "sha256": "7a55f0846f6d377cebbfce432b1e34cf52998cf232ce3324fcb95ee5d2f621c9",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/TLT?period1=0&period2=now&interval=1d (available_at = bar time + 24h)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
+  },
+  "daily-history-IWM": {
+   "name": "daily-history-IWM",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-IWM.jsonl.gz",
+   "created_at": "2026-10-14T11:16:51.290397+00:00",
+   "rows": 6634,
+   "bytes": 127072,
+   "sha256": "42acb2a7965c5c046aaa9634bdcd1ea92768dbb33d25133c7b3cabdbd885a4e6",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/IWM?period1=0&period2=now&interval=1d (available_at = bar time + 24h)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
+  },
+  "daily-history-USO": {
+   "name": "daily-history-USO",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-USO.jsonl.gz",
+   "created_at": "2026-10-14T11:16:52.638310+00:00",
+   "rows": 5160,
+   "bytes": 97709,
+   "sha256": "2d139817f3b87dcadb56dbcec3ea72180e843e8eb402b611da500fae622b744f",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/USO?period1=0&period2=now&interval=1d (available_at = bar time + 24h)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
+  },
+  "daily-history-IBIT": {
+   "name": "daily-history-IBIT",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-IBIT.jsonl.gz",
+   "created_at": "2026-10-14T11:16:54.026695+00:00",
+   "rows": 691,
+   "bytes": 13954,
+   "sha256": "eabdf7b1b0413551bd1aca2f444031320c1cefbc530e321488f42945c622ee3b",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/IBIT?period1=0&period2=now&interval=1d (available_at = bar time + 24h)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
   }
  }
 }

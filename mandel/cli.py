@@ -412,6 +412,15 @@ def cmd_social_fetch(args) -> int:
     return 0
 
 
+def cmd_options_fetch(args) -> int:
+    """Capture option chains + surfaces (daily) or the volatility / rates / DVOL histories (--history)."""
+    from mandel.data.options import collect_options_daily, collect_options_history
+    from mandel.data.store import ObservationStore
+    store = ObservationStore(Archive(ledger=Ledger()))
+    _print(collect_options_history(store) if args.history else collect_options_daily(store, capture_day=args.day))
+    return 0
+
+
 def cmd_archive(args) -> int:
     a = Archive()
     for e in a.entries(kind=args.kind):
@@ -528,6 +537,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("social-fetch", cmd_social_fetch, "Capture Reddit, StockTwits, crypto sentiment, daily prices, House PTR index (and X with X_BEARER_TOKEN) into dated bundles.")
     p.add_argument("--day", help="capture day label (default today, UTC)")
     p.add_argument("--history", action="store_true", help="instead: one-off deep history (full Fear & Greed series, full daily closes for BTC-USD, ETH-USD, SPY, QQQ)")
+    p = add("options-fetch", cmd_options_fetch, "Capture CBOE option chains (raw on disk, surface committed) and Deribit books; --history pulls VIX-family, FRED and DVOL histories.")
+    p.add_argument("--day"); p.add_argument("--history", action="store_true")
     p = add("archive", cmd_archive, "List cold-storage bundles (data, results, knowledge) and their rebuild recipes.")
     p.add_argument("--kind"); p.add_argument("-v", "--verbose", action="store_true")
     add("ingest", cmd_ingest, "Turn knowledge/*.md adopt / skeptical / design bullets into candidate insights (idempotent).")

@@ -168,7 +168,7 @@ def yahoo_history(symbol: str, client: httpx.Client, throttle: Throttle) -> list
         return []
 
 
-def collect_history(store: ObservationStore, symbols: Iterable[str] = ("BTC-USD", "ETH-USD", "SPY", "QQQ")) -> dict:
+def collect_history(store: ObservationStore, symbols: Iterable[str] = ("BTC-USD", "ETH-USD", "SPY", "QQQ", "GLD", "SLV", "TLT", "IWM", "USO", "IBIT")) -> dict:
     """One-off deep history: full Fear & Greed series (since 2018) and full daily closes for a few anchors.
     These are the long series the sentiment harnesses need; the daily capture only adds the recent tail."""
     cap = now_iso()
