@@ -188,6 +188,50 @@ def harness_controls(archive: Archive, ledger: Ledger, n_markets: int = 200) -> 
         f"coin {coin}, oracle {oracle}, market {mkt}: scoring path {'intact' if ok else 'BROKEN'}"
 
 
+def harness_longshot(archive: Archive, horizon: int = 7, hi_p: float = 0.10, n_boot: int = 2000, seed: int = 0) -> tuple[dict, int, str, str]:
+    """T-02: in the under-0.10 bucket at the 7d horizon, mean(outcome - price) < 0 (classic longshot bias:
+    cheap YES over-priced). Bootstrap 95% interval; the upper bound must be below zero."""
+    outcomes = resolved_outcomes(archive.load("polymarket-closed-markets"))
+    rows = price_at_horizons(archive.load("polymarket-price-history-daily"), outcomes, horizons_days=(horizon,))[horizon]
+    sel = np.array([o - p for p, o, _ in rows if p < hi_p])
+    if sel.size < 100:
+        return {"n": int(sel.size)}, int(sel.size), "inconclusive", f"only {sel.size} observations under {hi_p}"
+    rng = np.random.default_rng(seed)
+    boots = rng.choice(sel, size=(n_boot, sel.size), replace=True).mean(axis=1)
+    lo, hi = (float(x) for x in np.quantile(boots, [0.025, 0.975]))
+    stat = {"n": int(sel.size), "horizon_days": horizon, "bucket_hi": hi_p, "mean_error": float(sel.mean()), "ci": [lo, hi],
+            "yes_events": int(sum(1 for p, o, _ in rows if p < hi_p and o == 1)), "mean_price": float(np.mean([p for p, o, _ in rows if p < hi_p]))}
+    verdict = "supported" if hi < 0 else "not_supported"
+    return stat, int(sel.size), verdict, f"<{hi_p} bucket at {horizon}d: mean(outcome-price) {sel.mean():+.4f}, 95% [{lo:+.4f}, {hi:+.4f}], {stat['yes_events']} YES events of {sel.size}"
+
+
+def harness_horizon_monotone(archive: Archive, horizons=(1, 3, 7, 30, 90)) -> tuple[dict, int, str, str]:
+    """T-13: Brier skill vs coin is non-increasing as the horizon lengthens (the market learns as time passes).
+    Each adjacent pair must satisfy skill(shorter) >= skill(longer) - 0.01 (a 1-point tolerance for noise)."""
+    rep = market_calibration(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"), horizons_days=horizons)
+    skills = {h: rep["horizons"][h]["skill_vs_coin"] for h in horizons if h in rep["horizons"] and rep["horizons"][h].get("n", 0) >= 30}
+    hs = sorted(skills)
+    n = min((rep["horizons"][h]["n"] for h in hs), default=0)
+    if len(hs) < 3:
+        return {"skills": skills}, n, "inconclusive", "fewer than 3 horizons with 30+ observations"
+    ok = all(skills[hs[i]] >= skills[hs[i + 1]] - 0.01 for i in range(len(hs) - 1))
+    return {"skills": {str(h): skills[h] for h in hs}, "monotone": ok}, n, "supported" if ok else "not_supported", \
+        "skill by horizon " + ", ".join(f"{h}d {skills[h]:.3f}" for h in hs) + (" (non-increasing)" if ok else " (not monotone)")
+
+
+def harness_point_in_time(archive: Archive) -> tuple[dict, int, str, str]:
+    """T-19: does honouring available_at change a verdict? Runs the Fear & Greed harness with the naive join
+    (lag 0) and the honest one (lag 1) and compares verdicts and the sign of the fear-side effect."""
+    fng = list(archive.load("crypto-fear-greed-history")); px = list(archive.load("daily-history-BTC-USD"))
+    naive = fear_greed_forward_returns(fng, px, lag_days=0, n_boot=500)
+    honest = fear_greed_forward_returns(fng, px, lag_days=1, n_boot=500)
+    changed = naive["verdict"] != honest["verdict"] or (np.sign(naive.get("d_fear", 0)) != np.sign(honest.get("d_fear", 0)))
+    stat = {"naive": {k: naive.get(k) for k in ("verdict", "d_fear", "d_greed", "p_fear", "p_greed")},
+            "honest": {k: honest.get(k) for k in ("verdict", "d_fear", "d_greed", "p_fear", "p_greed")}, "changed": bool(changed)}
+    return stat, int(honest.get("n", 0)), "supported" if changed else "not_supported", \
+        f"naive {naive['verdict']} (d_fear {naive.get('d_fear', float('nan')):+.4f}) vs point-in-time {honest['verdict']} (d_fear {honest.get('d_fear', float('nan')):+.4f}): {'verdict or sign changed' if changed else 'no change on this harness'}"
+
+
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     names = sorted(e.name for e in archive.entries())
     return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
@@ -223,6 +267,9 @@ HARNESSES: dict[str, Callable] = {
     "controls": harness_controls,
     "social_attention": harness_social_attention,
     "fear_greed_contrarian": harness_fear_greed,
+    "longshot_bias": harness_longshot,
+    "horizon_monotone": harness_horizon_monotone,
+    "point_in_time_check": harness_point_in_time,
 }
 BUNDLES_NEEDED = {
     "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -233,6 +280,9 @@ BUNDLES_NEEDED = {
     "dsr_pbo_harness": ["polymarket-price-history-daily"], "controls": ["polymarket-price-history-daily", "polymarket-closed-markets"],
     "social_attention": ["social-derived-*", "social-prices-*"],
     "fear_greed_contrarian": ["crypto-fear-greed-history", "daily-history-BTC-USD"],
+    "longshot_bias": ["polymarket-price-history-daily", "polymarket-closed-markets"],
+    "horizon_monotone": ["polymarket-price-history-daily", "polymarket-closed-markets"],
+    "point_in_time_check": ["crypto-fear-greed-history", "daily-history-BTC-USD"],
 }
 
 
@@ -295,4 +345,7 @@ def _null_for(name: str) -> str:
         "controls": "coin 0.25, oracle 0, market < coin on the same questions",
         "social_attention": "mentions permuted within ticker: Spearman rho with next-day |return| ~ 0",
         "fear_greed_contrarian": "Fear & Greed series circularly shifted against returns: conditional mean difference ~ 0",
+        "longshot_bias": "calibrated bucket: mean(outcome - price) = 0 (bootstrap 95% interval)",
+        "horizon_monotone": "skill flat across horizons",
+        "point_in_time_check": "naive and point-in-time runs give the same verdict and sign",
     }.get(name, "n/a")

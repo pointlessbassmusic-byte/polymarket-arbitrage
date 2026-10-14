@@ -6,16 +6,17 @@ what is not useful now is parked with a reason and a recipe to bring it back.*
 
 ## The one-paragraph version
 
-Forty-four theories drawn from the 21 sources, Mandel's own ideas, the repo's arbitrage
+Forty-five theories drawn from the 21 sources, Mandel's own ideas, the repo's arbitrage
 premise and the new social layer are written down as single falsifiable statements with
 their trial math (statistic, null, procedure, data, minimum sample, pass criterion,
 controls) in `theories/registry.json`. Eleven executable harnesses ran on real data pulled
 into the archive (2,100 resolved Polymarket markets, 62,362 daily prices, 300 order books,
 Kalshi settled markets and candles, one day of Reddit / StockTwits / crypto sentiment /
 House disclosures, and full daily histories for BTC, ETH, SPY, QQQ and the crypto Fear &
-Greed index). Six theories are supported, one is not supported but needs more snapshots,
-one is inconclusive until thirty capture days exist, six are untested because their harness
-is not written yet, twenty-two are blocked on a named missing input (mostly: children), and
+Greed index). Fourteen harnesses ran. Seven theories are supported, three are not supported
+(one of them, bundle arbitrage, is kept active because it needs more snapshots), one is
+inconclusive until thirty capture days exist, three are untested because their harness is
+not written yet, twenty-three are blocked on a named missing input (mostly: children), and
 eight are parked. The headline finding is negative in the useful way: Polymarket prices are
 well calibrated at every horizon, no structural bias exists to exploit, YES+NO bundles show
 no after-fee mispricing in the one snapshot, and a declared search of 21 simple momentum
@@ -38,21 +39,24 @@ edge to trade.
 | controls | T-11 | supported | coin 0.25, oracle 0, market 0.024 on the same 200 questions |
 | social_attention | T-38 | inconclusive | 1 of 30 capture days; runs daily and will turn into a verdict on its own |
 | fear_greed_contrarian | T-41 | not supported, parked | 3,166 aligned days; fear<=25 adds +0.0001 to 7d BTC log return (p 0.52, halves disagree); greed>=75 adds +0.023 (p 0.96) |
+| longshot_bias | T-02 | not supported | under-0.10 bucket at 7d: mean(outcome - price) +0.018, 95% [+0.002, +0.039], 8 YES events of 284: the classic over-pricing of cheap YES is absent; the sign points the other way |
+| horizon_monotone | T-13 | supported | skill 0.858 (1d), 0.855 (3d), 0.778 (7d), 0.719 (30d), 0.701 (90d): non-increasing with horizon |
+| point_in_time_check | T-19 | not supported | naive (lag 0) and honest (lag 1) Fear & Greed runs give the same verdict and sign; on this harness point-in-time discipline changed nothing (it is still enforced) |
 
-Two readings taken from the calibration table but not yet automated as verdicts:
-
-- **T-02 longshot bias.** The under-0.10 bucket holds three quarters of all observations
-  (mean price 0.008 to 0.014). It resolves YES at 0.010 (1d), 0.007 (3d), 0.028 (7d),
-  0.020 (30d), 0.019 (90d). At 7 days and beyond, cheap YES resolves slightly *more* often
-  than priced, the opposite of the classic longshot bias, but that is 5 to 8 YES events per
-  horizon. It is a lead, not a finding.
-- **T-13 skill rises toward resolution.** Skill is monotone in horizon (0.70 at 90d to 0.86
-  at 1d), as expected; the market learns as time passes.
+One lead, handled the only honest way. The under-0.10 bucket holds three quarters of all
+observations (mean price 0.008 to 0.014) and at 7 days and beyond it resolves YES slightly
+*more* often than priced (0.019 to 0.028 against 0.010 to 0.014). The bootstrap interval
+excludes zero, but it rests on eight YES events found while looking at the data. So the
+in-sample reading is recorded as not evidence, and the claim is pre-registered as **T-47**
+(cheap YES under-priced at 7d) to be tested only on markets that resolve after today,
+with horizon, bucket and pass criterion frozen now. One to two months of resolutions will
+decide it.
 
 ## Triage
 
 **Useful now (supported, feed the next cycle).** T-01 market calibration is the benchmark
-every child and every strategy must beat. T-10 and T-36 justify the gate's deflation
+every child and every strategy must beat, and T-13 says the benchmark gets harder as
+resolution nears. T-10 and T-36 justify the gate's deflation
 machinery with real numbers. T-06 and T-07 describe the structure of the price process and
 are inputs to any model of it. T-11 keeps the scoring path honest.
 
@@ -65,16 +69,15 @@ metaphor: no statistic proposed), T-26 (retrieval quality), T-34 (box-count dupl
 **Not supported but kept active.** T-04 bundle arbitrage needs repeated book snapshots to
 measure frequency and half-life; one snapshot cannot park it.
 
-**Untested, cheap harness pending.** T-02 (longshot bucket as a verdict), T-12 (calibration
-by volume quartile; fix the end-of-life volume leak first), T-13 (horizon monotonicity),
-T-19 (naive vs point-in-time run), T-31 (small MLP vs logistic regression, walk-forward),
+**Untested, cheap harness pending.** T-12 (calibration by volume quartile; fix the
+end-of-life volume leak first), T-31 (small MLP vs logistic regression, walk-forward),
 T-32 (low-rank structure across concurrent markets).
 
-**Blocked, with the blocker named.** 22 theories, in three families: those that need
+**Blocked, with the blocker named.** 23 theories, in three families: those that need
 registered children recording forecasts (T-14, T-15, T-25, T-37), those that need decided
 proposals (T-16, T-17, T-18, T-20, T-21, T-22, T-23, T-30), and those that need thirty days
 of social capture, a key, or an entity-matching table (T-05, T-27, T-28, T-39, T-40, T-42
-to T-46).
+to T-46), plus T-47 which waits for fresh resolutions.
 
 ## Data inventory (all in the archive, all in git, 4.6 MB)
 
@@ -115,13 +118,13 @@ Theories T-38 to T-46 state what would make it one, and the first harness
 Agents: two workflows (theory extraction, stopped after I wrote the registry directly
 because its merge step would have overwritten the ledgered one; social-source sweep,
 running at the time of writing) plus direct work. Wall time about 2.5 hours. The data pull
-was the slow part (rate limits), the experiments run in 12 seconds end to end.
+was the slow part (rate limits), the fourteen harnesses run in about 15 seconds end to end.
 
 ## What the next cycle should do, in order
 
 1. Run `social-fetch` and `experiment-run all` daily (the OPERATIONS.md timer now does)
    so T-38 and the other social theories turn into verdicts by mid-November.
-2. Write the six cheap pending harnesses (T-02, T-12, T-13, T-19, T-31, T-32); each is an
-   afternoon of numpy against bundles that already exist.
+2. Write the three cheap pending harnesses (T-12, T-31, T-32); each is an afternoon of
+   numpy against bundles that already exist.
 3. Take a second and third book snapshot a few days apart to settle T-04.
 4. Meet the children (MANDEL.md §5); that unblocks eleven theories at once.

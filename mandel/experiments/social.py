@@ -107,25 +107,27 @@ def attention_vs_abs_return(derived_rows: Iterable[dict], price_rows: Iterable[d
 
 
 def fear_greed_forward_returns(fng_rows: Iterable[dict], price_rows: Iterable[dict], symbol: str = "BTC-USD", horizon_days: int = 7,
-                               low: int = 25, high: int = 75, n_boot: int = 2000, seed: int = 0, min_extreme: int = 30) -> dict:
+                               low: int = 25, high: int = 75, n_boot: int = 2000, seed: int = 0, min_extreme: int = 30, lag_days: int = 1) -> dict:
+    """``lag_days`` is the availability lag: 1 (default) means the index for day d is first usable at d+1, so the
+    forward window starts at close(d+1). 0 is the naive join that uses the index on the day it describes."""
     closes = daily_closes(price_rows).get(symbol, {})
     days = sorted(closes)
     idx = {d: i for i, d in enumerate(days)}
     fng = {}
     for r in fng_rows:
         fng[_day(r["observed_at"])] = float(r["value"]["value"])
-    # align: index for day d (usable from d+1) -> forward return from close(d+1) to close(d+1+h)
+    # align: index for day d (usable from d+lag) -> forward return from close(d+lag) to close(d+lag+h)
     f, fwd = [], []
     for d, val in sorted(fng.items()):
         i = idx.get(d)
-        if i is None or i + 1 + horizon_days >= len(days):
+        if i is None or i + lag_days + horizon_days >= len(days):
             continue
-        c0, c1 = closes[days[i + 1]], closes[days[i + 1 + horizon_days]]
+        c0, c1 = closes[days[i + lag_days]], closes[days[i + lag_days + horizon_days]]
         if c0 > 0 and c1 > 0:
             f.append(val); fwd.append(math.log(c1 / c0))
     f = np.array(f); fwd = np.array(fwd)
     n = len(f)
-    out = {"n": n, "horizon_days": horizon_days, "low": low, "high": high, "symbol": symbol}
+    out = {"n": n, "horizon_days": horizon_days, "low": low, "high": high, "symbol": symbol, "lag_days": lag_days}
     if n < 200:
         out.update({"verdict": "inconclusive", "reason": f"only {n} aligned days"}); return out
     fear = f <= low; greed = f >= high

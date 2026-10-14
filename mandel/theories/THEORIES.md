@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `7929f84985d49541`). 44 theories. supported 6, not_supported 1, inconclusive 1, untested 6, blocked 22, parked 8.
+Rendered from `registry.json` (hash `56f081ba23619bc7`). 45 theories. supported 7, not_supported 3, inconclusive 1, untested 3, blocked 23, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (6)
+## Supported (7)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -77,6 +77,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: controls
 - result X-aa7f417a: supported — coin 0.25, oracle 0.0, market 0.024331208750000007: scoring path intact
 
+### T-13 · skill-rises-toward-resolution
+
+**Claim.** Market skill vs coin increases monotonically as the horizon shortens (90d -> 1d).
+
+- kind: market-structure · origin: adj:A5, src:01
+- statistic: skill per horizon from market_calibration
+- null: flat skill across horizons
+- procedure: read the per-horizon table
+- data: same as T-01 · min n: 300
+- pass: skill(1d) > skill(7d) > skill(30d) > skill(90d)
+- controls: survivorship: only markets alive at each horizon
+- harness: horizon_monotone
+- result X-b7b7c690: supported — skill by horizon 1d 0.858, 3d 0.855, 7d 0.778, 30d 0.719, 90d 0.701 (non-increasing)
+- note: automated as harness horizon_monotone (1-point tolerance). Reading 2026-10-14: skill 0.70 (90d), 0.72 (30d), 0.78 (7d), 0.86 (3d), 0.86 (1d): monotone as claimed; the 1d/3d tie is within noise.
+
 ### T-36 · tuned-indicator-bot-fails-out-of-sample
 
 **Claim.** An indicator bot tuned on backtests has negative out-of-sample Sharpe on Polymarket prices.
@@ -92,7 +107,22 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-cd5674d2: supported — best of 21 momentum rules: Sharpe -0.031, DSR 0.00, PBO 0.90
 - note: the dsr_pbo verdict (overfit) is the same statement from the other side
 
-## Not Supported (1)
+## Not Supported (3)
+
+### T-02 · longshot-bias
+
+**Claim.** Low-probability YES contracts (price < 0.10) resolve YES less often than their price implies (mean outcome - price < 0 in that bucket).
+
+- kind: market-structure · origin: src:11, adj:A5
+- statistic: mean(outcome - price) in the <0.10 bucket with bootstrap 95% interval
+- null: zero mean error (calibrated)
+- procedure: calibration table by price bucket from market_calibration's statistic
+- data: same as T-01 · min n: 300
+- pass: upper interval bound < 0
+- controls: bucket chosen before looking; horizon fixed at 7d
+- harness: longshot_bias
+- result X-59df1d8a: not_supported — <0.1 bucket at 7d: mean(outcome-price) +0.0184, 95% [+0.0022, +0.0388], 8 YES events of 284
+- note: sub-claim read from the market_calibration calibration table; automated as harness longshot_bias (7d, <0.10, bootstrap interval). Reading 2026-10-14: the <0.10 bucket (mean price 0.008-0.014) resolves YES at 0.010 (1d), 0.007 (3d), 0.028 (7d), 0.020 (30d), 0.019 (90d): at 7d+ slightly MORE often than priced, the reverse of the classic longshot bias, on 5-8 YES events per horizon. A lead, not a finding.
 
 ### T-04 · yes-no-bundle-arbitrage-exists
 
@@ -108,6 +138,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: bundle_arb_scan
 - result X-8ca82b68: not_supported — 0 after-fee bundle mispricings in 268 markets (one snapshot)
 - note: one snapshot so far; the claim needs repeated snapshots (half-life) before parking
+
+### T-19 · point-in-time-changes-a-verdict
+
+**Claim.** Reconstructing inputs as of decision time (available_at) changes at least one backtest verdict relative to the naive join.
+
+- kind: engine · origin: mandel:idea-1, src:13, adj:A5
+- statistic: number of verdicts that differ between naive and point-in-time runs
+- null: no difference
+- procedure: run each harness twice: naive and PIT
+- data: any bitemporal bundle (social, history) · min n: 1
+- pass: >= 1 verdict differs
+- controls: same seeds
+- harness: point_in_time_check
+- result X-95aa94c7: not_supported — naive not_supported (d_fear +0.0003) vs point-in-time not_supported (d_fear +0.0001): no change on this harness
+- note: harness point_in_time_check runs the Fear & Greed test naive (lag 0) and honest (lag 1) and asks whether the verdict or sign changes; one harness only so far
 
 ## Inconclusive (1)
 
@@ -126,20 +171,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-95f1d3d2: inconclusive — 1/30 collection days, 2 usable ticker-days
 - note: runs daily; inconclusive until 30 capture days
 
-## Untested (6)
-
-### T-02 · longshot-bias
-
-**Claim.** Low-probability YES contracts (price < 0.10) resolve YES less often than their price implies (mean outcome - price < 0 in that bucket).
-
-- kind: market-structure · origin: src:11, adj:A5
-- statistic: mean(outcome - price) in the <0.10 bucket with bootstrap 95% interval
-- null: zero mean error (calibrated)
-- procedure: calibration table by price bucket from market_calibration's statistic
-- data: same as T-01 · min n: 300
-- pass: upper interval bound < 0
-- controls: bucket chosen before looking; horizon fixed at 7d
-- note: sub-claim read from the market_calibration calibration table; not automated as a verdict yet. Reading 2026-10-14: the <0.10 bucket (mean price 0.008-0.014) resolves YES at 0.010 (1d), 0.007 (3d), 0.028 (7d), 0.020 (30d), 0.019 (90d): at 7d+ slightly MORE often than priced, the reverse of the classic longshot bias, on 5-8 YES events per horizon. A lead, not a finding.
+## Untested (3)
 
 ### T-12 · volume-improves-calibration
 
@@ -153,32 +185,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: monotone increase, top-bottom gap interval excludes 0
 - controls: volume is end-of-life volume (not point in time) - a known leak to fix before trusting
 - note: harness not yet written: calibration_by_volume
-
-### T-13 · skill-rises-toward-resolution
-
-**Claim.** Market skill vs coin increases monotonically as the horizon shortens (90d -> 1d).
-
-- kind: market-structure · origin: adj:A5, src:01
-- statistic: skill per horizon from market_calibration
-- null: flat skill across horizons
-- procedure: read the per-horizon table
-- data: same as T-01 · min n: 300
-- pass: skill(1d) > skill(7d) > skill(30d) > skill(90d)
-- controls: survivorship: only markets alive at each horizon
-- note: read from the market_calibration statistic. Reading 2026-10-14: skill 0.70 (90d), 0.72 (30d), 0.78 (7d), 0.86 (3d), 0.86 (1d): monotone as claimed; the 1d/3d tie is within noise.
-
-### T-19 · point-in-time-changes-a-verdict
-
-**Claim.** Reconstructing inputs as of decision time (available_at) changes at least one backtest verdict relative to the naive join.
-
-- kind: engine · origin: mandel:idea-1, src:13, adj:A5
-- statistic: number of verdicts that differ between naive and point-in-time runs
-- null: no difference
-- procedure: run each harness twice: naive and PIT
-- data: any bitemporal bundle (social, history) · min n: 1
-- pass: >= 1 verdict differs
-- controls: same seeds
-- note: the fear_greed harness already uses a 1-day availability lag; the naive variant is not yet run
 
 ### T-31 · small-mlp-beats-logit-on-market-features
 
@@ -206,7 +212,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: missing-data alignment; markets of the same event are mechanically correlated (exclude same-event pairs)
 - note: harness not yet written: low_rank_structure
 
-## Blocked (22)
+## Blocked (23)
 
 ### T-05 · cross-venue-arbitrage
 
@@ -493,6 +499,20 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: difference > 0, p < 0.05
 - controls: topic matching precision audited
 - blocked on: topic-to-market matching and >= 30 capture days
+
+### T-47 · cheap-yes-underpriced-at-7d
+
+**Claim.** Polymarket YES contracts priced under 0.10 seven days before close resolve YES more often than their price implies (mean outcome - price > 0), on markets resolved after 2026-10-14.
+
+- kind: market-structure · origin: experiment:X-59df1d8a, src:11
+- statistic: mean(outcome - price) in the <0.10 bucket at the 7d horizon, bootstrap 95% interval
+- null: calibrated bucket (mean error 0)
+- procedure: same as harness longshot_bias, run ONLY on markets whose close is after 2026-10-14 (out of sample for this lead)
+- data: a future polymarket-closed-markets pull restricted to close > 2026-10-14, plus price history · min n: 300
+- pass: lower interval bound > 0 on the fresh sample
+- controls: pre-registered here before any fresh data; horizon and bucket fixed; the in-sample reading (+0.018, [+0.002, +0.039], 8 YES events) is NOT evidence
+- blocked on: a fresh pull of markets resolved after 2026-10-14 with >= 300 sub-0.10 observations at 7d (about one to two months of resolutions)
+- note: pre-registered lead from the in-sample longshot_bias run: the classic longshot bias (T-02) was rejected and the sign points the other way. Eight YES events in 284 is far too few to act on; this entry exists so the fresh data decides, not the reading that suggested it.
 
 ## Parked (8)
 

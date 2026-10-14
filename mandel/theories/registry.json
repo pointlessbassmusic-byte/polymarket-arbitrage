@@ -52,12 +52,16 @@
     "pass": "upper interval bound < 0",
     "controls": "bucket chosen before looking; horizon fixed at 7d"
    },
-   "experiments": [],
+   "experiments": [
+    "longshot_bias"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "sub-claim read from the market_calibration calibration table; not automated as a verdict yet. Reading 2026-10-14: the <0.10 bucket (mean price 0.008-0.014) resolves YES at 0.010 (1d), 0.007 (3d), 0.028 (7d), 0.020 (30d), 0.019 (90d): at 7d+ slightly MORE often than priced, the reverse of the classic longshot bias, on 5-8 YES events per horizon. A lead, not a finding."
+   "results": [
+    "X-59df1d8a"
+   ],
+   "notes": "sub-claim read from the market_calibration calibration table; automated as harness longshot_bias (7d, <0.10, bootstrap interval). Reading 2026-10-14: the <0.10 bucket (mean price 0.008-0.014) resolves YES at 0.010 (1d), 0.007 (3d), 0.028 (7d), 0.020 (30d), 0.019 (90d): at 7d+ slightly MORE often than priced, the reverse of the classic longshot bias, on 5-8 YES events per horizon. A lead, not a finding."
   },
   {
    "id": "T-03",
@@ -365,12 +369,16 @@
     "pass": "skill(1d) > skill(7d) > skill(30d) > skill(90d)",
     "controls": "survivorship: only markets alive at each horizon"
    },
-   "experiments": [],
+   "experiments": [
+    "horizon_monotone"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "read from the market_calibration statistic. Reading 2026-10-14: skill 0.70 (90d), 0.72 (30d), 0.78 (7d), 0.86 (3d), 0.86 (1d): monotone as claimed; the 1d/3d tie is within noise."
+   "results": [
+    "X-b7b7c690"
+   ],
+   "notes": "automated as harness horizon_monotone (1-point tolerance). Reading 2026-10-14: skill 0.70 (90d), 0.72 (30d), 0.78 (7d), 0.86 (3d), 0.86 (1d): monotone as claimed; the 1d/3d tie is within noise."
   },
   {
    "id": "T-14",
@@ -515,12 +523,16 @@
     "pass": ">= 1 verdict differs",
     "controls": "same seeds"
    },
-   "experiments": [],
+   "experiments": [
+    "point_in_time_check"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "the fear_greed harness already uses a 1-day availability lag; the naive variant is not yet run"
+   "results": [
+    "X-95aa94c7"
+   ],
+   "notes": "harness point_in_time_check runs the Fear & Greed test naive (lag 0) and honest (lag 1) and asks whether the verdict or sign changes; one harness only so far"
   },
   {
    "id": "T-20",
@@ -1157,6 +1169,31 @@
    "blocked_on": "topic-to-market matching and >= 30 capture days",
    "results": [],
    "notes": ""
+  },
+  {
+   "id": "T-47",
+   "slug": "cheap-yes-underpriced-at-7d",
+   "kind": "market-structure",
+   "claim": "Polymarket YES contracts priced under 0.10 seven days before close resolve YES more often than their price implies (mean outcome - price > 0), on markets resolved after 2026-10-14.",
+   "origin": [
+    "experiment:X-59df1d8a",
+    "src:11"
+   ],
+   "trial": {
+    "statistic": "mean(outcome - price) in the <0.10 bucket at the 7d horizon, bootstrap 95% interval",
+    "null": "calibrated bucket (mean error 0)",
+    "procedure": "same as harness longshot_bias, run ONLY on markets whose close is after 2026-10-14 (out of sample for this lead)",
+    "data": "a future polymarket-closed-markets pull restricted to close > 2026-10-14, plus price history",
+    "min_n": 300,
+    "pass": "lower interval bound > 0 on the fresh sample",
+    "controls": "pre-registered here before any fresh data; horizon and bucket fixed; the in-sample reading (+0.018, [+0.002, +0.039], 8 YES events) is NOT evidence"
+   },
+   "experiments": [],
+   "testable_now": false,
+   "status": "blocked",
+   "blocked_on": "a fresh pull of markets resolved after 2026-10-14 with >= 300 sub-0.10 observations at 7d (about one to two months of resolutions)",
+   "results": [],
+   "notes": "pre-registered lead from the in-sample longshot_bias run: the classic longshot bias (T-02) was rejected and the sign points the other way. Eight YES events in 284 is far too few to act on; this entry exists so the fresh data decides, not the reading that suggested it."
   }
  ]
 }
