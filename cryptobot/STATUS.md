@@ -107,6 +107,14 @@ the favourite pays after the fee only on the daily BTC contract, +3.2%
 per dollar at t 1.8 on 52 days. A one-decision forward test starts
 2026-10-14 and is read at 60 days (mid-December); the desk's daily
 collector gathers it.
+Killed (2026-10-14): quoting as a maker on Kalshi perps and event
+contracts. On 6 million perp trades makers lose the 2 bp fee net on
+every liquid contract, and resting orders on event contracts fill when
+they are wrong. By operator direction the desk does not compete with
+professional market makers or on speed (the stale-quote test was
+stopped unread). Also killed: the Kalshi funding carry as a 14-day
+hedged hold, and sizing the bounce-short by the range forecast. An
+ETF-hedged BTC carry runs forward on paper from 2026-10-15.
 Searched and empty: 6,096 one- and two-feature barrier rules over Kalshi's
 hourly perps (closed: the in-sample winners lose every month), eleven
 years of hourly BTC and ten years of nine macro ETFs (inconclusive: the
