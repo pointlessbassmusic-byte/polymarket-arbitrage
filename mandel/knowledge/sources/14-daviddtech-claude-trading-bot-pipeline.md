@@ -135,7 +135,7 @@ Confirmed for this video (0rzXU-BlKCg):
 
 Creator's companion material (paywalled; recovered via search snippets):
 - https://x.com/DaviddDotTech/article/2082142492003020811 ("How to Build an INSANELY Profitable AI Trading Bot (Full Guide)"; HTTP 402 on fetch; stack, step 1, NNFX template and the five rules quoted from search results)
-- https://x.com/DaviddDotTech/article/2080334621745545238 ("How To Build Your First AI Trading Bot With Claude (Complete Beginner Guide)"; HTTP 402; sub-account rule and cost quoted from search results)
+- https://x.com/DaviddDotTech/article/2080334621745545238 ("How To Build Your First AI Trading Bot With Claude (Complete Beginner Guide)"; HTTP 402; sub-account rule quoted from search results; the "$20/month" cost line comes from a snippet attributed to one of these two articles)
 
 Sibling and follow-up videos on the same channel:
 - https://sozai.app/transcript/claude-code-free-scalping-bot-results/ (transcript summary of "I Let Claude Code Build a FREE 5-Minute Scalping Bot": method, indicators, backtest numbers, execution lessons, forward-testing rule)
