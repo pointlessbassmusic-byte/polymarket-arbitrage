@@ -103,3 +103,31 @@ still has to be written for each before a status can move.
    box financing rate vs bills, dispersion vs COR1M, 0DTE pinning) from the chains as they accumulate.
 4. Pick execution venues from `VENUES.md` when a theory passes the gate: Alpaca paper for equities and
    options, Kalshi and Polymarket US for event contracts, tastytrade or IBKR for index and futures options.
+
+## Addendum, 17:45 UTC: verifier passes complete
+
+Both strategy libraries now have their adversarial verifier pass for every family.
+
+| Library | Strategies | Verifier corrections | Strategies the verifier added |
+|---|---|---|---|
+| Options | 211 | 277 | 35 |
+| Underlying | 171 | 211 | 52 |
+
+Every claim was reworded to some degree. Untested theories were updated in place. The 27 claims that already
+had a verdict keep it, because each verdict tested the old wording; the corrected wording became a new theory
+with a `supersedes` link, and all 27 restatements were harnessed the same day. Where the rewording mattered:
+
+- **Santa window** restricted to after publication (1973 on): +0.86 points, significant but under the 1-point
+  bar, so not supported. The 1928-based pass stands only for the original wording.
+- **BTC Mondays** pass as restated (p 0.012), but the restatement dropped a correction for testing seven
+  weekdays; corrected it would be about 0.08, and the effect does not survive retail fees.
+- **VIX forwards** now use the convexity-adjusted forward the verifier specified; VIX still lands below it in
+  80% of contango months and 19 of 23 spikes.
+- **SPX parity**, split by root as specified: 2.2% of strike pairs outside the band against a 2% bar.
+
+The payoff engine re-checked all 211 options templates. 67 are beyond a one-expiry engine (calendars, strips,
+dynamic hedges, futures legs) and 7 describe both the long and short versions in one sentence. 19 remain
+flagged; on inspection they are variant mentions or two-underlying pairs, with no confirmed payoff error.
+
+Registry after the addendum: 475 theories, 24 supported, 53 not supported, 8 inconclusive, 250 untested,
+132 blocked, 8 parked. 168 tests pass.
