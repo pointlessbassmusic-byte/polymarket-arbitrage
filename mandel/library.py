@@ -181,3 +181,34 @@ def theories_from_strategies(strategies: Iterable[dict], id_start: int, kind: st
                     "notes": f"from the {origin_prefix} library: {s['name']}; harness suggestion: {s.get('harness_suggestion', '')}"})
         existing_ids.add(tid); i += 1
     return out
+
+
+# ------------------------------------------------------------ engine checks --
+
+def engine_check_strategies(strategies: Iterable[dict], S: float = 100.0) -> dict:
+    """Run every template's legs through the payoff engine and compare with the stated max loss / max profit.
+    Flags: 'loss_text_vs_engine' when the text says unlimited/unbounded loss but the engine finds it bounded (or the
+    reverse), 'profit_text_vs_engine' likewise; 'unparsed' when a strike rule fell back to ATM."""
+    from mandel.options.strategies import build_position, classify_risk
+    out = {}
+    for s in strategies:
+        try:
+            pos, info = build_position(s, S)
+            risk = classify_risk(pos, S)
+        except Exception as e:  # a template the engine cannot draw is itself a finding
+            out[s["slug"]] = {"error": repr(e)[:160], "parsed": False}
+            continue
+        loss_text = (s.get("max_loss") or "").lower(); profit_text = (s.get("max_profit") or "").lower()
+        says_unbounded_loss = any(w in loss_text for w in ("unlimited", "unbounded", "theoretically unlimited", "infinite"))
+        says_unbounded_profit = any(w in profit_text for w in ("unlimited", "unbounded", "infinite"))
+        flags = []
+        if not info["parsed"]:
+            flags.append("unparsed")
+        if says_unbounded_loss != bool(risk["downside_unbounded"]) and info["parsed"]:
+            flags.append("loss_text_vs_engine")
+        if says_unbounded_profit != bool(risk["upside_unbounded"]) and info["parsed"]:
+            flags.append("profit_text_vs_engine")
+        out[s["slug"]] = {"parsed": info["parsed"], "n_legs": info["n_legs"], "defined_risk": risk["defined_risk"], "full_downside": risk["full_downside"],
+                          "downside_unbounded": risk["downside_unbounded"], "upside_unbounded": risk["upside_unbounded"], "n_breakevens": len(risk["breakevens"]),
+                          "net_debit": round(pos.net_debit(), 4), "max_loss_fraction_of_spot": round(risk["max_loss_fraction_of_spot"], 3), "flags": flags}
+    return out
