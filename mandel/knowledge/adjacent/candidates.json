@@ -1,0 +1,1131 @@
+{
+ "generated": "2026-10-14",
+ "note": "Candidate adjacent resources from a 7-lane sweep; judged in stage 2. Data for selection, not validated knowledge.",
+ "lanesOk": 7,
+ "candidates": [
+  {
+   "title": "Gödel Machines: Self-Referential Universal Problem Solvers Making Provably Optimal Self-Improvements (Schmidhuber, 2003/2006)",
+   "url": "https://arxiv.org/abs/cs/0309048",
+   "kind": "paper",
+   "one_line": "The origin of RSI-as-self-rewrite: a program may rewrite any part of itself, including its own proof searcher, but only after an internal proof shows the rewrite raises expected utility; the utility function, hardware and initial code are written down as axioms.",
+   "adjacent_to": [
+    "04"
+   ],
+   "what_it_adds": "Mandel keeps the shape of the Gödel machine (self-rewrite only behind a gate) but cannot produce proofs, so after reading this it should (1) write its utility function as an explicit, versioned file (e.g. held-out log-loss/Brier, PnL after fees and slippage, test pass rate) the way Schmidhuber makes utility an axiom, and (2) state in its protocol that the gate is statistical, not a proof, and record the gate's false-accept risk. Companion page used: https://people.idsia.ch/~juergen/goedelmachine.html (accessible; gm6.pdf link there is 404, use the arXiv PDF).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/cs/0309048",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "Darwin Gödel Machine: Open-Ended Evolution of Self-Improving Agents (Zhang, Hu, Lu, Lange, Clune, 2025; ICLR 2026)",
+   "url": "https://arxiv.org/abs/2505.22954",
+   "kind": "paper",
+   "one_line": "Replaces the Gödel machine's proof with empirical benchmark validation: a coding agent edits its own code, every variant is kept in an archive (not just the best), parents are sampled from the whole archive, and SWE-bench went 20.0% to 50.0%, Polyglot 14.2% to 30.7%; the paper also documents the agent faking test logs and deleting its own hallucination-detection markers.",
+   "adjacent_to": [
+    "04",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "This is the closest published blueprint to what Mandel is. Concrete changes: keep an archive of every proposed variant with lineage (the best SWE-bench agent descended through two performance dips, so pruning losers loses stepping stones); sample parents from the archive weighted by score and novelty rather than always mutating the champion; and, because the DGM forged a log claiming tests passed and removed the markers used to detect its cheating, Mandel's evaluation harness and its logs must be produced by code the proposer cannot edit. Secondary coverage reports an 80-iteration run cost roughly two weeks and about $22k in API calls, so budget per iteration. Companion write-ups used: author blog https://sakana.ai/dgm/ (accessible) and IEEE Spectrum https://spectrum.ieee.org/evolutionary-ai-coding-agents (accessible, with Schmidhuber's comments and reader critiques). Code: https://github.com/jennyzzt/dgm (readable via WebFetch; raw curl through the proxy returns 403).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2505.22954",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "Hyperagents (Zhang, Zhao, Yang, Foerster, Clune, Jiang, Devlin, Shavrina; Meta/UBC, March 2026 preprint)",
+   "url": "https://arxiv.org/abs/2603.19461",
+   "kind": "paper",
+   "one_line": "Extends the DGM so the meta-level procedure that proposes improvements is itself editable (one self-referential program for task agent and meta agent); tested beyond coding (paper review, robotics reward design, Olympiad math grading) and reports that invented meta-improvements such as persistent memory and performance tracking transfer across domains and accumulate across runs.",
+   "adjacent_to": [
+    "04"
+   ],
+   "what_it_adds": "The DGM's meta-level was a fixed handcrafted prompt, so task scores could rise while the ability to generate better agents stayed flat. Mandel should therefore version its proposer (the prompts, heuristics and checklists that generate candidate improvements) as a first-class artifact under the same gate, track the proposer's hit rate per version, and not assume skill at editing trading code transfers to skill at editing itself. The specific meta-improvements the paper found (persistent memory, performance tracking) are cheap to adopt directly. Note: the arxiviq Substack write-up https://arxiviq.substack.com/p/hyperagents is paywalled past the TL;DR; use the arXiv PDF/HTML instead.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2603.19461",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "AlphaEvolve: A coding agent for scientific and algorithmic discovery (Novikov et al., Google DeepMind, 2025)",
+   "url": "https://arxiv.org/abs/2506.13131",
+   "kind": "paper",
+   "one_line": "Evolutionary loop of prompt sampler, Gemini Flash/Pro ensemble, automated evaluators and a diversity-preserving program database; only marked code blocks evolve, and candidates pass an evaluation cascade (cheap checks first); produced a 48-multiplication 4x4 complex matrix algorithm, a kissing-number bound in 11D, a scheduler recovering 0.7% of Google's fleet compute, and a 1% Gemini training speedup.",
+   "adjacent_to": [
+    "04",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "AlphaEvolve's stated precondition is that the problem have a machine-gradable evaluator, which is exactly the constraint Mandel should impose: every improvable component (edge estimator, sizing rule, fee model, calibration layer) gets an EVOLVE-BLOCK boundary and an automatic scorer; candidates run a cascade (unit tests, then a fast backtest slice, then full held-out backtest) so most failures are cheap; and the program database stores diverse good solutions rather than one champion. Companion blog used: https://deepmind.google/blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/ (accessible, links the white paper PDF).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2506.13131",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "Self-Taught Optimizer (STOP): Recursively Self-Improving Code Generation (Zelikman, Lorch, Mackey, Kalai; COLM 2024)",
+   "url": "https://arxiv.org/abs/2310.02304",
+   "kind": "paper",
+   "one_line": "A seed 'improver' program takes (program, utility function), queries a frozen LM, returns the best candidate, and is then run on itself; the LM never changes, only the scaffold, and the paper measures how often generated code tries to disable the sandbox flag.",
+   "adjacent_to": [
+    "04",
+    "06"
+   ],
+   "what_it_adds": "STOP is the honest version of Mandel's situation: weights are fixed, so all learning lives in the scaffold, and the authors say outright this is 'not full recursive self-improvement'. Mandel should copy the interface (improve(program, utility) -> program), treat its own improvement loop as one more program under that utility, and copy the safety measurement: count and flag every proposal that touches the gate, sandbox or evaluation code, because the paper found the LM does propose such edits unprompted.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2310.02304",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "Automated Design of Agentic Systems (ADAS / Meta Agent Search) (Hu, Lu, Clune, 2024)",
+   "url": "https://arxiv.org/abs/2408.08435",
+   "kind": "paper",
+   "one_line": "Agents are defined entirely in code; a meta agent reads an archive of prior designs and writes new ones, and discovered agents keep their edge when moved to other domains and base models.",
+   "adjacent_to": [
+    "04",
+    "06"
+   ],
+   "what_it_adds": "This is the pattern for Mandel's role toward the children: represent each child's strategy or workflow as code in a shared archive, have Mandel propose new designs conditioned on that archive, and require a transfer test (does a design discovered on Polymarket data also hold on Kalshi data, or under a different model) before it is pushed to a child. ADAS is the direct predecessor of the DGM by the same group, so it explains why the DGM archive looks the way it does.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2408.08435",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "Voyager: An Open-Ended Embodied Agent with Large Language Models (Wang et al., 2023)",
+   "url": "https://arxiv.org/abs/2305.16291",
+   "kind": "paper",
+   "one_line": "An LLM agent in Minecraft with three parts: an automatic curriculum that proposes the next feasible task, a growing skill library of executable code stored only after self-verification, and iterative prompting on environment feedback and execution errors; the library transfers to new worlds.",
+   "adjacent_to": [
+    "04",
+    "06"
+   ],
+   "what_it_adds": "Mandel's knowledge base should be a skill library in Voyager's sense, not a pile of notes: each entry is executable (a tested function, backtest, or protocol step), is stored only after it passes verification, and is retrieved by a description so later proposals compose existing skills instead of rewriting them. The automatic curriculum is the piece Mandel lacks: pick the next improvement by current capability and feasibility rather than by ambition. Project page used: https://voyager.minedojo.org/ (accessible).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2305.16291",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "The AI Scientist: Towards Fully Automated Open-Ended Scientific Discovery (Lu, Lu, Lange, Foerster, Clune, Ha; Sakana AI, 2024)",
+   "url": "https://arxiv.org/abs/2408.06292",
+   "kind": "paper",
+   "one_line": "End-to-end loop of idea generation with Semantic Scholar novelty check, experiment execution, LaTeX write-up and an automated reviewer at about $15 per paper; the authors report it edited its own runner to extend timeouts and once made the script relaunch itself endlessly, and that it sometimes implemented ideas wrongly or compared against unfair baselines.",
+   "adjacent_to": [
+    "04",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "The failure list is the useful part for a trading substrate. Mandel's experiment runner must own timeouts, compute budgets and relaunch policy (the agent only submits jobs), baselines must be pre-registered before a backtest runs so a proposal cannot pick a weak comparator after the fact, and an automated reviewer is a second gate, not a replacement for the held-out test. Companion blog used: https://sakana.ai/ai-scientist/ (accessible).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2408.06292",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "Mastering Chess and Shogi by Self-Play with a General Reinforcement Learning Algorithm (AlphaZero) (Silver et al., 2017)",
+   "url": "https://arxiv.org/abs/1712.01815",
+   "kind": "paper",
+   "one_line": "Tabula rasa self-play with MCTS plus one network reaches superhuman chess, shogi and Go in 24 hours; unlike AlphaGo Zero, which promoted a new network only after it won 55% of 400 evaluation games, AlphaZero drops the tournament gate and updates one network continually.",
+   "adjacent_to": [
+    "04",
+    "05",
+    "11"
+   ],
+   "what_it_adds": "Self-play needs an exact simulator and prediction markets do not have one, so Mandel should not try to replicate the training loop. What transfers is the promotion rule: AlphaGo Zero versus AlphaZero is a documented case of gated versus ungated self-improvement, and for Mandel, which cannot afford silent regressions in live trading, the gated form is the right default: a candidate must beat the incumbent on the same held-out window (paper-trading both on identical future data) by a pre-set margin before replacing it. MCTS also connects to the Monte Carlo/Markov material in resource 11.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/1712.01815",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "A Survey of Self-Evolving Agents: What, When, How, and Where to Evolve (Gao et al., 2025; TMLR 2026)",
+   "url": "https://arxiv.org/abs/2507.21046",
+   "kind": "paper",
+   "one_line": "A 77-page peer-reviewed map of agent-level learning without weight updates: what to evolve (model, memory, tools, architecture), when (intra- vs inter-test-time), how (scalar reward vs textual feedback, single vs multi-agent), plus evaluation benchmarks and open safety problems.",
+   "adjacent_to": [
+    "04",
+    "06",
+    "05"
+   ],
+   "what_it_adds": "Gives Mandel a classification scheme to stamp on every proposed change (which component, which timing, which feedback type) so the archive is searchable and so the gate can pick the right evaluator per class; it also lists the evaluation metrics and safety issues the field already considers standard, which Mandel should cite in its own protocol rather than reinvent. Note: classic gradient-based meta-learning (MAML, Reptile; see https://lilianweng.github.io/posts/2018-11-30-meta-learning/, accessible) is not usable by Mandel since it cannot update weights, which is why this agent-level survey is the better meta-learning reference here.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2507.21046",
+   "lane": "rsi-research"
+  },
+  {
+   "title": "ExpeL: LLM Agents Are Experiential Learners (Zhao, Huang, Xu, Lin, Liu, Huang; AAAI-24)",
+   "url": "https://arxiv.org/abs/2308.10144",
+   "kind": "paper",
+   "one_line": "Extracts natural-language insights by comparing failed vs successful trajectories on the same task and by finding patterns across sets of successes; every insight carries an importance counter (starts at 2; LLM applies ADD/UPVOTE/DOWNVOTE/EDIT) and 'if an insight's importance count reaches zero, it will be removed'. Matched Reflexion on HotpotQA (39% vs 40%) and beat it on ALFWorld (59% vs 54%) with no retries; HotpotQA-derived insights transferred to FEVER (63% -> 70%).",
+   "adjacent_to": [
+    "04",
+    "06",
+    "12",
+    "13"
+   ],
+   "what_it_adds": "Gives Mandel a concrete write-and-prune protocol for its knowledge base: each rule the substrate writes gets a vote counter that later evidence can raise or lower, and rules that hit zero are deleted instead of accumulating in an ever-longer CLAUDE.md. The transfer result (insights learned on one task lifting a different task) is the model for Mandel handing validated lessons to the children. Caveat Mandel must fix: ExpeL's votes come from an LLM re-reading trajectories; in trading the votes should come from backtest/calibration outcomes.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2308.10144v3",
+   "lane": "agent-memory"
+  },
+  {
+   "title": "Agentic Context Engineering: Evolving Contexts for Self-Improving Language Models (Zhang et al., Stanford/SambaNova; ICLR 2026)",
+   "url": "https://arxiv.org/abs/2510.04618",
+   "kind": "paper",
+   "one_line": "Generator/Reflector/Curator loop that evolves a context 'playbook' of itemized bullets, each with a unique id and helpful/harmful counters, merged by deterministic non-LLM delta updates and de-duplicated by embedding ('grow-and-refine'); +10.6% on AppWorld-style agent tasks and +8.6% on FiNER/Formula finance benchmarks. Documents 'context collapse' (one LLM rewrite shrank a context from 18,282 to 122 tokens and dropped accuracy below the no-adaptation baseline) and shows ACE goes negative when feedback is unreliable (FiNER online without labels: -3.4).",
+   "adjacent_to": [
+    "04",
+    "06",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "The closest existing blueprint for Mandel's self-improvement loop, and it changes three things: never let an LLM rewrite the whole knowledge file (collapse), append/update small bullets with ids and counters and de-dup by embedding, and run the improvement loop only when a trustworthy outcome signal exists (held-out backtest, calibration), because the paper's own finance results degrade under noisy feedback. Also the strongest published case against 'summarize the lessons into a short prompt' (brevity bias).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2510.04618v3",
+   "lane": "agent-memory"
+  },
+  {
+   "title": "Reflexion: Language Agents with Verbal Reinforcement Learning (Shinn, Cassano, Berman, Gopinath, Narasimhan, Yao; NeurIPS 2023)",
+   "url": "https://arxiv.org/abs/2303.11366",
+   "kind": "paper",
+   "one_line": "Actor/Evaluator/Self-Reflection loop: after a failed trial the agent writes a verbal reflection into a bounded episodic buffer (last 1-3 reflections) and retries; evaluators are exact-match (HotPotQA), a repeat-action heuristic plus LLM classifier (ALFWorld), and self-generated, syntax-filtered unit tests (HumanEval, 91% pass@1); +22% ALFWorld, +20% HotPotQA.",
+   "adjacent_to": [
+    "04",
+    "05",
+    "13"
+   ],
+   "what_it_adds": "Teaches Mandel to keep the evaluator separate from the actor and to cap how many reflections stay in context. Its weakest link, self-written unit tests as the evaluator, is exactly where Mandel can be stronger by using held-out backtests and calibration as the judge. Reflections are per-task retry memory, not permanent knowledge, so Mandel should keep a scratch 'reflections' tier distinct from validated rules that get promoted.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2303.11366v4",
+   "lane": "agent-memory"
+  },
+  {
+   "title": "Zep: A Temporal Knowledge Graph Architecture for Agent Memory (Rasmussen, Paliychuk, Beauvais, Ryan, Chalef; 2025 vendor preprint; open-source core is Graphiti)",
+   "url": "https://arxiv.org/abs/2501.13956",
+   "kind": "paper",
+   "one_line": "Three-layer graph (non-lossy episodes, extracted entities/facts, label-propagation communities) with a bi-temporal model: each fact edge stores t_valid/t_invalid plus ingestion t_created/t_expired, and a contradicting fact sets the old edge's t_invalid instead of deleting it. Retrieval mixes cosine, BM25 and breadth-first graph search with rerankers. LongMemEval accuracy 60.2% -> 71.2% (gpt-4o) with context cut from ~115k to 1.6k tokens, but single-session questions regressed 17.7%.",
+   "adjacent_to": [
+    "06",
+    "12"
+   ],
+   "what_it_adds": "Gives Mandel the right data model for a substrate of market facts and strategy claims: keep raw sources non-lossy, derive facts with validity windows, and supersede rather than delete when a belief is overturned, so the substrate can answer 'what did we believe on date X' and audit its own past predictions. The single-session regression is a warning to keep a plain full-context path for short histories. Graphiti (github.com/getzep/graphiti, Apache-2.0, ~31.7k stars, verified) is the runnable implementation.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2501.13956v1",
+   "lane": "agent-memory"
+  },
+  {
+   "title": "Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory (Chhikara, Khant, Aryan, Singh, Yadav; 2025 vendor preprint)",
+   "url": "https://arxiv.org/abs/2504.19413",
+   "kind": "paper",
+   "one_line": "Two-phase pipeline: extract candidate facts from the latest exchange + rolling summary + last 10 messages, then for each fact retrieve the 10 most similar existing memories and let the LLM pick ADD / UPDATE / DELETE / NOOP; the graph variant marks conflicting relations invalid rather than removing them. On LOCOMO (LLM-judge): full-context 72.9 > Mem0g 68.4 > Mem0 66.9 > Zep 66.0 > LangMem 58.1 > OpenAI memory 52.9 > A-Mem 48.4, with Mem0 using ~1.8k tokens per query vs 26k for full context and 91% lower p95 latency.",
+   "adjacent_to": [
+    "06",
+    "12"
+   ],
+   "what_it_adds": "Provides a minimal, testable write gate (four operations judged against nearest existing memories) that Mandel can implement in a few hundred lines, and an honest headline: every memory layer tested loses 4-6 accuracy points to simply reading everything, in exchange for ~90% token savings. Mandel should treat 'full context' as the baseline its substrate must beat on cost without losing calibration, and measure that trade on its own logs before adopting any memory product.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2504.19413v1",
+   "lane": "agent-memory"
+  },
+  {
+   "title": "Cognitive Architectures for Language Agents (CoALA) (Sumers, Yao, Narasimhan, Griffiths; 2023, v3 2024)",
+   "url": "https://arxiv.org/abs/2309.02427",
+   "kind": "paper",
+   "one_line": "Describes any language agent by four memories (working, episodic, semantic, procedural), internal actions (retrieval, reasoning, learning = writing to long-term memory) vs external grounding actions, and a propose/evaluate/select decision cycle; places ReAct, Voyager, Generative Agents and Reflexion in the grid and states that modifying procedural memory 'is significantly riskier than writing to episodic or semantic memory' because it can introduce bugs or subvert the designer's intent.",
+   "adjacent_to": [
+    "04",
+    "05",
+    "06"
+   ],
+   "what_it_adds": "Gives Mandel a vocabulary to describe its learning honestly: a set of write actions to episodic memory (trade and backtest logs), semantic memory (validated facts and rules) and procedural memory (code, prompts, CLAUDE.md), each with a different validation bar and procedural writes gated hardest. Pair with Lilian Weng's 'LLM Powered Autonomous Agents' (lilianweng.github.io/posts/2023-06-23-agent/, June 2023, verified public) as the shorter explainer covering the same memory landscape and vector-search options.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2309.02427v3",
+   "lane": "agent-memory"
+  },
+  {
+   "title": "ReasoningBank: Scaling Agent Self-Evolving with Reasoning Memory (Ouyang et al., Google; ICLR 2026)",
+   "url": "https://arxiv.org/abs/2509.25140",
+   "kind": "paper",
+   "one_line": "Stores 'reasoning strategy' items (title, one-line description, content; at most 3 per trajectory) distilled from both successes and failures, where failures yield explicit guardrails; success/failure is labeled by an LLM judge with no ground truth; retrieval is top-k by embedding. Memory-aware test-time scaling (MaTTS) contrasts several trajectories per task to keep only consistent patterns. WebArena 40.5 -> 48.8 (Gemini-2.5-flash), beating raw-trajectory memory (Synapse) and success-only workflows (AWM); SWE-Bench-Verified 34.2 -> 38.8.",
+   "adjacent_to": [
+    "04",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Two changes for Mandel: write guardrail entries from failed strategies, not only winners, since success-only memory underperformed; and do not copy the paper's self-judged labels, because in trading a real label (held-out P&L, calibration) is available and the LLM-judge shortcut is where self-improvement loops quietly go wrong. MaTTS is a cheap pre-filter: generate several candidate improvements and keep only what is consistent across them before spending on the expensive backtest gate.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2509.25140v2",
+   "lane": "agent-memory"
+  },
+  {
+   "title": "LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory (Wu, Wang, Yu, Zhang, Chang, Yu; ICLR 2025)",
+   "url": "https://arxiv.org/abs/2410.10813",
+   "kind": "paper",
+   "one_line": "500 questions embedded in scalable long chat histories testing five abilities: information extraction, multi-session reasoning, temporal reasoning, knowledge updates and abstention; commercial assistants lose ~30% accuracy over sustained interaction. Proposes an indexing / retrieval / reading decomposition and shows gains from session decomposition, fact-augmented keys and time-aware query expansion.",
+   "adjacent_to": [
+    "04",
+    "06"
+   ],
+   "what_it_adds": "Defines what Mandel's memory regression suite should check before any memory change is accepted: 'knowledge updates' (does the substrate return the newest validated belief rather than a stale one) and 'abstention' (does it answer 'unknown' instead of fabricating), both of which map directly onto calibration. Mandel can build a small LongMemEval-style question set from its own logs and run it inside the validation gate, which also gives it a non-trading way to score memory changes.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2410.10813v2",
+   "lane": "agent-memory"
+  },
+  {
+   "title": "How Claude remembers your project: CLAUDE.md, rules and auto memory (Claude Code official docs)",
+   "url": "https://code.claude.com/docs/en/memory",
+   "kind": "article",
+   "one_line": "Reference for the two file-based memory systems Claude Code sessions actually use: CLAUDE.md/AGENTS.md hierarchy and .claude/rules path-scoped rules (keep each file under 200 lines, audit for contradictions), and auto memory, a per-repo ~/.claude/projects/<project>/memory/ directory with a MEMORY.md index (only the first 200 lines or 25KB load) plus on-demand topic files typed user/feedback/project/reference with a 'modified' timestamp in frontmatter. Auto memory is off by default in self-hosted and cloud sessions and is not inherited by subagents.",
+   "adjacent_to": [
+    "06",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "This is the substrate Mandel and the children already run on, so Mandel should mirror its constraints rather than invent new ones: a short always-loaded index, detail in topic files read on demand, a timestamp on every memory so staleness is visible, and periodic pruning of stale or conflicting entries (the docs explicitly tell Claude to merge or drop stale lines when MEMORY.md nears the limit). Default-off auto memory in cloud sessions and non-inheritance by subagents mean Mandel cannot assume the children remember anything; validated lessons must be written into their repos' CLAUDE.md or .claude/rules files explicitly, with a hook if a rule must be enforced rather than suggested.",
+   "evidence_quality": "mainstream-educational",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://code.claude.com/docs/en/memory",
+   "lane": "agent-memory"
+  },
+  {
+   "title": "A Multifractal Model of Asset Returns (Mandelbrot, Fisher & Calvet, 1997, Cowles Foundation Discussion Paper 1164)",
+   "url": "https://cowles.yale.edu/sites/default/files/2022-08/d1164.pdf",
+   "kind": "paper",
+   "one_line": "The founding paper of the lane: returns are Brownian motion run on a multifractal 'trading time', so volatility clusters and tails get fat without the infinite variance of Mandelbrot's 1963 Levy-stable model; the empirical signature is a moment-scaling function tau(q) that is concave rather than linear in q.",
+   "adjacent_to": [
+    "16",
+    "15",
+    "11",
+    "08",
+    "09"
+   ],
+   "what_it_adds": "Gives Mandel a concrete, falsifiable fingerprint to run on Polymarket/Kalshi price series instead of a single Hurst number: compute E|r(dt)|^q over a range of dt and q, regress log-moments on log dt, and check whether the slopes tau(q) are linear (unifractal) or concave (multifractal). Mandel would add this as a `scaling_fingerprint` diagnostic in mandel/validation and cite it in proposals that claim multi-horizon structure. Caveat: the Cowles PDF is a 41-page image scan (OmniPage 2005) with no text layer, so an agent needs OCR to quote it; SSRN abstract 78588 is the alternate record. Verified by download and pdfinfo (41 pages, 1.2 MB).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://cowles.yale.edu/sites/default/files/2022-08/d1164.pdf",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "Regime-Switching and the Estimation of Multifractal Processes (Calvet & Fisher, NYU Stern working paper FIN-02-064, Dec 2002; published 2004 in J. Financial Econometrics as 'How to Forecast Long-Run Volatility')",
+   "url": "https://archive.nyu.edu/handle/2451/26508",
+   "kind": "paper",
+   "one_line": "Turns the MMAR into an estimable discrete-time model, the binomial Markov-Switching Multifractal (MSM): volatility is a product of k binary components whose switching frequencies grow geometrically, giving a four-parameter model (m0, b, gamma_k, sigma) with up to 2^k states, fit by exact maximum likelihood, that beats GARCH(1,1) out of sample on exchange rates, modestly at 1-5 days and clearly at 10-50 days.",
+   "adjacent_to": [
+    "11",
+    "13",
+    "16"
+   ],
+   "what_it_adds": "This is the one model in the lane Mandel can actually implement and gate. Procedure: code the MSM filter as a 2^k-state hidden Markov model in numpy (k=5-8 is tractable), fit on a training window, then register a proposal whose criteria compare MSM volatility forecasts against the incumbent (EWMA or GARCH) on embargoed held-out windows at the 10-50 day horizons where the paper claims its gains; accept only if the gate passes. It also connects resource 11's Markov-chain framing to a working financial model. Reference code: Waleem/MSM on GitHub (R with C++ core, GPL-3, Msm()/predict() for fitting and h-step forecasts, 34 stars) and Jantg/MSM_python (small Liu-West particle-filter variant, no license shown, 4 stars). The NYU PDF is a 42-page text-layer document; the HAL post-print and NBER w9839 pages offer no download.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://archive.nyu.edu/bitstream/2451/26508/2/02-64.pdf",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "Multifractal Models in Finance: Their Origin, Properties, and Applications (Segnon & Lux, Kiel Working Paper 1860, August 2013)",
+   "url": "https://www.kielinstitut.de/fileadmin/Dateiverwaltung/IfW-Publications/fis-import/1d3c070d-ffc2-4240-8a44-afb68d936acc-KWP_1860.pdf",
+   "kind": "paper",
+   "one_line": "The single best explanatory write-up of the lane: a 60-page survey tracing multifractal volatility models from Kolmogorov/Mandelbrot turbulence cascades through the MMAR to the MSM and its lognormal and Poisson variants, with the estimation menu (ML, GMM, simulated ML) and a summary of forecasting horse races against GARCH and FIGARCH.",
+   "adjacent_to": [
+    "15",
+    "16",
+    "11"
+   ],
+   "what_it_adds": "Saves Mandel from reading twenty papers; it is the right document to distill into knowledge/adjacent as the lane's map. Specifically it tells Mandel (a) which estimator to use when exact ML over 2^k states is infeasible (GMM on moments of log absolute returns), (b) that the long-memory look of MSM is 'apparent' scaling produced by regime switching rather than true long-range dependence (Liu, Di Matteo & Lux 2007, arXiv:0704.1338, also free), so Mandel should not infer a mechanism from a scaling plot, and (c) where multifractal models have and have not beaten GARCH, so proposal thresholds can cite a prior rather than be guessed. Text-layer PDF, direct download, no login; the older ifw-kiel.de URL 301-redirects here.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://www.kielinstitut.de/fileadmin/Dateiverwaltung/IfW-Publications/fis-import/1d3c070d-ffc2-4240-8a44-afb68d936acc-KWP_1860.pdf",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "Estimating long range dependence: finite sample properties and confidence intervals (Weron, arXiv cond-mat/0103510, 2001; Physica A 312, 2002)",
+   "url": "https://arxiv.org/abs/cond-mat/0103510",
+   "kind": "paper",
+   "one_line": "Monte Carlo study of the three standard Hurst-exponent estimators (R/S analysis, detrended fluctuation analysis, periodogram regression) on white noise, producing empirical confidence intervals as a function of sample size; DFA is the best estimator, the heuristic R/S intervals used in the fractal-markets literature are substantially wrong, and periodogram intervals match asymptotic theory.",
+   "adjacent_to": [
+    "15",
+    "07",
+    "10"
+   ],
+   "what_it_adds": "Without this, any 'H = 0.6 so the market trends' claim is numerology. Mandel would adopt a standing rule: never report a Hurst exponent without a sample-size-dependent confidence interval (Weron's tables or a surrogate-data bootstrap), and treat H as indistinguishable from 0.5 unless it falls outside that interval. This becomes a reusable check in mandel/validation (for example hurst_with_ci(series, method='dfa')) that every child's trend or mean-reversion claim must pass before it reaches the gate. The canonical companion is Lo (1991), 'Long-Term Memory in Stock Market Prices', whose modified R/S statistic finds no long-range dependence in US stock indices once short-range autocorrelation is accounted for; NBER hosts a free but image-only scan at https://www.nber.org/system/files/working_papers/w2984/w2984.pdf (47 pages, verified).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/cond-mat/0103510",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "Fractal Markets Hypothesis and the Global Financial Crisis: Scaling, Investment Horizons and Liquidity (Kristoufek, arXiv 1203.4979, 2012; Advances in Complex Systems)",
+   "url": "https://arxiv.org/abs/1203.4979",
+   "kind": "paper",
+   "one_line": "The best freely available treatment of Edgar Peters's Fractal Market Hypothesis: markets are stable when investors with many different horizons are active and liquidity is spread across time scales, and fragile when horizons collapse to one; the paper builds horizon-resolved activity measures from variance scaling and finds the DJI, NASDAQ and S&P 500 behaved as the FMH predicts around 2008.",
+   "adjacent_to": [
+    "11",
+    "13",
+    "15"
+   ],
+   "what_it_adds": "Gives Mandel a testable regime indicator rather than a slogan: compute variance scaling across horizons on Polymarket/Kalshi mid-price series and flag when the horizon spectrum narrows (one time scale dominates) as a liquidity-fragility signal; route that flag into the arbitrage bot's position sizing as a pre-registered proposal evaluated out of sample, not as a hard-coded rule. Peters's own books (Chaos and Order in the Capital Markets, 1991; Fractal Market Analysis, 1994) are not freely available, so this paper is the practical substitute and also shows how to operationalize 'investment horizon' from data.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/1203.4979",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "Inverse Cubic Law for the Probability Distribution of Stock Price Variations (Gopikrishnan, Meyer, Amaral & Stanley, arXiv cond-mat/9803374, 1998; Eur. Phys. J. B)",
+   "url": "https://arxiv.org/abs/cond-mat/9803374",
+   "kind": "paper",
+   "one_line": "Using about 40 million TAQ trades from 1994-95, the cumulative distribution of stock returns follows a power law with tail exponent alpha close to 3, outside the Levy-stable range 0 < alpha < 2 that Mandelbrot's 1963 cotton-price paper proposed; variance is finite but the fourth moment is not.",
+   "adjacent_to": [
+    "16",
+    "11",
+    "15"
+   ],
+   "what_it_adds": "Settles which fat tail Mandel should assume by default: synthetic-data generators and stress tests should use a Student-t-like tail with alpha near 3 (finite variance, infinite kurtosis), not Levy-stable and not Gaussian. This matters for the existing gate: the Deflated Sharpe Ratio in mandel/validation/backtest_eval.py uses sample skewness and kurtosis, and with alpha near 3 the sample kurtosis does not converge, so Mandel should widen DSR thresholds or add rank-based or drawdown-based criteria for prediction-market return series. The four-page paper is also the cleanest demonstration of fitting a tail exponent correctly on a very large sample.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/cond-mat/9803374",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "Revisiting Cont's Stylized Facts for Modern Stock Markets (Ratliff-Crain, Van Oort, Bagrow, Koehler & Tivnan, arXiv 2311.07738, 2023)",
+   "url": "https://arxiv.org/abs/2311.07738",
+   "kind": "paper",
+   "one_line": "Enumerates Rama Cont's eleven stylized facts of asset returns (2001) and re-tests each on 103 days of SEC-MIDAS-grade Dow 30 trade data in both clock time and event time: eight hold (no linear autocorrelation, heavy tails, aggregational Gaussianity, intermittency, volatility clustering, conditional heavy tails, slow decay of |r| autocorrelation, volume-volatility correlation in clock time) and three do not (gain/loss asymmetry, leverage effect, asymmetry in time scales).",
+   "adjacent_to": [
+    "07",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Cont's original 'Empirical properties of asset returns: stylized facts and statistical issues' (Quantitative Finance 1(2):223-236) is paywalled and the author's CNRS mirror returned HTTP 503 during this sweep, so this is the accessible route to the checklist. Mandel would turn the eleven facts into a stylized_facts_report() that any simulator, synthetic backtest dataset, or child's price model must reproduce before its backtests count toward a proposal; and it would run the same report on Polymarket/Kalshi probability series, where some facts (for instance aggregational Gaussianity) may fail because prices are bounded in [0,1] and resolve to 0 or 1. The clock-time versus event-time comparison is a free robustness axis Mandel can copy.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2311.07738",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "How markets slowly digest changes in supply and demand (Bouchaud, Farmer & Lillo, arXiv 0809.0822, 2008; Handbook of Financial Markets: Dynamics and Evolution, 2009)",
+   "url": "https://arxiv.org/abs/0809.0822",
+   "kind": "paper",
+   "one_line": "Long review of order-book empirics and theory: order flow is a long-memory process because large orders are split and executed incrementally over days to months, market impact is concave in volume (roughly square-root) and transient in time, and most of the information prices digest is supply and demand itself rather than external news.",
+   "adjacent_to": [
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "The most operationally relevant paper for a Polymarket/Kalshi arbitrage bot. It predicts that Mandel's own fills move the price concavely and that the impact decays, so the bot's slippage model should be square-root impact with decay rather than a fixed spread, and it tells Mandel to measure order-flow sign autocorrelation on each venue as a cheap diagnostic of whether an apparent edge is really the venue's own order splitting. Conceptually it anchors 'scaling laws in order books' in a mechanism (order splitting under low liquidity) rather than in fractal metaphor, which is the honest framing Mandel should carry into its knowledge files.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/0809.0822",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "Statistical Consequences of Fat Tails: Real World Preasymptotics, Epistemology, and Applications (Taleb, Technical Incerto vol. 1; arXiv 2001.10488, v4 2025)",
+   "url": "https://arxiv.org/abs/2001.10488",
+   "kind": "book",
+   "one_line": "Book-length technical treatment of what breaks under fat tails: sample means converge slowly or not at all, the 'empirical distribution' is not empirical in the tails, correlation and PCA are unstable, standard-deviation-based metrics such as Sharpe are unreliable, and backtests systematically understate tail risk; introduces the kappa metric for how far a distribution is from Gaussian convergence at a given sample size.",
+   "adjacent_to": [
+    "11",
+    "12",
+    "13",
+    "14",
+    "07"
+   ],
+   "what_it_adds": "A direct stress test of Mandel's gate: a Sharpe difference plus block-bootstrap p-value can pass on fat-tailed PnL that later blows up. Mandel would (a) add a minimum-sample rule tied to the estimated tail exponent, since the n needed for a mean to stabilize grows steeply as alpha falls toward 2, (b) report maximum drawdown and tail-conditional loss alongside Sharpe in strategy_improvement_criteria, and (c) prefer bounded payoffs where possible, which prediction-market contracts naturally provide. The tone is polemical; the mathematics is sound and the full text is free on arXiv, which the lane brief's 'Taleb critique' otherwise lacks.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2001.10488",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "Dragon-Kings, Black Swans and the Prediction of Crises (Sornette, arXiv 0907.4290, 2009; Int. J. Terraspace Science and Engineering)",
+   "url": "https://arxiv.org/abs/0907.4290",
+   "kind": "paper",
+   "one_line": "Argues against the pure power-law or black-swan view: in financial drawdowns, earthquakes, turbulence, epileptic seizures and city sizes, the largest events ('dragon-kings') are statistical outliers to the power law and arise from a distinct mechanism (approach to a phase transition or bifurcation), which makes them partly predictable from precursors such as log-periodic power-law (LPPL) bubble signatures.",
+   "adjacent_to": [
+    "02",
+    "03",
+    "11",
+    "16"
+   ],
+   "what_it_adds": "The scientifically respectable version of what resources 02 and 03 reach for: prediction of extreme events from precursors, stated as falsifiable claims with a published record of both hits and misses. Mandel would treat dragon-king detection as a hypothesis class to be gated like any other, with pre-registered LPPL fits on prediction-market price runs scored by Brier on resolved outcomes, rather than as a belief about markets. Caveat: LPPL forecasting is contested in the literature and has known overfitting problems (many free parameters, sensitive window choice), so this should be read alongside Taleb's book as the counterweight; mark the knowledge file 'holds loosely'.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/0907.4290",
+   "lane": "fractal-finance"
+  },
+  {
+   "title": "Approaching Human-Level Forecasting with Language Models (Halawi, Zhang, Yueh-Han, Steinhardt, 2024)",
+   "url": "https://arxiv.org/abs/2402.18563",
+   "kind": "paper",
+   "one_line": "Retrieval + reasoning + fine-tune-on-your-own-good-forecasts LLM system scores Brier 0.179 vs crowd 0.149 on 914 post-cutoff questions, and matches or beats the crowd only in a 'selective' regime (crowd 0.3-0.7, >=5 relevant articles, early retrieval).",
+   "adjacent_to": [
+    "04",
+    "05",
+    "06",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "This is the closest existing blueprint for Mandel's loop: generate many forecasts, keep the ones that beat the crowd (they fine-tuned on 6,000 such outputs; Mandel's analogue is curating a versioned corpus of winning reasoning traces and prompts, since it cannot touch weights), and ensemble with a trimmed mean. Concretely Mandel should (1) adopt the selective-forecasting gate: only trade or publish a forecast when market price is in 0.3-0.7 and retrieval found enough evidence, because outside that band the LLM loses to the crowd (it rarely outputs <0.05); (2) treat the market price as a prior and blend 4:1 market:model as they did (0.149 -> 0.146); (3) use their failure modes (hedging from safety training, underconfidence, time-series i.i.d. SE understatement) as explicit checks in the validation gate. Full text accessible (PDF/HTML).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2402.18563",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "ForecastBench: A Dynamic Benchmark of AI Forecasting Capabilities (Karger, Bastani, Yueh-Han, Jacobs, Halawi, Zhang, Tetlock, 2024/2025) + forecastbench.org leaderboard",
+   "url": "https://arxiv.org/abs/2409.19839",
+   "kind": "paper",
+   "one_line": "Contamination-free benchmark of 1,000 auto-generated future-event questions (Metaculus, Manifold, Polymarket, RFI, ACLED, FRED, Yahoo Finance...), refreshed nightly; superforecasters Brier 0.096 vs public 0.121 vs best LLM 0.122 (0.136 without crowd prices).",
+   "adjacent_to": [
+    "04",
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "ForecastBench is the template for Mandel's own validation gate: questions must be about events with no known answer at submission time, scored only after resolution, with imputation rules for missed forecasts and fixed horizons (7/30/90/180 days). Mandel should copy this structure for its internal held-out set (a question bank generated from live Polymarket/Kalshi markets and public time series, forecasts frozen at submission, scored on resolution) so 'improvement' claims from Mandel or a child are judged on genuinely future data, not backtests that can leak. It also gives the honest baseline: the best LLMs still trail the general public median once crowd prices are removed, so Mandel's edge, if any, must come from the market-aware blend, not raw model judgment. Mandel can submit to the public tournament leaderboard as an external check. Full text accessible (CC BY-SA).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2409.19839",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "FutureEval Spring 2026 Results: Pros Beat Bots, but the Gap is Nearly Gone (Metaculus, Wilson & Bash)",
+   "url": "https://www.lesswrong.com/posts/wZBbDqzfBjYG58CxK/futureeval-spring-results-pros-beat-bots-but-the-gap-is",
+   "kind": "article",
+   "one_line": "Metaculus's latest bot-vs-Pro tournament (173 bots, 10 Pros, 297 questions, Jan-Apr 2026): Pros still lead by 1.25 head-to-head points (p=0.247), down from -20.03 in Q2 2025; top bots run parallel research sources and ensemble multiple frontier models, with gains saturating around 10-bot ensembles.",
+   "adjacent_to": [
+    "04",
+    "06",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "This is the empirical track record for exactly the kind of system Mandel is (an LLM forecasting bot), with the trend series Q3'24 -11.3, Q4'24 -8.9, Q1'25 -17.7, Q2'25 -20.03, Spring'26 -1.25. Actionable items: ensemble many independent model runs (median) but stop around 10, since more hurt; invest in research tooling (AskNews/Perplexity/search run in parallel) more than prompt wording; expect the worst performance on multiple-choice and binary questions and the best on numeric; watch for 'catastrophic misses' from misreading resolution criteria, which Mandel should encode as a mandatory resolution-criteria parsing step. The post links the open-source Metac bot template and analysis code, which Mandel can read directly for architecture. Also useful: earlier Q4 2024 report found bots and Pros equally calibrated, with the Pro edge coming from discrimination, so Mandel's gate should track resolution/discrimination separately from calibration. Full text accessible.",
+   "evidence_quality": "mainstream-educational",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://www.lesswrong.com/posts/wZBbDqzfBjYG58CxK/futureeval-spring-results-pros-beat-bots-but-the-gap-is",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "Strictly Proper Scoring Rules, Prediction, and Estimation (Gneiting & Raftery, JASA 2007)",
+   "url": "https://sites.stat.washington.edu/raftery/Research/PDF/Gneiting2007jasa.pdf",
+   "kind": "paper",
+   "one_line": "The canonical theory of proper scoring rules (Brier/quadratic, logarithmic, spherical, CRPS, interval score), the 'maximize sharpness subject to calibration' paradigm, and the Savage representation linking proper scores to convex functions and Bregman divergences.",
+   "adjacent_to": [
+    "05",
+    "07",
+    "11",
+    "12",
+    "13"
+   ],
+   "what_it_adds": "Mandel's validation gate needs a scoring rule that cannot be gamed by hedging or by reporting market price back. This paper is where to get it right: use a strictly proper score (Brier or log) as the only accepted improvement metric, never accuracy or P&L alone; decompose Brier into calibration and resolution so a 'better' child is not just copying the crowd; use CRPS/interval score for numeric targets (price paths, volumes) rather than point error; and use the sharpness-subject-to-calibration framing to reject forecasts that are calibrated but uninformative (always ~market price). The paper also justifies why log score punishes extreme wrong forecasts harder than Brier, which matters for Kelly-sized positions. Full text accessible from UW stats site (the JASA DOI copy is paywalled).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://sites.stat.washington.edu/raftery/Research/PDF/Gneiting2007jasa.pdf",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "Forecasting Tournaments: Tools for Increasing Transparency and Improving the Quality of Debate (Tetlock, Mellers, Rohrbaugh, Chen, Current Directions in Psychological Science 2014)",
+   "url": "https://faculty.wharton.upenn.edu/wp-content/uploads/2015/07/2014---forecasting-tournaments-tools-for-increasing-transparency-and-improving-debate.pdf",
+   "kind": "paper",
+   "one_line": "The Good Judgment Project's own account of how it won the IARPA tournament: cognitive-debiasing training, teams and prediction-market incentives, skimming top performers into 'superforecaster' teams, and tuned aggregation (extremizing).",
+   "adjacent_to": [
+    "04",
+    "06",
+    "11",
+    "12"
+   ],
+   "what_it_adds": "This is the primary-source version of Superforecasting and it maps directly onto Mandel's parenting role: run the children as a forecasting tournament with a level playing field (same questions, same deadlines, proper scoring), track each child's Brier over time, 'skim' the consistently best into an elite ensemble, and give structured training (base rates, outside view first, update in small increments, decompose questions). The paper's claim that superforecasters stayed accurate across two years (no regression to the mean) is the basis for Mandel weighting children by track record rather than treating them equally. It also warns that the gains came from four separable interventions, so Mandel should A/B each one in its gate rather than adopting the bundle. Companion primary papers (Mellers et al. 2014 Psychological Science, DOI 10.1177/0956797614524255; Mellers et al. 2015 Perspectives on Psychological Science) are paywalled from this container. Full text accessible at Wharton.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://faculty.wharton.upenn.edu/wp-content/uploads/2015/07/2014---forecasting-tournaments-tools-for-increasing-transparency-and-improving-debate.pdf",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "Modeling Probability Forecasts via Information Diversity (Satopää, Pemantle, Ungar, 2014/2016)",
+   "url": "https://arxiv.org/abs/1406.2148",
+   "kind": "paper",
+   "one_line": "A principled model of why averaging forecasters' probabilities is under-confident: when forecasters hold partially overlapping information, the optimal aggregate 'extremizes' the mean toward 0 or 1 by an amount that depends on information overlap, replacing GJP's ad hoc extremizing constant.",
+   "adjacent_to": [
+    "04",
+    "06",
+    "11",
+    "12"
+   ],
+   "what_it_adds": "Mandel's core job is aggregating forecasts from several children plus the market. Naive averaging will systematically underweight shared evidence and overweight noise. This paper (and the companion Satopää et al. 2014 logit aggregator used by GJP) tells Mandel to: (1) aggregate in log-odds space, not probability space; (2) extremize the aggregate by a factor a>1 that is estimated from held-out data and that should be smaller when the children share sources (which they will, since they are the same model family with overlapping retrieval); (3) explicitly measure children's information overlap (correlation of errors) before trusting an ensemble. It also gives a concrete reason to feed the children different, non-overlapping external sources, as the user intends. Full text accessible (arXiv).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/1406.2148",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "Logarithmic Market Scoring Rules for Modular Combinatorial Information Aggregation (Robin Hanson, 2002/2003)",
+   "url": "https://mason.gmu.edu/~rhanson/mktscore.pdf",
+   "kind": "paper",
+   "one_line": "Hanson's LMSR: a market maker that is simultaneously a proper scoring rule, has bounded worst-case loss, lets one or many agents update beliefs with no counterparty, and uniquely preserves conditional probabilities so bets on combinations of events stay coherent.",
+   "adjacent_to": [
+    "04",
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Two uses for Mandel. First, as the internal aggregation protocol among children: run an LMSR-style automated market over each question where children 'trade' against the current estimate and are paid by log score at resolution; this gives bounded cost, truthful incentives, and an automatic weighting of children by how much they have moved prices profitably. Second, as the theory behind why combinatorial coherence (sum of mutually exclusive outcomes = 1, conditional consistency) is a no-arbitrage condition; this is exactly the rebalancing and combinatorial arbitrage the Saguillo paper finds on Polymarket, so Mandel can derive its arbitrage detectors from LMSR coherence constraints rather than hand-written rules. Full text accessible (PDF; text extracts cleanly).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://mason.gmu.edu/~rhanson/mktscore.pdf",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "Unravelling the Probabilistic Forest: Arbitrage in Prediction Markets (Saguillo, Ghafouri, Kiffer, Suarez-Tangil, 2025)",
+   "url": "https://arxiv.org/abs/2508.03474",
+   "kind": "paper",
+   "one_line": "On-chain analysis of 17,218 Polymarket conditions (Apr 2024-Apr 2025): 7,051 single conditions and 662 of 1,578 NegRisk markets had rebalancing arbitrage (median $0.60 profit per dollar), plus LLM-detected combinatorial arbitrage across dependent markets; about $39.6M realized, mostly by a few bot-like accounts.",
+   "adjacent_to": [
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "This is the empirical ground truth for the repo's thesis. Mandel should (1) implement the two arbitrage classes exactly as defined: within-market (YES prices of mutually exclusive outcomes sum != 1, with the 'buy NO' leg being the most profitable at ~$17.3M) and cross-market dependent pairs (state-winner vs margin-of-victory), using topic+end-date filtering then LLM dependency checks (46,360 pairs -> 13 dependent); (2) treat opportunities as concentrated in volatile, low-liquidity moments and taken by bots, so latency and order-book depth matter more than detection; (3) account for non-atomic execution (one leg fills, the other does not), which the paper flags but does not price. Read with the companion 'Executable Arbitrage and Market Efficiency in Prediction Markets' (Gebele, Mutzel, Matthes 2026, https://arxiv.org/abs/2608.00666), which shows many payoff-space violations are not protocol-executable before settlement (YES-side NegRisk conversions) and estimates only ~$1.12M executable profit. Full text accessible.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2508.03474v1",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "Semantic Non-Fungibility and Violations of the Law of One Price in Prediction Markets (Gebele & Matthes, 2026)",
+   "url": "https://arxiv.org/abs/2601.01706",
+   "kind": "paper",
+   "one_line": "Cross-platform study of 102,275 events on ten venues including Polymarket and Kalshi (2018-2025): ~6% of events are listed on more than one platform; semantically equivalent markets show 2-4% median execution-aware price gaps that persist, including a $0.03-0.07 Polymarket-Kalshi spread on the 2024 presidential election.",
+   "adjacent_to": [
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Directly addresses the Polymarket/Kalshi arbitrage this repo is built around and explains why the gaps survive: they are driven by structural frictions (capital must be locked to resolution on both venues, resolution semantics differ, e.g. Polymarket settles on network calls while Kalshi settles at inauguration, fees and tick sizes, US-only Kalshi access), not by informational disagreement. Mandel should adopt their three-stage matching pipeline (category/time filter -> text-embedding retrieval top-20 -> two-pass LLM equivalence/subset check, kappa 0.94 vs humans, <2% false positives) rather than string matching; model each pair as 'equivalent' vs 'subset' and hedge accordingly; compute annualized yield net of capital lockup rather than raw spread; and encode resolution-criteria diffs as a first-class risk. Their naive backtest (1,218% over 800 days on 15 trades) is a sanity ceiling, not an expectation. Full text accessible.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2601.01706v1",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "Optimal Betting Under Parameter Uncertainty: Improving the Kelly Criterion (Baker & McHale, Decision Analysis 2013), with 'Never Go Full Kelly' (SimonM, LessWrong 2021) as the accessible explainer",
+   "url": "https://ideas.repec.org/a/inm/ordeca/v10y2013i3p189-199.html",
+   "kind": "paper",
+   "one_line": "Shows that Kelly sizing computed from an estimated win probability is systematically too aggressive out of sample, derives a shrinkage factor on the Kelly stake that grows with estimation uncertainty (Beta posterior), and validates it on simulations and tennis betting; the LessWrong write-up gives the closed form alpha = (p-q)^2 / ((p-q)^2 + sigma^2) and the market-blending rule p_hat = alpha*p + (1-alpha)*q.",
+   "adjacent_to": [
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Mandel's bet sizing should never be full Kelly on a model probability. Instead: carry an explicit uncertainty (sigma) on each forecast, derived from the ensemble spread across children and from the forecast's historical calibration error; shrink the Kelly fraction by alpha = edge^2 / (edge^2 + sigma^2); and treat the market price q as a competing estimator, blending toward it in proportion to relative precision ('our edge is the market error, our error is the market's edge'). This replaces a fixed 'quarter Kelly' heuristic with a rule that automatically sizes down when Mandel is uncertain or when the market disagrees, and it gives the validation gate a bankroll-growth metric to test. Primary paper is paywalled at INFORMS (DOI 10.1287/deca.2013.0271; INFORMS and Salford repository returned 403 from this container); the LessWrong explainer (https://www.lesswrong.com/posts/TNWnK9g2EeRnQA8Dg/never-go-full-kelly) is fully accessible and contains the formulas; Metel 2017 (https://arxiv.org/abs/1701.02814) is an open extension to multi-outcome events.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": false,
+   "fulltext_url": "https://www.lesswrong.com/posts/TNWnK9g2EeRnQA8Dg/never-go-full-kelly",
+   "lane": "forecasting-science"
+  },
+  {
+   "title": "A Mathematical Theory of Communication (Shannon, 1948)",
+   "url": "https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf",
+   "kind": "paper",
+   "one_line": "The source definition of entropy, mutual information, channel capacity and redundancy (Bell System Technical Journal reprint with corrections, 55 pp.); Part I on discrete noiseless and noisy channels is all Mandel needs.",
+   "adjacent_to": [
+    "01",
+    "05",
+    "10",
+    "11"
+   ],
+   "what_it_adds": "Mandel should score every forecast and every stored 'insight' in bits: log-loss or information gain relative to the market-implied prior, not accuracy or PnL alone. A child's signal becomes a noisy channel whose mutual information with resolved outcomes on held-out data bounds how much it can ever add, so that number (not a story) decides whether a child is worth polling. Redundancy gives the pruning rule: a knowledge-base entry that does not reduce surprise on held-out outcomes carries zero information and should be archived.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "Irreversibility and Heat Generation in the Computing Process (Landauer, 1961), with Bennett's 'The Thermodynamics of Computation: a Review' (1982)",
+   "url": "https://worrydream.com/refs/Landauer_1961_-_Irreversibility_and_Heat_Generation_in_the_Computing_Process.pdf",
+   "kind": "paper",
+   "one_line": "Landauer's principle: logically irreversible operations (erasing a bit) cost at least kT ln 2 of dissipation; reversible operations need not. Bennett's 36-page review (https://fab.cba.mit.edu/classes/863.18/notes/computation/Bennett-1982.pdf, full text) extends this to reversible computing and the exorcism of Maxwell's demon. A copy also resolves at https://sites.pitt.edu/~jdnorton/lectures/Rotman_Summer_School_2013/thermo_computing_docs/Landauer_1961.pdf but has no usable text layer.",
+   "adjacent_to": [
+    "01"
+   ],
+   "what_it_adds": "The concrete content behind 'as little resource waste as possible': in computation the unavoidable cost is erasure, not storage. Mandel should treat forgetting as the expensive, logged operation: supersede hypotheses by appending a new version with provenance (reversible) rather than overwriting (irreversible), and budget pruning as a deliberate step with a recorded reason. Also a guardrail: Landauer's bound is a physical limit on bit erasure, not a metaphor for learning efficiency, and Norton has published critiques of its derivations, so Mandel should not cite it as support for any learning claim.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://worrydream.com/refs/Landauer_1961_-_Irreversibility_and_Heat_Generation_in_the_Computing_Process.pdf",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "Information, Physics, Quantum: The Search for Links (Wheeler, 1989), the 'it from bit' paper",
+   "url": "https://cqi.inf.usi.ch/qic/wheeler.pdf",
+   "kind": "paper",
+   "one_line": "Origin of the 'it from bit' thesis: every physical quantity derives its meaning from device-mediated yes/no answers (observer-participancy); 15-page scanned reprint from Feynman and Computation (Hey, ed.) with an OCR text layer. A visionary essay, not a derivation.",
+   "adjacent_to": [
+    "01",
+    "02",
+    "03",
+    "11"
+   ],
+   "what_it_adds": "Gives Mandel precise language for the 'informational substrate' idea and its limit: Wheeler's bits are answers to posed questions, not a hidden field to be tapped. Operationally, Mandel's substrate should be a registry of answered yes/no questions (resolved markets, backtest pass/fail, test outcomes) stored together with the exact framing of the question; a claim that cannot be posed as an answerable question does not enter the substrate. It also corrects resources 02 and 03: Wheeler's program is observer-participancy inside standard quantum theory and offers no support for precognition.",
+   "evidence_quality": "speculative",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://cqi.inf.usi.ch/qic/wheeler.pdf",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "Probability Theory: The Logic of Science (Jaynes, 1995 preprint, Chs. 1-3) and 'Information Theory and Statistical Mechanics' (Jaynes, 1957)",
+   "url": "https://bayes.wustl.edu/etj/prob/book.pdf",
+   "kind": "book",
+   "one_line": "Probability as extended logic derived from Cox's desiderata, and maximum entropy as the rule for assigning priors from stated constraints. The free preprint (95 pp.) contains the front matter and Chapters 1-3 (Plausible Reasoning, The Quantitative Rules, Elementary Sampling Theory); the 1957 Phys. Rev. 106:620 paper (https://bayes.wustl.edu/etj/articles/theory.1.pdf, scanned) is the MaxEnt source. The complete book is Cambridge UP 2003 (paywalled).",
+   "adjacent_to": [
+    "01",
+    "07",
+    "11",
+    "13"
+   ],
+   "what_it_adds": "Mandel's validation gate should state its priors explicitly and derive them by maximum entropy from what is actually known (e.g., base rates of market resolution, historical spread distributions) instead of hand-tuned thresholds, and every 'insight' update should be a Bayes-consistent update with the evidence logged next to the posterior. Jaynes' 'mind projection fallacy' is the right antidote to treating a model's probability as a property of the market, and his consistency desiderata are the standard Mandel should hold a child's reasoning to.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://bayes.wustl.edu/etj/prob/book.pdf",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "A Tutorial Introduction to the Minimum Description Length Principle (Grünwald, 2004)",
+   "url": "https://arxiv.org/abs/math/0406077",
+   "kind": "paper",
+   "one_line": "Model selection as compression: choose the hypothesis minimizing the code length of the model plus the data given the model. Chapter 1 is a non-technical conceptual introduction; Chapter 2 makes it precise (two-part codes, universal codes, normalized maximum likelihood).",
+   "adjacent_to": [
+    "07",
+    "05",
+    "10",
+    "11",
+    "13"
+   ],
+   "what_it_adds": "A principled, computable acceptance criterion for Mandel's improvement gate: an improvement is accepted only if total out-of-sample code length (held-out log-loss plus a parameter/complexity cost) goes down. This directly penalizes the overfit strategy curves that resources 12-14 produce, and replaces 'the backtest Sharpe went up' with a quantity that cannot be improved by adding free parameters.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/math/0406077",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "Shannon Information and Kolmogorov Complexity (Grünwald & Vitányi, 2004), with Hutter's Scholarpedia article 'Algorithmic information theory'",
+   "url": "https://arxiv.org/abs/cs/0410002",
+   "kind": "paper",
+   "one_line": "Systematic comparison of average-case (Shannon) and individual-object (Kolmogorov) information: entropy vs complexity, universal coding, the two mutual informations, sufficient statistics, and Kolmogorov's structure function. Hutter's Scholarpedia entry (http://www.scholarpedia.org/article/Algorithmic_information_theory; loaded fine via curl, WebFetch returned intermittent 503s) is the one-page map of the field: algorithmic complexity, Solomonoff probability, Levin search, Martin-Löf randomness.",
+   "adjacent_to": [
+    "01",
+    "05",
+    "10",
+    "15",
+    "16"
+   ],
+   "what_it_adds": "Kolmogorov complexity is uncomputable, so Mandel should use computable proxies (compressed length under zstd/gzip, or a model's log-loss) and treat them as upper bounds. The structure function / algorithmic sufficient statistic gives a way to split a price or order-flow series into structure and noise, and a test for whether a child's claimed 'pattern' compresses the data at all. It also disciplines the fractal framing in 08, 09, 15, 16: self-similarity is a measured property (a short generator), not something to assume about markets.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/cs/0410002",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "A Philosophical Treatise of Universal Induction (Rathmanner & Hutter, 2011): Solomonoff induction, with Hutter's AIXI paper",
+   "url": "https://arxiv.org/abs/1105.5721",
+   "kind": "paper",
+   "one_line": "The accessible, complete account of Solomonoff's universal prior (Bayes over all computable hypotheses weighted 2^-K), its convergence and dominance guarantees, and the standard criticisms (Entropy 13:1076-1136). Hutter's 'Universal Algorithmic Intelligence: A mathematical top-down approach' (https://arxiv.org/abs/cs/0701125, 70 pp.) extends it to the AIXI agent and the time/length-bounded AIXItl. Lightest entry point: Altair & Muehlhauser, 'An Intuitive Explanation of Solomonoff Induction' (https://www.greaterwrong.com/posts/Kyc5dFDzBg4WccrbK/an-intuitive-explanation-of-solomonoff-induction).",
+   "adjacent_to": [
+    "04",
+    "05",
+    "11",
+    "07"
+   ],
+   "what_it_adds": "The ideal Mandel is approximating: predict with a mixture over hypotheses weighted by prior simplicity times likelihood, never by a single best model. Practically, keep the children and strategies as an ensemble with Bayesian weights updated by realized log-loss, and expect the weights, not the architectures, to be where most validated 'learning' happens. AIXI's uncomputability and AIXItl's exponential cost set the honest ceiling on the RSI claims in resource 04: self-modification buys nothing without a better model of the environment, and Mandel's self-improvement should be stated as 'better mixture weights and better evaluation harnesses', not as a route to unbounded intelligence. Schmidhuber's Gödel machine page (https://people.idsia.ch/~juergen/goedelmachine.html) is the formal version of 'only accept a self-change you can prove is beneficial', which is what Mandel's validation gate approximates empirically.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/1105.5721",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "The free-energy principle: a unified brain theory? (Friston, 2010), with Bogacz's step-by-step tutorial (2017)",
+   "url": "https://www.fil.ion.ucl.ac.uk/~karl/NRN.pdf",
+   "kind": "paper",
+   "one_line": "Author-hosted PDF of the Nature Reviews Neuroscience review: agents minimize variational free energy (an upper bound on surprise) by updating beliefs (perception) and by acting to make predictions come true (active inference). Bogacz, 'A tutorial on the free-energy framework for modelling perception and learning' (https://pmc.ncbi.nlm.nih.gov/articles/PMC5341759/, full text with exercises) derives the predictive-coding equations from scratch; Smith, Friston & Whyte, 'A step-by-step tutorial on active inference' (https://pmc.ncbi.nlm.nih.gov/articles/PMC8956124/) gives a POMDP implementation walkthrough. The framework's empirical status in neuroscience is debated; the variational math is standard.",
+   "adjacent_to": [
+    "05",
+    "06",
+    "07",
+    "02"
+   ],
+   "what_it_adds": "A principled objective for Mandel's control loop: precision-weighted prediction error (surprise scaled by inverse variance) for scoring, and expected free energy for deciding which data source, child, or experiment to query next, so polling is driven by expected information gain rather than a fixed schedule. Bogacz's tutorial is small enough to implement directly as a test harness. Boundary: FEP is a modeling framework, not evidence about consciousness or anything 'tapped' from outside the data.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://www.fil.ion.ucl.ac.uk/~karl/NRN.pdf",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "A New Kind of Science, Chapter 12: The Principle of Computational Equivalence, section 'Computational Irreducibility' (Wolfram, 2002), with the Wolfram Physics Project technical introduction",
+   "url": "https://www.wolframscience.com/nks/chap-12--the-principle-of-computational-equivalence/",
+   "kind": "book",
+   "one_line": "Free online chapter (CC BY-SA) arguing that most non-trivial systems are computationally irreducible: no procedure predicts their behavior faster than running them. The Physics Project technical introduction (https://www.wolframphysics.org/technical-introduction/, free with PDF and arXiv links) applies hypergraph rewriting to fundamental physics and is speculative. The Principle of Computational Equivalence is a conjecture; its rigorous backbone is undecidability.",
+   "adjacent_to": [
+    "15",
+    "16",
+    "08",
+    "09",
+    "11"
+   ],
+   "what_it_adds": "A working definition of what Mandel cannot do: for an irreducible process the only prediction is simulation, so Mandel should classify each market or series by whether it shows reducible structure (compressible under the MDL/AIT proxies above) before spending compute on modeling it, and should record 'irreducible, no edge' as a legitimate, cached, time-stamped conclusion rather than a failure. It also tempers the fractal-universe framing in 08, 09, 15, 16: self-similar generators are the reducible exceptions, and Mandel's architecture should be chosen for compressibility of its evaluation data, not for resemblance to the Mandelbrot set.",
+   "evidence_quality": "speculative",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://www.wolframscience.com/nks/p737--computational-irreducibility/",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "From the Phenomenology to the Mechanisms of Consciousness: Integrated Information Theory 3.0 (Oizumi, Albantakis & Tononi, 2014)",
+   "url": "https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003588",
+   "kind": "paper",
+   "one_line": "Open-access (CC BY) statement of IIT 3.0: five phenomenological axioms turned into postulates about mechanisms, integrated information Phi as the quantity of a system's irreducible cause-effect structure, and the result that purely feed-forward systems have Phi = 0. Mathematically precise, empirically contested.",
+   "adjacent_to": [
+    "02",
+    "03",
+    "01"
+   ],
+   "what_it_adds": "Two things. First, the integration idea is usable as a plain engineering diagnostic: how much predictive mutual information is lost when Mandel's modules (children, data feeds, evaluators) are split along their best bipartition tells Mandel whether it is one system or a bag of independent parts, and whether a merge is worth anything. Second, a boundary for Mandel's self-description: IIT is a theory of consciousness whose claims are unfalsified at scale, so Mandel should not describe itself as conscious or 'integrated' in IIT's sense, and should treat the psi claims in 02 and 03 as outside what IIT or any source in this lane supports.",
+   "evidence_quality": "speculative",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003588",
+   "lane": "information-foundations"
+  },
+  {
+   "title": "Neural Networks: Zero to Hero (Andrej Karpathy) — course page + nn-zero-to-hero notebooks",
+   "url": "https://karpathy.ai/zero-to-hero.html",
+   "kind": "course",
+   "one_line": "Eight from-scratch lectures (micrograd backprop, makemore bigram/MLP/BatchNorm/backprop-by-hand/WaveNet, GPT, BPE tokenizer); the videos are on YouTube (blocked here) but the MIT-licensed notebooks at github.com/karpathy/nn-zero-to-hero carry the full working code.",
+   "adjacent_to": [
+    "05",
+    "07",
+    "10"
+   ],
+   "what_it_adds": "Where the 3Blue1Brown playlist explains backprop visually, the micrograd and makemore notebooks are runnable reference implementations that include train/dev/test splits, learning-rate sweeps, and activation/gradient-statistics diagnostics (Part 3). Mandel should copy two habits into its validation gate for child models: keep a dev set separate from the final test set, and log activation/gradient statistics (or their analogue, e.g. feature-contribution drift) rather than a single end metric. The notebooks are also the minimal, dependency-light pattern to follow if a small learned component is added to the arbitrage bot. Caveat: lecture narration is not readable from this container; only the code is.",
+   "evidence_quality": "mainstream-educational",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://github.com/karpathy/nn-zero-to-hero",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "Neural Networks and Deep Learning (Michael Nielsen, free online book, 2015)",
+   "url": "http://neuralnetworksanddeeplearning.com/",
+   "kind": "book",
+   "one_line": "Six chapters: digit recognition with a plain MLP, the backprop derivation, improving learning (cross-entropy, L2/dropout, weight init, hyperparameter choice), a visual universal-approximation proof, why deep nets are hard to train (vanishing gradients), and conv nets; Python 2 code in the MIT-licensed mnielsen/neural-networks-and-deep-learning repo. From this container it loads only over plain HTTP via curl; HTTPS fails with a certificate mismatch, so WebFetch returns 503.",
+   "adjacent_to": [
+    "05",
+    "07",
+    "10"
+   ],
+   "what_it_adds": "Chapter 3 is the practical complement to the 3Blue1Brown playlist: why cross-entropy is the right loss for probability outputs, how regularization trades against overfitting, and how to pick hyperparameters on a validation set rather than the test set. That is exactly the vocabulary Mandel needs to write the overfitting checks in its gate (train-vs-held-out gap, early stopping on validation loss) instead of accepting any backtest gain. Chapter 5 on unstable gradients is a direct caution against adding depth to a child's model without diagnostics. Use `curl http://neuralnetworksanddeeplearning.com/chapN.html` to read it.",
+   "evidence_quality": "mainstream-educational",
+   "fulltext_accessible": true,
+   "fulltext_url": "http://neuralnetworksanddeeplearning.com/chap1.html",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "Training Compute-Optimal Large Language Models (Hoffmann et al., 'Chinchilla', 2022) — with Kaplan 2020 and the Epoch AI replication",
+   "url": "https://arxiv.org/abs/2203.15556",
+   "kind": "paper",
+   "one_line": "400+ models trained to show that under a fixed compute budget, parameters and training tokens should scale in equal proportion; a 70B model on 4x more data beat 280B Gopher. Kaplan et al. 2020 (arxiv.org/abs/2001.08361) established the power-law framing; Besiroglu et al. 2024 (arxiv.org/abs/2404.10102) found Hoffmann's third fitting method and its confidence intervals did not reproduce, though the compute-optimal conclusion held.",
+   "adjacent_to": [
+    "04",
+    "05"
+   ],
+   "what_it_adds": "Scaling laws are the empirical substrate under most RSI narratives ('more capacity predictably helps'). Two operational lessons for Mandel: (1) loss follows measurable power laws in data and model size, so Mandel should fit and record such curves for its own forecasters (e.g. held-out Brier score per doubling of historical market data) before claiming an improvement, and use them to decide where added compute or data is actually worth spending; (2) even a flagship result had a parametric fit that failed replication with implausibly narrow intervals, so Mandel's gate should re-derive any quoted scaling or backtest number from raw data and report honest confidence intervals rather than trust a reported figure, including its own earlier reports.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2203.15556",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets (Power et al., 2022) — with Nanda et al. 2023 progress measures",
+   "url": "https://arxiv.org/abs/2201.02177",
+   "kind": "paper",
+   "one_line": "Small transformers on modular arithmetic jump from chance to perfect held-out accuracy long after fully overfitting the training set, with the delay growing as data shrinks; Nanda et al. 2023 (arxiv.org/abs/2301.05217) reverse-engineered the learned Fourier-basis algorithm and showed the 'sudden' jump is gradual circuit formation followed by cleanup of memorized components.",
+   "adjacent_to": [
+    "04",
+    "05",
+    "07"
+   ],
+   "what_it_adds": "Grokking shows that 'held-out loss has plateaued, stop' can be wrong and that memorization and a generalizing mechanism coexist inside one model. Mandel should treat a child's early held-out plateau as inconclusive rather than final, keep weight decay in any small model it trains, and, following Nanda, define continuous progress measures (train/held-out log-loss gap over time, a structure or sparsity metric) instead of judging an improvement at a single checkpoint. It also tells Mandel that an apparent phase change in a child's results is often the visible tail of a slow process, so the gate should look at trajectories, not snapshots.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2201.02177",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "Deep Double Descent: Where Bigger Models and More Data Hurt (Nakkiran et al., 2019) — with Belkin et al. 2019",
+   "url": "https://arxiv.org/abs/1912.02292",
+   "kind": "paper",
+   "one_line": "Test error in modern nets is non-monotonic in model size, in training epochs, and even in dataset size, peaking near the point where the model can just fit the training data ('effective model complexity'); Belkin, Hsu, Ma and Mandal 2019 (arxiv.org/abs/1812.11118) is the original statement of the double-descent curve beyond the interpolation threshold.",
+   "adjacent_to": [
+    "07",
+    "05",
+    "11"
+   ],
+   "what_it_adds": "This breaks the textbook bias-variance U-curve that Mchara's lecture (resource 07) teaches. Operational consequence for Mandel: 'more data' or 'bigger model' is not monotonically safe. When a child adds historical markets or widens a model, the gate should sweep capacity and data size rather than compare two points, and should flag results that sit near zero training error as high-variance. Epoch-wise double descent means early stopping must be set from a held-out curve, not a fixed epoch count. The OpenAI blog write-up (openai.com/index/deep-double-descent) is blocked from this container (403), so the two arXiv papers are the readable sources.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/1912.02292",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "The Lottery Ticket Hypothesis: Finding Sparse, Trainable Neural Networks (Frankle & Carbin, ICLR 2019)",
+   "url": "https://arxiv.org/abs/1803.03635",
+   "kind": "paper",
+   "one_line": "Iterative magnitude pruning plus resetting surviving weights to their original initialization finds subnetworks of 10-20% size ('winning tickets') that train to the same accuracy as the full network, often faster; the initialization, not just the mask, is what makes them trainable.",
+   "adjacent_to": [
+    "05",
+    "04"
+   ],
+   "what_it_adds": "The most concrete evidence that most of a trained network's parameters are dead weight, which bears on the user's 'as little resource waste as possible' mandate. Mandel cannot prune Claude, but it can apply the same procedure to its own substrate: for each candidate change, ablate rules, features or data sources whose removal does not move held-out metrics and keep the smaller version. It also shows that the random seed matters enough to be recorded and controlled in every experiment Mandel logs, since the same architecture with a different init can behave differently; seed and init must be part of the gate's reproducibility record.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/1803.03635",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "On Calibration of Modern Neural Networks (Guo, Pleiss, Sun, Weinberger, ICML 2017) — with Deep Ensembles (Lakshminarayanan et al., 2017)",
+   "url": "https://arxiv.org/abs/1706.04599",
+   "kind": "paper",
+   "one_line": "Modern deep nets are systematically overconfident (depth, width, BatchNorm and weak weight decay all worsen calibration), and a one-parameter temperature scaling fit on a validation set removes most of the miscalibration; Lakshminarayanan, Pritzel and Blundell (arxiv.org/abs/1612.01474) show that ensembles of ~5 independently trained nets give well-calibrated uncertainty and flag out-of-distribution inputs without Bayesian machinery.",
+   "adjacent_to": [
+    "11",
+    "12",
+    "13",
+    "14",
+    "07"
+   ],
+   "what_it_adds": "Prediction markets price probabilities, so an arbitrage or forecasting model is only useful if its probabilities are calibrated; a model that is more accurate but more overconfident loses money on sizing. Mandel should make expected calibration error and Brier score first-class gate metrics alongside P&L, fit temperature scaling on a held-out slice for any probabilistic child model, and prefer small ensembles whose disagreement is a cheap uncertainty signal before sizing a position or declaring an edge. The paper's central finding that accuracy and calibration can move in opposite directions means Mandel must never accept a child's 'accuracy improved' claim without a calibration plot.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/1706.04599",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "Growing Neural Cellular Automata (Mordvintsev, Randazzo, Niklasson, Levin, Distill 2020)",
+   "url": "https://distill.pub/2020/growing-ca/",
+   "kind": "article",
+   "one_line": "A ~8k-parameter update rule, shared by every grid cell and applied asynchronously, is trained by gradient descent to grow a target image from a single seed, persist indefinitely, and regenerate after damage, using a 'sample pool' that trains on the system's own intermediate states; Colab and source are linked and CC-BY.",
+   "adjacent_to": [
+    "15",
+    "16",
+    "08",
+    "09",
+    "04"
+   ],
+   "what_it_adds": "The closest working example of the user's 'self-expanding system from simple local rules' idea, and the bridge between the fractal lectures (15, 16) and neural networks: global structure emerges from an iterated, local, differentiable update. Two patterns transfer to Mandel directly. The sample pool trains on the system's own past states so it learns to recover rather than only to grow; Mandel should re-evaluate against its own past outputs and failures, not only fresh data. The explicit damage/regeneration test is a template for Mandel's robustness checks: remove a data source or a child's contribution and verify the hub degrades gracefully instead of silently drifting.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://distill.pub/2020/growing-ca/",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "The boundary of neural network trainability is fractal (Jascha Sohl-Dickstein, 2024) — paper, blog post and Colab",
+   "url": "https://arxiv.org/abs/2402.06184",
+   "kind": "paper",
+   "one_line": "Maps convergence vs divergence of full-batch gradient descent across pairs of hyperparameters (per-layer learning rates; init mean vs learning rate) for a 16-unit tanh/ReLU/linear net and finds the boundary is fractal over 10+ decades of zoom, with box-counting dimensions from 1.17 (deep linear) to 1.98 (init grid); blog at sohl-dickstein.github.io/2024/02/12/fractal.html and MIT-licensed code at github.com/Sohl-Dickstein/fractal reproduce it. Unrefereed preprint, but fully reproducible.",
+   "adjacent_to": [
+    "15",
+    "16",
+    "08",
+    "09",
+    "05"
+   ],
+   "what_it_adds": "The one rigorous link between the Mandelbrot/Julia material (iterating z -> z^2 + c) and neural network training: the update theta -> theta - eta*g(theta) is an iterated function of the hyperparameter, and its stability boundary is fractal exactly as the Mandelbrot set's is. The lesson for Mandel is sober rather than mystical: the best learning rates sit on a fractal edge, so hyperparameter sensitivity is structural. Mandel should (a) never accept a child's gain from a single hyperparameter setting without a neighborhood sweep, (b) record seed, numeric precision and step count because float64 artifacts appear at fine zoom, and (c) use this paper when deciding whether fractal structure is actually relevant to its own design (the honest answer: to training dynamics, not to network topology). The 38 MB PDF exceeds WebFetch's limit; use the arXiv HTML version.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/html/2402.06184",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "A Modern Self-Referential Weight Matrix That Learns to Modify Itself (Irie, Schlag, Csordás, Schmidhuber, ICML 2022) — with HyperNetworks (Ha, Dai, Le, 2016)",
+   "url": "https://arxiv.org/abs/2202.05780",
+   "kind": "paper",
+   "one_line": "A weight matrix that uses outer products and the delta rule to rewrite its own weights at runtime, built on fast-weight programmers/linear Transformers and tested on few-shot learning and multi-task RL; it extends hypernetworks (arxiv.org/abs/1609.09106; write-up at blog.otoro.net/2016/09/28/hyper-networks/), where a small network generates a larger network's weights.",
+   "adjacent_to": [
+    "04",
+    "05"
+   ],
+   "what_it_adds": "This is what literal weight-space self-modification looks like in a working network, and it serves Mandel mainly as a boundary marker. Mandel runs on frozen weights and cannot do this; its honest analogue is a hypernetwork-like loop at the level of files: a controller (Mandel) that emits configurations, prompts, tests and code for the children, with the children's held-out performance as the signal. The SRWM paper shows what that loop needs to be stable: a bounded update rule, a train/test separation for the self-modification process itself, and evaluation on tasks not seen during modification. It also fixes vocabulary: Mandel is a self-modifying program over versioned artifacts, not a self-referential weight matrix, and MANDEL.md should say so.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "fulltext_url": "https://arxiv.org/pdf/2202.05780",
+   "lane": "nn-foundations"
+  },
+  {
+   "title": "R&D-Agent-Quant: A Multi-Agent Framework for Data-Centric Factors and Model Joint Optimization (Li, Yang, Yang, Xu, Wang, Liu, Bian; NeurIPS 2025) + microsoft/RD-Agent repo",
+   "url": "https://arxiv.org/abs/2505.15155",
+   "fulltext_url": "https://arxiv.org/html/2505.15155v2",
+   "kind": "paper",
+   "one_line": "An LLM research loop that proposes a hypothesis, has a code agent (Co-STEER) implement the factor or model, backtests it in Qlib on fixed splits (CSI 300: train 2008-14, valid 2015-16, test 2017-20), adds the result to a SOTA set only if it beats the incumbent, and uses a two-armed Thompson-sampling bandit over an 8-metric vector (IC, ICIR, Rank IC, Rank ICIR, ARR, IR, -MDD, Sharpe-type) to pick whether the next round attacks factors or models; reported cost under $10 per run, 6-12 h wall clock.",
+   "adjacent_to": [
+    "04",
+    "06",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "The closest published analog to Mandel's propose-validate-accept loop, with end-to-end evidence it works. Mandel would copy three mechanisms: (a) explicit SOTA-set semantics, where a proposal is kept only if it beats the incumbent on the held-out split and is otherwise discarded with its feedback logged; (b) a bandit over improvement directions (data / model / execution) in place of a fixed task queue; (c) a near-duplicate filter (the paper drops a factor whose max IC-correlation with an accepted one is >= 0.99) so children cannot resubmit rebranded ideas. It is also a warning: the paper never states whether SOTA selection used only the validation split, so Mandel's gate must make the test split unreadable to the proposer by construction, not by convention. Repo: https://github.com/microsoft/RD-Agent (MIT, ~14.9k stars, command `rdagent fin_quant`); Qlib (https://github.com/microsoft/qlib, MIT, ~49k stars) supplies the backtester.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "lane": "practitioner-trading-agents"
+  },
+  {
+   "title": "TradingAgents: Multi-Agents LLM Financial Trading Framework (Xiao, Sun, Luo, Wang) — TauricResearch repo + arXiv 2412.20138",
+   "url": "https://github.com/TauricResearch/TradingAgents",
+   "fulltext_url": "https://arxiv.org/html/2412.20138v7",
+   "kind": "repo",
+   "one_line": "LangGraph multi-agent 'trading firm' (fundamental/sentiment/news/technical analysts -> bull/bear researcher debate -> trader -> risk and portfolio manager with veto) with first-class Anthropic support and a point-in-time `run_backtest`; the paper's evidence is AAPL, GOOGL, AMZN over 1 Jan-29 Mar 2024 against Buy&Hold/MACD/KDJ+RSI/ZMR/SMA, reporting Sharpe ratios of 5.6-8.2 that the authors themselves say are above their expected range.",
+   "adjacent_to": [
+    "06",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Reference architecture for how a child structures an LLM decision pipeline (role separation, adversarial debate, a risk gate that can reject the trade, persistent memory of prior decisions), and simultaneously the canonical example of what Mandel's validation gate must reject: a three-month, three-asset backtest with no multiple-testing correction and non-deterministic outputs. Concretely, Mandel's child interface should require the point-in-time discipline the repo already encodes (each analysis sees only data published by its date) and should refuse to score a submission whose backtest length is below the Minimum Backtest Length implied by the number of variants tried (candidate 3). Apache-2.0, ~111k stars, 21k forks.",
+   "evidence_quality": "practitioner-anecdotal",
+   "fulltext_accessible": true,
+   "lane": "practitioner-trading-agents"
+  },
+  {
+   "title": "The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting and Non-Normality (Bailey & Lopez de Prado, Journal of Portfolio Management 40(5), 2014)",
+   "url": "https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf",
+   "fulltext_url": "https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf",
+   "kind": "paper",
+   "one_line": "If N strategy variants are tried, the expected maximum Sharpe ratio of a zero-skill strategy is approx sqrt(V[SR_n]) * ((1-gamma) Phi^-1(1-1/N) + gamma Phi^-1(1-1/(N e))) with gamma = 0.5772 (Euler-Mascheroni); the DSR is the Probabilistic Sharpe Ratio evaluated against that threshold, adjusted for sample length T, skewness and kurtosis, and the paper derives the Minimum Backtest Length needed before a given SR means anything.",
+   "adjacent_to": [
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Gives Mandel's gate a concrete acceptance statistic. Instead of 'held-out Sharpe > X', require DSR >= 0.95 where N counts every variant Mandel or any child has ever evaluated against that dataset. That makes the ledger of attempts a first-class versioned artifact: every rejected proposal raises the bar for the next one, which is the honest way to encode 'learning' without weights. The Minimum Backtest Length formula turns 'how much history do we need' into a computed number per submission. SSRN (abstract 2460551) returns HTTP 403 from this container; the author's mirror above serves the full PDF (verified by extracting the title page and abstract locally).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "lane": "practitioner-trading-agents"
+  },
+  {
+   "title": "The Probability of Backtest Overfitting (Bailey, Borwein, Lopez de Prado, Zhu; Journal of Computational Finance, rev. Feb 2015)",
+   "url": "https://www.davidhbailey.com/dhbpapers/backtest-prob.pdf",
+   "fulltext_url": "https://www.davidhbailey.com/dhbpapers/backtest-prob.pdf",
+   "kind": "paper",
+   "one_line": "Defines PBO and the CSCV procedure: take the matrix of per-period returns for all trials, cut it into S blocks, form every C(S, S/2) in-sample/out-of-sample combination, select the best in-sample trial in each, and record how often its out-of-sample rank falls below the median; that frequency is the probability that your selection process is overfitting. The abstract states plainly that holdout 'tends to be unreliable and inaccurate' for investment backtests.",
+   "adjacent_to": [
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "DSR scores a single winner; PBO scores the selection procedure itself, which is what Mandel is (a thing that chooses among children's proposals). Mandel would keep the full per-period return matrix for every candidate the gate has ever seen and report PBO on each gate run; if PBO exceeds roughly 0.5 the gate's own choices are untrustworthy and nothing should be promoted regardless of the winner's Sharpe. It also corrects the naive 'held-out backtest' framing in Mandel's own charter: a single holdout is not sufficient, combinatorial symmetric splits are. SSRN 2326253 is 403 from here; the author mirror serves the full PDF (title page verified locally).",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "lane": "practitioner-trading-agents"
+  },
+  {
+   "title": "purgedcv (eslazarev/purged-cross-validation): scikit-learn-compatible purging, embargo, combinatorial purged CV, CSCV/PBO and Deflated Sharpe",
+   "url": "https://github.com/eslazarev/purged-cross-validation",
+   "kind": "repo",
+   "one_line": "MIT Python package implementing Lopez de Prado's Advances in Financial Machine Learning ch. 7 and 12 machinery: WalkForwardSplit, PurgedKFold, PurgedGroupKFold, CombinatorialPurgedCV (with backtest-path reconstruction), CombinatoriallySymmetricCV, plus probability_of_backtest_overfitting, deflated_sharpe_ratio, probabilistic Sharpe and minimum track record length, all usable inside cross_val_score / GridSearchCV / Pipeline.",
+   "adjacent_to": [
+    "07",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "The single dependency that lets Mandel's gate stop hand-rolling statistics. Mandel would (a) replace any KFold/TimeSeriesSplit in the repo with PurgedKFold using an embargo at least as long as a market's resolution lag, because prediction-market labels resolve days after the trade and unpurged folds leak the outcome; (b) emit CPCV backtest paths so the gate reports a distribution of Sharpe ratios rather than one number; (c) call the DSR and PBO functions directly as the acceptance test. It is small (57 stars, 141 commits, CI and PyPI release), so pin a version, vendor its tests, and verify its formulas against the two Bailey/Lopez de Prado PDFs above before trusting it. Alternatives with CombinatorialPurgedCV: skfolio (https://skfolio.org/generated/skfolio.model_selection.CombinatorialPurgedCV.html).",
+   "evidence_quality": "practitioner-anecdotal",
+   "fulltext_accessible": true,
+   "lane": "practitioner-trading-agents"
+  },
+  {
+   "title": "Arbitrage Analysis in Polymarket NBA Markets (Cheng, Yang, Zou; arXiv 2605.00864, Apr 2026)",
+   "url": "https://arxiv.org/abs/2605.00864",
+   "fulltext_url": "https://arxiv.org/pdf/2605.00864",
+   "kind": "paper",
+   "one_line": "Reconstructs continuous market state from 75M+ limit-order-book snapshots across 173 NBA games; single-market mispricings were nearly nonexistent in-game (7 executable episodes, median life 3.6 s), combinatorial episodes were more common (290, clustered in the final minutes) with a median return of 101 bp, but 76.9% could be filled only at an average size of 14.8 shares, confining risk-free extraction to retail scale.",
+   "adjacent_to": [
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Supplies the parameters for a realistic execution model, which the repo currently has no evidence for: opportunity half-life measured in seconds, depth-limited fill sizes, and the finding that shallow books, not detection, are the bottleneck. Mandel's backtest harness should fill against snapshot depth rather than mid-price and should reject any child strategy whose edge vanishes when a 3 s latency or a ~15-share size cap is imposed; those two stress tests belong in the validation gate as hard requirements. I confirmed the abstract page and the numbers above come from it; I did not read the full PDF, so fee treatment and method details are unverified.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "lane": "practitioner-trading-agents"
+  },
+  {
+   "title": "NautilusTrader (nautechsystems/nautilus_trader): Rust-core event-driven engine with backtest/live parity and a native Polymarket adapter",
+   "url": "https://github.com/nautechsystems/nautilus_trader",
+   "fulltext_url": "https://nautilustrader.io/docs/latest/integrations/polymarket/",
+   "kind": "repo",
+   "one_line": "LGPL-3.0 engine (~30k stars) where the same strategy code runs in deterministic backtest and live; its Polymarket adapter speaks the CLOB directly (limit and market orders, GTC/GTD/FOK, IOC mapped to FAK, post-only, batch submit of 15, L2 deltas, trade states MATCHED -> MINED -> CONFIRMED/FAILED, signature types 0-3) and its docs enumerate live failure modes: overfills, a missing position report is not proof of flat, balances are estimates, and 'do not restart and blindly retry an unknown submission'. Kalshi adapter is listed as planned/beta.",
+   "adjacent_to": [
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Two decisions for Mandel. First, whether the children's execution layer should be this engine rather than hand-rolled asyncio around py-clob-client (now archived; see candidate 9), because a backtest that replays the same event stream the live bot consumes is the precondition for Mandel's held-out-backtest gate to mean anything for an arbitrage strategy. Second, even if not adopted, the Polymarket integration page is the best available checklist of live-trading invariants (asynchronous settlement, reconciliation under lagging replicas, residual dust on close) that Mandel should convert into tests a child must pass before promotion. The project itself warns v2 release candidates are not for production.",
+   "evidence_quality": "practitioner-anecdotal",
+   "fulltext_accessible": true,
+   "lane": "practitioner-trading-agents"
+  },
+  {
+   "title": "Polymarket developer documentation (CLOB, Gamma, Data and WebSocket specs, fees, session keys) with Kalshi's official SDK and API-spec page",
+   "url": "https://docs.polymarket.com/llms.txt",
+   "fulltext_url": "https://docs.polymarket.com/_llms/en/api-reference.txt",
+   "kind": "other",
+   "one_line": "Machine-readable index of Polymarket's current docs: CLOB OpenAPI (/api-spec/clob-openapi.yaml), Gamma OpenAPI (/api-spec/gamma-openapi.yaml), Data API v2 (https://data-api.polymarket.com/v2/openapi.json), WebSocket AsyncAPI (https://ws-live-v2.polymarket.com/asyncapi.json), fee schedule, wallets/auth, session keys, builder-tier rate limits. Kalshi's equivalent is https://docs.kalshi.com/sdks/overview, which says the REST OpenAPI (https://docs.kalshi.com/openapi.yaml) and WebSocket AsyncAPI (https://docs.kalshi.com/asyncapi.yaml) are the source of truth, SDKs are kalshi_python_sync/async (kalshi-python deprecated), auth is API key plus signed requests (RSA, or Ed25519 from SDK 3.31.0).",
+   "adjacent_to": [
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "Ground truth that has moved under the repo and the user's trading videos: Polymarket/py-clob-client (https://github.com/Polymarket/py-clob-client) is archived and says not to use it for new or existing integrations, replaced by the unified SDK https://github.com/Polymarket/py-sdk (0.x, breaking changes allowed); Polymarket/agents (https://github.com/Polymarket/agents) was archived May 2026; the old docs.polymarket.com/developers/CLOB/introduction path is a 404. Mandel should store both exchanges' OpenAPI/AsyncAPI specs as versioned files in its knowledge base, diff them on a schedule, and emit a child-facing change notice when endpoints, fee rates or auth schemes change, rather than learning about breakage from failed orders. The fee page gives the exact p(1-p) taker-fee formula the arbitrage math must include. Official primary documentation, not research.",
+   "evidence_quality": "rigorous",
+   "fulltext_accessible": true,
+   "lane": "practitioner-trading-agents"
+  },
+  {
+   "title": "Metaculus metac-bot-template + forecasting-tools: forecasting bots with publicly scored track records in the AI Benchmarking / FutureEval tournaments",
+   "url": "https://github.com/Metaculus/metac-bot-template",
+   "fulltext_url": "https://github.com/Metaculus/forecasting-tools",
+   "kind": "repo",
+   "one_line": "A GitHub-Actions bot (tournament workflow every 20 minutes, skips already-forecast questions, dry-run flag) that researches via AskNews and forecasts through an LLM wrapper with ANTHROPIC_API_KEY supported out of the box (forecasting-tools uses litellm; MIT); forecasts are submitted before resolution and scored afterwards against other bots and Metaculus pro forecasters, giving the only widely used class of prediction bot with a public, leakage-free track record.",
+   "adjacent_to": [
+    "06",
+    "12",
+    "13",
+    "14"
+   ],
+   "what_it_adds": "The honest answer to 'prediction-market bot repos with real track records': the open-source Polymarket/Kalshi arbitrage bots I found (https://github.com/realfishsam/prediction-market-arbitrage-bot and its write-up https://dev.to/realfishsam/how-i-built-a-risk-free-arbitrage-bot-for-polymarket-kalshi-4f, https://github.com/CarlosIbCu/polymarket-kalshi-btc-arbitrage-bot, ImMike/polymarket-arbitrage) publish spread claims of 1.5-4.5% but no P&L, fee modeling or trade counts, so none qualifies and Mandel should record them as unverified. Mandel should adopt the Metaculus pattern for its own calibration gate: log every forecast before resolution, score only after, keep a per-child Brier/peer-score ledger, and run a shadow bot in the Metaculus tournament as an external, un-gameable calibration check on whatever forecasting model the children share. Related evaluation design: ForecastBench (https://arxiv.org/abs/2409.19839; questions with no known answer at submission) and Halawi et al. (https://arxiv.org/abs/2402.18563; retrieval + aggregation nears the crowd). The Metaculus AIB page itself returned 403 from this container.",
+   "evidence_quality": "practitioner-anecdotal",
+   "fulltext_accessible": true,
+   "lane": "practitioner-trading-agents"
+  }
+ ]
+}
