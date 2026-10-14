@@ -6537,12 +6537,17 @@
     "pass": "Drawdown reduction > 40% on BTC and ETH; Sharpe difference lower 95% bound > -0.2; DSR > 0.5 for the golden cross",
     "controls": "Look-ahead: close at 00:00 UTC, trade next day; survivorship: BTC/ETH are survivors among thousands of coins, so the claim is per-asset not for 'crypto'; costs: 25 bps per side plus 10 bps slippage; multiple testing: whole grid; regime: report per halving cycle (2014-16, 2016-20, 2020-24, 2024-) and flag that 3 cycles is the effective sample"
    },
-   "experiments": [],
+   "experiments": [
+    "golden_cross_crypto"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Crypto trend: 50/200 SMA and 12-week momentum on BTC and ETH; harness suggestion: trend.py sma_cross(prices, fast, slow) and donchian(prices, n); harness crypto_trend_vs_bh over BTC/ETH bundles; add Coinbase candle fetcher (api.exchange.coinbase.com/products/BTC-USD/candles, verified) as a second source to check Yahoo closes. | verifier pass pending (usage limit)"
+   "results": [
+    "X-3f905d4b",
+    "X-2988e0ba"
+   ],
+   "notes": "from the underlying-library library: Crypto trend: 50/200 SMA and 12-week momentum on BTC and ETH; harness suggestion: trend.py sma_cross(prices, fast, slow) and donchian(prices, n); harness crypto_trend_vs_bh over BTC/ETH bundles; add Coinbase candle fetcher (api.exchange.coinbase.com/products/BTC-USD/candles, verified) as a second source to check Yahoo closes. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-303",
@@ -6615,12 +6620,17 @@
     "pass": "Sharpe difference >= 0 with lower 95% bound > -0.15, drawdown reduction > 25%, PBO < 0.5 across lookbacks",
     "controls": "Look-ahead: month-end close used next day; survivorship: ETFs chosen are the paper's, no selection; costs: 3 bps per switch; multiple testing: lookback and structural variants counted; regime: the 2003-2026 window has only two large bear markets (2008, 2022) and one flash (2020); report the result with and without 2008"
    },
-   "experiments": [],
+   "experiments": [
+    "gem_dual_momentum"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Dual momentum (Antonacci GEM): relative + absolute momentum between US and foreign equity with a bond fallback; harness suggestion: trend.py dual_momentum(prices_dict, lookback, fallback) -> monthly weights; harness gem_vs_6040 with pbo_cscv across the lookback grid. | verifier pass pending (usage limit)"
+   "results": [
+    "X-681555d4",
+    "X-289f61db"
+   ],
+   "notes": "from the underlying-library library: Dual momentum (Antonacci GEM): relative + absolute momentum between US and foreign equity with a bond fallback; harness suggestion: trend.py dual_momentum(prices_dict, lookback, fallback) -> monthly weights; harness gem_vs_6040 with pbo_cscv across the lookback grid. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-306",
@@ -6641,12 +6651,17 @@
     "pass": "Alpha > 0 with 95% interval excluding 0 and above the 95th percentile of the permutation null; PBO < 0.5; sign of alpha positive in each leave-one-out subset",
     "controls": "Look-ahead: ranks from month-end closes, trade next open; survivorship: sector SPDRs are a fixed, complete set since 1998 (no bias); costs: 3-5 bps per side, turnover about 30-50% per month; multiple testing: grid counted; regime: report by decade, exclude 2000-02 and 2008 as robustness"
    },
-   "experiments": [],
+   "experiments": [
+    "sector_rotation"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Cross-sectional ETF momentum (sector and asset-class rotation); harness suggestion: trend.py xs_momentum(prices_df, lookback, skip, top_k, long_short) -> weights; harness xs_etf_momentum with within-month rank permutation null; reuse pbo_cscv. | verifier pass pending (usage limit)"
+   "results": [
+    "X-61ec30e0",
+    "X-0667ba9d"
+   ],
+   "notes": "from the underlying-library library: Cross-sectional ETF momentum (sector and asset-class rotation); harness suggestion: trend.py xs_momentum(prices_df, lookback, skip, top_k, long_short) -> weights; harness xs_etf_momentum with within-month rank permutation null; reuse pbo_cscv. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-307",
@@ -6796,12 +6811,17 @@
     "pass": "Difference > 0 with interval excluding 0; drawdown reduction > 25%; sign agrees between ETF and chained-futures series; DSR > 0.5",
     "controls": "Look-ahead: month-end close used next day; survivorship: ETFs chosen ex ante, all survive; costs: 3-5 bps ETFs, GLD expense 40 bps/yr included via price; multiple testing: variants counted; regime: report per regime episode (5 episodes), flag the 2013 gold crash and 2011 silver crash as single-day gap risk for breakout variants"
    },
-   "experiments": [],
+   "experiments": [
+    "metals_tsmom"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Trend following on precious metals (gold and silver ETFs and chained futures); harness suggestion: collect_history for GLD, SLV, IAU, GC=F, SI=F, PPLT, PALL; trend.py functions from the TSMOM entry with an inverse-vol combiner; harness metals_trend with a roll-day mask for =F symbols. | verifier pass pending (usage limit)"
+   "results": [
+    "X-394ef7eb",
+    "X-59b357ad"
+   ],
+   "notes": "from the underlying-library library: Trend following on precious metals (gold and silver ETFs and chained futures); harness suggestion: collect_history for GLD, SLV, IAU, GC=F, SI=F, PPLT, PALL; trend.py functions from the TSMOM entry with an inverse-vol combiner; harness metals_trend with a roll-day mask for =F symbols. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-313",
@@ -6874,12 +6894,17 @@
     "pass": "Difference > 0 with interval excluding 0 after 30 bps per side costs; 2019-2026 sub-period difference > 0; DSR > 0.5",
     "controls": "Look-ahead: Sunday close used Monday open; survivorship: two surviving assets, per-asset claim; costs: 30 bps per side applied to every switch (~25 switches/yr); multiple testing: grid counted; regime: per halving cycle"
    },
-   "experiments": [],
+   "experiments": [
+    "crypto_weekly_tsmom"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Short-horizon time-series momentum in BTC and ETH (1-4 week); harness suggestion: trend.py sign_lookback on weekly resample; harness btc_weekly_tsmom; reuse crypto_trend_vs_bh infrastructure. | verifier pass pending (usage limit)"
+   "results": [
+    "X-9cf9dbda",
+    "X-33eb058b"
+   ],
+   "notes": "from the underlying-library library: Short-horizon time-series momentum in BTC and ETH (1-4 week); harness suggestion: trend.py sign_lookback on weekly resample; harness btc_weekly_tsmom; reuse crypto_trend_vs_bh infrastructure. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-316",
@@ -7004,12 +7029,17 @@
     "pass": "strategy is supported only if the net difference's lower interval bound > 0; otherwise the claim (no tradable reversal) stands",
     "controls": "look-ahead via trailing quantiles; survivorship in the cross-section (delisted coins) handled by using the trailing market-cap list at formation; costs 0.6% round trip; multiple testing via DSR; regime: 2015-2019 vs 2020-2026"
    },
-   "experiments": [],
+   "experiments": [
+    "btc_reversal"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Crypto short-term reversal (time-series BTC/ETH and cross-section of coins); harness suggestion: ts_reversal_quantile: generic conditional-next-return test with trailing quantile thresholds, reusable for SPY/QQQ | verifier pass pending (usage limit)"
+   "results": [
+    "X-0d11fe29",
+    "X-5add37e1"
+   ],
+   "notes": "from the underlying-library library: Crypto short-term reversal (time-series BTC/ETH and cross-section of coins); harness suggestion: ts_reversal_quantile: generic conditional-next-return test with trailing quantile thresholds, reusable for SPY/QQQ | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-321",
@@ -7627,12 +7657,17 @@
     "pass": "at least 3 of 5 assets with difference > 0, p < 0.05, both halves > 0",
     "controls": "look-ahead (none: calendar), survivorship (n/a), costs (12 rt/yr at 1-2 bps for ETFs, 20-60 bps for BTC at retail taker fees: charged), multiple testing (5 assets + 4 variants = 9 declared trials; the pass rule is a joint count), regime dependence (halves per asset)"
    },
-   "experiments": [],
+   "experiments": [
+    "tom_replication"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Turn-of-the-month premium: cross-asset and sub-window replication; harness suggestion: Extend run.py: loop turn_of_month(days, closes) over the five symbols after fetch_yahoo_history for QQQ/IWM/TLT/GLD (social.py yahoo_history is the fetcher); add window and payday variants as parameters (before, after, mid=(14,16)). | verifier pass pending (usage limit)"
+   "results": [
+    "X-4d5f471c",
+    "X-9a309bb4"
+   ],
+   "notes": "from the underlying-library library: Turn-of-the-month premium: cross-asset and sub-window replication; harness suggestion: Extend run.py: loop turn_of_month(days, closes) over the five symbols after fetch_yahoo_history for QQQ/IWM/TLT/GLD (social.py yahoo_history is the fetcher); add window and payday variants as parameters (before, after, mid=(14,16)). | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-345",
@@ -7679,12 +7714,17 @@
     "pass": "difference > 20 bps, bootstrap p < 0.05, both halves positive, placebo p > 0.1",
     "controls": "look-ahead (calendar only), survivorship (n/a for ETFs), costs (8 rt/yr at 1-3 bps: charged), multiple testing (5 variants), regime dependence (halves; pre/post-2002 publication split on ^RUT)"
    },
-   "experiments": [],
+   "experiments": [
+    "quarter_end_reversal"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Quarter-end window dressing and 'leaning for the tape'; harness suggestion: events.py: quarter_end_pairs(days) -> list of (last_day_idx, first_day_idx); paired_day_effect(closes, pairs, placebo_pairs) with bootstrap over pairs; run on IWM, ^RUT, SPY. | verifier pass pending (usage limit)"
+   "results": [
+    "X-979dcb94",
+    "X-c518ca95"
+   ],
+   "notes": "from the underlying-library library: Quarter-end window dressing and 'leaning for the tape'; harness suggestion: events.py: quarter_end_pairs(days) -> list of (last_day_idx, first_day_idx); paired_day_effect(closes, pairs, placebo_pairs) with bootstrap over pairs; run on IWM, ^RUT, SPY. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-347",
@@ -7783,12 +7823,17 @@
     "pass": "excess > 1 pp with placement-bootstrap p < 0.05 on ^GSPC (n ~ 98) and positive on SPY; barometers pass only if sign-agreement exceeds the drift-adjusted binomial 95th percentile",
     "controls": "look-ahead (none), survivorship (n/a), costs (1 rt/yr), multiple testing (6 variants; the window was chosen by Hirsch after looking at data, so treat 1950-1972 as in-sample and 1973-2026 as the real test), regime dependence (halves; overlap with TOM removed as a sensitivity)"
    },
-   "experiments": [],
+   "experiments": [
+    "santa_rally"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Santa Claus rally and turn-of-year indicators; harness suggestion: events.py: fixed_window_vs_random(days, closes, window_fn, length=7, n_boot=2000) where window_fn returns the Santa window per year; barometer_sign_test(days, closes, rule) for the indicator variants. | verifier pass pending (usage limit)"
+   "results": [
+    "X-77358286",
+    "X-22d944f4"
+   ],
+   "notes": "from the underlying-library library: Santa Claus rally and turn-of-year indicators; harness suggestion: events.py: fixed_window_vs_random(days, closes, window_fn, length=7, n_boot=2000) where window_fn returns the Santa window per year; barometer_sign_test(days, closes, rule) for the indicator variants. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-351",
@@ -7809,12 +7854,17 @@
     "pass": "mean spread > 1 pp with bootstrap p < 0.05 on the 1987-2026 series, both halves positive, placement-placebo p < 0.05",
     "controls": "look-ahead (none), survivorship (indexes/ETFs only; the single-stock tax-loss variant is flagged as survivorship-biased), costs (2 legs x 1 rt/yr at 1-2 bps; short borrow on SPY negligible), multiple testing (6 variants), regime dependence (halves; 2000-2002 and 2020-2021 small-cap episodes flagged)"
    },
-   "experiments": [],
+   "experiments": [
+    "january_small_cap"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Turn-of-year small-cap premium (January effect, tax-loss rebound); harness suggestion: events.py: fixed_window_vs_random on a spread series built from two symbols (helper spread_series(days_a, a, days_b, b)); reuse from the Santa-rally harness with a different window_fn. | verifier pass pending (usage limit)"
+   "results": [
+    "X-f0511619",
+    "X-2a0f4e77"
+   ],
+   "notes": "from the underlying-library library: Turn-of-year small-cap premium (January effect, tax-loss rebound); harness suggestion: events.py: fixed_window_vs_random on a spread series built from two symbols (helper spread_series(days_a, a, days_b, b)); reuse from the Santa-rally harness with a different window_fn. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-352",
@@ -7835,12 +7885,17 @@
     "pass": "difference > 50 bps/month with p < 0.05 on ^GSPC 1928-2026, SPY 1993-2026 difference > 0, 2002-2026 difference > 0",
     "controls": "look-ahead (none), survivorship (n/a), costs (2 rt/yr; sector rotation 12 legs/yr), multiple testing (7 variants + 12-month grid; DSR over 19), regime dependence (pre/post-publication split is pre-registered; 2008 and 2020 crash months fall in different halves, flagged)"
    },
-   "experiments": [],
+   "experiments": [
+    "sell_in_may"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Sell in May / Halloween indicator and month-of-year seasonality; harness suggestion: events.py: half_year_effect(days, closes, start_month=11, end_month=4) returning monthly means, block-bootstrap p, Sharpe of switching vs buy-and-hold; month_of_year_grid(days, closes) with Bonferroni, mirroring weekday_effect. | verifier pass pending (usage limit)"
+   "results": [
+    "X-eef67ea9",
+    "X-f434df42"
+   ],
+   "notes": "from the underlying-library library: Sell in May / Halloween indicator and month-of-year seasonality; harness suggestion: events.py: half_year_effect(days, closes, start_month=11, end_month=4) returning monthly means, block-bootstrap p, Sharpe of switching vs buy-and-hold; month_of_year_grid(days, closes) with Bonferroni, mirroring weekday_effect. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-353",
@@ -7861,12 +7916,17 @@
     "pass": "opex-week excess > 20 bps, Bonferroni p < 0.05, both halves positive",
     "controls": "look-ahead (none), survivorship (n/a), costs (12 rt/yr at 1-2 bps), multiple testing (7 variants; Bonferroni on the 3 week arms), regime dependence (halves; the rise of weekly/0DTE options after 2016 and 2022 flagged as a mechanism change)"
    },
-   "experiments": [],
+   "experiments": [
+    "opex_week"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Options-expiration week and triple witching; harness suggestion: events.py: third_fridays(days) and last_fridays(days); week_type_effect(days, closes, week_flag_fn) producing weekly returns and the paired bootstrap; witching_day_effect reuses event_day_effect. | verifier pass pending (usage limit)"
+   "results": [
+    "X-4ecac469",
+    "X-c1129583"
+   ],
+   "notes": "from the underlying-library library: Options-expiration week and triple witching; harness suggestion: events.py: third_fridays(days) and last_fridays(days); week_type_effect(days, closes, week_flag_fn) producing weekly returns and the paired bootstrap; witching_day_effect reuses event_day_effect. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-354",
@@ -7887,12 +7947,17 @@
     "pass": "Monday excess > 20 bps, Bonferroni p < 0.05, both halves positive, and the net-of-maker-fee (0.4% per round trip) weekly strategy Sharpe > buy-and-hold (expected fail on costs even if the effect exists)",
     "controls": "look-ahead (none), survivorship (BTC/ETH only, no dead coins), costs (52 rt/yr at 0.4-0.6%: charged, decisive), multiple testing (7 variants + 7 weekdays; Bonferroni), regime dependence (halves; 2017 and 2021 bubbles flagged; T-62's weekend null is a prior)"
    },
-   "experiments": [],
+   "experiments": [
+    "btc_monday"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Crypto calendar effects: weekday, month-turn, derivatives expiry and trading-hours; harness suggestion: Reuse weekday_effect and turn_of_month on BTC/ETH; add last_fridays-based event_day_effect two-sided; hours arm waits on data/fetch.py coinbase_candles(product, granularity=3600) with paging. | verifier pass pending (usage limit)"
+   "results": [
+    "X-c698c81e",
+    "X-f79ca263"
+   ],
+   "notes": "from the underlying-library library: Crypto calendar effects: weekday, month-turn, derivatives expiry and trading-hours; harness suggestion: Reuse weekday_effect and turn_of_month on BTC/ETH; add last_fridays-based event_day_effect two-sided; hours arm waits on data/fetch.py coinbase_candles(product, granularity=3600) with paging. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-355",
@@ -7939,12 +8004,17 @@
     "pass": "difference > 5 bps/day, p < 0.05, both halves positive, post-2013 difference > 0",
     "controls": "look-ahead (none), survivorship (n/a), costs (1-2 rt/yr at 2-3 bps), multiple testing (7 variants + 12-month grid; Bonferroni), regime dependence (halves; 2011 top and 2020, 2024-25 rallies flagged; the published reversal is the pre-registered expectation)"
    },
-   "experiments": [],
+   "experiments": [
+    "gold_autumn"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Gold seasonality: autumn effect, Indian wedding season and Lunar New Year; harness suggestion: events.py: month_set_effect(days, closes, months={9,10,11}) sharing code with half_year_effect; month_of_year_grid(days, closes) with Bonferroni; run over GLD, GC=F, SLV, GDX. | verifier pass pending (usage limit)"
+   "results": [
+    "X-415ea23a",
+    "X-4396480e"
+   ],
+   "notes": "from the underlying-library library: Gold seasonality: autumn effect, Indian wedding season and Lunar New Year; harness suggestion: events.py: month_set_effect(days, closes, months={9,10,11}) sharing code with half_year_effect; month_of_year_grid(days, closes) with Bonferroni; run over GLD, GC=F, SLV, GDX. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-357",
@@ -8537,12 +8607,17 @@
     "pass": "test-window Sharpe > 0.5 with lower bound > 0 and max drawdown < 50%; 4 variants counted",
     "controls": "XIV delisting (survivorship) noted: SVXY changed leverage to -0.5x in Feb 2018 (regime); ETP tracking vs futures; borrow fee for shorting VXX; costs 10 bp; regime dependence central"
    },
-   "experiments": [],
+   "experiments": [
+    "svxy_regime"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: VIX futures roll-yield carry via ETPs; harness suggestion: mandel/experiments/volatility.py: term_structure_filter(etp, vix, vix3m); add Cboe VX CSV fetcher to mandel/data/options.py | verifier pass pending (usage limit)"
+   "results": [
+    "X-7ca7aeae",
+    "X-de245b0b"
+   ],
+   "notes": "from the underlying-library library: VIX futures roll-yield carry via ETPs; harness suggestion: mandel/experiments/volatility.py: term_structure_filter(etp, vix, vix3m); add Cboe VX CSV fetcher to mandel/data/options.py | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-380",
@@ -8667,12 +8742,17 @@
     "pass": "Lower 95% bound of Sharpe difference > 0 over the full live window and positive in at least 3 of 4 rolling windows.",
     "controls": "Look-ahead: none. Survivorship: none at ETF level. Costs: 0.15-0.25% fees, 0.3% borrow on short leg. Multiple testing: 4 variants into the shared DSR. Regime: separate 2022 rate-shock window; test sensitivity to 10-year yield changes (FRED DGS10)."
    },
-   "experiments": [],
+   "experiments": [
+    "low_vol_tilt"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Low-volatility / minimum-variance tilt; harness suggestion: factor_etf_tilt with a sharpe_diff mode; add FRED DGS10 as a conditioning variable for the regime test. | verifier pass pending (usage limit)"
+   "results": [
+    "X-9bfda3b1",
+    "X-cecc68c9"
+   ],
+   "notes": "from the underlying-library library: Low-volatility / minimum-variance tilt; harness suggestion: factor_etf_tilt with a sharpe_diff mode; add FRED DGS10 as a conditioning variable for the regime test. | verifier pass pending (usage limit) | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason)"
   },
   {
    "id": "T-385",

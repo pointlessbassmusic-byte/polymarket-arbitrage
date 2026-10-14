@@ -26,9 +26,10 @@ from mandel.experiments.msm import msm_vs_rolling
 from mandel.experiments.overfit import overfit_report
 from mandel.experiments.scaling import hurst_with_interval, multifractal_test
 from mandel.experiments.social import attention_vs_abs_return, fear_greed_forward_returns
-from mandel.experiments.volatility import implied_move_vs_realised, overlay_backtest, overlay_verdict, price_closes, skew_tail, term_structure_reversion, variance_risk_premium
+from mandel.experiments.volatility import implied_move_vs_realised, index_closes, overlay_backtest, overlay_verdict, price_closes, skew_tail, term_structure_reversion, variance_risk_premium
 from mandel.experiments.underlying import ratio_reversion, trend_rules_multi, turn_of_month, weekday_effect, weekend_effect
 from mandel.experiments import options_market as om
+from mandel.experiments import underlying2 as u2
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
 from mandel.paths import MANDEL_ROOT
@@ -464,6 +465,48 @@ def harness_btc_weekend_var(archive):
     rep = om.btc_weekend_variance(archive.load("daily-history-BTC-USD")); return rep, rep["years"], rep["verdict"], rep["reason"]
 
 
+def _ls(archive, sym):
+    return u2.load_series(archive, sym)
+
+
+def _bill(archive):
+    d = index_closes(archive.load("fred-DTB3")); ks = sorted(d); return ks, [d[k] for k in ks]
+
+
+def _u2(fn):
+    def h(archive):
+        rep = fn(archive)
+        n = next((int(rep[k]) for k in ("n_years", "n_months", "n_weeks", "n_quarters", "n_signals", "n_test_days", "n_opex_weeks", "n_days") if rep.get(k)), 0)
+        return rep, n, rep["verdict"], rep["reason"]
+    h.__doc__ = fn.__doc__
+    return h
+
+
+U2_HARNESSES = {
+    "tom_replication": _u2(lambda a: u2.tom_replication({s: _ls(a, s) for s in ("QQQ", "IWM", "TLT", "GLD", "BTC-USD")}, {"QQQ": 2, "IWM": 2, "TLT": 2, "GLD": 3, "BTC-USD": 40})),
+    "quarter_end_reversal": _u2(lambda a: u2.quarter_end_reversal(*_ls(a, "IWM"))),
+    "santa_rally": _u2(lambda a: u2.santa_rally(_ls(a, "^GSPC"), _ls(a, "SPY"))),
+    "january_small_cap": _u2(lambda a: u2.january_small_cap(_ls(a, "IWM"), _ls(a, "SPY"), _ls(a, "^RUT"), _ls(a, "^GSPC"))),
+    "sell_in_may": _u2(lambda a: u2.sell_in_may(_ls(a, "^GSPC"), _ls(a, "SPY"))),
+    "opex_week": _u2(lambda a: u2.opex_week(*_ls(a, "SPY"))),
+    "btc_monday": _u2(lambda a: u2.btc_monday(*_ls(a, "BTC-USD"))),
+    "gold_autumn": _u2(lambda a: u2.gold_autumn(_ls(a, "GLD"), _ls(a, "GC=F"))),
+    "golden_cross_crypto": _u2(lambda a: u2.golden_cross(_ls(a, "BTC-USD"), _ls(a, "ETH-USD"))),
+    "metals_tsmom": _u2(lambda a: u2.metals_tsmom(_ls(a, "GLD"), _ls(a, "SLV"), _ls(a, "GC=F"), _ls(a, "SI=F"))),
+    "crypto_weekly_tsmom": _u2(lambda a: u2.crypto_weekly_tsmom(_ls(a, "BTC-USD"), _ls(a, "ETH-USD"))),
+    "btc_reversal": _u2(lambda a: u2.btc_reversal(*_ls(a, "BTC-USD"))),
+    "gem_dual_momentum": _u2(lambda a: u2.gem(_ls(a, "SPY"), _ls(a, "EFA"), _ls(a, "AGG"), *_bill(a))),
+    "sector_rotation": _u2(lambda a: u2.sector_rotation({s: _ls(a, s) for s in u2.SECTORS}, _ls(a, "SPY"), *_bill(a))),
+    "svxy_regime": _u2(lambda a: u2.svxy_regime(_ls(a, "SVXY"), index_closes(a.load("cboe-VIX-history")), index_closes(a.load("cboe-VIX3M-history")))),
+    "low_vol_tilt": _u2(lambda a: u2.low_vol_tilt(_ls(a, "USMV"), _ls(a, "SPY"), _ls(a, "SPLV"), _ls(a, "SPHB"))),
+}
+U2_BUNDLES = {"tom_replication": ["daily-history-QQQ", "daily-history-BTC-USD"], "quarter_end_reversal": ["daily-history-IWM"], "santa_rally": ["daily-history--GSPC"],
+              "january_small_cap": ["daily-history--RUT", "daily-history--GSPC"], "sell_in_may": ["daily-history--GSPC"], "opex_week": ["daily-history-SPY"], "btc_monday": ["daily-history-BTC-USD"],
+              "gold_autumn": ["daily-history-GLD", "daily-history-GC-F"], "golden_cross_crypto": ["daily-history-BTC-USD", "daily-history-ETH-USD"], "metals_tsmom": ["daily-history-GLD", "daily-history-SI-F"],
+              "crypto_weekly_tsmom": ["daily-history-BTC-USD", "daily-history-ETH-USD"], "btc_reversal": ["daily-history-BTC-USD"], "gem_dual_momentum": ["daily-history-EFA", "daily-history-AGG", "fred-DTB3"],
+              "sector_rotation": ["daily-history-XLK", "fred-DTB3"], "svxy_regime": ["daily-history-SVXY", "cboe-VIX3M-history"], "low_vol_tilt": ["daily-history-USMV", "daily-history-SPHB"]}
+
+
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     names = sorted(e.name for e in archive.entries())
     return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
@@ -512,6 +555,7 @@ HARNESSES: dict[str, Callable] = {
     "vix9d_conditional": harness_vix9d, "vix_forward_contango": harness_vix_forward_contango, "vix_spike_forward": harness_vix_spike,
     "spx_box_lending": harness_box_lend, "spx_box_borrowing": harness_box_borrow, "parity_forward": harness_parity,
     "opex_pinning": harness_pinning, "btc_weekend_variance": harness_btc_weekend_var,
+    **U2_HARNESSES,
 }
 BUNDLES_NEEDED = {
     "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -539,6 +583,7 @@ BUNDLES_NEEDED = {
     "vix_forward_contango": ["cboe-VIX-history", "cboe-VIX3M-history"], "vix_spike_forward": ["cboe-VIX-history", "cboe-VIX3M-history"],
     "spx_box_lending": ["options-chain-SPX-*", "fred-DTB3", "fred-DGS2"], "spx_box_borrowing": ["options-chain-SPX-*", "fred-DTB3", "fred-DGS2"],
     "parity_forward": ["options-chain-SPY-*", "fred-DTB3"], "opex_pinning": ["daily-history-SPY"], "btc_weekend_variance": ["daily-history-BTC-USD"],
+    **U2_BUNDLES,
 }
 
 
@@ -624,4 +669,4 @@ def _null_for(name: str) -> str:
         "spx_box_lending": "box lending spread over bills <= 0", "spx_box_borrowing": "short-box rate >= bill + 50 bp",
         "parity_forward": "parity deviations within the half-spread; implied rate = bill", "opex_pinning": "distance to nearest $1 uniform on opex and other days",
         "btc_weekend_variance": "weekend variance >= 3x weekday variance",
-    }.get(name, "n/a")
+    }.get(name, "see the harness docstring in mandel/experiments/underlying2.py (null stated per criterion)" if name in U2_HARNESSES else "n/a")

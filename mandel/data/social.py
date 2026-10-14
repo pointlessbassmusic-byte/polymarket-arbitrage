@@ -156,14 +156,16 @@ def yahoo_history(symbol: str, client: httpx.Client, throttle: Throttle) -> list
     Yahoo sometimes answers with an HTML page; that and any non-daily granularity are treated as empty."""
     throttle.wait()
     try:
-        r = client.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}", params={"period1": 0, "period2": int(time.time()), "interval": "1d"}, headers=UA, timeout=60)
+        r = client.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}", params={"period1": -1400000000, "period2": int(time.time()), "interval": "1d"}, headers=UA, timeout=60)
         if r.status_code != 200 or not r.headers.get("content-type", "").startswith("application/json"):
             return []
         res = r.json()["chart"]["result"][0]
         if res.get("meta", {}).get("dataGranularity", "1d") != "1d":
             return []
         ts = res["timestamp"]; q = res["indicators"]["quote"][0]
-        return [{"t": t, "close": q["close"][i], "volume": q["volume"][i]} for i, t in enumerate(ts) if q["close"][i] is not None]
+        adj = (res["indicators"].get("adjclose") or [{}])[0].get("adjclose")
+        return [{"t": t, "close": q["close"][i], "volume": q["volume"][i], **({"adjclose": adj[i]} if adj and adj[i] is not None else {})}
+                for i, t in enumerate(ts) if q["close"][i] is not None]
     except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError):
         return []
 
@@ -183,8 +185,8 @@ def collect_history(store: ObservationStore, symbols: Iterable[str] = ("BTC-USD"
         for sym in symbols:
             rows = yahoo_history(sym, c, th)
             e = store.write_bundle(f"daily-history-{sym}", (Observation("yahoo", "price", sym, observed_at=iso(r["t"]), available_at=iso(r["t"] + 86400), value={"symbol": sym, **r}) for r in rows),
-                                   recipe=f"yahoo /v8/finance/chart/{sym}?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
-                                   tags=["prices", "daily", "history"], schema="value = {symbol, t, close, volume}")
+                                   recipe=f"yahoo /v8/finance/chart/{sym}?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+                                   tags=["prices", "daily", "history"], schema="value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}")
             out[sym] = e.rows
     out["capture"] = cap
     return out

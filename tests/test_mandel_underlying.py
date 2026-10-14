@@ -72,3 +72,11 @@ def test_weekday_weekend_and_ratio():
     b = a * np.exp(-spread)
     rep = ratio_reversion(_days(4000), a, _days(4000), b, lookback=250, z_entry=1.5, n_boot=200)
     assert rep["verdict"] == "supported" and rep["mean_reversion_log"] > 0
+
+
+def test_u2_verdict_treats_numpy_false_as_failure():
+    import numpy as np
+    from mandel.experiments.underlying2 import _verdict
+    assert _verdict([("a", np.bool_(False)), ("b", True)])[0] == "not_supported"
+    assert _verdict([("a", np.bool_(True)), ("b", None)])[0] == "inconclusive"
+    assert _verdict([("a", np.bool_(True)), ("b", True)])[0] == "supported"
