@@ -145,8 +145,10 @@ def hurst_dfa(x: Sequence[float], min_box: int = 8, max_box: Optional[int] = Non
         A = np.vstack([t, np.ones(s)]).T
         coef, *_ = np.linalg.lstsq(A, segs.T, rcond=None)
         resid = segs - (A @ coef).T
-        F.append(math.sqrt(float(np.mean(resid ** 2))))
-        used.append(s)
+        f = math.sqrt(float(np.mean(resid ** 2)))
+        if f > 0:                                  # constant segments carry no scaling information
+            F.append(f)
+            used.append(s)
     if len(used) < 3:
         return float("nan"), float("nan"), len(used)
     lx, ly = np.log(used), np.log(F)

@@ -76,12 +76,17 @@ def msm_vs_rolling(returns: Sequence[float], k: int = 4, train_frac: float = 0.6
     if r.size < 120:
         return {"n_test": 0, "note": "too few returns"}
     cut = int(r.size * train_frac)
+    overall = float(r[:cut].var(ddof=1))
+    if not np.isfinite(overall) or overall <= 0:
+        return {"n_test": 0, "note": "degenerate series (zero variance in the training part)"}
+    floor = 1e-3 * overall                        # no forecaster may claim a variance below 0.1% of the series variance
     fit = fit_msm(r[:cut], k)
     _, cv = filter_loglik(r, k, fit["m0"], fit["gamma1"], fit["b"], fit["sigma"])
     test = slice(cut, r.size)
-    msm_var = np.maximum(cv[test], 1e-12)
-    roll = np.array([r[max(0, t - window):t].var(ddof=1) if t >= 5 else r[:cut].var(ddof=1) for t in range(cut, r.size)])
-    roll = np.maximum(roll, 1e-12)
+    msm_var = np.maximum(cv[test], floor)
+    roll = np.array([r[max(0, t - window):t].var(ddof=1) if t >= 5 else overall for t in range(cut, r.size)])
+    roll = np.where(np.isfinite(roll), roll, overall)
+    roll = np.maximum(roll, floor)
     def score(v):
         return float(np.mean(-0.5 * np.log(2 * math.pi * v) - 0.5 * r[test] ** 2 / v))
     return {"n_test": int(r.size - cut), "k": k, "fit": fit, "logscore_msm": score(msm_var), "logscore_rolling": score(roll),
