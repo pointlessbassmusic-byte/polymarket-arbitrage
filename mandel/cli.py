@@ -385,6 +385,18 @@ def cmd_theory_park(args) -> int:
     raise KeyError(args.id)
 
 
+def cmd_data_fetch(args) -> int:
+    """Reproducible data pull; the archive index records each bundle's recipe."""
+    from mandel.data.fetch import fetch_kalshi, fetch_polymarket
+    from mandel.data.store import ObservationStore
+    store = ObservationStore(Archive(ledger=Ledger()))
+    if args.source in ("polymarket", "all"):
+        _print({"polymarket": fetch_polymarket(store, n_markets=args.markets, n_histories=args.histories, n_books=args.books)})
+    if args.source in ("kalshi", "all"):
+        _print({"kalshi": fetch_kalshi(store, n_markets=min(args.markets, 3000), n_candles=args.candles)})
+    return 0
+
+
 def cmd_archive(args) -> int:
     a = Archive()
     for e in a.entries(kind=args.kind):
@@ -494,6 +506,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("theories", cmd_theories, "List the theory registry with statuses."); p.add_argument("--status")
     p = add("theory-park", cmd_theory_park, "Park a theory (kept, not pursued now) with a reason, or --unpark it.")
     p.add_argument("id"); p.add_argument("--reason"); p.add_argument("--unpark", action="store_true")
+    p = add("data-fetch", cmd_data_fetch, "Pull resolved markets, price histories, books (Polymarket) and settled markets, candles (Kalshi) into archive bundles.")
+    p.add_argument("source", choices=["polymarket", "kalshi", "all"]); p.add_argument("--markets", type=int, default=4000)
+    p.add_argument("--histories", type=int, default=400); p.add_argument("--books", type=int, default=300); p.add_argument("--candles", type=int, default=120)
     p = add("archive", cmd_archive, "List cold-storage bundles (data, results, knowledge) and their rebuild recipes.")
     p.add_argument("--kind"); p.add_argument("-v", "--verbose", action="store_true")
     add("ingest", cmd_ingest, "Turn knowledge/*.md adopt / skeptical / design bullets into candidate insights (idempotent).")

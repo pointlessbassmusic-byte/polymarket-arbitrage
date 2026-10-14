@@ -153,7 +153,11 @@ mandel/
     ORIGINAL-IDEAS.md      Mandel's own ideas beyond the sources
     SYNTHESIS.md           cross-cutting synthesis; read first
     CRITIQUE-*.md          independent critique of each learning pass
-  state/                   mutable, machine-written (ledger + ledger.head, insights, proposals, forecasts, children, cycles)
+  state/                   mutable, machine-written (ledger + ledger.head, insights, proposals, forecasts, children, cycles, experiments)
+  theories/                registry.json + THEORIES.md: every testable theory with its trial math, data needs and status
+  experiments/             the trial math, executable: harnesses and the runner (python -m mandel experiment-run all)
+  data/                    point-in-time observation store and the Polymarket / Kalshi fetchers (python -m mandel data-fetch all)
+  archive/                 cold storage: gzip bundles with an index of rebuild recipes; parked things live here, nothing is deleted
   viz/                     the signal map (template, generated graph.json and index.html)
   *.py, validation/        the engine; see module docstrings
 tests/test_mandel_*.py     the engine's tests
