@@ -1,0 +1,268 @@
+"""
+Experiment runner: load archived data, run harnesses, record results, update the theory registry.
+=================================================================================================
+
+``run_all`` is deterministic given the bundles; every result goes to ``state/experiments.jsonl``
+and the ledger. Theories mapped to a harness move from ``untested`` to the harness verdict with a
+pointer to the result id. Nothing is deleted when a theory is not supported: it is marked and
+stays in the registry.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from pathlib import Path
+from typing import Callable, Optional
+
+import numpy as np
+
+from mandel._io import atomic_write_text
+from mandel.archive import Archive
+from mandel.experiments import ExperimentLog
+from mandel.experiments.markets import bundle_arb_scan, market_calibration, multiscale_edge, price_at_horizons, resolved_outcomes
+from mandel.experiments.markov import markov_vs_persistence
+from mandel.experiments.msm import msm_vs_rolling
+from mandel.experiments.overfit import overfit_report
+from mandel.experiments.scaling import hurst_with_interval, multifractal_test
+from mandel.forecasts import ForecastBook
+from mandel.ledger import Ledger
+from mandel.paths import MANDEL_ROOT
+
+REGISTRY = MANDEL_ROOT / "theories" / "registry.json"
+
+
+def _series_by_market(price_rows) -> dict[str, np.ndarray]:
+    by = {}
+    for r in price_rows:
+        v = r["value"]
+        by.setdefault(v["market_id"], []).append((float(v["t"]), float(v["p"])))
+    return {k: np.array([p for _, p in sorted(v)]) for k, v in by.items()}
+
+
+def harness_market_calibration(archive: Archive) -> tuple[dict, int, str, str]:
+    rep = market_calibration(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"))
+    h = rep["horizons"]
+    usable = {k: v for k, v in h.items() if "brier" in v}
+    if not usable:
+        return rep, 0, "inconclusive", "no horizon had 20+ priced resolved markets"
+    worst_skill = min(v["skill_vs_coin"] for v in usable.values())
+    n = max(v["n"] for v in usable.values())
+    verdict = "supported" if worst_skill > 0 else "not_supported"
+    reason = f"market price beats the coin at every horizon (min skill {worst_skill:.2f})" if verdict == "supported" else \
+             f"market price fails to beat the coin at some horizon (min skill {worst_skill:.2f})"
+    return rep, n, verdict, reason
+
+
+def harness_multiscale_edge(archive: Archive) -> tuple[dict, int, str, str]:
+    rep = multiscale_edge(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"))
+    n = max((v["n"] for v in rep["horizons"].values()), default=0)
+    if rep["n_scales_total"] < 3:
+        return rep, n, "inconclusive", "fewer than three horizons had 30+ markets"
+    if rep["n_scales_significant"] == 0:
+        return rep, n, "not_supported", "no horizon shows a mean error whose interval excludes zero: no structural market bias to be consistent about"
+    verdict = "supported" if rep["signs_agree"] else "not_supported"
+    return rep, n, verdict, (f"{rep['n_scales_significant']}/{rep['n_scales_total']} horizons significant and signs agree" if rep["signs_agree"]
+                              else "significant horizons disagree in sign")
+
+
+def harness_bundle_arb(archive: Archive) -> tuple[dict, int, str, str]:
+    rep = bundle_arb_scan(archive.load("polymarket-books-snapshot"))
+    n = rep["markets_scanned"]
+    if n < 50:
+        return rep, n, "inconclusive", "fewer than 50 markets with both books"
+    found = rep["long_after_fees"] + rep["short_after_fees"]
+    verdict = "supported" if found > 0 else "not_supported"
+    return rep, n, verdict, f"{found} after-fee bundle mispricings in {n} markets (one snapshot)"
+
+
+def harness_multifractal(archive: Archive, max_markets: int = 40) -> tuple[dict, int, str, str]:
+    series = _series_by_market(archive.load("polymarket-price-history-daily"))
+    long_enough = [(k, s) for k, s in series.items() if s.size >= 120]
+    long_enough.sort(key=lambda kv: -kv[1].size)
+    results = []
+    for k, s in long_enough[:max_markets]:
+        r = multifractal_test(np.log(np.clip(s, 0.01, 0.99) / (1 - np.clip(s, 0.01, 0.99))), n_shuffles=100)
+        results.append({"market": k, "n": r.n, "concavity": r.concavity, "null_q95": r.null_concavity_q95, "exceeds": r.exceeds_null})
+    n = len(results)
+    if n < 10:
+        return {"per_market": results}, n, "inconclusive", "fewer than 10 series of 120+ daily points"
+    frac = sum(1 for r in results if r["exceeds"]) / n
+    verdict = "supported" if frac > 0.25 else "not_supported"
+    return {"fraction_exceeding_null": frac, "n_series": n, "per_market": results[:40]}, n, verdict, \
+        f"{frac:.0%} of {n} daily logit-price series show concavity beyond the shuffled null (threshold 25%; chance ~5%)"
+
+
+def harness_hurst(archive: Archive, max_markets: int = 40) -> tuple[dict, int, str, str]:
+    series = _series_by_market(archive.load("polymarket-price-history-daily"))
+    long_enough = sorted([(k, s) for k, s in series.items() if s.size >= 120], key=lambda kv: -kv[1].size)[:max_markets]
+    rows = []
+    for k, s in long_enough:
+        x = np.log(np.clip(s, 0.01, 0.99) / (1 - np.clip(s, 0.01, 0.99)))
+        h = hurst_with_interval(x, n_null=100)
+        h["market"] = k
+        rows.append(h)
+    n = len(rows)
+    if n < 10:
+        return {"per_market": rows}, n, "inconclusive", "fewer than 10 long series"
+    Hs = np.array([r["H"] for r in rows if np.isfinite(r["H"])])
+    outside = sum(1 for r in rows if r["outside_null"])
+    verdict = "supported" if outside / n > 0.25 else "not_supported"
+    return {"median_H": float(np.median(Hs)), "n_series": n, "fraction_outside_null": outside / n, "per_market": rows}, n, verdict, \
+        f"median H {np.median(Hs):.2f}; {outside}/{n} series outside their shuffle null (threshold 25%)"
+
+
+def harness_markov(archive: Archive, max_markets: int = 60) -> tuple[dict, int, str, str]:
+    series = _series_by_market(archive.load("polymarket-price-history-daily"))
+    long_enough = sorted([(k, s) for k, s in series.items() if s.size >= 100], key=lambda kv: -kv[1].size)[:max_markets]
+    gains = []
+    for k, s in long_enough:
+        r = markov_vs_persistence(s)
+        if r.get("n_test", 0) >= 20:
+            gains.append(r["improvement_bits"])
+    n = len(gains)
+    if n < 10:
+        return {"gains": gains}, n, "inconclusive", "fewer than 10 usable series"
+    g = np.array(gains)
+    verdict = "supported" if g.mean() > 0 and np.quantile(g, 0.25) > 0 else "not_supported"
+    return {"mean_gain_bits": float(g.mean()), "q25": float(np.quantile(g, 0.25)), "q75": float(np.quantile(g, 0.75)), "n_series": n}, n, verdict, \
+        f"first-order price-bucket Markov vs base rate: mean {g.mean():+.4f} bits/step over {n} series"
+
+
+def harness_msm(archive: Archive, max_markets: int = 12) -> tuple[dict, int, str, str]:
+    series = _series_by_market(archive.load("polymarket-price-history-daily"))
+    long_enough = sorted([(k, s) for k, s in series.items() if s.size >= 200], key=lambda kv: -kv[1].size)[:max_markets]
+    rows = []
+    for k, s in long_enough:
+        x = np.log(np.clip(s, 0.01, 0.99) / (1 - np.clip(s, 0.01, 0.99)))
+        r = msm_vs_rolling(np.diff(x), k=3)
+        if r.get("n_test", 0) >= 40:
+            rows.append({"market": k, "n_test": r["n_test"], "gain": r["gain_nats_per_obs"], "fit": r["fit"]})
+    n = len(rows)
+    if n < 5:
+        return {"per_market": rows}, n, "inconclusive", "fewer than 5 series of 200+ points"
+    g = np.array([r["gain"] for r in rows])
+    verdict = "supported" if np.median(g) > 0 else "not_supported"
+    return {"median_gain_nats": float(np.median(g)), "n_series": n, "per_market": rows}, n, verdict, \
+        f"MSM(k=3) vs 20-day rolling variance, out of sample: median gain {np.median(g):+.3f} nats/obs over {n} series"
+
+
+def harness_overfit(archive: Archive, max_markets: int = 150) -> tuple[dict, int, str, str]:
+    series = _series_by_market(archive.load("polymarket-price-history-daily"))
+    prices = [s for _, s in sorted(series.items(), key=lambda kv: -kv[1].size)[:max_markets] if s.size >= 60]
+    if len(prices) < 20:
+        return {}, len(prices), "inconclusive", "fewer than 20 series"
+    rep = overfit_report(prices)
+    n = rep["n_periods"]
+    # The theory: a declared search of simple rules produces an in-sample winner that does not survive deflation
+    verdict = "supported" if rep["dsr_best"] < 0.95 and rep["pbo"] > 0.5 else "not_supported"
+    return rep, n, verdict, f"best of {rep['n_variants']} momentum rules: Sharpe {rep['best_sharpe']:.3f}, DSR {rep['dsr_best']:.2f}, PBO {rep['pbo']:.2f}"
+
+
+def harness_controls(archive: Archive, ledger: Ledger, n_markets: int = 200) -> tuple[dict, int, str, str]:
+    """Write coin, oracle and market-price forecasts for resolved markets into the real forecast book and
+    check the scoring path end to end: coin ~0.25 Brier, oracle 0, market below coin."""
+    outcomes = resolved_outcomes(archive.load("polymarket-closed-markets"))
+    byh = price_at_horizons(archive.load("polymarket-price-history-daily"), outcomes, horizons_days=(1,))
+    rows = byh.get(1, [])[:n_markets]
+    if len(rows) < 30:
+        return {}, len(rows), "inconclusive", "fewer than 30 priced resolved markets"
+    fb = ForecastBook(ledger=ledger)
+    existing = {fc.question_id for fc in fb.forecasts}
+    written = 0
+    for p, o, mid in rows:
+        qid = f"pm:{mid}"
+        if qid in existing or qid in fb.resolutions:
+            continue
+        q = outcomes[mid]["question"][:120]
+        fb.record("market:polymarket", qid, q, p, horizon="1d-before-close")
+        fb.record("control:coin", qid, q, 0.5)
+        fb.record("control:oracle", qid, q, float(o))
+        fb.resolve(qid, o, note="Polymarket UMA resolution")
+        written += 1
+    board = {s.source: s.as_dict() for s in fb.scoreboard()}
+    coin = board.get("control:coin", {}).get("brier"); oracle = board.get("control:oracle", {}).get("brier"); mkt = board.get("market:polymarket", {}).get("brier")
+    ok = coin is not None and abs(coin - 0.25) < 1e-9 and oracle == 0.0 and mkt is not None and mkt < coin
+    return {"written": written, "scoreboard": board}, len(rows), "supported" if ok else "not_supported", \
+        f"coin {coin}, oracle {oracle}, market {mkt}: scoring path {'intact' if ok else 'BROKEN'}"
+
+
+HARNESSES: dict[str, Callable] = {
+    "market_calibration": harness_market_calibration,
+    "multiscale_edge": harness_multiscale_edge,
+    "bundle_arb_scan": harness_bundle_arb,
+    "multifractal_scaling": harness_multifractal,
+    "hurst_ci": harness_hurst,
+    "markov_baseline": harness_markov,
+    "msm_volatility": harness_msm,
+    "dsr_pbo_harness": harness_overfit,
+    "controls": harness_controls,
+}
+BUNDLES_NEEDED = {
+    "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
+    "multiscale_edge": ["polymarket-price-history-daily", "polymarket-closed-markets"],
+    "bundle_arb_scan": ["polymarket-books-snapshot"],
+    "multifractal_scaling": ["polymarket-price-history-daily"], "hurst_ci": ["polymarket-price-history-daily"],
+    "markov_baseline": ["polymarket-price-history-daily"], "msm_volatility": ["polymarket-price-history-daily"],
+    "dsr_pbo_harness": ["polymarket-price-history-daily"], "controls": ["polymarket-price-history-daily", "polymarket-closed-markets"],
+}
+
+
+def load_registry(path: Path = REGISTRY) -> Optional[dict]:
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def save_registry(reg: dict, path: Path = REGISTRY) -> None:
+    atomic_write_text(path, json.dumps(reg, indent=1, ensure_ascii=False))
+
+
+def run_all(only: Optional[list[str]] = None, ledger: Optional[Ledger] = None, archive: Optional[Archive] = None,
+            log: Optional[ExperimentLog] = None, registry_path: Path = REGISTRY) -> list[dict]:
+    ledger = ledger if ledger is not None else Ledger()
+    archive = archive if archive is not None else Archive(ledger=ledger)
+    log = log if log is not None else ExperimentLog(ledger=ledger)
+    reg = load_registry(registry_path)
+    theories_by_h: dict[str, list[str]] = {}
+    if reg:
+        for t in reg["theories"]:
+            for h in t.get("experiments", []):
+                theories_by_h.setdefault(h, []).append(t["id"])
+    out = []
+    for name, fn in HARNESSES.items():
+        if only and name not in only:
+            continue
+        t0 = time.time()
+        needed = BUNDLES_NEEDED[name]
+        missing = [b for b in needed if b not in {e.name for e in archive.entries()}]
+        if missing:
+            res = log.record(name, theories_by_h.get(name, []), {}, "n/a", 0, "inconclusive", f"missing data bundles {missing}", data_bundles=needed)
+            out.append(res.as_dict()); continue
+        try:
+            stat, n, verdict, reason = fn(archive, ledger) if name == "controls" else fn(archive)
+        except Exception as e:  # a crashing harness is a recorded error, not a silent skip
+            stat, n, verdict, reason = {"error": repr(e)[:300]}, 0, "error", f"harness raised {type(e).__name__}"
+        res = log.record(name, theories_by_h.get(name, []), stat, _null_for(name), n, verdict, reason, data_bundles=needed,
+                         cost={"wall_seconds": round(time.time() - t0, 1)})
+        out.append(res.as_dict())
+        if reg:
+            for t in reg["theories"]:
+                if name in t.get("experiments", []) and t.get("status") in ("untested", "inconclusive", "supported", "not_supported"):
+                    t["status"] = verdict if verdict != "error" else "inconclusive"
+                    t.setdefault("results", []).append(res.id)
+    if reg:
+        save_registry(reg, registry_path)
+    return out
+
+
+def _null_for(name: str) -> str:
+    return {
+        "market_calibration": "coin (p=0.5) Brier 0.25; skill vs coin must be > 0 at every horizon",
+        "multiscale_edge": "mean(outcome - price) = 0 at every horizon (bootstrap 95% interval)",
+        "bundle_arb_scan": "no after-fee mispricing in the snapshot",
+        "multifractal_scaling": "shuffled increments (same marginal, no clustering): concavity q95",
+        "hurst_ci": "shuffled increments: H interval around 0.5",
+        "markov_baseline": "base-rate predictor of the next move",
+        "msm_volatility": "20-day rolling variance, out-of-sample Gaussian log score",
+        "dsr_pbo_harness": "zero-skill best-of-N: DSR < 0.95 and PBO > 0.5 expected",
+        "controls": "coin 0.25, oracle 0, market < coin on the same questions",
+    }.get(name, "n/a")

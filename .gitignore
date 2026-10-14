@@ -72,3 +72,4 @@ config.live.yaml
 # Mandel advisory lock files
 mandel/state/*.lock
 mandel/state/**/*.lock
+mandel/**/*.lock

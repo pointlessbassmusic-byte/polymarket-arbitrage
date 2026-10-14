@@ -25,11 +25,14 @@ import sys
 from dataclasses import asdict
 
 from mandel import __version__, paths
+from mandel.archive import Archive
 from mandel.children import ChildRegistry
 from mandel.cycles import COST_FIELDS, OUTCOME_FIELDS, CycleLog
 from mandel.forecasts import ForecastBook
 from mandel.graph import TEMPLATE_PATH, build_graph, write_graph, write_html
 from mandel.ingest import ingest_knowledge
+from mandel.experiments import ExperimentLog
+from mandel.experiments.run import HARNESSES, load_registry, run_all, save_registry, REGISTRY
 from mandel.ledger import Ledger, LedgerCorrupt
 from mandel.paths import KNOWLEDGE_ROOT
 from mandel.proposals import Criterion, IntegrityError, LifecycleError, ProposalBook
@@ -328,6 +331,70 @@ def cmd_cycle_finish(args) -> int:
     return 0
 
 
+# ------------------------------------------------- experiments, theories, archive --
+
+def cmd_experiments(args) -> int:
+    log = ExperimentLog(ledger=Ledger())
+    rows = log.all()
+    for r in rows[-args.n:]:
+        print(f"{r.id}  {r.created_at[:19]}  {r.harness:22} n={r.n:6d}  {r.verdict:14} {r.reason}")
+    print(f"({len(rows)} results; harnesses: {', '.join(HARNESSES)})")
+    return 0
+
+
+def cmd_experiment_run(args) -> int:
+    only = None if args.harness == ["all"] else args.harness
+    for h in (only or []):
+        if h not in HARNESSES:
+            raise ValueError(f"unknown harness {h}; choose from {', '.join(HARNESSES)} or all")
+    results = run_all(only=only)
+    for r in results:
+        print(f"{r['id']}  {r['harness']:22} n={r['n']:6d}  {r['verdict']:14} {r['reason']}")
+    return 0
+
+
+def cmd_theories(args) -> int:
+    reg = load_registry()
+    if not reg:
+        print(f"no registry at {REGISTRY}; the theory-extraction pass has not run")
+        return 1
+    rows = [t for t in reg["theories"] if (args.status is None or t.get("status") == args.status)]
+    for t in rows:
+        print(f"{t['id']}  [{t.get('status', '?'):13}] {t['kind']:14} {t['slug'][:48]:48} <- {','.join(t.get('origin', []))[:40]}  h={','.join(t.get('experiments', [])) or '-'}")
+    counts = {}
+    for t in reg["theories"]:
+        counts[t.get("status", "?")] = counts.get(t.get("status", "?"), 0) + 1
+    print(f"({len(rows)} shown; by status {counts})")
+    return 0
+
+
+def cmd_theory_park(args) -> int:
+    reg = load_registry()
+    if not reg:
+        raise ValueError("no registry")
+    for t in reg["theories"]:
+        if t["id"] == args.id:
+            if args.unpark:
+                t["status"] = t.get("status_before_park", "untested"); t["parked_reason"] = ""
+            else:
+                t["status_before_park"] = t.get("status", "untested"); t["status"] = "parked"; t["parked_reason"] = args.reason or ""
+            save_registry(reg)
+            Ledger().append("theory.unparked" if args.unpark else "theory.parked", {"id": args.id, "reason": args.reason or ""}, actor="mandel")
+            print(f"{args.id} -> {t['status']}")
+            return 0
+    raise KeyError(args.id)
+
+
+def cmd_archive(args) -> int:
+    a = Archive()
+    for e in a.entries(kind=args.kind):
+        print(f"{e.name:36} {e.kind:9} rows={e.rows:7d} {e.bytes/1024:8.1f}KB {'git' if e.in_git else 'OFF-GIT'}  {e.created_at[:19]}  {('parked: ' + e.parked_reason) if e.parked_reason else ''}")
+        if args.verbose:
+            print(f"    recipe: {e.recipe}\n    schema: {e.schema}  sha256={e.sha256[:12]}")
+    _print(a.summary())
+    return 0
+
+
 # --------------------------------------------------------- ingest and graph --
 
 def cmd_ingest(_args) -> int:
@@ -421,6 +488,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("cycle-finish", cmd_cycle_finish, f"Close a cycle with its cost and outcomes. cost keys: {', '.join(COST_FIELDS)}; outcome keys: {', '.join(OUTCOME_FIELDS)}.")
     p.add_argument("id"); p.add_argument("--cost", action="append", help="k=v"); p.add_argument("--outcome", action="append", help="k=v"); p.add_argument("--notes")
 
+    p = add("experiments", cmd_experiments, "List recorded experiment results (the trial math, executed)."); p.add_argument("-n", type=int, default=30)
+    p = add("experiment-run", cmd_experiment_run, "Run harnesses on the archived data and record results; updates theory statuses.")
+    p.add_argument("harness", nargs="+", help="harness ids or 'all'")
+    p = add("theories", cmd_theories, "List the theory registry with statuses."); p.add_argument("--status")
+    p = add("theory-park", cmd_theory_park, "Park a theory (kept, not pursued now) with a reason, or --unpark it.")
+    p.add_argument("id"); p.add_argument("--reason"); p.add_argument("--unpark", action="store_true")
+    p = add("archive", cmd_archive, "List cold-storage bundles (data, results, knowledge) and their rebuild recipes.")
+    p.add_argument("--kind"); p.add_argument("-v", "--verbose", action="store_true")
     add("ingest", cmd_ingest, "Turn knowledge/*.md adopt / skeptical / design bullets into candidate insights (idempotent).")
     p = add("graph", cmd_graph, "Rebuild viz/graph.json and viz/index.html (the signal map)."); p.add_argument("--json-only", action="store_true")
     return ap
