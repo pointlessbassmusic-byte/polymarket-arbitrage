@@ -1392,12 +1392,13 @@
     "covered_call_overlay"
    ],
    "testable_now": true,
-   "status": "supported",
-   "blocked_on": "",
+   "status": "inconclusive",
+   "blocked_on": "a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing",
    "results": [
-    "X-c3d19508"
+    "X-c3d19508",
+    "X-2f57d496"
    ],
-   "notes": ""
+   "notes": "Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days)."
   },
   {
    "id": "T-55",
@@ -1421,12 +1422,13 @@
     "csp_overlay"
    ],
    "testable_now": true,
-   "status": "supported",
-   "blocked_on": "",
+   "status": "inconclusive",
+   "blocked_on": "a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing",
    "results": [
-    "X-babe2142"
+    "X-babe2142",
+    "X-0b25a5ae"
    ],
-   "notes": ""
+   "notes": "Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days)."
   },
   {
    "id": "T-56",
@@ -1450,12 +1452,13 @@
     "collar_overlay"
    ],
    "testable_now": true,
-   "status": "supported",
-   "blocked_on": "",
+   "status": "inconclusive",
+   "blocked_on": "a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing",
    "results": [
-    "X-70018c19"
+    "X-70018c19",
+    "X-24cba6b2"
    ],
-   "notes": ""
+   "notes": "Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days)."
   },
   {
    "id": "T-57",
@@ -1479,12 +1482,13 @@
     "short_straddle_model"
    ],
    "testable_now": true,
-   "status": "supported",
-   "blocked_on": "",
+   "status": "inconclusive",
+   "blocked_on": "a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing",
    "results": [
-    "X-13ef8afe"
+    "X-13ef8afe",
+    "X-c9662a62"
    ],
-   "notes": ""
+   "notes": "Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days)."
   }
  ]
 }

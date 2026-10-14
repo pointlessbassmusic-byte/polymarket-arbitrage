@@ -71,7 +71,7 @@ Description=Mandel daily maintenance cycle
 Type=oneshot
 User=USER
 WorkingDirectory=/home/USER/mandel
-ExecStart=/bin/bash -lc 'git pull --ff-only && . .venv/bin/activate && python -m mandel verify && python -m mandel social-fetch && python -m mandel experiment-run all && python -m mandel theories --render && python -m mandel ingest && python -m mandel graph && git add mandel/state mandel/viz mandel/archive mandel/theories && git -c user.name=Mandel -c user.email=mandel@localhost commit -qm "Mandel daily cycle" || true; git push'
+ExecStart=/bin/bash -lc 'git pull --ff-only && . .venv/bin/activate && python -m mandel verify && python -m mandel social-fetch && python -m mandel options-fetch && python -m mandel experiment-run all && python -m mandel theories --render && python -m mandel ingest && python -m mandel graph && git add mandel/state mandel/viz mandel/archive mandel/theories && git -c user.name=Mandel -c user.email=mandel@localhost commit -qm "Mandel daily cycle" || true; git push'
 ```
 ```ini
 # /etc/systemd/system/mandel-cycle.timer

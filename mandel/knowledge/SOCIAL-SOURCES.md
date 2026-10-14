@@ -67,6 +67,7 @@ Daily, from the Linode timer (`OPERATIONS.md`), inside polite limits:
 | When (UTC) | Command / source | Notes |
 |---|---|---|
 | 06:40 | `python -m mandel social-fetch` | Reddit RSS (10 subreddits x new+hot, 1 req/s), StockTwits trending + 14 symbol streams (0.8 s apart), Fear & Greed, CoinGecko trending + 4 coins, Yahoo 14 symbols, House FD index; about 60 s |
+| 06:41 | `python -m mandel options-fetch` | CBOE delayed chains for 14 symbols (raw on local disk, ~5 MB/day; per-expiry surface committed), Deribit BTC/ETH books; about 20 s |
 | 06:42 | `python -m mandel experiment-run all` | re-scores every harness; `social_attention` reports its capture-day count until 30 |
 | weekly | `python -m mandel data-fetch` | new resolved markets and a fresh book snapshot (T-04 needs repeated snapshots; T-47 needs post-2026-10-14 resolutions) |
 | when keyed | X API v2 recent search | only with `X_BEARER_TOKEN`; 100 tweets per call, cashtag query, lang:en, -is:retweet |

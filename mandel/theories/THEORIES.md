@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `16a7ed5ed5c0a64e`). 55 theories. supported 15, not_supported 5, inconclusive 1, untested 3, blocked 23, parked 8.
+Rendered from `registry.json` (hash `bea70f89102de375`). 55 theories. supported 11, not_supported 5, inconclusive 5, untested 3, blocked 23, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (15)
+## Supported (11)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -163,62 +163,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: term_structure_reversion
 - result X-47917835: supported — 21d change in VIX after backwardation -6.09 vs contango +0.45 pts (diff -6.54, block-shift p=0.0005, halves -5.43/-7.53; backwardation on 8% of days)
 
-### T-54 · covered-call-beats-buy-and-hold
-
-**Claim.** Writing monthly 30-delta covered calls on SPY produces a higher Sharpe ratio than holding SPY.
-
-- kind: options-strategy · origin: cboe:BXMD, options-sweep
-- statistic: Sharpe difference over non-overlapping monthly cycles
-- null: Sharpe(covered call) <= Sharpe(buy and hold); circular block bootstrap of paired cycles
-- procedure: every 21 trading days: hold SPY, sell a 30-delta call priced by BSM at VIX; settle at expiry
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
-- pass: Sharpe higher and p < 0.05
-- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it.
-- harness: covered_call_overlay
-- result X-c3d19508: supported — model-priced (VIX as flat IV, upper bound for call selling): Sharpe 1.17 vs buy-and-hold 0.62, CAGR 16.4% vs 8.9%, MDD -42% vs -56%, Sharpe-diff p=0.000, 403 cycles
-
-### T-55 · put-writing-beats-buy-and-hold
-
-**Claim.** Writing monthly ATM cash-secured puts on SPY produces a higher Sharpe ratio than holding SPY.
-
-- kind: options-strategy · origin: cboe:PUT, options-sweep
-- statistic: Sharpe difference over monthly cycles
-- null: Sharpe(put write) <= Sharpe(buy and hold); block bootstrap
-- procedure: every 21 trading days: sell an ATM put priced at VIX, hold the strike in bills
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
-- pass: Sharpe higher and p < 0.05
-- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it.
-- harness: csp_overlay
-- result X-babe2142: supported — model-priced: Sharpe 1.27 vs buy-and-hold 0.62, CAGR 12.9% vs 8.9%, MDD -32% vs -56%, Sharpe-diff p=0.005
-
-### T-56 · collar-cuts-drawdown-cheaply
-
-**Claim.** A monthly 30-delta collar on SPY cuts the maximum drawdown by at least a third while keeping the Sharpe ratio within 0.10 of buy-and-hold.
-
-- kind: options-strategy · origin: cboe:CLL, options-sweep
-- statistic: max drawdown ratio and Sharpe difference
-- null: descriptive thresholds (no sampling null)
-- procedure: every 21 trading days: hold SPY, sell 30-delta call, buy 30-delta put, both priced at VIX
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
-- pass: MDD(collar) < 2/3 MDD(SPY) and Sharpe >= Sharpe(SPY) - 0.10
-- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. A flat VIX under-prices the put, so the collar's cost is understated.
-- harness: collar_overlay
-- result X-70018c19: supported — model-priced: MDD -26% vs -56% (needs < -38%), Sharpe 1.15 vs 0.62, CAGR 10.3% vs 8.9%
-
-### T-57 · short-straddle-earns-the-vrp
-
-**Claim.** Selling the monthly ATM SPY straddle priced at VIX earns a positive mean P&L (the variance risk premium in option form).
-
-- kind: options-strategy · origin: literature:vrp, options-sweep
-- statistic: mean monthly P&L as a share of notional
-- null: mean P&L = 0; studentized block bootstrap
-- procedure: every 21 trading days: sell ATM call and put priced at VIX, settle at |S_T - K|
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
-- pass: mean > 0, p < 0.05, both halves > 0
-- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. ATM pricing at VIX is close to fair (VIX is roughly the ATM-ish 30-day IV), so this one is the least biased of the overlays.
-- harness: short_straddle_model
-- result X-13ef8afe: supported — model-priced: mean +1.10% of notional per month, Sharpe 1.33, MDD -23%, block-bootstrap p=0.0005, halves +1.14%/+1.06%
-
 ## Not Supported (5)
 
 ### T-02 · longshot-bias
@@ -295,7 +239,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-4b59c8db: not_supported — P(21d drop < -5%) top SKEW quintile 0.068 vs bottom 0.123 (diff -0.055, block-shift p=0.880, halves +nan/+0.069)
 - note: literature finds SKEW a weak predictor; this is the test, not the belief
 
-## Inconclusive (1)
+## Inconclusive (5)
 
 ### T-38 · retail-attention-predicts-abs-return
 
@@ -311,6 +255,74 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: social_attention
 - result X-95f1d3d2: inconclusive — 1/30 collection days, 2 usable ticker-days
 - note: runs daily; inconclusive until 30 capture days
+
+### T-54 · covered-call-beats-buy-and-hold
+
+**Claim.** Writing monthly 30-delta covered calls on SPY produces a higher Sharpe ratio than holding SPY.
+
+- kind: options-strategy · origin: cboe:BXMD, options-sweep
+- statistic: Sharpe difference over non-overlapping monthly cycles
+- null: Sharpe(covered call) <= Sharpe(buy and hold); circular block bootstrap of paired cycles
+- procedure: every 21 trading days: hold SPY, sell a 30-delta call priced by BSM at VIX; settle at expiry
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
+- pass: Sharpe higher and p < 0.05
+- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it.
+- harness: covered_call_overlay
+- result X-c3d19508: supported — model-priced (VIX as flat IV, upper bound for call selling): Sharpe 1.17 vs buy-and-hold 0.62, CAGR 16.4% vs 8.9%, MDD -42% vs -56%, Sharpe-diff p=0.000, 403 cycles
+- result X-2f57d496: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: Sharpe 1.17 vs B&H 0.62, CAGR 16.4% vs 8.9%; at IV x0.81: Sharpe 0.87, CAGR 11.1%, MDD -46% vs -56% (403 cycles)
+- blocked on: a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing
+- note: Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days).
+
+### T-55 · put-writing-beats-buy-and-hold
+
+**Claim.** Writing monthly ATM cash-secured puts on SPY produces a higher Sharpe ratio than holding SPY.
+
+- kind: options-strategy · origin: cboe:PUT, options-sweep
+- statistic: Sharpe difference over monthly cycles
+- null: Sharpe(put write) <= Sharpe(buy and hold); block bootstrap
+- procedure: every 21 trading days: sell an ATM put priced at VIX, hold the strike in bills
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
+- pass: Sharpe higher and p < 0.05
+- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it.
+- harness: csp_overlay
+- result X-babe2142: supported — model-priced: Sharpe 1.27 vs buy-and-hold 0.62, CAGR 12.9% vs 8.9%, MDD -32% vs -56%, Sharpe-diff p=0.005
+- result X-0b25a5ae: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: Sharpe 1.27 vs B&H 0.62, CAGR 12.9% vs 8.9%; at IV x0.81: Sharpe 0.76, CAGR 7.3%, MDD -38% vs -56%
+- blocked on: a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing
+- note: Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days).
+
+### T-56 · collar-cuts-drawdown-cheaply
+
+**Claim.** A monthly 30-delta collar on SPY cuts the maximum drawdown by at least a third while keeping the Sharpe ratio within 0.10 of buy-and-hold.
+
+- kind: options-strategy · origin: cboe:CLL, options-sweep
+- statistic: max drawdown ratio and Sharpe difference
+- null: descriptive thresholds (no sampling null)
+- procedure: every 21 trading days: hold SPY, sell 30-delta call, buy 30-delta put, both priced at VIX
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
+- pass: MDD(collar) < 2/3 MDD(SPY) and Sharpe >= Sharpe(SPY) - 0.10
+- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. A flat VIX under-prices the put, so the collar's cost is understated.
+- harness: collar_overlay
+- result X-70018c19: supported — model-priced: MDD -26% vs -56% (needs < -38%), Sharpe 1.15 vs 0.62, CAGR 10.3% vs 8.9%
+- result X-24cba6b2: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: MDD -26% vs -56%, Sharpe 1.15 vs 0.62; at IV x0.81: MDD -21%, Sharpe 1.19, CAGR 9.3% vs 8.9%
+- blocked on: a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing
+- note: Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days).
+
+### T-57 · short-straddle-earns-the-vrp
+
+**Claim.** Selling the monthly ATM SPY straddle priced at VIX earns a positive mean P&L (the variance risk premium in option form).
+
+- kind: options-strategy · origin: literature:vrp, options-sweep
+- statistic: mean monthly P&L as a share of notional
+- null: mean P&L = 0; studentized block bootstrap
+- procedure: every 21 trading days: sell ATM call and put priced at VIX, settle at |S_T - K|
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 100
+- pass: mean > 0, p < 0.05, both halves > 0
+- controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. ATM pricing at VIX is close to fair (VIX is roughly the ATM-ish 30-day IV), so this one is the least biased of the overlays.
+- harness: short_straddle_model
+- result X-13ef8afe: supported — model-priced: mean +1.10% of notional per month, Sharpe 1.33, MDD -23%, block-bootstrap p=0.0005, halves +1.14%/+1.06%
+- result X-c9662a62: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: mean +1.10%/month (p=0.0005); at IV x0.81: mean +0.24%/month (p=0.0745), Sharpe 0.29, MDD -37%
+- blocked on: a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing
+- note: Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days).
 
 ## Untested (3)
 

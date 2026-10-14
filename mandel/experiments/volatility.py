@@ -152,14 +152,14 @@ def term_structure_reversion(vix_rows: Iterable[dict], vix3m_rows: Iterable[dict
 # ------------------------------------------------------------- model-priced overlays --
 
 def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_rows: Optional[Iterable[dict]], strategy: str, symbol: str = "SPY",
-                     hold_days: int = 21, call_delta: float = 0.30, put_delta: float = -0.30, q: float = 0.0) -> dict:
+                     hold_days: int = 21, call_delta: float = 0.30, put_delta: float = -0.30, q: float = 0.0, iv_scale: float = 1.0) -> dict:
     """Monthly (hold_days) non-overlapping cycles. Options priced by Black-Scholes at entry with VIX/100 as IV and
     the bill rate; settled at intrinsic value at exit. Returns per-cycle simple returns on the position's notional.
     strategies: covered_call, cash_secured_put, collar, short_straddle, long_straddle, buy_and_hold."""
     px = price_closes(price_rows, symbol); vx = index_closes(vix_rows)
     rt = index_closes(rate_rows) if rate_rows is not None else {}
     days = sorted(d for d in px if d in vx)
-    S = np.array([px[d] for d in days]); iv = np.array([vx[d] / 100.0 for d in days])
+    S = np.array([px[d] for d in days]); iv = np.array([vx[d] / 100.0 * iv_scale for d in days])
     rate = np.array([rt.get(d, np.nan) for d in days]) / 100.0
     rate = np.where(np.isnan(rate), np.nanmean(rate) if np.isfinite(np.nanmean(rate)) else 0.0, rate)
     T = hold_days / TRADING_DAYS
@@ -190,7 +190,7 @@ def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_
     ppy = TRADING_DAYS / hold_days
     def dd(x):
         c = np.cumprod(1 + x); peak = np.maximum.accumulate(c); return float((c / peak - 1).min())
-    return {"strategy": strategy, "symbol": symbol, "model_priced": True, "n_cycles": int(len(rets)), "first_day": days[0], "last_day": days[min(len(days) - 1, (len(rets)) * hold_days)],
+    return {"strategy": strategy, "symbol": symbol, "model_priced": True, "iv_scale": iv_scale, "n_cycles": int(len(rets)), "first_day": days[0], "last_day": days[min(len(days) - 1, (len(rets)) * hold_days)],
             "mean_cycle_return": float(rets.mean()), "sharpe": float(sharpe_ratio(rets, ppy)), "cagr": float(np.prod(1 + rets) ** (ppy / max(len(rets), 1)) - 1), "max_drawdown": dd(rets),
             "benchmark_sharpe": float(sharpe_ratio(bh, ppy)), "benchmark_cagr": float(np.prod(1 + bh) ** (ppy / max(len(bh), 1)) - 1), "benchmark_max_drawdown": dd(bh),
             "returns": rets, "benchmark": bh}

@@ -280,47 +280,52 @@ def _sharpe_diff_p(a: np.ndarray, b: np.ndarray, n_boot: int = 2000, block_len: 
     return float((np.sum(null >= obs) + 1) / (n_boot + 1))
 
 
-def _overlay(archive: Archive, strategy: str):
-    return overlay_backtest(archive.load("daily-history-SPY"), archive.load("cboe-VIX-history"), archive.load("fred-DTB3"), strategy, symbol="SPY")
+# Measured 2026-10-14 against the live SPY chain at 30 DTE: VIX 15.27 vs SPY ATM IV 12.3 (ratio 0.81); a flat VIX
+# overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17%, the 30-delta put by 8%.
+# Until the daily chain capture gives a history of that ratio, model-priced overlays cannot be verdicts.
+IV_SCALE_TODAY = 0.81
+MODEL_NOTE = "MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%"
+
+
+def _overlay(archive: Archive, strategy: str, iv_scale: float = 1.0):
+    return overlay_backtest(archive.load("daily-history-SPY"), archive.load("cboe-VIX-history"), archive.load("fred-DTB3"), strategy, symbol="SPY", iv_scale=iv_scale)
+
+
+def _overlay_pair(archive: Archive, strategy: str, versus: str = "benchmark"):
+    """Runs the overlay at VIX and at today's measured ATM/VIX ratio; returns both and a sensitivity reading."""
+    a = _overlay(archive, strategy, 1.0); b = _overlay(archive, strategy, IV_SCALE_TODAY)
+    va = overlay_verdict(a, versus=versus); vb = overlay_verdict(b, versus=versus)
+    va["p_value_sharpe_diff"] = _sharpe_diff_p(a["returns"], a["benchmark"]); vb["p_value_sharpe_diff"] = _sharpe_diff_p(b["returns"], b["benchmark"])
+    return {"at_vix": va, "at_iv_scale_0.81": vb, "model_priced": True, "note": MODEL_NOTE}, a, b
 
 
 def harness_covered_call(archive: Archive):
-    """T-54 (model-priced): monthly 30-delta covered calls on SPY have a higher Sharpe than buy-and-hold."""
-    rep = _overlay(archive, "covered_call")
-    p = _sharpe_diff_p(rep["returns"], rep["benchmark"])
-    out = overlay_verdict(rep); out["p_value_sharpe_diff"] = p
-    ok = rep["sharpe"] > rep["benchmark_sharpe"] and p < 0.05
-    return out, rep["n_cycles"], "supported" if ok else "not_supported", \
-        f"model-priced (VIX as flat IV, upper bound for call selling): Sharpe {rep['sharpe']:.2f} vs buy-and-hold {rep['benchmark_sharpe']:.2f}, CAGR {rep['cagr']*100:.1f}% vs {rep['benchmark_cagr']*100:.1f}%, MDD {rep['max_drawdown']*100:.0f}% vs {rep['benchmark_max_drawdown']*100:.0f}%, Sharpe-diff p={p:.3f}, {rep['n_cycles']} cycles"
+    """T-54 (model-priced): monthly 30-delta covered calls on SPY vs buy-and-hold. Reported as inconclusive by design."""
+    stat, a, b = _overlay_pair(archive, "covered_call")
+    return stat, a["n_cycles"], "inconclusive", (f"{MODEL_NOTE}. At VIX: Sharpe {a['sharpe']:.2f} vs B&H {a['benchmark_sharpe']:.2f}, CAGR {a['cagr']*100:.1f}% vs {a['benchmark_cagr']*100:.1f}%; "
+                                                   f"at IV x0.81: Sharpe {b['sharpe']:.2f}, CAGR {b['cagr']*100:.1f}%, MDD {b['max_drawdown']*100:.0f}% vs {b['benchmark_max_drawdown']*100:.0f}% ({a['n_cycles']} cycles)")
 
 
 def harness_csp(archive: Archive):
-    """T-55 (model-priced): monthly ATM cash-secured puts on SPY have a higher Sharpe than buy-and-hold."""
-    rep = _overlay(archive, "cash_secured_put")
-    p = _sharpe_diff_p(rep["returns"], rep["benchmark"])
-    out = overlay_verdict(rep); out["p_value_sharpe_diff"] = p
-    ok = rep["sharpe"] > rep["benchmark_sharpe"] and p < 0.05
-    return out, rep["n_cycles"], "supported" if ok else "not_supported", \
-        f"model-priced: Sharpe {rep['sharpe']:.2f} vs buy-and-hold {rep['benchmark_sharpe']:.2f}, CAGR {rep['cagr']*100:.1f}% vs {rep['benchmark_cagr']*100:.1f}%, MDD {rep['max_drawdown']*100:.0f}% vs {rep['benchmark_max_drawdown']*100:.0f}%, Sharpe-diff p={p:.3f}"
+    """T-55 (model-priced): monthly ATM cash-secured puts on SPY vs buy-and-hold. Inconclusive by design."""
+    stat, a, b = _overlay_pair(archive, "cash_secured_put")
+    return stat, a["n_cycles"], "inconclusive", (f"{MODEL_NOTE}. At VIX: Sharpe {a['sharpe']:.2f} vs B&H {a['benchmark_sharpe']:.2f}, CAGR {a['cagr']*100:.1f}% vs {a['benchmark_cagr']*100:.1f}%; "
+                                                   f"at IV x0.81: Sharpe {b['sharpe']:.2f}, CAGR {b['cagr']*100:.1f}%, MDD {b['max_drawdown']*100:.0f}% vs {b['benchmark_max_drawdown']*100:.0f}%")
 
 
 def harness_collar(archive: Archive):
-    """T-56 (model-priced): a monthly 30-delta collar cuts SPY max drawdown by at least a third while keeping Sharpe within 0.10 of buy-and-hold."""
-    rep = _overlay(archive, "collar")
-    out = overlay_verdict(rep)
-    ok = rep["max_drawdown"] > rep["benchmark_max_drawdown"] * (2 / 3) and rep["sharpe"] >= rep["benchmark_sharpe"] - 0.10
-    return out, rep["n_cycles"], "supported" if ok else "not_supported", \
-        f"model-priced: MDD {rep['max_drawdown']*100:.0f}% vs {rep['benchmark_max_drawdown']*100:.0f}% (needs < {rep['benchmark_max_drawdown']*2/3*100:.0f}%), Sharpe {rep['sharpe']:.2f} vs {rep['benchmark_sharpe']:.2f}, CAGR {rep['cagr']*100:.1f}% vs {rep['benchmark_cagr']*100:.1f}%"
+    """T-56 (model-priced): monthly 30-delta collar on SPY. Inconclusive by design."""
+    stat, a, b = _overlay_pair(archive, "collar")
+    return stat, a["n_cycles"], "inconclusive", (f"{MODEL_NOTE}. At VIX: MDD {a['max_drawdown']*100:.0f}% vs {a['benchmark_max_drawdown']*100:.0f}%, Sharpe {a['sharpe']:.2f} vs {a['benchmark_sharpe']:.2f}; "
+                                                   f"at IV x0.81: MDD {b['max_drawdown']*100:.0f}%, Sharpe {b['sharpe']:.2f}, CAGR {b['cagr']*100:.1f}% vs {b['benchmark_cagr']*100:.1f}%")
 
 
 def harness_short_straddle(archive: Archive):
-    """T-57 (model-priced): selling the monthly ATM straddle on SPY priced at VIX has positive mean P&L (the VRP in option form)."""
-    rep = _overlay(archive, "short_straddle")
-    out = overlay_verdict(rep, versus="zero")
-    p = out.get("p_value_mean_excess", 1.0)
-    ok = rep["mean_cycle_return"] > 0 and p < 0.05 and all(h > 0 for h in out.get("halves", [0, 0]))
-    return out, rep["n_cycles"], "supported" if ok else "not_supported", \
-        f"model-priced: mean {rep['mean_cycle_return']*100:+.2f}% of notional per month, Sharpe {rep['sharpe']:.2f}, MDD {rep['max_drawdown']*100:.0f}%, block-bootstrap p={p:.4f}, halves {out['halves'][0]*100:+.2f}%/{out['halves'][1]*100:+.2f}%"
+    """T-57 (model-priced): selling the monthly ATM SPY straddle priced at VIX. Inconclusive by design; the sensitivity to the IV scale is the finding."""
+    stat, a, b = _overlay_pair(archive, "short_straddle", versus="zero")
+    pa = stat["at_vix"].get("p_value_mean_excess", 1.0); pb = stat["at_iv_scale_0.81"].get("p_value_mean_excess", 1.0)
+    return stat, a["n_cycles"], "inconclusive", (f"{MODEL_NOTE}. At VIX: mean {a['mean_cycle_return']*100:+.2f}%/month (p={pa:.4f}); "
+                                                   f"at IV x0.81: mean {b['mean_cycle_return']*100:+.2f}%/month (p={pb:.4f}), Sharpe {b['sharpe']:.2f}, MDD {b['max_drawdown']*100:.0f}%")
 
 
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
