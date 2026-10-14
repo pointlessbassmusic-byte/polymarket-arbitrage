@@ -120,6 +120,12 @@ hourly perps (closed: the in-sample winners lose every month), eleven
 years of hourly BTC and ten years of nine macro ETFs (inconclusive: the
 walk-forward earns the market's own drift, the best in-sample Sharpe is
 what the best of N null trials gives).
+Inconclusive, recorded (2026-10-14, `insider-purchases`): officer and
+director open-market buys (SEC Form 4, 28,706 priced events 2016-2026)
+beat the same names a quarter later by +1.21% a trade-month (PSR 0.91
+against the 0.95 bar), but the window after the filing earns exactly
+SPY: the names fall ~3% into the buy and pause; no return above the
+market to trade.
 Inconclusive, recorded: monthly trend-following on Kalshi's index, metal
 and oil perps (ten years of ETF proxies: +3%/yr after a 5%/yr carry
 assumption, +8%/yr without it, long-only +6–7%/yr but every instrument
