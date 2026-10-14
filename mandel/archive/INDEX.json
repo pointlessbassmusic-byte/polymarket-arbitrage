@@ -1,0 +1,94 @@
+{
+ "note": "Cold storage index. Bundles are gzip JSONL; entries not in git carry the recipe to rebuild them.",
+ "bundles": {
+  "polymarket-closed-markets": {
+   "name": "polymarket-closed-markets",
+   "kind": "data",
+   "path": "mandel/archive/data/polymarket-closed-markets.jsonl.gz",
+   "created_at": "2026-10-14T09:32:34.277438+00:00",
+   "rows": 2100,
+   "bytes": 2065757,
+   "sha256": "6025d73bb58fba661051076d15113482958642db51e97288aeb14130be429f5b",
+   "tags": [
+    "markets",
+    "polymarket",
+    "resolved"
+   ],
+   "recipe": "mandel.data.fetch.polymarket_closed_markets(n=4000) via https://gamma-api.polymarket.com/markets?closed=true&order=volumeNum",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = raw Gamma market row; observed_at = closedTime"
+  },
+  "polymarket-price-history-daily": {
+   "name": "polymarket-price-history-daily",
+   "kind": "data",
+   "path": "mandel/archive/data/polymarket-price-history-daily.jsonl.gz",
+   "created_at": "2026-10-14T09:29:44.522729+00:00",
+   "rows": 18962,
+   "bytes": 263922,
+   "sha256": "c560f732f2954994c20f0731de60f4189a89966d48580225a90c900802e18d6f",
+   "tags": [
+    "daily",
+    "polymarket",
+    "prices"
+   ],
+   "recipe": "CLOB /prices-history?interval=max&fidelity=1440 for the YES token of the 400 largest resolved markets",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {market_id, token, p, t}; one row per day"
+  },
+  "polymarket-books-snapshot": {
+   "name": "polymarket-books-snapshot",
+   "kind": "data",
+   "path": "mandel/archive/data/polymarket-books-snapshot.jsonl.gz",
+   "created_at": "2026-10-14T09:30:14.980296+00:00",
+   "rows": 100,
+   "bytes": 98032,
+   "sha256": "bb354eedde2f6b0366c6f3b60af0d2f9e383034be94ea54b27911f2e1e90a449",
+   "tags": [
+    "books",
+    "polymarket",
+    "snapshot"
+   ],
+   "recipe": "CLOB /book for both tokens of the 300 most active markets (one snapshot)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {question, tokens, books{yes,no}{bids,asks}}"
+  },
+  "kalshi-settled-markets": {
+   "name": "kalshi-settled-markets",
+   "kind": "data",
+   "path": "mandel/archive/data/kalshi-settled-markets.jsonl.gz",
+   "created_at": "2026-10-14T09:30:21.174524+00:00",
+   "rows": 3000,
+   "bytes": 816785,
+   "sha256": "1af9c7e478abac46a1f22a25b84fade4dd84901fbf990abbe7e74c862c6c2af3",
+   "tags": [
+    "kalshi",
+    "markets",
+    "settled"
+   ],
+   "recipe": "mandel.data.fetch.kalshi_settled_markets(n=3000) via https://api.elections.kalshi.com/trade-api/v2/markets?status=settled",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = raw Kalshi market row; observed_at = settlement_ts"
+  },
+  "kalshi-candles": {
+   "name": "kalshi-candles",
+   "kind": "data",
+   "path": "mandel/archive/data/kalshi-candles.jsonl.gz",
+   "created_at": "2026-10-14T09:32:32.254268+00:00",
+   "rows": 70,
+   "bytes": 3734,
+   "sha256": "45366aed22558d42e4c8da643b4a847f991be90c295ea7c0777c043028efe9cd",
+   "tags": [
+    "candles",
+    "kalshi"
+   ],
+   "recipe": "/series/{series}/markets/{ticker}/candlesticks for the 120 most traded settled markets",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {ticker, period, candle(raw)}"
+  }
+ }
+}
