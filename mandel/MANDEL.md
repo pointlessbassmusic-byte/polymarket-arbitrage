@@ -235,3 +235,10 @@ First-contact protocol, for when the user introduces a child:
   distilled, synthesised and critiqued; 696 candidate insights ingested;
   ARCHITECTURE.md v1 chosen from four independent proposals and revised
   after a red team; signal map published; REPORT-2026-10-14.md written.
+- 2026-10-14  Cycle 2 closed. 44 theories written as falsifiable statements
+  with trial math (`theories/registry.json`, rendered to `THEORIES.md`);
+  eleven harnesses ran on real Polymarket, Kalshi, social and history data
+  pulled into the archive (16 bundles, 96,708 rows, every one with a recipe);
+  6 supported, 1 not supported, 1 inconclusive, 6 untested, 22 blocked,
+  8 parked with reasons through the ledger; social / flow layer added
+  (`data/social.py`, daily `social-fetch`); REPORT-2026-10-14-cycle2.md.

@@ -1,6 +1,6 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `f79fea4b13290bd8`). 44 theories. supported 6, not_supported 1, inconclusive 1, untested 6, blocked 22, parked 8.
+Rendered from `registry.json` (hash `7929f84985d49541`). 44 theories. supported 6, not_supported 1, inconclusive 1, untested 6, blocked 22, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
@@ -139,7 +139,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - data: same as T-01 · min n: 300
 - pass: upper interval bound < 0
 - controls: bucket chosen before looking; horizon fixed at 7d
-- note: sub-claim read from the market_calibration calibration table; not automated as a verdict yet
+- note: sub-claim read from the market_calibration calibration table; not automated as a verdict yet. Reading 2026-10-14: the <0.10 bucket (mean price 0.008-0.014) resolves YES at 0.010 (1d), 0.007 (3d), 0.028 (7d), 0.020 (30d), 0.019 (90d): at 7d+ slightly MORE often than priced, the reverse of the classic longshot bias, on 5-8 YES events per horizon. A lead, not a finding.
 
 ### T-12 · volume-improves-calibration
 
@@ -165,7 +165,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - data: same as T-01 · min n: 300
 - pass: skill(1d) > skill(7d) > skill(30d) > skill(90d)
 - controls: survivorship: only markets alive at each horizon
-- note: read from the market_calibration statistic; recorded in the cycle report
+- note: read from the market_calibration statistic. Reading 2026-10-14: skill 0.70 (90d), 0.72 (30d), 0.78 (7d), 0.86 (3d), 0.86 (1d): monotone as claimed; the 1d/3d tie is within noise.
 
 ### T-19 · point-in-time-changes-a-verdict
 

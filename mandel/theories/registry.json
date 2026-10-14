@@ -57,7 +57,7 @@
    "status": "untested",
    "blocked_on": "",
    "results": [],
-   "notes": "sub-claim read from the market_calibration calibration table; not automated as a verdict yet"
+   "notes": "sub-claim read from the market_calibration calibration table; not automated as a verdict yet. Reading 2026-10-14: the <0.10 bucket (mean price 0.008-0.014) resolves YES at 0.010 (1d), 0.007 (3d), 0.028 (7d), 0.020 (30d), 0.019 (90d): at 7d+ slightly MORE often than priced, the reverse of the classic longshot bias, on 5-8 YES events per horizon. A lead, not a finding."
   },
   {
    "id": "T-03",
@@ -370,7 +370,7 @@
    "status": "untested",
    "blocked_on": "",
    "results": [],
-   "notes": "read from the market_calibration statistic; recorded in the cycle report"
+   "notes": "read from the market_calibration statistic. Reading 2026-10-14: skill 0.70 (90d), 0.72 (30d), 0.78 (7d), 0.86 (3d), 0.86 (1d): monotone as claimed; the 1d/3d tie is within noise."
   },
   {
    "id": "T-14",
