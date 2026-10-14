@@ -60,10 +60,18 @@ def test_build_graph_layers_and_edges(tmp_path):
 
 
 def test_cooccurrence_pmi(tmp_path):
-    g = build_graph(knowledge_root=_tree(tmp_path, n=6))
+    root = tmp_path / "knowledge"
+    (root / "sources").mkdir(parents=True); (root / "adjacent").mkdir()
+    extras = [" with Markov chains and the Kelly criterion", " with Markov chains and the Kelly criterion",
+              " about fractal dimension and Hausdorff measure", " about fractal dimension", " with the Kelly criterion", ""]
+    for i, ex in enumerate(extras, 1):
+        (root / "sources" / f"{i:02d}-doc.md").write_text(DOC.format(title=f"Doc {i}", extra=ex))
+    g = build_graph(knowledge_root=root)
     co = [e for e in g["edges"] if e["type"] == "cooccur"]
-    assert co, "expected co-occurrence edges with 7 documents"
+    assert co, "expected co-occurrence edges"
     assert all("PMI" in e["label"] or "inverse" in e["label"] for e in co)
+    # Markov and Kelly appear together in 2 of 6 files more often than chance: a positive edge
+    assert any({e["s"], e["t"]} == {"k:markov", "k:kelly"} and e["sign"] == 1 for e in co)
 
 
 def test_write_html_embeds_json(tmp_path):

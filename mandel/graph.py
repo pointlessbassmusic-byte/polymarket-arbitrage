@@ -184,6 +184,15 @@ def _first_line_value(text: str, key: str) -> str:
     return m.group(1).strip() if m else ""
 
 
+def _display_path(f: Path, repo_root: Path, knowledge_root: Path) -> str:
+    for base in (repo_root, knowledge_root):
+        try:
+            return str(f.relative_to(base))
+        except ValueError:
+            continue
+    return f.name
+
+
 def _count_mentions(text: str, rxs: Iterable[re.Pattern]) -> int:
     return sum(len(rx.findall(text)) for rx in rxs)
 
@@ -237,7 +246,7 @@ def build_graph(knowledge_root: Path = KNOWLEDGE_ROOT, mandel_root: Path = MANDE
         nodes[sid] = Node(sid, title[:60], 0, "source", size=2.0,
                           group="adjacent" if sid.startswith("adj") else "provided",
                           detail=f.name,
-                          meta={"file": str(f.relative_to(mandel_root.parent)), "coverage": float(cov.group(1)) if cov else None,
+                          meta={"file": _display_path(f, mandel_root.parent, knowledge_root), "coverage": float(cov.group(1)) if cov else None,
                                 "quality": quality[:80], "words": len(text.split())})
         counts = {cid: _count_mentions(text, r) for cid, r in rx.items()}
         counts = {k: v for k, v in counts.items() if v > 0}
