@@ -1,0 +1,16 @@
+# docker compose up -d        start (paper trading both strategies)
+# docker compose logs -f      watch; the dashboard URL with its token is logged
+# docker compose run --rm desk python -m cryptobot.desk --preflight
+services:
+  desk:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }   # unattended for months without filling the disk
+    volumes:
+      - ./state:/data
+      - ./cryptobot_config.yaml:/app/cryptobot_config.yaml:ro
+    ports:
+      - "127.0.0.1:${CRYPTOBOT_DASH_PORT:-8080}:8080"     # local only; CRYPTOBOT_DASH_PORT in .env moves it when 8080 is taken
