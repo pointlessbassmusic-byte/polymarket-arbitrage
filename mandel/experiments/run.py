@@ -27,6 +27,7 @@ from mandel.experiments.overfit import overfit_report
 from mandel.experiments.scaling import hurst_with_interval, multifractal_test
 from mandel.experiments.social import attention_vs_abs_return, fear_greed_forward_returns
 from mandel.experiments.volatility import overlay_backtest, overlay_verdict, skew_tail, term_structure_reversion, variance_risk_premium
+from mandel.experiments.underlying import ratio_reversion, trend_rules_multi, turn_of_month, weekday_effect, weekend_effect
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
 from mandel.paths import MANDEL_ROOT
@@ -328,6 +329,52 @@ def harness_short_straddle(archive: Archive):
                                                    f"at IV x0.81: mean {b['mean_cycle_return']*100:+.2f}%/month (p={pb:.4f}), Sharpe {b['sharpe']:.2f}, MDD {b['max_drawdown']*100:.0f}%")
 
 
+TREND_RULES = [("ma", 50), ("ma", 100), ("ma", 200), ("tsmom", 63), ("tsmom", 126), ("tsmom", 252)]
+TREND_ASSETS = {"SPY": 252, "QQQ": 252, "GLD": 252, "SLV": 252, "TLT": 252, "IWM": 252, "BTC-USD": 365, "ETH-USD": 365}
+
+
+def _closes(archive: Archive, sym: str):
+    from mandel.experiments.underlying import _series
+    return _series(archive.load(f"daily-history-{sym}"), sym)
+
+
+def harness_trend_rules(archive: Archive):
+    """T-58: a declared grid of six long/flat trend rules beats buy-and-hold on a majority of eight assets after deflation."""
+    series = {}
+    for sym in TREND_ASSETS:
+        try:
+            _, c = _closes(archive, sym); series[sym] = c
+        except Exception:
+            continue
+    rep = trend_rules_multi(series, TREND_RULES, cost_bps=5.0, ppy=TREND_ASSETS)
+    n = min(o["n_periods"] for o in rep["per_asset"].values()) if rep["per_asset"] else 0
+    return rep, n, rep["verdict"], rep["reason"]
+
+
+def harness_turn_of_month(archive: Archive):
+    """T-59: SPY's last four and first three trading days of the month earn more than the other days."""
+    days, c = _closes(archive, "SPY"); rep = turn_of_month(days, c)
+    return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
+def harness_weekday(archive: Archive):
+    """T-60: some weekday's SPY return differs from the rest (Bonferroni over weekdays, halves agree)."""
+    days, c = _closes(archive, "SPY"); rep = weekday_effect(days, c)
+    return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
+def harness_gold_silver_ratio(archive: Archive):
+    """T-61: the GLD/SLV log ratio mean-reverts after a 2-sigma deviation from its 250-day mean over the next 21 days."""
+    da, a = _closes(archive, "GLD"); db, b = _closes(archive, "SLV"); rep = ratio_reversion(da, a, db, b)
+    return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
+def harness_crypto_weekend(archive: Archive):
+    """T-62: BTC weekend (Sat, Sun) close-to-close returns differ from weekday returns."""
+    days, c = _closes(archive, "BTC-USD"); rep = weekend_effect(days, c)
+    return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     names = sorted(e.name for e in archive.entries())
     return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
@@ -369,6 +416,8 @@ HARNESSES: dict[str, Callable] = {
     "vrp_spx": harness_vrp_spx, "vrp_btc": harness_vrp_btc, "vrp_gold": harness_vrp_gold, "vrp_nasdaq": harness_vrp_nasdaq,
     "skew_tail": harness_skew_tail, "term_structure_reversion": harness_term_structure,
     "covered_call_overlay": harness_covered_call, "csp_overlay": harness_csp, "collar_overlay": harness_collar, "short_straddle_model": harness_short_straddle,
+    "trend_rules": harness_trend_rules, "turn_of_month": harness_turn_of_month, "weekday_effect": harness_weekday,
+    "gold_silver_ratio": harness_gold_silver_ratio, "crypto_weekend": harness_crypto_weekend,
 }
 BUNDLES_NEEDED = {
     "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -387,6 +436,8 @@ BUNDLES_NEEDED = {
     "skew_tail": ["cboe-SKEW-history", "daily-history-SPY"], "term_structure_reversion": ["cboe-VIX-history", "cboe-VIX3M-history"],
     "covered_call_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"], "csp_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"],
     "collar_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"], "short_straddle_model": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"],
+    "trend_rules": ["daily-history-SPY", "daily-history-BTC-USD"], "turn_of_month": ["daily-history-SPY"], "weekday_effect": ["daily-history-SPY"],
+    "gold_silver_ratio": ["daily-history-GLD", "daily-history-SLV"], "crypto_weekend": ["daily-history-BTC-USD"],
 }
 
 
@@ -459,4 +510,9 @@ def _null_for(name: str) -> str:
         "covered_call_overlay": "Sharpe(covered call) <= Sharpe(buy and hold), block bootstrap of paired cycles; model-priced",
         "csp_overlay": "Sharpe(put writing) <= Sharpe(buy and hold); model-priced", "collar_overlay": "descriptive thresholds; model-priced",
         "short_straddle_model": "mean straddle P&L = 0 (block bootstrap); model-priced",
+        "trend_rules": "zero-skill best-of-48 (6 rules x 8 assets): DSR and PBO deflation, block bootstrap vs buy-and-hold",
+        "turn_of_month": "equal mean return on turn-of-month and other days (block bootstrap, block 21)",
+        "weekday_effect": "equal means across weekdays (block bootstrap, Bonferroni over weekdays)",
+        "gold_silver_ratio": "z-score series circularly shifted against future ratio changes",
+        "crypto_weekend": "equal weekend and weekday means (two-sided block bootstrap)",
     }.get(name, "n/a")

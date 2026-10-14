@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `bea70f89102de375`). 55 theories. supported 11, not_supported 5, inconclusive 5, untested 3, blocked 23, parked 8.
+Rendered from `registry.json` (hash `8dc89f59948f9ca9`). 60 theories. supported 12, not_supported 9, inconclusive 5, untested 3, blocked 23, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (11)
+## Supported (12)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -163,7 +163,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: term_structure_reversion
 - result X-47917835: supported — 21d change in VIX after backwardation -6.09 vs contango +0.45 pts (diff -6.54, block-shift p=0.0005, halves -5.43/-7.53; backwardation on 8% of days)
 
-## Not Supported (5)
+### T-59 · turn-of-month-effect
+
+**Claim.** SPY earns more on the last four and first three trading days of each month than on the other days.
+
+- kind: underlying-strategy · origin: literature:lakonishok-smidt-1988, underlying-sweep
+- statistic: mean daily return difference (bps), turn-of-month minus other days
+- null: equal means; studentized block bootstrap (block 21) of the paired daily series
+- procedure: flag days by month position; both halves must agree
+- data: daily-history-SPY · min n: 3000
+- pass: difference > 0, p < 0.05, both halves > 0
+- controls: window fixed in advance (4 before, 3 after); no costs needed for a timing effect of this size to matter
+- harness: turn_of_month
+- result X-bc27e9fd: supported — turn-of-month days +9.0 bps/day vs others +1.6 (diff +7.4 bps, block-bootstrap p=0.0020, halves +8.8/+5.9)
+
+## Not Supported (9)
 
 ### T-02 · longshot-bias
 
@@ -238,6 +252,62 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: skew_tail
 - result X-4b59c8db: not_supported — P(21d drop < -5%) top SKEW quintile 0.068 vs bottom 0.123 (diff -0.055, block-shift p=0.880, halves +nan/+0.069)
 - note: literature finds SKEW a weak predictor; this is the test, not the belief
+
+### T-58 · trend-rules-beat-buy-and-hold
+
+**Claim.** A declared grid of six long/flat trend rules (50/100/200-day moving average, 3/6/12-month time-series momentum) beats buy-and-hold after deflation on a majority of SPY, QQQ, GLD, SLV, TLT, IWM, BTC and ETH.
+
+- kind: underlying-strategy · origin: literature:moskowitz-ooi-pedersen-2012, underlying-sweep
+- statistic: per asset: best variant's Sharpe vs buy-and-hold, deflated Sharpe over the grid, PBO (CSCV); count of assets passing
+- null: zero-skill best-of-48
+- procedure: full histories, 5 bps per position change, positions decided at close for the next day
+- data: daily-history-* (8 assets) · min n: 1500
+- pass: majority of assets with best Sharpe > B&H, block-bootstrap p < 0.05 and DSR > 0.95
+- controls: no look-ahead (signal at close t, return t+1); costs; the grid is the trial count; cash earns zero (conservative for the rule)
+- harness: trend_rules
+- result X-1974bcf3: not_supported — 0/8 assets where the best of 6 trend rules beats buy-and-hold after deflation (median DSR 0.99, median PBO 0.45); SPY: best tsmom126 SR 0.64 vs B&H 0.55, DSR 1.00, PBO 0.20; QQQ: best tsmom126 SR 0.53 vs B&H 0.40, DSR 0.99, PBO 0.43; GLD: best tsmom126 SR 0.65 vs B&H 0.63, DSR 0.99, PBO 0.29; SLV: best tsmom252 SR 0.42 vs B&H 0.39, DSR 0.86, PBO 0.64; TLT: best tsmom63 SR 0.09 vs B&H 0.05, DSR 0.41, PBO 0.53; IWM: best tsmom252 SR 0.39 vs B&H 0.40, DSR 0.94, PBO 0.47; BTC-USD: best ma50 SR 1.48 vs B&H 1.12, DSR 1.00, PBO 0.11; ETH-USD: best ma50 SR 1.02 vs B&H 0.66, DSR 0.99, PBO 0.60
+
+### T-60 · weekday-effect
+
+**Claim.** Some weekday's SPY close-to-close return differs from the other weekdays' after correcting for having looked at five weekdays.
+
+- kind: underlying-strategy · origin: literature:french-1980, underlying-sweep
+- statistic: per weekday mean difference vs rest; smallest Bonferroni-corrected two-sided p
+- null: equal means across weekdays
+- procedure: block bootstrap per weekday; Bonferroni x5; halves must agree in sign
+- data: daily-history-SPY · min n: 3000
+- pass: corrected p < 0.05 with halves agreeing
+- controls: multiple testing corrected; the classic Monday effect decayed after publication
+- harness: weekday_effect
+- result X-cd38bf54: not_supported — strongest weekday Fri: -5.1 bps vs rest (Bonferroni p=0.425, halves agree True)
+
+### T-61 · gold-silver-ratio-reverts
+
+**Claim.** When the GLD/SLV log ratio is more than two standard deviations from its 250-day mean it moves back toward the mean over the next 21 trading days.
+
+- kind: underlying-strategy · origin: underlying-sweep
+- statistic: mean of -sign(z) x 21-day change in the log ratio on signal days
+- null: z series circularly shifted against future changes
+- procedure: trailing 250-day z-score; signals |z| > 2; block-shift null; halves agree
+- data: daily-history-GLD, daily-history-SLV · min n: 2500
+- pass: mean > 0, p < 0.05, both halves > 0, >= 30 signals
+- controls: no look-ahead (trailing window); overlapping horizons via block shift; costs not charged (reversion size vs spread to be checked before any trade)
+- harness: gold_silver_ratio
+- result X-3983c31f: not_supported — 716 signal days (|z|>2.0); mean 21d move back toward the mean -0.0058 log units (block-shift p=0.739, halves -0.0175/+0.0119)
+
+### T-62 · crypto-weekend-effect
+
+**Claim.** BTC's Saturday and Sunday close-to-close returns differ from its weekday returns.
+
+- kind: underlying-strategy · origin: underlying-sweep
+- statistic: mean weekend minus weekday daily return (bps), two-sided
+- null: equal means; block bootstrap (block 14)
+- procedure: 7-day series since 2014; halves agree in sign
+- data: daily-history-BTC-USD · min n: 2000
+- pass: two-sided p < 0.05 with halves agreeing
+- controls: two-sided because the literature disagrees on the sign; weekend volatility ratio reported
+- harness: crypto_weekend
+- result X-45ddf2f7: not_supported — weekend +12.1 bps/day vs weekday +20.1 (diff -8.0, two-sided block-bootstrap p=0.402, halves -14.1/-1.9); weekend vol is 0.72x weekday vol
 
 ## Inconclusive (5)
 

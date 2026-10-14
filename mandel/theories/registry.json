@@ -1489,6 +1489,149 @@
     "X-c9662a62"
    ],
    "notes": "Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days)."
+  },
+  {
+   "id": "T-58",
+   "slug": "trend-rules-beat-buy-and-hold",
+   "kind": "underlying-strategy",
+   "claim": "A declared grid of six long/flat trend rules (50/100/200-day moving average, 3/6/12-month time-series momentum) beats buy-and-hold after deflation on a majority of SPY, QQQ, GLD, SLV, TLT, IWM, BTC and ETH.",
+   "origin": [
+    "literature:moskowitz-ooi-pedersen-2012",
+    "underlying-sweep"
+   ],
+   "trial": {
+    "statistic": "per asset: best variant's Sharpe vs buy-and-hold, deflated Sharpe over the grid, PBO (CSCV); count of assets passing",
+    "null": "zero-skill best-of-48",
+    "procedure": "full histories, 5 bps per position change, positions decided at close for the next day",
+    "data": "daily-history-* (8 assets)",
+    "min_n": 1500,
+    "pass": "majority of assets with best Sharpe > B&H, block-bootstrap p < 0.05 and DSR > 0.95",
+    "controls": "no look-ahead (signal at close t, return t+1); costs; the grid is the trial count; cash earns zero (conservative for the rule)"
+   },
+   "experiments": [
+    "trend_rules"
+   ],
+   "testable_now": true,
+   "status": "not_supported",
+   "blocked_on": "",
+   "results": [
+    "X-1974bcf3"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-59",
+   "slug": "turn-of-month-effect",
+   "kind": "underlying-strategy",
+   "claim": "SPY earns more on the last four and first three trading days of each month than on the other days.",
+   "origin": [
+    "literature:lakonishok-smidt-1988",
+    "underlying-sweep"
+   ],
+   "trial": {
+    "statistic": "mean daily return difference (bps), turn-of-month minus other days",
+    "null": "equal means; studentized block bootstrap (block 21) of the paired daily series",
+    "procedure": "flag days by month position; both halves must agree",
+    "data": "daily-history-SPY",
+    "min_n": 3000,
+    "pass": "difference > 0, p < 0.05, both halves > 0",
+    "controls": "window fixed in advance (4 before, 3 after); no costs needed for a timing effect of this size to matter"
+   },
+   "experiments": [
+    "turn_of_month"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-bc27e9fd"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-60",
+   "slug": "weekday-effect",
+   "kind": "underlying-strategy",
+   "claim": "Some weekday's SPY close-to-close return differs from the other weekdays' after correcting for having looked at five weekdays.",
+   "origin": [
+    "literature:french-1980",
+    "underlying-sweep"
+   ],
+   "trial": {
+    "statistic": "per weekday mean difference vs rest; smallest Bonferroni-corrected two-sided p",
+    "null": "equal means across weekdays",
+    "procedure": "block bootstrap per weekday; Bonferroni x5; halves must agree in sign",
+    "data": "daily-history-SPY",
+    "min_n": 3000,
+    "pass": "corrected p < 0.05 with halves agreeing",
+    "controls": "multiple testing corrected; the classic Monday effect decayed after publication"
+   },
+   "experiments": [
+    "weekday_effect"
+   ],
+   "testable_now": true,
+   "status": "not_supported",
+   "blocked_on": "",
+   "results": [
+    "X-cd38bf54"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-61",
+   "slug": "gold-silver-ratio-reverts",
+   "kind": "underlying-strategy",
+   "claim": "When the GLD/SLV log ratio is more than two standard deviations from its 250-day mean it moves back toward the mean over the next 21 trading days.",
+   "origin": [
+    "underlying-sweep"
+   ],
+   "trial": {
+    "statistic": "mean of -sign(z) x 21-day change in the log ratio on signal days",
+    "null": "z series circularly shifted against future changes",
+    "procedure": "trailing 250-day z-score; signals |z| > 2; block-shift null; halves agree",
+    "data": "daily-history-GLD, daily-history-SLV",
+    "min_n": 2500,
+    "pass": "mean > 0, p < 0.05, both halves > 0, >= 30 signals",
+    "controls": "no look-ahead (trailing window); overlapping horizons via block shift; costs not charged (reversion size vs spread to be checked before any trade)"
+   },
+   "experiments": [
+    "gold_silver_ratio"
+   ],
+   "testable_now": true,
+   "status": "not_supported",
+   "blocked_on": "",
+   "results": [
+    "X-3983c31f"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-62",
+   "slug": "crypto-weekend-effect",
+   "kind": "underlying-strategy",
+   "claim": "BTC's Saturday and Sunday close-to-close returns differ from its weekday returns.",
+   "origin": [
+    "underlying-sweep"
+   ],
+   "trial": {
+    "statistic": "mean weekend minus weekday daily return (bps), two-sided",
+    "null": "equal means; block bootstrap (block 14)",
+    "procedure": "7-day series since 2014; halves agree in sign",
+    "data": "daily-history-BTC-USD",
+    "min_n": 2000,
+    "pass": "two-sided p < 0.05 with halves agreeing",
+    "controls": "two-sided because the literature disagrees on the sign; weekend volatility ratio reported"
+   },
+   "experiments": [
+    "crypto_weekend"
+   ],
+   "testable_now": true,
+   "status": "not_supported",
+   "blocked_on": "",
+   "results": [
+    "X-45ddf2f7"
+   ],
+   "notes": ""
   }
  ]
 }
