@@ -752,9 +752,9 @@
   test: "cryptobot.lag_recorder samples the Kalshi book (top 3 levels) and the Coinbase ticker together about once a second for DOGE, SHIB and BTC for 90 minutes on 2026-10-14; markout of each signal at 5, 15, 30 and 60 s against the Kalshi mid, net of 4 bp; lead-lag correlation of 1-second spot changes with Kalshi mid changes at 0-10 s lags. Trials: 3 tickers x 2 horizons (15 s, 60 s) = 6."
   success: "Written before reading the recording: a CANDIDATE for a longer recording (a week, on the desk's server, with order sizes and queue checked) if a ticker shows >= 20 signals with net >= +2 bp at 15 s and 60 s; KILLED for a ticker if net is negative at both, or if there are fewer than 5 signals in 90 minutes. Ninety minutes on one day cannot make anything tradeable on its own."
   data: "scratch lag90/lag/<TICKER>.jsonl"
-  result: "PRE-REGISTERED 2026-10-14; recording"
+  result: "Not read. Stopped 2026-10-14 after 34 minutes of recording on operator direction: market making and latency arbitrage are professional liquidity providers' territory, not the desk's edge. The recorder stays in the repo; no result was looked at, so the registration can be reopened unchanged"
   verdict: inconclusive
-  regime: "pending"
+  regime: "closed by operator: the desk does not compete on speed or quoting"
   rerun: "python -m cryptobot.lag_recorder --dir <dir> --minutes 90"
   preregistered: true
   trials_run: 0
