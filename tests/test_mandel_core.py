@@ -176,3 +176,29 @@ class TestChildRegistry:
         again = ChildRegistry(tmp_path / "children", ledger)
         assert again.get("Fatou").status == "paused"
         assert [c.name for c in again.all()] == ["Fatou"]
+
+
+# ---------------------------------------------------------------- cycles ---
+
+from mandel.cycles import CycleLog  # noqa: E402
+
+
+class TestCycleLog:
+    def test_start_finish_efficiency(self, tmp_path, ledger):
+        log = CycleLog(tmp_path / "c.jsonl", ledger)
+        c = log.start("validate min_edge change")
+        assert log.current().id == c.id
+        with pytest.raises(RuntimeError):
+            log.start("second at once")
+        log.note_action(c.id, "pre-registered P-1")
+        with pytest.raises(ValueError):
+            log.finish(c.id, {"gold": 1}, {})
+        log.finish(c.id, {"agents": 3, "wall_seconds": 600}, {"proposals_accepted": 1, "insights_validated": 2})
+        eff = log.efficiency()
+        assert eff["cycles"] == 1 and eff["gains"] == 3
+        assert eff["gains_per_unit"]["agents"] == 1.0
+        assert eff["gains_per_unit"]["tokens_est"] is None
+        assert log.current() is None
+        assert [e.kind for e in ledger.events(kind="cycle")] == ["cycle.started", "cycle.finished"]
+        again = CycleLog(tmp_path / "c.jsonl", ledger)
+        assert again.all()[0].actions == ["pre-registered P-1"]

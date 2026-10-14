@@ -12,6 +12,7 @@ Commands
   children                    registry
   names [N]                   suggest names for new children
   ledger [--kind PREFIX] [-n N]
+  cycles                      improvement cycles and gains-per-cost efficiency
   ingest                      turn knowledge/*.md "adopts / skeptical / design" bullets into candidate insights
   verify                      recompute the hash chain
 """
@@ -31,6 +32,7 @@ from mandel.paths import DATA_ROOT, KNOWLEDGE_ROOT
 from mandel.proposals import ProposalBook
 from mandel.store import InsightStore
 from mandel.ingest import ingest_knowledge
+from mandel.cycles import CycleLog
 
 
 def _print(obj) -> None:
@@ -56,6 +58,7 @@ def cmd_status(_args) -> int:
                       "scoreboard": [s.as_dict() for s in fb.scoreboard()]},
         "children": [{"name": c.name, "status": c.status, "domain": c.domain, "reports": c.report_count,
                       "guidance": c.guidance_count, "last_contact": c.last_contact} for c in reg.all()],
+        "cycles": CycleLog(ledger=ledger).efficiency(),
         "knowledge": {"sources": len(sources), "adjacent": len(adjacent),
                       "synthesis": (KNOWLEDGE_ROOT / "SYNTHESIS.md").exists()},
     })
@@ -126,6 +129,15 @@ def cmd_ledger(args) -> int:
     return 0
 
 
+def cmd_cycles(_args) -> int:
+    log = CycleLog()
+    for c in log.all():
+        state = "open" if c.open else "done"
+        print(f"{c.id}  [{state}] {c.started_at[:19]}  gains={c.gains()}  cost={c.cost}  {c.goal}")
+    _print(log.efficiency())
+    return 0
+
+
 def cmd_ingest(_args) -> int:
     rep = ingest_knowledge(InsightStore())
     _print({"files": rep.files, "added": rep.added, "skipped_existing": rep.skipped_existing, "per_file": rep.per_file})
@@ -160,6 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("children").set_defaults(fn=cmd_children)
     p = sub.add_parser("names"); p.add_argument("n", nargs="?", type=int, default=5); p.set_defaults(fn=cmd_names)
     p = sub.add_parser("ledger"); p.add_argument("--kind"); p.add_argument("-n", type=int, default=30); p.set_defaults(fn=cmd_ledger)
+    sub.add_parser("cycles").set_defaults(fn=cmd_cycles)
     sub.add_parser("ingest").set_defaults(fn=cmd_ingest)
     sub.add_parser("verify").set_defaults(fn=cmd_verify)
     return ap
