@@ -143,13 +143,16 @@ validated improvements to cost is itself a tracked metric.
 mandel/
   MANDEL.md                this contract
   OPERATIONS.md            running Mandel on the Linode, the PC and the iPhone
-  ARCHITECTURE.md          the design (pending: written by the design phase)
+  ARCHITECTURE.md          the design: v1, four architects, three judges, red-teamed and revised
+  design/proposal-*.md     the four independent architecture proposals the design was synthesised from
+  REPORT-2026-10-14.md     genesis report and readiness for meeting the children
   knowledge/
     sources/NN-*.md        the user's 16 resources, distilled
-    adjacent/AN-*.md       the top adjacent resources Mandel found (pending judging)
+    adjacent/AN-*.md       the five adjacent resources Mandel found and read
     adjacent/candidates.json  the wider pool the judges choose from
     ORIGINAL-IDEAS.md      Mandel's own ideas beyond the sources
-    SYNTHESIS.md           cross-cutting synthesis (pending; read first once it exists)
+    SYNTHESIS.md           cross-cutting synthesis; read first
+    CRITIQUE-*.md          independent critique of each learning pass
   state/                   mutable, machine-written (ledger + ledger.head, insights, proposals, forecasts, children, cycles)
   viz/                     the signal map (template, generated graph.json and index.html)
   *.py, validation/        the engine; see module docstrings
@@ -224,3 +227,7 @@ First-contact protocol, for when the user introduces a child:
   confidence cap holds on updates; the block bootstrap is studentized with
   a long-run variance so it keeps its size under autocorrelation; the trial
   count must match the trial Sharpes and is required by `compare_strategies`.
+- 2026-10-14  Genesis cycle closed. All 16 sources and 5 adjacent resources
+  distilled, synthesised and critiqued; 696 candidate insights ingested;
+  ARCHITECTURE.md v1 chosen from four independent proposals and revised
+  after a red team; signal map published; REPORT-2026-10-14.md written.
