@@ -397,6 +397,14 @@ def cmd_data_fetch(args) -> int:
     return 0
 
 
+def cmd_social_fetch(args) -> int:
+    """Capture the social / flow layer for today into point-in-time bundles."""
+    from mandel.data.social import collect_social
+    from mandel.data.store import ObservationStore
+    _print(collect_social(ObservationStore(Archive(ledger=Ledger())), capture_day=args.day))
+    return 0
+
+
 def cmd_archive(args) -> int:
     a = Archive()
     for e in a.entries(kind=args.kind):
@@ -509,6 +517,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("data-fetch", cmd_data_fetch, "Pull resolved markets, price histories, books (Polymarket) and settled markets, candles (Kalshi) into archive bundles.")
     p.add_argument("source", choices=["polymarket", "kalshi", "all"]); p.add_argument("--markets", type=int, default=4000)
     p.add_argument("--histories", type=int, default=400); p.add_argument("--books", type=int, default=300); p.add_argument("--candles", type=int, default=120)
+    p = add("social-fetch", cmd_social_fetch, "Capture Reddit, StockTwits, crypto sentiment, daily prices, House PTR index (and X with X_BEARER_TOKEN) into dated bundles.")
+    p.add_argument("--day", help="capture day label (default today, UTC)")
     p = add("archive", cmd_archive, "List cold-storage bundles (data, results, knowledge) and their rebuild recipes.")
     p.add_argument("--kind"); p.add_argument("-v", "--verbose", action="store_true")
     add("ingest", cmd_ingest, "Turn knowledge/*.md adopt / skeptical / design bullets into candidate insights (idempotent).")

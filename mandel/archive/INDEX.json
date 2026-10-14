@@ -23,10 +23,10 @@
    "name": "polymarket-price-history-daily",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-price-history-daily.jsonl.gz",
-   "created_at": "2026-10-14T09:29:44.522729+00:00",
-   "rows": 18962,
-   "bytes": 263922,
-   "sha256": "c560f732f2954994c20f0731de60f4189a89966d48580225a90c900802e18d6f",
+   "created_at": "2026-10-14T09:34:42.727408+00:00",
+   "rows": 62362,
+   "bytes": 865127,
+   "sha256": "a2866d995ecf11bc885f32d2ddc97a56d2ad974bf82dfab2bdb65d97cfde6df1",
    "tags": [
     "daily",
     "polymarket",
@@ -41,10 +41,10 @@
    "name": "polymarket-books-snapshot",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-books-snapshot.jsonl.gz",
-   "created_at": "2026-10-14T09:30:14.980296+00:00",
-   "rows": 100,
-   "bytes": 98032,
-   "sha256": "bb354eedde2f6b0366c6f3b60af0d2f9e383034be94ea54b27911f2e1e90a449",
+   "created_at": "2026-10-14T09:36:16.263972+00:00",
+   "rows": 300,
+   "bytes": 272667,
+   "sha256": "c4d1388256040563928fb7112b29a569b30915a973ba32b4df4745d282f33dd2",
    "tags": [
     "books",
     "polymarket",
@@ -89,6 +89,114 @@
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {ticker, period, candle(raw)}"
+  },
+  "social-reddit-2026-10-14": {
+   "name": "social-reddit-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/social-reddit-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T10:08:48.126697+00:00",
+   "rows": 100,
+   "bytes": 27201,
+   "sha256": "5951bfc399178682cde14482410c711495e55f2b8d1f540c13a4d7664639e1cc",
+   "tags": [
+    "2026-10-14",
+    "reddit",
+    "social"
+   ],
+   "recipe": "reddit RSS /r/<sub>/{new,hot}/.rss?limit=100 for ['wallstreetbets', 'options', 'pennystocks', 'stocks', 'CryptoCurrency', 'SatoshiStreetBets', 'thetagang', 'Superstonk', 'Bitcoin', 'ethtrader']",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {id, subreddit, title, author, published, link, flair, text}"
+  },
+  "social-stocktwits-2026-10-14": {
+   "name": "social-stocktwits-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/social-stocktwits-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T10:08:59.446112+00:00",
+   "rows": 411,
+   "bytes": 40977,
+   "sha256": "f275be260a8b42e56a5f685c9bf55d74650ae477ead11a7ac42d99411d130213",
+   "tags": [
+    "2026-10-14",
+    "social",
+    "stocktwits"
+   ],
+   "recipe": "stocktwits /api/2/streams/trending.json and /symbol/<S>.json for ['SPY', 'QQQ', 'TSLA', 'NVDA', 'GME', 'AMC', 'AAPL', 'PLTR', 'MSTR', 'COIN', 'BTC.X', 'ETH.X', 'SOL.X', 'DOGE.X']",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {id, created_at, body, user, followers, symbols, sentiment, likes}"
+  },
+  "social-crypto-2026-10-14": {
+   "name": "social-crypto-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/social-crypto-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T10:09:19.744179+00:00",
+   "rows": 439,
+   "bytes": 7450,
+   "sha256": "fc22fdc4b0c9867c278f6e7a935339114b31a4d6dd0bc50a6baa02869fbe62de",
+   "tags": [
+    "2026-10-14",
+    "crypto",
+    "social"
+   ],
+   "recipe": "alternative.me /fng/?limit=60; coingecko /search/trending; /coins/<coin>/market_chart?days=90&interval=daily",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "fear_greed | trending | price rows"
+  },
+  "social-prices-2026-10-14": {
+   "name": "social-prices-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/social-prices-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T10:09:28.969299+00:00",
+   "rows": 1022,
+   "bytes": 22172,
+   "sha256": "237325170f0d101872f23825c871052860b70f66c1a3fc5466ffcec1b1248e6b",
+   "tags": [
+    "2026-10-14",
+    "daily",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/<sym>?range=3mo&interval=1d for ['SPY', 'QQQ', 'TSLA', 'NVDA', 'GME', 'AMC', 'AAPL', 'PLTR', 'MSTR', 'COIN', 'BTC-USD', 'ETH-USD', 'SOL-USD', 'DOGE-USD']",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, close, volume}"
+  },
+  "social-house-ptr-2026-10-14": {
+   "name": "social-house-ptr-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/social-house-ptr-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T10:09:29.195854+00:00",
+   "rows": 421,
+   "bytes": 9506,
+   "sha256": "7dd1d0f295bbac274f288c6187aa6520a001f9df5406cd170f5d9ec1ffd17bdd",
+   "tags": [
+    "2026-10-14",
+    "congress",
+    "flow"
+   ],
+   "recipe": "https://disclosures-clerk.house.gov/public_disc/financial-pdfs/2026FD.zip, FilingType P rows",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {doc_id, last, first, state_dst, filing_date, pdf}"
+  },
+  "social-derived-2026-10-14": {
+   "name": "social-derived-2026-10-14",
+   "kind": "data",
+   "path": "mandel/archive/data/social-derived-2026-10-14.jsonl.gz",
+   "created_at": "2026-10-14T10:09:29.218380+00:00",
+   "rows": 210,
+   "bytes": 3070,
+   "sha256": "44324863d4efb5f65ed191262a1587f5108910db08f1456d17c90fe8e7b3bb50",
+   "tags": [
+    "2026-10-14",
+    "derived",
+    "social"
+   ],
+   "recipe": "mandel.data.social.derive(reddit, stocktwits) with the lexicon in social.py",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {source, ticker, day, mentions, unique_authors, mean_score, bullish, bearish}"
   }
  }
 }
