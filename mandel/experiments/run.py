@@ -28,6 +28,7 @@ from mandel.experiments.scaling import hurst_with_interval, multifractal_test
 from mandel.experiments.social import attention_vs_abs_return, fear_greed_forward_returns
 from mandel.experiments.volatility import implied_move_vs_realised, overlay_backtest, overlay_verdict, price_closes, skew_tail, term_structure_reversion, variance_risk_premium
 from mandel.experiments.underlying import ratio_reversion, trend_rules_multi, turn_of_month, weekday_effect, weekend_effect
+from mandel.experiments import options_market as om
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
 from mandel.paths import MANDEL_ROOT
@@ -403,6 +404,66 @@ def harness_crypto_weekend(archive: Archive):
     return rep, rep["n"], rep["verdict"], rep["reason"]
 
 
+def _chain_captures(archive: Archive, sym: str) -> list[tuple[str, float, list]]:
+    """(day, spot, rows) for every raw chain capture of sym present on this machine; spot from that day's surface bundle."""
+    out = []
+    for name in _bundles_matching(archive, f"options-chain-{sym}-*"):
+        day = name.rsplit("-", 3)[-3:]; day = "-".join(day)
+        try:
+            rows = list(archive.load(name))
+        except Exception:
+            continue
+        spot = next((r["value"]["underlying"] for r in archive.load(f"options-surface-{day}") if r["value"]["symbol"] == sym), None) if _bundles_matching(archive, f"options-surface-{day}") else None
+        if rows and spot:
+            out.append((day, float(spot), rows))
+    return out
+
+
+def harness_forward_variance(archive):
+    rep = om.forward_variance_premium(archive.load("cboe-VIX-history"), archive.load("cboe-VIX3M-history"), archive.load("daily-history-SPY")); return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
+def harness_term_vs_spot(archive):
+    rep = om.term_vs_spot_premium(archive.load("cboe-VIX-history"), archive.load("cboe-VIX3M-history"), archive.load("daily-history-SPY")); return rep, rep["n_cycles"], rep["verdict"], rep["reason"]
+
+
+def harness_vvix(archive):
+    rep = om.vvix_premium(archive.load("cboe-VVIX-history"), archive.load("cboe-VIX-history")); return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
+def harness_vix9d(archive):
+    rep = om.short_horizon_conditional(archive.load("cboe-VIX9D-history"), archive.load("daily-history-SPY")); return rep, rep.get("n_signals", rep.get("n", 0)), rep["verdict"], rep["reason"]
+
+
+def harness_vix_forward_contango(archive):
+    rep = om.vix_forward_contango(archive.load("cboe-VIX-history"), archive.load("cboe-VIX3M-history")); return rep, rep["n"], rep["verdict"], rep["reason"]
+
+
+def harness_vix_spike(archive):
+    rep = om.vix_spike_forward(archive.load("cboe-VIX-history"), archive.load("cboe-VIX3M-history")); return rep, rep.get("n_events", rep.get("n", 0)), rep["verdict"], rep["reason"]
+
+
+def harness_box_lend(archive):
+    rep = om.box_lending(_chain_captures(archive, "SPX"), archive.load("fred-DTB3"), archive.load("fred-DGS2")); return rep, rep["n_days"], rep["verdict"], rep["reason"]
+
+
+def harness_box_borrow(archive):
+    rep = om.box_borrowing(_chain_captures(archive, "SPX"), archive.load("fred-DTB3"), archive.load("fred-DGS2")); return rep, rep["n_days"], rep["verdict"], rep["reason"]
+
+
+def harness_parity(archive):
+    caps = [(d, sym, sp, rows) for sym in ("SPY", "SPX") for d, sp, rows in _chain_captures(archive, sym)]
+    rep = om.parity_check(caps, archive.load("fred-DTB3")); return rep, rep.get("n_days", 0), rep["verdict"], rep["reason"]
+
+
+def harness_pinning(archive):
+    rep = om.expiry_pinning(archive.load("daily-history-SPY")); return rep, rep["n_opex"], rep["verdict"], rep["reason"]
+
+
+def harness_btc_weekend_var(archive):
+    rep = om.btc_weekend_variance(archive.load("daily-history-BTC-USD")); return rep, rep["years"], rep["verdict"], rep["reason"]
+
+
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     names = sorted(e.name for e in archive.entries())
     return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
@@ -447,6 +508,10 @@ HARNESSES: dict[str, Callable] = {
     "vrp_oil": harness_vrp_oil, "vrp_bonds": harness_vrp_bonds, "vrp_russell": harness_vrp_russell, "vrp_eth": harness_vrp_eth, "implied_move": harness_implied_move,
     "trend_rules": harness_trend_rules, "turn_of_month": harness_turn_of_month, "weekday_effect": harness_weekday,
     "gold_silver_ratio": harness_gold_silver_ratio, "crypto_weekend": harness_crypto_weekend,
+    "forward_variance_premium": harness_forward_variance, "term_vs_spot_premium": harness_term_vs_spot, "vvix_premium": harness_vvix,
+    "vix9d_conditional": harness_vix9d, "vix_forward_contango": harness_vix_forward_contango, "vix_spike_forward": harness_vix_spike,
+    "spx_box_lending": harness_box_lend, "spx_box_borrowing": harness_box_borrow, "parity_forward": harness_parity,
+    "opex_pinning": harness_pinning, "btc_weekend_variance": harness_btc_weekend_var,
 }
 BUNDLES_NEEDED = {
     "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -469,6 +534,11 @@ BUNDLES_NEEDED = {
     "vrp_eth": ["deribit-dvol-ETH-history", "daily-history-ETH-USD"], "implied_move": ["options-surface-*", "daily-history-SPY"],
     "trend_rules": ["daily-history-SPY", "daily-history-BTC-USD"], "turn_of_month": ["daily-history-SPY"], "weekday_effect": ["daily-history-SPY"],
     "gold_silver_ratio": ["daily-history-GLD", "daily-history-SLV"], "crypto_weekend": ["daily-history-BTC-USD"],
+    "forward_variance_premium": ["cboe-VIX-history", "cboe-VIX3M-history", "daily-history-SPY"], "term_vs_spot_premium": ["cboe-VIX-history", "cboe-VIX3M-history", "daily-history-SPY"],
+    "vvix_premium": ["cboe-VVIX-history", "cboe-VIX-history"], "vix9d_conditional": ["cboe-VIX9D-history", "daily-history-SPY"],
+    "vix_forward_contango": ["cboe-VIX-history", "cboe-VIX3M-history"], "vix_spike_forward": ["cboe-VIX-history", "cboe-VIX3M-history"],
+    "spx_box_lending": ["options-chain-SPX-*", "fred-DTB3", "fred-DGS2"], "spx_box_borrowing": ["options-chain-SPX-*", "fred-DTB3", "fred-DGS2"],
+    "parity_forward": ["options-chain-SPY-*", "fred-DTB3"], "opex_pinning": ["daily-history-SPY"], "btc_weekend_variance": ["daily-history-BTC-USD"],
 }
 
 
@@ -548,4 +618,10 @@ def _null_for(name: str) -> str:
         "weekday_effect": "equal means across weekdays (block bootstrap, Bonferroni over weekdays)",
         "gold_silver_ratio": "z-score series circularly shifted against future ratio changes",
         "crypto_weekend": "equal weekend and weekday means (two-sided block bootstrap)",
+        "forward_variance_premium": "zero mean forward premium (block bootstrap per half, sign test)", "term_vs_spot_premium": "forward premium <= spot premium",
+        "vvix_premium": "VVIX - realised VIX vol <= 10 or not increasing by quartile", "vix9d_conditional": "conditional near-term VRP >= 0",
+        "vix_forward_contango": "VIX(t+21) >= F on average", "vix_spike_forward": "P(VIX(t+21) < F) = 0.5 after spikes",
+        "spx_box_lending": "box lending spread over bills <= 0", "spx_box_borrowing": "short-box rate >= bill + 50 bp",
+        "parity_forward": "parity deviations within the half-spread; implied rate = bill", "opex_pinning": "distance to nearest $1 uniform on opex and other days",
+        "btc_weekend_variance": "weekend variance >= 3x weekday variance",
     }.get(name, "n/a")

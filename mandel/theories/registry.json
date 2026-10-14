@@ -3033,11 +3033,15 @@
     "pass": "95% CI of the mean excludes 0 in both halves and the mean exceeds 1 vol point; sign test p < 0.05 on non-overlapping windows",
     "controls": "Compare with the spot VRP (VIX^2 - RV_30) to show the forward premium is incremental to the 30-day premium; report 2008 and 2020 separately; the position-level P&L requires model pricing, but the claim itself is data-only"
    },
-   "experiments": [],
+   "experiments": [
+    "forward_variance_premium"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-439c1b3e"
+   ],
    "notes": "from the options-library library: Straddle calendar (time spread of straddles / forward-vol trade); harness suggestion: forward_variance_premium(vix_rows, vix3m_rows, price_rows) in experiments/volatility.py alongside variance_risk_premium; then a model-priced straddle-calendar P&L using the two-expiry simulator as a secondary check. | verifier pass pending (usage limit); engine-checked"
   },
   {
@@ -3890,12 +3894,17 @@
     "pass": "Violation fraction < 2% and |median r_impl - r_bill| < 50 bp on day one; stable over 20 captured days.",
     "controls": "Exclude strikes with zero bid; use mids not lasts; re-run with quotes aged < 15 min; placebo: shuffle puts across adjacent strikes to confirm the statistic detects artificial violations."
    },
-   "experiments": [],
+   "experiments": [
+    "parity_forward"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r, divs) -> per-(K,T) table; wire into payoff engine as a 2-leg template; daily job appends to data/options/parity/. | verifier pass pending (usage limit); engine-checked"
+   "results": [
+    "X-b7521792",
+    "X-adaf1657"
+   ],
+   "notes": "from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r, divs) -> per-(K,T) table; wire into payoff engine as a 2-leg template; daily job appends to data/options/parity/. | verifier pass pending (usage limit); engine-checked | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days"
   },
   {
    "id": "T-182",
@@ -4020,12 +4029,16 @@
     "pass": "Day-one median spread in [15, 80] bp with >= 80% of boxes positive; maintained over 20 captured days.",
     "controls": "Use mid and executable prices; drop legs with zero bid; compare to SPXW vs SPX AM-settled to check settlement effects; check that r_box is strike-invariant (if not, parity noise dominates)."
    },
-   "experiments": [],
+   "experiments": [
+    "spx_box_lending"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2) and daily box_curve; payoff engine test asserts flat K2-K1. | verifier pass pending (usage limit); engine-checked"
+   "results": [
+    "X-a110b91c"
+   ],
+   "notes": "from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2) and daily box_curve; payoff engine test asserts flat K2-K1. | verifier pass pending (usage limit); engine-checked | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days"
   },
   {
    "id": "T-187",
@@ -4046,12 +4059,16 @@
     "pass": "Median advantage > 100 bp on day one and on >= 80% of captured days.",
     "controls": "Check strike-invariance; drop expiries with zero-bid legs; compare SPX vs XSP implied rates (should match)."
    },
-   "experiments": [],
+   "experiments": [
+    "spx_box_borrowing"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; report borrow curve. | verifier pass pending (usage limit); engine-checked"
+   "results": [
+    "X-8a3bbd3c"
+   ],
+   "notes": "from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; report borrow curve. | verifier pass pending (usage limit); engine-checked | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days"
   },
   {
    "id": "T-188",
@@ -4176,12 +4193,16 @@
     "pass": "Expiration-day mean distance at least 10% below non-expiration mean with bootstrap p < 0.05, and the effect present in the majority of years.",
     "controls": "Placebo days (Thursdays); scale test with $0.50 strikes post-2020; repeat for QQQ and single names with $5 strikes where the effect should be larger."
    },
-   "experiments": [],
+   "experiments": [
+    "opex_pinning"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Expiration pin risk management and pinning trade; harness suggestion: mandel/experiments/pinning.py on SPY closes; later join captured OI to test OI-weighted pins. | verifier pass pending (usage limit); engine-checked"
+   "results": [
+    "X-0e2b4775"
+   ],
+   "notes": "from the options-library library: Expiration pin risk management and pinning trade; harness suggestion: mandel/experiments/pinning.py on SPY closes; later join captured OI to test OI-weighted pins. | verifier pass pending (usage limit); engine-checked | harness tests monthly third-Friday opex only; SPY has expired every trading day since 2022, so 'weekly expiration days' no longer have a non-expiry comparison group"
   },
   {
    "id": "T-193",
@@ -5182,11 +5203,15 @@
     "pass": "Forward premium > spot premium with 95% CI excluding zero; conditional premium positive in both halves of the sample.",
     "controls": "Shuffle VIX3M/VIX ratio placebo; exclude 2008 and 2020 as sensitivity."
    },
-   "experiments": [],
+   "experiments": [
+    "term_vs_spot_premium"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-44c31e4c"
+   ],
    "notes": "from the options-library library: Calendar vol spread (ATM time spread, long or reverse); harness suggestion: Extend harness_term_structure with the forward-variance decomposition F^2 = (3*VIX3M^2 - VIX^2)/2 and a 63-day realised window; P&L of the calendar via build_position with two expiries. | verifier pass pending (usage limit); engine-checked"
   },
   {
@@ -5208,12 +5233,16 @@
     "pass": "Conditional RV^2 - VIX9D^2 > 0 with 95% CI excluding zero and simulated P&L Sharpe > 0 after a 0.5 vol-point round-trip cost.",
     "controls": "Unconditional control (should be negative, the VRP); random-entry placebo."
    },
-   "experiments": [],
+   "experiments": [
+    "vix9d_conditional"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Vega-neutral gamma-positive straddle swap (reverse calendar straddle); harness suggestion: New harness_gamma_swap built on harness_term_structure's index loader plus a daily-rehedge simulator (bs.delta) over SPY closes. | verifier pass pending (usage limit); engine-checked"
+   "results": [
+    "X-d311688d"
+   ],
+   "notes": "from the options-library library: Vega-neutral gamma-positive straddle swap (reverse calendar straddle); harness suggestion: New harness_gamma_swap built on harness_term_structure's index loader plus a daily-rehedge simulator (bs.delta) over SPY closes. | verifier pass pending (usage limit); engine-checked | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists"
   },
   {
    "id": "T-233",
@@ -5364,12 +5393,16 @@
     "pass": "Conditional frequency > 0.60 with 95% CI above 0.5 and mean F - VIX_{t+21} > 0 at p<0.05; simulated call-spread Sharpe > 0.5 after 0.10 vol-point costs.",
     "controls": "Unconditional (no contango filter) control; shuffled term-structure placebo."
    },
-   "experiments": [],
+   "experiments": [
+    "vix_forward_contango"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: VIX futures roll-down harvest via short VIX call spread; harness suggestion: Extend harness_term_structure with the forward-level proxy F and a VIX-call-spread pricer (bs.price with sigma = VVIX/100, T from the VIX monthly calendar). | verifier pass pending (usage limit); engine-checked"
+   "results": [
+    "X-a0277481"
+   ],
+   "notes": "from the options-library library: VIX futures roll-down harvest via short VIX call spread; harness suggestion: Extend harness_term_structure with the forward-level proxy F and a VIX-call-spread pricer (bs.price with sigma = VVIX/100, T from the VIX monthly calendar). | verifier pass pending (usage limit); engine-checked | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists"
   },
   {
    "id": "T-239",
@@ -5442,12 +5475,17 @@
     "pass": "Report both frequencies with CIs; strategy passes only if P(VIX_{t+21} < F) > 0.5 with the 95% CI excluding 0.5, otherwise record 'forward is fair' as the finding.",
     "controls": "All-days baseline; VIX > 30 without backwardation."
    },
-   "experiments": [],
+   "experiments": [
+    "vix_spike_forward"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: VIX spike mean-reversion via long VIX put / put spread; harness suggestion: Add a 'backwardation event' study to harness_term_structure; event count will be small (~25-40 since 2007), report exact CIs. | verifier pass pending (usage limit); engine-checked"
+   "results": [
+    "X-a1f4f715",
+    "X-b9399c71"
+   ],
+   "notes": "from the options-library library: VIX spike mean-reversion via long VIX put / put spread; harness suggestion: Add a 'backwardation event' study to harness_term_structure; event count will be small (~25-40 since 2007), report exact CIs. | verifier pass pending (usage limit); engine-checked | WORDING CONFLICT: the claim sentence says VIX lands below the forward in fewer than 50% of spikes; the pass rule asks for more than 50% with the CI above 0.5. The verdict follows the pass rule. On 2026-10-14 data (19/23 below forward, CI 0.61-0.95) the pass rule is met and the claim sentence is refuted. Small n (23 non-overlapping events); in-sample."
   },
   {
    "id": "T-242",
@@ -5494,12 +5532,17 @@
     "pass": "Mean gap > 10 with 99% CI excluding zero; quartile means monotone increasing; simulated Sharpe > 0.3 after costs with worst-month loss < 5x average monthly gain.",
     "controls": "Shuffled VVIX placebo; realised vol of the forward proxy F instead of spot VIX as a lower-variance check."
    },
-   "experiments": [],
+   "experiments": [
+    "vvix_premium"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Vol-of-vol trade: VIX straddle / strangle vs VVIX; harness suggestion: Same harness_vvix_vrp as the VIX call ratio entry; add the quartile split and a strangle pricer. | verifier pass pending (usage limit); engine-checked"
+   "results": [
+    "X-ba2577e8",
+    "X-b139bb3f"
+   ],
+   "notes": "from the options-library library: Vol-of-vol trade: VIX straddle / strangle vs VVIX; harness suggestion: Same harness_vvix_vrp as the VIX call ratio entry; add the quartile split and a strangle pricer. | verifier pass pending (usage limit); engine-checked | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists | the claim compares VVIX with spot-VIX realised vol; VVIX prices VIX futures, which are less volatile than spot, so a fair test of the vol-of-vol premium needs VIX futures history (CFE, not yet captured)"
   },
   {
    "id": "T-244",
@@ -6032,11 +6075,15 @@
     "pass": "Ratio CI entirely < 0.9 in at least 70% of years",
     "controls": "Same ratio for ETH; shuffled weekday labels as null"
    },
-   "experiments": [],
+   "experiments": [
+    "btc_weekend_variance"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1d68b098"
+   ],
    "notes": "from the options-library library: Weekend theta harvest (24/7 pricing vs weekend realised vol); harness suggestion: Pure closes-based test; later confirm pricing side with Deribit daily-expiry captures | verifier pass pending (usage limit); engine-checked"
   },
   {
