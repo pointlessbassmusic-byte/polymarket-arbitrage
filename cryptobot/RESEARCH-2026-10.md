@@ -1568,3 +1568,86 @@ average across both. With $100 staked a day, that averages about $3 a
 day, but a single loss wipes out roughly 14 winning days. Sizing would
 come from the allocator, as for every other rule, and would stay a
 small slice of the $1,000.
+
+## Addendum, 2026-10-14 (29): maker vs taker, old ideas inverted and combined, Kraken, MetaMask, Uniswap and other venues
+
+**Maker vs taker (`kalshi-perps-maker-taker`, killed).** Kalshi publishes
+its perps trade tape with the taker's side. On 6.0 million trades over 7
+to 30 days, the liquidity provider's markout on real fills, against the
+median of the next 5 trades, was measured at 10 seconds to 30 minutes:
+
+| perp | trades | maker net at 5 min, after the 2 bp fee | t |
+|---|---|---|---|
+| BTC (7 days) | 1.07M | −2.0 bp | −25 |
+| ETH | 2.96M | −2.2 bp | −54 |
+| SOL | 270k | −2.3 bp | −16 |
+| XRP | 204k | −3.0 bp | −10 |
+| DOGE | 53k | −1.6 bp | −1.1 |
+| SHIB | 19k | −13.1 bp | 0.2 |
+| gold | 1.02M | −1.8 bp | −12 |
+| silver | 372k | −3.7 bp | −11 |
+| US500 (8 days) | 43k | +1.4 bp | 0.8 |
+
+Gross of the fee, makers earn about zero. The spread they collect is
+what adverse selection takes, and the fee is the loss. On DOGE the
+median fill earns +0.4 bp and the worst 1% of fills carry the whole
+loss. Taker order flow over 5 and 30 minutes predicts nothing on any
+perp worth trading (|t| ≤ 2.5; gold mildly contrarian at 0.4 bp per
+sd). Resting orders for the favourite on Kalshi's event contracts fill
+when they are wrong: the 15-minute market loses 11.0% per dollar (t
+−2.7) and the hourly 3.1% (t −2.4), because filled favourites won 82%
+and 89% against 92% paid. On operator direction the desk does not
+compete with professional market makers or on speed. The stale-quote
+test that would have measured the inverse was stopped unread.
+
+**Old ideas, inverted and combined.**
+- **Bounce-short sized by the range forecast** (`bounce-short-vol-scaled`,
+  killed): Sharpe per trade falls from 0.200 to 0.179 on 18 memecoins and
+  from 0.300 to 0.263 on DOGE and SHIB, in both halves, with deeper
+  drawdowns. The rule earns its −20% targets in wide-range spells.
+- **Funding carry on US venues** (`kalshi-funding-carry-us`, killed as
+  written). Funding persists: the next 14 days on the trailing 14, slope
+  +0.64, t 5.1. At 8–17% a year, a 14-day hold collects 0.46% against a
+  58 bp hedged round trip, of which 50 bp is the Alpaca crypto spot leg:
+  net −0.15% a hold over 10 holds. An IBIT-hedged BTC version with long
+  holds is pre-registered forward from 2026-10-15
+  (`kalshi-btc-carry-etf-hedge`, read 2027-02).
+
+**Kraken and MetaMask.** Kraken Derivatives US (Bitnomial, CFTC) lists 16
+perps at about $0.15 a contract a side (1–3 bp). It adds AVAX, DOT, HBAR,
+XLM and XTZ over Kalshi. Contract sizes are $530–1,250 on the majors, and
+no API for the US perps is documented. Kraken Pro spot costs 40/80 bp
+maker/taker at the desk's volume, and US margin costs 44–88% a year in
+rollover. MetaMask's perps run on Hyperliquid, which is closed to US
+users; its tokenized stocks are closed to US users; its swaps cost
+0.875% plus gas, and it has no API. The one Kraken decision is whether
+a trade-only US-perps API key can be made.
+
+**Uniswap and other crypto platforms.** Excluding market making
+(Uniswap liquidity provision included) and speed races:
+- **Two US venues, one contract.** Polymarket US now lists BTC hourly,
+  5 PM daily and Friday weekly above/below ladders, ranges, 15-minute
+  up/down, monthly and weekly highs and lows, and yearly ladders. All
+  settle on CF Benchmarks' BRTI 60-second average, the same number as
+  Kalshi, and Polymarket's "at or above K" is Kalshi's "above
+  K − 0.01". When YES on one venue plus NO on the other costs less than
+  $1 after both fees, the payout is locked whatever BTC does. Registered
+  as `kalshi-polyus-crossvenue`; results below.
+- **Token unlocks** (`token-unlock-short`, inconclusive). On a year of
+  free CoinGecko supply data (39 tokens, 142 cliff unlocks), a
+  BTC-hedged short from 20 days before to 10 days after nets +1.2%
+  per event (median +6.4%, 62% positive, t 0.3). Unlocks of 3% or more
+  net +4.0% (t 1.5), against −1.8% on random days. The sign matches
+  the literature, but squeezes swamp the mean. The three Kalshi-listed
+  tokens with unlocks in the year lost 6.1% (15 events). Longer history
+  is behind DefiLlama's paid API.
+- **Idle cash.** USDC lending pays 3.8–6.4% (Aave on Base 4.0%,
+  Compound 5.5–5.8%, Morpho vaults 4.2–5.8%) against smart-contract
+  risk. Aave's terms do not exclude the US. It is a cash yield, not an
+  edge.
+- **Not worth pursuing.** Coinbase listing pumps: weak and mixed
+  evidence. Airdrops: 11 of 12 major 2025 drops excluded US users. Pendle
+  fixed yields of 11–16%: that is stablecoin risk, and US access is
+  unverified. Crypto.com's event contracts settle on a different index,
+  so a basis exists there, but only when a strike is at the money at
+  expiry.
