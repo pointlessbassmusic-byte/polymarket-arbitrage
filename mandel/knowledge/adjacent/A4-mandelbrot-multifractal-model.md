@@ -2,6 +2,7 @@
 
 - **Authors / kind:** Benoit Mandelbrot, Adlai Fisher, Laurent Calvet. Cowles Foundation Discussion Paper 1164, September 1997 (paper). Read together with Calvet & Fisher, "Regime-Switching and the Estimation of Multifractal Processes" (2002, the Markov-switching multifractal, MSM) and Segnon & Lux, "Multifractal Models in Finance: Their Origin, Properties, and Applications" (Kiel Working Paper 1860, 2013).
 - **Links:** https://cowles.yale.edu/sites/default/files/2022-08/d1164.pdf (scanned) · companion DM/USD paper DP 1166 https://cowles.yale.edu/sites/default/files/2022-08/d1166.pdf · MSM https://archive.nyu.edu/bitstream/2451/26508/2/02-64.pdf · survey https://www.kielinstitut.de/fileadmin/Dateiverwaltung/IfW-Publications/fis-import/1d3c070d-ffc2-4240-8a44-afb68d936acc-KWP_1860.pdf
+- **Coverage confidence:** 0.50 (fraction of the source actually read and verified, see below).
 - **Date researched:** 2026-10-14. **How much was read:** the 1997 PDF is a scan with no extractable text, so the model is reconstructed from the survey's section 3.2.1.1 (read in full), the MSM paper's abstract, introduction and model section (read), and general knowledge of the companion DM/USD paper. Numbers attributed to the DM/USD study below are from memory of that companion paper and are marked as such.
 - **Selected as A4 because:** this is the namesake's own model of markets. It turns "fractal markets" from a slogan into a falsifiable scaling test, and its history (unestimable original, estimable successor) is itself a lesson for Mandel.
 
@@ -17,7 +18,7 @@
 
 ## Evidence quality
 
-**Rigorous** for the MSM (likelihood estimation, Monte Carlo finite-sample checks, in- and out-of-sample comparisons against named benchmarks, Vuong tests) and **mainstream-educational** for the MMAR itself, whose empirical support rested on scaling plots that later work showed to be weak discriminators. Mandel's own reading of the 1997 text is indirect.
+**Rating: mainstream-educational.** **Rigorous** for the MSM (likelihood estimation, Monte Carlo finite-sample checks, in- and out-of-sample comparisons against named benchmarks, Vuong tests) and **mainstream-educational** for the MMAR itself, whose empirical support rested on scaling plots that later work showed to be weak discriminators. Mandel's own reading of the 1997 text is indirect.
 
 ## What Mandel adopts
 

@@ -2,6 +2,7 @@
 
 - **Authors / kind:** Zhang et al. (Stanford, SambaNova, UC Berkeley). Paper, arXiv 2510.04618 (v3), 2025.
 - **Links:** https://arxiv.org/abs/2510.04618 · https://arxiv.org/html/2510.04618v3
+- **Coverage confidence:** 0.70 (fraction of the source actually read and verified, see below).
 - **Date researched:** 2026-10-14. **How much was read:** about 75% of the HTML (method, main results, cost analysis, label-free results, limitations).
 - **Selected as A3 because:** it is the closest existing blueprint for a knowledge substrate that improves itself without being rewritten by a model, and it documents the exact failure Mandel's insight store must avoid.
 
@@ -19,7 +20,7 @@
 
 ## Evidence quality
 
-**Rigorous** within its benchmarks (ablations, baselines, cost accounting), with the caveat that the headline numbers are on two task families and one base model, and that the paper's own text cites margins slightly different from its tables.
+**Rating: rigorous.** **Rigorous** within its benchmarks (ablations, baselines, cost accounting), with the caveat that the headline numbers are on two task families and one base model, and that the paper's own text cites margins slightly different from its tables.
 
 ## What Mandel adopts
 

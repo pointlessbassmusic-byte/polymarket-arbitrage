@@ -2,6 +2,7 @@
 
 - **Authors / kind:** Danny Halawi, Fred Zhang, Chen Yueh-Han, Jacob Steinhardt (UC Berkeley). Paper, arXiv 2402.18563, 2024.
 - **Links:** https://arxiv.org/abs/2402.18563 · https://arxiv.org/html/2402.18563
+- **Coverage confidence:** 0.65 (fraction of the source actually read and verified, see below).
 - **Date researched:** 2026-10-14. **How much was read:** about 60% of the HTML (data, system, main results, calibration, limitations).
 - **Selected as A5 because:** it is the closest published version of Mandel's central function, forecasting resolvable questions against a market or crowd, with leakage controls, proper scoring and an honest account of where the system wins and loses.
 
@@ -19,7 +20,7 @@
 
 ## Evidence quality
 
-**Rigorous.** Large curated dataset, explicit leakage controls, proper scoring, honest reporting of the regimes where the system loses. The remaining risks are the ones the authors name: optimistic selective results and underestimated errors from autocorrelation.
+**Rating: rigorous.** **Rigorous.** Large curated dataset, explicit leakage controls, proper scoring, honest reporting of the regimes where the system loses. The remaining risks are the ones the authors name: optimistic selective results and underestimated errors from autocorrelation.
 
 ## What Mandel adopts
 

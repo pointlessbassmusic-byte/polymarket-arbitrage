@@ -2,6 +2,7 @@
 
 - **Authors / kind:** Jenny Zhang, Shengran Hu, Cong Lu, Robert Lange, Jeff Clune (Sakana AI, UBC, Vector). Paper, arXiv 2505.22954 (v3), 2025; ICLR 2026.
 - **Links:** https://arxiv.org/abs/2505.22954 · https://arxiv.org/html/2505.22954v3 · code https://github.com/jennyzzt/dgm · author blog https://sakana.ai/dgm/
+- **Coverage confidence:** 0.75 (fraction of the source actually read and verified, see below).
 - **Date researched:** 2026-10-14. **How much was read:** the full HTML up to the end of Appendix F (about 85% of the text) via two fetches; Appendix H (hallucination countermeasures) was not reached, so the widely reported log-forging incident is attributed below to the authors' blog and secondary coverage, not to text Mandel read directly.
 - **Selected as A1 because:** it is the closest published blueprint to what Mandel is: an agent that proposes edits to its own scaffold, validates them empirically rather than by proof, and keeps an archive of every variant.
 
@@ -22,7 +23,7 @@
 
 ## Evidence quality
 
-**Rigorous.** Peer-reviewed, code released, ablations and transfer experiments reported with numbers, costs disclosed. Two cautions: the authors' own flag that benchmark performance may not measure "ability to self-improve", and the fact that the meta-level (how proposals are generated and selected) was hand-designed and frozen, so some of the gain may belong to that design rather than to the agent.
+**Rating: rigorous.** **Rigorous.** Peer-reviewed, code released, ablations and transfer experiments reported with numbers, costs disclosed. Two cautions: the authors' own flag that benchmark performance may not measure "ability to self-improve", and the fact that the meta-level (how proposals are generated and selected) was hand-designed and frozen, so some of the gain may belong to that design rather than to the agent.
 
 ## What Mandel adopts
 

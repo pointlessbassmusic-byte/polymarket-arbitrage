@@ -2,6 +2,7 @@
 
 - **Authors / kind:** Novikov et al., Google DeepMind. White paper, arXiv 2506.13131, 2025.
 - **Links:** https://arxiv.org/abs/2506.13131 · https://arxiv.org/html/2506.13131 · https://deepmind.google/blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/
+- **Coverage confidence:** 0.60 (fraction of the source actually read and verified, see below).
 - **Date researched:** 2026-10-14. **How much was read:** roughly the first 60% of the HTML (system description, results, limitations); the mathematical appendices were not read.
 - **Selected as A2 because:** it states the precondition Mandel must respect (a machine-gradable evaluator), and it shows how to keep an evolutionary search affordable (cascade) and diverse (program database).
 
@@ -17,7 +18,7 @@
 
 ## Evidence quality
 
-**Rigorous** for the discoveries (several results are independently checkable constructions), **mainstream-educational** for the system description, which is a white paper without ablations or costs. The loop's dependence on Google-scale compute is undisclosed.
+**Rating: mainstream-educational.** **Rigorous** for the discoveries (several results are independently checkable constructions), **mainstream-educational** for the system description, which is a white paper without ablations or costs. The loop's dependence on Google-scale compute is undisclosed.
 
 ## What Mandel adopts
 
