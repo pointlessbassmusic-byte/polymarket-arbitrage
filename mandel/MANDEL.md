@@ -214,3 +214,13 @@ First-contact protocol, for when the user introduces a child:
   variance; block-bootstrap minimum size; provenance and validation rules
   for insights; market-source reference for skill scores; case-insensitive
   child names; CLI for cycles and insight status with one-line errors.
+- 2026-10-14  Second hardening pass after a reproduction-verified review:
+  the ledger is now authoritative for every proposal transition (status,
+  frozen criteria, merged evidence and the verdict itself are recomputed
+  from ledger events; file copies that disagree refuse every step);
+  `verify` replays the ledger against proposals, insights and forecasts and
+  requires the head anchor; insight validation by proposal recomputes the
+  gate from the ledger; retired insights are final; the self-only
+  confidence cap holds on updates; the block bootstrap is studentized with
+  a long-run variance so it keeps its size under autocorrelation; the trial
+  count must match the trial Sharpes and is required by `compare_strategies`.

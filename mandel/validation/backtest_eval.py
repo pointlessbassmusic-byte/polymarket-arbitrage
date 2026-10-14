@@ -146,8 +146,12 @@ def deflated_sharpe_ratio(
     themselves. With ``n_trials=1`` this reduces to PSR against a zero benchmark.
     """
     r = _arr(returns)
+    if n_trials < 1:
+        raise ValueError("n_trials must be >= 1")
     if trial_sharpes is not None:
         ts = _arr(trial_sharpes)
+        if ts.size != n_trials:
+            raise ValueError(f"got {ts.size} trial Sharpes but n_trials={n_trials}; the trial count must match")
         var_trials_sr = float(ts.var(ddof=1)) if ts.size > 1 else 0.0
     if n_trials > 1 and (var_trials_sr is None or var_trials_sr <= 0):
         # No information about the spread of trial Sharpes: assume every trial was a
@@ -167,6 +171,17 @@ def deflated_sharpe_ratio(
 # Resampling and splits
 # --------------------------------------------------------------------------
 
+def _hac_var(x: np.ndarray, bandwidth: int) -> np.ndarray:
+    """Row-wise Bartlett (Newey-West) long-run variance of the mean's numerator, bandwidth ``bandwidth``."""
+    x = x - x.mean(axis=1, keepdims=True)
+    n = x.shape[1]
+    lrv = np.sum(x * x, axis=1) / n
+    for k in range(1, max(1, bandwidth)):
+        w = 1.0 - k / bandwidth
+        lrv = lrv + 2.0 * w * np.sum(x[:, k:] * x[:, :-k], axis=1) / n
+    return np.maximum(lrv, 1e-300)
+
+
 def block_bootstrap_pvalue(
     candidate: Sequence[float],
     incumbent: Sequence[float],
@@ -174,14 +189,14 @@ def block_bootstrap_pvalue(
     block_len: Optional[int] = None,
     seed: int = 0,
 ) -> float:
-    """One-sided p-value for H0: mean(candidate - incumbent) <= 0, by circular block
-    bootstrap of the paired differences. Small is good for the candidate.
+    """One-sided p-value for H0: mean(candidate - incumbent) <= 0, by a studentized (bootstrap-t)
+    circular block bootstrap of the paired differences. Small is good for the candidate.
 
-    ``block_len`` defaults to about n^(1/3) and is capped at n//4, so there are always
-    at least four blocks; a single-block "bootstrap" is a rotation of the data and would
-    return a tiny p-value for any positive mean. The centred bootstrap means are also
-    scaled by 1/sqrt(1 - block_len/n) to undo the known variance deflation of the
-    circular block bootstrap in short samples."""
+    The statistic is t = mean / sqrt(LRV / n) with a Bartlett long-run variance whose bandwidth is
+    the block length; each resample is studentized the same way, which keeps the test close to its
+    nominal size under autocorrelated differences, where a centred percentile bootstrap over-rejects.
+    ``block_len`` defaults to about n^(1/3) and is capped at n//4, so there are always at least four
+    blocks; a single-block "bootstrap" is a rotation of the data and proves nothing."""
     c, i = _arr(candidate), _arr(incumbent)
     if c.size != i.size:
         raise ValueError("candidate and incumbent must be aligned per period")
@@ -193,16 +208,15 @@ def block_bootstrap_pvalue(
         block_len = max(1, int(round(n ** (1.0 / 3.0))))
     block_len = max(1, min(int(block_len), n // 4))
     observed = d.mean()
+    t_obs = observed / math.sqrt(float(_hac_var(d[None, :], block_len)[0]) / n)
     rng = np.random.default_rng(seed)
     n_blocks = math.ceil(n / block_len)
     starts = rng.integers(0, n, size=(n_boot, n_blocks))
     offsets = np.arange(block_len)
     idx = (starts[:, :, None] + offsets[None, None, :]).reshape(n_boot, -1)[:, :n] % n
-    boot_means = d[idx].mean(axis=1)
-    # Centre under H0 (true mean difference = 0), correct the short-sample variance
-    # deflation, and ask how often the null produces at least what we observed.
-    centred = (boot_means - observed) / math.sqrt(1.0 - block_len / n)
-    return float((np.sum(centred >= observed) + 1) / (n_boot + 1))
+    samples = d[idx]
+    t_boot = (samples.mean(axis=1) - observed) / np.sqrt(_hac_var(samples, block_len) / n)
+    return float((np.sum(t_boot >= t_obs) + 1) / (n_boot + 1))
 
 
 def walk_forward_splits(
@@ -260,7 +274,8 @@ class ComparisonResult:
 def compare_strategies(
     candidate: Sequence[float],
     incumbent: Sequence[float],
-    n_trials: int = 1,
+    *,
+    n_trials: int,
     trial_sharpes: Optional[Sequence[float]] = None,
     n_boot: int = 2000,
     block_len: Optional[int] = None,
@@ -268,8 +283,9 @@ def compare_strategies(
 ) -> ComparisonResult:
     """Compare out-of-sample per-period returns of a candidate against the incumbent.
 
-    ``n_trials`` must be the honest count of variants tried while searching for the
-    candidate; understating it is the classic way to fool this test.
+    ``n_trials`` is required and must be the honest count of variants tried while searching
+    for the candidate; understating it is the classic way to fool this test. When
+    ``trial_sharpes`` is given its length must equal ``n_trials``.
     """
     c, i = _arr(candidate), _arr(incumbent)
     notes: list[str] = []

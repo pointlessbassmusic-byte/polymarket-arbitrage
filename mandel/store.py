@@ -168,24 +168,31 @@ class InsightStore:
         ins = self._items[insight_id]
         if status not in STATUSES:
             raise ValueError(f"status must be one of {STATUSES}")
+        if ins.status == "retired" and status != "retired":
+            raise ValueError("a retired insight is final; record a new insight")
         if status == "validated":
-            if ins.status == "retired":
-                raise ValueError("a retired insight cannot be validated; record a new insight")
             if PROPOSAL_ID_RX.match(by):
                 if self.proposals is None:
                     raise ValueError("validating by proposal requires an attached ProposalBook")
+                # Recompute the verdict from the ledger's pre-registration and evidence events;
+                # neither the proposals file nor a decision event's payload is trusted.
+                from mandel.proposals import IntegrityError
                 try:
-                    p = self.proposals.get(by)
-                except KeyError:
-                    raise ValueError(f"unknown proposal {by}") from None
-                if p.status != "accepted":
-                    raise ValueError(f"proposal {by} is {p.status}, not accepted")
-                if insight_id not in p.produces_insights and insight_id not in p.depends_on_insights:
-                    raise ValueError(f"proposal {by} does not name insight {insight_id}")
+                    g = self.proposals.gate_from_ledger(by)
+                except IntegrityError as e:
+                    raise ValueError(f"proposal {by} cannot be validated from the ledger: {e}") from None
+                if not g.passed:
+                    raise ValueError(f"proposal {by} does not pass its own pre-registered gate on the ledger's evidence")
+                decision = self.proposals.ledger.last_of("proposal.", id=by)
+                if decision is None or decision.kind not in ("proposal.accepted",):
+                    raise ValueError(f"proposal {by} has no accepted decision in the ledger")
+                if insight_id not in (decision.payload.get("produces_insights") or []):
+                    raise ValueError(f"proposal {by}'s decision does not name insight {insight_id}")
             elif by.startswith("converge:"):
-                refs = [r for r in by[len("converge:"):].split(",") if r.strip()]
-                if len(set(refs)) < 2 or not all(PROVENANCE_RX.match(r.strip()) for r in refs):
+                refs = [r.strip() for r in by[len("converge:"):].split(",") if r.strip()]
+                if len(set(refs)) < 2 or not all(PROVENANCE_RX.match(r) for r in refs):
                     raise ValueError("converge: needs at least two distinct recognised provenance refs")
+                by = "converge:" + ",".join(refs)
             else:
                 raise ValueError("validated requires by=<accepted proposal id> or by=converge:<ref>,<ref>")
         old = ins.status
@@ -205,12 +212,44 @@ class InsightStore:
             raise ValueError("confidence must be in [0, 1]")
         if not reason.strip():
             raise ValueError("a reason is required to change confidence")
+        new = float(confidence)
+        if ins.provenance and all(p == "mandel:self" for p in ins.provenance) and new > SELF_ONLY_CAP:
+            raise ValueError(f"confidence for a mandel:self-only insight is capped at {SELF_ONLY_CAP}; add independent provenance first")
         old = ins.confidence
-        ins.confidence = float(confidence)
+        ins.confidence = new
         ins.updated_at = utcnow_iso()
         self._flush()
         self.ledger.append("insight.confidence", {"id": insight_id, "from": old, "to": ins.confidence, "reason": reason}, actor=actor)
         return ins
+
+    # -- integrity against the ledger ------------------------------------
+    def reconcile(self) -> list[str]:
+        """Replay insight.* ledger events and report disagreements with the insights file."""
+        problems: list[str] = []
+        expected: dict[str, dict] = {}
+        for ev in self.ledger.events(kind="insight."):
+            pl = ev.payload
+            iid = pl.get("id")
+            if ev.kind == "insight.recorded":
+                expected[iid] = {"text": pl.get("text"), "kind": pl.get("kind"), "provenance": pl.get("provenance"),
+                                 "confidence": pl.get("confidence"), "status": "candidate"}
+            elif ev.kind == "insight.status" and iid in expected:
+                expected[iid]["status"] = pl.get("to")
+            elif ev.kind == "insight.confidence" and iid in expected:
+                expected[iid]["confidence"] = pl.get("to")
+        for iid, exp in expected.items():
+            ins = self._items.get(iid)
+            if ins is None:
+                problems.append(f"{iid}: in the ledger but missing from the file")
+                continue
+            for field_name in ("text", "kind", "provenance", "confidence", "status"):
+                if getattr(ins, field_name) != exp[field_name]:
+                    problems.append(f"{iid}: file {field_name}={getattr(ins, field_name)!r} differs from ledger {exp[field_name]!r}")
+                    break
+        for iid in self._items:
+            if iid not in expected:
+                problems.append(f"{iid}: present in file but never recorded in the ledger")
+        return problems
 
     # -- summaries ---------------------------------------------------------
     def summary(self) -> dict:

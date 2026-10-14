@@ -157,7 +157,7 @@ class ForecastBook:
             self.forecasts.append(fc)
             self._append("forecast", fc)
         self.ledger.append("forecast.recorded", {"id": fc.id, "source": fc.source, "question_id": qid,
-                                                 "p": fc.p, "market_p": market_p}, actor=fc.source)
+                                                 "p": fc.p, "market_p": market_p, "ts": fc.ts}, actor=fc.source)
         return fc
 
     def resolve(self, question_id: str, outcome: int, note: str = "", actor: str = "mandel") -> Resolution:
@@ -173,7 +173,7 @@ class ForecastBook:
             res = Resolution(question_id=qid, outcome=int(outcome), resolved_at=utcnow_iso(), note=note)
             self.resolutions[qid] = res
             self._append("resolution", res)
-        self.ledger.append("forecast.resolved", {"question_id": qid, "outcome": int(outcome)}, actor=actor)
+        self.ledger.append("forecast.resolved", {"question_id": qid, "outcome": int(outcome), "resolved_at": res.resolved_at}, actor=actor)
         return res
 
     # -- scoring -----------------------------------------------------------
@@ -230,6 +230,35 @@ class ForecastBook:
         sources = sorted({fc.source for fc in self.forecasts})
         out = [s for s in (self.score_source(src) for src in sources) if s is not None]
         return sorted(out, key=lambda s: s.brier)
+
+    # -- integrity against the ledger ------------------------------------
+    def reconcile(self) -> list[str]:
+        """Replay forecast.* ledger events and report disagreements with the forecasts file."""
+        problems: list[str] = []
+        rec = {e.payload["id"]: e.payload for e in self.ledger.events(kind="forecast.recorded") if e.payload.get("id")}
+        res = {e.payload["question_id"]: e.payload for e in self.ledger.events(kind="forecast.resolved") if e.payload.get("question_id")}
+        by_id = {fc.id: fc for fc in self.forecasts}
+        for fid, pl in rec.items():
+            fc = by_id.get(fid)
+            if fc is None:
+                problems.append(f"{fid}: forecast in the ledger but missing from the file")
+                continue
+            if (fc.source, fc.question_id, fc.p, fc.market_p) != (pl.get("source"), pl.get("question_id"), pl.get("p"), pl.get("market_p")) \
+                    or ("ts" in pl and fc.ts != pl.get("ts")):
+                problems.append(f"{fid}: forecast fields differ from the ledger")
+        for fid in by_id:
+            if fid not in rec:
+                problems.append(f"{fid}: forecast in the file but never recorded in the ledger")
+        for qid, pl in res.items():
+            r = self.resolutions.get(qid)
+            if r is None:
+                problems.append(f"{qid}: resolution in the ledger but missing from the file")
+            elif r.outcome != pl.get("outcome") or ("resolved_at" in pl and r.resolved_at != pl.get("resolved_at")):
+                problems.append(f"{qid}: resolution differs from the ledger")
+        for qid in self.resolutions:
+            if qid not in res:
+                problems.append(f"{qid}: resolution in the file but never recorded in the ledger")
+        return problems
 
     def open_questions(self) -> list[str]:
         return sorted({fc.question_id for fc in self.forecasts} - set(self.resolutions))

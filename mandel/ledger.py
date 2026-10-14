@@ -171,6 +171,12 @@ class Ledger:
             self._size = self.path.stat().st_size
         return ev
 
+    def anchor_now(self) -> str:
+        """Explicitly (re)write the head anchor for the current chain. Only for migrating a ledger
+        created before anchors existed; the call is itself recorded as an event first."""
+        ev = self.append("ledger.anchored", {"reason": "explicit re-anchor"}, actor="user")
+        return ev.hash
+
     # -- integrity ---------------------------------------------------------
     def verify(self, anchor: Optional[str] = None) -> tuple[bool, str]:
         """Recompute the chain, check the head anchor file and an optional external anchor."""
@@ -189,6 +195,8 @@ class Ledger:
                 n += 1
         except LedgerCorrupt as e:
             return False, str(e)
+        if (n > 0 or self.path.exists()) and not self.head_path.exists():
+            return False, f"head anchor file missing (ledger has {n} events); restore it from git or re-anchor explicitly with anchor_now()"
         if self.head_path.exists():
             try:
                 head = json.loads(self.head_path.read_text(encoding="utf-8"))

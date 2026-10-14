@@ -88,7 +88,7 @@ def parse_criterion(spec: str) -> Criterion:
 def cmd_status(_args) -> int:
     c = Ctx()
     ok, msg = c.ledger.verify()
-    problems = c.proposals.reconcile()
+    problems = c.proposals.reconcile() + c.store.reconcile() + c.forecasts.reconcile()
     warnings = []
     if not (KNOWLEDGE_ROOT / "SYNTHESIS.md").exists():
         warnings.append("knowledge/SYNTHESIS.md not written yet (the learning pass has not been synthesised)")
@@ -119,11 +119,16 @@ def cmd_status(_args) -> int:
 
 def cmd_verify(args) -> int:
     c = Ctx()
+    if args.reanchor:
+        h = c.ledger.anchor_now()
+        print(f"re-anchored; new head {h[:12]} (record this hash in your commit message)")
     ok, msg = c.ledger.verify(anchor=args.anchor)
     print(msg)
-    problems = c.proposals.reconcile()
+    problems = c.proposals.reconcile() + c.store.reconcile() + c.forecasts.reconcile()
     for p in problems:
         print("reconcile:", p)
+    if not problems:
+        print("reconcile: proposals, insights and forecasts agree with the ledger")
     return 0 if ok and not problems else 1
 
 
@@ -358,6 +363,7 @@ def build_parser() -> argparse.ArgumentParser:
     add("status", cmd_status, "Ledger integrity, counts of insights/proposals/forecasts/children, warnings.")
     p = add("verify", cmd_verify, "Recompute the ledger hash chain, check the head anchor and reconcile proposals.")
     p.add_argument("--anchor", help="a head hash copied from a git commit; verify fails if it is not in the chain")
+    p.add_argument("--reanchor", action="store_true", help="write a fresh head anchor for a ledger created before anchors existed (logged as an event)")
     p = add("ledger", cmd_ledger, "Show the most recent ledger events.")
     p.add_argument("--kind", help="event kind prefix, e.g. proposal. or insight.recorded"); p.add_argument("-n", type=int, default=30)
 
