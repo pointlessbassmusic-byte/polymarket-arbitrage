@@ -801,6 +801,34 @@
   preregistered: true
   trials_run: 0
 
+- id: kalshi-polyus-crossvenue
+  title: "Same BTC contract on two US venues: Kalshi and Polymarket US both settle on the BRTI 60-second average. Is YES on one plus NO on the other ever cheaper than $1 after both fees?"
+  source: "operator direction 2026-10-14 (other crypto platforms, advantages not yet seen; not market making, not speed); Polymarket US crypto contracts (docs.polymarket.us crypto schema and FAQ: BRTI, 60-second simple average before 5 PM ET / the hour, ties settle Yes) list hourly, 5 PM daily and Friday weekly above/below ladders, strikes every $250, the same events as Kalshi KXBTCD ('above K - 0.01'); both venues are CFTC-regulated and open to US residents; fees 0.07 p(1-p) (Kalshi, rounded up to the cent per order) and 0.0695 p(1-p) (Polymarket US taker)"
+  claim: "On matched above/below contracts (same expiry, same strike, same index and statistic), there are moments when buying YES at one venue's ask and NO at the other's (1 - that venue's YES bid) costs less than $1 minus both taker fees by at least 1 cent a contract, with at least 10 contracts available on both sides, at least once a day on average; held to settlement this is a locked profit independent of BTC."
+  test: "cryptobot.crossvenue_recorder polls both venues' public books for every matched pair of the current hourly, daily and weekly BTC ladders (Polymarket gateway BBO; Kalshi /markets/{ticker}/orderbook), records the two-sided prices and sizes, and computes the locked edge per contract net of both fees at 10 contracts (Kalshi's fee rounded up per order). Reported: share of snapshots and count of distinct episodes (a pair and direction with edge >= 1 cent, merged while it persists) by family, the edge distribution, the size available, and how long episodes last. A recording of at least 6 hours here, then 7 days on the desk's server. Trials: 3 families (hourly, daily, weekly)."
+  success: "Written before recording: CANDIDATE if, over 7 days on the server, a family shows >= 7 episodes with >= 1 cent net per contract at >= 10 contracts on both sides, each lasting >= 30 seconds (slow enough for a polling desk, so not a speed race); then a manual test of 5 real pairs at the minimum size on both venues, settlement checked. KILLED for a family if no such episode appears in 7 days. The 6-hour run here only decides whether the server run is worth doing."
+  data: "scratch crossvenue/*.jsonl; then state/crossvenue on the server"
+  result: "PRE-REGISTERED 2026-10-14; recording"
+  verdict: inconclusive
+  regime: "pending"
+  rerun: "python -m cryptobot.crossvenue_recorder --dir <dir> --hours 6 && python -m cryptobot.crossvenue_recorder --dir <dir> --report"
+  preregistered: true
+  trials_run: 0
+
+- id: token-unlock-short
+  title: "Short a token into its scheduled unlock, hedged with BTC, on a US venue"
+  source: "operator direction 2026-10-14 (other crypto platforms, advantages not yet seen; slow edges); Keyrock 2024 study of 16,000+ unlocks (about 90% show negative price pressure, drift starting about 30 days before, settling about 14 days after; team unlocks worst); Kalshi perps list unlock-heavy tokens (SUI, WLD, NEAR, HYPE, ZEC); unlock schedules are public in advance"
+  claim: "For tokens whose circulating supply jumps by at least 1% in a day (a cliff unlock), the token's return relative to BTC from 20 days before the jump to 10 days after is negative, so a BTC-hedged short over that window earns more than costs (2 x 18 bp on the token leg, 2 x 4 bp on the BTC hedge) and an assumed 10%/yr funding drag on the short."
+  test: "cryptobot.unlock_study: CoinGecko daily price and market cap for about 35 tokens with periodic cliff unlocks (circulating supply = market cap / price, the free API's last 365 days); events = days with supply up >= 1% (merged within 20 days), excluding jumps that reverse within 5 days (data fixes); window -20 to +10 days, return of the token minus BTC; mean, median, t clustered by month, by half; the Kalshi-listed subset reported separately. Placebo: the same window on random non-event days for the same tokens. Trials: 1 window, 1 threshold."
+  success: "Written before any data was pulled: CANDIDATE if the hedged short nets >= +3% per event after costs at t >= 2.5 over >= 30 events, both halves positive, and the placebo window is not as negative (difference >= 3 points); then a paper rule on the Kalshi-listed tokens with a published unlock calendar. KILLED if the mean hedged return is >= 0 (no drift). Otherwise inconclusive."
+  data: "scratch unlocks/<coin>.json (CoinGecko market_chart, 365 days)"
+  result: "Run 2026-10-14 on CoinGecko daily data, 2025-10 to 2026-10 (the free API's 365 days), 39 tokens. 142 events (supply +1% in a day, 30 coins): the BTC-hedged short from day -20 to +10 nets +1.22% per event after 1.26% of costs (median +6.36%, 62% positive, t 0.3 clustered by month, halves +2.17% / +0.29%; token vs BTC -2.48%). Jumps >= 3% (66 events, 19 coins): +4.04% (median +8.42%, t 1.5, halves +3.84% / +4.25%; token vs BTC -5.30%). Placebo on random days: -1.79% (median +2.19%, t -0.3), so the event window is about 3 points better than a random one. Kalshi-listed tokens (SUI, WLD, HYPE with events in the year; 15 events): -6.11% (t -0.8). The drift is there in the median and the sign matches the literature, but squeezes against the short swamp the mean; one year is too short, and the coins Kalshi lists did not show it. Not traded"
+  verdict: inconclusive
+  regime: "2025-10 to 2026-10: cliff unlocks lead to a median 2-5% underperformance against BTC, mean not significant; not on the Kalshi-listed tokens. Revisit with a longer history (paid data) or a forward calendar on the Kalshi tokens"
+  rerun: "python -m cryptobot.unlock_study --scratch <dir> --fetch"
+  preregistered: true
+  trials_run: 1
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
