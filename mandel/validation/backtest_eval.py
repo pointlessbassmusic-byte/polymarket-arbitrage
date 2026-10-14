@@ -149,6 +149,11 @@ def deflated_sharpe_ratio(
     if trial_sharpes is not None:
         ts = _arr(trial_sharpes)
         var_trials_sr = float(ts.var(ddof=1)) if ts.size > 1 else 0.0
+    if n_trials > 1 and (var_trials_sr is None or var_trials_sr <= 0):
+        # No information about the spread of trial Sharpes: assume every trial was a
+        # zero-skill series of this length. Var(SR_hat) under the iid null is 1/(T-1).
+        # Without this floor a best-of-N candidate was deflated by nothing at all.
+        var_trials_sr = 1.0 / max(1, r.size - 1)
     if var_trials_sr is None:
         var_trials_sr = 0.0
     sr_star = expected_max_sharpe(n_trials, var_trials_sr)
@@ -166,29 +171,37 @@ def block_bootstrap_pvalue(
     candidate: Sequence[float],
     incumbent: Sequence[float],
     n_boot: int = 2000,
-    block_len: int = 10,
+    block_len: Optional[int] = None,
     seed: int = 0,
 ) -> float:
     """One-sided p-value for H0: mean(candidate - incumbent) <= 0, by circular block
-    bootstrap of the paired differences. Small is good for the candidate."""
+    bootstrap of the paired differences. Small is good for the candidate.
+
+    ``block_len`` defaults to about n^(1/3) and is capped at n//4, so there are always
+    at least four blocks; a single-block "bootstrap" is a rotation of the data and would
+    return a tiny p-value for any positive mean. The centred bootstrap means are also
+    scaled by 1/sqrt(1 - block_len/n) to undo the known variance deflation of the
+    circular block bootstrap in short samples."""
     c, i = _arr(candidate), _arr(incumbent)
     if c.size != i.size:
         raise ValueError("candidate and incumbent must be aligned per period")
     d = c - i
     n = d.size
-    if n < 2:
-        return 1.0
+    if n < 8:
+        raise ValueError(f"need at least 8 aligned periods for a block bootstrap, got {n}")
+    if block_len is None:
+        block_len = max(1, int(round(n ** (1.0 / 3.0))))
+    block_len = max(1, min(int(block_len), n // 4))
     observed = d.mean()
-    block_len = max(1, min(block_len, n))
     rng = np.random.default_rng(seed)
     n_blocks = math.ceil(n / block_len)
     starts = rng.integers(0, n, size=(n_boot, n_blocks))
     offsets = np.arange(block_len)
     idx = (starts[:, :, None] + offsets[None, None, :]).reshape(n_boot, -1)[:, :n] % n
     boot_means = d[idx].mean(axis=1)
-    # Centre under H0 (true mean difference = 0) and ask how often the null produces
-    # something at least as large as what we observed.
-    centred = boot_means - observed
+    # Centre under H0 (true mean difference = 0), correct the short-sample variance
+    # deflation, and ask how often the null produces at least what we observed.
+    centred = (boot_means - observed) / math.sqrt(1.0 - block_len / n)
     return float((np.sum(centred >= observed) + 1) / (n_boot + 1))
 
 
@@ -250,7 +263,7 @@ def compare_strategies(
     n_trials: int = 1,
     trial_sharpes: Optional[Sequence[float]] = None,
     n_boot: int = 2000,
-    block_len: int = 10,
+    block_len: Optional[int] = None,
     seed: int = 0,
 ) -> ComparisonResult:
     """Compare out-of-sample per-period returns of a candidate against the incumbent.
@@ -264,6 +277,8 @@ def compare_strategies(
         notes.append(f"only {c.size} periods; statistics are weak below ~30")
     if n_trials <= 1:
         notes.append("n_trials=1: no selection-bias correction applied")
+    elif trial_sharpes is None:
+        notes.append(f"n_trials={n_trials} without trial Sharpes: deflating with the zero-skill variance floor 1/(n-1)")
     res = ComparisonResult(
         n_periods=int(c.size),
         candidate_sharpe=sharpe_ratio(c),

@@ -123,8 +123,12 @@ lists them. The commands that matter day to day:
 - `trading_mode: dry_run` stays the default everywhere. The only machine
   that may hold live keys is the Linode, and only after a proposal has
   passed the gate and the user has said yes.
-- The ledger is append-only by construction; `python -m mandel verify`
-  fails loudly if any line was edited. Run it in the daily cycle.
+- The ledger is a hash chain with a head anchor (`mandel/state/ledger.head`).
+  `python -m mandel verify` reports an edited, inserted or truncated line
+  and any proposal whose file status disagrees with the ledger. It cannot
+  detect a full rewrite of both files; git history is the anchor for that,
+  so keep `mandel/state` committed and compare heads across commits when
+  in doubt (`verify --anchor <hash>`). Run it in the daily cycle.
 
 ## Suggested next steps for the setup
 

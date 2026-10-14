@@ -66,7 +66,7 @@ class CalibrationBin:
 def calibration_table(probs: Sequence[float], outcomes: Sequence[int], n_bins: int = 10) -> list[CalibrationBin]:
     """Equal-width reliability bins. Empty bins are omitted."""
     p, o = _as_arrays(probs, outcomes)
-    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    edges = np.arange(n_bins + 1) / n_bins          # exact k/n_bins, unlike linspace
     idx = np.clip(np.digitize(p, edges[1:-1], right=False), 0, n_bins - 1)
     out: list[CalibrationBin] = []
     for b in range(n_bins):

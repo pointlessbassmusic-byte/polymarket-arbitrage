@@ -103,6 +103,8 @@ class TestBacktestEval:
         inc = rng.normal(0, 0.01, 400)
         cand = inc + 0.004 + rng.normal(0, 0.002, 400)
         assert block_bootstrap_pvalue(cand, inc, n_boot=1000) < 0.01
+        with pytest.raises(ValueError):
+            block_bootstrap_pvalue([1.0] * 5, [0.0] * 5)        # too short for blocks
         # Under the null (independent, equal-mean series) p-values should be roughly uniform:
         # across many seeds the rejection rate at 0.05 must stay small.
         rejections = 0
@@ -135,8 +137,24 @@ class TestBacktestEval:
         assert res.passes()
         res2 = compare_strategies(inc, cand, n_trials=5)
         assert not res2.passes()
-        ev = evidence_from_comparison(res)
-        assert ev["out_of_sample"] is True and ev["n_trials"] == 5
+        assert any("variance floor" in n for n in res2.notes)
+        ev = evidence_from_comparison(res, holdout_id="wf-2025Q3")
+        assert ev["out_of_sample"] is True and ev["n_trials"] == 5 and ev["holdout_id"] == "wf-2025Q3"
+        with pytest.raises(TypeError):
+            evidence_from_comparison(res)                       # holdout_id is mandatory
+        with pytest.raises(ValueError):
+            evidence_from_comparison(res, holdout_id="  ")
+
+    def test_dsr_deflates_best_of_many_by_default(self):
+        """Best of 40 zero-skill series must rarely pass when n_trials is honestly declared,
+        even when no trial Sharpes are supplied (the old default applied no deflation)."""
+        rng = np.random.default_rng(21)
+        passes = 0
+        for _ in range(40):
+            trials = rng.normal(0, 0.01, size=(40, 250))
+            best = trials[np.argmax(trials.mean(axis=1) / trials.std(axis=1, ddof=1))]
+            passes += deflated_sharpe_ratio(best, n_trials=40) >= 0.95
+        assert passes <= 4, f"{passes}/40 lucky candidates passed"
 
 
 # ---------------------------------------------------- proposals and gate ---
@@ -156,13 +174,20 @@ class TestProposalsAndGate:
         rng = np.random.default_rng(11)
         inc = rng.normal(0, 0.01, 300)
         res = compare_strategies(inc + 0.005, inc, n_trials=5)
-        book.record_evidence(p.id, evidence_from_comparison(res))
+        book.record_evidence(p.id, evidence_from_comparison(res, holdout_id="wf-1"))
         g = evaluate(book.get(p.id))
         assert g.passed, g.rationale()
-        book.decide(p.id, g.passed, g.rationale(), produces_insights=["I-1"])
+        book.decide(p.id, produces_insights=["I-1"])
         assert book.get(p.id).status == "accepted"
+        assert book.get(p.id).gate_result["passed"] is True
         kinds = [e.kind for e in book.ledger.events(kind="proposal")]
         assert kinds == ["proposal.drafted", "proposal.preregistered", "proposal.evidence", "proposal.accepted"]
+        # reload round-trip keeps criteria, hash and integrity
+        again = ProposalBook(book.path, book.ledger)
+        q = again.get(p.id)
+        assert q.criteria_hash == p.criteria_hash and len(q.criteria) == 4
+        again.check_integrity(q)
+        assert again.reconcile() == []
 
     def test_in_sample_evidence_fails(self, book):
         p = book.draft("t", "h", "mandel:x", "c", strategy_improvement_criteria())
@@ -170,6 +195,58 @@ class TestProposalsAndGate:
         book.record_evidence(p.id, {"sharpe_diff": 1, "mean_diff": 1, "bootstrap_p": 0.0, "dsr": 1.0})
         g = evaluate(book.get(p.id))
         assert not g.passed and any("out_of_sample" in r for r in g.reasons)
+        assert any("n_trials not reported" in r for r in g.reasons)
+
+    def test_non_finite_and_bool_values_fail(self, book):
+        p = book.draft("t", "h", "mandel:x", "c", strategy_improvement_criteria())
+        book.preregister(p.id)
+        book.record_evidence(p.id, {"sharpe_diff": float("inf"), "mean_diff": True, "bootstrap_p": float("-inf"),
+                                    "dsr": "high", "out_of_sample": True, "n_trials": 1})
+        g = evaluate(book.get(p.id))
+        assert not g.passed and all(not c.passed for c in g.checks)
+
+    def test_evidence_is_write_once(self, book):
+        p = book.draft("t", "h", "mandel:x", "c", strategy_improvement_criteria(), n_trials_declared=3)
+        book.preregister(p.id)
+        book.record_evidence(p.id, {"n_trials": 40, "out_of_sample": True})
+        with pytest.raises(LifecycleError):
+            book.record_evidence(p.id, {"n_trials": 3})
+        book.record_evidence(p.id, {"n_trials": 40, "dsr": 0.99})   # same value is fine
+        with pytest.raises(ValueError):
+            book.record_evidence(p.id, {})
+
+    def test_hand_edit_detected_against_ledger(self, book):
+        import json
+        p = book.draft("t", "h", "mandel:x", "c", [Criterion("brier_delta", "<", 0.0)])
+        book.preregister(p.id)
+        # attacker loosens the criterion AND recomputes the hash in the file
+        rows = [json.loads(l) for l in book.path.read_text().splitlines()]
+        rows[0]["criteria"][0]["threshold"] = 0.5
+        from mandel.proposals import _to_proposal
+        rows[0]["criteria_hash"] = _to_proposal(rows[0]).compute_criteria_hash()
+        book.path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        tampered = ProposalBook(book.path, book.ledger)
+        with pytest.raises(IntegrityError):
+            tampered.record_evidence(p.id, {"brier_delta": 0.3, "out_of_sample": True, "n_trials": 1})
+
+    def test_duplicate_hypothesis_needs_supersedes(self, book):
+        p = book.draft("t", "same hypothesis", "mandel:x", "c", code_change_criteria())
+        book.preregister(p.id); book.record_evidence(p.id, {"tests_pass": 0}); book.decide(p.id)
+        assert book.get(p.id).status == "rejected"
+        with pytest.raises(LifecycleError):
+            book.draft("t2", "same hypothesis", "mandel:x", "c", code_change_criteria())
+        q = book.draft("t2", "same hypothesis", "mandel:x", "c", code_change_criteria(), supersedes=p.id)
+        assert q.supersedes == p.id
+
+    def test_reconcile_detects_flipped_status(self, book):
+        import json
+        p = book.draft("t", "h", "mandel:x", "c", code_change_criteria())
+        book.preregister(p.id); book.record_evidence(p.id, {"tests_pass": 0}); book.decide(p.id)
+        rows = [json.loads(l) for l in book.path.read_text().splitlines()]
+        rows[0]["status"] = "accepted"
+        book.path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        problems = ProposalBook(book.path, book.ledger).reconcile()
+        assert problems and "file says accepted, ledger says rejected" in problems[0]
 
     def test_more_trials_than_declared_fails(self, book):
         p = book.draft("t", "h", "mandel:x", "c", strategy_improvement_criteria(), n_trials_declared=3)
@@ -182,7 +259,7 @@ class TestProposalsAndGate:
     def test_missing_metric_fails(self, book):
         p = book.draft("t", "h", "mandel:x", "c", code_change_criteria())
         book.preregister(p.id)
-        book.record_evidence(p.id, {})
+        book.record_evidence(p.id, {"notes": "ran the suite but forgot the number"})
         g = evaluate(book.get(p.id))
         assert not g.passed and g.checks[0].note == "metric not reported"
 
@@ -191,14 +268,17 @@ class TestProposalsAndGate:
         with pytest.raises(LifecycleError):
             book.record_evidence(p.id, {"tests_pass": 1})
         with pytest.raises(LifecycleError):
-            book.decide(p.id, True, "x")
+            book.decide(p.id)
         book.preregister(p.id)
         with pytest.raises(LifecycleError):
             book.edit_criteria(p.id, [Criterion("tests_pass", "==", 1.0)])
         with pytest.raises(LifecycleError):
             book.preregister(p.id)
         book.record_evidence(p.id, {"tests_pass": 1})
-        book.decide(p.id, True, "ok")
+        with pytest.raises(LifecycleError):                  # evidence seen: must decide, not withdraw
+            book.withdraw(p.id, "changed my mind")
+        book.decide(p.id)
+        assert book.get(p.id).status == "accepted"
         with pytest.raises(LifecycleError):
             book.withdraw(p.id, "late")
         book.roll_back(p.id, "regressed in production")
@@ -217,3 +297,7 @@ class TestProposalsAndGate:
             book.draft("t", "h", "x", "c", [Criterion("m", "~", 1.0)])
         with pytest.raises(ValueError):
             book.draft("t", "h", "x", "c", [])
+        with pytest.raises(ValueError):
+            book.draft("t", "h", "x", "c", [Criterion("m", ">", float("-inf"))])
+        with pytest.raises(ValueError):
+            book.draft("t", "h", "x", "c", [Criterion("m", ">", "abc")])

@@ -29,6 +29,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from mandel._io import append_line, atomic_write_text, file_lock
 from mandel.ledger import Ledger, utcnow_iso
 from mandel.paths import data_path
 
@@ -110,20 +111,27 @@ class ChildRegistry:
         self.ledger = ledger if ledger is not None else Ledger()
         self._children: dict[str, Child] = {}
         if self.index_path.exists():
-            data = json.loads(self.index_path.read_text(encoding="utf-8"))
+            raw = self.index_path.read_text(encoding="utf-8").strip()
+            data = json.loads(raw) if raw else {}
             for d in data.values():
                 self._children[d["name"]] = Child(**d)
 
     def _flush(self) -> None:
-        tmp = self.index_path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps({k: asdict(v) for k, v in self._children.items()}, indent=2, ensure_ascii=False),
-                       encoding="utf-8")
-        tmp.replace(self.index_path)
+        atomic_write_text(self.index_path, json.dumps({k: asdict(v) for k, v in self._children.items()}, indent=2, ensure_ascii=False))
 
-    def _child_dir(self, name: str) -> Path:
+    def _child_dir(self, name: str, create: bool = False) -> Path:
         d = self.root / slugify(name)
-        d.mkdir(parents=True, exist_ok=True)
+        if create:
+            d.mkdir(parents=True, exist_ok=True)
         return d
+
+    def _resolve(self, name: str) -> str:
+        """Case-insensitive lookup: returns the registered display name."""
+        slug = slugify(name)
+        for n in self._children:
+            if slugify(n) == slug:
+                return n
+        raise KeyError(name)
 
     # -- registry ----------------------------------------------------------
     def suggest_names(self, n: int = 5) -> list[tuple[str, str]]:
@@ -131,19 +139,21 @@ class ChildRegistry:
         return [(nm, why) for nm, why in NAME_POOL if nm.lower() not in taken][:n]
 
     def register(self, name: str, session_id: str, domain: str, description: str, tags: list[str] | None = None) -> Child:
-        if name in self._children:
-            raise ValueError(f"child {name!r} already registered")
         if not slugify(name):
             raise ValueError("name must contain letters or digits")
+        clash = [n for n in self._children if slugify(n) == slugify(name)]
+        if clash:
+            raise ValueError(f"child {name!r} collides with registered child {clash[0]!r} (names are case-insensitive)")
         child = Child(name=name, session_id=session_id, domain=domain, description=description, tags=sorted(set(tags or [])))
-        self._children[name] = child
-        self._child_dir(name)
-        self._flush()
+        with file_lock(self.index_path):
+            self._children[name] = child
+            self._child_dir(name, create=True)
+            self._flush()
         self.ledger.append("child.registered", {"name": name, "session_id": session_id, "domain": domain}, actor="mandel")
         return child
 
     def get(self, name: str) -> Child:
-        return self._children[name]
+        return self._children[self._resolve(name)]
 
     def all(self) -> list[Child]:
         return sorted(self._children.values(), key=lambda c: c.registered_at)
@@ -151,6 +161,7 @@ class ChildRegistry:
     def set_status(self, name: str, status: str) -> Child:
         if status not in ("active", "paused", "graduated", "archived"):
             raise ValueError("bad status")
+        name = self._resolve(name)
         c = self._children[name]
         c.status = status
         self._flush()
@@ -160,12 +171,12 @@ class ChildRegistry:
     # -- protocol ----------------------------------------------------------
     def record_report(self, name: str, summary: str, learnings: list[str] | None = None, metrics: dict | None = None,
                       questions: list[str] | None = None, artifacts: list[str] | None = None) -> ChildReport:
+        name = self._resolve(name)
         c = self._children[name]
         rep = ChildReport(id="R-" + uuid.uuid4().hex[:10], child=name, ts=utcnow_iso(), summary=summary,
                           learnings=list(learnings or []), metrics=dict(metrics or {}),
                           questions=list(questions or []), artifacts=list(artifacts or []))
-        with (self._child_dir(name) / "reports.jsonl").open("a", encoding="utf-8") as f:
-            f.write(json.dumps(asdict(rep), ensure_ascii=False) + "\n")
+        append_line(self._child_dir(name, create=True) / "reports.jsonl", json.dumps(asdict(rep), ensure_ascii=False))
         c.last_contact = rep.ts
         c.report_count += 1
         c.metrics.update(rep.metrics)
@@ -176,11 +187,11 @@ class ChildRegistry:
 
     def record_guidance(self, name: str, summary: str, insights: list[str] | None = None, warnings: list[str] | None = None,
                         requests: list[str] | None = None) -> Guidance:
+        name = self._resolve(name)
         c = self._children[name]
         g = Guidance(id="G-" + uuid.uuid4().hex[:10], to=name, ts=utcnow_iso(), summary=summary,
                      insights=list(insights or []), warnings=list(warnings or []), requests=list(requests or []))
-        with (self._child_dir(name) / "guidance.jsonl").open("a", encoding="utf-8") as f:
-            f.write(json.dumps(asdict(g), ensure_ascii=False) + "\n")
+        append_line(self._child_dir(name, create=True) / "guidance.jsonl", json.dumps(asdict(g), ensure_ascii=False))
         c.guidance_count += 1
         self._flush()
         self.ledger.append("child.guidance", {"id": g.id, "to": name, "n_insights": len(g.insights),
@@ -188,13 +199,13 @@ class ChildRegistry:
         return g
 
     def reports(self, name: str) -> list[ChildReport]:
-        p = self._child_dir(name) / "reports.jsonl"
+        p = self._child_dir(self._resolve(name)) / "reports.jsonl"
         if not p.exists():
             return []
         return [ChildReport(**json.loads(l)) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
 
     def guidance(self, name: str) -> list[Guidance]:
-        p = self._child_dir(name) / "guidance.jsonl"
+        p = self._child_dir(self._resolve(name)) / "guidance.jsonl"
         if not p.exists():
             return []
         return [Guidance(**json.loads(l)) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]

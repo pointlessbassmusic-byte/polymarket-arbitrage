@@ -7,6 +7,7 @@ import pytest
 from mandel.children import ChildRegistry
 from mandel.forecasts import ForecastBook
 from mandel.ledger import GENESIS_HASH, Ledger
+from mandel.proposals import Criterion, ProposalBook
 from mandel.store import InsightStore
 
 
@@ -62,6 +63,58 @@ class TestLedger:
         ledger.append("proposal.drafted", {})
         assert len(ledger.events(kind="insight")) == 2
         assert len(ledger.events(kind="proposal.drafted")) == 1
+        assert [e.kind for e in ledger.tail(2)] == ["insight.status", "proposal.drafted"]
+
+    def test_two_instances_on_one_file_keep_one_chain(self, tmp_path):
+        p = tmp_path / "l.jsonl"
+        a, b = Ledger(p), Ledger(p)
+        a.append("k", {"n": 1}); b.append("k", {"n": 2}); a.append("k", {"n": 3})
+        ok, msg = Ledger(p).verify()
+        assert ok, msg
+        assert [e.seq for e in Ledger(p).events()] == [0, 1, 2]
+
+    def test_truncation_detected_by_head_anchor(self, tmp_path):
+        p = tmp_path / "l.jsonl"
+        l = Ledger(p)
+        for n in range(4):
+            l.append("k", {"n": n})
+        lines = p.read_text().splitlines()
+        p.write_text("\n".join(lines[:2]) + "\n")
+        ok, msg = Ledger(p).verify()
+        assert not ok and "truncated" in msg
+
+    def test_missing_trailing_newline_is_repaired(self, tmp_path):
+        p = tmp_path / "l.jsonl"
+        l = Ledger(p)
+        l.append("k", {"n": 1})
+        p.write_bytes(p.read_bytes().rstrip(b"\n"))
+        Ledger(p).append("k", {"n": 2})
+        ok, msg = Ledger(p).verify()
+        assert ok, msg and len(Ledger(p)) == 2
+
+    def test_corrupt_line_reported_not_crashing(self, tmp_path):
+        p = tmp_path / "l.jsonl"
+        l = Ledger(p)
+        l.append("k", {"n": 1})
+        with p.open("a") as f:
+            f.write('{"seq": 1, "ts": "x", "kind": "k", "act')
+        l2 = Ledger(p)                      # constructor survives
+        assert l2.corrupt is not None
+        ok, msg = l2.verify()
+        assert not ok and "corrupt" in msg
+        with pytest.raises(RuntimeError):
+            l2.append("k", {"n": 2})
+
+    def test_external_anchor(self, ledger):
+        e = ledger.append("k", {"n": 1})
+        ledger.append("k", {"n": 2})
+        assert ledger.verify(anchor=e.hash)[0]
+        assert not ledger.verify(anchor="deadbeef" * 8)[0]
+
+    def test_numpy_payload_is_coerced(self, ledger):
+        import numpy as np
+        ev = ledger.append("k", {"x": np.float64(1.5), "b": np.bool_(True), "arr": np.arange(2)})
+        assert ev.payload == {"x": 1.5, "b": True, "arr": [0, 1]}
 
 
 # ----------------------------------------------------------------- store ---
@@ -90,13 +143,43 @@ class TestInsightStore:
         p = tmp_path / "i.jsonl"
         s = InsightStore(p, ledger)
         ins = s.add("claim", "heuristic", ["child:julia:report:1"], 0.4)
-        s.set_status(ins.id, "validated", by="P-abc")
+        s.set_status(ins.id, "validated", by="converge:src:01,src:02")
         s.update_confidence(ins.id, 0.7, reason="passed gate")
         again = InsightStore(p, ledger).get(ins.id)
         assert again.status == "validated"
-        assert again.validated_by == ["P-abc"]
+        assert again.validated_by == ["converge:src:01,src:02"]
         assert again.confidence == 0.7
         assert len(s.query(status="validated")) == 1
+
+    def test_validation_rules(self, tmp_path, ledger):
+        book = ProposalBook(tmp_path / "p.jsonl", ledger)
+        s = InsightStore(tmp_path / "i.jsonl", ledger, proposals=book)
+        ins = s.add("claim", "fact", ["src:01"], 0.5)
+        with pytest.raises(ValueError):                      # arbitrary string
+            s.set_status(ins.id, "validated", by="because I said so")
+        with pytest.raises(ValueError):                      # one ref is not convergence
+            s.set_status(ins.id, "validated", by="converge:src:01")
+        with pytest.raises(ValueError):                      # unknown proposal
+            s.set_status(ins.id, "validated", by="P-00000000")
+        prop = book.draft("t", "h", "mandel:x", "c", [Criterion("tests_pass", "==", 1.0)])
+        with pytest.raises(ValueError):                      # not accepted yet
+            s.set_status(ins.id, "validated", by=prop.id)
+        book.preregister(prop.id); book.record_evidence(prop.id, {"tests_pass": 1})
+        book.decide(prop.id, produces_insights=[ins.id])
+        s.set_status(ins.id, "validated", by=prop.id)
+        assert s.get(ins.id).validated_by == [prop.id]
+        s.set_status(ins.id, "retired", by="src:02")
+        with pytest.raises(ValueError):                      # retired cannot come back
+            s.set_status(ins.id, "validated", by=prop.id)
+
+    def test_provenance_rules(self, tmp_path, ledger):
+        s = InsightStore(tmp_path / "i.jsonl", ledger)
+        with pytest.raises(ValueError):
+            s.add("x", "fact", ["wikipedia"], 0.5)
+        ins = s.add("own inference", "heuristic", ["mandel:self"], 0.9)
+        assert ins.confidence == 0.5                         # capped for self-only provenance
+        ok = s.add("sourced", "fact", ["src:03", "mandel:self"], 0.9)
+        assert ok.confidence == 0.9
 
 
 # ------------------------------------------------------------- forecasts ---
@@ -133,8 +216,34 @@ class TestForecastBook:
         fb.record("mandel", "q1", "?", 0.1)
         fb.record("mandel", "q1", "?", 0.9)
         fb.resolve("q1", 1)
-        probs, outcomes, _ = fb.scored_pairs("mandel")
+        probs, outcomes, _, _ = fb.scored_pairs("mandel")
         assert probs == [0.9] and outcomes == [1]
+
+    def test_market_reference_prefers_market_source(self, tmp_path, ledger):
+        fb = ForecastBook(tmp_path / "f.jsonl", ledger)
+        fb.record("market:polymarket", "q1", "rain?", 0.6)
+        fb.record("child:julia", "q1", "rain?", 0.65, market_p=0.95)   # self-reported market_p is ignored
+        fb.resolve("q1", 1)
+        sc = fb.score_source("child:julia")
+        assert sc.market_reference == "market-source"
+        assert sc.skill_vs_market == pytest.approx(1 - (0.35 ** 2) / (0.4 ** 2))
+        fb.record("child:julia", "q2", "snow?", 0.7, market_p=0.5)
+        fb.resolve("q2", 1)
+        assert fb.score_source("child:julia").market_reference == "mixed"
+
+    def test_input_rules(self, tmp_path, ledger):
+        fb = ForecastBook(tmp_path / "f.jsonl", ledger)
+        with pytest.raises(ValueError):
+            fb.record("mandel", "q1", "?", 0.5, market_p=5.0)
+        with pytest.raises(ValueError):
+            fb.resolve("never-forecast", 1)
+        fb.record("mandel", " Q1 ", "Will it rain?", 0.5)
+        assert fb.open_questions() == ["q1"]
+        fb.resolve("q1", 1)
+        with pytest.raises(ValueError):                      # same text under a new id
+            fb.record("mandel", "q1-redo", "Will it rain?", 1.0)
+        with pytest.raises(ValueError):                      # normalised id already resolved
+            fb.record("mandel", "Q1", "other", 0.5)
 
     def test_reload(self, tmp_path, ledger):
         p = tmp_path / "f.jsonl"
@@ -172,6 +281,11 @@ class TestChildRegistry:
         reg.register("Fatou", "s1", "d", "x")
         with pytest.raises(ValueError):
             reg.register("Fatou", "s2", "d", "x")
+        with pytest.raises(ValueError):
+            reg.register("fatou", "s3", "d", "x")           # case-insensitive collision
+        assert reg.get("FATOU").name == "Fatou"
+        reg.record_report("fatou", "ok")
+        assert reg.get("Fatou").report_count == 1 and len(reg.reports("Fatou")) == 1
         reg.set_status("Fatou", "paused")
         again = ChildRegistry(tmp_path / "children", ledger)
         assert again.get("Fatou").status == "paused"

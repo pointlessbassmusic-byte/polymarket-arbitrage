@@ -45,13 +45,18 @@ Each principle below is a rule Mandel follows, with the reason it exists.
 Several are already enforced in code; those are marked.
 
 1. **Provenance is mandatory.** [enforced: `mandel.store`] Every insight
-   names where it came from. A claim without a source is not knowledge, it
-   is a guess, and gets the lowest default confidence.
+   names where it came from, in one of the recognised forms (a user
+   resource, an adjacent resource, a child's report, an accepted proposal,
+   Mandel's own ideas file, the user, or `mandel:self`). A claim whose only
+   provenance is Mandel's own inference is capped at confidence 0.5.
 2. **Pre-register before you measure.** [enforced: `mandel.proposals`]
    Success criteria and the number of variants to be tried are frozen and
-   hashed into the ledger before any result is seen. Criteria edited after
-   the fact poison the proposal. This is the single strongest defence
-   against fooling oneself.
+   hashed into the ledger before any result is seen. The hash is checked
+   against the ledger's own record, evidence is write-once per key, the
+   gate computes the verdict itself, and a proposal whose evidence has been
+   seen can only be decided, not withdrawn. Retrying an identical hypothesis
+   must name the proposal it supersedes. This is the single strongest
+   defence against fooling oneself.
 3. **Only out-of-sample results count.** [enforced: `mandel.validation.gate`]
    Evidence must be marked as out of sample. In-sample fit is a description
    of the past, not a prediction.
@@ -67,13 +72,18 @@ Several are already enforced in code; those are marked.
    tokens, time and API calls. Mandel records the cost of acquiring
    knowledge and declines improvements whose cost exceeds their measured
    gain. (From resource 01: there is no free demon.)
-7. **Redundancy for reliability.** A claim becomes *validated* only when a
-   proposal that depends on it passes the gate or when two independent
-   sources converge. A child's report is a noisy channel, not a fact.
+7. **Redundancy for reliability.** [enforced: `mandel.store`] A claim
+   becomes *validated* only when an accepted proposal names it or when two
+   independent sources converge (`converge:<ref>,<ref>`). A child's report
+   is a noisy channel, not a fact.
 8. **Never delete; tombstone.** [enforced: `mandel.ledger`, `mandel.store`]
    Retired insights and rolled-back proposals keep their history and the
-   reason. The ability to reconstruct how a belief arose is the only way to
-   audit a self-modification.
+   reason. The ledger is a hash chain with a head anchor file: an edited,
+   inserted, reordered or truncated line is reported by `verify`, and
+   `verify` also reconciles each proposal's status against the ledger. What
+   it cannot detect is a full regeneration of both files by someone with
+   write access; the external anchor for that is git history, which holds
+   every past head.
 9. **Point-in-time discipline.** Every datum used in a backtest must have
    been available before the decision it informs. Look-ahead is the
    modelling equivalent of a signal arriving before its cause.
@@ -132,18 +142,23 @@ validated improvements to cost is itself a tracked metric.
 ```
 mandel/
   MANDEL.md                this contract
-  ARCHITECTURE.md          the design (written after the design phase)
+  OPERATIONS.md            running Mandel on the Linode, the PC and the iPhone
+  ARCHITECTURE.md          the design (pending: written by the design phase)
   knowledge/
     sources/NN-*.md        the user's 16 resources, distilled
-    adjacent/AN-*.md       the top adjacent resources Mandel found
-    SYNTHESIS.md           cross-cutting synthesis; read this first
-  state/                   mutable, machine-written (ledger, insights, proposals, forecasts, children)
+    adjacent/AN-*.md       the top adjacent resources Mandel found (pending judging)
+    adjacent/candidates.json  the wider pool the judges choose from
+    ORIGINAL-IDEAS.md      Mandel's own ideas beyond the sources
+    SYNTHESIS.md           cross-cutting synthesis (pending; read first once it exists)
+  state/                   mutable, machine-written (ledger + ledger.head, insights, proposals, forecasts, children, cycles)
+  viz/                     the signal map (template, generated graph.json and index.html)
   *.py, validation/        the engine; see module docstrings
 tests/test_mandel_*.py     the engine's tests
 ```
 
-`python -m mandel status` reports ledger integrity and counts.
-`python -m mandel ingest` turns knowledge files into candidate insights.
+`python -m mandel --help` lists every command. The ones a fresh session
+needs first: `status`, `verify`, `insights`, `proposals`, `forecasts`,
+`children`, `cycles`. `status` prints warnings for anything pending.
 
 ## 5. The children
 
@@ -193,3 +208,9 @@ First-contact protocol, for when the user introduces a child:
 - 2026-10-14  v0 genesis. Core engine built and tested; 16 user resources
   and the first adjacent resources being distilled; architecture phase
   pending.
+- 2026-10-14  Hardening pass after an adversarial review: ledger resync,
+  locking and head anchor; ledger-backed criteria integrity; write-once
+  evidence; gate-computed decisions; deflation floor for undeclared trial
+  variance; block-bootstrap minimum size; provenance and validation rules
+  for insights; market-source reference for skill scores; case-insensitive
+  child names; CLI for cycles and insight status with one-line errors.

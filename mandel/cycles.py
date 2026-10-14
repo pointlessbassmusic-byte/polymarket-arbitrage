@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from mandel._io import atomic_write_text
 from mandel.ledger import Ledger, utcnow_iso
 from mandel.paths import data_path
 
@@ -60,11 +61,7 @@ class CycleLog:
                         self._items[d["id"]] = Cycle(**d)
 
     def _flush(self) -> None:
-        tmp = self.path.with_suffix(".jsonl.tmp")
-        with tmp.open("w", encoding="utf-8") as f:
-            for c in self._items.values():
-                f.write(json.dumps(asdict(c), ensure_ascii=False) + "\n")
-        tmp.replace(self.path)
+        atomic_write_text(self.path, "".join(json.dumps(asdict(c), ensure_ascii=False) + "\n" for c in self._items.values()))
 
     def start(self, goal: str, actor: str = "mandel") -> Cycle:
         if any(c.open for c in self._items.values()):
