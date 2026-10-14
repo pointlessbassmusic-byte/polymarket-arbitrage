@@ -161,6 +161,15 @@ cmd_polyus() {
   read -rsp "Polymarket US Secret Key (hidden): " sec; echo
   id="$(printf '%s' "$id" | tr -d '\r\n ')"; sec="$(printf '%s' "$sec" | tr -d '\r\n ')"
   if [ -z "$id" ] || [ -z "$sec" ]; then echo "both values are needed"; exit 1; fi
+  if ! printf '%s' "$id" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+    echo "the Key ID should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 characters, one line)."
+    echo "If it wrapped when you copied it, paste it into a text editor first and copy it again as one line. Nothing was saved."
+    exit 1
+  fi
+  if [ "${#sec}" -lt 40 ]; then
+    echo "that secret is only ${#sec} characters; the Secret Key is a long base64 string. Nothing was saved."
+    exit 1
+  fi
   set_env POLYMARKET_US_KEY_ID "$id"
   set_env POLYMARKET_US_SECRET "$sec"
   echo "saved to $ENV_FILE (mode 600). Run ./desk.sh polyhistory. Revoke the key at polymarket.us/developer when done."

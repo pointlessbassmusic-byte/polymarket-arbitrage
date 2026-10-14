@@ -47,11 +47,26 @@ def _amt(x) -> Optional[float]:
         return None
 
 
+def decode_secret(secret_b64: str) -> bytes:
+    """The 32-byte Ed25519 seed from the Secret Key (base64, standard or URL-safe,
+    padding optional). A clear error instead of a binascii traceback."""
+    s = "".join((secret_b64 or "").split())
+    s += "=" * (-len(s) % 4)
+    try:
+        raw = base64.b64decode(s.replace("-", "+").replace("_", "/"), validate=False)
+    except Exception as exc:                                  # noqa: BLE001
+        raise ValueError("POLYMARKET_US_SECRET is not valid base64; run ./desk.sh polyus again") from exc
+    if len(raw) < 32:
+        raise ValueError(f"POLYMARKET_US_SECRET decodes to {len(raw)} bytes, expected at least 32: "
+                         "it was probably cut short when pasted; run ./desk.sh polyus again")
+    return raw[:32]
+
+
 class Client:
     def __init__(self, key_id: str, secret_b64: str, client=None):
         from cryptography.hazmat.primitives.asymmetric import ed25519
         self.key_id = key_id.strip()
-        self._sk = ed25519.Ed25519PrivateKey.from_private_bytes(base64.b64decode(secret_b64.strip())[:32])
+        self._sk = ed25519.Ed25519PrivateKey.from_private_bytes(decode_secret(secret_b64))
         self.c = client or httpx.Client(timeout=30, headers=UA)
 
     def _headers(self, method: str, path: str) -> dict:
@@ -190,7 +205,11 @@ def main(argv=None) -> int:
     if not kid or not sec:
         print("set POLYMARKET_US_KEY_ID and POLYMARKET_US_SECRET (./desk.sh polyus stores them in .env)")
         return 1
-    raw = Client(kid, sec).fetch()
+    try:
+        raw = Client(kid, sec).fetch()
+    except (ValueError, PermissionError) as exc:
+        print(exc)
+        return 1
     res = analyse(raw)
     print(render(res))
     if a.out:
