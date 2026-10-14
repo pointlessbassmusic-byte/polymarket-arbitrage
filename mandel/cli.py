@@ -12,6 +12,7 @@ Commands
   children                    registry
   names [N]                   suggest names for new children
   ledger [--kind PREFIX] [-n N]
+  ingest                      turn knowledge/*.md "adopts / skeptical / design" bullets into candidate insights
   verify                      recompute the hash chain
 """
 
@@ -29,6 +30,7 @@ from mandel.ledger import Ledger
 from mandel.paths import DATA_ROOT, KNOWLEDGE_ROOT
 from mandel.proposals import ProposalBook
 from mandel.store import InsightStore
+from mandel.ingest import ingest_knowledge
 
 
 def _print(obj) -> None:
@@ -124,6 +126,12 @@ def cmd_ledger(args) -> int:
     return 0
 
 
+def cmd_ingest(_args) -> int:
+    rep = ingest_knowledge(InsightStore())
+    _print({"files": rep.files, "added": rep.added, "skipped_existing": rep.skipped_existing, "per_file": rep.per_file})
+    return 0
+
+
 def cmd_verify(_args) -> int:
     ok, msg = Ledger().verify()
     print(msg)
@@ -152,6 +160,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("children").set_defaults(fn=cmd_children)
     p = sub.add_parser("names"); p.add_argument("n", nargs="?", type=int, default=5); p.set_defaults(fn=cmd_names)
     p = sub.add_parser("ledger"); p.add_argument("--kind"); p.add_argument("-n", type=int, default=30); p.set_defaults(fn=cmd_ledger)
+    sub.add_parser("ingest").set_defaults(fn=cmd_ingest)
     sub.add_parser("verify").set_defaults(fn=cmd_verify)
     return ap
 
