@@ -773,6 +773,34 @@
   preregistered: true
   trials_run: 2
 
+- id: kalshi-funding-carry-us
+  title: "Carry the alive funding-carry idea to US venues: short a Kalshi perp whose funding runs high, hedge with spot"
+  source: "funding-carry (alive, but on Hyperliquid, closed to US persons); carry-us (killed on Coinbase perps); Kalshi funding prints 2026-06 to 2026-10 (BTC +8%/yr; SOL, XRP, LINK, ZEC +29-36%/yr over the last 14 days); Alpaca crypto spot and ETFs as the hedge leg"
+  claim: "On Kalshi crypto perps with at least 60 days of funding prints, when the trailing 14-day funding annualises above 8%, the next 14 days' funding collected by a short exceeds the round-trip cost of a hedged pair (perp 2 x 4 bp, spot hedge 2 x 25 bp at Alpaca crypto rates) plus the perp/spot basis change, so the hedged short earns > 0 per 14-day hold."
+  test: "cryptobot.kalshi_carry_study: per perp and day, trailing 14-day funding (annualised) and the next 14 days' funding sum; persistence = OLS of next on trailing (pooled, t clustered by date); the rule's hedged return = next-14-day funding + (short perp return - long spot return) - 58 bp, non-overlapping 14-day holds; spot from Coinbase daily closes, perp from Kalshi hourly closes at 00:00 UTC. Trials: 1 rule (threshold 8%), persistence reported."
+  success: "Written before running: CANDIDATE for a paper pair (Kalshi short + Alpaca paper spot) if the rule nets > 0 per hold with t >= 2.0 over >= 15 holds and the persistence slope is positive at t >= 2.5; KILLED if net per hold is negative. Otherwise inconclusive; four months of prints is short and the verdict is read again at 2027-01."
+  data: "scratch funding/kalshi_funding.json, state_collect/kalshi_hourly/<PERP>.jsonl, btc5m/<COIN>_5m.json (Coinbase)"
+  result: "Run 2026-10-14 on 112-133 days of Kalshi funding prints for 11 crypto perps. Mean funding: BTC +8.2%/yr, XRP +6.1%, SOL +4.2%, LINK +3.3%, DOGE +0.6%; ETH, SHIB, LTC, BCH, SUI, NEAR negative. Funding persists: next 14 days on trailing 14 days, slope +0.64 (t 5.1, 1,109 overlapping windows). The rule (trailing > 8%/yr, 14-day hedged hold, 58 bp) had 10 non-overlapping holds (BTC 5, XRP 4, SOL 1): funding collected +0.46% a hold, perp/spot basis -0.02%, net -0.15% (t -1.5, 3 of 10 positive). Killed as written: 8-17%/yr for two weeks does not pay a 58 bp round trip whose 50 bp is the Alpaca crypto spot hedge. Follow-up pre-registered on forward data with an ETF hedge and long holds (kalshi-btc-carry-etf-hedge)"
+  verdict: killed
+  regime: "2026-06 to 2026-10: Kalshi funding is mostly zero and persistent where positive (BTC, XRP); too small for a 14-day hedged hold at crypto-spot hedge costs"
+  rerun: "python -m cryptobot.kalshi_carry_study --scratch <dir>"
+  preregistered: true
+  trials_run: 1
+
+- id: kalshi-btc-carry-etf-hedge
+  title: "Forward test: short the Kalshi BTC perp against long IBIT while BTC funding runs positive, held until it stops"
+  source: "kalshi-funding-carry-us (killed as a 14-day hold with a 58 bp crypto-spot hedge; funding persists, slope +0.64, t 5.1; BTC +8.2%/yr over 133 days)"
+  claim: "From 2026-10-15, holding a short KXBTCPERP and a dollar-matched long IBIT position (rebalanced when the legs drift more than 5% apart) while the trailing 14-day BTC funding is above +4%/yr, and flat otherwise, earns funding minus IBIT's 0.25%/yr fee, the perp's 2 x 4 bp, IBIT's spread (about 1 bp a side) and the basis, > 0 over 120 days."
+  test: "Paper only: both legs marked daily from the Kalshi hourly closes, the Kalshi funding prints and IBIT daily closes (Alpaca paper fills when the pilot is wired); the hedge's tracking error (perp vs IBIT x BTC-per-share) reported by day; 1 trial, no parameter changes."
+  success: "Written before any forward data: after 120 days, CANDIDATE if the pair nets >= +2%/yr on the capital in both legs with the daily tracking-error sd under 0.5%; KILLED if it nets below zero. A candidate then runs on paper with real Alpaca paper fills for 60 days before real money."
+  data: "state/kalshi_hourly, the funding collector, IBIT daily closes"
+  result: "PRE-REGISTERED 2026-10-14; forward from 2026-10-15; read 2027-02"
+  verdict: inconclusive
+  regime: "collecting"
+  rerun: "python -m cryptobot.kalshi_carry_study --scratch <dir> (the forward ETF-hedged variant is read from the same funding files)"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
