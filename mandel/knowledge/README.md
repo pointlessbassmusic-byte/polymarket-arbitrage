@@ -18,3 +18,5 @@ tooling reads: `**Coverage confidence:** 0.NN` and `**Rating: <quality>.**` at t
 "Evidence quality". `python -m mandel ingest` turns the "What Mandel adopts", "What Mandel holds
 loosely or rejects" and "Design implications" bullets into candidate insights with provenance
 `src:NN` / `adj:AN`; `python -m mandel graph` rebuilds the signal map from the same files.
+
+`SOCIAL-SOURCES.md` (2026-10-14): 36 verified sentiment / attention / flow / congress / crypto sources by priority (now, with-key, later, avoid), the daily collection plan and the controls every predictive use must pass. The theories they feed are T-38 to T-47 in `../theories/THEORIES.md`.
