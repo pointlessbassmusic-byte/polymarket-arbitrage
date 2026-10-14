@@ -731,6 +731,20 @@
   preregistered: true
   trials_run: 0
 
+- id: kalshi-perps-maker-taker
+  title: "Maker vs taker on Kalshi perps (crypto, then index and metals): does posting liquidity earn more than the fee after adverse selection, and does taker order flow predict the next minutes?"
+  source: "operator direction 2026-10-14 (maker vs taker vs other prediction scenarios); polymarket-maker-fair-value (killed: fills arrive when the price moves against you); carry-maker-spot (adopted on an assumed maker fill); Kalshi perps fees 4 bp taker / 2 bp maker; the public trade tape with taker side (cryptobot.perp_tape)"
+  claim: "(1) MAKER: on each Kalshi perp, the liquidity provider's markout on real fills (maker side = opposite the taker; fair value = median of the next 5 trade prices after t + h) exceeds the 2 bp maker fee at h = 60 s and 300 s, so quoting at the touch earns after adverse selection. (2) FLOW: net taker-signed volume over the last 5 and 30 minutes predicts the next 5- and 30-minute return with the same sign, by more than a maker round trip (4 bp)."
+  test: "cryptobot.maker_taker_study on 30 days of tape per ticker (KXDOGEPERP, KXKSHIBPERP, KXBTCPERP, KXETHPERP, KXSOLPERP, KXXRPPERP, KXUS500PERP, KXGOLDPERP, KXSILVERPERP). Maker markout in bp of price, contract-weighted, at 10 s, 60 s, 300 s, 1,800 s; t clustered by hour; halves by date; split by trade size (top decile vs rest) and by UTC 13-17 vs other hours (descriptive). Taker effective cost = taker's markout at 10 s (half-spread plus impact). Flow: Newey-West OLS of the next 5- and 30-minute trade-price return on the standardised net signed contracts of the prior 5 and 30 minutes, on a 5-minute grid; a sign rule net of 4 bp (maker in and out) and 12 bp (taker). Trials: maker 9 tickers x 2 horizons (60 s, 300 s) = 18; flow 9 x 2 = 18; total 36."
+  success: "Written before running: MAKER candidate on a ticker if net markout (after 2 bp) at 300 s is >= +1 bp with cluster t >= 2.5 and both halves positive; then a paper quoting bot on that ticker (inventory capped, both sides at the touch) for 14 days measured against the tape. MAKER killed on a ticker if net markout is negative at both horizons. FLOW candidate if the sign rule nets >= +4 bp a trade at t >= 2.5 with both halves positive at the maker cost; killed if the coefficient has the wrong sign in both halves. Otherwise inconclusive."
+  data: "scratch tape_state/tape/<TICKER>.jsonl (Kalshi public /margin/trades, 30 days)"
+  result: "PRE-REGISTERED 2026-10-14; tape pull running"
+  verdict: inconclusive
+  regime: "pending"
+  rerun: "python -m cryptobot.perp_tape --state <dir> --days 30 && python -m cryptobot.maker_taker_study --state <dir>"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
@@ -793,7 +807,7 @@
   test: "Replay as for kraken-margin-venue with the fee per side = $0.15 / contract notional and no borrow: 1,000-DOGE contract (~18 bp a side) and 100-DOGE (~176 bp a side)."
   success: "Written before running: replay within 0.5 points of Kalshi per trade at the actual contract size, AND a documented API that a retail key can trade; both are needed before any executor is written."
   data: "state/hl_daily_us3.pkl"
-  result: "At ~18 bp a side +1.64%/trade (on $250: +6.5/+7.2/+23.5/+45.8/-2.8%, max drawdown -17%) vs Kalshi +1.92%; at ~176 bp the bot's own cost gate refuses every entry. Contract size is inferred from Bitnomial's product names, not confirmed; Kraken documents no API for US perps (its futures API pages cover the non-US platform). No executor written"
+  result: "At ~18 bp a side +1.64%/trade (on $250: +6.5/+7.2/+23.5/+45.8/-2.8%, max drawdown -17%) vs Kalshi +1.92%; at ~176 bp the bot's own cost gate refuses every entry. Contract size is inferred from Bitnomial's product names, not confirmed; Kraken documents no API for US perps (its futures API pages cover the non-US platform). No executor written | Update 2026-10-14 (official Kraken support pages and blog): Kraken Derivatives US launched 2026-06-15 on Bitnomial via NinjaTrader Clearing, CFTC-registered; 16 perps (BTC, ETH, SOL, XRP, DOGE, SHIB, ADA, LINK, LTC, AVAX, AAVE, BCH, DOT, HBAR, XLM, XTZ), USD collateral, funding every 8h, daily cash settlement 3pm CT; fee $0.15 per contract per side (about 1.2-2.8 bp); contract sizes BTC 0.01 (~$833), ETH 0.5 (~$1,250), SOL 5 (~$534), too large to size at $1,000 on the majors; leverage and minimums unpublished. No documented API for the US perps (the public Futures API covers the non-US platform). Versus Kalshi, adds AVAX, DOT, HBAR, XLM, XTZ and a second venue for the shared coins. Kraken Pro spot 40/80 bp maker/taker under $2.5k a month (25 bp / 40 bp tiers need volume); US spot margin up to 10x since 2026-05 at 0.02-0.04% open plus the same per 4 hours (44-88%/yr); xStocks closed to US residents; Kraken US equities are executed by Alpaca. MetaMask: Swaps 0.875% plus gas; MetaMask Perps run on Hyperliquid and are not available in the USA; Ondo tokenized stocks not available to US users; no trading API. Deciding test: a trade-only, no-withdrawal API key for Kraken US perps; without one, Kraken is out"
   verdict: inconclusive
   regime: "pending: confirm PDOGUK / PSHBUN contract sizes on the Kraken Pro contract page and whether Kraken Pro API keys can trade US perps"
   rerun: "python -m cryptobot.perp_bot --replay state/hl_daily_us3.pkl --replay-from 2022-01-01 --venue kalshi (then set taker_fee to 0.15 / contract notional)"
