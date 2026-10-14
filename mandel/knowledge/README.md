@@ -20,3 +20,5 @@ loosely or rejects" and "Design implications" bullets into candidate insights wi
 `src:NN` / `adj:AN`; `python -m mandel graph` rebuilds the signal map from the same files.
 
 `SOCIAL-SOURCES.md` (2026-10-14): 36 verified sentiment / attention / flow / congress / crypto sources by priority (now, with-key, later, avoid), the daily collection plan and the controls every predictive use must pass. The theories they feed are T-38 to T-47 in `../theories/THEORIES.md`.
+
+`VENUES.md`, `OPTIONS-STRATEGIES.md`, `UNDERLYING-STRATEGIES.md` (2026-10-14): the venue registry (every US-accessible API venue by asset class, docs-verified) and the two strategy libraries, rendered from `../data/venues.json`, `../options/strategies.json` and `../strategies/underlying.json`. Each strategy is a theory T-100+ (options) or T-300+ (underlying) in `../theories/THEORIES.md`; the payoff engine in `../options/` draws any options template.
