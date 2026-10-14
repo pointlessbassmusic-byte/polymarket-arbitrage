@@ -1,11 +1,11 @@
 {
 "generated_for": "Mandel signal map",
 "stats": {
-"nodes": 75,
-"edges": 458,
-"documents": 12,
+"nodes": 84,
+"edges": 676,
+"documents": 21,
 "layers": {
-"substrate": 14,
+"substrate": 23,
 "concepts": 41,
 "principles": 13,
 "centres": 7
@@ -358,6 +358,21 @@
 }
 },
 {
+"id": "src:08",
+"label": "Application of Linear Algebra (Fractals), by Nabil",
+"layer": 0,
+"kind": "source",
+"size": 2.0,
+"group": "provided",
+"detail": "08-nabil-application-of-linear-algebra-fractals.md",
+"meta": {
+"file": "mandel/knowledge/sources/08-nabil-application-of-linear-algebra-fractals.md",
+"coverage": 0.3,
+"quality": "",
+"words": 624
+}
+},
+{
 "id": "src:09",
 "label": "Asher Roberts — Linear Algebra 10.11 Fractals (Anton–Rorres–",
 "layer": 0,
@@ -433,16 +448,136 @@
 }
 },
 {
+"id": "src:14",
+"label": "I Built an INSANELY Profitable Claude AI Trading Bot (Full G",
+"layer": 0,
+"kind": "source",
+"size": 2.0,
+"group": "provided",
+"detail": "14-daviddtech-claude-trading-bot-guide.md",
+"meta": {
+"file": "mandel/knowledge/sources/14-daviddtech-claude-trading-bot-guide.md",
+"coverage": 0.3,
+"quality": "",
+"words": 700
+}
+},
+{
+"id": "src:15",
+"label": "Fractals are typically not self-similar (3Blue1Brown)",
+"layer": 0,
+"kind": "source",
+"size": 2.0,
+"group": "provided",
+"detail": "15-3blue1brown-fractals-not-self-similar.md",
+"meta": {
+"file": "mandel/knowledge/sources/15-3blue1brown-fractals-not-self-similar.md",
+"coverage": 0.7,
+"quality": "",
+"words": 942
+}
+},
+{
+"id": "src:16",
+"label": "John Hubbard: The Structure of the Mandelbrot Set (Cornell l",
+"layer": 0,
+"kind": "source",
+"size": 2.0,
+"group": "provided",
+"detail": "16-hubbard-structure-of-the-mandelbrot-set.md",
+"meta": {
+"file": "mandel/knowledge/sources/16-hubbard-structure-of-the-mandelbrot-set.md",
+"coverage": 0.45,
+"quality": "",
+"words": 1457
+}
+},
+{
+"id": "adj:A1",
+"label": "Darwin Gödel Machine: Open-Ended Evolution of Self-Improving",
+"layer": 0,
+"kind": "source",
+"size": 2.0,
+"group": "adjacent",
+"detail": "A1-darwin-godel-machine.md",
+"meta": {
+"file": "mandel/knowledge/adjacent/A1-darwin-godel-machine.md",
+"coverage": null,
+"quality": "",
+"words": 1304
+}
+},
+{
+"id": "adj:A2",
+"label": "AlphaEvolve: A coding agent for scientific and algorithmic d",
+"layer": 0,
+"kind": "source",
+"size": 2.0,
+"group": "adjacent",
+"detail": "A2-alphaevolve.md",
+"meta": {
+"file": "mandel/knowledge/adjacent/A2-alphaevolve.md",
+"coverage": null,
+"quality": "",
+"words": 925
+}
+},
+{
+"id": "adj:A3",
+"label": "Agentic Context Engineering: Evolving Contexts for Self-Impr",
+"layer": 0,
+"kind": "source",
+"size": 2.0,
+"group": "adjacent",
+"detail": "A3-agentic-context-engineering.md",
+"meta": {
+"file": "mandel/knowledge/adjacent/A3-agentic-context-engineering.md",
+"coverage": null,
+"quality": "",
+"words": 926
+}
+},
+{
+"id": "adj:A4",
+"label": "A Multifractal Model of Asset Returns (MMAR), and its estima",
+"layer": 0,
+"kind": "source",
+"size": 2.0,
+"group": "adjacent",
+"detail": "A4-mandelbrot-multifractal-model.md",
+"meta": {
+"file": "mandel/knowledge/adjacent/A4-mandelbrot-multifractal-model.md",
+"coverage": null,
+"quality": "",
+"words": 1388
+}
+},
+{
+"id": "adj:A5",
+"label": "Approaching Human-Level Forecasting with Language Models",
+"layer": 0,
+"kind": "source",
+"size": 2.0,
+"group": "adjacent",
+"detail": "A5-halawi-llm-forecasting.md",
+"meta": {
+"file": "mandel/knowledge/adjacent/A5-halawi-llm-forecasting.md",
+"coverage": null,
+"quality": "",
+"words": 995
+}
+},
+{
 "id": "k:affine_ifs",
 "label": "Affine maps & IFS",
 "layer": 1,
 "kind": "concept",
-"size": 3.1356005054539455,
+"size": 3.3242476210246794,
 "group": "fractal",
 "detail": "Fractals",
 "meta": {
-"mentions": 47,
-"documents": 5,
+"mentions": 69,
+"documents": 9,
 "excerpts": [
 {
 "src": "src:04",
@@ -451,6 +586,10 @@
 {
 "src": "src:07",
 "text": "09 (Roberts, linear algebra and fractals): Iterated affine maps converge to an attractor regardless of the start; gradient descent on a convex loss does the same, and on a non-convex MLP loss it does not, which is why seeds …"
+},
+{
+"src": "src:08",
+"text": "Date researched: 2026-10-14. Coverage confidence: 0.30. Only the title and channel are confirmed (oEmbed). No transcript, description or third-party summary could be reached from this container. The video almost certainly …"
 },
 {
 "src": "src:09",
@@ -463,6 +602,14 @@
 {
 "src": "src:13",
 "text": "08 (Nabil, linear algebra applied to fractals; sibling file pending): iterated affine maps converge to an attractor the way `A^n` converges to the stationary distribution; weak link."
+},
+{
+"src": "src:15",
+"text": "The mathematics is standard and correct in its sources: the similarity dimension log N / log(1/r) (Moran, Hutchinson), the Minkowski–Bouligand box-counting dimension, the inequalities relating Hausdorff and box dimensions, and …"
+},
+{
+"src": "src:15",
+"text": "08, 09 (IFS): the self-similar examples whose dimension formula log k / log(1/s) the video starts from; 09 gives the theorem and the non-overlap condition."
 }
 ]
 }
@@ -472,12 +619,12 @@
 "label": "Agents, tools, MCP",
 "layer": 1,
 "kind": "concept",
-"size": 3.2302215052732093,
+"size": 3.271567363195766,
 "group": "substrate",
 "detail": "Substrate",
 "meta": {
-"mentions": 57,
-"documents": 6,
+"mentions": 62,
+"documents": 10,
 "excerpts": [
 {
 "src": "src:04",
@@ -502,6 +649,14 @@
 {
 "src": "src:13",
 "text": "Creator: AI Pathways (YouTube @AIPathwaysChannel), hosted by Brendan Li: UCLA graduate, former technology investment banker, runs the paid Skool community \"AI Pathways\" ($149/month, 428 members on the day of research; the …"
+},
+{
+"src": "src:14",
+"text": "Date researched: 2026-10-14. Coverage confidence: 0.30. Title and channel confirmed via oEmbed; the transcript, description and any companion post were not reachable, and web search returned only similar guides by other creators …"
+},
+{
+"src": "adj:A1",
+"text": "Safety: sandboxed execution, time limits, monitoring of code changes, traceable lineage. The authors found \"no evidence of harmful or malicious behavior\". Their blog and press coverage describe a separate experiment where, asked …"
 }
 ]
 }
@@ -558,12 +713,12 @@
 "label": "Attention / transformers",
 "layer": 1,
 "kind": "concept",
-"size": 3.125073800855029,
+"size": 3.156011502714073,
 "group": "learning",
 "detail": "Learning",
 "meta": {
-"mentions": 46,
-"documents": 7,
+"mentions": 49,
+"documents": 8,
 "excerpts": [
 {
 "src": "src:01",
@@ -592,6 +747,10 @@
 {
 "src": "src:11",
 "text": "Coverage confidence: 0.75. The watch page and transcript APIs are blocked from this container, so the video was not viewed. Confirmed from Veritasium's own page: title, chapter list with timestamps, credited experts, that a …"
+},
+{
+"src": "adj:A5",
+"text": "System: an LM writes search queries (query expansion plus sub-question decomposition, unioned); articles come from NewsCatcher and Google News; GPT-3.5 rates relevance from the title and first 250 words (about 70% cost saving); …"
 }
 ]
 }
@@ -601,16 +760,20 @@
 "label": "Attractors & fixed points",
 "layer": 1,
 "kind": "concept",
-"size": 3.018793079863193,
+"size": 3.1143206982445477,
 "group": "fractal",
 "detail": "Fractals",
 "meta": {
-"mentions": 37,
-"documents": 5,
+"mentions": 45,
+"documents": 7,
 "excerpts": [
 {
 "src": "src:07",
 "text": "09 (Roberts, linear algebra and fractals): Iterated affine maps converge to an attractor regardless of the start; gradient descent on a convex loss does the same, and on a non-convex MLP loss it does not, which is why seeds …"
+},
+{
+"src": "src:08",
+"text": "An iterated function system (IFS) is a finite set of contracting affine maps T₁ … T_k. Applying all of them to a set and taking the union, repeatedly, converges to a unique attractor regardless of the starting set (Hutchinson). …"
 },
 {
 "src": "src:09",
@@ -627,6 +790,10 @@
 {
 "src": "src:13",
 "text": "10 (Batra, linear algebra for ML) and 09 (Roberts, linear algebra and fractals): the stationary distribution is an eigenvector; matrix powers converging to it are the iterated-map-to-attractor picture of 09; the covariance-type …"
+},
+{
+"src": "src:16",
+"text": "08, 09 (iterated function systems): M is not an IFS attractor and is only quasi-self-similar; 09's warning that the similarity-dimension formula does not apply here is correct."
 }
 ]
 }
@@ -667,12 +834,12 @@
 "label": "Backtesting discipline",
 "layer": 1,
 "kind": "concept",
-"size": 3.656327442868026,
+"size": 3.7217125584596236,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 135,
-"documents": 11,
+"mentions": 154,
+"documents": 16,
 "excerpts": [
 {
 "src": "src:01",
@@ -714,12 +881,12 @@
 "label": "Bayesian updating / priors",
 "layer": 1,
 "kind": "concept",
-"size": 2.5862943611198905,
+"size": 2.6722194895832203,
 "group": "prediction",
 "detail": "Prediction",
 "meta": {
-"mentions": 15,
-"documents": 7,
+"mentions": 18,
+"documents": 10,
 "excerpts": [
 {
 "src": "src:02",
@@ -748,6 +915,10 @@
 {
 "src": "src:13",
 "text": "What an HMM is, as the genre teaches it. [bg] A hidden state `s_t ∈ {1..K}` follows a Markov chain with transition matrix `A` (`A[i,j] = P(s_{t+1}=j | s_t=i)`, rows sum to 1); the observed daily return `r_t` is drawn from a …"
+},
+{
+"src": "adj:A3",
+"text": "`Insight` gains `helpful: int`, `harmful: int`; `ProposalBook.decide` increments them for every insight in `depends_on_insights`; `update_confidence` can be driven by a Beta posterior over the counters."
 }
 ]
 }
@@ -757,12 +928,12 @@
 "label": "Calibration",
 "layer": 1,
 "kind": "concept",
-"size": 2.789026915173973,
+"size": 2.916993602242573,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 23,
-"documents": 7,
+"mentions": 30,
+"documents": 9,
 "excerpts": [
 {
 "src": "src:01",
@@ -791,6 +962,10 @@
 {
 "src": "src:10",
 "text": "Similarity is an angle, measured against a same-model baseline. Deduplicate insights, cluster children's claims and detect near-identical strategy variants by cosine similarity with thresholds calibrated on the angle distribution …"
+},
+{
+"src": "src:15",
+"text": "Define by a scaling law, then measure by a procedure. The video's method is: generalise a concept through a property that survives generalisation (measure ∝ s^D), then supply a measurement procedure (box counting) that returns …"
 }
 ]
 }
@@ -843,12 +1018,12 @@
 "label": "Resource cost & budgets",
 "layer": 1,
 "kind": "concept",
-"size": 2.9776740307447067,
+"size": 3.068834809141684,
 "group": "substrate",
 "detail": "Substrate",
 "meta": {
-"mentions": 34,
-"documents": 8,
+"mentions": 41,
+"documents": 12,
 "excerpts": [
 {
 "src": "src:01",
@@ -890,12 +1065,12 @@
 "label": "Edge vs the market price",
 "layer": 1,
 "kind": "concept",
-"size": 3.1944920232821374,
+"size": 3.2948273710132128,
 "group": "markets",
 "detail": "Markets",
 "meta": {
-"mentions": 53,
-"documents": 8,
+"mentions": 65,
+"documents": 14,
 "excerpts": [
 {
 "src": "src:01",
@@ -1003,12 +1178,12 @@
 "label": "Feedback loops",
 "layer": 1,
 "kind": "concept",
-"size": 2.442453324894,
+"size": 2.4824746787307683,
 "group": "learning",
 "detail": "Learning",
 "meta": {
-"mentions": 11,
-"documents": 5,
+"mentions": 12,
+"documents": 6,
 "excerpts": [
 {
 "src": "src:04",
@@ -1029,6 +1204,10 @@
 {
 "src": "src:12",
 "text": "Trade review as a feedback loop. A companion video is devoted to using Claude to review one's own trades (chapters: system setup, results, architecture, prompts), and the community's \"performance tracking\" course track is …"
+},
+{
+"src": "adj:A2",
+"text": "Precondition and limits: \"The main limitation of AlphaEvolve is that it handles problems for which it is possible to devise an automated evaluator.\" Natural sciences with only partly simulable experiments are harder. LLM-graded …"
 }
 ]
 }
@@ -1038,12 +1217,12 @@
 "label": "Fees, slippage, liquidity",
 "layer": 1,
 "kind": "concept",
-"size": 2.7222612188617115,
+"size": 2.829048269010741,
 "group": "markets",
 "detail": "Markets",
 "meta": {
-"mentions": 20,
-"documents": 4,
+"mentions": 25,
+"documents": 7,
 "excerpts": [
 {
 "src": "src:01",
@@ -1060,6 +1239,22 @@
 {
 "src": "src:13",
 "text": "The genre's backtest, where it has one. [genre] Expanding-window walk-forward: at each day `t`, fit the transition matrix on all labels before `t` (minimum 252 days), take the position at the close of `t`, score it on `t+1`'s …"
+},
+{
+"src": "src:14",
+"text": "The genre's failure modes become Mandel's checklist for any claimed result, including the children's: in-sample equity curves; no fee, slippage or spread model; survivorship (only the configuration that worked is shown); short …"
+},
+{
+"src": "src:15",
+"text": "Box counting as a coverage diagnostic for Mandel itself (Mandel's inference, hold loosely). Treat the space of prediction-market questions as a grid (category × horizon × platform × liquidity bucket) and count \"boxes touched\" by …"
+},
+{
+"src": "adj:A2",
+"text": "Evolve-blocks. Each improvable component (edge estimator, sizing rule, fee model, calibration layer, the children's prompts) gets an explicit boundary; proposals may change only what is inside it. The skeleton, the gate and the …"
+},
+{
+"src": "adj:A3",
+"text": "Treating the Reflector as a single model call: Mandel's reflection on a failed proposal is a pre-registered checklist (look-ahead? fees? regime?) before any free-form reasoning."
 }
 ]
 }
@@ -1100,12 +1295,12 @@
 "label": "Fractal dimension / roughness",
 "layer": 1,
 "kind": "concept",
-"size": 3.1756218592907137,
+"size": 3.4386684072391036,
 "group": "fractal",
 "detail": "Fractals",
 "meta": {
-"mentions": 51,
-"documents": 12,
+"mentions": 87,
+"documents": 17,
 "excerpts": [
 {
 "src": "src:01",
@@ -1136,8 +1331,8 @@
 "text": "15 (3Blue1Brown, fractals are typically not self-similar): Detail at every scale is the data-side version of unbounded capacity: a model can always find more structure to fit; the question the validation set answers is whether …"
 },
 {
-"src": "src:09",
-"text": "Definition 10.11.1 (self-similar set). A closed, bounded S ⊂ R² is self-similar if S = S₁ ∪ S₂ ∪ ... ∪ S_k where the S_i are *nonoverlapping* (they may touch along boundaries but share no interior area) and each S_i is congruent …"
+"src": "src:08",
+"text": "The matrices encode the self-similarity: each piece of the attractor is the image of the whole under one map, so the picture is the fixed point of a linear-algebraic operation on sets."
 }
 ]
 }
@@ -1147,12 +1342,12 @@
 "label": "Gradient descent",
 "layer": 1,
 "kind": "concept",
-"size": 2.6978661367769954,
+"size": 2.7222612188617115,
 "group": "learning",
 "detail": "Learning",
 "meta": {
-"mentions": 19,
-"documents": 4,
+"mentions": 20,
+"documents": 5,
 "excerpts": [
 {
 "src": "src:04",
@@ -1169,6 +1364,10 @@
 {
 "src": "src:13",
 "text": "05 (3Blue1Brown, neural networks): EM is the other great fitting algorithm beside gradient descent; both find local optima from random starts, and the \"several restarts, keep the best\" discipline is shared. Latent-state inference …"
+},
+{
+"src": "adj:A2",
+"text": "05, 07 (neural networks): gradient descent is also a loop of propose-evaluate-keep; AlphaEvolve replaces the gradient with an LLM and the loss with any evaluator."
 }
 ]
 }
@@ -1274,12 +1473,12 @@
 "label": "Linear algebra",
 "layer": 1,
 "kind": "concept",
-"size": 3.885319014063831,
+"size": 3.9035858857300596,
 "group": "mathematics",
 "detail": "Mathematics",
 "meta": {
-"mentions": 214,
-"documents": 8,
+"mentions": 222,
+"documents": 10,
 "excerpts": [
 {
 "src": "src:04",
@@ -1292,6 +1491,10 @@
 {
 "src": "src:07",
 "text": "Without a nonlinearity the stack collapses. [title][bg] If g is the identity, ŷ = W₂(W₁x + b₁) + b₂ = (W₂W₁)x + (W₂b₁ + b₂), a single linear map. Google's phrasing: \"Linear calculations performed on the output of linear …"
+},
+{
+"src": "src:08",
+"text": "An affine transformation of the plane is T(x) = Ax + b with a 2×2 matrix A and a translation b: six numbers that rotate, scale, shear and shift."
 },
 {
 "src": "src:09",
@@ -1308,10 +1511,6 @@
 {
 "src": "src:12",
 "text": "09 (Roberts, linear algebra and fractals) and 10 (Batra, seven linear-algebra ideas): the dial space is a high-dimensional parameter grid; random sampling of 25,000 from 258M is an unbiased but very sparse search, and the …"
-},
-{
-"src": "src:13",
-"text": "What an HMM is, as the genre teaches it. [bg] A hidden state `s_t ∈ {1..K}` follows a Markov chain with transition matrix `A` (`A[i,j] = P(s_{t+1}=j | s_t=i)`, rows sum to 1); the observed daily return `r_t` is drawn from a …"
 }
 ]
 }
@@ -1321,12 +1520,12 @@
 "label": "Look-ahead & leakage",
 "layer": 1,
 "kind": "concept",
-"size": 3.1356005054539455,
+"size": 3.2302215052732093,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 47,
-"documents": 10,
+"mentions": 57,
+"documents": 13,
 "excerpts": [
 {
 "src": "src:01",
@@ -1368,12 +1567,12 @@
 "label": "Mandelbrot & Julia sets",
 "layer": 1,
 "kind": "concept",
-"size": 2.4824746787307683,
+"size": 3.080600057846781,
 "group": "fractal",
 "detail": "Fractals",
 "meta": {
-"mentions": 12,
-"documents": 8,
+"mentions": 42,
+"documents": 12,
 "excerpts": [
 {
 "src": "src:04",
@@ -1392,6 +1591,10 @@
 "text": "16 (Hubbard, structure of the Mandelbrot set): The escape-time ground truth is exactly computable and forbidden to the learner; that prohibition is the no-look-ahead rule, and the embargo in `walk_forward_splits` is its …"
 },
 {
+"src": "src:08",
+"text": "A small demo in the signal map's logo already renders the Mandelbrot set; an IFS fern is not needed."
+},
+{
 "src": "src:09",
 "text": "16 (Mandelbrot set structure). A contrast, not an overlap: the Mandelbrot set is not an IFS attractor and is only quasi-self-similar (its small copies are distorted, not congruent), so none of 09's formulas apply to it. …"
 },
@@ -1402,10 +1605,6 @@
 {
 "src": "src:12",
 "text": "15 (3Blue1Brown, fractals are typically not self-similar) and 16 (Hubbard, structure of the Mandelbrot set): weak link only. The survivors here were simple rules that fire frequently at every scale of the day, while the complex, …"
-},
-{
-"src": "src:13",
-"text": "15 (3Blue1Brown, fractals are not self-similar) and 16 (Hubbard, Mandelbrot set): volatility clustering is better described by multifractal (continuous, scale-dependent) roughness than by a few discrete states; an HMM is a …"
 }
 ]
 }
@@ -1415,12 +1614,12 @@
 "label": "Markov chains",
 "layer": 1,
 "kind": "concept",
-"size": 3.602010522366628,
+"size": 3.656327442868026,
 "group": "prediction",
 "detail": "Prediction",
 "meta": {
-"mentions": 121,
-"documents": 8,
+"mentions": 135,
+"documents": 13,
 "excerpts": [
 {
 "src": "src:04",
@@ -1462,12 +1661,12 @@
 "label": "Memory / knowledge base",
 "layer": 1,
 "kind": "concept",
-"size": 3.415408399421657,
+"size": 3.517364494114818,
 "group": "substrate",
 "detail": "Substrate",
 "meta": {
-"mentions": 83,
-"documents": 10,
+"mentions": 102,
+"documents": 15,
 "excerpts": [
 {
 "src": "src:01",
@@ -1509,12 +1708,12 @@
 "label": "Monte Carlo / bootstrap",
 "layer": 1,
 "kind": "concept",
-"size": 3.044439727056968,
+"size": 3.10333124488516,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 39,
-"documents": 7,
+"mentions": 44,
+"documents": 9,
 "excerpts": [
 {
 "src": "src:01",
@@ -1543,6 +1742,10 @@
 {
 "src": "src:12",
 "text": "His backtesting procedure, from the 25,000-strategy test: take a discretionary methodology (ICT \"Silver Bullet\": liquidity sweep, displacement, fair value gap), convert every judgment call into an explicit adjustable parameter …"
+},
+{
+"src": "src:15",
+"text": "Fit power laws in log space and report the slope with its range. Raw counts that \"look parabolic\" are unreadable; log N against log s is a straight line whose slope is the quantity of interest. Every exponent Mandel reports (edge …"
 }
 ]
 }
@@ -1552,12 +1755,12 @@
 "label": "Multifractal time / fat tails",
 "layer": 1,
 "kind": "concept",
-"size": 2.1729550745276565,
+"size": 2.9776740307447067,
 "group": "markets",
 "detail": "Markets",
 "meta": {
-"mentions": 6,
-"documents": 3,
+"mentions": 34,
+"documents": 6,
 "excerpts": [
 {
 "src": "src:01",
@@ -1570,6 +1773,22 @@
 {
 "src": "src:13",
 "text": "15 (3Blue1Brown, fractals are not self-similar) and 16 (Hubbard, Mandelbrot set): volatility clustering is better described by multifractal (continuous, scale-dependent) roughness than by a few discrete states; an HMM is a …"
+},
+{
+"src": "src:15",
+"text": "Hold loosely \"Non-integer dimension ⇔ Roughness\" as an equivalence. It is a good one-line reading for curves in the plane, where dimension 1 means smooth and values towards 2 mean area-filling, but roughness in time series is …"
+},
+{
+"src": "src:15",
+"text": "11 (Markov) and A4 (multifractal markets): Brownian paths have dimension 1.5; multifractal time is what makes real price paths rougher at some times than others."
+},
+{
+"src": "src:16",
+"text": "A4 (Mandelbrot's multifractal markets): the same author's programme applied to time series; the cascade's multipliers play the role of the quadratic map."
+},
+{
+"src": "adj:A4",
+"text": "Authors / kind: Benoit Mandelbrot, Adlai Fisher, Laurent Calvet. Cowles Foundation Discussion Paper 1164, September 1997 (paper). Read together with Calvet & Fisher, \"Regime-Switching and the Estimation of Multifractal Processes\" …"
 }
 ]
 }
@@ -1602,12 +1821,12 @@
 "label": "Overfitting & generalisation",
 "layer": 1,
 "kind": "concept",
-"size": 3.8020033435383978,
+"size": 3.8441335153472673,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 181,
-"documents": 12,
+"mentions": 197,
+"documents": 18,
 "excerpts": [
 {
 "src": "src:01",
@@ -1649,12 +1868,12 @@
 "label": "Prediction markets",
 "layer": 1,
 "kind": "concept",
-"size": 2.3512925464970227,
+"size": 2.442453324894,
 "group": "markets",
 "detail": "Markets",
 "meta": {
-"mentions": 9,
-"documents": 4,
+"mentions": 11,
+"documents": 5,
 "excerpts": [
 {
 "src": "src:07",
@@ -1671,6 +1890,10 @@
 {
 "src": "src:13",
 "text": "Regime is a first-class latent variable in the substrate. Because mispricings, spreads, fill rates and news flow on Polymarket and Kalshi cluster in time, and a strategy's edge measured without conditioning on regime is an …"
+},
+{
+"src": "adj:A5",
+"text": "Data: 48,754 questions and 7,174,607 user forecasts (2015–2024) from Metaculus, Good Judgment Open, INFER, Polymarket and Manifold; after curation 5,516 binary questions (3,762 train, 840 validation, 914 test). The test set holds …"
 }
 ]
 }
@@ -1680,12 +1903,12 @@
 "label": "Proper scoring rules",
 "layer": 1,
 "kind": "concept",
-"size": 3.1944920232821374,
+"size": 3.287193634947818,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 53,
-"documents": 12,
+"mentions": 64,
+"documents": 15,
 "excerpts": [
 {
 "src": "src:01",
@@ -1727,12 +1950,12 @@
 "label": "Provenance & audit",
 "layer": 1,
 "kind": "concept",
-"size": 3.7217125584596236,
+"size": 3.7708317782513303,
 "group": "substrate",
 "detail": "Substrate",
 "meta": {
-"mentions": 154,
-"documents": 12,
+"mentions": 170,
+"documents": 17,
 "excerpts": [
 {
 "src": "src:01",
@@ -1774,16 +1997,24 @@
 "label": "Renormalisation / universality",
 "layer": 1,
 "kind": "concept",
-"size": 1.7493061443340547,
+"size": 2.5862943611198905,
 "group": "fractal",
 "detail": "Fractals",
 "meta": {
-"mentions": 2,
-"documents": 1,
+"mentions": 15,
+"documents": 2,
 "excerpts": [
 {
 "src": "src:10",
 "text": "Similarity is an angle. The dot product has three readings: multiply matching slots and add (Σ xᵢyᵢ); lengths times alignment (‖x‖‖y‖ cos θ); the shadow (projection length times the other length). Starred derivation: cos θ = xᵀy …"
+},
+{
+"src": "src:15",
+"text": "\"What slope does this approach?\" as a convergence check for Mandel's own loop. Plot Mandel's held-out error against cumulative evidence (cycles, resolved questions) in log-log coordinates. A learning loop that is working shows a …"
+},
+{
+"src": "src:16",
+"text": "Date researched: 2026-10-14. Coverage confidence: 0.45. The lecture video and its transcript are not reachable from this container, and no written companion exists. Hubbard is the co-author, with Adrien Douady, of the theory the …"
 }
 ]
 }
@@ -1793,12 +2024,12 @@
 "label": "Replication & pre-registration",
 "layer": 1,
 "kind": "concept",
-"size": 3.4033596236321264,
+"size": 3.415408399421657,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 81,
-"documents": 9,
+"mentions": 83,
+"documents": 11,
 "excerpts": [
 {
 "src": "src:02",
@@ -1840,12 +2071,12 @@
 "label": "Representations / embeddings",
 "layer": 1,
 "kind": "concept",
-"size": 3.145910149055313,
+"size": 3.165912816362163,
 "group": "learning",
 "detail": "Learning",
 "meta": {
-"mentions": 48,
-"documents": 9,
+"mentions": 50,
+"documents": 10,
 "excerpts": [
 {
 "src": "src:02",
@@ -1926,12 +2157,12 @@
 "label": "Recursive self-improvement",
 "layer": 1,
 "kind": "concept",
-"size": 3.10333124488516,
+"size": 3.1756218592907137,
 "group": "learning",
 "detail": "Learning",
 "meta": {
-"mentions": 44,
-"documents": 12,
+"mentions": 51,
+"documents": 15,
 "excerpts": [
 {
 "src": "src:01",
@@ -3494,6 +3725,46 @@
 "label": "3 mentions (held loosely)"
 },
 {
+"s": "src:08",
+"t": "k:linear_algebra",
+"type": "provenance",
+"sign": 1,
+"w": 2.791759469228055,
+"label": "5 mentions"
+},
+{
+"s": "src:08",
+"t": "k:affine_ifs",
+"type": "skeptical",
+"sign": -1,
+"w": 3.833213344056216,
+"label": "16 mentions (held loosely)"
+},
+{
+"s": "src:08",
+"t": "k:attractor",
+"type": "provenance",
+"sign": 1,
+"w": 3.0794415416798357,
+"label": "7 mentions"
+},
+{
+"s": "src:08",
+"t": "k:fractal_dimension",
+"type": "provenance",
+"sign": 1,
+"w": 2.6094379124341005,
+"label": "4 mentions"
+},
+{
+"s": "src:08",
+"t": "k:mandelbrot_set",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "src:09",
 "t": "k:shannon",
 "type": "provenance",
@@ -4430,6 +4701,662 @@
 "label": "23 mentions (held loosely)"
 },
 {
+"s": "src:14",
+"t": "k:replication",
+"type": "skeptical",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
+},
+{
+"s": "src:14",
+"t": "k:overfitting",
+"type": "skeptical",
+"sign": -1,
+"w": 2.386294361119891,
+"label": "3 mentions (held loosely)"
+},
+{
+"s": "src:14",
+"t": "k:markov",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:14",
+"t": "k:proper_scoring",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:14",
+"t": "k:edge_vs_market",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:14",
+"t": "k:backtest",
+"type": "provenance",
+"sign": 1,
+"w": 3.302585092994046,
+"label": "9 mentions"
+},
+{
+"s": "src:14",
+"t": "k:lookahead",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:14",
+"t": "k:fees_slippage",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:14",
+"t": "k:memory",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "src:14",
+"t": "k:provenance",
+"type": "provenance",
+"sign": 1,
+"w": 2.791759469228055,
+"label": "5 mentions"
+},
+{
+"s": "src:14",
+"t": "k:agent_tools",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:15",
+"t": "k:overfitting",
+"type": "provenance",
+"sign": 1,
+"w": 2.6094379124341005,
+"label": "4 mentions"
+},
+{
+"s": "src:15",
+"t": "k:affine_ifs",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:15",
+"t": "k:fractal_dimension",
+"type": "provenance",
+"sign": 1,
+"w": 3.995732273553991,
+"label": "19 mentions"
+},
+{
+"s": "src:15",
+"t": "k:mandelbrot_set",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:15",
+"t": "k:multifractal",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:15",
+"t": "k:markov",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:15",
+"t": "k:edge_vs_market",
+"type": "skeptical",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
+},
+{
+"s": "src:15",
+"t": "k:provenance",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:16",
+"t": "k:overfitting",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:16",
+"t": "k:affine_ifs",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:16",
+"t": "k:attractor",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:16",
+"t": "k:fractal_dimension",
+"type": "provenance",
+"sign": 1,
+"w": 3.302585092994046,
+"label": "9 mentions"
+},
+{
+"s": "src:16",
+"t": "k:mandelbrot_set",
+"type": "provenance",
+"sign": 1,
+"w": 4.295836866004329,
+"label": "26 mentions"
+},
+{
+"s": "src:16",
+"t": "k:renormalization",
+"type": "skeptical",
+"sign": -1,
+"w": 3.639057329615259,
+"label": "13 mentions (held loosely)"
+},
+{
+"s": "src:16",
+"t": "k:multifractal",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:16",
+"t": "k:markov",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:16",
+"t": "k:backtest",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:16",
+"t": "k:provenance",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "src:16",
+"t": "k:cost_budget",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "adj:A1",
+"t": "k:rsi",
+"type": "provenance",
+"sign": 1,
+"w": 2.791759469228055,
+"label": "5 mentions"
+},
+{
+"s": "adj:A1",
+"t": "k:overfitting",
+"type": "skeptical",
+"sign": -1,
+"w": 2.0986122886681096,
+"label": "2 mentions (held loosely)"
+},
+{
+"s": "adj:A1",
+"t": "k:backtest",
+"type": "provenance",
+"sign": 1,
+"w": 2.6094379124341005,
+"label": "4 mentions"
+},
+{
+"s": "adj:A1",
+"t": "k:memory",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A1",
+"t": "k:provenance",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "adj:A1",
+"t": "k:agent_tools",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A1",
+"t": "k:cost_budget",
+"type": "skeptical",
+"sign": -1,
+"w": 2.0986122886681096,
+"label": "2 mentions (held loosely)"
+},
+{
+"s": "adj:A2",
+"t": "k:rsi",
+"type": "skeptical",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
+},
+{
+"s": "adj:A2",
+"t": "k:feedback_loop",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A2",
+"t": "k:gradient_descent",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A2",
+"t": "k:overfitting",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A2",
+"t": "k:linear_algebra",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "adj:A2",
+"t": "k:proper_scoring",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "adj:A2",
+"t": "k:calibration",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "adj:A2",
+"t": "k:edge_vs_market",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "adj:A2",
+"t": "k:backtest",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "adj:A2",
+"t": "k:fees_slippage",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "adj:A2",
+"t": "k:agent_tools",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A2",
+"t": "k:cost_budget",
+"type": "skeptical",
+"sign": -1,
+"w": 2.0986122886681096,
+"label": "2 mentions (held loosely)"
+},
+{
+"s": "adj:A3",
+"t": "k:replication",
+"type": "skeptical",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
+},
+{
+"s": "adj:A3",
+"t": "k:rsi",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A3",
+"t": "k:representation",
+"type": "skeptical",
+"sign": -1,
+"w": 2.0986122886681096,
+"label": "2 mentions (held loosely)"
+},
+{
+"s": "adj:A3",
+"t": "k:bayes",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A3",
+"t": "k:edge_vs_market",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A3",
+"t": "k:backtest",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A3",
+"t": "k:lookahead",
+"type": "skeptical",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
+},
+{
+"s": "adj:A3",
+"t": "k:fees_slippage",
+"type": "skeptical",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
+},
+{
+"s": "adj:A3",
+"t": "k:memory",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A3",
+"t": "k:provenance",
+"type": "skeptical",
+"sign": -1,
+"w": 2.791759469228055,
+"label": "5 mentions (held loosely)"
+},
+{
+"s": "adj:A3",
+"t": "k:agent_tools",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A3",
+"t": "k:cost_budget",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A4",
+"t": "k:overfitting",
+"type": "provenance",
+"sign": 1,
+"w": 2.791759469228055,
+"label": "5 mentions"
+},
+{
+"s": "adj:A4",
+"t": "k:affine_ifs",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "adj:A4",
+"t": "k:fractal_dimension",
+"type": "skeptical",
+"sign": -1,
+"w": 2.386294361119891,
+"label": "3 mentions (held loosely)"
+},
+{
+"s": "adj:A4",
+"t": "k:mandelbrot_set",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A4",
+"t": "k:multifractal",
+"type": "skeptical",
+"sign": -1,
+"w": 4.258096538021482,
+"label": "25 mentions (held loosely)"
+},
+{
+"s": "adj:A4",
+"t": "k:markov",
+"type": "provenance",
+"sign": 1,
+"w": 2.9459101490553135,
+"label": "6 mentions"
+},
+{
+"s": "adj:A4",
+"t": "k:monte_carlo",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "adj:A4",
+"t": "k:bayes",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A4",
+"t": "k:edge_vs_market",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A4",
+"t": "k:memory",
+"type": "provenance",
+"sign": 1,
+"w": 2.791759469228055,
+"label": "5 mentions"
+},
+{
+"s": "adj:A5",
+"t": "k:attention",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "adj:A5",
+"t": "k:fractal_dimension",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A5",
+"t": "k:markov",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "adj:A5",
+"t": "k:monte_carlo",
+"type": "skeptical",
+"sign": -1,
+"w": 2.0986122886681096,
+"label": "2 mentions (held loosely)"
+},
+{
+"s": "adj:A5",
+"t": "k:bayes",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A5",
+"t": "k:proper_scoring",
+"type": "provenance",
+"sign": 1,
+"w": 2.9459101490553135,
+"label": "6 mentions"
+},
+{
+"s": "adj:A5",
+"t": "k:calibration",
+"type": "provenance",
+"sign": 1,
+"w": 2.791759469228055,
+"label": "5 mentions"
+},
+{
+"s": "adj:A5",
+"t": "k:edge_vs_market",
+"type": "provenance",
+"sign": 1,
+"w": 2.9459101490553135,
+"label": "6 mentions"
+},
+{
+"s": "adj:A5",
+"t": "k:lookahead",
+"type": "provenance",
+"sign": 1,
+"w": 3.0794415416798357,
+"label": "7 mentions"
+},
+{
+"s": "adj:A5",
+"t": "k:prediction_market",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "adj:A5",
+"t": "k:memory",
+"type": "provenance",
+"sign": 1,
+"w": 3.302585092994046,
+"label": "9 mentions"
+},
+{
 "s": "k:provenance",
 "t": "p:p01",
 "type": "supports",
@@ -4794,872 +5721,1920 @@
 "t": "k:attractor",
 "type": "cooccur",
 "sign": 1,
-"w": 1.1523251860396901,
-"label": "co-occur in 4/12 files, PMI +0.65"
+"w": 1.1931471805599454,
+"label": "co-occur in 6/21 files, PMI +0.69"
 },
 {
 "s": "k:affine_ifs",
 "t": "k:compression",
 "type": "cooccur",
 "sign": 1,
-"w": 0.8158529494184771,
-"label": "co-occur in 4/12 files, PMI +0.32"
+"w": 0.7876820724517808,
+"label": "co-occur in 4/21 files, PMI +0.29"
 },
 {
 "s": "k:affine_ifs",
 "t": "k:gradient_descent",
 "type": "cooccur",
 "sign": 1,
-"w": 1.087786664902119,
-"label": "co-occur in 3/12 files, PMI +0.59"
+"w": 0.836472236621213,
+"label": "co-occur in 3/21 files, PMI +0.34"
 },
 {
 "s": "k:affine_ifs",
 "t": "k:linear_algebra",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 5/12 files, PMI +0.41"
+"w": 0.836472236621213,
+"label": "co-occur in 6/21 files, PMI +0.34"
+},
+{
+"s": "k:affine_ifs",
+"t": "k:mandelbrot_set",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9418327522790393,
+"label": "co-occur in 8/21 files, PMI +0.44"
 },
 {
 "s": "k:affine_ifs",
 "t": "k:markov",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 5/12 files, PMI +0.41"
+"w": 0.8617900446055027,
+"label": "co-occur in 8/21 files, PMI +0.36"
 },
 {
 "s": "k:affine_ifs",
 "t": "k:multifractal",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9700036292457355,
-"label": "co-occur in 2/12 files, PMI +0.47"
+"w": 1.164976303593249,
+"label": "co-occur in 5/21 files, PMI +0.66"
 },
 {
 "s": "k:affine_ifs",
 "t": "k:prediction_market",
 "type": "cooccur",
 "sign": 1,
-"w": 1.087786664902119,
-"label": "co-occur in 3/12 files, PMI +0.59"
+"w": 0.836472236621213,
+"label": "co-occur in 3/21 files, PMI +0.34"
+},
+{
+"s": "k:affine_ifs",
+"t": "k:renormalization",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3472978603872037,
+"label": "co-occur in 2/21 files, PMI +0.85"
+},
+{
+"s": "k:agent_tools",
+"t": "k:cost_budget",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 8/21 files, PMI +0.34"
 },
 {
 "s": "k:agent_tools",
 "t": "k:entropy",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 4/12 files, PMI +0.29"
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
 },
 {
 "s": "k:agent_tools",
 "t": "k:feedback_loop",
 "type": "cooccur",
 "sign": 1,
-"w": 1.1931471805599454,
-"label": "co-occur in 5/12 files, PMI +0.69"
+"w": 1.2419373447293773,
+"label": "co-occur in 6/21 files, PMI +0.74"
 },
 {
 "s": "k:agent_tools",
 "t": "k:fees_slippage",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 3/12 files, PMI +0.41"
+"w": 1.087786664902119,
+"label": "co-occur in 6/21 files, PMI +0.59"
 },
 {
 "s": "k:agent_tools",
 "t": "k:gradient_descent",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 3/12 files, PMI +0.41"
-},
-{
-"s": "k:agent_tools",
-"t": "k:information",
-"type": "cooccur",
-"sign": -1,
-"w": 1.0,
-"label": "never co-occur despite 6 and 4 files (inverse)"
-},
-{
-"s": "k:agent_tools",
-"t": "k:mandelbrot_set",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 6/12 files, PMI +0.41"
-},
-{
-"s": "k:agent_tools",
-"t": "k:markov",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 6/12 files, PMI +0.41"
-},
-{
-"s": "k:agent_tools",
-"t": "k:prediction_market",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 3/12 files, PMI +0.41"
+"w": 1.0187937934151674,
+"label": "co-occur in 4/21 files, PMI +0.52"
 },
 {
 "s": "k:agent_tools",
 "t": "k:replication",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 6/12 files, PMI +0.29"
+"w": 0.9234836136108427,
+"label": "co-occur in 8/21 files, PMI +0.42"
 },
 {
 "s": "k:agent_tools",
 "t": "k:risk",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 4/12 files, PMI +0.29"
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
 },
 {
-"s": "k:attention",
+"s": "k:anticipation",
+"t": "k:attention",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9542552722775965,
+"label": "co-occur in 6/21 files, PMI +0.45"
+},
+{
+"s": "k:anticipation",
 "t": "k:backprop",
 "type": "cooccur",
 "sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 4/12 files, PMI +0.54"
+"w": 1.2419373447293773,
+"label": "co-occur in 4/21 files, PMI +0.74"
 },
 {
-"s": "k:attention",
-"t": "k:cost_budget",
+"s": "k:anticipation",
+"t": "k:bayes",
 "type": "cooccur",
 "sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 6/12 files, PMI +0.25"
+"w": 0.8852624007906449,
+"label": "co-occur in 7/21 files, PMI +0.39"
 },
 {
-"s": "k:attention",
-"t": "k:evaluation_bottleneck",
-"type": "cooccur",
-"sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 3/12 files, PMI +0.54"
-},
-{
-"s": "k:attention",
-"t": "k:gradient_descent",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:attention",
-"t": "k:information",
-"type": "cooccur",
-"sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 4/12 files, PMI +0.54"
-},
-{
-"s": "k:attention",
-"t": "k:noisy_channel",
-"type": "cooccur",
-"sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 2/12 files, PMI +0.54"
-},
-{
-"s": "k:attention",
-"t": "k:shannon",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:attractor",
-"t": "k:backprop",
-"type": "cooccur",
-"sign": 1,
-"w": 1.087786664902119,
-"label": "co-occur in 3/12 files, PMI +0.59"
-},
-{
-"s": "k:attractor",
+"s": "k:anticipation",
 "t": "k:compression",
 "type": "cooccur",
 "sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 5/12 files, PMI +0.54"
-},
-{
-"s": "k:attractor",
-"t": "k:linear_algebra",
-"type": "cooccur",
-"sign": 1,
 "w": 0.9054651081081644,
-"label": "co-occur in 5/12 files, PMI +0.41"
+"label": "co-occur in 5/21 files, PMI +0.41"
 },
 {
-"s": "k:attractor",
-"t": "k:markov",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 5/12 files, PMI +0.41"
-},
-{
-"s": "k:attractor",
-"t": "k:multifractal",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9700036292457355,
-"label": "co-occur in 2/12 files, PMI +0.47"
-},
-{
-"s": "k:attractor",
-"t": "k:prediction_market",
-"type": "cooccur",
-"sign": 1,
-"w": 1.087786664902119,
-"label": "co-occur in 3/12 files, PMI +0.59"
-},
-{
-"s": "k:backprop",
-"t": "k:compression",
-"type": "cooccur",
-"sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 4/12 files, PMI +0.54"
-},
-{
-"s": "k:backprop",
-"t": "k:cost_budget",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 4/12 files, PMI +0.41"
-},
-{
-"s": "k:backprop",
-"t": "k:edge_vs_market",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 4/12 files, PMI +0.41"
-},
-{
-"s": "k:backprop",
+"s": "k:anticipation",
 "t": "k:entropy",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 3/12 files, PMI +0.41"
+"w": 1.0596157879354227,
+"label": "co-occur in 5/21 files, PMI +0.56"
 },
 {
-"s": "k:backprop",
-"t": "k:forking_paths",
-"type": "cooccur",
-"sign": -1,
-"w": 1.0,
-"label": "never co-occur despite 4 and 4 files (inverse)"
-},
-{
-"s": "k:backprop",
-"t": "k:gradient_descent",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
-},
-{
-"s": "k:backprop",
-"t": "k:information",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
-},
-{
-"s": "k:backprop",
-"t": "k:linear_algebra",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 4/12 files, PMI +0.41"
-},
-{
-"s": "k:backprop",
-"t": "k:prediction_market",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
-},
-{
-"s": "k:backprop",
-"t": "k:risk",
-"type": "cooccur",
-"sign": -1,
-"w": 1.0,
-"label": "never co-occur despite 4 and 6 files (inverse)"
-},
-{
-"s": "k:backprop",
-"t": "k:shannon",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
-},
-{
-"s": "k:bayes",
-"t": "k:fees_slippage",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:bayes",
-"t": "k:forking_paths",
-"type": "cooccur",
-"sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 4/12 files, PMI +0.54"
-},
-{
-"s": "k:bayes",
-"t": "k:gradient_descent",
-"type": "cooccur",
-"sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 4/12 files, PMI +0.54"
-},
-{
-"s": "k:bayes",
-"t": "k:prediction_market",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:bayes",
-"t": "k:representation",
-"type": "cooccur",
-"sign": 1,
-"w": 0.787682072451781,
-"label": "co-occur in 7/12 files, PMI +0.29"
-},
-{
-"s": "k:calibration",
+"s": "k:anticipation",
 "t": "k:evaluation_bottleneck",
 "type": "cooccur",
 "sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 3/12 files, PMI +0.54"
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
 },
 {
-"s": "k:calibration",
+"s": "k:anticipation",
+"t": "k:feedback_loop",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 5/21 files, PMI +0.56"
+},
+{
+"s": "k:anticipation",
+"t": "k:forking_paths",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 4/21 files, PMI +0.74"
+},
+{
+"s": "k:anticipation",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0187937934151674,
+"label": "co-occur in 4/21 files, PMI +0.52"
+},
+{
+"s": "k:anticipation",
 "t": "k:idealism",
 "type": "cooccur",
 "sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 3/12 files, PMI +0.54"
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
 },
 {
-"s": "k:calibration",
+"s": "k:anticipation",
 "t": "k:information",
 "type": "cooccur",
 "sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 4/12 files, PMI +0.54"
+"w": 0.9542552722775965,
+"label": "co-occur in 3/21 files, PMI +0.45"
 },
 {
-"s": "k:calibration",
-"t": "k:noisy_channel",
-"type": "cooccur",
-"sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 2/12 files, PMI +0.54"
-},
-{
-"s": "k:calibration",
-"t": "k:shannon",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:compression",
-"t": "k:edge_vs_market",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 6/12 files, PMI +0.25"
-},
-{
-"s": "k:compression",
-"t": "k:entropy",
-"type": "cooccur",
-"sign": 1,
-"w": 0.8566749439387324,
-"label": "co-occur in 5/12 files, PMI +0.36"
-},
-{
-"s": "k:compression",
-"t": "k:fees_slippage",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:compression",
-"t": "k:gradient_descent",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:compression",
-"t": "k:information",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:compression",
+"s": "k:anticipation",
 "t": "k:linear_algebra",
 "type": "cooccur",
 "sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 6/12 files, PMI +0.25"
+"w": 0.8852624007906449,
+"label": "co-occur in 7/21 files, PMI +0.39"
 },
 {
-"s": "k:compression",
-"t": "k:multifractal",
+"s": "k:anticipation",
+"t": "k:lookahead",
 "type": "cooccur",
 "sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 3/12 files, PMI +0.54"
+"w": 0.8742125646040599,
+"label": "co-occur in 9/21 files, PMI +0.37"
 },
 {
-"s": "k:compression",
-"t": "k:noisy_channel",
-"type": "cooccur",
-"sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 2/12 files, PMI +0.54"
-},
-{
-"s": "k:compression",
+"s": "k:anticipation",
 "t": "k:prediction_market",
 "type": "cooccur",
 "sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
+"w": 1.0187937934151674,
+"label": "co-occur in 4/21 files, PMI +0.52"
 },
 {
-"s": "k:compression",
-"t": "k:shannon",
+"s": "k:anticipation",
+"t": "k:proper_scoring",
 "type": "cooccur",
 "sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 4/12 files, PMI +0.54"
+"w": 0.836472236621213,
+"label": "co-occur in 10/21 files, PMI +0.34"
 },
 {
-"s": "k:cost_budget",
-"t": "k:evaluation_bottleneck",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 3/12 files, PMI +0.41"
-},
-{
-"s": "k:cost_budget",
-"t": "k:feedback_loop",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 5/12 files, PMI +0.41"
-},
-{
-"s": "k:cost_budget",
-"t": "k:noisy_channel",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
-},
-{
-"s": "k:edge_vs_market",
-"t": "k:fees_slippage",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 4/12 files, PMI +0.41"
-},
-{
-"s": "k:edge_vs_market",
-"t": "k:noisy_channel",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
-},
-{
-"s": "k:edge_vs_market",
-"t": "k:prediction_market",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 4/12 files, PMI +0.41"
-},
-{
-"s": "k:entropy",
-"t": "k:evaluation_bottleneck",
-"type": "cooccur",
-"sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 2/12 files, PMI +0.29"
-},
-{
-"s": "k:entropy",
-"t": "k:fees_slippage",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 3/12 files, PMI +0.41"
-},
-{
-"s": "k:entropy",
-"t": "k:gradient_descent",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 3/12 files, PMI +0.41"
-},
-{
-"s": "k:entropy",
-"t": "k:multifractal",
-"type": "cooccur",
-"sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 2/12 files, PMI +0.29"
-},
-{
-"s": "k:entropy",
-"t": "k:shannon",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 3/12 files, PMI +0.41"
-},
-{
-"s": "k:evaluation_bottleneck",
-"t": "k:gradient_descent",
-"type": "cooccur",
-"sign": 1,
-"w": 1.1931471805599454,
-"label": "co-occur in 2/12 files, PMI +0.69"
-},
-{
-"s": "k:evaluation_bottleneck",
-"t": "k:information",
-"type": "cooccur",
-"sign": 1,
-"w": 1.1931471805599454,
-"label": "co-occur in 2/12 files, PMI +0.69"
-},
-{
-"s": "k:evaluation_bottleneck",
-"t": "k:shannon",
-"type": "cooccur",
-"sign": 1,
-"w": 1.1931471805599454,
-"label": "co-occur in 2/12 files, PMI +0.69"
-},
-{
-"s": "k:feedback_loop",
-"t": "k:information",
-"type": "cooccur",
-"sign": -1,
-"w": 1.0,
-"label": "never co-occur despite 5 and 4 files (inverse)"
-},
-{
-"s": "k:feedback_loop",
-"t": "k:mandelbrot_set",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 5/12 files, PMI +0.41"
-},
-{
-"s": "k:feedback_loop",
-"t": "k:markov",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 5/12 files, PMI +0.41"
-},
-{
-"s": "k:feedback_loop",
+"s": "k:anticipation",
 "t": "k:replication",
 "type": "cooccur",
 "sign": 1,
-"w": 0.787682072451781,
-"label": "co-occur in 5/12 files, PMI +0.29"
+"w": 0.9234836136108427,
+"label": "co-occur in 8/21 files, PMI +0.42"
 },
 {
-"s": "k:fees_slippage",
-"t": "k:forking_paths",
+"s": "k:anticipation",
+"t": "k:representation",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
+"w": 1.1365768290715512,
+"label": "co-occur in 9/21 files, PMI +0.64"
 },
 {
-"s": "k:fees_slippage",
+"s": "k:anticipation",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 5/21 files, PMI +0.56"
+},
+{
+"s": "k:anticipation",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 10/21 files, PMI +0.34"
+},
+{
+"s": "k:attention",
+"t": "k:backprop",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4650808960435873,
+"label": "co-occur in 4/21 files, PMI +0.97"
+},
+{
+"s": "k:attention",
+"t": "k:bayes",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 5/21 files, PMI +0.27"
+},
+{
+"s": "k:attention",
+"t": "k:calibration",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 6/21 files, PMI +0.56"
+},
+{
+"s": "k:attention",
+"t": "k:compression",
+"type": "cooccur",
+"sign": 1,
+"w": 1.128608659422374,
+"label": "co-occur in 5/21 files, PMI +0.63"
+},
+{
+"s": "k:attention",
+"t": "k:cost_budget",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 6/21 files, PMI +0.27"
+},
+{
+"s": "k:attention",
+"t": "k:entropy",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 4/21 files, PMI +0.56"
+},
+{
+"s": "k:attention",
+"t": "k:evaluation_bottleneck",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4650808960435873,
+"label": "co-occur in 3/21 files, PMI +0.97"
+},
+{
+"s": "k:attention",
+"t": "k:feedback_loop",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 3/21 files, PMI +0.27"
+},
+{
+"s": "k:attention",
 "t": "k:gradient_descent",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
+"w": 0.9542552722775965,
+"label": "co-occur in 3/21 files, PMI +0.45"
 },
 {
-"s": "k:fees_slippage",
-"t": "k:multifractal",
+"s": "k:attention",
+"t": "k:idealism",
 "type": "cooccur",
 "sign": 1,
-"w": 1.1931471805599454,
-"label": "co-occur in 2/12 files, PMI +0.69"
+"w": 1.0596157879354227,
+"label": "co-occur in 2/21 files, PMI +0.56"
 },
 {
-"s": "k:fees_slippage",
+"s": "k:attention",
+"t": "k:information",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4650808960435873,
+"label": "co-occur in 4/21 files, PMI +0.97"
+},
+{
+"s": "k:attention",
+"t": "k:linear_algebra",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 5/21 files, PMI +0.27"
+},
+{
+"s": "k:attention",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9795730802618862,
+"label": "co-occur in 8/21 files, PMI +0.48"
+},
+{
+"s": "k:attention",
+"t": "k:monte_carlo",
+"type": "cooccur",
+"sign": 1,
+"w": 0.877294231141468,
+"label": "co-occur in 5/21 files, PMI +0.38"
+},
+{
+"s": "k:attention",
+"t": "k:noisy_channel",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4650808960435873,
+"label": "co-occur in 2/21 files, PMI +0.97"
+},
+{
+"s": "k:attention",
 "t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9542552722775965,
+"label": "co-occur in 3/21 files, PMI +0.45"
+},
+{
+"s": "k:attention",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 8/21 files, PMI +0.34"
+},
+{
+"s": "k:attention",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 5/21 files, PMI +0.27"
+},
+{
+"s": "k:attention",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1773988235918063,
+"label": "co-occur in 3/21 files, PMI +0.68"
+},
+{
+"s": "k:attractor",
+"t": "k:backprop",
 "type": "cooccur",
 "sign": 1,
 "w": 1.3109302162163288,
-"label": "co-occur in 3/12 files, PMI +0.81"
+"label": "co-occur in 3/21 files, PMI +0.81"
 },
 {
-"s": "k:forking_paths",
-"t": "k:idealism",
+"s": "k:attractor",
+"t": "k:compression",
 "type": "cooccur",
 "sign": 1,
-"w": 1.1931471805599454,
-"label": "co-occur in 2/12 files, PMI +0.69"
+"w": 1.2621400520468966,
+"label": "co-occur in 5/21 files, PMI +0.76"
 },
 {
-"s": "k:forking_paths",
-"t": "k:monte_carlo",
-"type": "cooccur",
-"sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:forking_paths",
-"t": "k:prediction_market",
+"s": "k:attractor",
+"t": "k:entropy",
 "type": "cooccur",
 "sign": 1,
 "w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
+"label": "co-occur in 3/21 files, PMI +0.41"
 },
 {
-"s": "k:forking_paths",
-"t": "k:replication",
-"type": "cooccur",
-"sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 4/12 files, PMI +0.29"
-},
-{
-"s": "k:forking_paths",
-"t": "k:representation",
-"type": "cooccur",
-"sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 4/12 files, PMI +0.29"
-},
-{
-"s": "k:forking_paths",
-"t": "k:risk",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 3/12 files, PMI +0.41"
-},
-{
-"s": "k:forking_paths",
-"t": "k:shannon",
-"type": "cooccur",
-"sign": -1,
-"w": 1.0,
-"label": "never co-occur despite 4 and 4 files (inverse)"
-},
-{
-"s": "k:gradient_descent",
+"s": "k:attractor",
 "t": "k:linear_algebra",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 4/12 files, PMI +0.41"
+"w": 1.087786664902119,
+"label": "co-occur in 6/21 files, PMI +0.59"
 },
 {
-"s": "k:gradient_descent",
+"s": "k:attractor",
 "t": "k:mandelbrot_set",
 "type": "cooccur",
 "sign": 1,
 "w": 0.9054651081081644,
-"label": "co-occur in 4/12 files, PMI +0.41"
+"label": "co-occur in 6/21 files, PMI +0.41"
 },
 {
-"s": "k:gradient_descent",
-"t": "k:prediction_market",
+"s": "k:attractor",
+"t": "k:markov",
+"type": "cooccur",
+"sign": 1,
+"w": 0.825422400434628,
+"label": "co-occur in 6/21 files, PMI +0.33"
+},
+{
+"s": "k:attractor",
+"t": "k:multifractal",
 "type": "cooccur",
 "sign": 1,
 "w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
+"label": "co-occur in 3/21 files, PMI +0.41"
 },
 {
-"s": "k:gradient_descent",
-"t": "k:representation",
+"s": "k:attractor",
+"t": "k:prediction_market",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 4/12 files, PMI +0.29"
+"w": 1.087786664902119,
+"label": "co-occur in 3/21 files, PMI +0.59"
 },
 {
-"s": "k:idealism",
+"s": "k:attractor",
+"t": "k:renormalization",
+"type": "cooccur",
+"sign": 1,
+"w": 1.5986122886681098,
+"label": "co-occur in 2/21 files, PMI +1.10"
+},
+{
+"s": "k:attractor",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 2/21 files, PMI +0.41"
+},
+{
+"s": "k:backprop",
+"t": "k:backtest",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 4/21 files, PMI +0.27"
+},
+{
+"s": "k:backprop",
+"t": "k:compression",
+"type": "cooccur",
+"sign": 1,
+"w": 1.5986122886681098,
+"label": "co-occur in 4/21 files, PMI +1.10"
+},
+{
+"s": "k:backprop",
+"t": "k:cost_budget",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 4/21 files, PMI +0.56"
+},
+{
+"s": "k:backprop",
+"t": "k:edge_vs_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 4/21 files, PMI +0.41"
+},
+{
+"s": "k:backprop",
+"t": "k:entropy",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4650808960435873,
+"label": "co-occur in 3/21 files, PMI +0.97"
+},
+{
+"s": "k:backprop",
+"t": "k:feedback_loop",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 2/21 files, PMI +0.56"
+},
+{
+"s": "k:backprop",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 2/21 files, PMI +0.74"
+},
+{
+"s": "k:backprop",
 "t": "k:information",
 "type": "cooccur",
 "sign": 1,
-"w": 1.1931471805599454,
-"label": "co-occur in 2/12 files, PMI +0.69"
+"w": 1.4650808960435873,
+"label": "co-occur in 2/21 files, PMI +0.97"
 },
 {
-"s": "k:idealism",
+"s": "k:backprop",
+"t": "k:linear_algebra",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 4/21 files, PMI +0.74"
+},
+{
+"s": "k:backprop",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9795730802618862,
+"label": "co-occur in 4/21 files, PMI +0.48"
+},
+{
+"s": "k:backprop",
+"t": "k:mandelbrot_set",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 3/21 files, PMI +0.27"
+},
+{
+"s": "k:backprop",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 2/21 files, PMI +0.74"
+},
+{
+"s": "k:backprop",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:backprop",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9542552722775965,
+"label": "co-occur in 3/21 files, PMI +0.45"
+},
+{
+"s": "k:backprop",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:backprop",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4650808960435873,
+"label": "co-occur in 2/21 files, PMI +0.97"
+},
+{
+"s": "k:backtest",
+"t": "k:compression",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836418,
+"label": "co-occur in 7/21 files, PMI +0.27"
+},
+{
+"s": "k:backtest",
+"t": "k:evaluation_bottleneck",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 3/21 files, PMI +0.27"
+},
+{
+"s": "k:backtest",
+"t": "k:fees_slippage",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836418,
+"label": "co-occur in 7/21 files, PMI +0.27"
+},
+{
+"s": "k:backtest",
+"t": "k:forking_paths",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 4/21 files, PMI +0.27"
+},
+{
+"s": "k:backtest",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 5/21 files, PMI +0.27"
+},
+{
+"s": "k:backtest",
+"t": "k:idealism",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 3/21 files, PMI +0.27"
+},
+{
+"s": "k:backtest",
+"t": "k:information",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 4/21 files, PMI +0.27"
+},
+{
+"s": "k:backtest",
+"t": "k:noisy_channel",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 2/21 files, PMI +0.27"
+},
+{
+"s": "k:backtest",
+"t": "k:renormalization",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 2/21 files, PMI +0.27"
+},
+{
+"s": "k:backtest",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 4/21 files, PMI +0.27"
+},
+{
+"s": "k:bayes",
+"t": "k:evaluation_bottleneck",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:bayes",
+"t": "k:forking_paths",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 4/21 files, PMI +0.74"
+},
+{
+"s": "k:bayes",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0187937934151674,
+"label": "co-occur in 4/21 files, PMI +0.52"
+},
+{
+"s": "k:bayes",
+"t": "k:idealism",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:bayes",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8742125646040599,
+"label": "co-occur in 9/21 files, PMI +0.37"
+},
+{
+"s": "k:bayes",
+"t": "k:memory",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 10/21 files, PMI +0.34"
+},
+{
+"s": "k:bayes",
 "t": "k:monte_carlo",
 "type": "cooccur",
 "sign": 1,
-"w": 1.038996500732687,
-"label": "co-occur in 3/12 files, PMI +0.54"
+"w": 0.836472236621213,
+"label": "co-occur in 6/21 files, PMI +0.34"
 },
 {
-"s": "k:information",
+"s": "k:bayes",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0187937934151674,
+"label": "co-occur in 4/21 files, PMI +0.52"
+},
+{
+"s": "k:bayes",
+"t": "k:replication",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7899522209863201,
+"label": "co-occur in 7/21 files, PMI +0.29"
+},
+{
+"s": "k:bayes",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0187937934151674,
+"label": "co-occur in 8/21 files, PMI +0.52"
+},
+{
+"s": "k:bayes",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:calibration",
+"t": "k:compression",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7876820724517808,
+"label": "co-occur in 4/21 files, PMI +0.29"
+},
+{
+"s": "k:calibration",
+"t": "k:evaluation_bottleneck",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3472978603872037,
+"label": "co-occur in 3/21 files, PMI +0.85"
+},
+{
+"s": "k:calibration",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 3/21 files, PMI +0.34"
+},
+{
+"s": "k:calibration",
+"t": "k:idealism",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3472978603872037,
+"label": "co-occur in 3/21 files, PMI +0.85"
+},
+{
+"s": "k:calibration",
+"t": "k:information",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3472978603872037,
+"label": "co-occur in 4/21 files, PMI +0.85"
+},
+{
+"s": "k:calibration",
+"t": "k:monte_carlo",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9418327522790393,
+"label": "co-occur in 6/21 files, PMI +0.44"
+},
+{
+"s": "k:calibration",
+"t": "k:noisy_channel",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3472978603872037,
+"label": "co-occur in 2/21 files, PMI +0.85"
+},
+{
+"s": "k:calibration",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 9/21 files, PMI +0.34"
+},
+{
+"s": "k:calibration",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 3/21 files, PMI +0.56"
+},
+{
+"s": "k:compression",
+"t": "k:edge_vs_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7513144282809061,
+"label": "co-occur in 6/21 files, PMI +0.25"
+},
+{
+"s": "k:compression",
+"t": "k:entropy",
+"type": "cooccur",
+"sign": 1,
+"w": 1.416290731874155,
+"label": "co-occur in 5/21 files, PMI +0.92"
+},
+{
+"s": "k:compression",
+"t": "k:evaluation_bottleneck",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1931471805599454,
+"label": "co-occur in 2/21 files, PMI +0.69"
+},
+{
+"s": "k:compression",
+"t": "k:fees_slippage",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7513144282809061,
+"label": "co-occur in 3/21 files, PMI +0.25"
+},
+{
+"s": "k:compression",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 1.087786664902119,
+"label": "co-occur in 3/21 files, PMI +0.59"
+},
+{
+"s": "k:compression",
+"t": "k:information",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3109302162163288,
+"label": "co-occur in 3/21 files, PMI +0.81"
+},
+{
+"s": "k:compression",
+"t": "k:linear_algebra",
+"type": "cooccur",
+"sign": 1,
+"w": 1.087786664902119,
+"label": "co-occur in 6/21 files, PMI +0.59"
+},
+{
+"s": "k:compression",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.825422400434628,
+"label": "co-occur in 6/21 files, PMI +0.33"
+},
+{
+"s": "k:compression",
+"t": "k:multifractal",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 3/21 files, PMI +0.41"
+},
+{
+"s": "k:compression",
 "t": "k:noisy_channel",
 "type": "cooccur",
 "sign": 1,
 "w": 1.5986122886681098,
-"label": "co-occur in 2/12 files, PMI +1.10"
+"label": "co-occur in 2/21 files, PMI +1.10"
+},
+{
+"s": "k:compression",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 1.087786664902119,
+"label": "co-occur in 3/21 files, PMI +0.59"
+},
+{
+"s": "k:compression",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 7/21 files, PMI +0.34"
+},
+{
+"s": "k:compression",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 7/21 files, PMI +0.34"
+},
+{
+"s": "k:compression",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 1.5986122886681098,
+"label": "co-occur in 4/21 files, PMI +1.10"
+},
+{
+"s": "k:cost_budget",
+"t": "k:entropy",
+"type": "cooccur",
+"sign": 1,
+"w": 0.877294231141468,
+"label": "co-occur in 5/21 files, PMI +0.38"
+},
+{
+"s": "k:cost_budget",
+"t": "k:evaluation_bottleneck",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 3/21 files, PMI +0.56"
+},
+{
+"s": "k:cost_budget",
+"t": "k:feedback_loop",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 6/21 files, PMI +0.56"
+},
+{
+"s": "k:cost_budget",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:cost_budget",
+"t": "k:information",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 3/21 files, PMI +0.27"
+},
+{
+"s": "k:cost_budget",
+"t": "k:noisy_channel",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 2/21 files, PMI +0.56"
+},
+{
+"s": "k:cost_budget",
+"t": "k:renormalization",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 2/21 files, PMI +0.56"
+},
+{
+"s": "k:cost_budget",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7719337154836419,
+"label": "co-occur in 3/21 files, PMI +0.27"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:fees_slippage",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 7/21 files, PMI +0.41"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:noisy_channel",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 2/21 files, PMI +0.41"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 5/21 files, PMI +0.41"
+},
+{
+"s": "k:entropy",
+"t": "k:evaluation_bottleneck",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3472978603872037,
+"label": "co-occur in 2/21 files, PMI +0.85"
+},
+{
+"s": "k:entropy",
+"t": "k:feedback_loop",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 3/21 files, PMI +0.56"
+},
+{
+"s": "k:entropy",
+"t": "k:fees_slippage",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 3/21 files, PMI +0.41"
+},
+{
+"s": "k:entropy",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 3/21 files, PMI +0.74"
+},
+{
+"s": "k:entropy",
+"t": "k:information",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 2/21 files, PMI +0.56"
+},
+{
+"s": "k:entropy",
+"t": "k:linear_algebra",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:entropy",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7972515234679316,
+"label": "co-occur in 5/21 files, PMI +0.30"
+},
+{
+"s": "k:entropy",
+"t": "k:mandelbrot_set",
+"type": "cooccur",
+"sign": 1,
+"w": 0.877294231141468,
+"label": "co-occur in 5/21 files, PMI +0.38"
+},
+{
+"s": "k:entropy",
+"t": "k:memory",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 6/21 files, PMI +0.34"
+},
+{
+"s": "k:entropy",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:entropy",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 6/21 files, PMI +0.34"
+},
+{
+"s": "k:entropy",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:entropy",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 6/21 files, PMI +0.34"
+},
+{
+"s": "k:entropy",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4650808960435873,
+"label": "co-occur in 3/21 files, PMI +0.97"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 1.5296194171811583,
+"label": "co-occur in 2/21 files, PMI +1.03"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:information",
+"type": "cooccur",
+"sign": 1,
+"w": 1.752762968495368,
+"label": "co-occur in 2/21 files, PMI +1.25"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:linear_algebra",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9795730802618862,
+"label": "co-occur in 3/21 files, PMI +0.48"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:memory",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 3/21 files, PMI +0.34"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:monte_carlo",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9418327522790393,
+"label": "co-occur in 2/21 files, PMI +0.44"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 3/21 files, PMI +0.34"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 3/21 files, PMI +0.34"
+},
+{
+"s": "k:evaluation_bottleneck",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 1.752762968495368,
+"label": "co-occur in 2/21 files, PMI +1.25"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:fees_slippage",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 3/21 files, PMI +0.41"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 3/21 files, PMI +0.74"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:linear_algebra",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 5/21 files, PMI +0.56"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:mandelbrot_set",
+"type": "cooccur",
+"sign": 1,
+"w": 0.877294231141468,
+"label": "co-occur in 5/21 files, PMI +0.38"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:markov",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7972515234679316,
+"label": "co-occur in 5/21 files, PMI +0.30"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 6/21 files, PMI +0.34"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:replication",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9643056081310978,
+"label": "co-occur in 5/21 files, PMI +0.46"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 3/21 files, PMI +0.56"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 6/21 files, PMI +0.34"
+},
+{
+"s": "k:fees_slippage",
+"t": "k:forking_paths",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 2/21 files, PMI +0.41"
+},
+{
+"s": "k:fees_slippage",
+"t": "k:gradient_descent",
+"type": "cooccur",
+"sign": 1,
+"w": 1.087786664902119,
+"label": "co-occur in 3/21 files, PMI +0.59"
+},
+{
+"s": "k:fees_slippage",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.825422400434628,
+"label": "co-occur in 6/21 files, PMI +0.33"
+},
+{
+"s": "k:fees_slippage",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 1.087786664902119,
+"label": "co-occur in 3/21 files, PMI +0.59"
+},
+{
+"s": "k:fees_slippage",
+"t": "k:replication",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8101549283038394,
+"label": "co-occur in 5/21 files, PMI +0.31"
+},
+{
+"s": "k:forking_paths",
+"t": "k:idealism",
+"type": "cooccur",
+"sign": 1,
+"w": 1.752762968495368,
+"label": "co-occur in 2/21 files, PMI +1.25"
+},
+{
+"s": "k:forking_paths",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9795730802618862,
+"label": "co-occur in 4/21 files, PMI +0.48"
+},
+{
+"s": "k:forking_paths",
+"t": "k:memory",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:forking_paths",
+"t": "k:monte_carlo",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 3/21 files, PMI +0.56"
+},
+{
+"s": "k:forking_paths",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 2/21 files, PMI +0.74"
+},
+{
+"s": "k:forking_paths",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:forking_paths",
+"t": "k:replication",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1466271649250523,
+"label": "co-occur in 4/21 files, PMI +0.65"
+},
+{
+"s": "k:forking_paths",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 4/21 files, PMI +0.74"
+},
+{
+"s": "k:forking_paths",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4650808960435873,
+"label": "co-occur in 3/21 files, PMI +0.97"
+},
+{
+"s": "k:forking_paths",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:gradient_descent",
+"t": "k:linear_algebra",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2419373447293773,
+"label": "co-occur in 5/21 files, PMI +0.74"
+},
+{
+"s": "k:gradient_descent",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7564295289476766,
+"label": "co-occur in 4/21 files, PMI +0.26"
+},
+{
+"s": "k:gradient_descent",
+"t": "k:mandelbrot_set",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:gradient_descent",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0187937934151674,
+"label": "co-occur in 2/21 files, PMI +0.52"
+},
+{
+"s": "k:gradient_descent",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 5/21 files, PMI +0.34"
+},
+{
+"s": "k:gradient_descent",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0187937934151674,
+"label": "co-occur in 4/21 files, PMI +0.52"
+},
+{
+"s": "k:gradient_descent",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:gradient_descent",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 5/21 files, PMI +0.34"
+},
+{
+"s": "k:idealism",
+"t": "k:information",
+"type": "cooccur",
+"sign": 1,
+"w": 1.752762968495368,
+"label": "co-occur in 2/21 files, PMI +1.25"
+},
+{
+"s": "k:idealism",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9795730802618862,
+"label": "co-occur in 3/21 files, PMI +0.48"
+},
+{
+"s": "k:idealism",
+"t": "k:memory",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 3/21 files, PMI +0.34"
+},
+{
+"s": "k:idealism",
+"t": "k:monte_carlo",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3472978603872037,
+"label": "co-occur in 3/21 files, PMI +0.85"
+},
+{
+"s": "k:idealism",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 3/21 files, PMI +0.34"
+},
+{
+"s": "k:idealism",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:idealism",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 3/21 files, PMI +0.34"
+},
+{
+"s": "k:information",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9795730802618862,
+"label": "co-occur in 4/21 files, PMI +0.48"
+},
+{
+"s": "k:information",
+"t": "k:noisy_channel",
+"type": "cooccur",
+"sign": 1,
+"w": 2.1582280766035327,
+"label": "co-occur in 2/21 files, PMI +1.66"
+},
+{
+"s": "k:information",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:information",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9542552722775965,
+"label": "co-occur in 3/21 files, PMI +0.45"
+},
+{
+"s": "k:information",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
 },
 {
 "s": "k:information",
 "t": "k:shannon",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 2/12 files, PMI +0.41"
+"w": 1.4650808960435873,
+"label": "co-occur in 2/21 files, PMI +0.97"
 },
 {
 "s": "k:linear_algebra",
 "t": "k:mandelbrot_set",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7719337154836419,
-"label": "co-occur in 7/12 files, PMI +0.27"
-},
-{
-"s": "k:linear_algebra",
-"t": "k:markov",
-"type": "cooccur",
-"sign": 1,
-"w": 0.7719337154836419,
-"label": "co-occur in 7/12 files, PMI +0.27"
+"w": 0.836472236621213,
+"label": "co-occur in 8/21 files, PMI +0.34"
 },
 {
 "s": "k:linear_algebra",
 "t": "k:prediction_market",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 4/12 files, PMI +0.41"
+"w": 1.0187937934151674,
+"label": "co-occur in 4/21 files, PMI +0.52"
+},
+{
+"s": "k:linear_algebra",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:linear_algebra",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9542552722775965,
+"label": "co-occur in 3/21 files, PMI +0.45"
+},
+{
+"s": "k:lookahead",
+"t": "k:memory",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7564295289476763,
+"label": "co-occur in 12/21 files, PMI +0.26"
+},
+{
+"s": "k:lookahead",
+"t": "k:noisy_channel",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9795730802618862,
+"label": "co-occur in 2/21 files, PMI +0.48"
+},
+{
+"s": "k:lookahead",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9795730802618863,
+"label": "co-occur in 5/21 files, PMI +0.48"
+},
+{
+"s": "k:lookahead",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7564295289476763,
+"label": "co-occur in 12/21 files, PMI +0.26"
+},
+{
+"s": "k:lookahead",
+"t": "k:replication",
+"type": "cooccur",
+"sign": 1,
+"w": 0.778902384799735,
+"label": "co-occur in 9/21 files, PMI +0.28"
+},
+{
+"s": "k:lookahead",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8742125646040599,
+"label": "co-occur in 9/21 files, PMI +0.37"
 },
 {
 "s": "k:mandelbrot_set",
 "t": "k:markov",
 "type": "cooccur",
 "sign": 1,
+"w": 0.7972515234679316,
+"label": "co-occur in 10/21 files, PMI +0.30"
+},
+{
+"s": "k:mandelbrot_set",
+"t": "k:multifractal",
+"type": "cooccur",
+"sign": 1,
+"w": 0.877294231141468,
+"label": "co-occur in 5/21 files, PMI +0.38"
+},
+{
+"s": "k:mandelbrot_set",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 0.877294231141468,
+"label": "co-occur in 5/21 files, PMI +0.38"
+},
+{
+"s": "k:mandelbrot_set",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
 "w": 0.7719337154836419,
-"label": "co-occur in 7/12 files, PMI +0.27"
+"label": "co-occur in 3/21 files, PMI +0.27"
+},
+{
+"s": "k:markov",
+"t": "k:multifractal",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7972515234679316,
+"label": "co-occur in 5/21 files, PMI +0.30"
 },
 {
 "s": "k:markov",
 "t": "k:prediction_market",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9054651081081644,
-"label": "co-occur in 4/12 files, PMI +0.41"
+"w": 0.9795730802618863,
+"label": "co-occur in 5/21 files, PMI +0.48"
+},
+{
+"s": "k:markov",
+"t": "k:renormalization",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9795730802618862,
+"label": "co-occur in 2/21 files, PMI +0.48"
+},
+{
+"s": "k:markov",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7972515234679316,
+"label": "co-occur in 5/21 files, PMI +0.30"
+},
+{
+"s": "k:monte_carlo",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9418327522790393,
+"label": "co-occur in 4/21 files, PMI +0.44"
 },
 {
 "s": "k:monte_carlo",
 "t": "k:shannon",
 "type": "cooccur",
 "sign": 1,
-"w": 0.751314428280906,
-"label": "co-occur in 3/12 files, PMI +0.25"
-},
-{
-"s": "k:multifractal",
-"t": "k:risk",
-"type": "cooccur",
-"sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 2/12 files, PMI +0.29"
+"w": 1.0596157879354227,
+"label": "co-occur in 3/21 files, PMI +0.56"
 },
 {
 "s": "k:multifractal",
 "t": "k:shannon",
 "type": "cooccur",
 "sign": 1,
-"w": 1.1931471805599454,
-"label": "co-occur in 2/12 files, PMI +0.69"
+"w": 1.0596157879354227,
+"label": "co-occur in 2/21 files, PMI +0.56"
+},
+{
+"s": "k:noisy_channel",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:noisy_channel",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:prediction_market",
+"t": "k:proper_scoring",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 5/21 files, PMI +0.34"
 },
 {
 "s": "k:prediction_market",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 4/12 files, PMI +0.29"
+"w": 1.0187937934151674,
+"label": "co-occur in 4/21 files, PMI +0.52"
 },
 {
 "s": "k:prediction_market",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 2/21 files, PMI +0.34"
+},
+{
+"s": "k:proper_scoring",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 6/21 files, PMI +0.34"
+},
+{
+"s": "k:proper_scoring",
 "t": "k:shannon",
 "type": "cooccur",
-"sign": -1,
-"w": 1.0,
-"label": "never co-occur despite 4 and 4 files (inverse)"
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
+},
+{
+"s": "k:replication",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9234836136108427,
+"label": "co-occur in 8/21 files, PMI +0.42"
 },
 {
 "s": "k:replication",
 "t": "k:risk",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 6/12 files, PMI +0.29"
+"w": 1.1466271649250523,
+"label": "co-occur in 6/21 files, PMI +0.65"
+},
+{
+"s": "k:representation",
+"t": "k:risk",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 5/21 files, PMI +0.56"
+},
+{
+"s": "k:representation",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 10/21 files, PMI +0.34"
+},
+{
+"s": "k:risk",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 6/21 files, PMI +0.34"
+},
+{
+"s": "k:rsi",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 4/21 files, PMI +0.34"
 },
 {
 "s": "stream:markets",
