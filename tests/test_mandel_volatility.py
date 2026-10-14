@@ -66,3 +66,19 @@ def test_overlay_engine_relationships():
     assert np.allclose(ss["returns"], -ls["returns"])                        # straddle P&L antisymmetric
     v = overlay_verdict(ss, versus="zero", n_boot=300)
     assert "p_value_mean_excess" in v and "returns" not in v
+
+
+def test_implied_move_pairs_captures_with_expiries():
+    from mandel.experiments.volatility import implied_move_vs_realised
+    days = _days(120)
+    px = {"SPY": {d: 100 * (1 + 0.001 * i) for i, d in enumerate(days)}}
+    rows = []
+    for i in range(0, 60):
+        cap = days[i]; exp = days[i + 30]
+        rows.append({"available_at": cap + "T12:00:00+00:00", "value": {"symbol": "SPY", "expiry": exp, "dte": 30, "implied_move_pct": 5.0}})
+    rep = implied_move_vs_realised(rows, px, min_captures=30)
+    assert rep["n_resolved_captures"] == 60 and rep["verdict"] == "supported" and rep["mean_realised_pct"] < 5
+    few = implied_move_vs_realised(rows[:10], px, min_captures=30)
+    assert few["verdict"] == "inconclusive" and "10/30" in few["reason"]
+    unresolved = implied_move_vs_realised([{"available_at": days[100] + "T12:00:00+00:00", "value": {"symbol": "SPY", "expiry": "2099-01-01", "dte": 30, "implied_move_pct": 5.0}}], px)
+    assert unresolved["n_resolved_captures"] == 0

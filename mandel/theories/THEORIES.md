@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `8dc89f59948f9ca9`). 60 theories. supported 12, not_supported 9, inconclusive 5, untested 3, blocked 23, parked 8.
+Rendered from `registry.json` (hash `9bae406221334b15`). 65 theories. supported 14, not_supported 11, inconclusive 6, untested 3, blocked 23, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (12)
+## Supported (14)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -177,7 +177,35 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: turn_of_month
 - result X-bc27e9fd: supported — turn-of-month days +9.0 bps/day vs others +1.6 (diff +7.4 bps, block-bootstrap p=0.0020, halves +8.8/+5.9)
 
-## Not Supported (9)
+### T-63 · variance-risk-premium-oil
+
+**Claim.** OVX-implied variance exceeds realised USO variance over the following 21 trading days on average.
+
+- kind: volatility · origin: cboe:OVX, options-sweep
+- statistic: mean(OVX^2 - RV^2)
+- null: implied = realised; studentized block bootstrap
+- procedure: as T-48
+- data: cboe-OVX-history, daily-history-USO · min n: 2000
+- pass: p < 0.05, mean > 0, both halves > 0
+- controls: overlapping windows via block bootstrap; index IV applied to the ETF
+- harness: vrp_oil
+- result X-888bbcd8: supported — implied 41.8 vs realised 36.7 vol pts over 4267 days (2009-09-18..2026-09-11); VRP positive on 79% of days, block-bootstrap p=0.0015, halves +0.0314/+0.0483
+
+### T-64 · variance-risk-premium-bonds
+
+**Claim.** VXTLT-implied variance exceeds realised TLT variance over the following 21 trading days on average.
+
+- kind: volatility · origin: cboe:VXTLT, options-sweep
+- statistic: mean(VXTLT^2 - RV^2)
+- null: implied = realised; studentized block bootstrap
+- procedure: as T-48
+- data: cboe-VXTLT-history, daily-history-TLT · min n: 2000
+- pass: p < 0.05, mean > 0, both halves > 0
+- controls: overlapping windows via block bootstrap; index IV applied to the ETF
+- harness: vrp_bonds
+- result X-b147605f: supported — implied 15.5 vs realised 14.4 vol pts over 5697 days (2004-01-02..2026-09-11); VRP positive on 72% of days, block-bootstrap p=0.0220, halves +0.0019/+0.0044
+
+## Not Supported (11)
 
 ### T-02 · longshot-bias
 
@@ -309,7 +337,35 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: crypto_weekend
 - result X-45ddf2f7: not_supported — weekend +12.1 bps/day vs weekday +20.1 (diff -8.0, two-sided block-bootstrap p=0.402, halves -14.1/-1.9); weekend vol is 0.72x weekday vol
 
-## Inconclusive (5)
+### T-65 · variance-risk-premium-russell
+
+**Claim.** RVX-implied variance exceeds realised IWM variance over the following 21 trading days on average.
+
+- kind: volatility · origin: cboe:RVX, options-sweep
+- statistic: mean(RVX^2 - RV^2)
+- null: implied = realised; studentized block bootstrap
+- procedure: as T-48
+- data: cboe-RVX-history, daily-history-IWM · min n: 2000
+- pass: p < 0.05, mean > 0, both halves > 0
+- controls: overlapping windows via block bootstrap; index IV applied to the ETF
+- harness: vrp_russell
+- result X-3f3a7dbe: not_supported — implied 24.9 vs realised 22.2 vol pts over 4268 days (2009-09-16..2026-09-11); VRP positive on 83% of days, block-bootstrap p=0.0950, halves +0.0151/+0.0098
+
+### T-67 · variance-risk-premium-eth
+
+**Claim.** Deribit DVOL(ETH)-implied variance exceeds realised ETH variance over the following 30 days on average.
+
+- kind: volatility · origin: deribit:DVOL, options-sweep
+- statistic: mean(DVOL^2 - RV^2), 365-day convention
+- null: implied = realised; block bootstrap
+- procedure: as T-49 on ETH
+- data: deribit-dvol-ETH-history, daily-history-ETH-USD · min n: 1000
+- pass: p < 0.05, mean > 0, both halves > 0
+- controls: DVOL-ETH history from 2021-03
+- harness: vrp_eth
+- result X-80732af2: not_supported — implied 77.4 vs realised 74.4 vol pts over 2000 days (2021-03-24..2026-09-13); VRP positive on 64% of days, block-bootstrap p=0.2019, halves +0.1137/-0.0218
+
+## Inconclusive (6)
 
 ### T-38 · retail-attention-predicts-abs-return
 
@@ -393,6 +449,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-c9662a62: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: mean +1.10%/month (p=0.0005); at IV x0.81: mean +0.24%/month (p=0.0745), Sharpe 0.29, MDD -37%
 - blocked on: a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing
 - note: Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days).
+
+### T-66 · implied-move-exceeds-realised
+
+**Claim.** The ATM straddle's implied move at about 30 days exceeds the realised move to expiry on average across SPY, QQQ, IWM, TLT, GLD, SLV, USO and IBIT.
+
+- kind: volatility · origin: options-sweep, cboe:chains
+- statistic: mean(implied move % - realised |move| %) over resolved captures; share implied > realised
+- null: equal; block bootstrap over captures
+- procedure: daily surface capture; pair each capture's ~30 DTE straddle with the realised move once the expiry passes
+- data: options-surface-* (daily), daily-history-* · min n: 30
+- pass: mean > 0, p < 0.05
+- controls: market-priced (actual mids), point in time by construction; needs the expiry to pass, so the first verdict is ~2 months after 2026-10-14
+- harness: implied_move
+- result X-fe2505e4: inconclusive — 0/30 captures with an expired ~30d expiry (chain capture started 2026-10-14)
+- note: the market-priced replacement for the model-priced short-straddle overlay (T-57)
 
 ## Untested (3)
 

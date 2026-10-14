@@ -206,3 +206,37 @@ def overlay_verdict(rep: dict, versus: str = "benchmark", n_boot: int = 2000, se
     out = {k: v for k, v in rep.items() if k not in ("returns", "benchmark")}
     out.update({"p_value_mean_excess": float(p), "mean_excess_per_cycle": float(d.mean()), "halves": [float(d[:len(d) // 2].mean()), float(d[len(d) // 2:].mean())], "versus": versus})
     return out
+
+
+def implied_move_vs_realised(surface_rows: Iterable[dict], price_rows_by_symbol: dict[str, dict[str, float]], target_dte: int = 30, min_captures: int = 30) -> dict:
+    """From the daily surface captures: the ATM straddle's implied move (% of spot) at the expiry nearest target_dte vs the
+    realised |log return| from the capture day to that expiry. Needs the expiry to have passed; inconclusive until
+    ``min_captures`` resolved captures exist. Statistic: mean(implied - realised) in % and the share of captures where the
+    implied move exceeded the realised one."""
+    by_capture: dict[tuple, list[dict]] = {}
+    for r in surface_rows:
+        v = r["value"]; cap = (r.get("available_at") or "")[:10]
+        by_capture.setdefault((v["symbol"], cap), []).append(v)
+    pairs = []
+    for (sym, cap), rows in by_capture.items():
+        px = price_rows_by_symbol.get(sym)
+        if not px or cap not in px:
+            continue
+        row = min(rows, key=lambda v: abs(v["dte"] - target_dte))
+        exp = row["expiry"]
+        exp_day = max((d for d in px if d <= exp), default=None)
+        if exp_day is None or exp_day <= cap or exp > max(px):
+            continue                                              # expiry not yet observed
+        realised = abs(math.log(px[exp_day] / px[cap])) * 100
+        pairs.append((sym, cap, exp, row["implied_move_pct"], realised))
+    n = len(pairs)
+    out = {"n_resolved_captures": n, "n_captures_total": len(by_capture), "min_captures": min_captures}
+    if n < min_captures:
+        out.update({"verdict": "inconclusive", "reason": f"{n}/{min_captures} captures with an expired ~{target_dte}d expiry (chain capture started 2026-10-14)"}); return out
+    imp = np.array([p[3] for p in pairs]); real = np.array([p[4] for p in pairs])
+    d = imp - real
+    p = block_bootstrap_pvalue(imp, real, n_boot=2000, block_len=5)
+    out.update({"mean_implied_pct": float(imp.mean()), "mean_realised_pct": float(real.mean()), "mean_diff_pct": float(d.mean()), "share_implied_exceeds": float((d > 0).mean()), "p_value": float(p),
+                "verdict": "supported" if (p < 0.05 and d.mean() > 0) else "not_supported",
+                "reason": f"implied move {imp.mean():.2f}% vs realised {real.mean():.2f}% over {n} resolved captures (implied larger on {float((d > 0).mean())*100:.0f}%, p={p:.3f})"})
+    return out

@@ -1632,6 +1632,151 @@
     "X-45ddf2f7"
    ],
    "notes": ""
+  },
+  {
+   "id": "T-63",
+   "slug": "variance-risk-premium-oil",
+   "kind": "volatility",
+   "claim": "OVX-implied variance exceeds realised USO variance over the following 21 trading days on average.",
+   "origin": [
+    "cboe:OVX",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean(OVX^2 - RV^2)",
+    "null": "implied = realised; studentized block bootstrap",
+    "procedure": "as T-48",
+    "data": "cboe-OVX-history, daily-history-USO",
+    "min_n": 2000,
+    "pass": "p < 0.05, mean > 0, both halves > 0",
+    "controls": "overlapping windows via block bootstrap; index IV applied to the ETF"
+   },
+   "experiments": [
+    "vrp_oil"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-888bbcd8"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-64",
+   "slug": "variance-risk-premium-bonds",
+   "kind": "volatility",
+   "claim": "VXTLT-implied variance exceeds realised TLT variance over the following 21 trading days on average.",
+   "origin": [
+    "cboe:VXTLT",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean(VXTLT^2 - RV^2)",
+    "null": "implied = realised; studentized block bootstrap",
+    "procedure": "as T-48",
+    "data": "cboe-VXTLT-history, daily-history-TLT",
+    "min_n": 2000,
+    "pass": "p < 0.05, mean > 0, both halves > 0",
+    "controls": "overlapping windows via block bootstrap; index IV applied to the ETF"
+   },
+   "experiments": [
+    "vrp_bonds"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-b147605f"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-65",
+   "slug": "variance-risk-premium-russell",
+   "kind": "volatility",
+   "claim": "RVX-implied variance exceeds realised IWM variance over the following 21 trading days on average.",
+   "origin": [
+    "cboe:RVX",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean(RVX^2 - RV^2)",
+    "null": "implied = realised; studentized block bootstrap",
+    "procedure": "as T-48",
+    "data": "cboe-RVX-history, daily-history-IWM",
+    "min_n": 2000,
+    "pass": "p < 0.05, mean > 0, both halves > 0",
+    "controls": "overlapping windows via block bootstrap; index IV applied to the ETF"
+   },
+   "experiments": [
+    "vrp_russell"
+   ],
+   "testable_now": true,
+   "status": "not_supported",
+   "blocked_on": "",
+   "results": [
+    "X-3f3a7dbe"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "T-66",
+   "slug": "implied-move-exceeds-realised",
+   "kind": "volatility",
+   "claim": "The ATM straddle's implied move at about 30 days exceeds the realised move to expiry on average across SPY, QQQ, IWM, TLT, GLD, SLV, USO and IBIT.",
+   "origin": [
+    "options-sweep",
+    "cboe:chains"
+   ],
+   "trial": {
+    "statistic": "mean(implied move % - realised |move| %) over resolved captures; share implied > realised",
+    "null": "equal; block bootstrap over captures",
+    "procedure": "daily surface capture; pair each capture's ~30 DTE straddle with the realised move once the expiry passes",
+    "data": "options-surface-* (daily), daily-history-*",
+    "min_n": 30,
+    "pass": "mean > 0, p < 0.05",
+    "controls": "market-priced (actual mids), point in time by construction; needs the expiry to pass, so the first verdict is ~2 months after 2026-10-14"
+   },
+   "experiments": [
+    "implied_move"
+   ],
+   "testable_now": true,
+   "status": "inconclusive",
+   "blocked_on": "",
+   "results": [
+    "X-fe2505e4"
+   ],
+   "notes": "the market-priced replacement for the model-priced short-straddle overlay (T-57)"
+  },
+  {
+   "id": "T-67",
+   "slug": "variance-risk-premium-eth",
+   "kind": "volatility",
+   "claim": "Deribit DVOL(ETH)-implied variance exceeds realised ETH variance over the following 30 days on average.",
+   "origin": [
+    "deribit:DVOL",
+    "options-sweep"
+   ],
+   "trial": {
+    "statistic": "mean(DVOL^2 - RV^2), 365-day convention",
+    "null": "implied = realised; block bootstrap",
+    "procedure": "as T-49 on ETH",
+    "data": "deribit-dvol-ETH-history, daily-history-ETH-USD",
+    "min_n": 1000,
+    "pass": "p < 0.05, mean > 0, both halves > 0",
+    "controls": "DVOL-ETH history from 2021-03"
+   },
+   "experiments": [
+    "vrp_eth"
+   ],
+   "testable_now": true,
+   "status": "not_supported",
+   "blocked_on": "",
+   "results": [
+    "X-80732af2"
+   ],
+   "notes": ""
   }
  ]
 }

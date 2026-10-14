@@ -26,7 +26,7 @@ from mandel.experiments.msm import msm_vs_rolling
 from mandel.experiments.overfit import overfit_report
 from mandel.experiments.scaling import hurst_with_interval, multifractal_test
 from mandel.experiments.social import attention_vs_abs_return, fear_greed_forward_returns
-from mandel.experiments.volatility import overlay_backtest, overlay_verdict, skew_tail, term_structure_reversion, variance_risk_premium
+from mandel.experiments.volatility import implied_move_vs_realised, overlay_backtest, overlay_verdict, price_closes, skew_tail, term_structure_reversion, variance_risk_premium
 from mandel.experiments.underlying import ratio_reversion, trend_rules_multi, turn_of_month, weekday_effect, weekend_effect
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
@@ -259,6 +259,34 @@ def harness_vrp_nasdaq(archive: Archive):
     return _vrp(archive, "cboe-VXN-history", "daily-history-QQQ", "QQQ", 21, 252)
 
 
+def harness_vrp_oil(archive: Archive):
+    """T-63: OVX^2 exceeds realised USO variance over the next 21 days."""
+    return _vrp(archive, "cboe-OVX-history", "daily-history-USO", "USO", 21, 252)
+
+
+def harness_vrp_bonds(archive: Archive):
+    """T-64: VXTLT^2 exceeds realised TLT variance over the next 21 days."""
+    return _vrp(archive, "cboe-VXTLT-history", "daily-history-TLT", "TLT", 21, 252)
+
+
+def harness_vrp_russell(archive: Archive):
+    """T-65: RVX^2 exceeds realised IWM variance over the next 21 days."""
+    return _vrp(archive, "cboe-RVX-history", "daily-history-IWM", "IWM", 21, 252)
+
+
+def harness_vrp_eth(archive: Archive):
+    """T-67: DVOL(ETH)^2 exceeds realised ETH variance over the next 30 days."""
+    return _vrp(archive, "deribit-dvol-ETH-history", "daily-history-ETH-USD", "ETH-USD", 30, 365)
+
+
+def harness_implied_move(archive: Archive):
+    """T-66: the ATM straddle's implied move at ~30 DTE exceeds the realised move to expiry (from the daily surface capture)."""
+    syms = ["SPY", "QQQ", "IWM", "TLT", "GLD", "SLV", "USO", "IBIT"]
+    px = {s: price_closes(archive.load(f"daily-history-{s}"), s) for s in syms if _bundles_matching(archive, f"daily-history-{s}")}
+    rep = implied_move_vs_realised(_load_many(archive, "options-surface-*"), px)
+    return rep, rep["n_resolved_captures"], rep["verdict"], rep["reason"]
+
+
 def harness_skew_tail(archive: Archive):
     rep = skew_tail(archive.load("cboe-SKEW-history"), archive.load("daily-history-SPY"), symbol="SPY")
     return rep, rep["n"], rep["verdict"], rep["reason"]
@@ -416,6 +444,7 @@ HARNESSES: dict[str, Callable] = {
     "vrp_spx": harness_vrp_spx, "vrp_btc": harness_vrp_btc, "vrp_gold": harness_vrp_gold, "vrp_nasdaq": harness_vrp_nasdaq,
     "skew_tail": harness_skew_tail, "term_structure_reversion": harness_term_structure,
     "covered_call_overlay": harness_covered_call, "csp_overlay": harness_csp, "collar_overlay": harness_collar, "short_straddle_model": harness_short_straddle,
+    "vrp_oil": harness_vrp_oil, "vrp_bonds": harness_vrp_bonds, "vrp_russell": harness_vrp_russell, "vrp_eth": harness_vrp_eth, "implied_move": harness_implied_move,
     "trend_rules": harness_trend_rules, "turn_of_month": harness_turn_of_month, "weekday_effect": harness_weekday,
     "gold_silver_ratio": harness_gold_silver_ratio, "crypto_weekend": harness_crypto_weekend,
 }
@@ -436,6 +465,8 @@ BUNDLES_NEEDED = {
     "skew_tail": ["cboe-SKEW-history", "daily-history-SPY"], "term_structure_reversion": ["cboe-VIX-history", "cboe-VIX3M-history"],
     "covered_call_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"], "csp_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"],
     "collar_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"], "short_straddle_model": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"],
+    "vrp_oil": ["cboe-OVX-history", "daily-history-USO"], "vrp_bonds": ["cboe-VXTLT-history", "daily-history-TLT"], "vrp_russell": ["cboe-RVX-history", "daily-history-IWM"],
+    "vrp_eth": ["deribit-dvol-ETH-history", "daily-history-ETH-USD"], "implied_move": ["options-surface-*", "daily-history-SPY"],
     "trend_rules": ["daily-history-SPY", "daily-history-BTC-USD"], "turn_of_month": ["daily-history-SPY"], "weekday_effect": ["daily-history-SPY"],
     "gold_silver_ratio": ["daily-history-GLD", "daily-history-SLV"], "crypto_weekend": ["daily-history-BTC-USD"],
 }
@@ -510,6 +541,8 @@ def _null_for(name: str) -> str:
         "covered_call_overlay": "Sharpe(covered call) <= Sharpe(buy and hold), block bootstrap of paired cycles; model-priced",
         "csp_overlay": "Sharpe(put writing) <= Sharpe(buy and hold); model-priced", "collar_overlay": "descriptive thresholds; model-priced",
         "short_straddle_model": "mean straddle P&L = 0 (block bootstrap); model-priced",
+        "vrp_oil": "implied = realised (block bootstrap)", "vrp_bonds": "implied = realised (block bootstrap)", "vrp_russell": "implied = realised (block bootstrap)", "vrp_eth": "implied = realised (block bootstrap)",
+        "implied_move": "implied move = realised move (block bootstrap over captures)",
         "trend_rules": "zero-skill best-of-48 (6 rules x 8 assets): DSR and PBO deflation, block bootstrap vs buy-and-hold",
         "turn_of_month": "equal mean return on turn-of-month and other days (block bootstrap, block 21)",
         "weekday_effect": "equal means across weekdays (block bootstrap, Bonferroni over weekdays)",
