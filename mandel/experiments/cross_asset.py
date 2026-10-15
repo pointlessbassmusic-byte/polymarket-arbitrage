@@ -289,8 +289,9 @@ def conditional_straddle(days, closes, idx, rates, dte, hold, start, window, pct
     """T-256 / T-272: ATM straddles (BS at the index as flat IV, held `hold` periods to expiry) bought when the index is below its
     trailing-window pct-percentile vs bought on all days: conditional minus unconditional mean return on premium, 95% CI > 0.
     The conditional set is non-overlapping, as both trials specify: after a low-index entry the next `hold` days are skipped. The
-    unconditional mean is over every daily entry. CI: independent circular block bootstraps of the conditional entries (block `block`
-    entries) and of the daily series (block = hold), differenced; ignoring their positive covariance makes the CI conservative.
+    unconditional mean is over every daily entry. CI: paired circular block bootstrap of the difference on the daily timeline (blocks of
+    `block` x `hold` rows, about `block` conditional entries each) of z = 1[entry] x / p - x, p = share of rows that are entries, whose
+    mean is exactly mean_low - mean_all; both means move together in every draw, so their positive covariance is kept.
     n_entries counts the non-overlapping conditional entries (the trials' unit); fewer than min_n (default: the _TRIAL entry for the
     label) caps the verdict at inconclusive."""
     min_n = _trial("conditional_straddle", label, "min_n", min_n, 0)
@@ -318,7 +319,9 @@ def conditional_straddle(days, closes, idx, rates, dte, hold, start, window, pct
         return {"n_entries": nc, "n_days": int(len(x)), "n_low_days": int(m.sum()), "entry_days": entry_days, "min_n": min_n, "verdict": "inconclusive",
                 "reason": f"MODEL-PRICED at flat {label}: only {nc} non-overlapping low-{label} entries (min_n {min_n})"}
     xc = x[cond]
-    draws = _block_mean_draws(xc, block, seed=0) - _block_mean_draws(x, hold, seed=1)
+    flag = np.zeros(len(x), bool); flag[cond] = True
+    z = np.where(flag, x, 0.0) / flag.mean() - x                  # paired difference series: mean(z) == xc.mean() - x.mean()
+    draws = _block_mean_draws(z, block * hold, seed=0)
     lo, hi = float(np.quantile(draws, 0.025)), float(np.quantile(draws, 0.975))
     dmean = float(xc.mean() - x.mean())
     v, why = _verdict([("difference 95% CI > 0", lo > 0)])
