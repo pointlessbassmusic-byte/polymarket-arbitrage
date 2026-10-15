@@ -4102,6 +4102,27 @@
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {symbol, snapshot_date (DoltHub date), quote_date (close quoted: last NYSE trading day <= snapshot_date, or the session a decisive put-call parity match against the closes points to), expiry, strike, type, bid, ask, iv (source column vol), delta, gamma, theta, vega, rho, dolt_commit_at (last named DoltHub commit for the date; 2021-04-21T01:13:00+00:00 for the bulk era; provenance), backfilled (that commit after the next session's open; None = unknown; provenance), stale (True = quote_date moved off the rule, None = not checked), stale_basis}; observed_at = fetch time; available_at = 22:00 UTC on the later of snapshot_date and quote_date"
+  },
+  "dolt-volhistory": {
+   "name": "dolt-volhistory",
+   "kind": "data",
+   "path": "mandel/archive/data/dolt-volhistory.jsonl.gz",
+   "created_at": "2026-10-15T16:44:36.685345+00:00",
+   "rows": 12884,
+   "bytes": 389578,
+   "sha256": "c24b574d1e2d75ba5a8270120d368ce153aa641842bfcbe522a1a22f2e8f4c29",
+   "tags": [
+    "cc-by-sa-4.0",
+    "dolthub",
+    "history",
+    "implied-vol",
+    "realised-vol",
+    "volatility"
+   ],
+   "recipe": "GET https://www.dolthub.com/api/v1alpha1/post-no-preference/options/master?q=SELECT * FROM volatility_history WHERE act_symbol IN ('GLD','IWM','QQQ','SLV','SPY','TLT','USO','XLB','XLE','XLF','XLI','XLK','XLP','XLU','XLV','XLY') AND date IN (<every calendar day of an adaptive window, up to 92 days>), walked 2019-02-09..2026-10-15; windows halve on the 1000-row cap or 'context deadline exceeded'; commit times (provenance) from dolt_log; stale check against archive daily-history-<SYM> closes (read only). Rebuild: mandel.data.dolt_options.fetch_dolt_volhistory(store, symbols, in_git=True). Licence CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/; post-no-preference/options on DoltHub, LICENSE.md in dolt_docs). Attribution: post-no-preference via DoltHub (https://www.dolthub.com/repositories/post-no-preference/options). Changes: added quote_date, available_at, observed_at, dolt_commit_at, backfilled, stale and stale_basis. ShareAlike: this bundle is an adaptation redistributed under CC BY-SA 4.0; anything shared that is built from it must carry the same licence and this attribution.",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, snapshot_date, quote_date (last NYSE trading day <= snapshot_date, or the one session whose 30-session close-to-close vol equals hv_current), hv_current, hv_week_ago, hv_month_ago, hv_year_high, hv_year_high_date, hv_year_low, hv_year_low_date, iv_current, iv_week_ago, iv_month_ago, iv_year_high, iv_year_high_date, iv_year_low, iv_year_low_date (decimals, annualised; hv_current = 30-session sample stdev of log returns x sqrt(252) to quote_date), dolt_commit_at (last named commit; provenance), backfilled (provenance; None = unknown), stale (True = quote_date moved off the rule, None = not checked), stale_basis}; observed_at = fetch time; available_at = 22:00 UTC on the later of snapshot_date and quote_date"
   }
  }
 }
