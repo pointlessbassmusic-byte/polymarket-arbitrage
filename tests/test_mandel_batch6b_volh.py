@@ -290,6 +290,84 @@ def test_snapshots_dedupe_and_drop_rules():
     assert info["rows_after_capture"] == 10
 
 
+BASE_IV = np.array([0.12, 0.20, 0.30, 0.18, 0.16, 0.17, 0.11, 0.14, 0.13, 0.19])      # SPY first, then the nine
+
+
+def _iv_rows(levels):
+    """dolt-volhistory rows for consecutive sessions from {offset: (10,) iv vector}."""
+    days = _sessions("2024-03-04", len(levels))
+    rows = []
+    for d, iv in zip(days, levels):
+        for j, s in enumerate(v.SYMS):
+            rows.append(_vol_row(s, d, d, float(iv[j])))
+    return days, rows
+
+
+def test_iv_screen_drops_one_symbol_glitches_and_keeps_market_wide_moves():
+    # regression (T-250 review): XLK 2021-11-03 iv_current 1.2518 between 0.165 and 0.1885 was kept in the judged sample
+    k, xv = v.SYMS.index("XLK"), v.SYMS.index("XLV")
+    lv = [BASE_IV * (1 + 0.03 * (i % 3)) for i in range(10)]
+    lv[4] = lv[4].copy()
+    lv[4][k] *= 7.5                                              # planted one-symbol spike that reverts next snapshot
+    for i in (6, 7, 8, 9):
+        lv[i] = lv[i] * 2.5                                      # market-wide jump (a Covid-like onset): genuine
+    lv[8] = lv[8].copy()
+    lv[8][xv] *= 0.3                                             # planted one-symbol collapse
+    days, rows = _iv_rows(lv)
+    snaps, info = v.snapshots(rows)
+    assert days[4] not in snaps and days[8] not in snaps
+    assert all(d in snaps for d in days[:4] + days[5:8] + days[9:])         # the reversion and the market jump stay
+    assert info["iv_glitch_dropped"] == 2 and info["used"] == 8
+    assert [(g["quote_date"], g["symbol"]) for g in info["iv_glitches"]] == [(days[4], "XLK"), (days[8], "XLV")]
+    g = info["iv_glitches"][0]
+    assert g["relative_move"] > 7 and g["ref"] == pytest.approx(BASE_IV[k] * 1.03)
+    raw, info_raw = v.snapshots(rows, screen=False)               # the as-is sensitivity keeps them
+    assert len(raw) == 10 and info_raw["iv_glitch_kept"] == 2 and info_raw["iv_glitches"] == info["iv_glitches"]
+
+
+def test_iv_screen_null_keeps_moves_below_the_threshold():
+    rng = np.random.default_rng(12)
+    lv = [BASE_IV * np.exp(0.05 * rng.standard_normal(10)) for _ in range(30)]
+    lv[10] = lv[10].copy()
+    lv[10][3] = 1.7 * np.median(np.array(lv[7:10]), axis=0)[3]   # a 1.7x one-symbol move is not a glitch
+    for i in range(20, 30):
+        lv[i] = lv[i] * 3.0                                       # a 3x market-wide jump is not a glitch
+    days, rows = _iv_rows(lv)
+    snaps, info = v.snapshots(rows)
+    assert len(snaps) == 30 and info["iv_glitch_dropped"] == 0 and info["iv_glitches"] == []
+    largest = info["iv_screen_largest_kept"]
+    assert largest["quote_date"] == days[10] and largest["symbol"] == v.SYMS[3] and 1.6 < largest["relative_move"] < 2
+
+
+def test_iv_screen_level_shift_is_flagged_only_until_it_persists():
+    e = v.SYMS.index("XLE")
+    lv = [BASE_IV.copy() for _ in range(12)]
+    for i in range(5, 12):
+        lv[i] = lv[i].copy()
+        lv[i][e] *= 3.0                                           # a persistent 3x shift of one symbol
+    days, rows = _iv_rows(lv)
+    snaps, info = v.snapshots(rows)
+    assert [g["quote_date"] for g in info["iv_glitches"]] == days[5:5 + v.IV_SCREEN_PREV]
+    assert all(d in snaps for d in days[5 + v.IV_SCREEN_PREV:])   # then it is the symbol's reference level
+
+
+def test_iv_screen_is_point_in_time():
+    k = v.SYMS.index("XLK")
+    lv = [BASE_IV.copy() for _ in range(8)]
+    lv[7] = lv[7].copy()
+    lv[7][k] *= 6.0                                               # a spike on the LAST snapshot needs no later data
+    days, rows = _iv_rows(lv)
+    snaps, info = v.snapshots(rows)
+    assert days[7] not in snaps and info["iv_glitch_dropped"] == 1
+    # earlier flags do not depend on later snapshots
+    lv2 = [x.copy() for x in lv]
+    lv2[3][k] *= 5.0
+    days2, rows2 = _iv_rows(lv2)
+    full = [(g["quote_date"], g["symbol"]) for g in v.snapshots(rows2)[1]["iv_glitches"]]
+    cut = [(g["quote_date"], g["symbol"]) for g in v.snapshots([r for r in rows2 if r["value"]["snapshot_date"] <= days2[3]])[1]["iv_glitches"]]
+    assert cut == [(days2[3], "XLK")] and full[:1] == cut
+
+
 def _chain_rows(sd, spot, term_fn, expiries):
     out = []
     for e in expiries:
@@ -331,7 +409,8 @@ def test_hv_check_matches_planted_and_rejects_wrong_values():
 
 # ------------------------------------------------------------------------------------------------------- harness --
 
-def _bundles(premium, T=1250, seed=10, with_vix=True, mwf=True):
+def _bundles(premium, T=1250, seed=10, with_vix=True, mwf=True, glitch=None):
+    """glitch: (session index, symbol, factor) planted on that snapshot's iv_current."""
     days, px = _market(T, seed=seed)
     b = {}
     for j, s in enumerate(v.SYMS):
@@ -347,7 +426,8 @@ def _bundles(premium, T=1250, seed=10, with_vix=True, mwf=True):
             continue
         for j, s in enumerate(v.SYMS):
             h = float(np.std(np.diff(np.log(px[i - 30:i + 1, j])), ddof=1) * math.sqrt(252))
-            vol.append(_vol_row(s, d, d, float(iv[j]), hv=round(h, 4)))
+            f = glitch[2] if glitch and glitch[0] == i and glitch[1] == s else 1.0
+            vol.append(_vol_row(s, d, d, float(iv[j]) * f, hv=round(h, 4)))
     b[v.VOL_B] = vol
     if with_vix:
         b[v.VIX_B] = [{"value": {"day": d, "close": 18.0 + (i % 5)}} for i, d in enumerate(days)]
@@ -370,6 +450,26 @@ def test_harness_planted_premium_capped_by_the_weights_data_limit():
     assert " — implemented criteria pass; not implemented: point-in-time SPY sector weights" in reason
     assert stat["hv_check"]["SPY"]["share"] == 1.0 and stat["weights_point_in_time"] is False
     assert stat["controls_available"] == {"VIX": True, "COR1M": False}
+
+
+def test_harness_drops_a_planted_iv_glitch_and_reports_the_as_is_sensitivity():
+    # regression (T-250 review): a one-symbol vendor IV spike must not enter the judged sample unnamed
+    days = _sessions("2018-01-02", 1250)
+    i = next(k for k in range(700, 720) if date.fromisoformat(days[k]).weekday() == 2)      # a Wednesday snapshot
+    stat, n, verdict, reason = v.b6b_volh_sector_corr_premium(FakeArchive(_bundles(0.15, glitch=(i, "XLK", 12.0))))
+    json.dumps(stat)
+    si = stat["snapshot_info"]
+    assert si["iv_glitch_dropped"] == 1 and [(g["quote_date"], g["symbol"]) for g in si["iv_glitches"]] == [(days[i], "XLK")]
+    assert f"XLK {days[i]} iv_current" in reason and "as-is with the glitches kept (reported)" in reason
+    asis = stat["as_is_before_iv_screen"]
+    assert asis["n_entries"] == stat["n_entries"] + 1
+    assert asis["rho_implied_outside_pm1"] >= 1 and stat["schemes"]["anchor_nearest"]["rho_implied_outside_pm1"] == 0
+    assert asis["schemes"]["anchor_nearest"]["mean"] < stat["schemes"]["anchor_nearest"]["pooled"]["mean"]
+    assert verdict == "inconclusive" and stat["criterion_mean_ok"] is True
+    # null: without a glitch nothing is dropped and no as-is run is needed
+    stat0, _, _, reason0 = v.b6b_volh_sector_corr_premium(FakeArchive(_bundles(0.15)))
+    assert stat0["snapshot_info"]["iv_glitch_dropped"] == 0 and stat0["as_is_before_iv_screen"] is None
+    assert "dropped 0 snapshot(s) with a vendor IV glitch" in reason0
 
 
 def test_harness_null_premium_not_supported():

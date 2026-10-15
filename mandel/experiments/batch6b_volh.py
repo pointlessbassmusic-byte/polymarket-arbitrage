@@ -17,6 +17,19 @@ Data
     taken on the quote day and not flagged stale is kept, else the earliest. A snapshot is used only when all ten symbols
     have a positive ``iv_current`` and the same ``quote_date`` (a stale-moved symbol beside unmoved ones would mix
     sessions; such snapshots are dropped and counted).
+  * IV sanity screen (vendor glitches; point in time). The vendor's ``iv_current`` has isolated one-symbol spikes that
+    revert at the next snapshot (XLK 2021-11-03 at 1.2518 between 0.165 and 0.1885 with hv 0.17, and its
+    ``iv_year_high`` set to that value; XLV 2020-01-06 at 0.3373 between about 0.124 and 0.128 with hv 0.08). One such
+    value moves the implied correlation by more than 1 (XLK: rho_imp -1.45). A symbol's ``iv_current`` is flagged when its
+    ratio to the median of the same symbol's previous ``IV_SCREEN_PREV`` unflagged values, divided by the market-wide move
+    (the median of that ratio over all ten symbols on the same snapshot), is above ``IV_SCREEN_JUMP`` (2x) or below its
+    inverse. A symbol flagged on ``IV_SCREEN_PREV`` consecutive snapshots has shifted level, so those values join its
+    reference and one shift cannot flag it for ever. The screen uses only earlier snapshots and the same snapshot's
+    cross-section, so it is known at the quote.
+    A market-wide jump (Covid, 2020-02/03) moves the median with it and is not flagged. A flagged snapshot is dropped,
+    because the formula needs all ten IVs. Dropped snapshots are counted and named in the reason, with the largest
+    relative move kept. The as-is result (glitches kept) is a reported sensitivity. Measured 2026-10-15: exactly
+    those two snapshots are flagged (relative moves 7.3x and 2.5x). The largest kept move is 1.9x (XLB 2019-12-27).
   * ``iv_current`` is taken as the vendor's 30-calendar-day ATM implied vol. The data module does not document its tenor,
     so the harness measures it: on every snapshot with an archived SPY chain (``dolt-chain-SPY``, optional) it builds the
     ATM IV of each listed expiry (vendor per-strike IVs, call/put average, linear in strike between the two strikes that
@@ -124,6 +137,8 @@ WALK_YEARS = 2                       # walk-forward burn-in
 HV_N = 30                            # hv_current: 30-session close-to-close vol
 HV_TOL = 0.00006                     # 4-decimal rounding plus close-price precision (the data module's tolerance)
 TENORS = tuple(range(14, 46))        # tenor check, calendar days
+IV_SCREEN_PREV = 3                   # IV sanity screen: reference = median of the symbol's previous 3 unflagged values
+IV_SCREEN_JUMP = 2.0                 # flagged when the move relative to the market-wide move is > 2x or < 1/2
 MIN_CLUSTERS = 8
 N_BOOT = 2000
 SEED = 0
@@ -802,10 +817,53 @@ def index_closes(rows) -> dict:
     return out
 
 
-def snapshots(rows, created: str = "", syms: Sequence[str] = SYMS) -> tuple:
+def iv_screen(snaps: dict, syms: Sequence[str] = SYMS, prev: int = IV_SCREEN_PREV, jump: float = IV_SCREEN_JUMP) -> tuple:
+    """Point-in-time vendor-glitch screen over {quote_date: entry} (see the module docstring). In quote order, each
+    symbol's iv_current is compared with the median of its own previous ``prev`` unflagged values, and that ratio is
+    divided by its median over every symbol on the same snapshot (the market-wide move). Flagged when the relative move
+    is > ``jump`` or < 1/``jump``; the first snapshot has no reference. A flagged value stays out of the symbol's
+    reference, except that a symbol flagged on ``prev`` consecutive snapshots has shifted level (not an isolated glitch):
+    those values then become its reference, so one level shift cannot flag it for ever (the ``prev`` snapshots already
+    flagged stay flagged). Returns ([{quote_date, snapshot_date, symbol, iv, ref, relative_move, market_move, hv}], the
+    largest relative move kept as {quote_date, symbol, relative_move} or None)."""
+    flags, top = [], None
+    hist = [[] for _ in syms]
+    pend = [[] for _ in syms]
+    for q in sorted(snaps):
+        e = snaps[q]
+        iv = np.asarray(e["iv"], dtype=float)
+        if not hist[0]:
+            for j in range(len(syms)):
+                hist[j].append(float(iv[j]))
+            continue
+        ref = np.array([float(np.median(h[-prev:])) for h in hist])
+        ratio = iv / ref
+        mkt = float(np.median(ratio))
+        rel = ratio / mkt
+        for j, s in enumerate(syms):
+            if rel[j] > jump or rel[j] < 1.0 / jump:
+                flags.append({"quote_date": q, "snapshot_date": e["snapshot_date"], "symbol": s, "iv": float(iv[j]),
+                              "ref": float(ref[j]), "relative_move": float(rel[j]), "market_move": mkt,
+                              "hv": float(e["hv"][j]) if "hv" in e else None})
+                pend[j].append(float(iv[j]))
+                if len(pend[j]) >= prev:
+                    hist[j].extend(pend[j])
+                    pend[j] = []
+                continue
+            pend[j] = []
+            hist[j].append(float(iv[j]))
+            sz = max(float(rel[j]), 1.0 / float(rel[j]))
+            if top is None or sz > max(top["relative_move"], 1.0 / top["relative_move"]):
+                top = {"quote_date": q, "symbol": s, "relative_move": float(rel[j])}
+    return flags, top
+
+
+def snapshots(rows, created: str = "", syms: Sequence[str] = SYMS, screen: bool = True) -> tuple:
     """({quote_date: entry}, info) from dolt-volhistory rows. One snapshot per quote session (not stale and taken on the
     quote day first, else the earliest); entry = {quote_date, snapshot_date, available_at (latest of the rows), stale,
-    iv (10,), hv (10,)}. A snapshot needs every symbol with a positive iv_current and one common quote_date."""
+    iv (10,), hv (10,)}. A snapshot needs every symbol with a positive iv_current and one common quote_date. The IV sanity
+    screen (``iv_screen``) flags vendor glitches: with ``screen`` the flagged snapshots are dropped (info
+    ``iv_glitch_dropped``), else kept (info ``iv_glitch_kept``); info ``iv_glitches`` names them either way."""
     by = defaultdict(dict)
     late = 0
     for r in rows:
@@ -846,9 +904,17 @@ def snapshots(rows, created: str = "", syms: Sequence[str] = SYMS) -> tuple:
                 continue
         best[q] = (key, e)
     out = {q: e for q, (k, e) in best.items()}
+    flags, top = iv_screen(out, syms)
+    bad = sorted({f["quote_date"] for f in flags})
+    if screen:
+        out = {q: e for q, e in out.items() if q not in bad}
+    info["iv_glitch_dropped" if screen else "iv_glitch_kept"] = len(bad)
     info["used"] = len(out)
     info["stale_moved_kept"] = sum(1 for e in out.values() if e["stale"])
-    return out, dict(info)
+    info = dict(info)
+    info["iv_glitches"] = flags
+    info["iv_screen_largest_kept"] = top
+    return out, info
 
 
 def hv_check(close_col, days: Sequence[str], hv_by_day: dict, n: int = HV_N, tol: float = HV_TOL) -> dict:
@@ -953,7 +1019,9 @@ def b6b_volh_sector_corr_premium(archive):
     if miss:
         return miss
     created = _created(archive, VOL_B)
-    snaps, sinfo = snapshots(archive.load(VOL_B), created)
+    vrows = list(archive.load(VOL_B))
+    snaps, sinfo = snapshots(vrows, created)
+    snaps_raw, _ = snapshots(vrows, created, screen=False)        # as-is (IV glitches kept): reported sensitivity
     cl = {s: closes_from_rows(archive.load(CLOSE_B[s]), _created(archive, CLOSE_B[s])) for s in SYMS}
     days = sorted(set.intersection(*[set(c) for c in cl.values()]))
     if len(days) < REG_WINDOW + HOLD + 10:
@@ -972,12 +1040,50 @@ def b6b_volh_sector_corr_premium(archive):
                     f"no usable {VOL_B} snapshot (all ten symbols with iv_current on a common quote session with closes): "
                     f"{sinfo} — not implemented: every criterion (no snapshots)")
     pos = {d: i for i, d in enumerate(days)}
-    sess = np.array([pos[e["quote_date"]] for e in entries], dtype=np.int64)
-    judged, reported, winfo = weight_schemes(days, close, adj, sess)
+    entries_raw = [snaps_raw[q] for q in sorted(snaps_raw) if q in dset]
+    sess_raw = np.array([pos[e["quote_date"]] for e in entries_raw], dtype=np.int64)
+    judged_raw, reported_raw, winfo = weight_schemes(days, close, adj, sess_raw)
+    keep = np.array([e["quote_date"] in snaps for e in entries_raw], dtype=bool)
+    judged = {k: w[keep] for k, w in judged_raw.items()}
+    reported = {k: w[keep] for k, w in reported_raw.items()}
     note = ("not archived: year-end anchors (approximate, typed in) drifted by price, and a trailing NNLS regression; "
             "data limit, rule 9")
     res = premium_test(days, adj, close, entries, judged, reported, weights_pit=False, weights_note=note, vix=vix,
                        cor1m=cor)
+    as_is = None
+    if not keep.all():
+        r0 = premium_test(days, adj, close, entries_raw, judged_raw, {}, weights_pit=False, weights_note=note, vix=vix,
+                          cor1m=cor)
+        if "schemes" in r0:
+            as_is = {"n_entries": r0["n_entries"], "verdict": r0["verdict"],
+                     "entry_weighted_mean": r0["schemes"][HEADLINE]["entry_weighted"]["mean"]
+                     if HEADLINE in r0["schemes"] else None,
+                     "rho_implied_outside_pm1": r0["schemes"][HEADLINE]["rho_implied_outside_pm1"]
+                     if HEADLINE in r0["schemes"] else None,
+                     "by_year": r0["by_year"],
+                     "schemes": {nm: {"mean": v["pooled"]["mean"], "lower": [b["lower"] for b in v["pooled"]["by_block"]]}
+                                 for nm, v in r0["schemes"].items()}}
+    glitch_txt = "; ".join(
+        f"{g['symbol']} {g['quote_date']} iv_current {_f(g['iv'], 4)} vs {_f(g['ref'], 4)} (median of its previous "
+        f"{IV_SCREEN_PREV} unflagged), hv {_f(g['hv'], 4)}, {_f(g['relative_move'], 1)}x relative to the market-wide move "
+        f"{_f(g['market_move'], 2)}x" for g in sinfo.get("iv_glitches", []))
+    top = sinfo.get("iv_screen_largest_kept")
+    screen_txt = (
+        f"IV sanity screen (a symbol's iv_current moving more than {IV_SCREEN_JUMP:.0f}x or less than 1/{IV_SCREEN_JUMP:.0f} "
+        f"against the median of its previous {IV_SCREEN_PREV} unflagged values, relative to the median move of all ten on the "
+        f"snapshot; point in time): dropped {sinfo.get('iv_glitch_dropped', 0)} snapshot(s) with a vendor IV glitch"
+        + (f" ({glitch_txt})" if glitch_txt else "")
+        + ("" if top is None else f"; largest move kept {top['symbol']} {top['quote_date']} {_f(top['relative_move'], 2)}x")
+        + ("" if as_is is None else
+           f"; as-is with the glitches kept (reported): " + "; ".join(
+               f"{nm} {_s(v['mean'])} (lower " + "/".join(_s(x) for x in v["lower"]) + ")"
+               for nm, v in as_is["schemes"].items())
+           + f", entry-weighted {_s(as_is['entry_weighted_mean'])}, implied |rho| > 1 {as_is['rho_implied_outside_pm1']}"
+           + "".join(f", {y} {_s((as_is['by_year'].get(y) or {}).get('mean'))} (screened "
+                     f"{_s((res.get('by_year', {}).get(y) or {}).get('mean'))})"
+                     for y in sorted({g['quote_date'][:4] for g in sinfo.get('iv_glitches', [])}))
+           + f", verdict {as_is['verdict']}")
+        + ". ")
     # --- data diagnostics: iv_current tenor and hv alignment
     spy_iv = {e["snapshot_date"]: float(e["iv"][0]) for e in entries}
     spy_iv_q = {e["quote_date"]: float(e["iv"][0]) for e in entries}
@@ -1007,7 +1113,8 @@ def b6b_volh_sector_corr_premium(archive):
         f"T-250 on {VOL_B} (vendor iv_current; {sinfo.get('snapshot_dates', 0)} snapshot dates, {sinfo.get('used', 0)} quote "
         f"sessions with all ten IVs on one quote session; dropped: {sinfo.get('missing_iv', 0)} missing an IV, "
         f"{sinfo.get('missing_symbol', 0)} missing a symbol, {sinfo.get('mixed_quote_dates', 0)} with mixed quote dates, "
-        f"{sinfo.get('duplicate_quote_day_dropped', 0)} duplicate quote sessions; {len(no_close)} without closes) and "
+        f"{sinfo.get('duplicate_quote_day_dropped', 0)} duplicate quote sessions, {sinfo.get('iv_glitch_dropped', 0)} with "
+        f"a vendor iv_current glitch; {len(no_close)} without closes) and "
         f"daily-history adjclose for SPY and {', '.join(SECTORS)}. iv_current tenor evidence: "
         + ("no dolt-chain-SPY" if not tenor or tenor.get("best") is None else
            f"SPY chain ATM IV interpolated in total variance matches iv_current best at {tenor['best']} days over "
@@ -1024,9 +1131,10 @@ def b6b_volh_sector_corr_premium(archive):
         f"weights typed in, drifted by raw-close price relatives, normalised over the nine; regression_pit = trailing "
         f"{REG_WINDOW}-session NNLS, strictly point in time): {wtxt}. Realised: zero-mean {HOLD}-session vol of adjclose "
         f"log returns after the quote close. ")
-    reason = data_txt + res["reason_core"] + " — " + res["why"]
+    reason = data_txt + screen_txt + res["reason_core"] + " — " + res["why"]
     stat = {k: v for k, v in res.items() if k not in ("reason", "reason_core", "why")}
     stat.update({"snapshot_info": sinfo, "snapshots_without_closes": no_close, "weights_info": winfo,
+                 "as_is_before_iv_screen": as_is,
                  "weights_point_in_time": False, "iv_tenor_check": tenor, "spy_iv_vs_vix": vix_cmp, "hv_check": hvc,
                  "controls_available": {"VIX": bool(vix), "COR1M": bool(cor)}, "claim_margin": MARGIN, "min_n": MIN_N})
     return _out(stat, res["n"], res["verdict"], reason)
