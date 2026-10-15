@@ -164,3 +164,17 @@ def test_implied_move_block_is_at_least_twice_the_realised_window():
     realised window shared by about 21 consecutive captures needs a block of at least 42 captures (it was about 21)."""
     rep = implied_move_vs_realised(*_surface_history(seed=3, n_cap=700, h=21), n_boot=199)
     assert rep["block_len"] >= 42 and f"block {rep['block_len']} captures" in rep["reason"]
+
+
+def test_overlay_without_a_prior_bill_is_inconclusive_not_an_error():
+    """Rule 9: when no DTB3 print is dated before any entry, every cycle is dropped and the overlay is a data limit
+    (inconclusive, the cause named), never a crash."""
+    from mandel.experiments import volatility as vol
+    days = _sessions("2010-01-04", 400)
+    px = _px_rows(days, [100.0 + 0.05 * i for i in range(len(days))])
+    vix = _idx_rows(days, [20.0] * len(days))
+    late = _bill_rows(["2099-01-02"], [5.0])                   # the only print is dated after every entry
+    rep = vol.overlay_backtest(px, vix, late, "covered_call")
+    assert rep["n_cycles"] == 0 and rep["cycles_without_prior_bill"] > 0 and "no DTB3 print" in rep["no_cycles_reason"]
+    out = vol.overlay_verdict(rep)
+    assert out["verdict"] == "inconclusive" and "no DTB3 print dated before any entry" in out["reason"]

@@ -328,6 +328,15 @@ def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_
         rets.append(pnl / notional); bh.append((s1 - s0) / s0 + div); bill.append(math.exp(r * T) - 1); qdiv.append(qd)
     rets, bh, bill, qdiv = np.array(rets), np.array(bh), np.array(bill), np.array(qdiv)
     funded = strategy not in ("short_straddle", "long_straddle")
+    if not cycles:                          # a data limit (rule 9): no cycle survives, e.g. no DTB3 print before any entry
+        cause = (f"no DTB3 print dated before any entry ({n_no_bill} cycles dropped)" if n_no_bill else "too few sessions for one cycle")
+        return {"strategy": strategy, "symbol": symbol, "model_priced": True, "iv_scale": iv_scale, "n_cycles": 0,
+                "first_day": days[0] if days else None, "last_day": days[-1] if days else None, "calendar": cal, "cycle_sessions": None,
+                "mean_cycle_return": None, "sharpe": None, "cagr": None, "max_drawdown": None, "benchmark_sharpe": None,
+                "benchmark_cagr": None, "benchmark_max_drawdown": None, "no_cycles_reason": cause,
+                "rate_basis": ("DTB3 discount yield as the continuous rate, last print dated before the entry" if rt is not None else "no bill rows: r = 0"),
+                "cycles_without_prior_bill": int(n_no_bill), "bill_max_staleness_days": None, "dividend_forward_cycles": 0,
+                "returns": rets, "benchmark": bh, "bill_returns": bill, "dividend_q": qdiv}
     def dd(x):
         c = np.cumprod(1 + x); peak = np.maximum.accumulate(c); return float((c / peak - 1).min())
     lens = [i1 - i for i, i1 in cycles]
@@ -352,7 +361,8 @@ def overlay_verdict(rep: dict, versus: str = "benchmark", n_boot: int = 2000, se
     rets = rep["returns"]; inc = rep["benchmark"] if versus == "benchmark" else np.zeros_like(rets)
     arrays = ("returns", "benchmark", "bill_returns", "dividend_q")
     if len(rets) < 24:
-        return {**{k: v for k, v in rep.items() if k not in arrays}, "verdict": "inconclusive", "reason": f"only {len(rets)} cycles"}
+        why = f"only {len(rets)} cycles" + (f": {rep['no_cycles_reason']}" if rep.get("no_cycles_reason") else "")
+        return {**{k: v for k, v in rep.items() if k not in arrays}, "verdict": "inconclusive", "reason": why}
     p = block_bootstrap_pvalue(rets, inc, n_boot=n_boot, seed=seed)
     d = rets - inc
     out = {k: v for k, v in rep.items() if k not in arrays}

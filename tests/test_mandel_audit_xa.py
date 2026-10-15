@@ -209,6 +209,9 @@ def test_xa8_daily_path_drawdown_and_monthly_roll():
     rep = xa.protective_put_calmar(days, closes, idx, rates, days[0])
     assert rep["n_cycles"] == 25                                             # monthly rolls (was 90-day hold-to-expiry cycles)
     assert rep["mdd_hold"] == pytest.approx(-0.5)                            # cycle-end sampling saw no drawdown at all
+    # the hedged arm is measured on the daily path too: every roll phase's daily path sees the mid-period dip (pooled about -0.53,
+    # each phase -0.58..-0.41), while roll-end sampling of the hedged sleeves would show only about -0.18
+    assert rep["mdd_hedged"] < -0.35
     assert "daily-path MDD" in rep["reason"] and "rolled every 30 days" in rep["reason"]
     # The put cushions a crash on the daily path. One fast crash (100 -> 40 in 6 days, back by day +60) at every offset against the
     # roll grid: every roll phase holds a put struck near 72 when it comes, so the pooled hedged MDD (mean over phases) is far
