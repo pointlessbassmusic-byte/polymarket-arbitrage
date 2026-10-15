@@ -83,7 +83,9 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 ```
-`sudo systemctl enable --now mandel-cycle.timer`. The daily cycle is
+`sudo systemctl enable --now mandel-cycle.timer`.
+
+Weekly (Sunday), refresh the slower-moving histories the daily job does not touch: `python -m mandel unlock-fetch all` (Yahoo OHLC histories, Ken French and AQR factors, FOMC calendar, Deribit funding/settlement/futures, CBOE VIX futures) followed by `python -m mandel experiment-run all`. A second timer (`OnCalendar=Sun *-*-* 07:30:00`) running the same service with these two commands is enough. The daily cycle is
 maintenance only: it never changes trading parameters. Anything that
 changes behaviour goes through a proposal and the gate, run by a Claude
 Code session (on the Linode or in the cloud) that can read the evidence.
