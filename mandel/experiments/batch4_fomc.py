@@ -7,7 +7,9 @@ the claim and its trial.pass as worded.
 
 Calendar. Decision days are ``decision_day`` from the ``fomc-meetings`` bundle (federalreserve.gov), scheduled meetings
 only. The schedule is published about a year ahead, so flagging a scheduled decision day at the previous close uses no
-future information. Meetings after the last price bar are dropped.
+future information. Meetings after the last price bar are dropped. Unscheduled meetings that a claim leaves out of the
+non-FOMC group are mapped to the first trading day on or after their decision day (the 2020-03-15 meeting was a Sunday;
+its market reaction is the 2020-03-16 session), plus the statement-release day when it differs (2020-03-02 -> 2020-03-03).
 
 Day-flagged tests. A daily series x_t with event flag f_t is turned into d_t = diff + w_t (x_t - m_g(t)), where
 w_t = 1/p on event days and -1/(1-p) on other days (p = share of event days), m_g is the group mean and diff is the
@@ -100,11 +102,30 @@ def _fomc(archive) -> list[str]:
     return _cached(archive, ("fomc",), lambda: scheduled_decision_days(archive.load("fomc-meetings")))
 
 
+# Unscheduled meetings whose statement came out on a later day than the bundle's decision_day: the rate cut decided at
+# the 2020-03-02 unscheduled meeting was released 2020-03-03 at 10:00 a.m. EST (federalreserve.gov press release
+# monetary20200303a).
+UNSCHEDULED_RELEASE_DAYS = {"2020-03-02": "2020-03-03"}
+
+
 def _fomc_unscheduled(archive) -> list[str]:
+    """Unscheduled decision days plus any later statement-release day (calendar dates; the callers align them to the
+    trading calendar with ``align_to_trading_days``)."""
     def load():
         rows = list(archive.load("fomc-meetings"))
-        return sorted(set(scheduled_decision_days(rows, scheduled_only=False)) - set(scheduled_decision_days(rows)))
+        un = set(scheduled_decision_days(rows, scheduled_only=False)) - set(scheduled_decision_days(rows))
+        return sorted(un | {UNSCHEDULED_RELEASE_DAYS[d] for d in un if d in UNSCHEDULED_RELEASE_DAYS})
     return _cached(archive, ("fomc-unscheduled",), load)
+
+
+def align_to_trading_days(days: Sequence[str], dates) -> set:
+    """First trading day on or after each date (a weekend meeting maps to the next session); dates outside the calendar
+    are dropped."""
+    arr = np.asarray(days); out = set()
+    for d in dates:
+        if len(arr) and arr[0] <= d <= arr[-1]:
+            out.add(str(arr[int(np.searchsorted(arr, d, side="left"))]))
+    return out
 
 
 def _missing(archive, names: Sequence[str]):
@@ -237,8 +258,8 @@ def event_straddle_panel(days, closes, iv: dict, event_days, tau: float, ppy: in
                          end: Optional[str] = None, max_gap_days: Optional[int] = None, exclude_days=()) -> dict:
     """One short 1-period ATM straddle per day i: sold at close i-1 with sigma = iv[day i-1]/100, settled at close i.
     ``max_gap_days`` drops windows longer than that many calendar days (data gaps in 24/7 series); ``exclude_days``
-    (e.g. unscheduled FOMC days) are left out of both groups."""
-    ev = set(event_days); ex = set(exclude_days) - ev; c = np.asarray(closes, dtype=float)
+    (e.g. unscheduled FOMC days), each mapped to the first trading day on or after it, are left out of both groups."""
+    ev = set(event_days); ex = align_to_trading_days(days, exclude_days) - ev; c = np.asarray(closes, dtype=float)
     keep = []
     lr = np.diff(np.log(c))
     for i in range(1, len(days)):
@@ -284,7 +305,7 @@ def spx_event_straddle(days, closes, vix: dict, fomc_days, start: str = "1994-01
     settled on |SPY_T - SPY_T-1|. Pass: FOMC-minus-non-FOMC mean short P&L < 0 with the 95% CI excluding 0 in both
     1994-2010 and 2011-2026. Controls reported: FOMC +/- 7 calendar-day placebo, excluding September 2008 and March 2020,
     VIX terciles, |r|/(VIX/sqrt 252) by group, |r| over trailing 30-day realised daily vol by group. ``exclude_days``
-    (unscheduled FOMC days) are dropped from the non-FOMC group."""
+    (unscheduled FOMC days, mapped to the first trading day on or after each) are dropped from the non-FOMC group."""
     P = event_straddle_panel(days, closes, vix, fomc_days, 1.0 / EQ_PPY, EQ_PPY, start=start, exclude_days=exclude_days)
     if len(P["days"]) == 0:
         return {"n": 0, "verdict": "inconclusive", "reason": "no SPY day has a prior-day VIX close"}
@@ -401,8 +422,9 @@ def pre_fomc_drift_oos(days, closes, fomc_days, test=("2012-01-01", "2026-12-31"
     """T-215: SPY close(T-1)-to-close(T) return on scheduled FOMC decision days minus the mean return on non-FOMC days,
     2012-2026. Pass: difference > 0 with the 95% CI excluding 0. Reported: Newey-West CI, 1994-2011 split, random-date placebo,
     FOMC mean minus the unconditional mean, MODEL-PRICED 1%-wide call-spread overlay (``overlay`` = (days, unadjusted closes, vix)).
-    ``exclude_days`` (unscheduled FOMC days) are dropped from the non-FOMC group."""
-    ev = set(fomc_days); ex = set(exclude_days) - ev
+    ``exclude_days`` (unscheduled FOMC days, mapped to the first trading day on or after each) are dropped from the
+    non-FOMC group."""
+    ev = set(fomc_days); ex = align_to_trading_days(days, exclude_days) - ev
     ds, r = _returns(days, closes, *test)
     keep = np.array([d not in ex for d in ds], dtype=bool); ds, r = ds[keep], r[keep]
     f = np.array([d in ev for d in ds], dtype=bool)
@@ -597,7 +619,9 @@ def monetary_momentum(days, closes, dgs2: dict, statement_days, start: str = "19
     15 trading days. Net gap = mean expansionary return - mean contractionary return - 2 x (2 legs x ``cost_bps_leg``)
     (each arm pays its entry and exit legs). Pass: net gap > 1 pp, label-permutation p < 0.05 (labels shuffled across all
     classified meetings, 10,000 draws), both halves positive, and the long-only expansionary arm's Sharpe (daily excess
-    returns over T-bills, cash otherwise, sqrt(252)) above buy-and-hold's over the same calendar span."""
+    returns over T-bills, cash otherwise, sqrt(252)) above buy-and-hold's over the same calendar span. The DGS2 change is
+    taken in exact basis points (DGS2 is quoted to 0.01 pp), so an exact 5 bp move is neutral. min_n counts the
+    expansionary + contractionary meetings, the ones that enter the gap; fewer -> inconclusive, criteria still reported."""
     c = np.asarray(closes, dtype=float); pos = {d: i for i, d in enumerate(days)}
     gk = sorted(dgs2); ga = np.array(gk)
     ev = []
@@ -613,7 +637,7 @@ def monetary_momentum(days, closes, dgs2: dict, statement_days, start: str = "19
         i = pos[t]
         if i + entry_lag + horizon >= len(days):
             skipped["window_incomplete"] += 1; continue
-        chg = (dgs2[t] - dgs2[gk[j - 1]]) * 100
+        chg = round((dgs2[t] - dgs2[gk[j - 1]]) * 100, 6)              # exact bps: 5.65 -> 5.60 is -5, not -5.00000000000007
         lab = "exp" if chg < -threshold_bps else ("con" if chg > threshold_bps else "neu")
         ev.append((t, chg, lab, c[i + entry_lag + horizon] / c[i + entry_lag] - 1, i + entry_lag))
     if not ev:
@@ -627,7 +651,8 @@ def monetary_momentum(days, closes, dgs2: dict, statement_days, start: str = "19
 
     g_gross = gap(labs, ret)
     n_exp, n_con = int((labs == "exp").sum()), int((labs == "con").sum())
-    rep = {"n": len(ev), "n_expansionary": n_exp, "n_contractionary": n_con, "n_neutral": int((labs == "neu").sum()), "skipped": skipped,
+    rep = {"n": n_exp + n_con, "n_classified": len(ev), "n_expansionary": n_exp, "n_contractionary": n_con,
+           "n_neutral": int((labs == "neu").sum()), "skipped": skipped,
            "definition": f"DGS2 change from the previous DGS2 day to t; +/-{threshold_bps:g} bps; entry close t+{entry_lag}, exit {horizon} trading days later",
            "cost": f"{cost_bps_leg:g} bps per leg; each arm pays 2 legs"}
     if g_gross is None:
@@ -669,19 +694,25 @@ def monetary_momentum(days, closes, dgs2: dict, statement_days, start: str = "19
                mean_exp_pp=float(a.mean() * 100), mean_con_pp=float(b.mean() * 100), halves=hv, zlb_2009_2015=zlb,
                arm_sharpe=sr_arm, buy_hold_sharpe=sr_bh, sharpe_diff_lower_95=sd_lo, span=[str(d_d[first]), str(d_d[last - 1])],
                arm_days_in_market_share=float(posn[span].mean()), not_run=["^FVX same-day variant", "Polymarket/Kalshi variants", "Holm over the 6 variants"])
-    if len(ev) < min_n:
-        rep.update(verdict="inconclusive", reason=f"only {len(ev)} classified meetings (min_n {min_n})"); return rep
     crit = [(f"net gap > {gap_pp:g} pp", g_net * 100 > gap_pp), ("permutation p < 0.05", p_perm < 0.05)]
     for lab, h in hv.items():
         crit.append((f"{lab} net gap > 0", None if h["gap_net_pp"] is None else h["gap_net_pp"] > 0))
     crit.append(("long-only expansionary arm Sharpe > buy-and-hold Sharpe", sr_arm > sr_bh))
     v, why = _verdict(crit)
-    rep["verdict"] = v
-    rep["reason"] = (f"SPY 15 trading days from the t+2 close: after {n_exp} expansionary (DGS2 < -{threshold_bps:g} bps) {a.mean()*100:+.2f}% vs "
-                     f"{n_con} contractionary {b.mean()*100:+.2f}% of {len(ev)} meetings: net gap {g_net*100:+.2f} pp (95% CI {ci[0]*100:+.2f} to {ci[1]*100:+.2f}), "
+    rep["criteria"] = {name: ok for name, ok in crit}
+    body = (f"SPY 15 trading days from the t+2 close: after {n_exp} expansionary (DGS2 < -{threshold_bps:g} bps) {a.mean()*100:+.2f}% vs "
+                     f"{n_con} contractionary {b.mean()*100:+.2f}% of {len(ev)} classified meetings: net gap {g_net*100:+.2f} pp (95% CI {ci[0]*100:+.2f} to {ci[1]*100:+.2f}), "
                      f"permutation p={p_perm:.4f}; " + ", ".join(f"{k} {('n/a' if h['gap_net_pp'] is None else format(h['gap_net_pp'], '+.2f'))} pp" for k, h in hv.items())
                      + f"; ZLB 2009-2015 {('n/a' if zlb['gap_net_pp'] is None else format(zlb['gap_net_pp'], '+.2f'))} pp; long-only arm Sharpe {sr_arm:.2f} vs buy-and-hold {sr_bh:.2f} "
-                     f"({rep['span'][0]}..{rep['span'][1]}, excess over T-bills) — {why}")
+                     f"({rep['span'][0]}..{rep['span'][1]}, excess over T-bills)")
+    if n_exp + n_con < min_n:
+        rep.update(verdict="inconclusive", criteria_verdict_if_min_n_ignored=v,
+                   reason=f"only {n_exp + n_con} expansionary+contractionary meetings (min_n {min_n}); {body} — inconclusive: only "
+                          f"{n_exp + n_con} of {len(ev)} classified meetings enter the gap (min_n {min_n}); criteria on this sample, "
+                          f"not used for the verdict: {why}")
+        return rep
+    rep["verdict"] = v
+    rep["reason"] = f"{body} — {why}"
     return rep
 
 
