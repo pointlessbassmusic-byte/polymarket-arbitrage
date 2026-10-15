@@ -105,7 +105,7 @@ Several are already enforced in code; those are marked.
 
 ### Harness rules
 
-Every experiment harness (`mandel/experiments/*.py`) follows these rules. They come from an adversarial audit of
+Every experiment harness (`mandel/experiments/*.py`) follows these twelve rules. They come from an adversarial audit of
 the first 125 harnesses (81 confirmed defects, three fix rounds, each fix independently checked) and from
 refutation passes on every new 'supported' result. A harness that breaks one is a defect, whatever its verdict.
 
@@ -133,6 +133,12 @@ refutation passes on every new 'supported' result. A harness that breaks one is 
     monthly expiry), use it. Otherwise a non-overlapping grid has as many valid start days as its hold length: the
     pooled all-start estimate (overlapping entries, blocks at least twice the hold) is the primary statistic and the
     per-start range is reported. Two 'supported' previews (T-540, T-154) failed this when checked.
+11. **Alternatives must agree.** When a trial names alternative procedures (a studentized block bootstrap *or* the
+    Ledoit-Wolf test), a criterion passes only if every named construction passes; when they disagree it is
+    undecided. A borderline pass that flips under a permitted alternative is not evidence (T-162).
+12. **One information set per decision.** A gate, a strike choice and a price used at the same decision must all be
+    known at the same time. When the archive stamps a value after the fill, use the previous close for all of them or
+    the entry-day close as the live proxy for all of them; if the two readings disagree, the result is undecided (T-220).
 
 ## 3. The improvement loop
 
