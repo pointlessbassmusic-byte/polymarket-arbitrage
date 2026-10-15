@@ -1870,6 +1870,8 @@ def vvix_win_rate(days, vvix, vix, window: int = MONTH, bound: float = 0.70, blo
     ovl_all = np.maximum(ts[:-1] + window - ts[1:], 0)
     ovl, n_ovl3 = int(ovl_all.max()), int((ovl_all > 2).sum())
     ovl_months = [days[ts[i]][:7] for i in np.nonzero(ovl_all > 2)[0]]
+    m_first = {days[i][:7]: int(i) for i in month_first(days, start=start)}
+    late = [days[t] for t in ts if m_first.get(days[t][:7]) != int(t)]
     # rule 10: the 21-session grid (reported)
     gi = np.arange(int(ts[0]), m_all, dtype=np.int64)
     gi = gi[okv[gi]]
@@ -1898,7 +1900,9 @@ def vvix_win_rate(days, vvix, vix, window: int = MONTH, bound: float = 0.70, blo
     reason = (f"VVIX above the realised 21d vol of daily log changes in spot VIX in {k} of {n} calendar months, each entered at "
               f"its first session with a VVIX print ({days[ts[0]]}..{days[ts[-1]]}; spot-VIX changes over 21 sessions of the "
               f"trading calendar; a window runs at most {ovl} session(s) into the next month's window, {n_ovl3} by more than 2"
-              + (f": {', '.join(ovl_months[:6])}" if ovl_months else "") + f"): win rate {k/n:.3f}, one-sided 95% lower bound Clopper-Pearson {cp1[0]:.3f} / "
+              + (f": {', '.join(ovl_months[:6])}" if ovl_months else "")
+              + (f"; {len(late)} month(s) entered after their first session, which had no VVIX print" if late else "")
+              + f"): win rate {k/n:.3f}, one-sided 95% lower bound Clopper-Pearson {cp1[0]:.3f} / "
               f"block bootstrap {b_lo1:.3f} (two-sided exact {cp2[0]:.3f}-{cp2[1]:.3f}) vs {bound:.2f}; mean premium "
               f"{prem.mean():+.1f} vol pts, halves {halves[0]:+.1f}/{halves[1]:+.1f} (win rates {hw[0]:.2f}/{hw[1]:.2f}). Rule 10 "
               f"grid sensitivity (reported): all {gi.size} daily entries pooled win rate {gwin.mean():.3f} (one-sided lower "
@@ -1912,6 +1916,7 @@ def vvix_win_rate(days, vvix, vix, window: int = MONTH, bound: float = 0.70, blo
             "win_rate_halves": hw, "spx_vrp_win_rate": spx_wr, "placebo_win_rate": plc, "first_window": days[ts[0]],
             "last_window": days[ts[-1]], "calendar": "calendar months, first session with a VVIX print",
             "max_window_overlap": ovl, "windows_overlapping_over_2": n_ovl3, "months_overlapping_over_2": ovl_months,
+            "late_entries": late,
             "grid_pooled_rate": float(gwin.mean()), "grid_pooled_lower": g_lo, "grid_offsets": gcp,
             "verdict": verdict, "reason": reason + " — " + why}
 

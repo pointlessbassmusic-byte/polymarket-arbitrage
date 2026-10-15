@@ -115,6 +115,22 @@ def test_decide_below_min_n_needs_decisive_failure():
     assert v == "supported"
 
 
+def test_rule10_helpers():
+    rng = np.random.default_rng(9)
+    x = rng.standard_normal((3, 500)).cumsum(axis=1)
+    from mandel.validation.backtest_eval import _hac_var
+    assert np.allclose(s._lrv(x, 126), _hac_var(x, 126)) and np.allclose(s._lrv(x, 5), _hac_var(x, 5))
+    assert s.pool_block_len(21) == 126 and s.pool_block_len(63, 2) == 126 and s.pool_block_len(21, 1) == 42
+    idx = np.arange(7, 7 + 21 * 10)
+    assert s.n_holds(idx, 21) == 10 and s.n_holds(idx[:1], 21) == 1 and s.n_holds([], 21) == 0
+    assert np.array_equal(s.offset_of(idx, 21)[:3], [0, 1, 2]) and s.offset_of(idx, 21)[21] == 0
+    days = _bdays("2024-01-29", 30)
+    assert [days[i] for i in s.month_first(days)] == ["2024-01-29", "2024-02-01", "2024-03-01"]
+    ok = np.array([d != "2024-02-01" for d in days])
+    assert [days[i] for i in s.month_first(days, ok=ok, start="2024-02-01")] == ["2024-02-02", "2024-03-01"]
+    assert s.grid_cycles(50, 21, 3).tolist() == [[3, 24], [24, 45]]
+
+
 # ================================================================================================= market data ==
 
 def test_dtb3_conversion_and_prior_print():
@@ -270,6 +286,15 @@ def test_vrp_regime_failing_testable_tercile_is_a_failure_even_when_others_are_u
     assert rep["why"].startswith("failed: high VIX tercile") and "implemented criteria pass" not in rep["why"]
 
 
+def test_short_strangle_daily_entries_for_the_pooled_secondary():
+    days = _bdays("2010-01-04", 120)
+    fr = s.make_frame(days, _path(np.full(119, 0.1 / math.sqrt(252)), 3), vix=np.full(120, 20.0), rate=np.full(120, 0.02))
+    grid = s.short_strangle_cycles(fr)
+    daily = s.short_strangle_cycles(fr, starts=np.arange(120))
+    assert grid["start"].tolist() == [0, 21, 42, 63, 84] and daily["start"].tolist() == list(range(99))
+    assert np.allclose(daily["pnl"][grid["start"]], grid["pnl"])
+
+
 def test_short_strangle_cycles_sign():
     days = _bdays("2010-01-04", 400)
     calm = _path(np.full(399, 0.05 / math.sqrt(252)), 3)
@@ -337,22 +362,113 @@ def test_skew_implied_gap_null_fails():
     assert abs(rep["mean_gap"]) < 0.02
 
 
+def test_skew_implied_gap_effect_only_on_one_grid_phase_does_not_pass():
+    # rule 10 regression (T-228): SKEW is rich (140, P = 13.1%) only on the sessions of grid offset 0 and 100 (P = the
+    # normal 2.28%) elsewhere. The old offset-0 grid clears the 2 pp margin; the pooled all-offset estimate (primary) does
+    # not, so the claim must not pass.
+    days, c, sk, vx = _gap_world(100)
+    sk = sk.copy()
+    sk[::21] = 140.0
+    rep = s.skew_implied_gap(days, c, sk, vx, n_boot=NB, n_placebo=50)
+    offs = {o["offset"]: o for o in rep["grid_offsets"]}
+    assert offs[0]["pass"] and offs[0]["lower"] > 0.02
+    assert sum(o["pass_bound"] for o in rep["grid_offsets"]) == 1
+    assert rep["lower_bound_95_one_sided"] < 0.02 and rep["verdict"] == "not_supported", rep["reason"]
+    assert rep["n"] == 340 - 1 and rep["n_entries"] == len(days) - 21           # n = distinct 21-session holds
+
+
+def test_skew_implied_gap_needs_each_of_three_sub_periods():
+    # refuter (T-228): the procedure requires the gap to be positive in EACH third; the pass rule's 2 of 3 is weaker.
+    # Thirds 1 and 3 carry a large gap, the middle third a negative one: the pooled bound and 2-of-3 pass, each-of-3 fails.
+    n = 21 * 600
+    days = _bdays("1990-01-02", n)
+    third = np.arange(n) * 3 // n
+    mid = third == 1
+    sk = np.where(mid, 100.0, 160.0)
+    sd = np.where(mid, 0.40, 0.20) / math.sqrt(252)                       # realised vol 2x VIX in the middle third
+    c = _path(sd[:-1], 4)
+    rep = s.skew_implied_gap(days, c, sk, np.full(n, 20.0), n_boot=NB, n_placebo=50)
+    assert rep["thirds"][0] > 0 > rep["thirds"][1] and rep["thirds"][2] > 0
+    assert rep["lower_bound_95_one_sided"] > 0.02
+    assert rep["verdict"] == "not_supported" and "EACH of the 3 sub-periods" in rep["reason"].split(" — ")[-1]
+    assert "at least 2 of 3" not in rep["reason"].split(" — ")[-1]
+
+
+def test_skew_implied_gap_placebo_is_on_the_realised_indicator():
+    # refuter (T-228): the SKEW placebo must ask whether SKEW predicts REALISED tails (P_SKEW rises with SKEW by
+    # construction, so a placebo on the gap could not fail).
+    rng = np.random.default_rng(5)
+    n = 21 * 400
+    sk = np.repeat(rng.uniform(110, 160, n // 42 + 1), 42)[:n]
+    days = _bdays("1990-01-02", n)
+    flat = s.skew_implied_gap(days, _path(np.full(n - 1, 0.20 / math.sqrt(252)), 6), sk, np.full(n, 20.0),
+                              n_boot=NB, n_placebo=300)
+    sd = np.where(sk > 135, 0.45, 0.20) / math.sqrt(252)                 # high SKEW really precedes fat left tails
+    info = s.skew_implied_gap(days, _path(sd[:-1], 6), sk, np.full(n, 20.0), n_boot=NB, n_placebo=300)
+    assert info["skew_information"]["diff"] > 0.05 and info["skew_information"]["placebo_p"] < 0.05
+    assert flat["skew_information"]["placebo_p"] > 0.05
+    assert "REALISED tail" in flat["reason"] and "BELOW" in flat["reason"]    # benchmark gap below the margin is stated
+
+
+def test_skew_implied_gap_reports_the_spy_splice():
+    days, c, sk, vx = _gap_world(140)
+    alt = np.where(np.arange(len(days)) >= 200, c, np.nan)                  # the same prices from session 200 on
+    rep = s.skew_implied_gap(days, c, sk, vx, n_boot=NB, n_placebo=20, alt_close={"SPY splice": alt})
+    a = rep["alt_series"]["SPY splice"]
+    assert a["from"] == days[200] and a["mean_gap"] == pytest.approx(rep["mean_gap"])
+    assert "SPY splice (from" in rep["reason"] and "the S&P 500 itself" in rep["reason"]
+
+
+def test_gspc_calendar_carries_prints_point_in_time():
+    gd = _bdays("1990-01-02", 30)
+    gc = np.linspace(100, 110, 30)
+    skew = {d: 120.0 + i for i, d in enumerate(gd) if i not in (5, 6, 7)}     # SKEW misses three index sessions
+    vix = {d: 20.0 for d in gd[1:]}                                          # VIX starts a session later
+    days, c, sk, vx, fresh = s.gspc_calendar(gd, gc, skew, vix)
+    assert days == gd[1:] and c[0] == gc[1]                                 # from the first day with both prints
+    i5 = days.index(gd[5])
+    assert sk[i5] == 124.0 and sk[i5 + 2] == 124.0 and sk[i5 + 3] == 128.0   # last print at or before, never a later one
+    assert not fresh[i5] and fresh[i5 + 3]
+    v, f = s.asof_series(gd, {gd[0]: 1.0}, max_age=7)
+    assert v[5] == 1.0 and np.isnan(v[6])                                  # 8 calendar days old: too stale
+
+
 # ===================================================================== T-229: SKEW-gated SPX put spread ==
 
+def _monthly_entries(days, dte=30):
+    return s.calendar_entries(days, s.sessions_for(days, s.monthly_expiry_dates(days)), dte, non_overlap=True)
+
+
 def _spread_world(planted, entries=400, seed=0):
+    """SKEW in 21-session blocks; with ``planted`` a cheap-SKEW entry (below the trailing p20) on SPX's monthly-expiry
+    calendar is followed by a 12% slide to its expiry."""
     rng = np.random.default_rng(seed)
     n = 252 + 21 * entries + 22
+    days = _bdays("1990-01-02", n)
     blocks = n // 21 + 1
     skew = np.repeat(rng.uniform(110, 140, blocks), 21)[:n]
     p20 = s.trailing_pctl(skew, 0.20, 252)
     sd = np.full(n - 1, 0.15 / math.sqrt(252))
     lr = sd * rng.standard_normal(n - 1)
-    if planted:                                                          # a cheap-SKEW month is followed by a crash
-        for t in range(252, n - 21, 21):
-            if skew[t] < p20[t]:
-                lr[t:t + 21] = -0.12 / 21
+    if planted:
+        for t, e in np.stack(_monthly_entries(days), axis=1):
+            if t >= 252 and skew[t] < p20[t]:
+                lr[t:e] = -0.12 / (e - t)
     close = 100 * np.exp(np.concatenate([[0.0], np.cumsum(lr)]))
-    return _bdays("1990-01-02", n), close, skew, np.full(n, 20.0), np.full(n, 0.03), np.full(n, 0.015)
+    return days, close, skew, np.full(n, 20.0), np.full(n, 0.03), np.full(n, 0.015)
+
+
+def test_monthly_expiry_entries_are_30_dte_and_never_overlap():
+    days = _bdays("1990-01-02", 2000)
+    ent, exp = _monthly_entries(days)
+    o = s._ords(days)
+    assert all(date.fromisoformat(days[e]).weekday() == 4 and 15 <= int(days[e][8:]) <= 21 for e in exp)   # third Fridays
+    dte = o[exp] - o[ent]
+    assert dte.min() >= 27 and dte.max() <= 32 and np.all(ent[1:] >= exp[:-1])
+    assert np.any(ent[1:] == exp[:-1])                                   # 28-day months: entered at the previous expiry
+    hol = [d for d in days if d != "1992-04-17"]                         # a holiday third Friday (Good Friday 1992)
+    m = s.monthly_expiry_dates(hol)
+    assert "1992-04-16" in m and "1992-04-17" not in m
 
 
 def test_put_spread_cycle_prices_a_debit_spread():
@@ -366,6 +482,22 @@ def test_put_spread_skew_planted_passes():
     days, c, sk, vx, r, q = _spread_world(True)
     rep = s.put_spread_skew(days, c, sk, vx, r, q, 0.8, 0.015, start="1990-01-02", n_boot=NB, n_placebo=200)
     assert rep["verdict"] == "supported", rep["reason"]
+    assert rep["calendar"].startswith("SPX monthly expiry") and 27 <= rep["dte_range"][0] <= rep["dte_range"][1] <= 32
+    assert "standard monthly expiry calendar" in rep["reason"]
+
+
+def test_put_spread_skew_entries_follow_the_expiry_calendar_not_a_grid():
+    # rule 10(a) (T-229): "monthly 30-DTE" is the monthly expiry calendar. The same world tested on explicit 21-session
+    # grid entries gives a different sample; the default must be the calendar's.
+    days, c, sk, vx, r, q = _spread_world(False, entries=60)
+    rep = s.put_spread_skew(days, c, sk, vx, r, q, 0.8, 0.015, start="1990-01-02", n_boot=NB, n_placebo=20)
+    ent, exp = _monthly_entries(days)
+    keep = ent >= 252
+    assert rep["first_entry"] == days[ent[keep][0]] and rep["last_expiry"] == days[exp[keep][-1]]
+    g = s.grid_cycles(len(days), 21, 252)
+    rep_g = s.put_spread_skew(days, c, sk, vx, r, q, 0.8, 0.015, start="1990-01-02", n_boot=NB, n_placebo=20,
+                              entries=g[:, 0], expiries=g[:, 1])
+    assert rep_g["first_entry"] == days[252] and rep_g["dte_range"] != rep["dte_range"]
 
 
 def test_put_spread_skew_null_fails():
@@ -377,7 +509,9 @@ def test_put_spread_skew_null_fails():
 def test_put_spread_skew_reports_entries_on_an_assumed_yield():
     # regression (T-229): entries priced on the ex-ante assumed yield are counted and named in the reason
     days, c, sk, vx, r, q = _spread_world(False, entries=60)
-    qa = np.arange(len(days)) < 252 + 21 * 10                            # the first 10 entries (t = 252, 273, ..., 441)
+    ent, _ = _monthly_entries(days)
+    ent = ent[ent >= 252]
+    qa = np.arange(len(days)) < ent[9] + 1                               # the first 10 calendar entries
     rep = s.put_spread_skew(days, c, sk, vx, r, q, 0.8, 0.015, start="1990-01-02", n_boot=NB, n_placebo=20, q_assumed=qa)
     assert rep["entries_assumed_q"] == 10 and "ASSUMED dividend yield" in rep["reason"]
     rep0 = s.put_spread_skew(days, c, sk, vx, r, q, 0.8, 0.015, start="1990-01-02", n_boot=NB, n_placebo=20)
@@ -441,19 +575,26 @@ def test_vol_spread_each_side_is_a_criterion():
 
 # ===================================================================================== T-239: VIX call hedge ==
 
-def _hedge_frame(spike, cycles=240, seed=0):
-    n = 21 * cycles + 1
+def _vix_cycles(days):
+    return s.rolling_cycles(s.sessions_for(days, s.vix_expiry_dates(days)))
+
+
+def _hedge_frame(spike, cycles=240, seed=0, calendar=True):
+    """SPY grinds up 0.8% a cycle and falls 20% in every 20th cycle; with ``spike`` VIX jumps to 80 on that cycle's last
+    session. ``calendar``: the cycles are the VIX expiry calendar's; otherwise the 21-session grid from session 0."""
+    n = 21 * cycles + 60
     days = _bdays("2009-09-18", n)
-    adj = np.empty(n)
+    cyc = _vix_cycles(days) if calendar else s.grid_cycles(n, 21)
+    adj = np.full(n, 100.0)
     vix = np.full(n, 15.0)
-    adj[0] = 100.0
-    for c in range(cycles):
-        t = 21 * c
+    for c, (t, e) in enumerate(cyc):
         crash = c % 20 == 10
         ret = -0.20 if crash else 0.008
-        adj[t + 1:t + 22] = adj[t] * (1 + ret * np.arange(1, 22) / 21)
+        L = e - t
+        adj[t + 1:e + 1] = adj[t] * (1 + ret * np.arange(1, L + 1) / L)
+        adj[e + 1:] = adj[e]
         if crash and spike:
-            vix[t + 21] = 80.0                                           # VIX spikes into the crash cycle's expiry
+            vix[e] = 80.0                                                # VIX spikes into the crash cycle's expiry
     return s.make_frame(days, adj.copy(), adj=adj, vix=vix, rate=np.full(n, 0.02),
                         extra={"vix3m": vix * 1.1, "vvix": np.full(n, 90.0)})
 
@@ -461,13 +602,40 @@ def _hedge_frame(spike, cycles=240, seed=0):
 def test_vix_hedge_planted_passes():
     rep = s.vix_hedge_test(_hedge_frame(True), None, n_boot=NB)
     assert rep["verdict"] == "supported", rep["reason"]
-    assert rep["reduction"] > 0.25
+    assert rep["reduction"] > 0.25 and rep["calendar"].startswith("VIX monthly expiry")
 
 
 def test_vix_hedge_null_fails():
     rep = s.vix_hedge_test(_hedge_frame(False), None, n_boot=NB)
     assert rep["verdict"] == "not_supported"
     assert rep["reduction"] < 0.0                                        # premium spent, nothing paid
+
+
+def test_vix_hedge_effect_only_on_one_grid_phase_does_not_pass():
+    # rule 10 regression (T-239): the crash and the VIX spike sit on the 21-session grid from session 0, so a call rolled
+    # on that grid's offset 0 pays off (the old harness: supported). The claim's "rolling 1-month" call follows the VIX
+    # expiry calendar, where the spike falls mid-cycle and has faded by expiry: the verdict must not be supported.
+    fr = _hedge_frame(True, calendar=False)
+    rep = s.vix_hedge_test(fr, None, n_boot=NB)
+    g = {o["offset"]: o["reduction"] for o in rep["grid_offsets"]}
+    assert g[0] > 0.25 and sum(x > 0.25 for x in g.values()) <= 2           # only the planted phase clears the target
+    assert rep["verdict"] == "not_supported", rep["reason"]
+    assert "grid sensitivity" in rep["reason"]
+
+
+def test_vix_expiry_calendar_matches_cboe_rules():
+    hol = {"2024-01-01", "2024-01-15", "2024-02-19", "2024-03-29", "2024-05-27", "2024-06-19", "2024-07-04", "2024-09-02",
+           "2024-11-28", "2024-12-25", "2025-01-01", "2025-01-09", "2025-01-20", "2025-02-17", "2025-04-18", "2025-05-26"}
+    days = [d for d in _bdays("2024-01-02", 400) if d not in hol]
+    v = s.vix_expiry_dates(days)
+    assert "2024-06-18" in v and "2024-06-19" not in v                   # Juneteenth Wednesday -> Tuesday
+    assert "2025-03-18" in v and "2025-03-19" not in v                   # Good Friday 2025-04-18 -> 30 days before Thursday
+    assert {"2024-01-17", "2024-02-14", "2024-03-20", "2024-12-18", "2025-01-22"} <= set(v)
+    m = s.monthly_expiry_dates(days)
+    assert "2025-04-17" in m and "2025-04-18" not in m                   # holiday third Friday -> prior session
+    assert {"2024-01-19", "2024-03-15", "2024-12-20"} <= set(m)
+    cyc = s.rolling_cycles(s.sessions_for(days, v))
+    assert np.all(cyc[1:, 0] == cyc[:-1, 1])                              # rolled at each expiry: no gap, no overlap
 
 
 def test_mdd_rows():
@@ -481,23 +649,30 @@ def test_mdd_paths_chains_daily_paths_and_reduces_to_cycle_returns():
     P = np.array([[0.7, 1.05], [1.0, 1.1]])                            # a 30% dip inside cycle 1 that recovers by its end
     assert s._mdd_paths(P)[0] == pytest.approx(0.30)
     assert s._mdd_rows(P[:, -1] - 1)[0] == pytest.approx(0.0)
+    # ragged cycles padded with their end value chain to the same curve
+    rag = s._pad_paths([np.array([0.9, 1.1]), np.array([0.8]), np.array([1.2, 0.95, 1.3])])
+    flat = np.concatenate([[1.0], np.cumprod([1.1, 0.8, 1.3])])
+    assert rag.shape == (3, 3) and np.allclose(rag[:, -1], [1.1, 0.8, 1.3])
+    eq = [1.0, 0.9, 1.1, 1.1 * 0.8, 1.1 * 0.8 * 1.2, 1.1 * 0.8 * 0.95, 1.1 * 0.8 * 1.3]
+    want = max(1 - x / max(eq[:i + 1]) for i, x in enumerate(eq))
+    assert s._mdd_paths(rag)[0] == pytest.approx(want) and flat[-1] == pytest.approx(eq[-1])
 
 
 def _dip_frame(vix_peak, cycles=200):
-    """SPY falls 30% by session 10 of every 20th cycle and recovers to +0.8% by its end; VIX rises to ``vix_peak`` with the
-    dip and is back at 15 on the expiry session, so the calls pay nothing at expiry."""
-    n = 21 * cycles + 1
+    """On the VIX expiry calendar: SPY falls 30% by session 10 of every 20th cycle and recovers to +0.8% by its end; VIX
+    rises to ``vix_peak`` with the dip and is back at 15 on the expiry session, so the calls pay nothing at expiry."""
+    n = 21 * cycles + 60
     days = _bdays("2009-09-18", n)
-    adj, vix = np.empty(n), np.full(n, 15.0)
-    adj[0] = 100.0
-    j = np.arange(1, 22)
-    for c in range(cycles):
-        t = 21 * c
+    adj, vix = np.full(n, 100.0), np.full(n, 15.0)
+    for c, (t, e) in enumerate(_vix_cycles(days)):
+        L = e - t
+        j = np.arange(1, L + 1)
         if c % 20 == 10:
-            adj[t + 1:t + 22] = adj[t] * (1 + np.where(j <= 10, -0.30 * j / 10, -0.30 + 0.308 * (j - 10) / 11))
-            vix[t + 1:t + 21] = 15 + (vix_peak - 15) * np.where(j[:-1] <= 10, j[:-1] / 10, (21 - j[:-1]) / 11)
+            adj[t + 1:e + 1] = adj[t] * (1 + np.where(j <= 10, -0.30 * j / 10, -0.30 + 0.308 * (j - 10) / (L - 10)))
+            vix[t + 1:e] = 15 + (vix_peak - 15) * np.where(j[:-1] <= 10, j[:-1] / 10, (L - j[:-1]) / (L - 10))
         else:
-            adj[t + 1:t + 22] = adj[t] * (1 + 0.008 * j / 21)
+            adj[t + 1:e + 1] = adj[t] * (1 + 0.008 * j / L)
+        adj[e + 1:] = adj[e]
     return s.make_frame(days, adj.copy(), adj=adj, vix=vix, rate=np.full(n, 0.02),
                         extra={"vix3m": vix * 1.1, "vvix": np.full(n, 90.0)})
 
@@ -506,7 +681,7 @@ def test_vix_hedge_drawdown_is_measured_on_daily_equity():
     # regression (T-239): MDD used to be computed on cycle-end points only, which misses an intra-cycle crash (SPY's
     # Feb-Mar 2020 drawdown) and the daily mark-up of the held calls. Now both curves are daily.
     fr = _dip_frame(80.0)
-    ov = s.vix_call_overlay(fr)
+    ov = s.vix_call_overlay(fr, cycles=_vix_cycles(fr["days"]))
     assert np.allclose(ov["path_hedged"][:, -1] - 1, ov["r_hedged"], atol=1e-12)      # daily marks end at the cycle return
     assert np.allclose(ov["path_spy"][:, -1] - 1, ov["r_spy"], atol=1e-12)
     assert s._mdd_rows(ov["r_spy"])[0] == pytest.approx(0.0)                          # cycle-end sampling sees no drawdown
@@ -539,6 +714,40 @@ def test_vvix_win_rate_null_fails():
     assert 0.3 < rep["win_rate"] < 0.7
 
 
+def test_vvix_win_rate_uses_calendar_months():
+    # rule 10(a) (T-240): "non-overlapping months" are calendar months entered at their first session. VVIX is rich only
+    # on each month's first session: the claim holds on the calendar, while the 21-session grid would mostly miss it.
+    days, _, vx = _vvix_world(80)
+    first = set(s.month_first(days).tolist())
+    vv = np.array([120.0 if i in first else 60.0 for i in range(len(days))])
+    rep = s.vvix_win_rate(days, vv, vx, n_boot=NB, n_placebo=50)
+    assert rep["verdict"] == "supported", rep["reason"]
+    assert rep["n"] >= 200 and rep["calendar"].startswith("calendar months") and rep["grid_pooled_rate"] < 0.2
+    assert all(days[i][:7] != days[i - 1][:7] for i in s.month_first(days)[1:])
+
+
+def test_vvix_win_rate_effect_only_on_one_grid_phase_does_not_pass():
+    # rule 10 regression (T-240): VVIX is rich only on grid offset 0 (every 21st session): the old grid's offset 0 wins
+    # every window, the calendar months almost never do.
+    days, _, vx = _vvix_world(80)
+    vv = np.where(np.arange(len(days)) % 21 == 0, 120.0, 60.0)
+    rep = s.vvix_win_rate(days, vv, vx, n_boot=NB, n_placebo=50)
+    g0 = next(g for g in rep["grid_offsets"] if g["offset"] == 0)
+    assert g0["cp_lower"] > 0.7 and sum(g["cp_lower"] > 0.7 for g in rep["grid_offsets"]) == 1
+    assert rep["verdict"] == "not_supported" and rep["win_rate"] < 0.3
+
+
+def test_vvix_win_rate_skips_sessions_without_a_vvix_print():
+    days, vv, vx = _vvix_world(120)
+    vv = vv.copy()
+    gap = [i for i, d in enumerate(days) if d[:7] == "2006-04"]
+    vv[gap[:5]] = np.nan                                                   # April 2006's first five sessions have no VVIX
+    rep = s.vvix_win_rate(days, vv, vx, n_boot=NB, n_placebo=20)
+    assert rep["late_entries"] == [days[gap[5]]] and "1 month(s) entered after their first session" in rep["reason"]
+    full = s.vvix_win_rate(days, np.where(np.isfinite(vv), vv, 120.0), vx, n_boot=NB, n_placebo=20)
+    assert full["late_entries"] == [] and full["n"] == rep["n"]
+
+
 # ====================================================================== T-249: forward variance premium ==
 
 def _fwd_world(v3, n=63 * 66 + 64, seed=0):
@@ -554,6 +763,24 @@ def test_forward_variance_planted_passes():
 def test_forward_variance_null_fails():
     rep = s.forward_variance_premium(*_fwd_world(16.0), n_boot=NB, n_shift=20)
     assert rep["verdict"] == "not_supported", rep["reason_core"]
+
+
+def test_forward_variance_effect_only_on_one_grid_phase_does_not_pass():
+    # rule 10 regression (T-249): VIX3M is rich (a forward premium) only on the sessions of offset 0 of the 63-session
+    # grid; that grid passes, the pooled all-offset estimate (primary) does not.
+    days, px, vix, v3 = _fwd_world(16.0)
+    v3 = v3.copy()
+    v3[::63] = 20.0
+    rep = s.forward_variance_premium(days, px, vix, v3, n_boot=NB, n_shift=20)
+    offs = {o["offset"]: o for o in rep["grid_offsets"]}
+    assert offs[0]["pass"] and offs[0]["mean"] > 0.3 and len(offs) == 63
+    assert rep["ci_pooled"][0] < 0 < rep["ci_pooled"][1]
+    assert rep["verdict"] == "not_supported", rep["reason_core"]
+    assert rep["n"] >= 60 and rep["block_days"] == 126
+    # even without any planted effect a few adjacent 63-session grids clear the bar by chance (~67 cycles each): the
+    # reason has to report that spread
+    null = s.forward_variance_premium(*_fwd_world(16.0), n_boot=NB, n_shift=20)
+    assert null["verdict"] == "not_supported" and "offsets pass" in null["reason_core"]
 
 
 # ================================================================================== T-511: weekend variance ==
@@ -611,6 +838,19 @@ def test_implied_corr_planted_and_null_with_constituents():
     days, cor, px = _corr_world(30.0)
     rep0 = s.implied_vs_realised_corr(days, cor, px, list("ABCDE"), n_boot=NB, constituents=True)
     assert rep0["verdict"] == "not_supported"
+
+
+def test_implied_corr_effect_only_on_one_grid_phase_does_not_pass():
+    # rule 10 regression (T-538): COR1M is rich only on grid offset 0's sessions (and slightly below the realised 0.3
+    # elsewhere). Offset 0's grid passes; the pooled estimate (primary) does not.
+    days, cor, px = _corr_world(28.0)
+    cor = cor.copy()
+    cor[::21] = 60.0
+    rep = s.implied_vs_realised_corr(days, cor, px, list("ABCDE"), n_boot=NB, constituents=True)
+    offs = {o["offset"]: o for o in rep["grid_offsets"]}
+    assert offs[0]["pass"] and sum(o["pass"] for o in rep["grid_offsets"]) == 1
+    assert rep["verdict"] == "not_supported" and rep["ci95"][0] < 0 < offs[0]["ci"][0], rep["reason"]
+    assert rep["n"] == 251 and rep["block_days"] == 126                  # = the old offset-0 grid's window count
 
 
 def test_implied_corr_sector_proxy_caps_at_inconclusive():

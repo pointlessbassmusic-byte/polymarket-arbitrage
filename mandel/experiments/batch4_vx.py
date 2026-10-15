@@ -35,15 +35,27 @@ Zero-volume bars are stale quotes and are dropped: the two launch bars and 2018-
 split-adjusted closes, and VXX pays no dividends. The matured 2009-2019 series is not archived and is not spliced.
 
 * Entry rule: VIX3M/VIX at the close of trading day t-1 is above 1.10. VXX is bought at the close of day t and sold at
-  the close of t+21, so the cycles do not overlap. Scanning resumes at t+21.
+  the close of t+21.
+* House rule 10 (no arbitrary grid phase). The claim names no entry calendar: every close after a qualifying close is
+  a valid entry, and a non-overlapping scan from the first day (resuming at t+21) fixes an arbitrary phase. The primary
+  statistic is therefore pooled over every qualifying daily entry (overlapping 21-day holds). n stays in the claim's
+  units: the maximal set of non-overlapping qualifying cycles (the sequential scan from the first day, the largest
+  count any start offset gives), which is the min_n count. The reason reports, for each of the 21 start offsets, the
+  sequential scan started there and the fixed 21-session grid phase (the phases together are the pooled entries):
+  the range of their means and upper bounds and how many pass.
 * The pass bound is "upper 95% bound", read as the one-sided 95% upper bound (the repo's convention), from a
-  studentized circular block bootstrap with block 3 cycles.
-* Reported controls: unconditional drift, a random-entry placebo, the worst cycles, a walk-forward threshold chosen
-  on the first half over {1.00, 1.05, 1.10, 1.15, 1.20}, a deflated Sharpe ratio of the short-VXX cycle over that grid,
-  fixed-grid phases, and an SVXY proxy (sign-flipped and leverage-adjusted: -1x through 2018-02-27, -0.5x from
-  2018-02-28).
-* The secondary put spread is MODEL-PRICED: Black-Scholes on VXX with a VVIX-scaled IV proxy. It is reported
-  separately and is not a pass criterion.
+  studentized circular block bootstrap of the pooled entries with blocks of 63 entries (the 3-cycle block in daily
+  entries, at least twice the 21-day hold). Each per-offset statistic uses block 3 cycles.
+* Reported controls, all on pooled daily entries: unconditional drift, a random-entry placebo, the worst entry
+  months, a walk-forward threshold chosen on the first half over {1.00, 1.05, 1.10, 1.15, 1.20}, a deflated Sharpe
+  ratio of the short-VXX cycle over that grid (sample length n cycles), and an SVXY proxy (sign-flipped and
+  leverage-adjusted: -1x through 2018-02-27, -0.5x from 2018-02-28).
+* The secondary put spread is MODEL-PRICED: Black-Scholes on VXX with a VVIX-scaled IV proxy, entered on every
+  qualifying day. It is reported separately and is not a pass criterion.
+
+Rule 10 and T-160: the gated calendar is a daily series (every trading day's P&L, flat days 0) rolled on the VX expiry
+calendar the trial names (Wednesday rolls), so it has no grid phase. Its block-shifted gate placebo (shifts in
+multiples of 21 days) is a reported control, not a criterion.
 
 Verdicts use ``underlying2._verdict``. Any implemented criterion failing gives not_supported. Any criterion not
 implemented (missing data, too few events) gives at best inconclusive. A claim is supported only when every criterion
@@ -52,8 +64,8 @@ cycles) house rule 5 applies (``_rule5_criteria``): the min_n criterion is unmet
 a failing criterion counts only when it fails decisively, its studentized bound at the pass's own confidence lying
 wholly on the wrong side of the claimed bound. T-160's pass is a two-sided 95% CI, so its failure is decisive when the
 two-sided 95% CI lies at or below 0. T-242's pass is the one-sided 95% upper bound, so its failure is decisive when the
-one-sided 95% lower bound from the same bootstrap-t draws lies at or above -3% (the two-sided 95% CI's lower end would
-be a one-sided 97.5% bound and under-call). Any other failure there is undecided, so the verdict is inconclusive. Under
+one-sided 95% lower bound from the same bootstrap-t draws of the pooled entries (rule 10) lies at or above -3% (the
+two-sided 95% CI's lower end would be a one-sided 97.5% bound and under-call). Any other failure there is undecided, so the verdict is inconclusive. Under
 8 observations no bootstrap runs and the verdict is inconclusive.
 """
 
@@ -70,7 +82,8 @@ import numpy as np
 from mandel.experiments.underlying2 import _sr, _verdict
 from mandel.experiments.volatility import index_closes
 from mandel.options import bs
-from mandel.validation.backtest_eval import deflated_sharpe_ratio
+from mandel.validation.backtest_eval import (expected_max_sharpe, kurtosis, probabilistic_sharpe_ratio, sharpe_ratio,
+                                             skewness)
 
 EQUITY_PPY = 252
 VX_MULT = 1000.0
@@ -422,25 +435,77 @@ def vx_calendar(curve: dict, vix: dict, vix3m: dict, cost_per_contract: float = 
 
 def conditional_cycles(days: Sequence[str], closes: np.ndarray, ratio: dict, threshold: float = 1.10,
                        horizon: int = 21, lag: int = 1, start: Optional[str] = None, end: Optional[str] = None,
-                       max_stale_days: int = 5) -> dict:
-    """Non-overlapping event cycles: VIX3M/VIX (``ratio``, as of the close of days[i - lag]) above ``threshold`` means
-    buy at the close of days[i] and sell at the close of days[i + horizon]. Scanning resumes at i + horizon. Returns
-    entry indices, entry days and log returns. With ``threshold=None`` every scanned day is an entry (the
-    unconditional drift)."""
+                       max_stale_days: int = 5, offset: int = 0, overlapping: bool = False) -> dict:
+    """Event cycles: VIX3M/VIX (``ratio``, as of the close of days[i - lag]) above ``threshold`` means buy at the close
+    of days[i] and sell at the close of days[i + horizon]. Returns entry indices, entry days and log returns. With
+    ``threshold=None`` every scanned day is an entry (the unconditional drift).
+
+    Non-overlapping (the default): the scan starts at day ``lag + offset`` and resumes at i + horizon after an entry.
+    From ``offset=0`` this is the maximal set of non-overlapping qualifying cycles (earliest-start greedy); the other
+    offsets are the scan's other start days (rule 10). ``overlapping=True`` enters on every qualifying day (the pooled
+    all-start sample, rule 10)."""
     asof = AsOf(ratio, max_stale_days=max_stale_days)
     c = np.asarray(closes, dtype=float)
     idx, lr = [], []
-    i = max(lag, 0)
+    i = max(lag, 0) + max(int(offset), 0)
     n = len(days)
     while i + horizon < n:
         if (start and days[i] < start) or (end and days[i + horizon] > end):
             i += 1; continue
         r = asof.at(days[i - lag]) if threshold is not None else None
         if threshold is None or (r is not None and r > threshold):
-            idx.append(i); lr.append(math.log(c[i + horizon] / c[i])); i += horizon
+            idx.append(i); lr.append(math.log(c[i + horizon] / c[i])); i += 1 if overlapping else horizon
         else:
             i += 1
     return {"idx": idx, "days": [days[i] for i in idx], "logret": np.array(lr, dtype=float)}
+
+
+def _dsr_n(x: np.ndarray, n_trials: int, trial_sharpes: Sequence[float], n_obs: int) -> Optional[float]:
+    """Deflated Sharpe ratio of ``x`` with the sample length set to ``n_obs``: for a pooled sample of overlapping entries
+    the Sharpe, skew and kurtosis come from every entry, while the estimate's precision is that of ``n_obs``
+    non-overlapping cycles (the claim's units). With n_obs = len(x) it equals ``deflated_sharpe_ratio``."""
+    x = np.asarray(x, dtype=float)
+    if len(x) < 3 or n_obs < 3 or not x.std() > 0:
+        return None
+    ts = np.asarray(trial_sharpes, dtype=float)
+    var = float(ts.var(ddof=1)) if ts.size > 1 else 0.0
+    if n_trials > 1 and not var > 0:
+        var = 1.0 / max(1, n_obs - 1)
+    return float(probabilistic_sharpe_ratio(sharpe_ratio(x), expected_max_sharpe(n_trials, var), n_obs, skewness(x), kurtosis(x)))
+
+
+def offset_scans(days, closes, ratio: dict, threshold: float, horizon: int = 21, lag: int = 1, block: int = 3,
+                 n_boot: int = 5000, seed: int = 0, bound: float = -0.03) -> dict:
+    """Rule 10 per-start statistics of T-242: for each of the ``horizon`` start offsets, the non-overlapping sequential
+    scan from day lag + offset (``conditional_cycles``) and the fixed 21-session grid phase (``grid_cycles``, entries on
+    lag + offset + k * horizon kept when the condition holds; the phases together are exactly the pooled entries). Each
+    gets the claim's statistic (mean log return, studentized block-``block`` one-sided 95% upper bound) and its pass
+    (upper bound < ``bound``)."""
+    out = {}
+    for kind in ("sequential", "grid"):
+        rows = []
+        for p in range(horizon):
+            x = (conditional_cycles(days, closes, ratio, threshold, horizon, lag, offset=p)["logret"] if kind == "sequential"
+                 else grid_cycles(days, closes, ratio, threshold, p, horizon, lag))
+            st = stud_mean(x, block, n_boot, seed) if len(x) else {"mean": None, "ub95": None}
+            rows.append({"offset": p, "n": int(len(x)), "mean": st["mean"], "ub95": st["ub95"],
+                         "pass": bool(st["ub95"] is not None and st["ub95"] < bound)})
+        means = [r["mean"] for r in rows if r["mean"] is not None]
+        ubs = [r["ub95"] for r in rows if r["ub95"] is not None]
+        out[kind] = {"offsets": rows, "n_range": [min(r["n"] for r in rows), max(r["n"] for r in rows)],
+                     "mean_range": [min(means), max(means)] if means else [None, None],
+                     "ub95_range": [min(ubs), max(ubs)] if ubs else [None, None],
+                     "n_pass": int(sum(r["pass"] for r in rows)), "n_offsets": horizon}
+    return out
+
+
+def _worst_months(days: Sequence[str], x: np.ndarray, k: int = 5) -> list:
+    """The ``k`` entry months with the largest VXX gain (each month's largest entry), as (entry day, log return)."""
+    best: dict = {}
+    for d, r in zip(days, np.asarray(x, dtype=float).tolist()):
+        if d[:7] not in best or r > best[d[:7]][1]:
+            best[d[:7]] = (d, r)
+    return sorted(best.values(), key=lambda t: -t[1])[:k]
 
 
 def grid_cycles(days, closes, ratio: dict, threshold: float, phase: int, horizon: int = 21, lag: int = 1) -> np.ndarray:
@@ -529,79 +594,125 @@ def vxx_decay(days: Sequence[str], closes: np.ndarray, vix: dict, vix3m: dict, t
     one-sided 95% studentized block-bootstrap upper bound < bound. Below min_n (house rule 5) the bound criterion's
     failure counts only when the one-sided 95% lower bound (the same bootstrap-t draws, the pass's own confidence) lies
     at or above ``bound``. ``proxy`` = (days, closes) of the
-    SVXY-based proxy, reported as a cross-check. The model-priced put spread is reported separately."""
+    SVXY-based proxy, reported as a cross-check. The model-priced put spread is reported separately.
+
+    Rule 10: the claim names no entry calendar (every close after a VIX3M/VIX > ``threshold`` close is a valid entry),
+    and a non-overlapping scan from the first day fixes an arbitrary phase. The primary statistic is therefore pooled
+    over every qualifying daily entry (overlapping 21-day holds, ``conditional_cycles(overlapping=True)``): the mean, its
+    studentized circular block bootstrap with blocks of max(``block`` x ``horizon``, 2 x ``horizon``) entries (the
+    3-cycle block in daily entries, at least twice the hold), the upper bound that decides the pass and the lower bound
+    that decides a failure below min_n. n stays in the claim's units: the maximal set of non-overlapping qualifying
+    cycles (the earliest-start sequential scan, the largest count any start offset gives). Every control runs on the
+    pooled entries too. Reported per start offset (``offset_scans``): the sequential scan from each of the ``horizon``
+    start days and each fixed 21-session grid phase, with their mean, upper bound and how many pass."""
     days = list(days); c = np.asarray(closes, dtype=float)
     ratio = ratio_series(vix3m, vix)                       # VIX3M / VIX
-    ev = conditional_cycles(days, c, ratio, threshold, horizon, lag)
-    x = ev["logret"]; n = int(len(x))
+    ev = conditional_cycles(days, c, ratio, threshold, horizon, lag)               # maximal non-overlapping set: n
+    n = int(len(ev["logret"]))
     if n < 8:
         crit = [(f"n >= {min_n} non-overlapping conditional cycles (min_n)", None),
                 (f"upper 95% bound of the conditional mean < {bound}", None)]
         v, why = _verdict(crit)
         return {"n": n, "criteria": crit, "verdict": v,
                 "reason": f"only {n} VXX cycles with VIX3M/VIX > {threshold} at entry — {why}"}
-    st = stud_mean(x, block, n_boot, seed)
-    unc = conditional_cycles(days, c, ratio, None, horizon, lag)["logret"]
-    lag0 = conditional_cycles(days, c, ratio, threshold, horizon, 0)["logret"]
-    phases = [grid_cycles(days, c, ratio, threshold, p, horizon, lag) for p in range(horizon)]
-    ph_means = [float(p.mean()) for p in phases if len(p)]
-    # random-entry placebo: the same number of entries drawn uniformly from all valid entry days
+
+    def pooled(t, lg=lag, **kw):
+        return conditional_cycles(days, c, ratio, t, horizon, lg, overlapping=True, **kw)
+
+    pool = pooled(threshold)
+    x = pool["logret"]
+    pblock = max(block * horizon, 2 * horizon)
+    st = stud_mean(x, pblock, n_boot, seed)
+    offs = offset_scans(days, c, ratio, threshold, horizon, lag, block, n_boot, seed, bound)
+    sq, gd = offs["sequential"], offs["grid"]
+    unc = pooled(None)["logret"]
+    unc_n = len(conditional_cycles(days, c, ratio, None, horizon, lag)["logret"])
+    lag0 = pooled(threshold, 0)["logret"]
+    ph_means = [r["mean"] for r in gd["offsets"] if r["mean"] is not None]
+    # random-entry placebo: n entries (the claim's cycles) drawn uniformly from all valid entry days, against the pooled mean
     rng = np.random.default_rng(seed + 7)
     all_lr = np.log(c[lag + horizon:] / c[lag:len(c) - horizon]) if len(c) > lag + horizon else np.array([])
     plc = np.array([all_lr[rng.integers(0, len(all_lr), n)].mean() for _ in range(n_place)]) if len(all_lr) else np.array([])
     plc_p = float((plc <= st["mean"]).mean()) if len(plc) else None
-    worst = sorted(zip(ev["days"], x.tolist()), key=lambda t: -t[1])[:5]
-    # walk-forward threshold: chosen on the first half of the calendar, applied to the second
+    worst = _worst_months(pool["days"], x)
+    # walk-forward threshold: chosen on the first half of the calendar (pooled entries whose exit is in it; at least 5
+    # non-overlapping cycles), applied to the second
     mid = days[len(days) // 2]
-    first = {t: conditional_cycles(days, c, ratio, t, horizon, lag, end=mid)["logret"] for t in grid}
-    pick = min((t for t in grid if len(first[t]) >= 5), key=lambda t: float(first[t].mean()), default=None)
-    wf = conditional_cycles(days, c, ratio, pick, horizon, lag, start=mid)["logret"] if pick is not None else np.array([])
-    # deflated Sharpe of the short-VXX cycle (-log return) at the stated threshold, over the threshold grid
-    trial = {t: conditional_cycles(days, c, ratio, t, horizon, lag)["logret"] for t in grid}
+    first = {t: pooled(t, end=mid)["logret"] for t in grid}
+    n_first = {t: len(conditional_cycles(days, c, ratio, t, horizon, lag, end=mid)["logret"]) for t in grid}
+    pick = min((t for t in grid if n_first[t] >= 5), key=lambda t: float(first[t].mean()), default=None)
+    wf = pooled(pick, start=mid)["logret"] if pick is not None else np.array([])
+    wf_n = len(conditional_cycles(days, c, ratio, pick, horizon, lag, start=mid)["logret"]) if pick is not None else 0
+    # deflated Sharpe of the short-VXX cycle (-log return) at the stated threshold, over the threshold grid, on pooled
+    # entries with the sample length in non-overlapping cycles
+    trial = {t: (x if t == threshold else pooled(t)["logret"]) for t in grid}
     tsr = [float((-trial[t]).mean() / (-trial[t]).std(ddof=1)) if len(trial[t]) > 2 and trial[t].std(ddof=1) > 0 else 0.0 for t in grid]
-    dsr = float(deflated_sharpe_ratio(-x, n_trials=len(grid), trial_sharpes=tsr)) if n > 2 else None
+    dsr = _dsr_n(-x, len(grid), tsr, n) if n > 2 else None
     prox = None
     if proxy is not None:
-        pd_, pc_ = proxy
-        pe = conditional_cycles(list(pd_), np.asarray(pc_, dtype=float), ratio, threshold, horizon, lag)["logret"]
-        ps = stud_mean(pe, block, n_boot, seed + 3) if len(pe) >= 8 else {"mean": float(pe.mean()) if len(pe) else None, "ub95": None}
-        pre = conditional_cycles(list(pd_), np.asarray(pc_, dtype=float), ratio, threshold, horizon, lag, end=days[0])["logret"]
-        prox = {"start": pd_[0], "end": pd_[-1], "n": int(len(pe)), "mean": ps["mean"], "ub95": ps.get("ub95"),
-                "n_before_vxx": int(len(pre)), "mean_before_vxx": float(pre.mean()) if len(pre) else None}
-    mp = put_spread_model(days, c, ev["idx"], vvix, rates or {}, horizon) if vvix else {"pricing": "MODEL-PRICED", "n": 0}
+        pd_, pc_ = list(proxy[0]), np.asarray(proxy[1], dtype=float)
+        pe = conditional_cycles(pd_, pc_, ratio, threshold, horizon, lag, overlapping=True)["logret"]
+        pn = len(conditional_cycles(pd_, pc_, ratio, threshold, horizon, lag)["logret"])
+        ps = stud_mean(pe, pblock, n_boot, seed + 3) if pn >= 8 else {"mean": float(pe.mean()) if len(pe) else None, "ub95": None}
+        pre = conditional_cycles(pd_, pc_, ratio, threshold, horizon, lag, end=days[0], overlapping=True)["logret"]
+        pre_n = len(conditional_cycles(pd_, pc_, ratio, threshold, horizon, lag, end=days[0])["logret"])
+        prox = {"start": pd_[0], "end": pd_[-1], "n": int(pn), "n_pooled_entries": int(len(pe)), "mean": ps["mean"],
+                "ub95": ps.get("ub95"), "n_before_vxx": int(pre_n), "mean_before_vxx": float(pre.mean()) if len(pre) else None}
+    mp = put_spread_model(days, c, pool["idx"], vvix, rates or {}, horizon) if vvix else {"pricing": "MODEL-PRICED", "n": 0}
     # rule 5: the pass is the one-sided 95% upper bound, so the failure is decisive when the one-sided 95% lower bound
     # from the same bootstrap-t draws lies at or above the bound (the two-sided CI's lower end is a one-sided 97.5% bound;
-    # a zero-width interval decides nothing)
-    rows = [(f"one-sided 95% studentized block-{block} bootstrap upper bound of the conditional mean < {bound}",
+    # a zero-width interval decides nothing). Both bounds are the pooled estimate's (rule 10)
+    rows = [(f"one-sided 95% studentized block-{st['block']} bootstrap upper bound of the pooled conditional mean < {bound}",
              None if st["ub95"] is None else bool(st["ub95"] < bound),
              st["lb95"] is not None and bool(st["se"]) and st["lb95"] >= bound)]
     crit = _rule5_criteria(f"n >= {min_n} non-overlapping conditional cycles (min_n)", rows, n, min_n)
     v, why = _verdict(crit)
     r5_dec = (f"its one-sided 95% lower bound ({_pc(st['lb95'])}, the mirror of the one-sided 95% upper-bound pass from the "
               f"same bootstrap-t draws) at or above {_pc(bound)}")
-    pr = (f"SVXY proxy (sign-flipped, -1x to 2018-02-27 then -0.5x) {prox['start']}..{prox['end']}: n={prox['n']}, mean "
-          f"{_pc(prox['mean'])}, upper bound {_pc(prox['ub95'])}, pre-2018 cycles {prox['n_before_vxx']} mean {_pc(prox['mean_before_vxx'])}"
-          if prox else "SVXY proxy not run")
-    mps = (f"{mp['pricing']}: n={mp['n']}, mean P&L {_pc(mp.get('mean_pnl_over_debit'))} of the debit "
+    pr = (f"SVXY proxy (sign-flipped, -1x to 2018-02-27 then -0.5x) {prox['start']}..{prox['end']}: n={prox['n']} cycles "
+          f"({prox['n_pooled_entries']} pooled entries), mean {_pc(prox['mean'])}, upper bound {_pc(prox['ub95'])}, pre-2018 cycles "
+          f"{prox['n_before_vxx']} mean {_pc(prox['mean_before_vxx'])}" if prox else "SVXY proxy not run")
+    mps = (f"{mp['pricing']}: n={mp['n']} pooled entries, mean P&L {_pc(mp.get('mean_pnl_over_debit'))} of the debit "
            f"(debit {mp['mean_debit_over_spot']:.1%} of spot, IV proxy {mp['mean_iv_entry']:.0%}), win rate "
            f"{mp['win_rate']:.0%}" if mp.get("n") else "MODEL-PRICED put spread: no cycle with a full VVIX/VXX history")
+
+    def rng_pc(a):
+        return f"{_pc(a[0])} to {_pc(a[1])}"
+
+    def rng_n(a):
+        return f"{a[0]}" if a[0] == a[1] else f"{a[0]}-{a[1]}"
+
+    r10 = (f"rule 10: the claim names no entry calendar, so the primary statistic is pooled over all {len(x)} qualifying daily "
+           f"entries (overlapping 21-day holds; studentized circular block bootstrap, blocks of {st['block']} entries, "
+           f"at least twice the hold); per start offset: the sequential scan ({rng_n(sq['n_range'])} cycles) "
+           f"mean {rng_pc(sq['mean_range'])}, upper bound {rng_pc(sq['ub95_range'])}, {sq['n_pass']}/{sq['n_offsets']} offsets pass; "
+           f"the fixed 21-session grid phases ({rng_n(gd['n_range'])} cycles, together the pooled entries) mean "
+           f"{rng_pc(gd['mean_range'])}, upper bound {rng_pc(gd['ub95_range'])}, {gd['n_pass']}/{gd['n_offsets']} phases pass")
     reason = (f"VXX (current series B, zero-volume bars dropped) {days[0]}..{days[-1]}: n={n} non-overlapping 21-day cycles "
-              f"entered at the close after a VIX3M/VIX > {threshold} close (need >= {min_n}); mean log return {_pc(st['mean'])} "
-              f"(median {_pc(float(np.median(x)))}), one-sided 95% studentized block-{block} upper bound {_pc(st['ub95'])} "
-              f"(need < {_pc(bound)}), 95% CI [{_pc(st['ci95'][0])}, {_pc(st['ci95'][1])}]. Controls: unconditional mean "
-              f"{_pc(float(unc.mean()) if len(unc) else None)} over {len(unc)} cycles; random-entry placebo: {'n/a' if plc_p is None else f'{plc_p:.0%}'} of "
-              f"{len(plc)} draws at or below the conditional mean; lag-0 entry mean {_pc(float(lag0.mean()) if len(lag0) else None)} "
-              f"(n={len(lag0)}); fixed-grid phases {_pc(min(ph_means) if ph_means else None)} to {_pc(max(ph_means) if ph_means else None)}; "
-              f"walk-forward threshold {pick} (first half to {mid}) gives second-half mean {_pc(float(wf.mean()) if len(wf) else None)} "
-              f"(n={len(wf)}); DSR of the short-VXX cycle over {len(grid)} thresholds {_f(dsr, 3)}; worst cycles (largest VXX gains) "
+              f"entered at the close after a VIX3M/VIX > {threshold} close (the maximal non-overlapping set; need >= {min_n}); "
+              f"{r10}. Pooled mean log return {_pc(st['mean'])} (median {_pc(float(np.median(x)))}), one-sided 95% studentized "
+              f"block-{st['block']} upper bound {_pc(st['ub95'])} (need < {_pc(bound)}), 95% CI [{_pc(st['ci95'][0])}, "
+              f"{_pc(st['ci95'][1])}]. Controls (pooled daily entries): unconditional mean "
+              f"{_pc(float(unc.mean()) if len(unc) else None)} over {len(unc)} entries ({unc_n} cycles); random-entry placebo: "
+              f"{'n/a' if plc_p is None else f'{plc_p:.0%}'} of {len(plc)} draws of {n} entries at or below the pooled conditional "
+              f"mean; lag-0 entry mean {_pc(float(lag0.mean()) if len(lag0) else None)} ({len(lag0)} entries); walk-forward "
+              f"threshold {pick} (first half to {mid}) gives second-half mean {_pc(float(wf.mean()) if len(wf) else None)} "
+              f"({len(wf)} entries, {wf_n} cycles); DSR of the short-VXX cycle over {len(grid)} thresholds {_f(dsr, 3)} "
+              f"(sample length {n} cycles); worst entry months (largest VXX gains) "
               f"{', '.join(f'{d} {_pc(r, 0)}' for d, r in worst[:3])}; {pr}. Secondary, reported separately: {mps}"
               f"{_rule5_note(rows, n, min_n, 'non-overlapping conditional cycles', r5_dec)} — {why}")
     rep = {"n": n, "start": days[0], "end": days[-1], "threshold": threshold, "mean_logret": st["mean"],
            "median_logret": float(np.median(x)), "ub95": st["ub95"], "ci95": st["ci95"], "se": st["se"],
-           "entries": ev["days"], "unconditional_mean": float(unc.mean()) if len(unc) else None, "unconditional_n": int(len(unc)),
-           "lag0": {"n": int(len(lag0)), "mean": float(lag0.mean()) if len(lag0) else None},
-           "grid_phase_means": ph_means, "placebo_share_le": plc_p, "worst_cycles": worst,
-           "walk_forward": {"split": mid, "threshold": pick, "n": int(len(wf)), "mean": float(wf.mean()) if len(wf) else None,
+           "n_pooled_entries": int(len(x)), "pooled_block": st["block"],
+           "entries": ev["days"], "unconditional_mean": float(unc.mean()) if len(unc) else None, "unconditional_n": int(unc_n),
+           "unconditional_n_entries": int(len(unc)),
+           "lag0": {"n_entries": int(len(lag0)), "mean": float(lag0.mean()) if len(lag0) else None},
+           "rule10": {"primary": "pooled over every qualifying daily entry (overlapping 21-day holds)", "block_entries": st["block"],
+                      "n_cycles": "maximal non-overlapping set (sequential scan from the first day)",
+                      "sequential_offsets": sq, "grid_phases": gd},
+           "grid_phase_means": ph_means, "placebo_share_le": plc_p, "worst_months": worst,
+           "walk_forward": {"split": mid, "threshold": pick, "n": int(wf_n), "n_entries": int(len(wf)),
+                            "mean": float(wf.mean()) if len(wf) else None,
                             "first_half_means": {str(t): (float(first[t].mean()) if len(first[t]) else None) for t in grid}},
            "dsr": dsr, "grid_sharpes_per_cycle": dict(zip([str(t) for t in grid], tsr)), "svxy_proxy": prox,
            "model_priced_put_spread": mp, "criteria": crit, "verdict": v, "reason": reason}

@@ -41,6 +41,16 @@ Conventions:
   * min_n in the claim's own units. Below min_n a claim cannot be supported, and a failing criterion counts only when
     it fails decisively (its interval wholly on the wrong side, or the failure would persist at min_n); otherwise it is
     reported as not decisive (None) and the verdict is inconclusive.
+  * House rule 10 (no verdict may rest on an arbitrary grid phase). T-255 and T-261 are stated on "non-overlapping 30-day
+    cycles" and name no entry or expiry calendar ("30-day", priced at T = 30/365 on a 24/7 asset, not Deribit's monthly
+    expiries), so the 30-day grid has 30 equally valid start offsets (rule 10(b)). The PRIMARY statistic of every
+    criterion is the pooled all-offset estimate: an entry on every day from 2021-04-01 whose 30-day expiry close is on or
+    before 2026-09-30 (overlapping cycles), with a circular block bootstrap of the claimed statistic in blocks of
+    pool_block(30, 3) = 90 days (>= 2 holds; studentized for T-255's mean, paired percentile for T-261's variance ratio).
+    Each offset's own non-overlapping grid is also tested (blocks of 3 cycles, as before) and the reason gives the
+    min/max of its statistic and of its bound and how many offsets pass. n stays in the claim's units: the distinct
+    30-day holds the entries span (n_holds). T-194, T-199 and T-137 are statistics on fixed capture days, not on a cycle
+    grid (rule 10(c)): unaffected.
 
 Verdicts use ``underlying2._verdict``: any implemented criterion failing gives not_supported; any criterion not
 implemented gives at best inconclusive; supported only when every criterion is implemented and passes.
@@ -69,6 +79,7 @@ DVOL_B = "deribit-dvol-BTC-history"
 DTB3_B = "fred-DTB3"
 DGS3MO_B = "fred-DGS3MO"
 DGS2_B = "fred-DGS2"
+FUNDING_B = "deribit-funding-BTC-PERPETUAL"   # T-255 sensitivity: signed perpetual funding in place of the flat 1 bp/day
 # T-199's named bill. fred-DGS3MO is not archived yet; these FRED DGS3MO prints (percent, bond-equivalent; read once,
 # read-only, from fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO on 2026-10-15, where the same file's DTB3 column
 # matches the archived fred-DTB3: 4.06 and 4.09) stand in for it only until it is archived, and only for a quote day
@@ -200,6 +211,27 @@ def _halves(x) -> list:
     x = np.asarray(x, dtype=float)
     h = x.size // 2
     return [float(x[:h].mean()) if h else None, float(x[h:].mean()) if x.size - h else None]
+
+
+# ================================================================== rule 10: grid phases of the 30-day cycles ==
+
+def pool_block(hold: int, block_cycles: int) -> int:
+    """Block length (days) of the pooled overlapping daily-entry bootstrap: ``block_cycles`` holds, and at least 2 holds
+    (house rule 10(b)), so a block always spans the overlap of a hold-day cycle with its neighbours."""
+    return max(2 * int(hold), int(block_cycles) * int(hold))
+
+
+def n_holds(idx, hold: int) -> int:
+    """Distinct ``hold``-day holds spanned by sorted daily entry indices: the cycle count of the densest non-overlapping
+    grid through them, i.e. n in the claim's unit (non-overlapping cycles) for a pooled estimate."""
+    idx = np.asarray(idx, dtype=np.int64)
+    return 0 if idx.size == 0 else int((idx[-1] - idx[0]) // int(hold) + 1)
+
+
+def _rng(vals, fmt) -> str:
+    """'min to max' of the finite values, each formatted by ``fmt``; 'n/a' when there are none."""
+    v = [float(x) for x in vals if x is not None and math.isfinite(float(x))]
+    return "n/a" if not v else f"{fmt(min(v))} to {fmt(max(v))}"
 
 
 def _f(x, nd: int = 2) -> str:
@@ -466,11 +498,12 @@ def last_dividend(days, close, adj, before: str) -> Optional[float]:
 
 # ====================================================================================== T-255: hedged straddle ==
 
-def _cycle_starts(days: Sequence[str], hold: int, start: str, end: str) -> np.ndarray:
-    """Non-overlapping cycle entries every ``hold`` days from the first day >= start; the expiry close must be <= end and
-    the cycle must span consecutive calendar days (no data gap)."""
+def _cycle_starts(days: Sequence[str], hold: int, start: str, end: str, offset: int = 0) -> np.ndarray:
+    """Non-overlapping cycle entries every ``hold`` days from the ``offset``-th day after the first day >= start (offset 0:
+    the grid from ``start`` itself); the expiry close must be <= end and the cycle must span consecutive calendar days (no
+    data gap). Grid ``offset`` = the daily entries of _daily_starts with (entry - first) % hold == offset."""
     ords = np.array([date.fromisoformat(d).toordinal() for d in days], dtype=np.int64)
-    i = bisect_left(list(days), start)
+    i = bisect_left(list(days), start) + int(offset)
     out = []
     while i + hold < len(days) and days[i + hold] <= end:
         if ords[i + hold] - ords[i] == hold:
@@ -479,25 +512,49 @@ def _cycle_starts(days: Sequence[str], hold: int, start: str, end: str) -> np.nd
     return np.array(out, dtype=np.int64)
 
 
-def _ivs(iv, I, scale: float) -> np.ndarray:
-    return np.maximum(scale * np.asarray(iv, dtype=float)[I] / 100.0, 0.01)
+def _daily_starts(days: Sequence[str], hold: int, start: str, end: str) -> np.ndarray:
+    """Every daily entry (house rule 10(b), the pooled all-offset estimate): each day >= start whose expiry close ``hold``
+    days later is <= end, the cycle spanning consecutive calendar days (no data gap). The union over the ``hold`` grid
+    offsets of _cycle_starts."""
+    days = list(days)
+    ords = np.array([date.fromisoformat(d).toordinal() for d in days], dtype=np.int64)
+    i0 = bisect_left(days, start)
+    idx = np.arange(i0, max(i0, len(days) - hold), dtype=np.int64)
+    ok = np.array([days[i + hold] <= end and ords[i + hold] - ords[i] == hold for i in idx], dtype=bool)
+    return idx[ok] if idx.size else idx
 
 
-def hedged_straddle(days, close, iv, start: str = "2021-04-01", end: str = "2026-09-30", hold: int = HOLD, scale: float = 1.0,
+def _offsets(idx, days: Sequence[str], hold: int, start: str) -> np.ndarray:
+    """Grid offset (0 .. hold - 1) of each daily entry: the _cycle_starts grid it belongs to."""
+    return (np.asarray(idx, dtype=np.int64) - bisect_left(list(days), start)) % int(hold)
+
+
+def _ivs(iv, I, scale) -> np.ndarray:
+    """sigma = scale * iv / 100 (floored at 1%) on the cycle-day matrix I; ``scale`` is a number or a per-day array
+    aligned with iv (a per-day ATM/DVOL ratio)."""
+    s = np.asarray(scale, dtype=float)
+    s = s[I] if s.ndim else s
+    return np.maximum(s * np.asarray(iv, dtype=float)[I] / 100.0, 0.01)
+
+
+def hedged_straddle(days, close, iv, start: str = "2021-04-01", end: str = "2026-09-30", hold: int = HOLD, scale=1.0,
                     hedge_vol: str = "current", opt_fee: float = DERIBIT_OPT_FEE, hedge_fee: float = DERIBIT_PERP_FEE,
-                    funding_bp: float = FUNDING_BP_DAY) -> dict:
+                    funding_bp: float = FUNDING_BP_DAY, starts=None, funding_rate=None) -> dict:
     """Short ATM straddle (K = entry close) on a 24/7 asset priced by BS at sigma = scale * iv / 100 with r = q = 0, held
     ``hold`` calendar days to expiry and delta-hedged at every daily close with the BS straddle delta (at that day's iv,
     or the entry iv with hedge_vol='entry'); settled on the raw close. gross = premium - |S_T - K| + sum h_j (S_j+1 - S_j).
     Fees: the option fee per leg at entry (opt_fee x S, capped at 12.5% of the leg price), the hedge's taker fee on every
-    traded notional (open, daily rebalances, unwind) and funding_bp per day on the hedge notional. Also returns the
-    entry implied variance minus the cycle's realised variance (365 / hold x sum of squared log returns)."""
+    traded notional (open, daily rebalances, unwind) and funding_bp per day on |hedge notional| or, with
+    ``funding_rate`` (per day aligned with days: the perpetual funding accrued from close i to close i + 1, positive =
+    longs pay; NaN = missing, charged 0), the signed funding sum h_j S_j f_j. Also returns the entry implied variance minus
+    the cycle's realised variance (365 / hold x sum of squared log returns). Entries: ``starts`` (indices into days) when
+    given, else the non-overlapping grid from ``start``."""
     days = list(days)
     close = np.asarray(close, dtype=float)
-    starts = _cycle_starts(days, hold, start, end)
-    keys = ("gross", "net", "prem", "x_gross", "x_net", "var_gap", "fees", "spot", "sig0")
+    starts = _cycle_starts(days, hold, start, end) if starts is None else np.asarray(starts, dtype=np.int64)
+    keys = ("gross", "net", "prem", "x_gross", "x_net", "var_gap", "fees", "spot", "sig0", "funding")
     if starts.size == 0:
-        return {k: np.zeros(0) for k in keys} | {"day": [], "start": starts}
+        return {k: np.zeros(0) for k in keys} | {"day": [], "start": starts, "funding_missing_days": 0}
     I = starts[:, None] + np.arange(hold + 1)[None, :]
     S = close[I]
     sig = _ivs(iv, I, scale)
@@ -515,11 +572,19 @@ def hedged_straddle(days, close, iv, start: str = "2021-04-01", end: str = "2026
     gross = prem - payoff + hedge_pnl
     leg_fee = np.minimum(opt_fee * K, 0.125 * c0) + np.minimum(opt_fee * K, 0.125 * p0)
     trades = np.concatenate([np.abs(h[:, :1]) * S[:, :1], np.abs(np.diff(h, axis=1)) * S[:, 1:hold], np.abs(h[:, -1:]) * S[:, -1:]], axis=1)
-    fees = leg_fee + hedge_fee * trades.sum(axis=1) + funding_bp / 1e4 * np.sum(np.abs(h) * S[:, :hold], axis=1)
+    miss = 0
+    if funding_rate is None:
+        funding = funding_bp / 1e4 * np.sum(np.abs(h) * S[:, :hold], axis=1)
+    else:
+        fr = np.asarray(funding_rate, dtype=float)[I[:, :hold]]
+        miss = int(np.isnan(fr).sum())
+        funding = np.sum(h * S[:, :hold] * np.nan_to_num(fr), axis=1)
+    fees = leg_fee + hedge_fee * trades.sum(axis=1) + funding
     net = gross - fees
     rv2 = (365.0 / hold) * np.sum(np.log(S[:, 1:] / S[:, :-1]) ** 2, axis=1)
     return {"start": starts, "day": [days[a] for a in starts], "gross": gross, "net": net, "prem": prem,
-            "x_gross": gross / prem, "x_net": net / prem, "var_gap": sig[:, 0] ** 2 - rv2, "fees": fees, "spot": K, "sig0": sig[:, 0]}
+            "x_gross": gross / prem, "x_net": net / prem, "var_gap": sig[:, 0] ** 2 - rv2, "fees": fees, "spot": K, "sig0": sig[:, 0],
+            "funding": funding, "funding_missing_days": miss}
 
 
 def trailing_rv(close, idx, window: int = HOLD, ppy: int = CRYPTO_PPY) -> np.ndarray:
@@ -535,80 +600,178 @@ def trailing_rv(close, idx, window: int = HOLD, ppy: int = CRYPTO_PPY) -> np.nda
 
 def btc_vrp_straddle(days, close, iv, start: str = "2021-04-01", end: str = "2026-09-30", hold: int = HOLD, block: int = 3,
                      n_boot: int = 2000, seed: int = 0, min_n: int = T255_MIN_N, sharpe_bound: float = 0.5,
-                     measured_scale: Optional[float] = None, measured_note: str = "", spy_control: Optional[dict] = None) -> dict:
-    """T-255: delta-hedged short 30-day ATM straddle at DVOL. Pass: the pooled studentized block-bootstrap 95% CI of the
-    mean P&L / premium lies above 0, the mean is positive in both walk-forward halves, and the annualised Sharpe of the
-    P&L after fees (365/30 cycles a year) exceeds 0.5. min_n 36 cycles. The 'positive mean P&L' criteria use the gross
-    hedged P&L (the claim names no costs there); the Sharpe uses the P&L net of option fees, hedge fees and 1 bp/day funding."""
-    base = hedged_straddle(days, close, iv, start, end, hold)
-    n = int(base["x_gross"].size)
+                     measured_scale: Optional[float] = None, measured_note: str = "", spy_control: Optional[dict] = None,
+                     funding_rate=None, scale_by_day=None, n_placebo: int = 100) -> dict:
+    """T-255: delta-hedged short 30-day ATM straddle at DVOL. Pass: the studentized block-bootstrap 95% CI of the mean
+    P&L / premium lies above 0 (pooled), the mean is positive in both walk-forward halves, and the Sharpe of the P&L
+    after fees exceeds 0.5, read as annualised (x sqrt(365/30), the project's convention for cycle P&L; the per-cycle
+    Sharpe is reported next to it). min_n 36 cycles. The 'positive mean P&L' criteria use the gross hedged P&L (the
+    claim names no costs there); the Sharpe uses the P&L net of option fees, hedge fees and 1 bp/day funding.
+
+    House rule 10(b): the claim's non-overlapping 30-day cycles name no entry calendar, so every criterion is judged on
+    the POOLED estimate over all ``hold`` grid offsets: an entry on every day (overlapping cycles), the mean studentized
+    by a circular block bootstrap in blocks of pool_block(hold, block) days, the halves split by entry count, the Sharpe
+    the mean / sd of the per-entry cycle P&L. Each offset's own non-overlapping grid is tested as before (blocks of
+    ``block`` cycles) and reported: the range of its mean, CI lower bound and Sharpe, and how many offsets pass all
+    three. n = the distinct 30-day holds the entries span.
+
+    Controls and sensitivities (reported, on the pooled entries): the IV scale (constant ATM/DVOL ratios, among them the
+    one measured on the Deribit book captures); a per-day ATM/DVOL ratio ``scale_by_day`` (aligned with days, NaN =
+    unknown and carried forward, entries before the first known ratio dropped) when one is archived; the entry-vol
+    hedge; the shuffled-DVOL placebo over ``n_placebo`` permutations (a shuffle keeps the unconditional DVOL level, so it
+    keeps the LEVEL VRP and isolates only its timing part: a positive placebo is expected); archived signed perpetual
+    funding ``funding_rate`` (see hedged_straddle) in place of the flat 1 bp/day; the DSR over DVOL-RV30 threshold
+    variants on each offset's grid."""
+    days = list(days)
+    close = np.asarray(close, dtype=float)
+    iv = np.asarray(iv, dtype=float)
+    idx = _daily_starts(days, hold, start, end)
+    n = n_holds(idx, hold)
     if n < 8:
-        return {"verdict": "inconclusive", "n": n, "reason": f"{MP}: only {n} non-overlapping {hold}-day cycles between {start} and {end}",
+        return {"verdict": "inconclusive", "n": n, "reason": f"{MP}: only {n} distinct {hold}-day cycles between {start} and {end}",
                 "stat": {"model_priced": True, "n_cycles": n}}
+    base = hedged_straddle(days, close, iv, start, end, hold, starts=idx)
     xg, xn = base["x_gross"], base["x_net"]
-    lo, hi = stud_ci(xg, block, 0.95, n_boot, seed)
-    lo_n, hi_n = stud_ci(xn, block, 0.95, n_boot, seed)
+    pb = pool_block(hold, block)
+    lo, hi = stud_ci(xg, pb, 0.95, n_boot, seed)
+    lo_n, hi_n = stud_ci(xn, pb, 0.95, n_boot, seed)
     hv = _halves(xg)
     ppy_c = CRYPTO_PPY / hold
-    sr_net = sharpe_ratio(xn, ppy_c)
-    sr_gross = sharpe_ratio(xg, ppy_c)
-    h = n // 2
-    rows = [("mean hedged P&L / premium > 0 with the studentized block-bootstrap 95% CI above 0 (pooled)",
+    sr_net, sr_gross, sr_cyc = sharpe_ratio(xn, ppy_c), sharpe_ratio(xg, ppy_c), sharpe_ratio(xn)
+    # DVOL - trailing RV30 threshold variants (the trial's deflated-Sharpe family), per entry
+    rv_entry = trailing_rv(close, idx, hold)
+    with np.errstate(invalid="ignore"):
+        gap_entry = base["sig0"] * 100 - rv_entry
+        masks = {"all": np.ones(idx.size, bool)} | {f"DVOL-RV30>{thr}": gap_entry > thr for thr in (0, 5, 10, 15)}
+    # rule 10(b): every offset's own non-overlapping grid
+    off = _offsets(idx, days, hold, start)
+    offs = []
+    for k in range(hold):
+        mk = off == k
+        if mk.sum() < 8:
+            continue
+        g, nn = xg[mk], xn[mk]
+        l_k, h_k = stud_ci(g, block, 0.95, n_boot, seed)
+        hv_k = _halves(g)
+        s_k = sharpe_ratio(nn, ppy_c)
+        ts = [sharpe_ratio(xn[mk & m]) if (mk & m).sum() >= 3 else 0.0 for m in masks.values()]
+        offs.append({"offset": k, "first_entry": days[int(idx[mk][0])], "n_cycles": int(mk.sum()), "mean_gross": float(g.mean()),
+                     "ci_gross": [l_k, h_k], "halves_gross": hv_k, "mean_net": float(nn.mean()), "sharpe_net_annual": s_k,
+                     "sharpe_net_per_cycle": sharpe_ratio(nn), "dsr": float(deflated_sharpe_ratio(nn, len(masks), trial_sharpes=ts)),
+                     "pass": bool(l_k is not None and l_k > 0 and all(v is not None and v > 0 for v in hv_k) and s_k > sharpe_bound)})
+    n_pass = sum(o["pass"] for o in offs)
+    first_half = xg[idx < idx[0] + (min_n // 2) * hold]
+    rows = [(f"POOLED over all {hold} grid offsets: mean hedged P&L / premium > 0 with the studentized block-bootstrap 95% CI above 0",
              lo is not None and lo > 0, hi is not None and hi <= 0),
-            ("mean > 0 in both walk-forward halves", all(v is not None and v > 0 for v in hv),
-             min_n // 2 <= n < min_n and not xg[:min_n // 2].mean() > 0),
-            (f"annualised Sharpe of hedged P&L after fees > {sharpe_bound}", sr_net > sharpe_bound, False)]
-    verdict, why = _decide(rows, n, min_n, "cycles")
-    # controls and sensitivities (reported, outside the verdict)
+            ("POOLED mean > 0 in both walk-forward halves", all(v is not None and v > 0 for v in hv),
+             min_n // 2 <= n < min_n and first_half.size > 0 and not first_half.mean() > 0),
+            (f"POOLED Sharpe of hedged P&L after fees > {sharpe_bound}, annualised x sqrt(365/{hold}) ({ppy_c:.2f} non-overlapping "
+             f"{hold}-day cycles a year)", sr_net > sharpe_bound, False)]
+    verdict, why = _decide(rows, n, min_n, f"distinct non-overlapping {hold}-day cycles")
+    # controls and sensitivities (reported, outside the verdict), on the pooled entries
     scales = sorted(set([0.85, 0.90, 0.95, 1.0] + ([round(measured_scale, 4)] if measured_scale else [])))
     sens = {}
     for s in scales:
-        r = hedged_straddle(days, close, iv, start, end, hold, scale=s)
+        r = hedged_straddle(days, close, iv, start, end, hold, scale=s, starts=idx)
         sens[f"{s:.4f}"] = {"mean_gross": float(r["x_gross"].mean()), "mean_net": float(r["x_net"].mean()),
                             "sharpe_net": sharpe_ratio(r["x_net"], ppy_c)}
-    entry = hedged_straddle(days, close, iv, start, end, hold, hedge_vol="entry")
+    entry = hedged_straddle(days, close, iv, start, end, hold, hedge_vol="entry", starts=idx)
     rng = np.random.default_rng(seed)
-    iv_arr = np.asarray(iv, dtype=float)
-    shuf = hedged_straddle(days, close, iv_arr[rng.permutation(iv_arr.size)], start, end, hold)
-    rv_entry = trailing_rv(close, base["start"], hold)
-    gap_entry = base["sig0"] * 100 - rv_entry
-    variants = {"all": np.ones(n, bool)}
-    for thr in (0, 5, 10, 15):
-        variants[f"DVOL-RV30>{thr}"] = gap_entry > thr
-    trial_sr = [sharpe_ratio(xn[m]) if m.sum() >= 3 else 0.0 for m in variants.values()]
-    dsr = float(deflated_sharpe_ratio(xn, len(variants), trial_sharpes=trial_sr))
+    plc = np.array([float(hedged_straddle(days, close, iv[rng.permutation(iv.size)], start, end, hold, starts=idx)["x_gross"].mean())
+                    for _ in range(int(n_placebo))])
+    plc_q = [float(q) for q in np.quantile(plc, [0.05, 0.5, 0.95])] if plc.size else [None, None, None]
+    plc_p = float((np.sum(plc >= xg.mean()) + 1) / (plc.size + 1)) if plc.size else None
+    var_sr = {k: (sharpe_ratio(xn[m]) if m.sum() >= 3 else 0.0) for k, m in masks.items()}
+    dsrs = [o["dsr"] for o in offs]
     var_gap = base["var_gap"]
     stat = {"model_priced": True, "pricing": "Black-Scholes at sigma = DVOL/100, r = q = 0, K = entry close, T = 30/365; daily delta hedge on closes",
-            "n_cycles": n, "first_entry": base["day"][0], "last_entry": base["day"][-1],
+            "rule10": f"pooled over all {hold} offsets of the non-overlapping {hold}-day grid (no entry calendar named)",
+            "n_cycles": n, "n_entries": int(idx.size), "first_entry": base["day"][0], "last_entry": base["day"][-1], "pool_block_days": pb,
             "mean_gross": float(xg.mean()), "ci_gross": [lo, hi], "halves_gross": hv, "mean_net": float(xn.mean()), "ci_net": [lo_n, hi_n],
-            "sharpe_net_annual": sr_net, "sharpe_gross_annual": sr_gross, "sharpe_net_per_cycle": sharpe_ratio(xn),
+            "sharpe_net_annual": sr_net, "sharpe_gross_annual": sr_gross, "sharpe_net_per_cycle": sr_cyc,
+            "per_offset": offs, "offsets_passing": n_pass, "n_offsets": len(offs),
             "mean_fees_over_premium": float(np.mean(base["fees"] / base["prem"])),
             "mean_dvol2_minus_rv2": float(var_gap.mean()), "share_dvol2_above_rv2": float((var_gap > 0).mean()),
             "iv_scale_sensitivity": sens, "measured_atm_over_dvol": measured_scale,
-            "entry_vol_hedge_mean_gross": float(entry["x_gross"].mean()), "shuffled_dvol_placebo_mean_gross": float(shuf["x_gross"].mean()),
-            "dsr_over_threshold_variants": dsr, "variant_sharpes_per_cycle": dict(zip(variants, trial_sr)),
+            "entry_vol_hedge_mean_gross": float(entry["x_gross"].mean()),
+            "shuffled_dvol_placebo": {"n_perm": int(plc.size), "q05_median_q95": plc_q, "share_at_or_above_actual_p": plc_p},
+            "dsr_over_threshold_variants_by_offset": dsrs, "variant_sharpes_per_cycle_pooled": var_sr,
             "spy_vix_positive_control": spy_control, "verdict": verdict}
+    pct1 = lambda v: _pct(v)                                    # noqa: E731
     sens_txt = ", ".join(f"s={float(k):.3f}{' (measured)' if measured_scale and abs(float(k) - measured_scale) < 1e-4 else ''} "
                          f"{v['mean_gross'] * 100:+.1f}%" for k, v in sens.items())
     meas_txt = ""
     if measured_scale:
-        rm = hedged_straddle(days, close, iv, start, end, hold, scale=measured_scale)
-        ml, mh = stud_ci(rm["x_gross"], block, 0.95, n_boot, seed)
+        rm = hedged_straddle(days, close, iv, start, end, hold, scale=measured_scale, starts=idx)
+        ml, mh = stud_ci(rm["x_gross"], pb, 0.95, n_boot, seed)
         stat["measured_scale_ci_gross"] = [ml, mh]
         meas_txt = (f"; at the measured ATM/DVOL scale {measured_scale:.3f}: mean {rm['x_gross'].mean() * 100:+.1f}% (CI {_pct(ml)} to {_pct(mh)}), "
-                    f"after fees Sharpe {sharpe_ratio(rm['x_net'], ppy_c):.2f}")
-    ctl = (f"; SPY/VIX hedged short straddle (positive control) {spy_control['mean'] * 100:+.1f}% of premium over {spy_control['n']} cycles"
-           if spy_control and spy_control.get("mean") is not None else "; SPY/VIX positive control not run (bundles missing)")
+                    f"after fees Sharpe {sharpe_ratio(rm['x_net'], ppy_c):.2f} annualised")
+    hc_txt = ("; the trial's haircut (the DVOL-ATM IV gap per cycle from history.deribit.com trade IVs) needs the Deribit "
+              "option-trade history, which is not archived yet: the measured scale comes from 2 book captures in October 2026, a "
+              "low-vol regime, and the gap is not constant over 2021-2026, so a constant scale can overstate the haircut-adjusted "
+              "premium in other years")
+    if scale_by_day is not None:
+        sd = np.asarray(scale_by_day, dtype=float)
+        known = np.isfinite(sd)
+        if known.any():
+            last = np.maximum.accumulate(np.where(known, np.arange(sd.size), -1))
+            sd_ff = np.where(last >= 0, sd[np.maximum(last, 0)], np.nan)
+            ih = idx[np.isfinite(sd_ff[idx])]
+            if n_holds(ih, hold) >= 8:
+                rh = hedged_straddle(days, close, iv, start, end, hold, scale=np.nan_to_num(sd_ff, nan=1.0), starts=ih)
+                hl, hh = stud_ci(rh["x_gross"], pb, 0.95, n_boot, seed)
+                hvh = _halves(rh["x_gross"])
+                stat["per_day_haircut"] = {"n_entries": int(ih.size), "n_cycles": n_holds(ih, hold), "mean_scale": float(np.nanmean(sd_ff[ih])),
+                                           "mean_gross": float(rh["x_gross"].mean()), "ci_gross": [hl, hh], "halves_gross": hvh,
+                                           "sharpe_net_annual": sharpe_ratio(rh["x_net"], ppy_c)}
+                hc_txt = (f"; per-day DVOL-ATM haircut (archived trade-IV ratio, mean {np.nanmean(sd_ff[ih]):.3f}, {n_holds(ih, hold)} "
+                          f"cycles): mean {rh['x_gross'].mean() * 100:+.1f}% (CI {_pct(hl)} to {_pct(hh)}), halves {_pct(hvh[0])}/"
+                          f"{_pct(hvh[1])}, after fees Sharpe {sharpe_ratio(rh['x_net'], ppy_c):.2f} annualised")
+    fund_txt = ""
+    if funding_rate is not None:
+        rf = hedged_straddle(days, close, iv, start, end, hold, starts=idx, funding_rate=funding_rate)
+        xf = rf["x_net"]
+        fl, fh = stud_ci(xf, pb, 0.95, n_boot, seed)
+        hvf = _halves(xf)
+        stat["signed_funding"] = {"mean_net": float(xf.mean()), "ci_net": [fl, fh], "halves_net": hvf,
+                                  "sharpe_net_annual": sharpe_ratio(xf, ppy_c), "sharpe_net_per_cycle": sharpe_ratio(xf),
+                                  "mean_funding_over_premium": float(np.mean(rf["funding"] / rf["prem"])),
+                                  "mean_flat_funding_over_premium": float(np.mean(base["funding"] / base["prem"])),
+                                  "missing_days": rf["funding_missing_days"]}
+        fund_txt = (f"; with the archived Deribit BTC-PERPETUAL funding signed by the hedge's direction in place of the flat 1 bp/day "
+                    f"(funding {np.mean(rf['funding'] / rf['prem']) * 100:.1f}% of premium per cycle vs {np.mean(base['funding'] / base['prem']) * 100:.1f}%"
+                    + (f", {rf['funding_missing_days']} hedge-days without a funding print charged 0" if rf["funding_missing_days"] else "")
+                    + f"): net mean {xf.mean() * 100:+.1f}% (CI {_pct(fl)} to {_pct(fh)}), halves {_pct(hvf[0])}/{_pct(hvf[1])}, "
+                    f"Sharpe {sharpe_ratio(xf, ppy_c):.2f} annualised ({sharpe_ratio(xf):.2f} per cycle)")
+    if spy_control and spy_control.get("mean") is not None:
+        ctl = (f"; SPY/VIX hedged short straddle (positive control{', ' + spy_control['grid'] if spy_control.get('grid') else ''}) "
+               f"{spy_control['mean'] * 100:+.1f}% of premium over {spy_control['n']} cycles"
+               + (f" (per-offset mean {_rng(spy_control['offset_means'], pct1)})" if spy_control.get("offset_means") else ""))
+    else:
+        ctl = "; SPY/VIX positive control not run" + (f" ({spy_control['error']})" if spy_control and spy_control.get("error") else " (bundles missing)")
+    o0 = next((o for o in offs if o["offset"] == 0), None)
+    o0_txt = (f"; offset 0 (the grid from {start}): mean {_pct(o0['mean_gross'])}, CI {_pct(o0['ci_gross'][0])} to {_pct(o0['ci_gross'][1])}, "
+              f"Sharpe {o0['sharpe_net_annual']:.2f}" if o0 else "")
     reason = (f"{MP} (BS at DVOL, r = q = 0, daily delta hedge on daily closes; self-financed at r = 0, so the P&L is an excess P&L): "
-              f"short 30-day ATM BTC straddle, {n} non-overlapping "
-              f"cycles {base['day'][0]}..{base['day'][-1]}: mean hedged P&L {xg.mean() * 100:+.1f}% of premium (studentized 95% CI "
-              f"{_pct(lo)} to {_pct(hi)}), halves {_pct(hv[0])}/{_pct(hv[1])}; after fees (0.03% option fee per leg, 0.05% perp taker on "
-              f"hedge trades, 1 bp/day funding) mean {xn.mean() * 100:+.1f}% (CI {_pct(lo_n)} to {_pct(hi_n)}), annualised Sharpe "
-              f"{sr_net:.2f} (needs > {sharpe_bound}); mean DVOL^2 - RV^2(30d) {var_gap.mean():+.4f} (positive in {(var_gap > 0).mean() * 100:.0f}% "
-              f"of cycles){measured_note}; IV-scale sensitivity (gross mean) {sens_txt}{meas_txt}; entry-vol hedge {entry['x_gross'].mean() * 100:+.1f}%, "
-              f"shuffled-DVOL placebo {shuf['x_gross'].mean() * 100:+.1f}%, DSR over {len(variants)} DVOL-RV30 threshold variants {dsr:.2f}{ctl}; "
-              f"DVOL is a variance-swap level that sits above ATM IV, so pricing the ATM straddle at DVOL overstates the premium: the edge "
-              f"hinges on the IV level and the traded version needs Deribit option-trade history (2 book captures archived) — {why}")
+              f"short 30-day ATM BTC straddle. POOLED over all {hold} start offsets of the non-overlapping {hold}-day grid (house rule 10: "
+              f"the claim names no entry calendar; {idx.size} daily entries {base['day'][0]}..{base['day'][-1]} = {n} distinct {hold}-day "
+              f"cycles; studentized circular block bootstrap, blocks of {pb} days): mean hedged P&L {xg.mean() * 100:+.1f}% of premium "
+              f"(95% CI {_pct(lo)} to {_pct(hi)}), halves {_pct(hv[0])}/{_pct(hv[1])}; after fees (0.03% option fee per leg, 0.05% perp "
+              f"taker on hedge trades, 1 bp/day funding) mean {xn.mean() * 100:+.1f}% (CI {_pct(lo_n)} to {_pct(hi_n)}), Sharpe {sr_net:.2f} "
+              f"annualised x sqrt(365/{hold}) (needs > {sharpe_bound}; {sr_cyc:.2f} per cycle). Per grid offset ({len(offs)} grids of "
+              f"{_rng([o['n_cycles'] for o in offs], lambda v: f'{v:.0f}')} non-overlapping cycles, blocks of {block} cycles): mean "
+              f"{_rng([o['mean_gross'] for o in offs], pct1)}, CI lower bound {_rng([o['ci_gross'][0] for o in offs], pct1)}, halves' "
+              f"lower mean {_rng([min(o['halves_gross']) for o in offs], pct1)}, after-fee Sharpe {_rng([o['sharpe_net_annual'] for o in offs], lambda v: f'{v:.2f}')} "
+              f"annualised ({_rng([o['sharpe_net_per_cycle'] for o in offs], lambda v: f'{v:.2f}')} per cycle); {n_pass}/{len(offs)} offsets "
+              f"pass all three criteria{o0_txt}. Mean DVOL^2 - RV^2(30d) {var_gap.mean():+.4f} (positive in {(var_gap > 0).mean() * 100:.0f}% "
+              f"of entries){measured_note}; IV-scale sensitivity (gross mean) {sens_txt}{meas_txt}{hc_txt}; entry-vol hedge "
+              f"{entry['x_gross'].mean() * 100:+.1f}%; shuffled-DVOL placebo over {plc.size} permutations: median {_pct(plc_q[1])} "
+              f"(5-95% {_pct(plc_q[0])} to {_pct(plc_q[2])}); the actual {xg.mean() * 100:+.1f}% is above {int(np.sum(plc < xg.mean()))}/{plc.size} "
+              f"of them (one-sided permutation p = {_f(plc_p, 3)}); the shuffle keeps the unconditional DVOL level, so it keeps the level VRP "
+              f"and a positive placebo is expected: it tests only the timing part of the edge; DSR over {len(masks)} DVOL-RV30 threshold "
+              f"variants on each offset's grid {_rng(dsrs, lambda v: f'{v:.2f}')}{fund_txt}{ctl}; DVOL is a variance-swap level that sits "
+              f"above ATM IV, so pricing the ATM straddle at DVOL overstates the premium: the edge hinges on the IV level — {why}")
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
 
@@ -623,7 +786,7 @@ def deribit_im_btc(S: np.ndarray, Kc: np.ndarray, Kp: np.ndarray, c_btc: np.ndar
 
 
 def inverse_strangle(days, close, iv, start: str = "2021-04-01", end: str = "2026-09-30", hold: int = HOLD, delta: float = 0.15,
-                     scale: float = 1.0) -> dict:
+                     scale: float = 1.0, starts=None) -> dict:
     """Short delta-d strangle (BS at sigma = scale * iv / 100, r = q = 0, strikes at +/- d delta on the entry close), held
     ``hold`` days and hedged at each daily close. USD P&L per 1-BTC contract under:
       inverse, premium booked in coin (pc = USD premium / S0 BTC, held):
@@ -633,10 +796,11 @@ def inverse_strangle(days, close, iv, start: str = "2021-04-01", end: str = "202
         naive_coll = naive + m (S_T - S0),  corrected_coll = naive_coll - (pc + m)(S_T - S0)
       USDC-linear (premium in USD): naive_lin = premium_usd - payoff_usd + sum D_j dS_j; the correct rule hedges the same
         way (ratio 1 by construction); misapplied = naive_lin - pc (S_T - S0) (the coin correction applied where no coin is held).
-    The USD value of an inverse option equals its BS value, so the option legs are identical across the variants."""
+    The USD value of an inverse option equals its BS value, so the option legs are identical across the variants.
+    Entries: ``starts`` (indices into days) when given, else the non-overlapping grid from ``start``."""
     days = list(days)
     close = np.asarray(close, dtype=float)
-    starts = _cycle_starts(days, hold, start, end)
+    starts = _cycle_starts(days, hold, start, end) if starts is None else np.asarray(starts, dtype=np.int64)
     if starts.size == 0:
         z = np.zeros(0)
         return {"start": starts, "day": [], "naive": z, "corrected": z, "naive_coll": z, "corrected_coll": z, "naive_lin": z,
@@ -673,30 +837,59 @@ def inverse_hedge_ratio(days, close, iv, start: str = "2021-04-01", end: str = "
     """T-261: ratio var(USD P&L, coin-corrected hedge) / var(USD P&L, naive BS-delta hedge) for the short 15-delta inverse
     strangle (premium in coin), with a paired percentile block-bootstrap 95% CI. Pass: upper end of the CI < 0.8.
     min_n 36 cycles. The claimed statistic is on USD P&L per contract; the same ratio on P&L / entry spot and the
-    collateral and USDC-linear controls are reported."""
-    res = inverse_strangle(days, close, iv, start, end, hold, delta)
-    n = int(res["naive"].size)
+    collateral and USDC-linear controls are reported.
+
+    House rule 10(b): the claim's 30-day cycles name no entry calendar, so the criterion is judged on the POOLED ratio
+    over all ``hold`` grid offsets: an entry on every day (overlapping cycles), both variances over all entries, the
+    paired circular block bootstrap in blocks of pool_block(hold, block) days. Each offset's own non-overlapping grid is
+    tested as before (blocks of ``block`` cycles) and reported: the range of its ratio and of its CI upper end, and how
+    many offsets pass. n = the distinct 30-day holds the entries span."""
+    days = list(days)
+    idx = _daily_starts(days, hold, start, end)
+    n = n_holds(idx, hold)
     if n < 8:
-        return {"verdict": "inconclusive", "n": n, "reason": f"{MP}: only {n} non-overlapping {hold}-day cycles between {start} and {end}",
+        return {"verdict": "inconclusive", "n": n, "reason": f"{MP}: only {n} distinct {hold}-day cycles between {start} and {end}",
                 "stat": {"model_priced": True, "n_cycles": n}}
-    main = var_ratio_ci(res["corrected"], res["naive"], block, 0.95, n_boot, seed)
-    per_spot = var_ratio_ci(res["corrected"] / res["spot"], res["naive"] / res["spot"], block, 0.95, n_boot, seed)
-    coll = var_ratio_ci(res["corrected_coll"], res["naive_coll"], block, 0.95, n_boot, seed)
-    lin = var_ratio_ci(res["naive_lin"], res["naive_lin"], block, 0.95, n_boot, seed)
-    mis = var_ratio_ci(res["misapplied_lin"], res["naive_lin"], block, 0.95, n_boot, seed)
-    rows = [(f"upper end of the 95% CI of var(corrected) / var(naive) < {bound}",
+    res = inverse_strangle(days, close, iv, start, end, hold, delta, starts=idx)
+    pb = pool_block(hold, block)
+    main = var_ratio_ci(res["corrected"], res["naive"], pb, 0.95, n_boot, seed)
+    per_spot = var_ratio_ci(res["corrected"] / res["spot"], res["naive"] / res["spot"], pb, 0.95, n_boot, seed)
+    coll = var_ratio_ci(res["corrected_coll"], res["naive_coll"], pb, 0.95, n_boot, seed)
+    lin = var_ratio_ci(res["naive_lin"], res["naive_lin"], pb, 0.95, n_boot, seed)
+    mis = var_ratio_ci(res["misapplied_lin"], res["naive_lin"], pb, 0.95, n_boot, seed)
+    # rule 10(b): every offset's own non-overlapping grid
+    off = _offsets(idx, days, hold, start)
+    offs = []
+    for k in range(hold):
+        mk = off == k
+        if mk.sum() < 8:
+            continue
+        r_k = var_ratio_ci(res["corrected"][mk], res["naive"][mk], block, 0.95, n_boot, seed)
+        offs.append({"offset": k, "first_entry": days[int(idx[mk][0])], "n_cycles": int(mk.sum()), "ratio": r_k["ratio"],
+                     "lo": r_k["lo"], "hi": r_k["hi"], "pass": bool(r_k["hi"] is not None and r_k["hi"] < bound)})
+    n_pass = sum(o["pass"] for o in offs)
+    rows = [(f"POOLED over all {hold} grid offsets: upper end of the 95% CI of var(corrected) / var(naive) < {bound}",
              main["hi"] is not None and main["hi"] < bound, main["lo"] is not None and main["lo"] >= bound)]
-    verdict, why = _decide(rows, n, min_n, "cycles")
+    verdict, why = _decide(rows, n, min_n, f"distinct non-overlapping {hold}-day cycles")
     stat = {"model_priced": True, "pricing": "Black-Scholes at sigma = DVOL/100, r = q = 0, 15-delta strikes on the entry close, T = 30/365; daily hedge on closes",
-            "n_cycles": n, "first_entry": res["day"][0], "last_entry": res["day"][-1],
+            "rule10": f"pooled over all {hold} offsets of the non-overlapping {hold}-day grid (no entry calendar named)",
+            "n_cycles": n, "n_entries": int(idx.size), "first_entry": res["day"][0], "last_entry": res["day"][-1], "pool_block_days": pb,
             "var_ratio_usd": main, "var_ratio_per_spot": per_spot, "var_ratio_premium_plus_collateral": coll,
             "usdc_linear_correct_rule": lin, "usdc_linear_coin_correction_misapplied": mis,
+            "per_offset": offs, "offsets_passing": n_pass, "n_offsets": len(offs),
             "mean_premium_btc": float(res["prem_btc"].mean()), "mean_im_btc": float(res["im_btc"].mean()),
             "sd_usd_naive": float(res["naive"].std(ddof=1)), "sd_usd_corrected": float(res["corrected"].std(ddof=1)), "verdict": verdict}
+    f3 = lambda v: f"{v:.3f}"                                   # noqa: E731
+    o0 = next((o for o in offs if o["offset"] == 0), None)
+    o0_txt = (f"; offset 0 (the grid from {start}): {_f(o0['ratio'], 3)} (CI {_f(o0['lo'], 3)} to {_f(o0['hi'], 3)})" if o0 else "")
     reason = (f"{MP} (BS at DVOL, r = q = 0, daily hedge on closes): short 15-delta inverse BTC strangle, premium booked in coin "
-              f"(mean {res['prem_btc'].mean():.4f} BTC), {n} non-overlapping 30-day cycles {res['day'][0]}..{res['day'][-1]}: "
-              f"var(USD P&L) corrected / naive = {_f(main['ratio'], 3)} (paired block-bootstrap 95% CI {_f(main['lo'], 3)} to "
-              f"{_f(main['hi'], 3)}; needs upper < {bound}); per unit of entry spot {_f(per_spot['ratio'], 3)} (CI {_f(per_spot['lo'], 3)} "
+              f"(mean {res['prem_btc'].mean():.4f} BTC). POOLED over all {hold} start offsets of the non-overlapping {hold}-day grid "
+              f"(house rule 10: the claim names no entry calendar; {idx.size} daily entries {res['day'][0]}..{res['day'][-1]} = {n} "
+              f"distinct {hold}-day cycles; paired circular block bootstrap, blocks of {pb} days): var(USD P&L) corrected / naive = "
+              f"{_f(main['ratio'], 3)} (95% CI {_f(main['lo'], 3)} to {_f(main['hi'], 3)}; needs upper < {bound}). Per grid offset "
+              f"({len(offs)} grids of {_rng([o['n_cycles'] for o in offs], lambda v: f'{v:.0f}')} non-overlapping cycles, blocks of {block} "
+              f"cycles): ratio {_rng([o['ratio'] for o in offs], f3)}, CI upper end {_rng([o['hi'] for o in offs], f3)}; {n_pass}/{len(offs)} "
+              f"offsets pass{o0_txt}. Pooled controls: per unit of entry spot {_f(per_spot['ratio'], 3)} (CI {_f(per_spot['lo'], 3)} "
               f"to {_f(per_spot['hi'], 3)}); with the Deribit initial margin (mean {res['im_btc'].mean():.3f} BTC) also held in coin "
               f"{_f(coll['ratio'], 3)} (CI {_f(coll['lo'], 3)} to {_f(coll['hi'], 3)}); USDC-linear control: the correct rule hedges "
               f"identically (ratio {_f(lin['ratio'], 3)}), the coin correction misapplied gives {_f(mis['ratio'], 3)} — {why}")
@@ -766,7 +959,7 @@ def spy_spx_financing(captures: Sequence[dict], ex_date: str = "2026-12-18", dte
     reason = (f"SPY ATM +/- 3 OLS forward vs SPXW wide-box mid rate, SPY expiries {dte_range[0]}-{dte_range[1]} DTE before {ex_date}, "
               f"r_spy = ln(F/SPY)/T + {fee * 100:.4f}% (bp/yr): " + "; ".join(txt)
               + f". SPY options quote to 16:15 ET but the SPY close prints at 16:00, so a 15-minute move of the spot shifts r_spy by "
-              f"(dS/S)/T (about 10 bp/yr per 1 bp of spot at 37 DTE); the XSP box (second reference) is not captured — {why}")
+              f"(dS/S)/T (about 10 bp/yr per 1 bp of spot at 37 DTE); the XSP box (second reference) is not captured; rule 10(c): statistics on fixed capture days, no cycle grid, so no grid phase to vary — {why}")
     stat = {"n_days": len(per_day), "day_one": d0["quote_day"], "n_matched_day_one": n1, "n_within_day_one": k1,
             "n_matched_total": sum(d["n_expiries"] for d in per_day), "per_day": per_day, "days_criterion": days_ok, "verdict": verdict}
     return {"verdict": verdict, "n": n1, "reason": reason, "stat": stat}
@@ -916,7 +1109,7 @@ def gld_carry(captures: Sequence[dict], fee: float = GLD_FEE, tol_bp: float = 50
     reason = (f"GLD option-implied financing rate from ATM +/- 3 mids at 90-365 DTE vs the trial's 3-month bill, FRED DGS3MO - 0.40% "
               f"(bond-equivalent print dated before the quote day, continuous ln(1 + y 91/365) / (91/365){src_txt}; day one with the bill "
               f"10 bp higher or lower: {d0['bill_shift_share']['+10bp']:.0%} / {d0['bill_shift_share']['-10bp']:.0%} within): "
-              + day_txt + slv_txt + f" — {why}")
+              + day_txt + slv_txt + f"; rule 10(c): statistics on fixed capture days, no cycle grid, so no grid phase to vary — {why}")
     stat = {"n_days": len(per_day), "day_one": d0["quote_day"], "n_pairs_day_one": n1, "share_day_one": k1 / n1,
             "bill_series": sorted({d["bill_src"] or "bill as given" for d in per_day}), "dgs3mo_minus_dtb3_bp": gaps,
             "per_day": per_day, "days_criterion": days_ok, "slv": slv_days, "verdict": verdict}
@@ -1188,23 +1381,55 @@ def measured_atm_over_dvol(surface_rows_by_name: dict, dvol: dict, target_days: 
 
 def _spy_vix_control(archive) -> Optional[dict]:
     """SPY/VIX MODEL-PRICED hedged short 30-DTE straddle (batch6_var engine: dividend forward, raw closes, bill rate)
-    over the same window, as T-255's positive control. None when its bundles are missing."""
+    over the same window, as T-255's positive control. Rule 10(b), as for T-255: pooled over every offset of its
+    non-overlapping grid (an entry on every session with a VIX close whose expiry close is on or before 2026-09-30); n =
+    the distinct holds, and the per-offset means are returned. None when its bundles are missing."""
     if not all(_has(archive, b) for b in (SPY_B, VIX_B, DTB3_B)):
         return None
     try:
-        from mandel.experiments.batch6_var import _spy_frame, straddle_cycles
+        from mandel.experiments.batch6_var import HOLD as SPY_HOLD, _spy_frame, straddle_cycles
         fr = _spy_frame(archive)
-        first = bisect_left(fr["days"], "2021-04-01")
-        r = straddle_cycles(fr, 1.0, side=-1, hedge=True, first=first)
-        keep = [i for i, d in enumerate(r["day"]) if d <= "2026-09-30"]
-        x = (r["pnl"] / r["prem"])[keep]
-        return {"n": int(x.size), "mean": float(x.mean()) if x.size else None}
+        sd = list(fr["days"])
+        first = bisect_left(sd, "2021-04-01")
+        r = straddle_cycles(fr, 1.0, side=-1, hedge=True, starts=np.arange(first, max(first, len(sd) - SPY_HOLD), dtype=np.int64))
+        st, en = np.asarray(r["start"], dtype=np.int64), np.asarray(r["end"], dtype=np.int64)
+        keep = np.array([sd[e] <= "2026-09-30" for e in en], dtype=bool) if en.size else np.zeros(0, bool)
+        x = (np.asarray(r["pnl"]) / np.asarray(r["prem"]))[keep]
+        st = st[keep]
+        off = (st - first) % SPY_HOLD
+        means = [float(x[off == k].mean()) for k in range(SPY_HOLD) if (off == k).any()]
+        return {"n": n_holds(st, SPY_HOLD), "n_entries": int(x.size), "mean": float(x.mean()) if x.size else None,
+                "offset_means": means, "grid": f"pooled over all {SPY_HOLD} offsets of its {SPY_HOLD}-session grid"}
     except Exception as exc:                     # a control must never break the harness
         return {"n": 0, "mean": None, "error": f"{type(exc).__name__}: {exc}"}
 
 
+def _funding_by_day(rows) -> dict:
+    """{day: perpetual funding rate accrued over that UTC day} from deribit-funding rows (value.timestamp = end of the hour,
+    value.interest_1h = that hour's rate): the sum over the 24 hours ending in (day 00:00, day+1 00:00]. A day with
+    fewer than 24 hourly prints is left out (missing)."""
+    tot, cnt = defaultdict(float), defaultdict(int)
+    for r in rows:
+        v = r["value"]
+        ts, x = v.get("timestamp"), v.get("interest_1h")
+        if ts is None or x is None:
+            continue
+        d = (datetime.fromtimestamp(float(ts) / 1000.0, tz=timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%d")
+        tot[d] += float(x)
+        cnt[d] += 1
+    return {d: tot[d] for d in tot if cnt[d] >= 24}
+
+
+def funding_rate_series(days: Sequence[str], by_day: dict) -> np.ndarray:
+    """Per day aligned with ``days``: the funding a perpetual held from the close of days[i] (24:00 UTC) to the close of
+    days[i + 1] accrues, i.e. that of the UTC day days[i + 1]; NaN where missing (and on the last day)."""
+    days = list(days)
+    return np.array([by_day.get(days[i + 1], np.nan) if i + 1 < len(days) else np.nan for i in range(len(days))], dtype=float)
+
+
 def b6_xc_btc_hedged_straddle(archive):
-    """T-255: MODEL-PRICED delta-hedged short 30-day ATM BTC straddle at DVOL, 2021-04 to 2026-09."""
+    """T-255: MODEL-PRICED delta-hedged short 30-day ATM BTC straddle at DVOL, 2021-04 to 2026-09, pooled over all 30
+    offsets of the non-overlapping 30-day grid (house rule 10(b)); the archived signed perpetual funding is a sensitivity."""
     miss = _missing(archive, [BTC_B, DVOL_B])
     if miss:
         return miss
@@ -1213,12 +1438,15 @@ def b6_xc_btc_hedged_straddle(archive):
     ms, k = measured_atm_over_dvol(surf, _dvol_points(_rows(archive, DVOL_B, filtered=False)))
     note = (f"; measured 30-day ATM mark IV / DVOL = {ms:.3f} on {k} Deribit book capture(s)" if ms else
             "; no Deribit surface capture to measure the ATM IV / DVOL gap")
-    rep = btc_vrp_straddle(days, close, dv, measured_scale=ms, measured_note=note, spy_control=_spy_vix_control(archive))
+    fund = (funding_rate_series(days, _funding_by_day(_rows(archive, FUNDING_B))) if _has(archive, FUNDING_B) else None)
+    rep = btc_vrp_straddle(days, close, dv, measured_scale=ms, measured_note=note, spy_control=_spy_vix_control(archive),
+                           funding_rate=fund)
     return _out(rep["stat"], rep["n"], rep["verdict"], rep["reason"])
 
 
 def b6_xc_inverse_strangle_hedge(archive):
-    """T-261: MODEL-PRICED short 15-delta inverse BTC strangle, coin-corrected vs naive delta hedge, 2021-04 to 2026-09."""
+    """T-261: MODEL-PRICED short 15-delta inverse BTC strangle, coin-corrected vs naive delta hedge, 2021-04 to 2026-09,
+    pooled over all 30 offsets of the non-overlapping 30-day grid (house rule 10(b))."""
     miss = _missing(archive, [BTC_B, DVOL_B])
     if miss:
         return miss
@@ -1436,7 +1664,7 @@ def b6_xc_parity_deviation_scan(archive):
               + f". By chain: {sym_txt}{tim_txt}. SPX parity forward F = S e^(r - q)T with r the 3-month bill (DTB3) and q from the intercept of the "
               f"C - P on K regression; SPX options discount at their box rate, above the 3-month bill and rising with maturity, so long-dated "
               f"SPX pairs sit outside a bill-financed parity forward while the cross-strike fit at the box rate is tight; American SPY/GLD/IBIT "
-              f"checked against S - PV(D) - K <= C - P <= S - K e^(-rT){t181_txt} — {rep['reason']}")
+              f"checked against S - PV(D) - K <= C - P <= S - K e^(-rT){t181_txt}; rule 10(c): statistics on fixed capture days, no cycle grid, so no grid phase to vary — {rep['reason']}")
     stat = dict(st, skipped=notes, t181_parity_check=t181_out, spot_timing=tim)
     return _out(stat, rep["n"], rep["verdict"], reason + (f" [skipped: {'; '.join(notes)}]" if notes else ""))
 

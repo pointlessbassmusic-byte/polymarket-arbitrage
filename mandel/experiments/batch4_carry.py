@@ -72,6 +72,19 @@ bound, T-363's optimistic Sharpe upper bound, T-364's gaps, T-423's out-of-sampl
 min_n only. At or above min_n every criterion is judged at face value, exactly as before. Below min_n the report's
 ``criteria`` are the ones judged, and ``rule5`` holds the face-value criteria, the decisive failures and the bounds
 that decided them.
+
+House rule 10 (no arbitrary grid phase). Two harnesses rest on a grid whose phase the claim does not fix. T-198's
+"non-overlapping 90-day windows since 2020" name no window calendar, so a window starts on every day from 2020-01-01
+and both criteria are judged on that pooled all-start set (overlapping windows; circular-block bootstrap over the daily
+starts in blocks of 180 days, twice the hold). The 90 per-offset grids are reported (ranges, how many offsets pass), and
+n stays in windows: the number of non-overlapping windows the sample holds. T-364's weekly observations name no
+weekday, so its five weekday phases (each ISO week's first ok session on or after Monday, ..., Friday) are pooled, each
+labelled from its own trailing 52 observations, with the permutation and bootstrap in blocks of 8 weeks of pooled
+entries. The per-phase results are reported and n stays in weeks. The other six need no change. T-258 is a
+calendar-month statistic (entry on day 1 of each month). T-362 follows the CME monthly contract calendar (decision on
+the first session after the previous expiry, held to expiry). T-303 and T-363 are daily series. T-329 enters on its own
+signal days (event-driven, no grid; its block-shifted signal null is a reported diagnostic). T-423 is a daily event
+study with overlapping windows.
 """
 
 from __future__ import annotations
@@ -85,7 +98,7 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 
-from mandel.experiments.underlying2 import _mdd, _mean_ci, _sr, _verdict, load_series
+from mandel.experiments.underlying2 import _mdd, _sr, _verdict, load_series
 from mandel.experiments.volatility import index_closes
 from mandel.options import bs
 from mandel.validation.backtest_eval import deflated_sharpe_ratio
@@ -473,6 +486,18 @@ def block_sharpe_ci(x, block: int, n_boot: int = 5000, seed: int = 0, ppy: int =
     return [float(np.quantile(v, 0.025)), float(np.quantile(v, 0.975))]
 
 
+def cbb_mean_ci(x, block: int, n_boot: int = 5000, seed: int = 0, chunk: int = 500) -> tuple:
+    """Two-sided 95% percentile circular-block-bootstrap interval of the mean: ``underlying2._mean_ci``'s estimator and
+    draws (the same block starts from the same seed, so the same interval), vectorised ``chunk`` resamples at a time."""
+    x = np.asarray(x, dtype=float); n = len(x); nb = math.ceil(n / block)
+    rng = np.random.default_rng(seed); off = np.arange(block); vals = []
+    for s in range(0, n_boot, chunk):
+        st = rng.integers(0, n, (min(chunk, n_boot - s), nb))
+        vals.append(x[((st[:, :, None] + off[None, None, :]).reshape(len(st), -1)[:, :n]) % n].mean(axis=1))
+    m = np.concatenate(vals)
+    return float(np.quantile(m, 0.025)), float(np.quantile(m, 0.975))
+
+
 def _stationary_mean_draws(x: np.ndarray, mean_block: float, n_boot: int, seed: int, chunk: int) -> np.ndarray:
     """Means of n_boot stationary-bootstrap resamples of x, drawn ``chunk`` at a time: the same draws, for the same
     (mean_block, n_boot, seed, chunk), as ``stationary_mean_p_less``."""
@@ -508,21 +533,32 @@ def _front_quarterly(futures: Sequence[dict], t: int, min_dte_days: float):
 def perp_vs_quarterly_basis(fts, i1, fidx, futures: Sequence[dict], start: str = "2020-01-01", window_days: int = 90,
                             min_dte_days: float = 7.0, block: int = 2, n_boot: int = 5000, seed: int = 0,
                             fee_per_leg: float = 0.0005, min_n: int = 24, min_coverage: float = 0.95) -> dict:
-    """T-198. Windows of ``window_days`` from ``start`` 08:00 UTC. funding_90d = sum of interest_1h over (t, t+90d]
-    (received by a short perp). basis_90d = (F/S - 1) x 365/dte x 90/365, with F the close at t of the nearest
-    quarterly with at least ``min_dte_days`` to expiry (closer ones are in delivery week, where the annualised basis is
-    noise) and S the Deribit index at the same 08:00 UTC hour. Pass: share(funding_90d > basis_90d) >= 50% and the
-    two-sided 95% block-bootstrap CI of the mean difference above 0. Below min_n windows (house rule 5) the share fails
-    decisively when it would stay under 50% at min_n even if every missing window won, and the mean criterion when its
-    CI lies wholly at or below 0."""
+    """T-198. funding_90d = sum of interest_1h over (t, t+90d] (received by a short perp). basis_90d = (F/S - 1) x
+    365/dte x 90/365, with F the close at t of the nearest quarterly with at least ``min_dte_days`` to expiry (closer
+    ones are in delivery week, where the annualised basis is noise) and S the Deribit index at the same 08:00 UTC hour.
+    Pass: share(funding_90d > basis_90d) >= 50% and the two-sided 95% block-bootstrap CI of the mean difference above 0.
+
+    House rule 10. The claim names no window calendar ("since 2020" fixes the sample, not the phase), so a
+    non-overlapping grid of ``window_days`` windows has ``window_days`` valid start days. A window starts at 08:00 UTC on
+    EVERY day from ``start`` (the pooled all-start set; consecutive windows overlap), and the grid with start offset o
+    holds the windows starting o, o + 90, o + 180, ... days after ``start`` (offset 0 is the old grid from ``start``).
+    Both criteria are judged on the pooled set: the share of all its windows, and the mean difference with a
+    circular-block bootstrap over the daily starts in blocks of ``block`` x ``window_days`` starts (180 days, twice the
+    hold). Each offset's share, mean and CI (blocks of ``block`` windows), their ranges and how many offsets pass are
+    reported, never judged. n, in windows (the claim's unit), is the number of non-overlapping windows the sample holds:
+    the most any offset's grid fits. Below min_n windows (house rule 5) the share fails decisively when it would stay
+    under 50% at min_n even if every missing window won (pooled share x n wins so far), and the mean criterion when its
+    pooled CI lies wholly at or below 0."""
     ts, cs = _hourly(fts, i1)
     i1a = np.asarray(i1, dtype=float)
     cap = float(np.quantile(i1a, 0.99))
     _, cs_drop = _hourly(fts, np.where(i1a > cap, 0.0, i1a))
     W = window_days * DAY
+    pblock = block * window_days                         # the pooled bootstrap's block, in daily starts
 
     def windows(min_dte: float, csum) -> list[dict]:
-        out, t = [], _utc_ts(start, 8)
+        """Every daily start from ``start``; ``offset`` is the start's grid phase (days after ``start`` mod window_days)."""
+        out, t, k = [], _utc_ts(start, 8), 0
         while t + W <= ts[-1]:
             fsum, nh = window_sum(ts, csum, t, t + W)
             S = value_at(ts, fidx, t)[0]
@@ -530,47 +566,92 @@ def perp_vs_quarterly_basis(fts, i1, fidx, futures: Sequence[dict], start: str =
             if nh >= min_coverage * window_days * 24 and math.isfinite(S) and fq is not None:
                 dte = (fq[0] - t) / DAY
                 b90 = (fq[1] / S - 1.0) * window_days / dte
-                out.append({"start": _day_of(t), "dte": dte, "funding_90d": float(fsum), "basis_90d": float(b90),
-                            "diff": float(fsum - b90)})
-            t += W
+                out.append({"start": _day_of(t), "offset": k % window_days, "dte": dte, "funding_90d": float(fsum),
+                            "basis_90d": float(b90), "diff": float(fsum - b90)})
+            t += DAY; k += 1
         return out
 
     def summary(ws: list[dict], cost: float = 0.0) -> dict:
+        """The pooled all-start statistics; n = the most windows any offset's non-overlapping grid holds."""
         if not ws:
-            return {"n": 0, "share": None, "mean": None, "ci95": [None, None]}
+            return {"n": 0, "starts": 0, "share": None, "mean": None, "ci95": [None, None]}
         d = np.array([w["diff"] for w in ws]) - cost
-        lo, hi = _mean_ci(d, block, n_boot, seed) if len(d) >= 4 else (None, None)
-        return {"n": len(d), "share": float(np.mean(d > 0)), "mean": float(d.mean()), "ci95": [lo, hi]}
+        n_ = int(np.bincount([w["offset"] for w in ws], minlength=window_days).max())
+        lo, hi = cbb_mean_ci(d, pblock, n_boot, seed) if n_ >= 4 else (None, None)
+        return {"n": n_, "starts": len(d), "share": float(np.mean(d > 0)), "mean": float(d.mean()), "ci95": [lo, hi]}
+
+    def offsets(ws: list[dict]) -> dict:
+        """Each offset's non-overlapping grid: share, mean and CI (blocks of ``block`` windows), and which criteria pass."""
+        out = {}
+        for o in range(window_days):
+            d = np.array([w["diff"] for w in ws if w["offset"] == o])
+            if not len(d):
+                continue
+            lo, hi = cbb_mean_ci(d, block, n_boot, seed) if len(d) >= 4 else (None, None)
+            out[o] = {"first_start": next(w["start"] for w in ws if w["offset"] == o), "n": len(d),
+                      "share": float(np.mean(d > 0)), "mean": float(d.mean()), "ci95": [lo, hi],
+                      "share_pass": bool(np.mean(d > 0) >= 0.5), "ci_pass": lo is not None and lo > 0}
+        return out
 
     ws = windows(min_dte_days, cs)
     main = summary(ws)
+    per = offsets(ws)
     per_year = {}
     for y in sorted({w["start"][:4] for w in ws}):
         d = np.array([w["diff"] for w in ws if w["start"][:4] == y])
-        per_year[y] = {"n": len(d), "share": float(np.mean(d > 0)), "mean": float(d.mean())}
+        per_year[y] = {"starts": len(d), "share": float(np.mean(d > 0)), "mean": float(d.mean())}
     controls = {"drop_top_1pct_funding_prints": summary(windows(min_dte_days, cs_drop)),
                 "taker_fees_4_legs": {**summary(ws, 4 * fee_per_leg), "fee_per_leg": fee_per_leg},
                 "front_min_30_dte": summary(windows(30.0, cs)),
                 "eth_replication": "not run: deribit-funding-ETH-PERPETUAL and ETH quarterly futures are not archived",
-                "top_1pct_cap_interest_1h": cap}
+                "top_1pct_cap_interest_1h": cap, "note": "pooled over every daily start, as the main test"}
     n = main["n"]
     crit = [(f"windows >= {min_n} (min_n)", True if n >= min_n else None),
             ("share of windows with funding_90d > basis_90d >= 50%", None if main["share"] is None else main["share"] >= 0.5),
             ("mean difference's 95% block-bootstrap CI above 0", None if main["ci95"][0] is None else main["ci95"][0] > 0)]
 
     def decisive():       # rule 5: the share stays < 50% at min_n even if every missing window wins; the CI lies at or below 0
-        hits = sum(w["diff"] > 0 for w in ws)
+        hits = main["share"] * n if main["share"] is not None else 0.0
         return [False, (hits + min_n - n) / min_n < 0.5, _ci_below(main["ci95"], 0.0)]
 
     v, why, crit, r5 = _rule5(crit, n, min_n, "windows", decisive)
-    reason = (f"{n} non-overlapping {window_days}-day windows from {start} (front quarterly with >= {min_dte_days:g} days to "
-              f"expiry, F and Deribit index both at 08:00 UTC): funding_90d > basis_90d in "
-              f"{sum(w['diff'] > 0 for w in ws)}/{n} = {_f(main['share'] * 100 if main['share'] is not None else None, 0)}% "
+
+    def rng_(key):
+        vals = [p[key] for p in per.values() if p[key] is not None]
+        return [min(vals), max(vals)] if vals else [None, None]
+
+    lows = [p["ci95"][0] for p in per.values() if p["ci95"][0] is not None]
+    r10 = {"offsets": window_days, "offsets_with_windows": len(per), "first_start": start, "pooled_starts": main["starts"],
+           "pooled_block_starts": pblock, "per_offset_block_windows": block,
+           "windows_per_offset_range": rng_("n"), "share_range": rng_("share"), "mean_range": rng_("mean"),
+           "ci_lower_range": [min(lows), max(lows)] if lows else [None, None],
+           "n_offsets_share_pass": sum(p["share_pass"] for p in per.values()),
+           "n_offsets_ci_pass": sum(p["ci_pass"] for p in per.values()),
+           "n_offsets_both_pass": sum(p["share_pass"] and p["ci_pass"] for p in per.values()),
+           "per_offset": {str(o): p for o, p in per.items()}}
+    o0 = per.get(0)
+    no = len(per)
+    reason = (f"house rule 10: no window calendar is named, so every daily start from {start} is a window (08:00 UTC, "
+              f"front quarterly with >= {min_dte_days:g} days to expiry, F and Deribit index both at 08:00 UTC) and the "
+              f"criteria are judged on all {main['starts']} overlapping {window_days}-day windows pooled over the "
+              f"{window_days} start offsets (the sample holds {n} non-overlapping windows; per-offset grids "
+              f"{_f(r10['windows_per_offset_range'][0], 0)}-{_f(r10['windows_per_offset_range'][1], 0)}): "
+              f"funding_90d > basis_90d in {_f(main['share'] * 100 if main['share'] is not None else None, 1)}% "
               f"(need >= 50%); mean funding_90d {_pp(np.mean([w['funding_90d'] for w in ws]) if ws else None)} pp, mean "
               f"basis_90d {_pp(np.mean([w['basis_90d'] for w in ws]) if ws else None)} pp, mean difference "
-              f"{_pp(main['mean'])} pp, 95% block-bootstrap CI [{_pp(main['ci95'][0])}, {_pp(main['ci95'][1])}] pp "
-              f"(need lower > 0) — {why}")
-    return {"n": n, "share": main["share"], "mean_diff": main["mean"], "ci95": main["ci95"], "windows": ws,
+              f"{_pp(main['mean'])} pp, 95% circular-block bootstrap CI (blocks of {pblock} daily starts) "
+              f"[{_pp(main['ci95'][0])}, {_pp(main['ci95'][1])}] pp (need lower > 0). Per offset (reported, not judged): "
+              f"share {_f(r10['share_range'][0] * 100 if r10['share_range'][0] is not None else None, 0)}%-"
+              f"{_f(r10['share_range'][1] * 100 if r10['share_range'][1] is not None else None, 0)}% with "
+              f"{r10['n_offsets_share_pass']} of {no} offsets >= 50%; mean difference {_pp(r10['mean_range'][0])} to "
+              f"{_pp(r10['mean_range'][1])} pp; CI lower bound {_pp(r10['ci_lower_range'][0])} to "
+              f"{_pp(r10['ci_lower_range'][1])} pp with {r10['n_offsets_ci_pass']} of {no} offsets above 0; "
+              f"{r10['n_offsets_both_pass']} of {no} offsets pass both"
+              + (f"; the grid from {start} (offset 0): {o0['n']} windows, share {_f(o0['share'] * 100, 0)}%, mean "
+                 f"{_pp(o0['mean'])} pp, CI [{_pp(o0['ci95'][0])}, {_pp(o0['ci95'][1])}] pp" if o0 else "")
+              + f" — {why}")
+    return {"n": n, "share": main["share"], "mean_diff": main["mean"], "ci95": main["ci95"], "pooled_starts": main["starts"],
+            "windows_offset0": [w for w in ws if w["offset"] == 0], "rule10": r10,
             "per_year": per_year, "controls": controls, "criteria": crit, "verdict": v, "reason": reason,
             "sign_convention": "short perp receives +interest_1h x notional (positive funding: longs pay shorts)",
             **({"rule5": r5} if r5 else {})}
@@ -1224,6 +1305,25 @@ def weekly_first(days: Sequence[str], ok) -> list[int]:
     return out
 
 
+WEEKDAY_PHASES = ("Mon", "Tue", "Wed", "Thu", "Fri")     # the CME sessions a weekly observation can fall on
+
+
+def weekly_phase(days: Sequence[str], ok, phase: int) -> list[int]:
+    """Index of each ISO week's observation on weekday phase ``phase`` (0 = Monday, ..., 4 = Friday): the week's first
+    ok day on or after that weekday, else its last ok day before it (the roll window drops Tuesday to Friday of an
+    expiry week, so every week with an ok day keeps one observation on every phase). Phase 0 is ``weekly_first``.
+    ``days`` are in ascending order."""
+    weeks: dict = {}
+    for i, d in enumerate(days):
+        if ok[i]:
+            weeks.setdefault(_d(d).isocalendar()[:2], []).append(i)
+    out = []
+    for k in sorted(weeks):
+        on = [i for i in weeks[k] if _d(days[i]).weekday() >= phase]
+        out.append(on[0] if on else weeks[k][-1])
+    return out
+
+
 def _fwd_mdd(px_pos: dict, px: np.ndarray, day: str, horizon: int) -> Optional[float]:
     i = px_pos.get(day)
     if i is None or i + horizon >= len(px):
@@ -1265,34 +1365,63 @@ def block_gap_ub95(lab, dep, block: int, n_boot: int = 5000, seed: int = 0) -> O
 def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[str], px_close, dtb3: Optional[dict] = None,
                           start: str = "2018-12-01", end: str = "2026-09-30", trailing: int = 52, horizon: int = 30,
                           block: int = 8, n_perm: int = 5000, seed: int = 0, min_n: int = 350, split: str = "2022-01-01",
-                          min_episodes: int = 8, gap_pp: float = 10.0, switch_cost: float = 0.0010, n_trials: int = 4) -> dict:
-    """T-364. Weekly basis observations (first valid settle of each ISO week). The state comes from the previous 52
-    weekly observations only: top decile if b > their 90th percentile, bottom half if b < their median. Forward
-    30-day max drawdown from the daily close on the observation day (the first close after the 15:00 CT signal)
-    through 30 days later. Depth = -MDD in percentage points. Pass: mean depth(top) - mean depth(bottom half) >= 10
-    pp, block-permutation (8-week blocks) p < 0.05, a positive gap in both halves, >= 8 non-overlapping top-decile
-    episodes (fewer = insufficient events), >= 350 weeks, and the claim window from ``start`` covered. Below min_n weeks
-    (house rule 5) each criterion fails decisively at the confidence of its pass, from 8-week block-bootstrap draws of
-    the gap: the gap (a point estimate >= 10 pp) when its two-sided 95% interval lies wholly below 10 pp, the
-    one-sided 5% permutation test (p < 0.05) when the gap's one-sided 95% upper bound (the 95% quantile) is at or below
-    0, and the halves (point estimates > 0) when either half's two-sided 95% interval lies wholly at or below 0. Each
-    needs an interval of positive width; the episode count never decides there."""
-    ob = np.asarray(obs_basis, dtype=float); px = np.asarray(px_close, dtype=float)
+                          min_episodes: int = 8, gap_pp: float = 10.0, switch_cost: float = 0.0010, n_trials: int = 4,
+                          more_phases: Sequence[tuple] = (), phase_labels: Optional[Sequence[str]] = None) -> dict:
+    """T-364. Weekly basis observations. The state comes from the previous 52 weekly observations only: top decile if
+    b > their 90th percentile, bottom half if b < their median. Forward 30-day max drawdown from the daily close on the
+    observation day (the first close after the 15:00 CT signal) through 30 days later. Depth = -MDD in percentage
+    points. Pass: mean depth(top) - mean depth(bottom half) >= 10 pp, block-permutation (8-week blocks) p < 0.05, a
+    positive gap in both halves, >= 8 non-overlapping top-decile episodes (fewer = insufficient events), >= 350 weeks,
+    and the claim window from ``start`` covered.
+
+    House rule 10. The claim names weeks but no weekday, so a weekly grid has one valid phase per CME weekday.
+    ``obs_days``/``obs_basis`` are one phase's weekly series (the harness passes Monday, the first session of each ISO
+    week) and ``more_phases`` the other phases as (days, basis) pairs (the harness passes Tuesday to Friday from
+    ``weekly_phase``). Each phase is labelled from its own trailing 52 observations. Every criterion is judged on the
+    pooled set, all phases' labelled observations ordered by ISO week and phase: the pooled gap; the block permutation
+    and the block bootstrap in blocks of 8 weeks of pooled entries (8 x the phase count); the halves' pooled gaps; and
+    the non-overlapping episodes among the pooled top-decile days. n, in weeks (the claim's unit), counts the ISO weeks
+    with a labelled observation. Each phase's gap, p-value, halves and episodes, their ranges and how many phases pass
+    are reported, never judged. The timing rule (a control) gives each phase an equal share of capital. With a single
+    phase (no ``more_phases``) the test is that phase's alone.
+
+    Below min_n weeks (house rule 5) each criterion fails decisively at the confidence of its pass, from block-bootstrap
+    draws of the pooled gap (8 weeks of entries): the gap (a point estimate >= 10 pp) when its two-sided 95% interval
+    lies wholly below 10 pp, the one-sided 5% permutation test (p < 0.05) when the gap's one-sided 95% upper bound (the
+    95% quantile) is at or below 0, and the halves (point estimates > 0) when either half's two-sided 95% interval lies
+    wholly at or below 0. Each needs an interval of positive width; the episode count never decides there."""
+    px = np.asarray(px_close, dtype=float)
     pos = {d: i for i, d in enumerate(px_days)}
-    lab, dep, wk = [], [], []
-    for k in range(trailing, len(obs_days)):
-        d = obs_days[k]
-        if d < start or d > end:
-            continue
-        prev = ob[k - trailing:k]
-        if not np.all(np.isfinite(prev)) or not math.isfinite(ob[k]):
-            continue
-        m = _fwd_mdd(pos, px, d, horizon)
-        if m is None:
-            continue
-        lab.append(2 if ob[k] > np.quantile(prev, 0.9) else (0 if ob[k] < np.median(prev) else 1))
-        dep.append(-100.0 * m); wk.append(d)
-    lab = np.array(lab); dep = np.array(dep); n = len(lab)
+    phases = [(list(obs_days), np.asarray(obs_basis, dtype=float))] + [(list(d_), np.asarray(b_, dtype=float))
+                                                                        for d_, b_ in more_phases]
+    P = len(phases)
+    labels = list(phase_labels) if phase_labels is not None else [str(k) for k in range(P)]
+    if len(labels) != P:
+        raise ValueError(f"{len(labels)} phase labels for {P} phases")
+
+    def label(od: list, ob: np.ndarray):
+        lab_, dep_, wk_ = [], [], []
+        for k in range(trailing, len(od)):
+            d = od[k]
+            if d < start or d > end:
+                continue
+            prev = ob[k - trailing:k]
+            if not np.all(np.isfinite(prev)) or not math.isfinite(ob[k]):
+                continue
+            m = _fwd_mdd(pos, px, d, horizon)
+            if m is None:
+                continue
+            lab_.append(2 if ob[k] > np.quantile(prev, 0.9) else (0 if ob[k] < np.median(prev) else 1))
+            dep_.append(-100.0 * m); wk_.append(d)
+        return np.array(lab_, dtype=int), np.array(dep_, dtype=float), wk_
+
+    per = [label(od, ob) for od, ob in phases]
+    ent = sorted((_d(w).isocalendar()[:2], p, j) for p, (_, _, wk_) in enumerate(per) for j, w in enumerate(wk_))
+    lab = np.array([per[p][0][j] for _, p, j in ent], dtype=int)
+    dep = np.array([per[p][1][j] for _, p, j in ent], dtype=float)
+    wk = [per[p][2][j] for _, p, j in ent]
+    n = len({e[0] for e in ent})                          # ISO weeks with a labelled observation (the claim's unit)
+    bl = block * P                                        # 8 weeks of pooled entries
     covered = bool(wk) and wk[0] <= (_d(start) + timedelta(days=14)).isoformat()
 
     def gap(L: np.ndarray, D: np.ndarray) -> Optional[float]:
@@ -1300,40 +1429,52 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
             return None
         return float(D[L == 2].mean() - D[L == 0].mean())
 
-    g = gap(lab, dep) if n else None
-    p = None
-    if g is not None:
-        rng = np.random.default_rng(seed); nb = math.ceil(n / block); hits = 0
-        blocks = [lab[i * block:(i + 1) * block] for i in range(nb)]
-        for _ in range(n_perm):
-            Lp = np.concatenate([blocks[j] for j in rng.permutation(nb)])
-            gp = gap(Lp, dep)
-            hits += int(gp is not None and gp >= g)
-        p = (1 + hits) / (1 + n_perm)
-    wka = np.array(wk, dtype=str)                        # str dtype: an empty sample compares with the split too
-    halves = {}
-    for nm, msk in (("first", wka < split), ("second", wka >= split)):
-        halves[nm] = {"weeks": int(msk.sum()), "top": int((lab[msk] == 2).sum()) if n else 0,
-                      "gap": gap(lab[msk], dep[msk]) if n and msk.any() else None}
-    hs = [halves["first"]["gap"], halves["second"]["gap"]]
-    same = None if any(x is None for x in hs) else bool(hs[0] > 0 and hs[1] > 0)
-    eps = _episodes([_d(w).toordinal() for w, l_ in zip(wk, lab) if l_ == 2], horizon)
-    # timing rule: flat (bills) for 30 days after a top-decile week, 10 bp per switch
+    def summary(L: np.ndarray, D: np.ndarray, W: list, bl_: int) -> dict:
+        """Gap, block-permutation p (blocks of ``bl_`` entries), halves and episodes of one labelled set."""
+        m = len(L)
+        g_ = gap(L, D) if m else None
+        p_ = None
+        if g_ is not None:
+            rng = np.random.default_rng(seed); nb = math.ceil(m / bl_); hits = 0
+            blocks = [L[i * bl_:(i + 1) * bl_] for i in range(nb)]
+            for _ in range(n_perm):
+                gp = gap(np.concatenate([blocks[j] for j in rng.permutation(nb)]), D)
+                hits += int(gp is not None and gp >= g_)
+            p_ = (1 + hits) / (1 + n_perm)
+        wa = np.array(W, dtype=str)                       # str dtype: an empty sample compares with the split too
+        halves_ = {}
+        for nm, msk in (("first", wa < split), ("second", wa >= split)):
+            halves_[nm] = {"weeks": len({_d(w).isocalendar()[:2] for w in wa[msk]}), "entries": int(msk.sum()),
+                           "top": int((L[msk] == 2).sum()) if m else 0,
+                           "gap": gap(L[msk], D[msk]) if m and msk.any() else None}
+        hs_ = [halves_["first"]["gap"], halves_["second"]["gap"]]
+        same_ = None if any(x is None for x in hs_) else bool(hs_[0] > 0 and hs_[1] > 0)
+        eps_ = _episodes([_d(w).toordinal() for w, l_ in zip(W, L) if l_ == 2], horizon)
+        return {"gap": g_, "p": p_, "halves": halves_, "hs": hs_, "same": same_, "episodes": eps_}
+
+    S0 = summary(lab, dep, wk, bl)
+    g, p, halves, hs, same, eps = S0["gap"], S0["p"], S0["halves"], S0["hs"], S0["same"], S0["episodes"]
+    wka = np.array(wk, dtype=str)
+    # timing rule: flat (bills) for 30 days after a top-decile week, 10 bp per switch; each phase holds 1/P of capital
     timing = None
     if n:
         r = np.full(len(px), np.nan); r[1:] = px[1:] / px[:-1] - 1
-        flat = np.zeros(len(px), dtype=bool)
-        for w, l_ in zip(wk, lab):
-            if l_ == 2:
-                i = pos[w]; flat[i + 1:i + 1 + horizon] = True
         rates = Rates(dtb3)
         pdays = np.array(px_days)
         msk = (pdays >= wk[0]) & (pdays <= end) & np.isfinite(r)
         cash = np.array([rates.before(d) / 365.0 for d in pdays[msk]])
-        sw = np.abs(np.diff(flat.astype(float), prepend=0.0))[msk]
-        rr = np.where(flat[msk], cash, r[msk]) - switch_cost * sw
+        books = []
+        for lab_p, _, wk_p in per:
+            flat = np.zeros(len(px), dtype=bool)
+            for w, l_ in zip(wk_p, lab_p):
+                if l_ == 2:
+                    i = pos[w]; flat[i + 1:i + 1 + horizon] = True
+            sw = np.abs(np.diff(flat.astype(float), prepend=0.0))[msk]
+            books.append(np.where(flat[msk], cash, r[msk]) - switch_cost * sw)
+        rr = np.mean(books, axis=0)
         timing = {"sharpe": _sr(rr, CRYPTO_PPY), "buy_hold_sharpe": _sr(r[msk], CRYPTO_PPY), "dsr": _dsr(rr, n_trials),
-                  "dsr_vs_buy_hold": _dsr(rr - r[msk], n_trials), "mdd": _mdd(rr), "buy_hold_mdd": _mdd(r[msk])}
+                  "dsr_vs_buy_hold": _dsr(rr - r[msk], n_trials), "mdd": _mdd(rr), "buy_hold_mdd": _mdd(r[msk]),
+                  "phases": P}
     crit = [(f"weeks >= {min_n} (min_n)", True if n >= min_n else None),
             (f"claim window from {start[:7]} covered by settle-synchronous basis with a 52-week history", True if covered else None),
             (f"depth gap (top decile - bottom half) >= {gap_pp:g} pp", None if g is None else g >= gap_pp),
@@ -1343,28 +1484,63 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
     gap_ci = {}
     gap_ub95 = None
 
-    def decisive():       # rule 5: block-bootstrap (8-week) draws of the gaps, n_perm of them, at each pass's confidence
+    def decisive():       # rule 5: block-bootstrap (8 weeks of entries) draws of the gaps, n_perm of them, at each pass's confidence
         nonlocal gap_ub95
-        gap_ci["all"] = block_gap_ci(lab, dep, block, n_perm, seed) if n else [None, None]
-        gap_ub95 = block_gap_ub95(lab, dep, block, n_perm, seed) if n else None
+        gap_ci["all"] = block_gap_ci(lab, dep, bl, n_perm, seed) if n else [None, None]
+        gap_ub95 = block_gap_ub95(lab, dep, bl, n_perm, seed) if n else None
         for nm, msk in (("first", wka < split), ("second", wka >= split)):
-            gap_ci[nm] = block_gap_ci(lab[msk], dep[msk], block, n_perm, seed) if n and msk.any() else [None, None]
+            gap_ci[nm] = block_gap_ci(lab[msk], dep[msk], bl, n_perm, seed) if n and msk.any() else [None, None]
         return [False, False, _ci_below(gap_ci["all"], gap_pp, strict=True),       # gap wholly below 10 pp
                 _wide(gap_ci["all"]) and gap_ub95 is not None and gap_ub95 <= 0,     # one-sided 5% test: 95% bound <= 0
                 _ci_below(gap_ci["first"], 0.0) or _ci_below(gap_ci["second"], 0.0),  # a half's gap wholly at or below 0
                 False]
 
     v, why, crit, r5 = _rule5(crit, n, min_n, "weeks", decisive)
+    r10, r10_txt = None, ""
+    if P > 1:
+        pp_ = {}
+        for lb, (lab_p, dep_p, wk_p) in zip(labels, per):
+            s_ = summary(lab_p, dep_p, wk_p, block)
+            pp_[lb] = {"weeks": len(lab_p), "first_week": wk_p[0] if wk_p else None, "top": int((lab_p == 2).sum()),
+                       "bottom": int((lab_p == 0).sum()), "gap_pp": s_["gap"], "p_perm": s_["p"], "halves_pp": s_["hs"],
+                       "episodes": s_["episodes"], "gap_pass": s_["gap"] is not None and s_["gap"] >= gap_pp,
+                       "p_pass": s_["p"] is not None and s_["p"] < 0.05, "halves_pass": bool(s_["same"]),
+                       "episodes_pass": s_["episodes"] >= min_episodes}
+            pp_[lb]["all_pass"] = all(pp_[lb][k] for k in ("gap_pass", "p_pass", "halves_pass", "episodes_pass"))
+
+        def rng_(key):
+            vals = [x[key] for x in pp_.values() if x[key] is not None]
+            return [min(vals), max(vals)] if vals else [None, None]
+
+        r10 = {"phases": labels, "block_weeks": block, "pooled_block_entries": bl, "pooled_entries": int(len(lab)),
+               "gap_range_pp": rng_("gap_pp"), "p_range": rng_("p_perm"), "episodes_range": rng_("episodes"),
+               **{f"n_phases_{k}": sum(x[k] for x in pp_.values())
+                  for k in ("gap_pass", "p_pass", "halves_pass", "episodes_pass", "all_pass")},
+               "per_phase": pp_}
+        r10_txt = (f"house rule 10: no weekday is named, so the criteria are judged on the {len(lab)} labelled "
+                   f"observations pooled over the {P} weekday phases ({'/'.join(labels)}; each labelled from its own "
+                   f"trailing {trailing} observations; permutation and bootstrap in blocks of {block} weeks = {bl} pooled "
+                   f"entries). ")
+    ntop, nbot = int((lab == 2).sum()) if n else 0, int((lab == 0).sum()) if n else 0
     ci_txt = ""
     if r5:
         r5["gap_ci95_pp"] = gap_ci
         r5["gap_ub95_pp"] = gap_ub95
-        ci_txt = ("; 8-week block-bootstrap 95% CIs of the gap " + ", ".join(
+        ci_txt = (f"; {block}-week block-bootstrap 95% CIs of the gap " + ", ".join(
             f"{nm} [{_f(c_[0], 1)}, {_f(c_[1], 1)}] pp" for nm, c_ in gap_ci.items())
             + f"; one-sided 95% upper bound of the gap {_f(gap_ub95, 1)} pp from the same draws (decisive for the "
               f"permutation test below min_n when <= 0)")
-    reason = (f"{n} weeks {wk[0] if wk else 'n/a'}..{wk[-1] if wk else 'n/a'} ({int((lab == 2).sum()) if n else 0} top-decile, "
-              f"{int((lab == 0).sum()) if n else 0} bottom-half): mean 30-day max drawdown {_f(dep[lab == 2].mean() if n and (lab == 2).any() else None, 1)}% "
+    if r10:
+        ci_txt += (f". Per phase (reported, not judged): gap {_f(r10['gap_range_pp'][0], 1)} to {_f(r10['gap_range_pp'][1], 1)} pp "
+                   f"({r10['n_phases_gap_pass']} of {P} phases >= {gap_pp:g}); permutation p {_f(r10['p_range'][0], 4)} to "
+                   f"{_f(r10['p_range'][1], 4)} ({r10['n_phases_p_pass']} of {P} < 0.05); both halves positive in "
+                   f"{r10['n_phases_halves_pass']} of {P}; episodes {_f(r10['episodes_range'][0], 0)}-"
+                   f"{_f(r10['episodes_range'][1], 0)} ({r10['n_phases_episodes_pass']} of {P} >= {min_episodes}); "
+                   f"{r10['n_phases_all_pass']} of {P} phases pass all four; "
+                   + ", ".join(f"{k} {_f(x['gap_pp'], 1)} pp p {_f(x['p_perm'], 3)}" for k, x in r10["per_phase"].items()))
+    reason = (f"{r10_txt}{n} weeks {wk[0] if wk else 'n/a'}..{wk[-1] if wk else 'n/a'} ({ntop} top-decile, "
+              f"{nbot} bottom-half{' observations' if P > 1 else ''}): mean 30-day max drawdown "
+              f"{_f(dep[lab == 2].mean() if n and (lab == 2).any() else None, 1)}% "
               f"vs {_f(dep[lab == 0].mean() if n and (lab == 0).any() else None, 1)}%, gap {_f(g, 1)} pp (need >= {gap_pp:g}); "
               f"permutation p {_f(p, 4)} (need < 0.05); halves {_f(hs[0], 1)} / {_f(hs[1], 1)} pp (need both > 0); "
               f"{eps} non-overlapping episodes (need >= {min_episodes}); weeks need >= {min_n}; window from {start[:7]} "
@@ -1373,7 +1549,7 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
             "mean_depth_top": float(dep[lab == 2].mean()) if n and (lab == 2).any() else None,
             "mean_depth_bottom": float(dep[lab == 0].mean()) if n and (lab == 0).any() else None,
             "timing_rule": timing, "first_week": wk[0] if wk else None, "criteria": crit, "verdict": v, "reason": reason,
-            **({"rule5": r5} if r5 else {})}
+            **({"rule10": r10} if r10 else {}), **({"rule5": r5} if r5 else {})}
 
 
 # ===================================================================================================================
@@ -1626,7 +1802,8 @@ def _clean(x):
 
 
 def carry_perp_funding_vs_quarterly(archive):
-    """T-198: 90-day BTC-PERPETUAL funding received by a short vs the front quarterly basis pro-rated to 90 days."""
+    """T-198: 90-day BTC-PERPETUAL funding received by a short vs the front quarterly basis pro-rated to 90 days, pooled
+    over every daily window start (house rule 10)."""
     miss = _missing(archive, [FUNDING, QUARTERLIES])
     if miss:
         return miss
@@ -1683,15 +1860,19 @@ def carry_perp_funding_threshold(archive):
 
 
 def carry_basis_crash_predictor(archive):
-    """T-364: forward 30-day BTC-USD max drawdown after top-decile vs bottom-half weekly synchronous BTC=F basis."""
+    """T-364: forward 30-day BTC-USD max drawdown after top-decile vs bottom-half weekly synchronous BTC=F basis, pooled
+    over the five weekday phases of the weekly observation (house rule 10)."""
     miss = _missing(archive, [FUNDING, "daily-history-BTC-F", "daily-history-BTC-USD", "fred-DTB3"])
     if miss:
         return miss
     days, F, S, std = _cme_sync(archive)
     tab = cme_daily_basis(days, F, S, std, cme_expiries(), roll_calendar_days=3)
-    wk = weekly_first(days, tab["ok"])
+    ph = [weekly_phase(days, tab["ok"], p) for p in range(len(WEEKDAY_PHASES))]      # house rule 10: every weekday phase
     pdays, pclose = _cached(archive, ("px", "BTC-USD"), lambda: load_series(archive, "BTC-USD", adjusted=True))
-    return _wrap(basis_crash_predictor([days[i] for i in wk], tab["basis"][wk], pdays, pclose, _index(archive, "fred-DTB3")))
+    return _wrap(basis_crash_predictor([days[i] for i in ph[0]], tab["basis"][ph[0]], pdays, pclose,
+                                       _index(archive, "fred-DTB3"),
+                                       more_phases=[([days[i] for i in w], tab["basis"][w]) for w in ph[1:]],
+                                       phase_labels=WEEKDAY_PHASES))
 
 
 def carry_funding_sentiment(archive):

@@ -38,6 +38,15 @@ Shared conventions
   would face at min_n (the 1/(T-1) floor of the trial-Sharpe variance taken at min_n, which can only lower it) and
   at least 8 observations. PBO and a QMJ loading given without an interval never fail decisively. Any other
   failure below min_n is undecided (None), so the verdict is inconclusive.
+* No arbitrary grid phase (house rule 10). Only T-389 rests on a non-overlapping cycle grid: its claim says
+  'quarterly' (tilts, one-quarter embargo) without naming a quarter calendar, so the rebalance has three valid phases
+  (Jan/Apr/Jul/Oct, Feb/May/Aug/Nov, Mar/Jun/Sep/Dec). ``contrarian_timing_test`` builds every portfolio on all three
+  and judges both criteria on the pooled book (one third of capital per phase, i.e. overlapping entries; block 12 >=
+  2 x the 3-month hold); the reason gives the per-phase range and how many phases pass. The other eleven are
+  unaffected: T-382, T-386, T-446 and T-447 are daily factor series over fixed windows; T-385 and T-387 are daily P&L
+  series of books reset at calendar-month starts (T-387 also on state-triggered beta drift, not a fixed grid);
+  T-383, T-388, T-397, T-445 and T-449 are calendar-month statistics (T-383's monthly hedge reset and T-388's monthly
+  rebalance are calendar months with a one-month hold, so the grid has a single phase).
 """
 
 from __future__ import annotations
@@ -712,14 +721,21 @@ def _tilt(z: np.ndarray) -> np.ndarray:
     return np.where(np.isfinite(z) & (np.abs(z) > 1.0), t, 0.0)
 
 
+QUARTER_PHASES = ("Jan/Apr/Jul/Oct", "Feb/May/Aug/Nov", "Mar/Jun/Sep/Dec")
+
+
 def contrarian_portfolios(F: np.ndarray, months: Sequence[str], W: int, tilt_mask: np.ndarray, start: int,
-                          embargo: int = 4, z_min: int = 12, cost: float = 0.0005, target: float = 0.10, return_tilts: bool = False):
-    """(static, timed) monthly returns from row ``start``. Quarterly rebalance (Jan/Apr/Jul/Oct, plus the first row).
+                          embargo: int = 4, z_min: int = 12, cost: float = 0.0005, target: float = 0.10, return_tilts: bool = False,
+                          phase: int = 0):
+    """(static, timed) monthly returns from row ``start``. Quarterly rebalance in the months of QUARTER_PHASES[phase]
+    (phase 0: Jan/Apr/Jul/Oct; 1: Feb/May/Aug/Nov; 2: Mar/Jun/Sep/Dec), plus the first row.
     Static: inverse trailing 36-month vol weights to t-1 scaled to ``target`` vol. Timed: static raw weights times
     (1 + tilt) where tilt comes from the expanding-window z-score of the trailing W-month factor return measured
     ``embargo`` months before the rebalance month (signal at the end of the quarter before the last: one quarter of
     embargo), then scaled to ``target`` vol. Costs: ``cost`` per unit of notional traded. With ``return_tilts`` a third
     element maps each rebalance month to its tilt vector."""
+    if phase not in (0, 1, 2):
+        raise ValueError("phase must be 0, 1 or 2 (the three quarterly rebalance calendars)")
     T, K = F.shape
     RW = np.full((T, K), np.nan)
     for j in range(W - 1, T):
@@ -734,7 +750,7 @@ def contrarian_portfolios(F: np.ndarray, months: Sequence[str], W: int, tilt_mas
     ws = wt = None
     for i in range(start, T):
         cs = ct = 0.0
-        if ws is None or int(months[i][5:7]) in (1, 4, 7, 10):
+        if ws is None or (int(months[i][5:7]) - 1) % 3 == phase:
             sig, cov = _risk(F, i)
             if sig is None or np.any(sig <= 0):
                 raise ValueError("not enough history for the risk model at the start row")
@@ -753,56 +769,103 @@ def contrarian_portfolios(F: np.ndarray, months: Sequence[str], W: int, tilt_mas
     return np.array(static), np.array(timed)
 
 
+def _contrarian_stats(static: np.ndarray, trials: dict, n_boot: int, seed: int) -> dict:
+    """Sharpe difference of trials['z60_all'] over ``static`` (annualised, studentized block-12 CI; 12 >= 2 x the
+    3-month hold) and the DSR over 5 trials with the variance of the given trials' timed-minus-static Sharpes."""
+    diffs = {k: v - static for k, v in trials.items()}
+    obs, lo, hi = sharpe_diff_ci(trials["z60_all"], static, 12, 12, n_boot, seed)
+    tsr = [float(sharpe_ratio(diffs[k])) for k in trials]
+    var_tsr = float(np.var(tsr, ddof=1))
+    dsr = float(deflated_sharpe_ratio(diffs["z60_all"], n_trials=5, var_trials_sr=var_tsr if var_tsr > 0 else None))
+    return {"obs": obs, "lo": lo, "hi": hi, "tsr": tsr, "dsr": dsr, "diffs": diffs,
+            "sharpe_timed": float(sharpe_ratio(trials["z60_all"], 12)), "sharpe_static": float(sharpe_ratio(static, 12))}
+
+
 def contrarian_timing_test(months: Sequence[str], F: np.ndarray, names: Sequence[str], start_month: str = "1968-01", min_n: int = 600,
                            n_boot: int = 5000, seed: int = 0, value_spread_timed: Optional[np.ndarray] = None) -> dict:
     """T-389: static equal-risk portfolio tilted by 60-month reversal z-scores (expanding window, one-quarter embargo,
     quarterly) minus the static portfolio: lower 95% bound of the annualised Sharpe difference > 0 (studentized
     block-12 bootstrap) AND DSR > 0.95 over the 5 pre-registered trials ({36, 60} x {all, ex-HML} + value spread).
+
+    House rule 10: the claim says 'quarterly' without naming a calendar, so a quarterly rebalance grid has three valid
+    phases (QUARTER_PHASES). Every portfolio (static and each trial) is built on all three phases and the primary
+    series is the pooled all-phase book: one third of capital in each phase's book (overlapping entries, so each month
+    holds the average of the three phase returns). Both criteria are judged on the pooled series (block 12 >= 2 x the
+    3-month hold); each phase's Sharpe difference, CI and DSR are reported with the number of phases that pass. n is
+    the number of monthly observations, the claim's unit.
+
     The value-spread trial needs the BE/ME block of 6_Portfolios_2x3; ``value_spread_timed`` is that trial's monthly
-    timed return series aligned with months[start:]. Without it the DSR criterion is not implemented (None, so the
-    verdict is at best inconclusive); the DSR over 5 trials with the variance of the 4 computable trials is reported."""
+    timed return series aligned with months[start:] (shape (n,), used for the pooled book and every phase, or (3, n),
+    one series per phase, pooled by averaging). Without it the DSR criterion is not implemented (None, so the verdict
+    is at best inconclusive); the DSR over 5 trials with the variance of the 4 computable trials is reported."""
     F = np.asarray(F, dtype=float)
     months = list(months)
     start = next(i for i, m in enumerate(months) if m >= start_month)
     K = F.shape[1]
     all_mask = np.ones(K)
     ex_hml = np.array([0.0 if nm == "HML" else 1.0 for nm in names])
-    trials = {}
-    static = None
-    for W in (60, 36):
-        for setn, mask in (("all", all_mask), ("exHML", ex_hml)):
-            s, t = contrarian_portfolios(F, months, W, mask, start)
-            static = s
-            trials[f"z{W}_{setn}"] = t
+    phase_static, phase_trials = [], []
+    for p in range(len(QUARTER_PHASES)):
+        tp, sp = {}, None
+        for W in (60, 36):
+            for setn, mask in (("all", all_mask), ("exHML", ex_hml)):
+                s, t = contrarian_portfolios(F, months, W, mask, start, phase=p)
+                sp = s                                   # the static book depends on the phase only
+                tp[f"z{W}_{setn}"] = t
+        phase_static.append(sp)
+        phase_trials.append(tp)
     ms = months[start:]
-    n = len(static)
+    n = len(phase_static[0])
     have_vs = value_spread_timed is not None
     if have_vs:
         vst = np.asarray(value_spread_timed, dtype=float)
-        if vst.shape != static.shape:
-            raise ValueError(f"value_spread_timed must have {n} monthly returns aligned with {ms[0]}..{ms[-1]}")
-        trials["value_spread"] = vst
-    diffs = {k: v - static for k, v in trials.items()}
-    obs, lo, hi = sharpe_diff_ci(trials["z60_all"], static, 12, 12, n_boot, seed)
-    tsr = [float(sharpe_ratio(diffs[k])) for k in trials]
-    var_tsr = float(np.var(tsr, ddof=1))
-    dsr = float(deflated_sharpe_ratio(diffs["z60_all"], n_trials=5, var_trials_sr=var_tsr if var_tsr > 0 else None))
+        if vst.shape == (n,):
+            vst = np.tile(vst, (len(QUARTER_PHASES), 1))
+        if vst.shape != (len(QUARTER_PHASES), n):
+            raise ValueError(f"value_spread_timed must have {n} monthly returns aligned with {ms[0]}..{ms[-1]} "
+                             f"(shape ({n},) or ({len(QUARTER_PHASES)}, {n}))")
+        for p, tp in enumerate(phase_trials):
+            tp["value_spread"] = vst[p]
+    static = np.mean(phase_static, axis=0)
+    trials = {k: np.mean([tp[k] for tp in phase_trials], axis=0) for k in phase_trials[0]}
+    pool = _contrarian_stats(static, trials, n_boot, seed)
+    obs, lo, hi, tsr, dsr = pool["obs"], pool["lo"], pool["hi"], pool["tsr"], pool["dsr"]
+    per = {}
+    for p, label in enumerate(QUARTER_PHASES):
+        st = _contrarian_stats(phase_static[p], phase_trials[p], n_boot, seed)
+        per[label] = {"sharpe_diff": st["obs"], "ci": [st["lo"], st["hi"]], "ci_lower_passes": bool(st["lo"] > 0),
+                      "dsr": st["dsr"], "dsr_passes": bool(st["dsr"] > DSR_PASS) if have_vs else None,
+                      "sharpe_timed": st["sharpe_timed"], "sharpe_static": st["sharpe_static"]}
     dsr_name = f"DSR > {DSR_PASS} over 5 trials" + ("" if have_vs else " (value-spread trial not computable)")
     rows = [_ci_row("lower 95% bound of the Sharpe difference > 0", lo, hi, f"{hi:+.2f}"),
-            _dsr_row(dsr_name, bool(dsr > DSR_PASS) if have_vs else None, diffs["z60_all"], 5, _trial_var(tsr, max(n, min_n)))]
+            _dsr_row(dsr_name, bool(dsr > DSR_PASS) if have_vs else None, pool["diffs"]["z60_all"], 5, _trial_var(tsr, max(n, min_n)))]
     v, why = _decide(rows, n, min_n, "monthly observations")
-    s_t, s_s = float(sharpe_ratio(trials["z60_all"], 12)), float(sharpe_ratio(static, 12))
-    dsr_s = (f"DSR {dsr:.3f} over 5 trials (needs > {DSR_PASS})" if have_vs else
-             f"DSR {dsr:.3f} over 5 trials not decided: value-spread trial not computable (6_Portfolios_2x3 BE/ME not archived), so only "
-             f"4 of the 5 trial Sharpes are in the variance (reported only)")
-    reason = (f"{'/'.join(names)} {ms[0]}..{ms[-1]} (n={n} months): 60-month z tilt Sharpe {s_t:.2f} vs static {s_s:.2f}, difference "
-              f"{obs:+.2f} (95% studentized CI {lo:+.2f} to {hi:+.2f}); {dsr_s}; annualised Sharpe of each timed-minus-static series "
+    s_t, s_s = pool["sharpe_timed"], pool["sharpe_static"]
+    d_ph = [r["sharpe_diff"] for r in per.values()]
+    lo_ph = [r["ci"][0] for r in per.values()]
+    dsr_ph = [r["dsr"] for r in per.values()]
+    n_ci_pass = sum(r["ci_lower_passes"] for r in per.values())
+    n_dsr_pass = sum(bool(r["dsr_passes"]) for r in per.values()) if have_vs else None
+    rule10 = {"grid": "quarterly rebalance; the claim names no quarter calendar, so all three phases are run",
+              "phases": list(QUARTER_PHASES), "primary": "pooled all-phase book (one third of capital per phase)",
+              "block": 12, "per_phase": per, "sharpe_diff_range": [min(d_ph), max(d_ph)], "ci_lower_range": [min(lo_ph), max(lo_ph)],
+              "dsr_range": [min(dsr_ph), max(dsr_ph)], "n_phases_ci_pass": n_ci_pass, "n_phases_dsr_pass": n_dsr_pass}
+    dsr_s = (f"pooled DSR {dsr:.3f} over 5 trials (needs > {DSR_PASS}; per phase {min(dsr_ph):.3f} to {max(dsr_ph):.3f}, "
+             f"{n_dsr_pass} of 3 phases pass)" if have_vs else
+             f"pooled DSR {dsr:.3f} over 5 trials (per phase {min(dsr_ph):.3f} to {max(dsr_ph):.3f}) not decided: value-spread trial "
+             f"not computable (6_Portfolios_2x3 BE/ME not archived), so only 4 of the 5 trial Sharpes are in the variance (reported only)")
+    ph_s = "; ".join(f"{k} {r['sharpe_diff']:+.2f} [{r['ci'][0]:+.2f}, {r['ci'][1]:+.2f}]" for k, r in per.items())
+    reason = (f"{'/'.join(names)} {ms[0]}..{ms[-1]} (n={n} months; quarterly rebalance pooled over its 3 phases, one third of "
+              f"capital each, house rule 10): 60-month z tilt Sharpe {s_t:.2f} vs static {s_s:.2f}, pooled difference "
+              f"{obs:+.2f} (95% studentized block-12 CI {lo:+.2f} to {hi:+.2f}); per phase difference {min(d_ph):+.2f} to "
+              f"{max(d_ph):+.2f}, lower bounds {min(lo_ph):+.2f} to {max(lo_ph):+.2f}, {n_ci_pass} of 3 phases pass the lower "
+              f"bound ({ph_s}); {dsr_s}; annualised Sharpe of each pooled timed-minus-static series "
               f"{', '.join(f'{k} {s * math.sqrt(12):+.2f}' for k, s in zip(trials, tsr))} — {why}")
     return {"n": n, "n_months": n, "window_used": f"{ms[0]}..{ms[-1]}", "factors": list(names), "sharpe_timed": s_t, "sharpe_static": s_s,
             "sharpe_diff": obs, "ci": [lo, hi], "dsr": dsr, "dsr_decided": have_vs,
             "trial_diff_sharpes_ann": {k: s * math.sqrt(12) for k, s in zip(trials, tsr)},
             "value_spread_trial": "computed" if have_vs else "not computable (BE/ME of 6_Portfolios_2x3 not archived)",
-            "verdict": v, "reason": reason}
+            "rule10": rule10, "verdict": v, "reason": reason}
 
 
 def industry_alpha_test(months: Sequence[str], port: np.ndarray, rf: np.ndarray, F5: np.ndarray, start: str = "2009-01", end: str = "2026-09",
@@ -1251,7 +1314,8 @@ def fact_contrarian_timing(archive) -> dict:
     embargo; overweight z < -1, underweight z > +1, tilt capped at +/-50%; 5 bp per unit traded), 1968-2026. Pass:
     lower 95% bound of the Sharpe difference > 0 AND DSR > 0.95 over 5 trials. The value-spread trial (5th of 5) needs
     the BE/ME block of 6_Portfolios_2x3, which is not archived, so the DSR criterion is not implemented and the verdict
-    is at best inconclusive."""
+    is at best inconclusive. House rule 10: 'quarterly' names no quarter calendar, so both criteria are judged on the
+    pooled book over the three quarterly rebalance phases, with each phase reported."""
     fm_months, fm = ff_monthly(archive)
     names = FF5 + ["UMD"]
     rep = contrarian_timing_test(fm_months, _ff_matrix(fm, names), names)

@@ -50,6 +50,13 @@ H0 diff >= 0 (``group_diff``'s p_less), or the lower-tail permutation p. That is
 side. The two-sided 95% interval would be a one-sided 97.5% bound, a higher confidence than the pass, and would
 under-call. Any other failure there is undecided (None), so the verdict is inconclusive; T-342's random-offset placebo
 p never decides below min_n. The criteria judged, and the decisive failures, are reported under ``rule5``.
+
+House rule 10 (no arbitrary grid phase) does not bind here: no statistic rests on a non-overlapping cycle grid with an
+arbitrary start. T-214, T-215, T-221 and T-341 compare day-flagged daily series (every trading day is in one group or
+the other). T-273 is an event study on the fixed FOMC decision days. T-342's cycle weeks are counted from the scheduled
+statement days, the calendar the claim names; its random-offset placebo is the trial's own control. T-361's 15-day
+holds start at the t+2 close after each scheduled statement (event dates, about six weeks apart, so the holds neither
+overlap nor have a free phase), and its long-only arm is compared with buy-and-hold on daily returns.
 """
 
 from __future__ import annotations

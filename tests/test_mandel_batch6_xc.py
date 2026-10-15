@@ -1,9 +1,12 @@
 """Batch 6a, group xc: crypto model-priced hedging and captured-chain arbitrage harnesses on synthetic data only (no
-archive, no network). Each core function gets a planted effect that passes and a null that does not."""
+archive, no network). Each core function gets a planted effect that passes and a null that does not. House rule 10
+(no verdict may rest on an arbitrary grid phase): T-255 and T-261 pool all 30 offsets of their 30-day grid; a planted
+effect on one grid phase must not pass, a phase-robust one passes on every offset."""
 
 import json
 import math
-from datetime import date, datetime, timedelta
+from bisect import bisect_left
+from datetime import date, datetime, timedelta, timezone
 
 import numpy as np
 import pytest
@@ -220,6 +223,203 @@ def test_inverse_hedge_ratio_null_fails():
     rep = x.inverse_hedge_ratio(days, close, iv, start="2021-01-01", end="2024-12-31", delta=0.01, n_boot=NB)
     assert rep["verdict"] == "not_supported", rep["reason"]             # a tiny coin premium: nothing to correct
     assert rep["stat"]["var_ratio_usd"]["ratio"] > 0.9
+
+
+# ======================================================================= rule 10: grid phases (T-255, T-261) ==
+
+def _one_phase_iv(n: int, base: float, spike: float, phase: int = 0, hold: int = 30) -> np.ndarray:
+    """DVOL at ``base`` except on the entry days of one 30-day grid offset, where it is ``spike``."""
+    iv = np.full(n, float(base))
+    iv[np.arange(n) % hold == phase] = spike
+    return iv
+
+
+def test_offset_grids_partition_the_daily_entries_rule10():
+    """Calendar alignment of the 30 grids: offset k's grid starts k days after the claim's start and steps 30 calendar
+    days; the 30 grids partition the pooled daily entries; offset 0 is the old grid from the start date; no entry's cycle
+    spans a data gap; n (distinct holds) is the size of the densest grid."""
+    days = _cal_days("2021-01-01", 400)
+    idx = x._daily_starts(days, 30, "2021-01-05", "2021-12-31")
+    off = x._offsets(idx, days, 30, "2021-01-05")
+    assert days[idx[0]] == "2021-01-05" and days[idx[-1] + 30] <= "2021-12-31" < days[idx[-1] + 31]
+    union = []
+    for k in range(30):
+        g = x._cycle_starts(days, 30, "2021-01-05", "2021-12-31", offset=k)
+        assert np.array_equal(g, idx[off == k])
+        assert days[g[0]] == (date(2021, 1, 5) + timedelta(days=k)).isoformat() and (np.diff(g) == 30).all()
+        union += list(g)
+    assert sorted(union) == list(idx)
+    assert np.array_equal(x._cycle_starts(days, 30, "2021-01-05", "2021-12-31"), idx[off == 0])
+    assert x.n_holds(idx, 30) == max(int((off == k).sum()) for k in range(30)) == 12
+    assert x.pool_block(30, 3) == 90 and x.pool_block(30, 1) == 60
+    gap = days[:200] + days[201:]                                            # one missing day
+    ig = x._daily_starts(gap, 30, "2021-01-05", "2021-12-31")
+    o = np.array([date.fromisoformat(d).toordinal() for d in gap])
+    assert (o[ig + 30] - o[ig] == 30).all() and ig.size == idx.size - 31     # the 30 cycles spanning it and the day itself
+    og = x._offsets(ig, gap, 30, "2021-01-05")
+    assert sorted(sum((list(x._cycle_starts(gap, 30, "2021-01-05", "2021-12-31", offset=k)) for k in range(30)), [])) == list(ig)
+    assert all(np.array_equal(x._cycle_starts(gap, 30, "2021-01-05", "2021-12-31", offset=k), ig[og == k]) for k in range(30))
+
+
+def test_btc_vrp_one_phase_effect_does_not_pass_rule10():
+    """Regression (rule 10, T-255): DVOL is rich (100) only on the entry days of grid offset 0 and fair (60 = realised)
+    on every other day. The old harness, the single grid from the start date, sees a large significant edge; the pooled
+    all-offset estimate (the primary statistic) must not pass."""
+    n = 1300
+    days, close, iv = _cal_days("2021-01-01", n), _gbm365(n, 0.6, 11), _one_phase_iv(n, 60.0, 100.0)
+    rep = x.btc_vrp_straddle(days, close, iv, start="2021-01-01", end="2024-12-31", n_boot=NB, n_placebo=10)
+    st = rep["stat"]
+    o0 = st["per_offset"][0]
+    assert o0["offset"] == 0 and o0["pass"] and o0["mean_gross"] > 0.3 and o0["ci_gross"][0] > 0.2
+    old = x.hedged_straddle(days, close, iv, start="2021-01-01", end="2024-12-31")    # what the harness used to test
+    assert o0["mean_gross"] == pytest.approx(float(old["x_gross"].mean())) and o0["n_cycles"] == old["x_gross"].size
+    others = [o for o in st["per_offset"] if o["offset"]]
+    assert max(abs(o["mean_gross"]) for o in others) < 0.1
+    assert st["n_offsets"] == 30 and st["offsets_passing"] <= 2
+    assert rep["verdict"] == "not_supported", rep["reason"]
+    assert st["ci_gross"][0] < 0.05 and st["sharpe_net_annual"] < 0.5
+    assert f"{st['offsets_passing']}/30 offsets pass all three criteria" in rep["reason"]
+    assert "POOLED over all 30 start offsets" in rep["reason"]
+
+
+def test_btc_vrp_phase_robust_effect_passes_every_offset_rule10():
+    """The phase-robust counterpart: DVOL rich on every day. Pooled passes, every offset passes, n is in the claim's
+    unit (distinct non-overlapping 30-day cycles), the pooled block spans >= 2 holds; the Sharpe criterion states its
+    annualisation and the per-cycle Sharpe is reported; the placebo is reported as a distribution."""
+    days, close, iv = _btc(1300, 0.40, 60.0, seed=3)
+    rep = x.btc_vrp_straddle(days, close, iv, start="2021-01-01", end="2024-12-31", n_boot=NB, n_placebo=12)
+    st = rep["stat"]
+    assert rep["verdict"] == "supported", rep["reason"]
+    assert st["offsets_passing"] == st["n_offsets"] == 30
+    idx = x._daily_starts(days, 30, "2021-01-01", "2024-12-31")
+    assert rep["n"] == st["n_cycles"] == x.n_holds(idx, 30) == x._cycle_starts(days, 30, "2021-01-01", "2024-12-31").size
+    assert st["n_entries"] == idx.size and st["pool_block_days"] >= 60
+    assert "annualised x sqrt(365/30)" in rep["reason"] and "per cycle" in rep["reason"]
+    assert st["sharpe_net_per_cycle"] == pytest.approx(st["sharpe_net_annual"] / math.sqrt(365 / 30))
+    pl = st["shuffled_dvol_placebo"]
+    assert pl["n_perm"] == 12 and pl["q05_median_q95"][0] <= pl["q05_median_q95"][1] <= pl["q05_median_q95"][2]
+    assert "keeps the level VRP" in rep["reason"] and "not archived yet" in rep["reason"]
+    json.dumps(x._clean(st), allow_nan=False)
+
+
+def test_inverse_hedge_ratio_one_phase_effect_does_not_pass_rule10(monkeypatch):
+    """Regression (rule 10, T-261): the coin premium's P&L term is planted on the entries of grid offset 0 only, so on
+    that grid the corrected hedge cuts the variance by about 70% and on every other grid not at all. That one grid
+    passes; the pooled ratio (the primary statistic) must not."""
+    n = 1300
+    days = _cal_days("2021-01-01", n)
+    rng = np.random.default_rng(5)
+    e, m = rng.standard_normal(n), 1.5 * rng.standard_normal(n)
+
+    def fake(days_, close, iv, start, end, hold, delta, starts=None):
+        s = np.asarray(starts, dtype=np.int64)
+        mv = np.where((s - bisect_left(list(days_), start)) % hold == 0, m[s], 0.0)
+        c = e[s]
+        one = np.ones(s.size)
+        return {"start": s, "day": [days_[i] for i in s], "corrected": c, "naive": c + mv, "corrected_coll": c, "naive_coll": c + mv,
+                "naive_lin": c, "misapplied_lin": c - mv, "spot": one, "prem_btc": 0.03 * one, "im_btc": 0.2 * one}
+
+    monkeypatch.setattr(x, "inverse_strangle", fake)
+    rep = x.inverse_hedge_ratio(days, np.ones(n), np.full(n, 60.0), start="2021-01-01", end="2024-12-31", n_boot=NB)
+    st = rep["stat"]
+    o0 = st["per_offset"][0]
+    assert o0["offset"] == 0 and o0["pass"] and o0["hi"] < 0.8
+    assert st["offsets_passing"] == 1 and st["n_offsets"] == 30
+    assert st["var_ratio_usd"]["ratio"] > 0.85 and st["var_ratio_usd"]["hi"] >= 0.8
+    assert rep["verdict"] == "not_supported", rep["reason"]
+    assert "1/30 offsets pass" in rep["reason"]
+
+
+def test_inverse_hedge_ratio_phase_robust_passes_every_offset_rule10():
+    days, close, iv = _btc(1300, 0.8, 80.0, seed=8)
+    rep = x.inverse_hedge_ratio(days, close, iv, start="2021-01-01", end="2024-12-31", delta=0.45, n_boot=NB)
+    st = rep["stat"]
+    assert rep["verdict"] == "supported", rep["reason"]
+    assert st["offsets_passing"] == st["n_offsets"] == 30 and st["pool_block_days"] >= 60
+    assert rep["n"] == x.n_holds(x._daily_starts(days, 30, "2021-01-01", "2024-12-31"), 30)
+
+
+def test_funding_by_day_and_series_alignment_t255():
+    """Signed perpetual funding: day d sums the hourly rates of the hours ending in (d 00:00, d+1 00:00] UTC; a day with
+    fewer than 24 prints is missing; the hold from the close of day i (24:00 UTC) to the close of day i+1 accrues day
+    i+1's funding."""
+    t0 = datetime(2021, 1, 1, tzinfo=timezone.utc)
+    rows = []
+    for h in range(1, 24 * 3 + 1):
+        ts = t0 + timedelta(hours=h)
+        rows.append({"value": {"timestamp": ts.timestamp() * 1000, "interest_1h": 1e-4 * (ts - timedelta(hours=1)).day}})
+    by = x._funding_by_day(rows[:-5])                                        # the third day has 19 prints
+    assert set(by) == {"2021-01-01", "2021-01-02"}
+    assert by["2021-01-01"] == pytest.approx(24e-4) and by["2021-01-02"] == pytest.approx(48e-4)
+    f = x.funding_rate_series(["2020-12-31", "2021-01-01", "2021-01-02", "2021-01-03"], by)
+    assert f[0] == pytest.approx(24e-4) and f[1] == pytest.approx(48e-4) and np.isnan(f[2]) and np.isnan(f[3])
+
+
+def test_signed_funding_charge_t255():
+    days, close, iv = _btc(400, 0.5, 50.0)
+    kw = dict(start="2021-01-01", end="2021-12-31")
+    zero = x.hedged_straddle(days, close, iv, funding_bp=0.0, **kw)
+    flat = x.hedged_straddle(days, close, iv, funding_bp=1.0, **kw)
+    pos = x.hedged_straddle(days, close, iv, funding_rate=np.full(400, 1e-4), **kw)
+    neg = x.hedged_straddle(days, close, iv, funding_rate=np.full(400, -1e-4), **kw)
+    assert np.allclose(pos["funding"], -neg["funding"]) and np.allclose(pos["net"] + pos["funding"], zero["net"])
+    assert (np.abs(pos["funding"]) <= flat["funding"] + 1e-9).all()        # |h| S bounds the signed charge
+    fr = np.full(400, 1e-4)
+    fr[45] = np.nan
+    miss = x.hedged_straddle(days, close, iv, funding_rate=fr, **kw)
+    assert miss["funding_missing_days"] == 1 and pos["funding_missing_days"] == 0
+    days, close, iv = _btc(1300, 0.40, 60.0, seed=3)
+    rep = x.btc_vrp_straddle(days, close, iv, start="2021-01-01", end="2024-12-31", n_boot=NB, n_placebo=5,
+                             funding_rate=np.full(1300, 3e-4))
+    sf = rep["stat"]["signed_funding"]
+    assert sf["mean_funding_over_premium"] != pytest.approx(sf["mean_flat_funding_over_premium"])
+    assert "BTC-PERPETUAL funding signed" in rep["reason"] and sf["ci_net"][0] is not None
+
+
+def test_per_day_haircut_matches_constant_scale_t255():
+    """The trial's haircut from a per-day ATM/DVOL ratio (when archived): a constant ratio reproduces the constant-scale
+    sensitivity; entries before the first known ratio are dropped and later gaps carry the last ratio forward."""
+    days, close, iv = _btc(1300, 0.40, 60.0, seed=3)
+    rep = x.btc_vrp_straddle(days, close, iv, start="2021-01-01", end="2024-12-31", n_boot=NB, n_placebo=5,
+                             scale_by_day=np.full(1300, 0.9))
+    st = rep["stat"]
+    assert st["per_day_haircut"]["mean_gross"] == pytest.approx(st["iv_scale_sensitivity"]["0.9000"]["mean_gross"])
+    assert "per-day DVOL-ATM haircut" in rep["reason"] and "not archived yet" not in rep["reason"]
+    sd = np.full(1300, np.nan)
+    sd[400::7] = 0.9
+    rep2 = x.btc_vrp_straddle(days, close, iv, start="2021-01-01", end="2024-12-31", n_boot=NB, n_placebo=5, scale_by_day=sd)
+    h = rep2["stat"]["per_day_haircut"]
+    assert h["n_entries"] == st["n_entries"] - 400 and h["mean_scale"] == pytest.approx(0.9)
+
+
+def test_spy_control_pools_every_offset_rule10(monkeypatch):
+    """T-255's SPY/VIX positive control is pooled over every offset of its 21-session grid (rule 10), within the window."""
+    import mandel.experiments.batch6_var as v
+    sd = _cal_days("2021-03-01", 400)
+    seen = {}
+
+    def fake_cycles(fr, scale, side=-1, hedge=True, starts=None, **kw):
+        seen["starts"] = np.asarray(starts)
+        st = np.asarray(starts)
+        return {"start": st, "end": st + v.HOLD, "pnl": np.where((st - st[0]) % v.HOLD == 0, 2.0, 1.0), "prem": np.full(st.size, 10.0)}
+
+    monkeypatch.setattr(x, "_has", lambda a, b: True)
+    monkeypatch.setattr(v, "_spy_frame", lambda a: {"days": sd})
+    monkeypatch.setattr(v, "straddle_cycles", fake_cycles)
+    out = x._spy_vix_control(object())
+    first = sd.index("2021-04-01")
+    assert seen["starts"][0] == first and (np.diff(seen["starts"]) == 1).all()
+    assert out["n_entries"] == len(sd) - v.HOLD - first                     # every expiry inside the window is kept
+    assert len(out["offset_means"]) == v.HOLD and max(out["offset_means"]) == pytest.approx(0.2)
+    assert out["n"] == x.n_holds(np.arange(first, first + out["n_entries"]), v.HOLD)
+
+
+def test_capture_day_claims_note_rule10c():
+    """T-194 / T-199 are statistics on fixed capture days (rule 10(c)): no grid phase; the reason says so."""
+    rep = x.spy_spx_financing(_t194_captures(1, 10))
+    assert "rule 10(c)" in rep["reason"]
+    rep = x.gld_carry(_gld_caps(1))
+    assert "rule 10(c)" in rep["reason"]
 
 
 # ========================================================================== T-194: SPY vs SPX financing ==
