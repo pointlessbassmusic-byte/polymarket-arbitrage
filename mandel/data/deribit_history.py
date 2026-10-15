@@ -63,13 +63,16 @@ write that fails before the INDEX is updated puts the previous bundle file back.
 of ``chunk_days`` complete days, spilled to a temporary gzip file while they are fetched, and on an interrupt the
 complete days fetched so far are stored. ``skip_stored`` skips windows already stored complete (resume a long run).
 
-Estimates (``dry_run=True`` puts the plan in ``report['_plan']``; per-window trade counts measured 2026-10-15):
-  * fomc: 38 decisions 2022-01-26 .. 2026-09-16, ~26k BTC option trades per 24 h window (sampled 2022-06-15,
-    2024-09-18, 2026-09-16), ~1,000 pages + 2 instrument calls (~77 MB each), ~10 minutes; ~6% of trades are in
-    the next-day expiry, about 60k rows, ~3 MB gzip.
-  * dvol: ~53 calls (1 instrument list, 42 instruments, ~10 delivery-price pages), < 1 minute, a few hundred rows.
-  * daily: 1,779 days, ~1,100-3,300 trades per window (2 pages on a typical day), ~3,900 pages, ~2.9 M rows,
-    ~105 MB gzip, ~45-60 minutes including the chunk merges (chunk_days 90).
+Estimates (``dry_run=True`` puts the plan in ``report['_plan']``; trade counts measured 2026-10-15; time at
+``options_misc.PAGE_SECONDS`` = 0.55 s per page, the samples here ran at about 0.35 s):
+  * fomc: 38 decisions 2022-01-26 .. 2026-09-16; 6.5k-38k BTC option trades per 24 h window (six windows fetched),
+    10-25% of them in the next-day expiry: ~424 pages + 2 instrument calls (~77 MB each), ~5 minutes; ~72k rows,
+    ~3 MB gzip.
+  * dvol: 53 calls (1 instrument list, 42 instruments, 10 delivery-price pages), ~15 s; 3,716 rows, ~85 kB gzip
+    (fetched in full as the preview).
+  * daily: 1,779 days, 650-3,300 trades per window (2 pages on a typical day): ~3,900 pages, ~3.0 M rows, ~96 MB
+    gzip; ~36 minutes of paging + ~11 minutes for the 10 chunk merges (about 40 us per stored row per merge).
+    The harness's ``_rows`` holds every row of a bundle in memory: ~3 M rows need several GB.
 
 Each ``fetch_*`` takes ``store`` (an Archive, an ObservationStore whose ``.archive`` is used, or None to only return the
 rows), ``limit``, ``dry_run``, ``max_pages``, ``skip_stored`` and a ``report`` dict, as in options_misc. Command line:
@@ -103,8 +106,8 @@ LIVE = "https://www.deribit.com/api/v2/public/"
 HOUR_MS = 3_600_000
 LICENCE_NOTE = ("Deribit states no data licence (no redistribution right) and the repo is public: local disk only "
                 "(in_git=False), rebuild from this recipe")
-ROW_GZ_BYTES = 37                   # gzip bytes per stored option-trade row (catalyst bundle 36; daily preview 2026-10-15)
-MERGE_SECONDS_PER_ROW = 12e-6       # one streamed re-write of a stored row (gunzip, parse, dump, gzip -9), measured locally
+MERGE_SECONDS_PER_ROW = 40e-6       # one streamed re-write of a stored row (gunzip, parse, merge, dump, gzip -9; 300k-row bench)
+SCAN_SECONDS_PER_ROW = 7e-6         # one streamed read of a stored row (the skip_stored scan at the start of a run)
 
 
 def _now_ms() -> int:
@@ -228,10 +231,11 @@ FOMC_FIRST, FOMC_LAST = "2022-01-01", "2026-12-31"
 FOMC_TZ = ZoneInfo("America/New_York")
 FOMC_STATEMENT = (14, 0)                       # 2:00 pm Eastern: the statement time of every scheduled decision 2022-2026
 FOMC_HOURS_BEFORE = 24
-# BTC option trades in the 24 h before the decision, sampled 2026-10-15 (2022-06-15, 2024-09-18, 2026-09-16 windows);
-# used only for the dry-run estimate.
-FOMC_WINDOW_TRADES = {2022: 26000, 2023: 22000, 2024: 30000, 2025: 28000, 2026: 22000}
-FOMC_KEEP_SHARE = 0.06                         # share of the window's trades in the next-day expiry (same samples)
+# BTC option trades in the 24 h before the decision, from six windows fetched 2026-10-15 (2022-01-26: 8,544; 2022-06-15:
+# 38,322; 2023-07-26: 6,525; 2024-09-18: 8,919; 2025-03-19: 11,198; 2026-09-16: 7,334); dry-run estimate only.
+FOMC_WINDOW_TRADES = {2022: 20000, 2023: 7000, 2024: 9000, 2025: 11000, 2026: 7500}
+FOMC_KEEP_SHARE = 0.17                         # share of those trades in the next-day expiry (10-25% in the six windows)
+FOMC_ROW_GZ_BYTES = 40                         # gzip bytes per stored row (full raw trades; the six-window preview)
 FOMC_SCHEMA = ("kind option-trade: value = raw Deribit trade {trade_id, trade_seq, timestamp (ms), instrument_name, price (coin), "
                "mark_price, iv, index_price, amount, contracts?, direction, tick_direction, block_trade_id?} + {decision_day, currency, "
                "expiry, expiry_code, strike, type}; only the target expiry; available_at = trade time | kind fomc-window: value = "
@@ -337,7 +341,7 @@ def _fomc_plan(windows: list[dict], min_interval: float) -> dict:
         seen += n
     rows = int(seen * FOMC_KEEP_SHARE) + len(windows)
     return {"windows": len(windows), "est_trades_seen": seen, "est_calls": calls, "est_rows": rows,
-            "est_gz_mb": round(rows * ROW_GZ_BYTES / 1e6, 1), "est_minutes": round(calls * max(min_interval, PAGE_SECONDS) / 60 + 1),
+            "est_gz_mb": round(rows * FOMC_ROW_GZ_BYTES / 1e6, 1), "est_minutes": round(calls * max(min_interval, PAGE_SECONDS) / 60 + 1),
             "per_window": per}
 
 
@@ -431,6 +435,7 @@ DVOL_INDEX = "btcdvol_usdc"
 DVOLF_LEAD_DAYS = 8.0
 DVOLF_EXPIRED = 42                  # expired BTCDVOL_USDC futures on 2026-10-15 (2023-04-26 .. 2026-09-30); dry-run estimate only
 DVOL_DELIVERY_RECORDS = 989         # btcdvol_usdc delivery prices on 2026-10-15 (2023-03-24 on); dry-run estimate only
+DVOLF_ROWS_PER_INSTRUMENT = 88      # 3,716 rows over the 42 instruments (preview 2026-10-15, 85 kB gzip); dry-run estimate only
 FUTURE_TRADE_FIELDS = ("timestamp", "price", "mark_price", "index_price", "amount", "direction")
 _DVOL_ORDER = {"future-window": 0, "future-trade": 1, "future-settlement": 2}
 DVOLF_SCHEMA = ("kind future-trade: value = {instrument_name, expiry (ISO UTC), timestamp (ms), price, mark_price, index_price (the "
@@ -609,7 +614,8 @@ def fetch_deribit_dvol_futures(store=None, limit: Optional[int] = None, dry_run:
         n = min(n, limit) if limit is not None else n
         dcalls = 0 if deliveries is not None else math.ceil(DVOL_DELIVERY_RECORDS / 100)
         calls = (0 if instruments is not None else 1) + n + dcalls
-        rep["_plan"] = {"instruments": n, "est_calls": calls, "est_rows": n * 12, "est_gz_mb": 0.1,
+        rep["_plan"] = {"instruments": n, "est_calls": calls, "est_rows": n * DVOLF_ROWS_PER_INSTRUMENT,
+                        "est_gz_mb": round(n * DVOLF_ROWS_PER_INSTRUMENT * 23 / 1e6, 2),
                         "est_minutes": round(calls * max(min_interval, PAGE_SECONDS) / 60 + 0.5, 1), "lead_days": lead_days}
         return []
     own = client is None
@@ -679,12 +685,13 @@ DAILY_PREFIX = "deribit-option-trades-daily-"
 DAILY_FIRST, DAILY_LAST = "2021-12-01", "2026-10-14"
 DAILY_HOURS = (7, 9)                    # [07:00, 09:00) UTC, the window batch6b_drb.daily_smiles samples
 DAILY_DTE_DAYS = (1, 400)               # expiry date minus sample day: daily_smiles keeps 1/365 <= T <= 400/365
-DAILY_CHUNK_DAYS = 90
+DAILY_CHUNK_DAYS = 180                  # complete days per merge into the stored bundle (10 merges for the full range)
 DAILY_TRADE_FIELDS = ("trade_id", "timestamp", "instrument_name", "price", "mark_price", "iv", "index_price", "amount", "direction")
 # BTC option trades in the 07:00-09:00 UTC window, mean of the days sampled 2026-10-15 (2019-06-03 .. 2026-10-14, 15 days);
 # dry-run estimate only. A busy day (2024-03-01) had 3,343.
 DAILY_WINDOW_TRADES = {2019: 60, 2020: 270, 2021: 1150, 2022: 1650, 2023: 1630, 2024: 2360, 2025: 1770, 2026: 1240}
 DAILY_KEEP_SHARE = 0.97                 # share of the window's trades in expiries 1-400 days out (same samples)
+DAILY_ROW_GZ_BYTES = 32                 # gzip bytes per stored row (5-day store preview 2026-10-15: 7,154 rows, 230,524 bytes)
 DAILY_SCHEMA = ("kind option-trade: value = {trade_id, timestamp (ms), instrument_name, price (coin), mark_price, iv, index_price, amount, "
                 "direction} (fields of the raw Deribit trade) + {currency, expiry, expiry_code, strike, type}; trades in [day 07:00, day 09:00) "
                 "UTC in expiries 1-400 calendar days after the day; available_at = trade time | kind sample-day (fetch metadata, not market "
@@ -731,9 +738,15 @@ def _daily_group(r: dict) -> str:
     return str(v["day"]) if r.get("kind") == "sample-day" else _day_of(int(v.get("timestamp") or 0))
 
 
+def _daily_idx(r: dict) -> int:
+    """Days since 1970-01-01 of the row's sample day (cheap: the merge evaluates it for every stored row)."""
+    v = r.get("value") or {}
+    return _ms(str(v["day"])) // DAY_MS if r.get("kind") == "sample-day" else int(v.get("timestamp") or 0) // DAY_MS
+
+
 def _daily_sort(r: dict) -> tuple:
     v = r.get("value") or {}
-    return (_daily_group(r), r.get("kind") != "sample-day", int(v.get("timestamp") or 0), str(v.get("trade_id") or ""))
+    return (_daily_idx(r), r.get("kind") != "sample-day", int(v.get("timestamp") or 0), str(v.get("trade_id") or ""))
 
 
 def _daily_trade_row(t: dict, currency: str, observed_at: str) -> dict:
@@ -771,9 +784,9 @@ def _daily_plan(days: list[str], stored_rows: int, chunk_days: int, min_interval
     merges = max(1, math.ceil(len(days) / max(chunk_days, 1))) if days else 0
     merge_rows = merges * stored_rows + rows * (merges + 1) / 2                     # each merge re-writes the bundle so far
     fetch_min = calls * max(min_interval, PAGE_SECONDS) / 60
-    merge_min = merge_rows * MERGE_SECONDS_PER_ROW / 60
+    merge_min = (merge_rows * MERGE_SECONDS_PER_ROW + stored_rows * SCAN_SECONDS_PER_ROW) / 60
     return {"days": len(days), "first": days[0] if days else None, "last": days[-1] if days else None, "est_calls": calls,
-            "est_trades_seen": trades, "est_rows": rows, "est_gz_mb": round((rows + stored_rows) * ROW_GZ_BYTES / 1e6, 1),
+            "est_trades_seen": trades, "est_rows": rows, "est_gz_mb": round((rows + stored_rows) * DAILY_ROW_GZ_BYTES / 1e6, 1),
             "merges": merges, "est_fetch_minutes": round(fetch_min), "est_merge_minutes": round(merge_min),
             "est_minutes": round(fetch_min + merge_min), "by_year": by_year}
 
@@ -829,7 +842,7 @@ def fetch_deribit_daily_trades(store=None, currency: str = "BTC", first: str = D
         if sp is None or not dd:
             return
         allday = sorted(stored_days | dd)
-        e = _merge_store(archive, name, sp.rows(), set(dd), _daily_group, _daily_sort, tags=["options", "crypto", "deribit", "trades", "daily",
+        e = _merge_store(archive, name, sp.rows(), {_ms(d) // DAY_MS for d in dd}, _daily_idx, _daily_sort, tags=["options", "crypto", "deribit", "trades", "daily",
                          "smile", "T-257", "T-262"], schema=DAILY_SCHEMA, tmp_dir=tmp_dir,
                          recipe=(f"GET {DERIBIT_HISTORY}get_last_trades_by_currency_and_time?currency={currency}&kind=option&start_timestamp=<day "
                                  f"{hours[0]:02d}:00 UTC ms>&end_timestamp=<day {hours[1]:02d}:00 UTC ms - 1>&count=1000&include_old=true&sorting=asc, "
