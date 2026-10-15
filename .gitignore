@@ -143,3 +143,6 @@ mandel/archive/data/cboe-VRO-history.jsonl.gz
 mandel/archive/data/box-rates-bdg.jsonl.gz
 mandel/archive/data/deribit-option-trades-catalysts.jsonl.gz
 mandel/archive/data/deribit-box-monthly.jsonl.gz
+
+# Scratch pickles an agent may drop at the repo root (never part of the repo)
+/*.pkl
