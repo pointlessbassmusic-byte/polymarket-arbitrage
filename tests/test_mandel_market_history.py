@@ -6,7 +6,6 @@ import io
 import json
 import time
 import zipfile
-from pathlib import Path
 from urllib.parse import parse_qs
 
 import httpx

@@ -88,7 +88,7 @@ import httpx
 
 from mandel.data.fetch import Throttle, now_iso
 from mandel.data.options import fred_series
-from mandel.data.options_misc import RETRY_STATUS, UA, _archive, _client, _end_of_day, _get, _retry_after
+from mandel.data.options_misc import RETRY_STATUS, _archive, _client, _end_of_day, _get, _retry_after
 from mandel.data.store import Observation, iso
 
 YAHOO_HOSTS = ("https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com")
