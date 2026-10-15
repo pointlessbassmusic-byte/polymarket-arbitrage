@@ -412,8 +412,9 @@ def btc_event_straddle(days, closes, dvol: dict, fomc_days, start: str = "2021-0
     weekday-only non-FOMC days, coin (BTC) accounting sign, VIX-regime split (VIX close of the last US session before D).
     With ``cpi_days`` (CPI release dates; the 08:30 ET release lies in BTC day D) two more rows are reported, neither a
     criterion: the pooled FOMC+CPI variant (FOMC or CPI days minus all other days, the pass's "pooled reported
-    alongside") with CPI-only and FOMC-only parts, and the random non-macro-day control (FOMC minus days that are neither
-    FOMC nor CPI, with the share of ``n_placebo`` random same-size sets of non-macro days that come out as low)."""
+    alongside") with its CPI-only part (CPI days minus non-macro days), and the random non-macro-day control (FOMC minus
+    days that are neither FOMC nor CPI, with the share of ``n_placebo`` random same-size sets of non-macro days that come
+    out as low)."""
     P = event_straddle_panel(days, closes, dvol, fomc_days, 1.0 / CRYPTO_PPY, CRYPTO_PPY, start=start, max_gap_days=1)
     if len(P["days"]) == 0:
         return {"n": 0, "verdict": "inconclusive", "reason": "no BTC day has a prior-candle DVOL close"}

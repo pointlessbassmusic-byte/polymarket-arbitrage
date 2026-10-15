@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `4bd40862980defa6`). 476 theories. supported 38, not_supported 119, inconclusive 13, untested 169, blocked 129, parked 8.
+Rendered from `registry.json` (hash `a106886a6a094386`). 477 theories. supported 37, not_supported 118, inconclusive 15, untested 169, blocked 130, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (38)
+## Supported (37)
 
 ### T-06 · price-series-are-multifractal
 
@@ -313,6 +313,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: The same statistic for SPX (VIX vs forward RV) as the known-positive reference; crash months (May-21, Nov-22) kept in. The IBIT-vs-DVOL IV basis is measured separately from the daily IBIT chain capture.
 - harness: dvol_gap_5pts
 - result X-f7120cfc: supported — BTC DVOL implied minus realised over 30 periods: +8.4055 vol pts since 2021-03-24 (95% CI +5.3997 to +11.4100), halves +12.1785/+4.6324 — all criteria pass
+- result X-eca8ed72: supported — BTC DVOL implied minus realised over 30 periods: +8.4010 vol pts since 2021-03-24 (95% CI +5.3927 to +11.4266), halves +12.1785/+4.6273 — all criteria pass
 - note: from the options-library library: Covered call on IBIT / BTC ETF; harness suggestion: Already close to the BTC-VRP harness; add the conditional-on-percentile split and report expected premium capture per 30-delta covered call via Black-Scholes at DVOL. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-216 · opex-gamma-pin-short-straddle
@@ -328,7 +329,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Exclude opex days with FOMC/CPI; quarterly vs non-quarterly opex; pre/post-2010 split.
 - harness: ohlc_opex_pin_straddle
 - result X-ace3719a: supported — MODEL-PRICED (BS, sigma = Thursday VIX, T=1/252): 395 opex vs 1253 other Fridays 1993-02-05..2026-10-09; short-straddle P&L +26.99 vs +17.85 bps of spot, difference +9.14 bps (95% block-8 CI +1.81..+16.31, p=0.005); settled on raw closes |SPY_Fri - SPY_Thu| with the known dividend priced into the forward S_thu - D on the 132 ex-dividend Fridays (132 of them opex); as-worded sensitivity at r = q = 0 ignoring the dividend: +6.57, CI -0.76..+13.77 (not supported, so the verdict depends on how the dividend is treated); with all ex-dividend Fridays dropped: +10.15, CI +2.05..+18.11; $1-strike distance opex 0.256 vs 0.250 (perm p=0.760) — all criteria pass
-- note: from the options-library library: Monthly opex gamma pin (short ATM straddle / iron butterfly on heavy-OI strikes); harness suggestion: Add a GEX estimator (sum over strikes of OI*gamma*spot^2*0.01 with sign convention calls +, puts -) once chain captures accumulate; join to the opex clustering test. | verifier: corrected claim/trial | Scope (2026-10-15): supported for the MODEL-PRICED straddle (sigma = Thursday VIX, T = 1/252), priced on the dividend forward on ex-dividend Fridays. The 132 quarterly opex Fridays are SPY ex-dividend days; at r = q = 0 with the dividend ignored the difference is +6.57 bps with a CI of -0.76..+13.77, so the as-priced reading matters. With every ex-dividend Friday dropped the result holds (+10.15 bps, CI +2.05..+18.11). A traded-price test needs 1-day implied vol on opex Thursdays (chain captures). CPI-day exclusion control pending (task: CPI-calendar controls).
+- result X-93130d94: supported — MODEL-PRICED (BS, sigma = Thursday VIX, T=1/252): 395 opex vs 1253 other Fridays 1993-02-05..2026-10-09; short-straddle P&L +26.99 vs +17.85 bps of spot, difference +9.14 bps (95% block-8 CI +1.81..+16.31, p=0.005); settled on raw closes |SPY_Fri - SPY_Thu| with the known dividend priced into the forward S_thu - D on the 132 ex-dividend Fridays (132 of them opex); as-worded sensitivity at r = q = 0 ignoring the dividend: +6.57, CI -0.76..+13.77 (not supported, so the verdict depends on how the dividend is treated); with all ex-dividend Fridays dropped: +10.15, CI +2.05..+18.11; control, opex Fridays with FOMC/CPI excluded (46 dropped, 45 for CPI): +8.01 bps (CI +0.61..+15.26), same Fridays out of both groups +7.74 bps (CI +0.29..+15.07), Thursday CPI also dropped +6.37 bps (CI -1.51..+14.14); $1-strike distance opex 0.256 vs 0.250 (perm p=0.760) — all criteria pass
+- note: from the options-library library: Monthly opex gamma pin (short ATM straddle / iron butterfly on heavy-OI strikes); harness suggestion: Add a GEX estimator (sum over strikes of OI*gamma*spot^2*0.01 with sign convention calls +, puts -) once chain captures accumulate; join to the opex clustering test. | verifier: corrected claim/trial | Scope (2026-10-15): supported for the MODEL-PRICED straddle (sigma = Thursday VIX, T = 1/252), priced on the dividend forward on ex-dividend Fridays. The 132 quarterly opex Fridays are SPY ex-dividend days; at r = q = 0 with the dividend ignored the difference is +6.57 bps with a CI of -0.76..+13.77, so the as-priced reading matters. With every ex-dividend Friday dropped the result holds (+10.15 bps, CI +2.05..+18.11). A traded-price test needs 1-day implied vol on opex Thursdays (chain captures). CPI-day exclusion control pending (task: CPI-calendar controls). | 2026-10-15: CPI-day exclusion control done (macro-release-cpi archived): opex Fridays with FOMC/CPI excluded +8.01 bps (CI +0.61..+15.26); Thursday CPI also dropped +6.37 bps (CI -1.51..+14.14), a sensitivity that touches 0.
 
 ### T-224 · metals-macro-event-straddle
 
@@ -358,6 +360,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Buy-and-hold GLD (harness_controls); shuffled-GVZ placebo; GC=F front-futures closes (archive) instead of GLD.
 - harness: gvz_var_premium_thirds
 - result X-e4186ff5: supported — GVZ^2 vs GLD implied minus realised over 21 periods: +0.0062 variance since 2009-09-18 (95% CI +0.0032 to +0.0089), thirds +0.0091/+0.0065/+0.0031 — all criteria pass
+- result X-26ff7ed2: supported — GVZ^2 vs GLD implied minus realised over 21 periods: +0.0062 variance since 2009-09-18 (95% CI +0.0032 to +0.0089), thirds +0.0091/+0.0065/+0.0031 — all criteria pass
 - note: from the options-library library: Gold volatility premium (GVZ) via GLD straddles / GC strangles; harness suggestion: harness_vrp_gold exists; add the ratio-to-SPX comparison and a 15-delta strangle pricer; add SLV ATM IV from surface_summary for the silver twin. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-246 · btc_dvol_vrp
@@ -373,23 +376,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Buy-and-hold BTC; shuffled-DVOL placebo; the SPX VRP over the same dates for scale.
 - harness: dvol_var_premium
 - result X-b01e58de: supported — DVOL^2 vs BTC implied minus realised over 30 periods: +0.0940 variance since 2021-03-24 (95% CI +0.0539 to +0.1348), halves +0.1535/+0.0345 — all criteria pass
+- result X-73d614a4: supported — DVOL^2 vs BTC implied minus realised over 30 periods: +0.0940 variance since 2021-03-24 (95% CI +0.0540 to +0.1345), halves +0.1535/+0.0344 — all criteria pass
 - note: from the options-library library: BTC/ETH volatility premium (DVOL vs realised) via Deribit inverse straddles; harness suggestion: harness_vrp_btc and harness_vrp_eth exist; add the worst-decile share, a funding sensitivity parameter and an inverse-payoff conversion in the payoff engine (payoff in BTC = payoff_usd / S_T). | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
-
-### T-266 · eth-btc-vol-pair
-
-**Claim.** When the ETH/BTC DVOL ratio is below its trailing 365-day 20th percentile, the subsequent 30-day realised vol ratio (ETH/BTC) exceeds the entry DVOL ratio on average, 2022-2026.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_volatility_index_data?currency=BTC&start_timestamp=1700000000000&end_timestamp=1700300000000&resolution=86400
-- statistic: Mean of (RV_ETH/RV_BTC - DVOL_ETH/DVOL_BTC), conditional on the low percentile
-- null: Mean <= 0
-- procedure: Daily DVOL for both; 30-day forward realised vol from closes; 365-day percentile filter; non-overlapping entries; block bootstrap; walk-forward
-- data: BTC and ETH DVOL from 2021-03-24; BTC/ETH closes · min n: 25
-- pass: CI > 0; report the unconditional mean (usually negative, since DVOL carries a VRP) for comparison
-- controls: High-percentile mirror trade; random dates
-- harness: eth_btc_dvol_ratio
-- result X-7cf64c6f: error — harness raised ValueError
-- result X-39ddc726: supported — ETH/BTC DVOL extremes: 21 signals, mean +0.072 log units (95% CI +0.015 to +0.125), win rate 0.71 — all criteria pass
-- note: from the options-library library: ETH vs BTC relative volatility (vol pair / dispersion); harness suggestion: deribit_dvol_history('ETH') alongside BTC; ratio harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-271 · gold-vrp-short-strangle
 
@@ -404,6 +392,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: SPY/VIX VRP as benchmark; shuffled GVZ
 - harness: gvz_var_premium_halves
 - result X-c5b6056b: supported — GVZ^2 vs GLD implied minus realised over 21 periods: +0.0062 variance since 2009-10-01 (95% CI +0.0032 to +0.0089), halves +0.0083/+0.0041 — all criteria pass
+- result X-4c9ff56d: supported — GVZ^2 vs GLD implied minus realised over 21 periods: +0.0062 variance since 2009-10-01 (95% CI +0.0032 to +0.0089), halves +0.0083/+0.0041 — all criteria pass
 - note: from the options-library library: Gold variance risk premium (delta-hedged short strangle on GLD/GC); harness suggestion: Clone the SPY/VIX VRP harness with GVZ/GLD inputs | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-279 · metals-put-write
@@ -420,6 +409,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gld_put_write
 - result X-70072aa5: supported — MODEL-PRICED at flat GVZ: 0.25-delta short put mean +0.33% of spot per cycle over 203 cycles (95% CI +0.16 to +0.49), halves +0.14/+0.51 — all criteria pass
 - result X-460817bd: supported — MODEL-PRICED at flat GVZ: 0.25-delta short put mean +0.33% of strike per cycle over 203 cycles (95% CI +0.16 to +0.49), halves +0.14/+0.51 — all criteria pass
+- result X-99ef77b8: supported — MODEL-PRICED at flat GVZ: 0.25-delta short put mean +0.33% of strike per cycle over 203 cycles (95% CI +0.16 to +0.49), halves +0.14/+0.51 — all criteria pass
 - note: from the options-library library: Metals put-write for accumulation (GLD/SLV cash-secured; GC/SI SPAN); harness suggestion: Shares loop with gold-covered-call; kind='put' | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-320 · crypto-short-term-reversal
@@ -499,6 +489,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: GVZ/GLD and VIX/SPY VRPs as comparators; shuffled OVX
 - harness: ovx_var_premium
 - result X-40ab469d: supported — OVX^2 vs USO implied minus realised over 21 periods: +0.0397 variance since 2009-10-01 (95% CI +0.0130 to +0.0635), halves +0.0311/+0.0484 — all criteria pass
+- result X-a9bf4b49: supported — OVX^2 vs USO implied minus realised over 21 periods: +0.0398 variance since 2009-10-01 (95% CI +0.0128 to +0.0639), halves +0.0311/+0.0485 — all criteria pass
 - note: from the options-library library: Crude oil variance risk premium (OVX on USO) short strangle; harness suggestion: Clone the GVZ VRP harness with OVX/USO inputs; cboe_index_history('OVX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py
 
 ### T-514 · gvz-vix-relative-vol
@@ -514,6 +505,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Shuffled-date null; the same test on log(OVX/VIX)
 - harness: gvz_vix_zscore_slope
 - result X-46f63ac4: supported — GVZ/VIX 20-day reversion: slope on z-score -0.0837 (upper -0.0598) and -0.0723 (upper -0.0397) in the two halves, 201 samples — all criteria pass
+- result X-3c8945e5: supported — GVZ/VIX 20-day reversion: slope on z-score -0.0837 (upper -0.0598) and -0.0723 (upper -0.0397) in the two halves, 201 samples — all criteria pass
 - note: from the options-library library: Gold vs equity implied-vol spread (GVZ/VIX relative value); harness suggestion: Ratio z-score harness over cboe_index_history('GVZ') and ('VIX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py
 
 ### T-515 · btc-weekend-theta
@@ -597,7 +589,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-5fa20844: supported — 23 spike events since 2009-09-18: VIX 21 days later below F_adj in 19/23 (0.61-0.95), below unadjusted F in 83%, below spot in 83%
 - note: from the options-library library: VIX spike mean-reversion via long VIX put / put spread; harness suggestion: harness_vix_spike (T-241) runs this; add F_adj and report the exact event count. | verifier-corrected restatement of T-241, whose verdict tested the earlier wording and stands
 
-## Not Supported (119)
+## Not Supported (118)
 
 ### T-02 · longshot-bias
 
@@ -1037,6 +1029,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: ATM strike vs 25-delta; fee at 2x; USD-terms annual return vs BTC buy-and-hold reported descriptively
 - harness: btc_inverse_covered_call
 - result X-7bb88d2c: not_supported — MODEL-PRICED at flat DVOL: 25-delta 30-day BTC call against 1 BTC earns +0.0058 BTC per cycle on average over 67 cycles (95% CI -0.0052 to +0.0162); spot closes stand in for Deribit delivery prices — failed: 95% CI of the mean > 0
+- result X-821aad1c: not_supported — MODEL-PRICED at flat DVOL: 25-delta 30-day BTC call against 1 BTC earns +0.0054 BTC per cycle on average (premium 0.0237 BTC at S_0) over 67 cycles (95% CI -0.0050 to +0.0152); Deribit delivery prices on day +31 — failed: 95% CI of the mean > 0
 - note: from the options-library library: Deribit covered call on BTC/ETH inventory (inverse options); harness suggestion: Mandel's deribit_book + DVOL fetchers already exist; add public/get_delivery_prices (free, 2,638 daily records) so expiries settle at the official TWAP rather than a close. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states; spot closes stand in for Deribit delivery prices (30-minute TWAP)
 
 ### T-177 · covered-call-metals
@@ -1052,6 +1045,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Exclude 2011 and 2020 spikes one at a time; OVX/USO as another commodity reference
 - harness: gvz_gap_2pts
 - result X-b7862591: not_supported — GVZ/GLD implied minus realised over 21 periods: +2.3535 vol pts since 2009-09-18 (95% CI +1.7626 to +2.9158), halves +2.8537/+1.8533 — failed: lower 95% CI > 2.0
+- result X-dc722fd2: not_supported — GVZ/GLD implied minus realised over 21 periods: +2.3535 vol pts since 2009-09-18 (95% CI +1.7626 to +2.9158), halves +2.8537/+1.8533 — failed: lower 95% CI > 2.0
 - note: from the options-library library: Covered call on gold/silver (GLD/SLV equity route; GC/SI futures-options route); harness suggestion: GVZ history is already fetched; add GLD/SLV daily closes (free) and reuse the VRP harness; GC futures closes are not free - use GLD as the proxy. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-181 · put-call-parity-synthetic-forward
@@ -1209,7 +1203,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Random non-macro days; weekend exclusion; VIX-regime control; check BTC- vs USD-accounting give the same sign.
 - harness: fomc_btc_event_straddle
 - result X-bd896fa6: not_supported — MODEL-PRICED short 1-day ATM BTC straddle (BS, sigma=DVOL 00:00 UTC, T=1/365) since 2021-04-01: FOMC minus non-FOMC mean P&L -40.6 bps of spot (95% CI -101.1 to +19.1) over 44 FOMC / 1979 other days; |r|/(DVOL/sqrt365) FOMC 0.71 vs other 0.63; weekdays only -13.5 bps; coin accounting -36.1 bps; CPI-pooled variant not run (no CPI calendar) — failed: FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0
-- note: from the options-library library: Crypto macro-event straddle on Deribit (FOMC / CPI) - DVOL vs realised; harness suggestion: Reuse the BTC VRP harness (DVOL vs realised) with an event-date mask; add inverse-option payoff mode to the payoff engine (payoff/S_T). | verifier: corrected claim/trial
+- result X-d2e0bbe4: not_supported — MODEL-PRICED short 1-day ATM BTC straddle (BS, sigma=DVOL 00:00 UTC, T=1/365) since 2021-04-01: FOMC minus non-FOMC mean P&L -40.6 bps of spot (95% CI -101.1 to +19.1) over 44 FOMC / 1979 other days; |r|/(DVOL/sqrt365) FOMC 0.71 vs other 0.63; weekdays only -13.5 bps; coin accounting -36.1 bps; pooled FOMC+CPI (reported, not a criterion) -51.7 bps (95% CI -95.8 to -9.9) over 109 event days (44 FOMC, 66 CPI); CPI only -58.0 bps (95% CI -119.7 to -1.4); FOMC vs non-macro days -42.5 bps (95% CI -109.1 to +18.3, random non-macro-day placebo p=0.084) — failed: FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0
+- note: from the options-library library: Crypto macro-event straddle on Deribit (FOMC / CPI) - DVOL vs realised; harness suggestion: Reuse the BTC VRP harness (DVOL vs realised) with an event-date mask; add inverse-option payoff mode to the payoff engine (payoff/S_T). | verifier: corrected claim/trial | 2026-10-15: the reported pooled FOMC+CPI variant gives -51.7 bps (95% CI -95.8 to -9.9) over 109 event days and CPI-only -58.0 bps (CI -119.7 to -1.4); not a pass criterion here (FOMC alone fails), so it is pre-registered as the forward test T-543.
 
 ### T-232 · vega_neutral_gamma_long
 
@@ -1289,6 +1284,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Equal-weight buy-and-hold of the underlyings; shuffled-index placebo; drop-one-asset sensitivity.
 - harness: multi_asset_short_var
 - result X-e6c23238: not_supported — equal-vega short variance on SPX/GLD/USO/TLT Sharpe 0.95 vs SPX alone 1.13 over 204 months since 2009-09-18 (diff -0.17, one-sided lower -0.41; halves +0.35/-0.26) — failed: Sharpe diff > 0 with one-sided p < 0.05; positive in both halves
+- result X-dfbd6504: not_supported — equal-vega short variance on SPX/GLD/USO/TLT Sharpe 0.95 vs SPX alone 1.13 over 204 months since 2009-09-18 (diff -0.17, one-sided lower -0.41; halves +0.35/-0.26) — failed: Sharpe diff > 0 with one-sided p < 0.05; positive in both halves
 - note: from the options-library library: Oil and bond volatility premium (OVX via USO, VXTLT via TLT); harness suggestion: harness_vrp_oil and harness_vrp_bonds exist; add a portfolio aggregator over the harness outputs with the correlation matrix. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-247 · cross_asset_vol_ratio
@@ -1304,6 +1300,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Unconditional ratio drift; random-entry placebo; VIX-level stratification.
 - harness: gvz_vix_extremes
 - result X-00e1fb1e: not_supported — GVZ/VIX extremes: 90 signals, mean -0.052 log units (95% CI -0.145 to +0.038), win rate 0.46 — failed: mean > 0 with CI excluding 0; win rate > 0.6
+- result X-35dc52fb: not_supported — GVZ/VIX extremes: 90 non-overlapping signals, mean -0.052 log units (95% CI -0.145 to +0.038), win rate 0.46; unconditional mean over all 3512 post-warm-up days +0.127 — failed: mean > 0 with CI excluding 0; win rate > 0.6
 - note: from the options-library library: Cross-asset implied vol ratio trades (GVZ/VIX, DVOL/VIX, OVX/VIX); harness suggestion: Combine harness_vrp_gold and harness_vrp_spx outputs into a ratio harness; the DVOL/VIX version joins harness_vrp_btc. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-253 · btc-covered-call
@@ -1319,6 +1316,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: SPY covered call with VIX as IV (model-priced; should replicate the known BXM-style result). Cost min(0.0003 BTC, 12.5% of premium) per contract + 5% of premium for bid-ask. Skew sensitivity: price the call at DVOL +/- 3 vol points.
 - harness: btc_covered_call
 - result X-130e1ef5: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta covered call Sharpe 0.51 vs hold 0.38 over 67 cycles (diff +0.13, 95% CI -0.05 to +0.41; halves +0.19/+0.12), DSR 0.44, MDD -60% vs -73% — failed: Sharpe diff 95% CI excludes 0
+- result X-a681b36c: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta covered call Sharpe 0.51 vs hold 0.38 over 67 cycles (diff +0.13, 95% CI -0.05 to +0.41; halves +0.19/+0.12), DSR probability 0.44 (deflated Sharpe > 0 needs > 0.5), MDD -60% vs -73% — failed: Sharpe diff 95% CI excludes 0; deflated Sharpe > 0 (DSR probability > 0.5)
 - note: from the options-library library: BTC covered call on coin inventory; harness suggestion: mandel.data.options.deribit_dvol_history + BTC closes -> bs.price with sigma=DVOL; payoff via Position; bootstrap from validation | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-254 · btc-cash-secured-put
@@ -1335,22 +1333,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: btc_short_put
 - result X-a9d5ba07: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta short put mean +0.88% of spot per cycle over 67 cycles (95% CI -0.44 to +2.15), halves +0.80/+0.96 — failed: 95% CI of the mean > 0
 - result X-af2e1a54: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta short put mean +0.88% of strike per cycle over 67 cycles (95% CI -0.44 to +2.15), halves +0.80/+0.96 — failed: 95% CI of the mean > 0
+- result X-e15fd8af: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta short put mean +0.88% of strike per cycle over 67 cycles (95% CI -0.44 to +2.15), halves +0.80/+0.96 — failed: 95% CI of the mean > 0
 - note: from the options-library library: Coin-secured / cash-secured put to accumulate BTC or metal; harness suggestion: Same loop as btc-covered-call with kind='put'; reuse VRP harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
-
-### T-256 · dvol-percentile-vega
-
-**Claim.** Model-priced (BS at DVOL): ATM BTC straddles bought when DVOL is below its trailing 365-day 20th percentile and held 60 days to expiry have a higher mean return than straddles bought on all days, 2022-2026.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://insights.deribit.com/exchange-updates/dvol-deribit-implied-volatility-index/
-- statistic: Mean straddle return conditional on low DVOL minus the unconditional mean
-- null: Difference <= 0
-- procedure: Rolling 365-day percentile of DVOL (warm-up ends 2022-03); on entry days price a 60-DTE straddle at DVOL (DVOL is a 30-day IV, so a term mismatch is a known model bias); hold 60 days; use non-overlapping entries for the conditional set; block bootstrap of the difference; walk-forward halves
-- data: DVOL history 2021-03-24..today; BTC closes · min n: 25
-- pass: Difference CI > 0 (also report whether the conditional mean is > 0)
-- controls: Random entry days matched by count; SPY straddle at VIX (model-priced) as sanity check; a 30-DTE version to remove the term mismatch
-- harness: btc_low_dvol_straddle
-- result X-766daf94: not_supported — MODEL-PRICED at flat DVOL: 60-day ATM straddles bought with DVOL below its trailing 20% quantile return +31.0% on premium vs +14.0% on all days (629 of 1605 daily entries; diff 95% CI -12.1 to +46.8, overlapping entries, block = holding period) — failed: difference 95% CI > 0
-- note: from the options-library library: DVOL percentile vega timing (long/short vol regimes); harness suggestion: Add percentile filter to the DVOL harness; straddle P&L via Position | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-258 · funding-carry-option-hedged
 
@@ -1396,6 +1380,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: SPY/VIX (model-priced; protective puts there are known to underperform collars); collar variant as a comparator
 - harness: btc_protective_put
 - result X-a4d32b86: not_supported — MODEL-PRICED at flat DVOL: BTC + rolling 10-delta 90-day puts Calmar 0.13 vs hold 0.07 over 22 cycles (diff +0.06, 95% lower -0.42; thirds +0.10/-2.20/-0.08) — failed: Calmar difference 95% CI > 0; positive in >= 2 of 3 windows
+- result X-1767f28c: not_supported — MODEL-PRICED at flat DVOL: BTC + 10-delta 90-DTE puts rolled every 30 days Calmar 0.10 vs hold 0.09 over 67 roll periods since 2021-04-01 (daily-path MDD -73% vs -77%, gross premium 20.1% of spot a year; diff +0.01, 95% lower -0.12; thirds +0.04/-1.07/+0.05) — failed: Calmar difference 95% CI > 0
 - note: from the options-library library: Protective put / tail hedge on BTC inventory sized by DVOL; harness suggestion: Payoff engine rolling template; reuse covered-call loop | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-270 · gold-covered-call
@@ -1411,6 +1396,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: SPY/VIX covered call as positive control (model-priced); slippage 2% of premium; GVZ - 1 vol point (GVZ is a variance-swap level, above the 30-delta call IV)
 - harness: gld_covered_call
 - result X-e5665ac0: not_supported — MODEL-PRICED at flat GVZ: 0.30-delta covered call Sharpe 0.70 vs hold 0.57 over 203 cycles (diff +0.12, 95% CI -0.04 to +0.32; halves +0.03/+0.29), DSR 0.22, MDD -28% vs -43% — failed: Sharpe diff 95% CI excludes 0
+- result X-6fc32c1c: not_supported — MODEL-PRICED at flat GVZ: 0.30-delta covered call Sharpe 0.70 vs hold 0.57 over 203 cycles (diff +0.12, 95% CI -0.04 to +0.32; halves +0.03/+0.29), DSR probability 0.22 (deflated Sharpe > 0 needs > 0.5), MDD -28% vs -43% — failed: Sharpe diff 95% CI excludes 0; deflated Sharpe > 0 (DSR probability > 0.5)
 - note: from the options-library library: Gold covered call (GLD / GC-OG) using GVZ as the IV reference; harness suggestion: cboe_index_history('GVZ') exists in mandel.data.options (CBOE_INDICES); add GLD to the closes feed; reuse VRP harness with GVZ | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-272 · gvz-low-long-straddle
@@ -1426,6 +1412,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Random entry dates; VIX/SPY analogue; 30-DTE version
 - harness: gld_low_gvz_straddle
 - result X-4d1156f7: not_supported — MODEL-PRICED at flat GVZ: 90-day ATM straddles bought with GVZ below its trailing 20% quantile return +12.1% on premium vs -0.5% on all days (1131 of 3974 daily entries; diff 95% CI -5.9 to +32.1, overlapping entries, block = holding period) — failed: difference 95% CI > 0
+- result X-877d8dc2: not_supported — MODEL-PRICED at flat GVZ: 90-day ATM straddles bought with GVZ below its trailing 20% quantile return +20.6% on premium over 38 non-overlapping entries (conditional mean > 0) vs -0.5% on all 3974 daily entries (diff +21.1, 95% CI -2.9 to +45.9; 1131 low-GVZ days in all) — failed: difference 95% CI > 0
 - note: from the options-library library: GVZ low-percentile long gold vol (crisis convexity); harness suggestion: Percentile harness shared with dvol-percentile-vega | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-273 · gold-event-vol
@@ -1441,6 +1428,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Non-event days matched by weekday; the same test on VIX as positive control; note that 30-day VIX-method indices mechanically drop when an event leaves the window
 - harness: fomc_gvz_event_change
 - result X-dfd2c227: not_supported — GVZ change from the close before to the close after 135 scheduled FOMC decision days (2009-11-04..2026-09-16): mean +0.053 vol pts (95% CI -0.247 to +0.385), 56% declining (sign-test p=0.0841); weekday-matched non-event 2-day change -0.086; VIX positive control +0.009 pts (95% CI -0.414 to +0.437) — failed: mean GVZ change < 0 with 95% CI excluding 0
+- result X-f24ee748: not_supported — GVZ change from the close before to the close after 135 scheduled FOMC decision days (2009-11-04..2026-09-16): mean +0.053 vol pts (95% CI -0.247 to +0.385), 56% declining (sign-test p=0.0841); weekday-matched non-macro 2-day change -0.095; VIX positive control +0.009 pts (95% CI -0.414 to +0.437); CPI-date repeat (reported, not a criterion): GVZ -0.083 pts (95% CI -0.292 to +0.135, 59% declining, n=203), windows without an FOMC day -0.026 pts (95% CI -0.250 to +0.205, 56% declining, n=181), VIX -0.114 pts (95% CI -0.507 to +0.360, 67% declining, n=203) — failed: mean GVZ change < 0 with 95% CI excluding 0
 - note: from the options-library library: Gold event vol (FOMC/CPI straddle on GLD); harness suggestion: Event-date table in mandel/knowledge; paired-difference harness over cboe_index_history('GVZ') | verifier: corrected claim/trial
 
 ### T-274 · gold-silver-ratio-options
@@ -1456,6 +1444,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Low-percentile mirror; random dates
 - harness: gold_silver_ratio_extreme
 - result X-5beb6789: not_supported — GLD/SLV above its 5-year 90th percentile: 16 independent episodes, 180-day change -0.042 (one-sided 90% upper +0.010), hit rate 0.62 — failed: mean < 0 at 90% confidence
+- result X-731b4b2d: not_supported — GLD/SLV above its 5-year 90th percentile: 16 independent episodes, 180-calendar-day change -0.058 (one-sided 90% upper +0.002), hit rate 0.56 — failed: mean < 0 at 90% confidence (one-sided); hit rate > 60%
 - note: from the options-library library: Gold-silver ratio options trade; harness suggestion: Underlying-ratio harness now; option overlay once SLV surface_summary history exists | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-302 · crypto-trend-sma-50-200
@@ -1601,6 +1590,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: the schedule is published a year ahead; scheduled dates only. Survivorship: n/a. Costs: 8 round trips/yr at 1-2 bps, charged. Multiple testing: 1 primary plus 10 secondary trials (Holm). Regime: pre/post-2015 is the pre-registered split; ZLB years 2009-2015 flagged; overlap with CPI release days flagged.
 - harness: fomc_statement_day_drift
 - result X-3b985170: not_supported — SPY statement-day return +21.6 bps (net of 2 bps) vs other days +4.2 bps over 261 statement days 1994-01-03..2026-10-13: net difference +17.4 bps (95% CI +3.1 to +31.5), p=0.0070 (H0 diff<=0; p vs 15 bps 0.384); 2016-2026 -5.3 bps; secondary Holm p QQQ +26.2 bps p_holm=0.060, IWM +23.9 bps p_holm=0.070, TLT +7.2 bps p_holm=0.409, GLD +7.0 bps p_holm=0.431, BTC-USD +6.8 bps p_holm=0.431 — failed: 2016-2026 net difference > 0
+- result X-15befc42: not_supported — SPY statement-day return +21.6 bps (net of 2 bps) vs other days +4.2 bps over 261 statement days 1994-01-03..2026-10-13: net difference +17.4 bps (95% CI +3.1 to +31.5), p=0.0070 (H0 diff<=0; p vs 15 bps 0.384); 2016-2026 -5.3 bps; secondary Holm p QQQ +26.2 bps p_holm=0.060, IWM +23.9 bps p_holm=0.070, TLT +7.2 bps p_holm=0.409, GLD +7.0 bps p_holm=0.431, BTC-USD +6.8 bps p_holm=0.431; CPI overlap (flag, not a criterion): 20 statement days are CPI sessions, without them +11.8 bps (p=0.0495; 2016-2026 -7.4), all CPI sessions out of both groups +11.7 bps (p=0.0550; 2016-2026 -7.5) — failed: 2016-2026 net difference > 0
 - note: from the underlying-library library: Pre-FOMC announcement drift; harness suggestion: events.py: fomc_dates() fetcher (parse statement URLs by year, cache to mandel/data as 'fomc-dates'), then event_day_effect(days, closes, event_days, offset=-1, n_boot=2000) generalizing turn_of_month's paired block bootstrap; add subsample argument. | verifier: corrected claim/trial
 
 ### T-342 · fomc-cycle-even-weeks
@@ -2470,7 +2460,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-1b1179af: not_supported — 243 non-overlapping months: VVIX minus realised spot-VIX vol -22.4 pts (lower 99% -29.8, needs > 10); VVIX prices VIX futures, which move less than spot
 - note: from the options-library library: Vol-of-vol trade: short VIX strangle vs VVIX; harness suggestion: harness_vvix (T-243) implements the data part; add the strangle pricer so a pass is no longer reported as inconclusive. | verifier-corrected restatement of T-243, whose verdict tested the earlier wording and stands
 
-## Inconclusive (13)
+## Inconclusive (15)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -2624,6 +2614,39 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-a0277481: inconclusive — in contango (VIX3M/VIX>1.10), VIX 21 days later is below the forward 147/177 = 83% (95% CI 0.77-0.88); mean F - VIX(t+21) +2.90 pts, p=0.0005; data part passes, call-spread simulation not implemented
 - result X-0b47e7e3: inconclusive — in contango (VIX3M/VIX>1.10), VIX 21 days later is below the forward 147/177 = 83% (95% CI 0.77-0.88); mean F - VIX(t+21) +2.90 pts, p=0.0005; data part passes, call-spread simulation not implemented
 - note: from the options-library library: VIX futures roll-down harvest via short VIX call spread; harness suggestion: Extend harness_term_structure with the forward-level proxy F and a VIX-call-spread pricer (bs.price with sigma = VVIX/100, T from the VIX monthly calendar). | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists | superseded by T-534 (verifier-corrected wording)
+
+### T-256 · dvol-percentile-vega
+
+**Claim.** Model-priced (BS at DVOL): ATM BTC straddles bought when DVOL is below its trailing 365-day 20th percentile and held 60 days to expiry have a higher mean return than straddles bought on all days, 2022-2026.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://insights.deribit.com/exchange-updates/dvol-deribit-implied-volatility-index/
+- statistic: Mean straddle return conditional on low DVOL minus the unconditional mean
+- null: Difference <= 0
+- procedure: Rolling 365-day percentile of DVOL (warm-up ends 2022-03); on entry days price a 60-DTE straddle at DVOL (DVOL is a 30-day IV, so a term mismatch is a known model bias); hold 60 days; use non-overlapping entries for the conditional set; block bootstrap of the difference; walk-forward halves
+- data: DVOL history 2021-03-24..today; BTC closes · min n: 25
+- pass: Difference CI > 0 (also report whether the conditional mean is > 0)
+- controls: Random entry days matched by count; SPY straddle at VIX (model-priced) as sanity check; a 30-DTE version to remove the term mismatch
+- harness: btc_low_dvol_straddle
+- result X-766daf94: not_supported — MODEL-PRICED at flat DVOL: 60-day ATM straddles bought with DVOL below its trailing 20% quantile return +31.0% on premium vs +14.0% on all days (629 of 1605 daily entries; diff 95% CI -12.1 to +46.8, overlapping entries, block = holding period) — failed: difference 95% CI > 0
+- result X-f666096a: inconclusive — MODEL-PRICED at flat DVOL: 60-day ATM straddles bought with DVOL below its trailing 20% quantile return +29.2% on premium over 18 non-overlapping entries (conditional mean > 0) vs +14.1% on all 1606 daily entries (diff +15.1, 95% CI -13.0 to +43.3; 630 low-DVOL days in all) — only 18 non-overlapping conditional entries, below the trial's min_n 25, so the verdict cannot be supported and a failing criterion counts only when it fails decisively (house rule 5): inconclusive, implemented criteria pass; not implemented: difference 95% CI > 0 (fails, not decisively, below min_n: undecided); n >= trial min_n (18 of 25 non-overlapping conditional entries) (criteria: not_supported, failed: difference 95% CI > 0)
+- note: from the options-library library: DVOL percentile vega timing (long/short vol regimes); harness suggestion: Add percentile filter to the DVOL harness; straddle P&L via Position | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
+
+### T-266 · eth-btc-vol-pair
+
+**Claim.** When the ETH/BTC DVOL ratio is below its trailing 365-day 20th percentile, the subsequent 30-day realised vol ratio (ETH/BTC) exceeds the entry DVOL ratio on average, 2022-2026.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_volatility_index_data?currency=BTC&start_timestamp=1700000000000&end_timestamp=1700300000000&resolution=86400
+- statistic: Mean of (RV_ETH/RV_BTC - DVOL_ETH/DVOL_BTC), conditional on the low percentile
+- null: Mean <= 0
+- procedure: Daily DVOL for both; 30-day forward realised vol from closes; 365-day percentile filter; non-overlapping entries; block bootstrap; walk-forward
+- data: BTC and ETH DVOL from 2021-03-24; BTC/ETH closes · min n: 25
+- pass: CI > 0; report the unconditional mean (usually negative, since DVOL carries a VRP) for comparison
+- controls: High-percentile mirror trade; random dates
+- harness: eth_btc_dvol_ratio
+- result X-7cf64c6f: error — harness raised ValueError
+- result X-39ddc726: supported — ETH/BTC DVOL extremes: 21 signals, mean +0.072 log units (95% CI +0.015 to +0.125), win rate 0.71 — all criteria pass
+- result X-15ae0752: inconclusive — ETH/BTC DVOL extremes: 21 non-overlapping signals, mean +0.082 ratio points (95% CI +0.020 to +0.139), win rate 0.71; unconditional mean over all 1636 post-warm-up days +0.136 — only 21 non-overlapping signals, below the trial's min_n 25, so the verdict cannot be supported and a failing criterion counts only when it fails decisively (house rule 5): inconclusive, implemented criteria pass; not implemented: n >= trial min_n (21 of 25 non-overlapping signals) (criteria: supported, all criteria pass)
+- note: from the options-library library: ETH vs BTC relative volatility (vol pair / dispersion); harness suggestion: deribit_dvol_history('ETH') alongside BTC; ratio harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-324 · etf-nav-premium-reversion
 
@@ -4886,7 +4909,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: SPX vs SPY basis; close-to-close vs 5-minute RV (BTZ use 5-minute RV, which runs lower); no cap; vrp_spx already supports this in vol units (T-48), so this is the variance-unit and tail-statistics restatement.
 - note: from the options-library library: Variance Swap Replication (long / short variance via 1/K^2 strip); harness suggestion: Extend 'vrp_spx' (mandel/experiments/volatility.variance_risk_premium) with a variance-unit, non-overlapping mode and tail statistics; the same mode for vrp_btc and vrp_gold. | added by the verifier pass
 
-## Blocked (129)
+## Blocked (130)
 
 ### T-05 · cross-venue-arbitrage
 
@@ -6671,6 +6694,20 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: registered on 2026-10-15 with 2 of the 20 days already observed (2.2% and 0.5%); no day-one gate; same band and strike set as T-505
 - blocked on: 20 SPX capture days (2 of 20 on 2026-10-15)
 - note: pre-registered restatement of T-505 without its day-one gate, which let one noisy day decide the claim
+
+### T-543 · btc-macro-day-short-straddle-forward
+
+**Claim.** On scheduled FOMC decision days and CPI release days after 2026-10-15, a 1-day ATM BTC short straddle model-priced at DVOL (sigma = DVOL at 00:00 UTC of the day, T = 1/365, strike = the prior UTC close, settled at the day's close) has a lower mean P&L (bps of spot) than on non-event days.
+
+- kind: options-strategy · origin: T-221, batch4_fomc pooled FOMC+CPI variant
+- statistic: mean P&L on event days minus mean on non-event days (bps of spot), MODEL-PRICED
+- null: event-day mean P&L >= non-event-day mean P&L
+- procedure: same pricing and settlement as fomc_btc_event_straddle's pooled FOMC+CPI variant; only event days after 2026-10-15 count (forward test); block bootstrap of the paired day-flagged series
+- data: deribit-dvol-BTC-history, daily-history-BTC-USD, fomc-meetings, macro-release-cpi (all updated by the daily/weekly jobs) · min n: 30
+- pass: difference < 0 with the 95% CI excluding 0 over >= 30 event days after 2026-10-15
+- controls: registered 2026-10-15 after the in-sample pooled variant showed -51.7 bps (95% CI -95.8 to -9.9) over 109 event days 2021-04..2026-10 (FOMC 44, CPI 66), found while adding T-221's reported CPI variant: those days are excluded from this test; random non-macro-day placebo; CPI-only and FOMC-only splits reported
+- blocked on: 30 forward event days after 2026-10-15 (0 of 30 on 2026-10-15; about 20 a year)
+- note: pre-registered forward test of an in-sample observation; the in-sample result is evidence for registering it, not for supporting it
 
 ## Parked (8)
 

@@ -77,7 +77,7 @@ def test_xa3_below_min_n_caps_a_failing_verdict_too():
     ok = xa.conditional_straddle(days, calm, flat, rates, 60, 60, days[0], 252, 0.20, "X", min_n=1)
     assert ok["verdict"] == "not_supported"
     rep = xa.conditional_straddle(days, calm, flat, rates, 60, 60, days[0], 252, 0.20, "X", min_n=ok["n_entries"] + 1)
-    assert rep["verdict"] == "inconclusive" and "criteria: not_supported" in rep["reason"]          # batch4_fomc convention
+    assert rep["verdict"] == "inconclusive" and "criteria: not_supported" in rep["reason"]          # house rule 5: the CI straddles 0, so the failure is not decisive below min_n
 
 
 # ------------------------------------------------------------------------- XA-4: DSR is a probability (T-253) --
@@ -192,4 +192,7 @@ def test_xa8_daily_path_drawdown_and_monthly_roll():
     assert rep["mdd_hedged"] > rep["mdd_hold"]                               # the put cushions the intra-month dip
     assert "daily-path MDD" in rep["reason"] and "rolled every 30 days" in rep["reason"]
     short = xa.protective_put_calmar(days[:30 * 10 + 1], closes[:30 * 10 + 1], idx, rates, days[0])
-    assert short["n_cycles"] == 10 and short["verdict"] == "inconclusive" and "min_n 20" in short["reason"]
+    # 10 identical roll periods: the bootstrap CI of the Calmar difference is a point mass wholly below 0, so house rule 5
+    # makes the failure decisive below min_n (this line used to expect the round-1 cap-everything 'inconclusive')
+    assert short["n_cycles"] == 10 and short["verdict"] == "not_supported" and "min_n 20" in short["reason"]
+    assert "fails decisively below min_n" in short["reason"] and short["upper"] <= 0

@@ -1005,24 +1005,28 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
         cpi_fri = np.array([d in cs for d in fr], dtype=bool)             # released inside the Thu-close -> Fri-close window
         cpi_thu = np.array([days[di[d] - 1] in cs for d in fr], dtype=bool)   # released before Thursday's close (the sale)
         macro = near | cpi_fri
-        k = ~(macro & ox)
-        gx = group_diff(pnl[k], ox[k], block, n_boot, seed)
-        kc = ~(cpi_fri & ox); kb = ~macro; kt = ~((macro | cpi_thu) & ox)
-        pdiff = lambda m: float((pnl[m & ox].mean() - pnl[m & ~ox].mean()) * 1e4) if np.any(m & ox) and np.any(m & ~ox) else None
-        ctrl["ex_cpi_opex_diff_bps"] = pdiff(kc)
+
+        def gd(keep):                                                   # opex-minus-other on the kept Fridays, in bps
+            g_ = group_diff(pnl[keep], ox[keep], block, n_boot, seed)
+            return {"n_opex": g_["n_flag"], "n_other": g_["n_other"], "diff_bps": None if g_["diff"] is None else g_["diff"] * 1e4,
+                    "ci_bps": [None if c_ is None else c_ * 1e4 for c_ in g_["ci"]], "p": g_["p"]}
+        gx = gd(~(macro & ox))
+        kc = ~(cpi_fri & ox)
+        ctrl["ex_cpi_opex_diff_bps"] = float((pnl[kc & ox].mean() - pnl[kc & ~ox].mean()) * 1e4) if np.any(kc & ox) else None
         ctrl["n_opex_cpi_excluded"] = int((cpi_fri & ox).sum())
         ctrl["ex_fomc_cpi_opex"] = {
             "rule": "opex Fridays dropped when the Friday is a CPI release session (08:30 ET, inside the straddle window) or the "
                     "Friday or its Thursday is a scheduled FOMC decision day; other Fridays kept",
-            "n_opex_excluded": int((macro & ox).sum()), "n_opex_left": gx["n_flag"],
-            "diff_bps": None if gx["diff"] is None else gx["diff"] * 1e4,
-            "ci_bps": [None if c_ is None else c_ * 1e4 for c_ in gx["ci"]], "p": gx["p"],
-            "macro_fridays_out_of_both_groups_diff_bps": pdiff(kb), "n_fridays_out_of_both_groups": int(macro.sum()),
-            "also_thursday_cpi_diff_bps": pdiff(kt), "n_opex_thursday_cpi": int((cpi_thu & ox).sum())}
+            "n_opex_excluded": int((macro & ox).sum()), **gx,
+            "macro_fridays_out_of_both_groups": {**gd(~macro), "n_fridays_dropped": int(macro.sum())},
+            "also_thursday_cpi": {**gd(~((macro | cpi_thu) & ox)), "n_opex_thursday_cpi": int((cpi_thu & ox).sum()),
+                                  "note": "a Thursday 08:30 ET release precedes the Thursday-close sale; dropped here as a sensitivity"}}
         e = ctrl["ex_fomc_cpi_opex"]
+        ci_txt = lambda r: (f"{r['diff_bps']:+.2f} bps (CI {r['ci_bps'][0]:+.2f}..{r['ci_bps'][1]:+.2f})" if r["diff_bps"] is not None and r["ci_bps"][0] is not None
+                            else ("n/a" if r["diff_bps"] is None else f"{r['diff_bps']:+.2f} bps"))
         macro_txt = (f"; control, opex Fridays with FOMC/CPI excluded ({e['n_opex_excluded']} dropped, {ctrl['n_opex_cpi_excluded']} for CPI): "
-                     + (f"{e['diff_bps']:+.2f} bps (CI {e['ci_bps'][0]:+.2f}..{e['ci_bps'][1]:+.2f})" if e["diff_bps"] is not None else "n/a")
-                     + (f", out of both groups {e['macro_fridays_out_of_both_groups_diff_bps']:+.2f}" if e["macro_fridays_out_of_both_groups_diff_bps"] is not None else ""))
+                     f"{ci_txt(e)}, same Fridays out of both groups {ci_txt(e['macro_fridays_out_of_both_groups'])}, "
+                     f"Thursday CPI also dropped {ci_txt(e['also_thursday_cpi'])}")
     else:
         not_run.append("CPI part of the FOMC/CPI opex exclusion control (macro-release-cpi not archived)")
         macro_txt = "; CPI exclusion control not run (macro-release-cpi not archived)"

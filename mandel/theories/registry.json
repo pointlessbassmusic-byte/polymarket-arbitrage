@@ -3884,7 +3884,8 @@
    "status": "supported",
    "blocked_on": "",
    "results": [
-    "X-f7120cfc"
+    "X-f7120cfc",
+    "X-eca8ed72"
    ],
    "notes": "from the options-library library: Covered call on IBIT / BTC ETF; harness suggestion: Already close to the BTC-VRP harness; add the conditional-on-percentile split and report expected premium capture per 30-delta covered call via Black-Scholes at DVOL. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -3914,7 +3915,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-7bb88d2c"
+    "X-7bb88d2c",
+    "X-821aad1c"
    ],
    "notes": "from the options-library library: Deribit covered call on BTC/ETH inventory (inverse options); harness suggestion: Mandel's deribit_book + DVOL fetchers already exist; add public/get_delivery_prices (free, 2,638 daily records) so expiries settle at the official TWAP rather than a close. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states; spot closes stand in for Deribit delivery prices (30-minute TWAP)"
   },
@@ -3944,7 +3946,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-b7862591"
+    "X-b7862591",
+    "X-dc722fd2"
    ],
    "notes": "from the options-library library: Covered call on gold/silver (GLD/SLV equity route; GC/SI futures-options route); harness suggestion: GVZ history is already fetched; add GLD/SLV daily closes (free) and reuse the VRP harness; GC futures closes are not free - use GLD as the proxy. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -4996,9 +4999,10 @@
    "status": "supported",
    "blocked_on": "",
    "results": [
-    "X-ace3719a"
+    "X-ace3719a",
+    "X-93130d94"
    ],
-   "notes": "from the options-library library: Monthly opex gamma pin (short ATM straddle / iron butterfly on heavy-OI strikes); harness suggestion: Add a GEX estimator (sum over strikes of OI*gamma*spot^2*0.01 with sign convention calls +, puts -) once chain captures accumulate; join to the opex clustering test. | verifier: corrected claim/trial | Scope (2026-10-15): supported for the MODEL-PRICED straddle (sigma = Thursday VIX, T = 1/252), priced on the dividend forward on ex-dividend Fridays. The 132 quarterly opex Fridays are SPY ex-dividend days; at r = q = 0 with the dividend ignored the difference is +6.57 bps with a CI of -0.76..+13.77, so the as-priced reading matters. With every ex-dividend Friday dropped the result holds (+10.15 bps, CI +2.05..+18.11). A traded-price test needs 1-day implied vol on opex Thursdays (chain captures). CPI-day exclusion control pending (task: CPI-calendar controls)."
+   "notes": "from the options-library library: Monthly opex gamma pin (short ATM straddle / iron butterfly on heavy-OI strikes); harness suggestion: Add a GEX estimator (sum over strikes of OI*gamma*spot^2*0.01 with sign convention calls +, puts -) once chain captures accumulate; join to the opex clustering test. | verifier: corrected claim/trial | Scope (2026-10-15): supported for the MODEL-PRICED straddle (sigma = Thursday VIX, T = 1/252), priced on the dividend forward on ex-dividend Fridays. The 132 quarterly opex Fridays are SPY ex-dividend days; at r = q = 0 with the dividend ignored the difference is +6.57 bps with a CI of -0.76..+13.77, so the as-priced reading matters. With every ex-dividend Friday dropped the result holds (+10.15 bps, CI +2.05..+18.11). A traded-price test needs 1-day implied vol on opex Thursdays (chain captures). CPI-day exclusion control pending (task: CPI-calendar controls). | 2026-10-15: CPI-day exclusion control done (macro-release-cpi archived): opex Fridays with FOMC/CPI excluded +8.01 bps (CI +0.61..+15.26); Thursday CPI also dropped +6.37 bps (CI -1.51..+14.14), a sensitivity that touches 0."
   },
   {
    "id": "T-217",
@@ -5134,9 +5138,10 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-bd896fa6"
+    "X-bd896fa6",
+    "X-d2e0bbe4"
    ],
-   "notes": "from the options-library library: Crypto macro-event straddle on Deribit (FOMC / CPI) - DVOL vs realised; harness suggestion: Reuse the BTC VRP harness (DVOL vs realised) with an event-date mask; add inverse-option payoff mode to the payoff engine (payoff/S_T). | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Crypto macro-event straddle on Deribit (FOMC / CPI) - DVOL vs realised; harness suggestion: Reuse the BTC VRP harness (DVOL vs realised) with an event-date mask; add inverse-option payoff mode to the payoff engine (payoff/S_T). | verifier: corrected claim/trial | 2026-10-15: the reported pooled FOMC+CPI variant gives -51.7 bps (95% CI -95.8 to -9.9) over 109 event days and CPI-only -58.0 bps (CI -119.7 to -1.4); not a pass criterion here (FOMC alone fails), so it is pre-registered as the forward test T-543."
   },
   {
    "id": "T-222",
@@ -5769,7 +5774,8 @@
    "status": "supported",
    "blocked_on": "",
    "results": [
-    "X-e4186ff5"
+    "X-e4186ff5",
+    "X-26ff7ed2"
    ],
    "notes": "from the options-library library: Gold volatility premium (GVZ) via GLD straddles / GC strangles; harness suggestion: harness_vrp_gold exists; add the ratio-to-SPX comparison and a 15-delta strangle pricer; add SLV ATM IV from surface_summary for the silver twin. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -5799,7 +5805,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-e6c23238"
+    "X-e6c23238",
+    "X-dfbd6504"
    ],
    "notes": "from the options-library library: Oil and bond volatility premium (OVX via USO, VXTLT via TLT); harness suggestion: harness_vrp_oil and harness_vrp_bonds exist; add a portfolio aggregator over the harness outputs with the correlation matrix. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -5829,7 +5836,8 @@
    "status": "supported",
    "blocked_on": "",
    "results": [
-    "X-b01e58de"
+    "X-b01e58de",
+    "X-73d614a4"
    ],
    "notes": "from the options-library library: BTC/ETH volatility premium (DVOL vs realised) via Deribit inverse straddles; harness suggestion: harness_vrp_btc and harness_vrp_eth exist; add the worst-decile share, a funding sensitivity parameter and an inverse-payoff conversion in the payoff engine (payoff in BTC = payoff_usd / S_T). | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -5859,7 +5867,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-00e1fb1e"
+    "X-00e1fb1e",
+    "X-35dc52fb"
    ],
    "notes": "from the options-library library: Cross-asset implied vol ratio trades (GVZ/VIX, DVOL/VIX, OVX/VIX); harness suggestion: Combine harness_vrp_gold and harness_vrp_spx outputs into a ratio harness; the DVOL/VIX version joins harness_vrp_btc. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -6019,7 +6028,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-130e1ef5"
+    "X-130e1ef5",
+    "X-a681b36c"
    ],
    "notes": "from the options-library library: BTC covered call on coin inventory; harness suggestion: mandel.data.options.deribit_dvol_history + BTC closes -> bs.price with sigma=DVOL; payoff via Position; bootstrap from validation | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6050,7 +6060,8 @@
    "blocked_on": "",
    "results": [
     "X-a9d5ba07",
-    "X-af2e1a54"
+    "X-af2e1a54",
+    "X-e15fd8af"
    ],
    "notes": "from the options-library library: Coin-secured / cash-secured put to accumulate BTC or metal; harness suggestion: Same loop as btc-covered-call with kind='put'; reuse VRP harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6102,10 +6113,11 @@
     "btc_low_dvol_straddle"
    ],
    "testable_now": true,
-   "status": "not_supported",
+   "status": "inconclusive",
    "blocked_on": "",
    "results": [
-    "X-766daf94"
+    "X-766daf94",
+    "X-f666096a"
    ],
    "notes": "from the options-library library: DVOL percentile vega timing (long/short vol regimes); harness suggestion: Add percentile filter to the DVOL harness; straddle P&L via Position | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6367,11 +6379,12 @@
     "eth_btc_dvol_ratio"
    ],
    "testable_now": true,
-   "status": "supported",
+   "status": "inconclusive",
    "blocked_on": "",
    "results": [
     "X-7cf64c6f",
-    "X-39ddc726"
+    "X-39ddc726",
+    "X-15ae0752"
    ],
    "notes": "from the options-library library: ETH vs BTC relative volatility (vol pair / dispersion); harness suggestion: deribit_dvol_history('ETH') alongside BTC; ratio harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -6400,7 +6413,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-a4d32b86"
+    "X-a4d32b86",
+    "X-1767f28c"
    ],
    "notes": "from the options-library library: Protective put / tail hedge on BTC inventory sized by DVOL; harness suggestion: Payoff engine rolling template; reuse covered-call loop | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6480,7 +6494,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-e5665ac0"
+    "X-e5665ac0",
+    "X-6fc32c1c"
    ],
    "notes": "from the options-library library: Gold covered call (GLD / GC-OG) using GVZ as the IV reference; harness suggestion: cboe_index_history('GVZ') exists in mandel.data.options (CBOE_INDICES); add GLD to the closes feed; reuse VRP harness with GVZ | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6509,7 +6524,8 @@
    "status": "supported",
    "blocked_on": "",
    "results": [
-    "X-c5b6056b"
+    "X-c5b6056b",
+    "X-4c9ff56d"
    ],
    "notes": "from the options-library library: Gold variance risk premium (delta-hedged short strangle on GLD/GC); harness suggestion: Clone the SPY/VIX VRP harness with GVZ/GLD inputs | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -6538,7 +6554,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-4d1156f7"
+    "X-4d1156f7",
+    "X-877d8dc2"
    ],
    "notes": "from the options-library library: GVZ low-percentile long gold vol (crisis convexity); harness suggestion: Percentile harness shared with dvol-percentile-vega | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6567,7 +6584,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-dfd2c227"
+    "X-dfd2c227",
+    "X-f24ee748"
    ],
    "notes": "from the options-library library: Gold event vol (FOMC/CPI straddle on GLD); harness suggestion: Event-date table in mandel/knowledge; paired-difference harness over cboe_index_history('GVZ') | verifier: corrected claim/trial"
   },
@@ -6597,7 +6615,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-5beb6789"
+    "X-5beb6789",
+    "X-731b4b2d"
    ],
    "notes": "from the options-library library: Gold-silver ratio options trade; harness suggestion: Underlying-ratio harness now; option overlay once SLV surface_summary history exists | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -6729,7 +6748,8 @@
    "blocked_on": "",
    "results": [
     "X-70072aa5",
-    "X-460817bd"
+    "X-460817bd",
+    "X-99ef77b8"
    ],
    "notes": "from the options-library library: Metals put-write for accumulation (GLD/SLV cash-secured; GC/SI SPAN); harness suggestion: Shares loop with gold-covered-call; kind='put' | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -7883,7 +7903,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-3b985170"
+    "X-3b985170",
+    "X-15befc42"
    ],
    "notes": "from the underlying-library library: Pre-FOMC announcement drift; harness suggestion: events.py: fomc_dates() fetcher (parse statement URLs by year, cache to mandel/data as 'fomc-dates'), then event_day_effect(days, closes, event_days, offset=-1, n_boot=2000) generalizing turn_of_month's paired block bootstrap; add subsample argument. | verifier: corrected claim/trial"
   },
@@ -12307,7 +12328,8 @@
    "status": "supported",
    "blocked_on": "",
    "results": [
-    "X-40ab469d"
+    "X-40ab469d",
+    "X-a9bf4b49"
    ],
    "notes": "from the options-library library: Crude oil variance risk premium (OVX on USO) short strangle; harness suggestion: Clone the GVZ VRP harness with OVX/USO inputs; cboe_index_history('OVX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py"
   },
@@ -12363,7 +12385,8 @@
    "status": "supported",
    "blocked_on": "",
    "results": [
-    "X-46f63ac4"
+    "X-46f63ac4",
+    "X-3c8945e5"
    ],
    "notes": "from the options-library library: Gold vs equity implied-vol spread (GVZ/VIX relative value); harness suggestion: Ratio z-score harness over cboe_index_history('GVZ') and ('VIX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py"
   },
@@ -13134,6 +13157,31 @@
    "blocked_on": "20 SPX capture days (2 of 20 on 2026-10-15)",
    "results": [],
    "notes": "pre-registered restatement of T-505 without its day-one gate, which let one noisy day decide the claim"
+  },
+  {
+   "id": "T-543",
+   "slug": "btc-macro-day-short-straddle-forward",
+   "kind": "options-strategy",
+   "claim": "On scheduled FOMC decision days and CPI release days after 2026-10-15, a 1-day ATM BTC short straddle model-priced at DVOL (sigma = DVOL at 00:00 UTC of the day, T = 1/365, strike = the prior UTC close, settled at the day's close) has a lower mean P&L (bps of spot) than on non-event days.",
+   "origin": [
+    "T-221",
+    "batch4_fomc pooled FOMC+CPI variant"
+   ],
+   "trial": {
+    "statistic": "mean P&L on event days minus mean on non-event days (bps of spot), MODEL-PRICED",
+    "null": "event-day mean P&L >= non-event-day mean P&L",
+    "procedure": "same pricing and settlement as fomc_btc_event_straddle's pooled FOMC+CPI variant; only event days after 2026-10-15 count (forward test); block bootstrap of the paired day-flagged series",
+    "data": "deribit-dvol-BTC-history, daily-history-BTC-USD, fomc-meetings, macro-release-cpi (all updated by the daily/weekly jobs)",
+    "min_n": 30,
+    "pass": "difference < 0 with the 95% CI excluding 0 over >= 30 event days after 2026-10-15",
+    "controls": "registered 2026-10-15 after the in-sample pooled variant showed -51.7 bps (95% CI -95.8 to -9.9) over 109 event days 2021-04..2026-10 (FOMC 44, CPI 66), found while adding T-221's reported CPI variant: those days are excluded from this test; random non-macro-day placebo; CPI-only and FOMC-only splits reported"
+   },
+   "experiments": [],
+   "testable_now": false,
+   "status": "blocked",
+   "blocked_on": "30 forward event days after 2026-10-15 (0 of 30 on 2026-10-15; about 20 a year)",
+   "results": [],
+   "notes": "pre-registered forward test of an in-sample observation; the in-sample result is evidence for registering it, not for supporting it"
   }
  ]
 }
