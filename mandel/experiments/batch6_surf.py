@@ -325,6 +325,172 @@ def _bt_summary(bt: Optional[dict]) -> dict:
     return {k: v for k, v in bt.items() if k != "t"}
 
 
+# ============================================================== rule 10: entry calendars and grid phases ==
+
+POOL_HOLDS = 6          # default cycle block of the module's non-overlapping grids (6 holds)
+
+
+def pool_block_len(hold: int, block_cycles: int = POOL_HOLDS) -> int:
+    """Block length (sessions) of a pooled overlapping daily-entry bootstrap: ``block_cycles`` holds, at least 2 holds."""
+    return max(2 * int(hold), int(block_cycles) * int(hold))
+
+
+def n_holds(idx, hold: int) -> int:
+    """Distinct ``hold``-session holds spanned by sorted entry indices: the cycle count of the densest non-overlapping
+    grid through them (the claim's unit for a pooled estimate)."""
+    idx = np.asarray(idx, dtype=np.int64)
+    return 0 if idx.size == 0 else int((idx[-1] - idx[0]) // int(hold) + 1)
+
+
+def _ords(days) -> np.ndarray:
+    return np.array([date.fromisoformat(d).toordinal() for d in days], dtype=np.int64)
+
+
+def _third_friday(y: int, m: int) -> date:
+    d = date(y, m, 1)
+    d += timedelta(days=(4 - d.weekday()) % 7)
+    return d + timedelta(days=14)
+
+
+def _on_or_before(ords: np.ndarray, target: int, max_back: int = 4) -> Optional[int]:
+    """Index of the last session at or before ordinal ``target`` (None when none lies within ``max_back`` days)."""
+    j = int(np.searchsorted(ords, target, side="right") - 1)
+    return j if j >= 0 and target - int(ords[j]) <= max_back else None
+
+
+def monthly_expiry_dates(cal_days) -> list:
+    """SPX/SPY standard monthly expiries on an exchange calendar: the third Friday of each month, or the prior session
+    when that Friday is a holiday (not a session of ``cal_days``). Only dates inside the calendar are returned."""
+    cal_days = sorted(cal_days)
+    if not cal_days:
+        return []
+    o = _ords(cal_days)
+    out = set()
+    for y in range(int(cal_days[0][:4]), int(cal_days[-1][:4]) + 1):
+        for m in range(1, 13):
+            f = _third_friday(y, m).toordinal()
+            if o[0] <= f <= o[-1]:
+                j = _on_or_before(o, f)
+                if j is not None:
+                    out.add(cal_days[j])
+    return sorted(out)
+
+
+def vix_expiry_dates(cal_days) -> list:
+    """VIX standard monthly expiries (CBOE): the Wednesday 30 calendar days before the third Friday of the following month;
+    when that Friday is a holiday, 30 days before the session preceding it; a Wednesday that is a holiday moves to the
+    prior session (2024-06-18 for Juneteenth; 2025-03-18 for the Good Friday 2025-04-18). Holidays are the weekdays
+    missing from ``cal_days``; only dates inside the calendar are returned."""
+    cal_days = sorted(cal_days)
+    if not cal_days:
+        return []
+    o = _ords(cal_days)
+    out = set()
+    for y in range(int(cal_days[0][:4]), int(cal_days[-1][:4]) + 1):
+        for m in range(1, 13):
+            ny, nm = (y + 1, 1) if m == 12 else (y, m + 1)
+            f = _third_friday(ny, nm).toordinal()
+            if f <= o[-1]:
+                j = _on_or_before(o, f)
+                if j is None:
+                    continue
+                f = int(o[j])
+            w = f - 30
+            if o[0] <= w <= o[-1]:
+                j = _on_or_before(o, w)
+                if j is not None:
+                    out.add(cal_days[j])
+    return sorted(out)
+
+
+def sessions_for(days, dates, max_back: int = 4) -> np.ndarray:
+    """Index in ``days`` of each date: the date itself, or the prior session within ``max_back`` calendar days (a date
+    missing from an aligned calendar because one series has no print falls back to the last session with all of them)."""
+    if not len(days):
+        return np.zeros(0, dtype=np.int64)
+    o = _ords(days)
+    out = set()
+    for d in dates:
+        t = date.fromisoformat(d).toordinal()
+        if o[0] <= t:
+            j = _on_or_before(o, t, max_back)
+            if j is not None:
+                out.add(j)
+    return np.array(sorted(out), dtype=np.int64)
+
+
+def rolling_cycles(expiries) -> np.ndarray:
+    """(start, end) session pairs of a position rolled at each expiry: bought at expiry k's close, held to expiry k+1."""
+    e = np.asarray(expiries, dtype=np.int64)
+    return np.stack([e[:-1], e[1:]], axis=1) if e.size >= 2 else np.zeros((0, 2), dtype=np.int64)
+
+
+def grid_cycles(n: int, hold: int, offset: int = 0) -> np.ndarray:
+    """(start, end) pairs of the non-overlapping ``hold``-session grid starting at session ``offset``."""
+    ts = np.arange(int(offset), n - hold, hold, dtype=np.int64)
+    return np.stack([ts, ts + hold], axis=1) if ts.size else np.zeros((0, 2), dtype=np.int64)
+
+
+def calendar_entries(days, expiries, dte: int, non_overlap: bool = True, ok=None) -> tuple:
+    """(entries, expiries) for options of ``dte`` calendar days on an expiry calendar: each entry is the session nearest
+    expiry - dte (ties to the earlier, longer-dated session); an expiry whose entry date lies more than 4 days from any
+    session is skipped. ``non_overlap``: an entry before the previous expiry moves to that expiry's close. ``ok`` (bool
+    per session): an entry on a session without it is skipped."""
+    o = _ords(days)
+    ent, exp, prev = [], [], None
+    for e in np.asarray(expiries, dtype=np.int64):
+        t = int(o[e]) - int(dte)
+        j = int(np.searchsorted(o, t))
+        cands = [k for k in (j - 1, j) if 0 <= k < o.size]
+        k = min(cands, key=lambda c: (abs(int(o[c]) - t), int(o[c]))) if cands else None
+        if k is not None and abs(int(o[k]) - t) <= 4:
+            if non_overlap and prev is not None and k < prev:
+                k = int(prev)
+            if k < e and (ok is None or bool(ok[k])):
+                ent.append(int(k))
+                exp.append(int(e))
+        prev = int(e)
+    return np.array(ent, dtype=np.int64), np.array(exp, dtype=np.int64)
+
+
+def month_first(days, ok=None, start: str = "") -> np.ndarray:
+    """First session of each calendar month (on or after ``start``) where ``ok`` holds."""
+    out, seen = [], set()
+    for i, d in enumerate(days):
+        if d < start or d[:7] in seen or (ok is not None and not ok[i]):
+            continue
+        seen.add(d[:7])
+        out.append(i)
+    return np.array(out, dtype=np.int64)
+
+
+def offset_of(idx, hold: int) -> np.ndarray:
+    """Grid offset of each entry: offset 0 is the grid through the first entry (the grid the claim's start date gives)."""
+    idx = np.asarray(idx, dtype=np.int64)
+    return (idx - idx[0]) % int(hold) if idx.size else idx
+
+
+def _rng(vals, nd: int = 2, scale: float = 1.0) -> str:
+    v = [x * scale for x in vals if x is not None and math.isfinite(x)]
+    return "n/a" if not v else f"{min(v):+.{nd}f} to {max(v):+.{nd}f}"
+
+
+def asof_series(days, series: dict, max_age: int = 15) -> tuple:
+    """(values, fresh) on ``days``: the last print of ``series`` at or before each day (point in time; NaN before the
+    first print or when the last print is more than ``max_age`` calendar days old) and whether the day has its own."""
+    ks = sorted(series)
+    ko = _ords(ks) if ks else np.zeros(0, dtype=np.int64)
+    o = _ords(days)
+    vals = np.full(len(days), np.nan)
+    fresh = np.zeros(len(days), dtype=bool)
+    for i, d in enumerate(days):
+        j = bisect_right(ks, d) - 1
+        if j >= 0 and o[i] - ko[j] <= max_age:
+            vals[i] = series[ks[j]]
+            fresh[i] = ks[j] == d
+    return vals, fresh
+
+
 # ============================================================================================ archive plumbing ==
 
 def _has(archive, name: str) -> bool:
@@ -562,6 +728,19 @@ def _align(*dicts) -> list:
     return sorted(keys)
 
 
+def gspc_calendar(gd, gc, skew: dict, vix: dict) -> tuple:
+    """(days, close, skew, vix, fresh) on the ^GSPC sessions from the first day with both a SKEW and a VIX print: SKEW and
+    VIX as of each session (``asof_series``); ``fresh`` = both printed that session."""
+    if not skew or not vix:
+        return [], np.zeros(0), np.zeros(0), np.zeros(0), np.zeros(0, dtype=bool)
+    first = max(min(skew), min(vix))
+    keep = [i for i, d in enumerate(gd) if d >= first]
+    days = [gd[i] for i in keep]
+    sk, fs = asof_series(days, skew)
+    vx, fv = asof_series(days, vix)
+    return days, np.asarray(gc, dtype=float)[keep], sk, vx, fs & fv
+
+
 # ========================================================================================== option pricing ==
 
 def _N(x: float) -> float:
@@ -631,7 +810,9 @@ def vrp_regime(days, px, vix, vix3m, lo: float = 0.95, hi: float = 1.05, window:
     0.90/0.95/1.00/1.05), must be < 0.05, the difference > 0 in both walk-forward halves (a half with < ``min_half`` days in
     either cell is not testable). Criteria: EACH tercile passes (the claim: "within each VIX-level tercile"; an untestable
     tercile is a criterion not implemented, a testable one that fails is a failure) and >= 2 of 3 terciles pass (the pass
-    rule). A tercile with < ``min_n`` days in either regime is not testable. n = backwardation days (the scarce regime)."""
+    rule). A tercile with < ``min_n`` days in either regime is not testable. n = backwardation days (the scarce regime).
+    Rule 10(c): daily entries (the trial's design) have no grid phase; the studentized p with 2 x ``window``-day blocks
+    is reported per tercile as a block-length sensitivity."""
     days = list(days)
     px, vix, vix3m = (np.asarray(a, dtype=float) for a in (px, vix, vix3m))
     n = len(days) - window
@@ -668,6 +849,7 @@ def vrp_regime(days, px, vix, vix3m, lo: float = 0.95, hi: float = 1.05, window:
         bt = stud_group(vrp, a, b, block, n_boot, seed)
         d0 = bt["est"]
         p_st = p_greater(bt)
+        p_2h = p_greater(stud_group(vrp, a, b, 2 * window, n_boot, seed))
         null = []
         for s in shifts:
             rs = np.roll(ratio, int(s))
@@ -685,7 +867,7 @@ def vrp_regime(days, px, vix, vix3m, lo: float = 0.95, hi: float = 1.05, window:
         comps = [d0 > 0, p_defl < 0.05, halves_ok]
         ok = False if any(c is False for c in comps) else (None if any(c is None for c in comps) else True)
         row.update({"ci_var": list(two_sided(bt)), "p_studentized": p_st, "p_block_shift": p_sh, "p_deflated": p_defl,
-                    "halves_var": halves, "pass": ok})
+                    "p_studentized_2hold_blocks": p_2h, "halves_var": halves, "pass": ok})
         rows.append(row)
     n_true = sum(r["pass"] is True for r in rows)
     n_none = sum(r["pass"] is None for r in rows)
@@ -715,20 +897,23 @@ def vrp_regime(days, px, vix, vix3m, lo: float = 0.95, hi: float = 1.05, window:
             return s + f" [not testable: < {min_n} days in a regime]"
         hv = "/".join("n/a" if x is None else f"{x*1e4:+.1f}" for x in r["halves_var"])
         return s + (f", {_ci_s(r['ci_var'], 1, 1e4)}, p stud {r['p_studentized']:.3f} / block-shift {r['p_block_shift']:.3f}"
-                    f" -> deflated x{n_thresholds} {r['p_deflated']:.3f}, halves {hv} -> {'pass' if r['pass'] else ('n/a' if r['pass'] is None else 'fail')}")
+                    f" -> deflated x{n_thresholds} {r['p_deflated']:.3f}, halves {hv} -> {'pass' if r['pass'] else ('n/a' if r['pass'] is None else 'fail')}"
+                    f" (p stud with {2 * window}-day blocks {_f(r['p_studentized_2hold_blocks'], 3)}, reported)")
     return {"n": n_bwd, "min_n": min_n, "n_days": int(n), "first_day": days[0], "last_entry": days[n - 1], "lo": lo, "hi": hi,
             "tercile_cuts": [float(q1), float(q2)], "terciles": rows, "share_backwardation": float(bwd.mean()),
             "share_contango": float(con.mean()), "terciles_passing": n_true, "verdict": verdict,
             "reason_core": "; ".join(_row_s(r) for r in rows), "why": why}
 
 
-def short_strangle_cycles(fr: dict, scale: float = 1.0, delta: float = 0.16, hold: int = MONTH) -> dict:
+def short_strangle_cycles(fr: dict, scale: float = 1.0, delta: float = 0.16, hold: int = MONTH, starts=None) -> dict:
     """MODEL-PRICED short 16-delta strangle, entered at a close, expiring at the close ``hold`` sessions later (T =
     calendar days / 365), legs at sigma = scale * VIX / 100 (flat smile) on the dividend forward; premium earns the bill
-    to expiry; settles on the raw close. Returns entry indices and P&L / spot."""
+    to expiry; settles on the raw close. Entries: ``starts`` (session indices; every daily entry for the rule-10 pooled
+    estimate) or the non-overlapping grid from session 0. Returns entry indices and P&L / spot."""
     n = len(fr["days"])
+    grid = range(0, n - hold, hold) if starts is None else [int(t) for t in starts if 0 <= int(t) < n - hold]
     starts, pnl = [], []
-    for t in range(0, n - hold, hold):
+    for t in grid:
         e = t + hold
         S = float(fr["close"][t])
         T = (fr["ords"][e] - fr["ords"][t]) / 365.0
@@ -752,13 +937,17 @@ def short_strangle_cycles(fr: dict, scale: float = 1.0, delta: float = 0.16, hol
 def skew_tail_frequency(days, close, skew, vix, start: str = "1991-01-01", window: int = MONTH, cut: tuple = (0.80, 0.20),
                         alt_cut: tuple = (0.90, 0.10), bound: float = 0.01, n_cuts: int = 2, split: str = "2009-01-01",
                         block: int = 21, lookback: int = 252, n_boot: int = N_BOOT, seed: int = 0, min_n: int = 300,
-                        excl_months: tuple = ("2008-10", "2020-03"), n_placebo: int = 200) -> dict:
-    """T-227 on aligned daily arrays (^GSPC close, SKEW, VIX). Windows start every day from ``start`` (trailing percentiles
+                        excl_months: tuple = ("2008-10", "2020-03"), n_placebo: int = 200, fresh=None) -> dict:
+    """T-227 on aligned daily arrays (^GSPC close on its own sessions, SKEW and VIX as of each session; ``fresh`` marks
+    sessions with their own prints, for the report). Windows start every day from ``start`` (trailing percentiles
     need ``lookback`` prior values). y_t = 1{ln(S_{t+21}/S_t) < -2 (VIX_t/100) sqrt(21/252)}. High: SKEW_t above the q_hi
     quantile of the prior 252 SKEW values; low: below q_lo. Pass: one-sided upper bound of freq_high - freq_low at 1 - 0.05 /
     ``n_cuts`` (95% deflated for the 80/20 and 90/10 cut pairs) < ``bound``; and in both halves (before / from ``split``)
     the realised-21d-skewness difference high - low is not significantly negative (one-sided p > 0.1). Bootstraps are
-    studentized, paired on the timeline, block 21 (the window overlap). n = min(high, low) windows."""
+    studentized, paired on the timeline, block 21 (the window overlap). n = min(high, low) windows.
+    Rule 10(c): daily-start windows are the trial's own design (no grid phase). Reported: the same test with 2 x window
+    session blocks, and each of the ``window`` non-overlapping grids (block 6 windows): range of the difference and of
+    its upper bound, and how many grids would pass the frequency criterion."""
     days = list(days)
     close, skew, vix = (np.asarray(a, dtype=float) for a in (close, skew, vix))
     n = len(days) - window
@@ -803,6 +992,17 @@ def skew_tail_frequency(days, close, skew, vix, start: str = "1991-01-01", windo
                         "freq_diff": None if bth is None else bth["est"], "freq_diff_upper": upper_bound(bth, level)})
     alt_hi, alt_lo = groups(skew, *alt_cut)
     bt_alt = freq_test(alt_hi, alt_lo, idx)
+    bt_2h = stud_group(y[idx], hi_m[idx], lo_m[idx], 2 * window, n_boot, seed)
+    ub_2h = upper_bound(bt_2h, level)
+    offs = []
+    for k in range(window):
+        sel = idx[offset_of(idx, window) == k]
+        b_k = stud_group(y[sel], hi_m[sel], lo_m[sel], 6, n_boot, seed) if sel.size >= 8 else None
+        if b_k is not None:
+            u_k = upper_bound(b_k, level)
+            offs.append({"offset": k, "n": int(sel.size), "n_min_group": int(min(hi_m[sel].sum(), lo_m[sel].sum())),
+                         "diff": b_k["est"], "upper": u_k, "pass": bool(u_k < bound)})
+    n_stale = None if fresh is None else int((~np.asarray(fresh, dtype=bool)[idx]).sum())
     # controls
     mon = np.array([d[:7] for d in days])
     bad = np.isin(mon, list(excl_months)).astype(int)
@@ -847,13 +1047,20 @@ def skew_tail_frequency(days, close, skew, vix, start: str = "1991-01-01", windo
               f" excluding windows touching {'/'.join(excl_months)} {_s(bt_ex['est']*100 if bt_ex else None, 2)} pp (upper {_s(upper_bound(bt_ex, level)*100 if bt_ex else None, 2)});"
               f" 21-day SKEW change instead of level {_s(bt_ch['est']*100 if bt_ch else None, 2)} pp (upper {_s(upper_bound(bt_ch, level)*100 if bt_ch else None, 2)});"
               f" within VIX terciles " + "/".join(_s(None if x is None else x * 100, 2) for x in strat) + " pp;"
-              f" shifted-SKEW placebo mean {_s(float(plc.mean())*100 if plc.size else None, 2)} pp")
+              f" shifted-SKEW placebo mean {_s(float(plc.mean())*100 if plc.size else None, 2)} pp. Rule 10 (daily starts are the "
+              f"trial's design, no grid phase): with {2 * window}-session blocks the upper bound is {_s(None if ub_2h is None else ub_2h * 100, 2)} pp; "
+              f"the {len(offs)} non-overlapping {window}-session grids (block 6 windows, {_rng([o['n_min_group'] for o in offs], 0).replace('+', '')} "
+              f"windows in the smaller group) give differences {_rng([o['diff'] for o in offs], 2, 100)} pp, upper bounds "
+              f"{_rng([o['upper'] for o in offs], 2, 100)} pp, {sum(o['pass'] for o in offs)}/{len(offs)} below the margin (reported)"
+              + (f". Calendar: 21 ^GSPC sessions per window; SKEW/VIX as of each session ({n_stale} of {idx.size} entries on a "
+                 "carried print)" if n_stale is not None else ""))
     return {"n": n_min, "min_n": min_n, "n_high": n_hi, "n_low": n_lo, "freq_high": bt["mean_a"], "freq_low": bt["mean_b"],
             "diff": bt["est"], "upper_bound": ub, "bound_level": level, "ci95": list(ci), "halves": sk_rows,
             "alt_cut_diff": None if bt_alt is None else bt_alt["est"], "alt_cut_upper": upper_bound(bt_alt, level),
             "excl_months_diff": None if bt_ex is None else bt_ex["est"], "excl_months_upper": upper_bound(bt_ex, level),
             "skew_change_diff": None if bt_ch is None else bt_ch["est"], "skew_change_upper": upper_bound(bt_ch, level),
             "vix_tercile_diffs": strat, "placebo_mean": float(plc.mean()) if plc.size else None,
+            "upper_bound_2hold_blocks": ub_2h, "grid_offsets": offs, "entries_on_carried_print": n_stale,
             "first_window": days[idx[0]], "last_window": days[idx[-1]], "verdict": verdict, "reason": reason + " — " + why}
 
 
