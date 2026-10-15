@@ -299,3 +299,13 @@ First-contact protocol, for when the user introduces a child:
   Unblock sweep of 129 blocked theories: 34 testable after a free fetch, led by
   DoltHub's historical option chains (CC BY-SA). T-543 pre-registered as a
   forward-only test. Data whose terms forbid redistribution is stored local-only.
+  Batch 6b (49 harnesses on the Cboe strategy indices, DoltHub chains and vol
+  history, box rates, OPEC dates and Deribit trades) wired; rules 11 (named
+  alternative procedures must agree) and 12 (one information set per decision)
+  added after refutations of T-162 and T-220. Official re-run of all 262
+  harnesses on the current code: 95 status changes, 11 newly supported claims
+  (each survived an independent refutation first), T-530 lost support under
+  rule 10, four theories parked under their trials' own park rules. The archive
+  now writes every bundle whole and renames it into place, so a killed fetch
+  cannot truncate a stored bundle. Batch 6c (underlying library) triaged: 17
+  testable now, 65 after a free fetch, 4 blocked on survivorship-free stock data.
