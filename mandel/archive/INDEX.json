@@ -202,7 +202,7 @@
    "name": "crypto-fear-greed-history",
    "kind": "data",
    "path": "mandel/archive/data/crypto-fear-greed-history.jsonl.gz",
-   "created_at": "2026-10-15T08:01:13.742855+00:00",
+   "created_at": "2026-10-15T08:05:30.721715+00:00",
    "rows": 3175,
    "bytes": 23332,
    "sha256": "0b75d42fb2cc816d9f3225f7b5b9aa8ccc59a397b97ef89550885e1efe253506",
@@ -2467,6 +2467,114 @@
     "prices"
    ],
    "recipe": "yahoo /v8/finance/chart/ES=F?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "french-accruals-monthly": {
+   "name": "french-accruals-monthly",
+   "kind": "data",
+   "path": "mandel/archive/data/french-accruals-monthly.jsonl.gz",
+   "created_at": "2026-10-15T08:05:28.286665+00:00",
+   "rows": 758,
+   "bytes": 43606,
+   "sha256": "53a705b2b5a0703c08c403013781bf33937c6958f9e0801af809604f805b2efc",
+   "tags": [
+    "factors",
+    "fama-french",
+    "history"
+   ],
+   "recipe": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Portfolios_Formed_on_AC_CSV.zip (first daily block; percent returns; the library is revised monthly, so available_at is optimistic for recent rows)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, Lo 20, Qnt 2, Qnt 3, Qnt 4, Hi 20, Lo 10, Dec 2, Dec 3...} in percent"
+  },
+  "french-net-issuance-monthly": {
+   "name": "french-net-issuance-monthly",
+   "kind": "data",
+   "path": "mandel/archive/data/french-net-issuance-monthly.jsonl.gz",
+   "created_at": "2026-10-15T08:05:28.965226+00:00",
+   "rows": 758,
+   "bytes": 48701,
+   "sha256": "7225ee26797731ca379a464beffd666107601d9ba6c7366b6179378383c0d571",
+   "tags": [
+    "factors",
+    "fama-french",
+    "history"
+   ],
+   "recipe": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Portfolios_Formed_on_NI_CSV.zip (first daily block; percent returns; the library is revised monthly, so available_at is optimistic for recent rows)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, < 0, ZERO, Lo 20, Qnt 2, Qnt 3, Qnt 4, Hi 20, Lo 10...} in percent"
+  },
+  "daily-history-BTC-F": {
+   "name": "daily-history-BTC-F",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-BTC-F.jsonl.gz",
+   "created_at": "2026-10-15T08:05:31.311345+00:00",
+   "rows": 2221,
+   "bytes": 69504,
+   "sha256": "51e50c691ded4a63e4c516d3f240195a4f9f0570e06c0b6d4d9220db5ddbd0fd",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/BTC=F?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-VXX": {
+   "name": "daily-history-VXX",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-VXX.jsonl.gz",
+   "created_at": "2026-10-15T08:05:32.434601+00:00",
+   "rows": 2192,
+   "bytes": 79890,
+   "sha256": "f8e6985c1e3cb1b2444697435a0d7cdbdea3489a512f1446c014fc046c0a0086",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/VXX?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history--VIX": {
+   "name": "daily-history--VIX",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history--VIX.jsonl.gz",
+   "created_at": "2026-10-15T08:05:34.279457+00:00",
+   "rows": 9265,
+   "bytes": 274783,
+   "sha256": "1243dd59a625b01fa5204a6134f0230dbf8ba34934c5647d71293eca7f8a4b71",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/^VIX?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-MBB": {
+   "name": "daily-history-MBB",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-MBB.jsonl.gz",
+   "created_at": "2026-10-15T08:05:35.605116+00:00",
+   "rows": 4927,
+   "bytes": 177182,
+   "sha256": "6084a05c3c1f6139c9336ded43bff656ed1e6ce35222954dc1db8255ecdc68ad",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/MBB?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"

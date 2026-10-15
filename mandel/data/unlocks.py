@@ -39,7 +39,8 @@ def _client():
 # ------------------------------------------------------------------ Fama-French --
 
 def parse_french_daily(text: str) -> tuple[list[str], list[dict]]:
-    """The first block of YYYYMMDD rows after a header line that starts with ','. Returns (columns, rows) with values in percent."""
+    """The first block of YYYYMMDD (daily) or YYYYMM (monthly, day = 'YYYY-MM') rows after a header line that starts with ','.
+    Returns (columns, rows) with values in percent; -99.99 / -999 (French's missing codes) are dropped."""
     lines = text.splitlines()
     cols, rows, in_block = None, [], False
     for ln in lines:
@@ -48,11 +49,11 @@ def parse_french_daily(text: str) -> tuple[list[str], list[dict]]:
                 cols = [c.strip() for c in ln.split(",")[1:]]; in_block = True
             continue
         parts = [p.strip() for p in ln.split(",")]
-        if not parts or not re.fullmatch(r"\d{8}", parts[0] or ""):
+        if not parts or not re.fullmatch(r"\d{8}|\d{6}", parts[0] or ""):
             if rows:
                 break
             continue
-        d = f"{parts[0][:4]}-{parts[0][4:6]}-{parts[0][6:]}"
+        d = f"{parts[0][:4]}-{parts[0][4:6]}-{parts[0][6:]}" if len(parts[0]) == 8 else f"{parts[0][:4]}-{parts[0][4:6]}"
         try:
             vals = [float(x) for x in parts[1:len(cols) + 1]]
         except ValueError:
@@ -74,8 +75,10 @@ def fetch_french(store: ObservationStore, files: dict | None = None) -> dict:
                 out[name] = f"HTTP {r.status_code}"; continue
             z = zipfile.ZipFile(io.BytesIO(r.content))
             cols, rows = parse_french_daily(z.read(z.namelist()[0]).decode("latin-1"))
-            e = store.write_bundle(f"french-{name}", (Observation("ken-french", "factor", name, observed_at=x["day"] + "T21:00:00+00:00",
-                                                                  available_at=x["day"] + "T21:00:00+00:00", value=x) for x in rows),
+            def _ts(dd):
+                return dd + "T21:00:00+00:00" if len(dd) == 10 else dd + "-28T21:00:00+00:00"
+            e = store.write_bundle(f"french-{name}", (Observation("ken-french", "factor", name, observed_at=_ts(x["day"]),
+                                                                  available_at=_ts(x["day"]), value=x) for x in rows),
                                    recipe=f"{FRENCH}{f} (first daily block; percent returns; the library is revised monthly, so available_at is optimistic for recent rows)",
                                    tags=["factors", "fama-french", "history"], schema=f"value = {{day, {', '.join(cols[:8])}{'...' if len(cols) > 8 else ''}}} in percent")
             out[name] = {"rows": e.rows, "columns": len(cols), "first": rows[0]["day"] if rows else None, "last": rows[-1]["day"] if rows else None}
