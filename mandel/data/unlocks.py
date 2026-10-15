@@ -332,9 +332,11 @@ def fetch_macro_releases(store: ObservationStore, series=(("CPIAUCSL", "cpi"), (
 # --------------------------------------------------------------------- G10 FX --
 
 FX_SPOT = {"EUR": ("DEXUSEU", True), "GBP": ("DEXUSUK", True), "AUD": ("DEXUSAL", True), "NZD": ("DEXUSNZ", True),
-           "JPY": ("DEXJPUS", False), "CHF": ("DEXSZUS", False), "CAD": ("DEXCAUS", False), "NOK": ("DEXNOUS", False), "SEK": ("DEXSDUS", False)}
+           "JPY": ("DEXJPUS", False), "CHF": ("DEXSZUS", False), "CAD": ("DEXCAUS", False), "NOK": ("DEXNOUS", False), "SEK": ("DEXSDUS", False),
+           "MXN": ("DEXMXUS", False), "ZAR": ("DEXSFUS", False)}            # MXN and ZAR are the two EM extras (not G10)
 FX_RATE3M = {"USD": "IR3TIB01USM156N", "EUR": "IR3TIB01EZM156N", "GBP": "IR3TIB01GBM156N", "AUD": "IR3TIB01AUM156N", "NZD": "IR3TIB01NZM156N",
-             "JPY": "IR3TIB01JPM156N", "CHF": "IR3TIB01CHM156N", "CAD": "IR3TIB01CAM156N", "NOK": "IR3TIB01NOM156N", "SEK": "IR3TIB01SEM156N"}
+             "JPY": "IR3TIB01JPM156N", "CHF": "IR3TIB01CHM156N", "CAD": "IR3TIB01CAM156N", "NOK": "IR3TIB01NOM156N", "SEK": "IR3TIB01SEM156N",
+             "MXN": "IR3TIB01MXM156N", "ZAR": "IR3TIB01ZAM156N"}
 
 
 def fetch_fx(store: ObservationStore) -> dict:
@@ -351,7 +353,8 @@ def fetch_fx(store: ObservationStore) -> dict:
         for ccy, sid in FX_RATE3M.items():
             for r in fred_series(sid, c, th):
                 rate_rows.append({"month": r["day"][:7], "ccy": ccy, "rate3m": r["value"], "fred_id": sid})
-    e1 = store.write_bundle("fx-spot-g10", (Observation("fred", "fx", f"{x['ccy']}:{x['day']}", observed_at=x["day"] + "T17:00:00+00:00", available_at=x["day"] + "T21:00:00+00:00", value=x) for x in spot_rows),
+    e1 = store.write_bundle("fx-spot-g10",  # G10 plus MXN and ZAR; filter ccy for G10-only claims
+                            (Observation("fred", "fx", f"{x['ccy']}:{x['day']}", observed_at=x["day"] + "T17:00:00+00:00", available_at=x["day"] + "T21:00:00+00:00", value=x) for x in spot_rows),
                             recipe="FRED " + ", ".join(s for s, _ in FX_SPOT.values()) + " (noon NY buying rates; inverted where FRED quotes foreign per USD)", tags=["fx", "history"], schema="value = {day, ccy, usd_per_unit, fred_id}")
     e2 = store.write_bundle("fx-rates-3m", (Observation("fred", "rate", f"{x['ccy']}:{x['month']}", observed_at=x["month"] + "-01T00:00:00+00:00", available_at=x["month"] + "-28T00:00:00+00:00", value=x) for x in rate_rows),
                             recipe="FRED OECD " + ", ".join(FX_RATE3M.values()) + " (monthly averages; available_at conservatively at month end)", tags=["fx", "rates", "history"], schema="value = {month, ccy, rate3m (percent), fred_id}")

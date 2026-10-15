@@ -2637,15 +2637,15 @@
    "name": "fx-spot-g10",
    "kind": "data",
    "path": "mandel/archive/data/fx-spot-g10.jsonl.gz",
-   "created_at": "2026-10-15T08:35:56.478381+00:00",
-   "rows": 118828,
-   "bytes": 2084802,
-   "sha256": "8d1101ece1f411825b6601ec2c55d4c72a1fbf4074b1edaad59dd6d9f6456ce8",
+   "created_at": "2026-10-15T08:37:09.331466+00:00",
+   "rows": 138811,
+   "bytes": 2488379,
+   "sha256": "f165a5ee6871d73ff33a0dcdf8a9a2588b9293546467d7658a29506dff9d4dc6",
    "tags": [
     "fx",
     "history"
    ],
-   "recipe": "FRED DEXUSEU, DEXUSUK, DEXUSAL, DEXUSNZ, DEXJPUS, DEXSZUS, DEXCAUS, DEXNOUS, DEXSDUS (noon NY buying rates; inverted where FRED quotes foreign per USD)",
+   "recipe": "FRED DEXUSEU, DEXUSUK, DEXUSAL, DEXUSNZ, DEXJPUS, DEXSZUS, DEXCAUS, DEXNOUS, DEXSDUS, DEXMXUS, DEXSFUS (noon NY buying rates; inverted where FRED quotes foreign per USD)",
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {day, ccy, usd_per_unit, fred_id}"
@@ -2654,16 +2654,16 @@
    "name": "fx-rates-3m",
    "kind": "data",
    "path": "mandel/archive/data/fx-rates-3m.jsonl.gz",
-   "created_at": "2026-10-15T08:35:56.576935+00:00",
-   "rows": 5871,
-   "bytes": 84278,
-   "sha256": "0a8d9df45799bc0489aa82ea5ed9333e103379b8a9328c92e2925a080a73ca97",
+   "created_at": "2026-10-15T08:37:09.458209+00:00",
+   "rows": 6776,
+   "bytes": 98157,
+   "sha256": "59e8fb813c2804250faef8c70fabe279ac9a3f91baf6d447f07fbc73322e2c74",
    "tags": [
     "fx",
     "history",
     "rates"
    ],
-   "recipe": "FRED OECD IR3TIB01USM156N, IR3TIB01EZM156N, IR3TIB01GBM156N, IR3TIB01AUM156N, IR3TIB01NZM156N, IR3TIB01JPM156N, IR3TIB01CHM156N, IR3TIB01CAM156N, IR3TIB01NOM156N, IR3TIB01SEM156N (monthly averages; available_at conservatively at month end)",
+   "recipe": "FRED OECD IR3TIB01USM156N, IR3TIB01EZM156N, IR3TIB01GBM156N, IR3TIB01AUM156N, IR3TIB01NZM156N, IR3TIB01JPM156N, IR3TIB01CHM156N, IR3TIB01CAM156N, IR3TIB01NOM156N, IR3TIB01SEM156N, IR3TIB01MXM156N, IR3TIB01ZAM156N (monthly averages; available_at conservatively at month end)",
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {month, ccy, rate3m (percent), fred_id}"
