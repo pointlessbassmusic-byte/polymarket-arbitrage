@@ -97,15 +97,24 @@ def parse_reddit_atom(xml_text: str, subreddit: str) -> list[dict]:
     return out
 
 
-def reddit_feed(subreddit: str, sort: str, client: httpx.Client, throttle: Throttle, limit: int = 100) -> list[dict]:
-    throttle.wait()
-    try:
-        r = client.get(f"https://www.reddit.com/r/{subreddit}/{sort}/.rss", params={"limit": limit}, headers=UA, timeout=30)
-        if r.status_code != 200:
-            return []
-        return parse_reddit_atom(r.text, subreddit)
-    except (httpx.HTTPError, ET.ParseError):
-        return []
+def reddit_feed(subreddit: str, sort: str, client: httpx.Client, throttle: Throttle, limit: int = 100, retries: int = 3) -> Optional[list[dict]]:
+    """One RSS listing. Returns None when Reddit refuses (429/403 after retries) so callers can tell 'refused' from 'empty'."""
+    for attempt in range(retries + 1):
+        throttle.wait()
+        try:
+            r = client.get(f"https://www.reddit.com/r/{subreddit}/{sort}/.rss", params={"limit": limit}, headers=UA, timeout=30)
+        except httpx.HTTPError:
+            r = None
+        if r is not None and r.status_code == 200:
+            try:
+                return parse_reddit_atom(r.text, subreddit)
+            except ET.ParseError:
+                return None
+        if r is not None and r.status_code not in (429, 500, 502, 503):
+            return None
+        wait = float(r.headers.get("retry-after", 0) or 0) if r is not None else 0
+        time.sleep(max(wait, 10 * 2 ** attempt))
+    return None
 
 
 # ------------------------------------------------------------------- stocktwits --
@@ -278,18 +287,27 @@ def collect_social(store: ObservationStore, capture_day: Optional[str] = None, s
     summary: dict = {"capture": cap, "bundles": {}}
     with httpx.Client() as c:
         th = Throttle(1.0)
-        # Reddit
-        reddit = []
+        # Reddit (unauthenticated RSS is rate limited: 3 s between feeds, backoff on 429; never store an empty refusal as data)
+        reddit, refused = [], 0
+        th_r = Throttle(3.0)
         for sub in subreddits:
             for sort in ("new", "hot"):
-                reddit.extend(reddit_feed(sub, sort, c, th))
+                got = reddit_feed(sub, sort, c, th_r)
+                if got is None:
+                    refused += 1
+                else:
+                    reddit.extend(got)
         seen = set(); reddit_u = []
         for p in reddit:
             if p["id"] and p["id"] not in seen:
                 seen.add(p["id"]); reddit_u.append(p)
-        e = store.write_bundle(f"social-reddit-{day}", (Observation("reddit", "post", p["id"], observed_at=p["published"] or cap, available_at=cap, value=p) for p in reddit_u),
-                               recipe=f"reddit RSS /r/<sub>/{{new,hot}}/.rss?limit=100 for {list(subreddits)}", tags=["social", "reddit", day], schema="value = {id, subreddit, title, author, published, link, flair, text}")
-        summary["bundles"]["reddit"] = e.rows
+        if reddit_u:
+            e = store.write_bundle(f"social-reddit-{day}", (Observation("reddit", "post", p["id"], observed_at=p["published"] or cap, available_at=cap, value=p) for p in reddit_u),
+                                   recipe=f"reddit RSS /r/<sub>/{{new,hot}}/.rss?limit=100 for {list(subreddits)}", tags=["social", "reddit", day], schema="value = {id, subreddit, title, author, published, link, flair, text}")
+            summary["bundles"]["reddit"] = e.rows
+        else:
+            summary["bundles"]["reddit"] = f"refused: {refused} feeds rate-limited (HTTP 429); no bundle written"
+        summary["reddit_feeds_refused"] = refused
         # StockTwits
         st = []
         th2 = Throttle(0.8)

@@ -145,7 +145,7 @@ def multiscale_edge(price_rows: Iterable[dict], market_rows: Iterable[dict], hor
 
 def bundle_arb_scan(book_rows: Iterable[dict], taker_fee_bps: float = 150.0, gas_per_order: float = 0.02, min_depth_usd: float = 5.0) -> dict:
     """Scan one snapshot for bundle mispricings after fees. Uses the top of book and the depth at it."""
-    n = 0; long_ops = []; short_ops = []; spreads = []
+    n = 0; long_ops = []; short_ops = []; spreads = []; gross = 0
     for r in book_rows:
         v = r["value"]; b = v["books"]
         try:
@@ -159,6 +159,7 @@ def bundle_arb_scan(book_rows: Iterable[dict], taker_fee_bps: float = 150.0, gas
         fee = taker_fee_bps / 10000
         spreads.append((ask_y - bid_y) + (ask_n - bid_n))
         total_ask = ask_y + ask_n
+        gross += total_ask < 1.0
         net_long = 1.0 - total_ask - fee * total_ask - 2 * gas_per_order
         total_bid = bid_y + bid_n
         net_short = total_bid - 1.0 - fee * total_bid - 2 * gas_per_order
@@ -167,6 +168,6 @@ def bundle_arb_scan(book_rows: Iterable[dict], taker_fee_bps: float = 150.0, gas
         if net_short > 0:
             short_ops.append({"market": v.get("question", "")[:60], "net_edge": round(net_short, 4)})
     return {"markets_scanned": n, "long_after_fees": len(long_ops), "short_after_fees": len(short_ops),
-            "gross_long_candidates": sum(1 for r in [] ), "median_round_trip_spread": float(np.median(spreads)) if spreads else None,
+            "gross_long_candidates": int(gross), "median_round_trip_spread": float(np.median(spreads)) if spreads else None,
             "examples_long": sorted(long_ops, key=lambda d: -d["net_edge"])[:5], "examples_short": sorted(short_ops, key=lambda d: -d["net_edge"])[:5],
             "params": {"taker_fee_bps": taker_fee_bps, "gas_per_order": gas_per_order, "min_depth_usd": min_depth_usd}}

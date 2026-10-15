@@ -72,13 +72,22 @@ def harness_multiscale_edge(archive: Archive) -> tuple[dict, int, str, str]:
 
 
 def harness_bundle_arb(archive: Archive) -> tuple[dict, int, str, str]:
-    rep = bundle_arb_scan(archive.load("polymarket-books-snapshot"))
-    n = rep["markets_scanned"]
-    if n < 50:
-        return rep, n, "inconclusive", "fewer than 50 markets with both books"
-    found = rep["long_after_fees"] + rep["short_after_fees"]
-    verdict = "supported" if found > 0 else "not_supported"
-    return rep, n, verdict, f"{found} after-fee bundle mispricings in {n} markets (one snapshot)"
+    """T-04: >= 1 after-fee YES+NO mispricing per 100 markets in every snapshot, across >= 2 snapshots. One snapshot can falsify
+    persistence (a snapshot below the rate) but cannot confirm it."""
+    names = ["polymarket-books-snapshot"] * bool(_bundles_matching(archive, "polymarket-books-snapshot")) + [n for n in _bundles_matching(archive, "polymarket-books-2*")]
+    snaps = []
+    for name in names:
+        rep = bundle_arb_scan(archive.load(name))
+        if rep["markets_scanned"] >= 50:
+            found = rep["long_after_fees"] + rep["short_after_fees"]
+            snaps.append({"bundle": name, "markets": rep["markets_scanned"], "found": found, "rate_per_100": 100 * found / rep["markets_scanned"],
+                          "gross_long_candidates": rep["gross_long_candidates"], "median_spread": rep["median_round_trip_spread"], "examples": rep["examples_long"][:3] + rep["examples_short"][:3]})
+    if not snaps:
+        return {"snapshots": []}, 0, "inconclusive", "no snapshot with 50+ markets"
+    ok = [s["rate_per_100"] >= 1 for s in snaps]
+    verdict = "not_supported" if not all(ok) else ("supported" if len(snaps) >= 2 else "inconclusive")
+    txt = "; ".join(f"{s['bundle'].replace('polymarket-books-', '')}: {s['found']} after-fee in {s['markets']} markets ({s['gross_long_candidates']} with YES+NO asks below 1 before fees), median round-trip spread {s['median_spread']:.3f}" for s in snaps)
+    return {"snapshots": snaps}, sum(s["markets"] for s in snaps), verdict, f"{len(snaps)} snapshot(s): {txt}"
 
 
 def harness_multifractal(archive: Archive, max_markets: int = 40) -> tuple[dict, int, str, str]:

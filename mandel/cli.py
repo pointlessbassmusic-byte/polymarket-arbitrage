@@ -421,6 +421,15 @@ def cmd_options_fetch(args) -> int:
     return 0
 
 
+def cmd_book_snapshot(args) -> int:
+    """One dated snapshot of Polymarket YES/NO books (for the bundle-arbitrage persistence test)."""
+    from mandel.data.fetch import fetch_polymarket_books
+    from mandel.data.store import ObservationStore
+    e, calls = fetch_polymarket_books(ObservationStore(Archive(ledger=Ledger())), args.books)
+    _print({"bundle": e.name, "markets": e.rows, "api_calls": calls})
+    return 0
+
+
 def cmd_archive(args) -> int:
     a = Archive()
     for e in a.entries(kind=args.kind):
@@ -539,6 +548,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--history", action="store_true", help="instead: one-off deep history (full Fear & Greed series, full daily closes for BTC-USD, ETH-USD, SPY, QQQ)")
     p = add("options-fetch", cmd_options_fetch, "Capture CBOE option chains (raw on disk, surface committed) and Deribit books; --history pulls VIX-family, FRED and DVOL histories.")
     p.add_argument("--day"); p.add_argument("--history", action="store_true")
+    p = add("book-snapshot", cmd_book_snapshot, "Capture one dated snapshot of Polymarket YES/NO books (polymarket-books-<day>).")
+    p.add_argument("--books", type=int, default=300)
     p = add("archive", cmd_archive, "List cold-storage bundles (data, results, knowledge) and their rebuild recipes.")
     p.add_argument("--kind"); p.add_argument("-v", "--verbose", action="store_true")
     add("ingest", cmd_ingest, "Turn knowledge/*.md adopt / skeptical / design bullets into candidate insights (idempotent).")

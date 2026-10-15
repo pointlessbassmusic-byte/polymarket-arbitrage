@@ -111,6 +111,33 @@ def _tokens(m: dict) -> list[str]:
     return list(t or [])
 
 
+def fetch_polymarket_books(store: ObservationStore, n_books: int = 300, day: Optional[str] = None):
+    """One dated snapshot of YES and NO books for the most active markets: bundle polymarket-books-<day>.
+    (The first snapshot, 2026-10-14, is the bundle named polymarket-books-snapshot.)"""
+    day = day or now_iso()[:10]
+    active = polymarket_active_markets(n_books)
+    book_obs, calls = [], 0
+    with httpx.Client() as c:
+        th = Throttle(0.12)
+        for m in active:
+            toks = _tokens(m)
+            if len(toks) != 2:
+                continue
+            books = {}
+            for side, tok in zip(("yes", "no"), toks):
+                b = polymarket_book(tok, c, th); calls += 1
+                if b:
+                    books[side] = {"bids": b.get("bids", []), "asks": b.get("asks", []), "timestamp": b.get("timestamp")}
+            if len(books) == 2:
+                ts = now_iso()
+                book_obs.append(Observation("polymarket", "book", str(m.get("id")), observed_at=ts, available_at=ts,
+                                            value={"question": m.get("question"), "tokens": toks, "books": books,
+                                                   "volume24hr": m.get("volume24hr"), "negRisk": m.get("negRisk")}))
+    e = store.write_bundle(f"polymarket-books-{day}", book_obs, recipe=f"CLOB /book for both tokens of the {n_books} most active markets (one dated snapshot)",
+                           tags=["polymarket", "books", "snapshot", day], schema="value = {question, tokens, books{yes,no}{bids,asks}}")
+    return e, calls
+
+
 def fetch_polymarket(store: ObservationStore, n_markets: int = 4000, n_histories: int = 400, n_books: int = 300) -> dict:
     """Resolved markets, daily price histories for the largest, and live books for active markets."""
     t0 = time.time()
@@ -133,26 +160,8 @@ def fetch_polymarket(store: ObservationStore, n_markets: int = 4000, n_histories
                                             value={"market_id": str(m.get("id")), "token": tok, "p": pt["p"], "t": pt["t"]}))
     e2 = store.write_bundle("polymarket-price-history-daily", hist_obs, recipe=f"CLOB /prices-history?interval=max&fidelity=1440 for the YES token of the {n_histories} largest resolved markets",
                             tags=["polymarket", "prices", "daily"], schema="value = {market_id, token, p, t}; one row per day")
-    active = polymarket_active_markets(n_books)
-    book_obs = []
-    with httpx.Client() as c:
-        th = Throttle(0.12)
-        for m in active:
-            toks = _tokens(m)
-            if len(toks) != 2:
-                continue
-            books = {}
-            for side, tok in zip(("yes", "no"), toks):
-                b = polymarket_book(tok, c, th); calls += 1
-                if b:
-                    books[side] = {"bids": b.get("bids", []), "asks": b.get("asks", []), "timestamp": b.get("timestamp")}
-            if len(books) == 2:
-                ts = now_iso()
-                book_obs.append(Observation("polymarket", "book", str(m.get("id")), observed_at=ts, available_at=ts,
-                                            value={"question": m.get("question"), "tokens": toks, "books": books,
-                                                   "volume24hr": m.get("volume24hr"), "negRisk": m.get("negRisk")}))
-    e3 = store.write_bundle("polymarket-books-snapshot", book_obs, recipe=f"CLOB /book for both tokens of the {n_books} most active markets (one snapshot)",
-                            tags=["polymarket", "books", "snapshot"], schema="value = {question, tokens, books{yes,no}{bids,asks}}")
+    e3, calls_b = fetch_polymarket_books(store, n_books)
+    calls += calls_b
     return {"markets": e1.rows, "resolved": len(resolved), "history_rows": e2.rows, "books": e3.rows, "api_calls": calls + 10,
             "wall_seconds": round(time.time() - t0, 1)}
 

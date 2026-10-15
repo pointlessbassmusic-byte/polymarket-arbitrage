@@ -1,6 +1,6 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `ad04b9efef903de2`). 475 theories. supported 24, not_supported 53, inconclusive 8, untested 250, blocked 132, parked 8.
+Rendered from `registry.json` (hash `c4e9fa8a47945152`). 476 theories. supported 24, not_supported 53, inconclusive 8, untested 250, blocked 133, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
@@ -390,6 +390,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: fees 150 bps taker, gas estimate, min depth 5 USD; snapshots are a sample of time
 - harness: bundle_arb_scan
 - result X-8ca82b68: not_supported — 0 after-fee bundle mispricings in 268 markets (one snapshot)
+- result X-71e7a200: not_supported — 2 snapshot(s): snapshot: 0 after-fee in 268 markets (0 with YES+NO asks below 1 before fees), median round-trip spread 0.020; 2026-10-15: 0 after-fee in 277 markets (0 with YES+NO asks below 1 before fees), median round-trip spread 0.020
 - note: one snapshot so far; the claim needs repeated snapshots (half-life) before parking
 
 ### T-19 · point-in-time-changes-a-verdict
@@ -534,6 +535,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: parity_forward
 - result X-b7521792: not_supported — SPY 2026-10-14: 3.8% of 320 pairs outside half-spread, implied rate -693 bp vs bill; SPX 2026-10-14: 3.1% of 540 pairs outside half-spread, implied rate +91 bp vs bill (claim: < 2% and within 50 bp, stable over 20 days)
 - result X-adaf1657: not_supported — SPY 2026-10-14: 3.8% of 320 pairs outside half-spread, implied rate -693 bp vs bill; SPX 2026-10-14: 3.1% of 540 pairs outside half-spread, implied rate +91 bp vs bill (claim: < 2% and within 50 bp, stable over 20 days); the implied rate from ten strikes is noise-dominated for SPY's $1 strikes, so the violation rate is the reliable half
+- result X-ddf2141f: not_supported — SPY 2026-10-14: 3.8% of 320 pairs outside half-spread, implied rate -693 bp vs bill; SPY 2026-10-15: 0.3% of 320 pairs outside half-spread, implied rate -568 bp vs bill; SPX 2026-10-14: 3.1% of 540 pairs outside half-spread, implied rate +91 bp vs bill; SPX 2026-10-15: 1.3% of 520 pairs outside half-spread, implied rate +82 bp vs bill (claim: < 2% and within 50 bp, stable over 20 days); the implied rate from ten strikes is noise-dominated for SPY's $1 strikes, so the violation rate is the reliable half
 - note: from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r, divs) -> per-(K,T) table; wire into payoff engine as a 2-leg template; daily job appends to data/options/parity/. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-505 (verifier-corrected wording)
 
 ### T-186 · long-box-spread-lend
@@ -549,6 +551,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Use mid and executable prices; drop legs with zero bid; compare to SPXW vs SPX AM-settled to check settlement effects; check that r_box is strike-invariant (if not, parity noise dominates).
 - harness: spx_box_lending
 - result X-a110b91c: not_supported — 1 capture day(s); latest 2026-10-14: 1680 boxes, executable lending spread over bills median -5 bp (mid +69 bp), 45% positive; claim needs [15, 80] bp and 80% positive on 80% of 20+ days
+- result X-b8a1631b: not_supported — 2 capture day(s); latest 2026-10-15: 1680 boxes, executable lending spread over bills median -39 bp (mid +69 bp), 18% positive; claim needs [15, 80] bp and 80% positive on 80% of 20+ days
 - note: from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2) and daily box_curve; payoff engine test asserts flat K2-K1. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-503 (verifier-corrected wording)
 
 ### T-187 · short-box-spread-borrow
@@ -564,6 +567,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Check strike-invariance; drop expiries with zero-bid legs; compare SPX vs XSP implied rates (should match).
 - harness: spx_box_borrowing
 - result X-8a3bbd3c: not_supported — 1 capture day(s); latest 2026-10-14: 1440 boxes, borrowing via short box beats bill+150 bp by a median -4 bp (claim: > 100 bp on 80% of 20+ days)
+- result X-fb00bd60: not_supported — 2 capture day(s); latest 2026-10-15: 1440 boxes, borrowing via short box beats bill+150 bp by a median -27 bp (claim: > 100 bp on 80% of 20+ days)
 - note: from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; report borrow curve. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-506 (verifier-corrected wording)
 
 ### T-192 · pin-risk-expiration-pinning
@@ -1122,6 +1126,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Placebo: shift put quotes by one strike and confirm the statistic flags them; repeat on XSP (should match SPX); repeat on SPY with the American band instead of equality; exclude quotes whose last update is older than the chain timestamp.
 - harness: parity_v2
 - result X-a1e718fa: not_supported — day one 2026-10-14: 2.2% of 590 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 3.2%; needs < 2%)
+- result X-b2f95ecc: not_supported — day one 2026-10-14: 2.2% of 590 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 3.2%; needs < 2%)
+- result X-ddcd0c9a: not_supported — day one 2026-10-14: 2.2% of 590 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 3.2%; needs < 2%); later days: 2026-10-15 0.5% (the claim makes day one decisive)
 - note: from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r) -> per-(K,T) table with strike-dispersion column; inverse_parity(deribit_book) using F_impl = K/(1 - (C_btc - P_btc)); 2-leg template [call+, put-] in the payoff engine must draw a straight line. | verifier-corrected restatement of T-181, whose verdict tested the earlier wording and stands
 
 ### T-506 · short-box-spread-borrow
@@ -1137,6 +1143,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Strike-invariance; SPX vs XSP agreement; mid vs executable gap reported.
 - harness: box_borrow_v2
 - result X-5463bfbf: not_supported — day one 2026-10-14: executable short-box borrowing rate is bill +171 bp over 29815 boxes (needs < +50 bp)
+- result X-da417e54: not_supported — day one 2026-10-14: executable short-box borrowing rate is bill +171 bp over 29815 boxes (needs < +50 bp)
+- result X-546d5c3b: not_supported — day one 2026-10-14: executable short-box borrowing rate is bill +171 bp over 29815 boxes (needs < +50 bp); later days: 2026-10-15 +202 bp
 - note: from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; borrow-curve output. | verifier-corrected restatement of T-187, whose verdict tested the earlier wording and stands
 
 ### T-533 · vega_neutral_gamma_long
@@ -1267,6 +1275,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: market-priced (actual mids), point in time by construction; needs the expiry to pass, so the first verdict is ~2 months after 2026-10-14
 - harness: implied_move
 - result X-fe2505e4: inconclusive — 0/30 captures with an expired ~30d expiry (chain capture started 2026-10-14)
+- result X-c288209a: inconclusive — 0/30 captures with an expired ~30d expiry (chain capture started 2026-10-14)
 - note: the market-priced replacement for the model-priced short-straddle overlay (T-57)
 
 ### T-238 · vix_contango_short_call_spread
@@ -1296,8 +1305,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Day-one median spread inside [15, 80] bp with the 95% bootstrap CI inside [0, 120] bp; persistence over 20 captured days.
 - controls: Strike-invariance of r_box (if r_box varies by more than spreads across pairs, quote noise dominates); SPX AM vs SPXW PM roots; XSP replication; convert DGS3MO from bond-equivalent to continuous.
 - harness: box_mid_v2
-- result X-1f3f8803: inconclusive — day one 2026-10-14: 15583 boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median +63 bp (95% CI +63 to +63); needs [15, 80] with CI in [0, 120]; persistence needs 20 capture days (1 so far)
 - result X-56531a00: inconclusive — day one 2026-10-14: 15583 boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median +63 bp (95% CI +63 to +63); needs [15, 80] with CI in [0, 120]; persistence needs 20 capture days (1 so far); the CI resamples boxes that share strikes, so it understates uncertainty
+- result X-afab5dd0: inconclusive — day one 2026-10-14: 15583 boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median +63 bp (95% CI +63 to +63); needs [15, 80] with CI in [0, 120]; persistence needs 20 capture days (2 so far); the CI resamples boxes that share strikes, so it understates uncertainty
+- result X-23bc344d: inconclusive — day one 2026-10-14: 15583 boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median +63 bp (95% CI +63 to +63); needs [15, 80] with CI in [0, 120]; later days: 2026-10-15 +65 bp (in range); persistence needs 20 capture days (2 so far); the CI resamples boxes that share strikes, so it understates uncertainty
 - note: from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2, side) and daily box_curve; payoff-engine test asserts a flat K2 - K1. | verifier-corrected restatement of T-186, whose verdict tested the earlier wording and stands | the bootstrap CI over boxes is too narrow (boxes share strikes and are not independent); the persistence criterion over 20 capture days is the real test
 
 ## Untested (250)
@@ -4552,7 +4562,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: SPX vs SPY basis; close-to-close vs 5-minute RV (BTZ use 5-minute RV, which runs lower); no cap; vrp_spx already supports this in vol units (T-48), so this is the variance-unit and tail-statistics restatement.
 - note: from the options-library library: Variance Swap Replication (long / short variance via 1/K^2 strip); harness suggestion: Extend 'vrp_spx' (mandel/experiments/volatility.variance_risk_premium) with a variance-unit, non-overlapping mode and tail statistics; the same mode for vrp_btc and vrp_gold. | added by the verifier pass
 
-## Blocked (132)
+## Blocked (133)
 
 ### T-05 · cross-venue-arbitrage
 
@@ -6379,6 +6389,20 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: VVIX vs realised spot-VIX vol is a partial proxy only (spot VIX is more volatile than the futures VIX options settle against, which biases the proxy against finding a premium). VIX futures history is not in the free data list.
 - blocked on: VIX option chain capture: 200 entry days including a vol spike; VIX futures history not available
 - note: from the options-library library: VIX Call Spread (long vol-of-vol hedge); harness suggestion: Harness 'vix_call_spread' reading options-chain-VIX-*; settlement values from CBOE. | added by the verifier pass
+
+### T-542 · spx-parity-20-day-persistence
+
+**Claim.** On the CBOE delayed SPX chain split by root, the share of (K, T) pairs within ATM +/- 5 strikes whose implied forward lies outside the half-spread band around the expiry median is below 2% on at least 16 of the first 20 capture days (2026-10-14 onward).
+
+- kind: options-strategy · origin: options-library:arbitrage-synthetics, T-505
+- statistic: count of capture days with share < 2% among the first 20
+- null: parity deviations exceed the half-spread band (share >= 2%) on more than 4 of 20 days
+- procedure: parity_v2 per capture day; count days below 2% once 20 capture days exist
+- data: options-chain-SPX-* (daily raw captures), fred-DTB3 · min n: 20
+- pass: >= 16 of the first 20 capture days below 2%
+- controls: registered on 2026-10-15 with 2 of the 20 days already observed (2.2% and 0.5%); no day-one gate; same band and strike set as T-505
+- blocked on: 20 SPX capture days (2 of 20 on 2026-10-15)
+- note: pre-registered restatement of T-505 without its day-one gate, which let one noisy day decide the claim
 
 ## Parked (8)
 

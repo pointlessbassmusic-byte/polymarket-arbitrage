@@ -119,7 +119,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-8ca82b68"
+    "X-8ca82b68",
+    "X-71e7a200"
    ],
    "notes": "one snapshot so far; the claim needs repeated snapshots (half-life) before parking"
   },
@@ -1745,7 +1746,8 @@
    "status": "inconclusive",
    "blocked_on": "",
    "results": [
-    "X-fe2505e4"
+    "X-fe2505e4",
+    "X-c288209a"
    ],
    "notes": "the market-priced replacement for the model-priced short-straddle overlay (T-57)"
   },
@@ -3903,7 +3905,8 @@
    "blocked_on": "",
    "results": [
     "X-b7521792",
-    "X-adaf1657"
+    "X-adaf1657",
+    "X-ddf2141f"
    ],
    "notes": "from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r, divs) -> per-(K,T) table; wire into payoff engine as a 2-leg template; daily job appends to data/options/parity/. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-505 (verifier-corrected wording)"
   },
@@ -4037,7 +4040,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-a110b91c"
+    "X-a110b91c",
+    "X-b8a1631b"
    ],
    "notes": "from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2) and daily box_curve; payoff engine test asserts flat K2-K1. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-503 (verifier-corrected wording)"
   },
@@ -4067,7 +4071,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-8a3bbd3c"
+    "X-8a3bbd3c",
+    "X-fb00bd60"
    ],
    "notes": "from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; report borrow curve. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-506 (verifier-corrected wording)"
   },
@@ -11615,7 +11620,9 @@
    "blocked_on": "",
    "results": [
     "X-1f3f8803",
-    "X-56531a00"
+    "X-56531a00",
+    "X-afab5dd0",
+    "X-23bc344d"
    ],
    "notes": "from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2, side) and daily box_curve; payoff-engine test asserts a flat K2 - K1. | verifier-corrected restatement of T-186, whose verdict tested the earlier wording and stands | the bootstrap CI over boxes is too narrow (boxes share strikes and are not independent); the persistence criterion over 20 capture days is the real test",
    "supersedes": "T-186"
@@ -11672,7 +11679,9 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-a1e718fa"
+    "X-a1e718fa",
+    "X-b2f95ecc",
+    "X-ddcd0c9a"
    ],
    "notes": "from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r) -> per-(K,T) table with strike-dispersion column; inverse_parity(deribit_book) using F_impl = K/(1 - (C_btc - P_btc)); 2-leg template [call+, put-] in the payoff engine must draw a straight line. | verifier-corrected restatement of T-181, whose verdict tested the earlier wording and stands",
    "supersedes": "T-181"
@@ -11703,7 +11712,9 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-5463bfbf"
+    "X-5463bfbf",
+    "X-da417e54",
+    "X-546d5c3b"
    ],
    "notes": "from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; borrow-curve output. | verifier-corrected restatement of T-187, whose verdict tested the earlier wording and stands",
    "supersedes": "T-187"
@@ -12652,6 +12663,31 @@
    "blocked_on": "VIX option chain capture: 200 entry days including a vol spike; VIX futures history not available",
    "results": [],
    "notes": "from the options-library library: VIX Call Spread (long vol-of-vol hedge); harness suggestion: Harness 'vix_call_spread' reading options-chain-VIX-*; settlement values from CBOE. | added by the verifier pass"
+  },
+  {
+   "id": "T-542",
+   "slug": "spx-parity-20-day-persistence",
+   "kind": "options-strategy",
+   "claim": "On the CBOE delayed SPX chain split by root, the share of (K, T) pairs within ATM +/- 5 strikes whose implied forward lies outside the half-spread band around the expiry median is below 2% on at least 16 of the first 20 capture days (2026-10-14 onward).",
+   "origin": [
+    "options-library:arbitrage-synthetics",
+    "T-505"
+   ],
+   "trial": {
+    "statistic": "count of capture days with share < 2% among the first 20",
+    "null": "parity deviations exceed the half-spread band (share >= 2%) on more than 4 of 20 days",
+    "procedure": "parity_v2 per capture day; count days below 2% once 20 capture days exist",
+    "data": "options-chain-SPX-* (daily raw captures), fred-DTB3",
+    "min_n": 20,
+    "pass": ">= 16 of the first 20 capture days below 2%",
+    "controls": "registered on 2026-10-15 with 2 of the 20 days already observed (2.2% and 0.5%); no day-one gate; same band and strike set as T-505"
+   },
+   "experiments": [],
+   "testable_now": false,
+   "status": "blocked",
+   "blocked_on": "20 SPX capture days (2 of 20 on 2026-10-15)",
+   "results": [],
+   "notes": "pre-registered restatement of T-505 without its day-one gate, which let one noisy day decide the claim"
   }
  ]
 }

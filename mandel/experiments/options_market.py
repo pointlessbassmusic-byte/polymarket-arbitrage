@@ -478,7 +478,8 @@ def box_mid_v2(captures, dtb3_rows, n_boot: int = 2000, seed: int = 0) -> dict:
     d0 = days[0]; persist = (sum(d["pass"] for d in days) / len(days) >= 0.8) if len(days) >= 20 else None
     verdict = "not_supported" if not d0["pass"] else ("inconclusive" if persist is None else ("supported" if persist else "not_supported"))
     return {"n_days": len(days), "days": days, "verdict": verdict,
-            "reason": f"day one {d0['day']}: {d0['n_boxes']} boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median {d0['median_bp']:+.0f} bp (95% CI {d0['ci_bp'][0]:+.0f} to {d0['ci_bp'][1]:+.0f}); needs [15, 80] with CI in [0, 120]" + ("" if persist is not None else f"; persistence needs 20 capture days ({len(days)} so far)") + "; the CI resamples boxes that share strikes, so it understates uncertainty"}
+            "reason": f"day one {d0['day']}: {d0['n_boxes']} boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median {d0['median_bp']:+.0f} bp (95% CI {d0['ci_bp'][0]:+.0f} to {d0['ci_bp'][1]:+.0f}); needs [15, 80] with CI in [0, 120]" + ("; later days: " + ", ".join(f"{d['day']} {d['median_bp']:+.0f} bp ({'in' if d['pass'] else 'out of'} range)" for d in days[1:]) if len(days) > 1 else "")
+                      + ("" if persist is not None else f"; persistence needs 20 capture days ({len(days)} so far)") + "; the CI resamples boxes that share strikes, so it understates uncertainty"}
 
 
 def box_borrow_v2(captures, dtb3_rows) -> dict:
@@ -493,7 +494,7 @@ def box_borrow_v2(captures, dtb3_rows) -> dict:
     d0 = days[0]; share = sum(d["pass"] for d in days) / len(days)
     verdict = "not_supported" if not d0["pass"] else ("supported" if len(days) >= 20 and share >= 0.8 else "inconclusive")
     return {"n_days": len(days), "days": days, "verdict": verdict,
-            "reason": f"day one {d0['day']}: executable short-box borrowing rate is bill {d0['median_bp']:+.0f} bp over {d0['n_boxes']} boxes (needs < +50 bp)"}
+            "reason": f"day one {d0['day']}: executable short-box borrowing rate is bill {d0['median_bp']:+.0f} bp over {d0['n_boxes']} boxes (needs < +50 bp)" + ("; later days: " + ", ".join(f"{d['day']} {d['median_bp']:+.0f} bp" for d in days[1:]) if len(days) > 1 else "")}
 
 
 def parity_v2(captures, dtb3_rows, n_side: int = 5, n_boot: int = 2000, seed: int = 0) -> dict:
@@ -522,7 +523,8 @@ def parity_v2(captures, dtb3_rows, n_side: int = 5, n_boot: int = 2000, seed: in
     d0 = days[0]
     verdict = "not_supported" if not d0["pass"] else ("inconclusive" if len(days) < 20 else ("supported" if sum(d["share"] < 0.02 for d in days[:20]) >= 16 else "not_supported"))
     return {"n_days": len(days), "days": days, "verdict": verdict,
-            "reason": f"day one {d0['day']}: {d0['share']*100:.1f}% of {d0['pairs']} SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound {d0['upper95']*100:.1f}%; needs < 2%)"}
+            "reason": f"day one {d0['day']}: {d0['share']*100:.1f}% of {d0['pairs']} SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound {d0['upper95']*100:.1f}%; needs < 2%)"
+                      + (f"; later days: " + ", ".join(f"{d['day']} {d['share']*100:.1f}%" for d in days[1:]) + " (the claim makes day one decisive)" if len(days) > 1 else "")}
 
 
 def btc_weekend_ratio_v2(btc_rows, start_year: int = 2017, n_boot: int = 2000, seed: int = 0) -> dict:
