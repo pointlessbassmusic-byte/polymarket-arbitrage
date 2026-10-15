@@ -43,16 +43,24 @@ Conventions
   * Inverse options: Deribit premiums are in coin; a USD value is coin price x index at the same print. Deribit marks are
     Black-76 on the expiry forward with r = 0, so C_btc - P_btc = 1 - K/F and F_impl = K / (1 - (C_btc - P_btc)).
   * Model pricing (rule 8): T-223 and T-269 are Black-Scholes at DVOL (MODEL-PRICED, IV-scale sensitivities reported);
-    T-257 / T-262 price legs by Black-Scholes at IVs fitted to trade prints (MODEL-PRICED at trade-fitted IVs). T-222 uses
-    Deribit's own mark at real prints (a re-mark by model only as a labelled fallback).
+    T-257 prices legs by Black-Scholes on the sample index at IVs fitted to trade prints (MODEL-PRICED at trade-fitted
+    IVs); T-262 prices every leg Black-76 on its own expiry forward (r = 0, the convention Deribit's IVs are quoted on),
+    the forward recovered per day and expiry from the prints (``print_forward``: the F on which each print's own IV
+    reproduces its coin price; checked against the archived quarterly futures closes), and reads ATM IV at K = F.
+    T-222 uses Deribit's own mark at real prints (a re-mark by model only as a labelled fallback).
   * Intervals (rule 6): two-sided 95% unless a pass says otherwise; block lengths as each trial names, at least as long as
     any overlap; differences are resampled paired on their shared timeline.
   * Calendars (rule 10): T-223 and T-269 use Deribit's named calendars (Fridays; monthly = last Friday). T-257 and T-262
-    have conditional entries with a hold (30 and 14 days) and no named calendar, so the pooled estimate over every signal
-    day (overlapping holds, circular block bootstrap on the daily timeline with blocks of 2 x the longest actual hold) is
-    primary; n is the count of non-overlapping holds (greedy from the first signal) and the per-start range over every
-    start offset (as many as the longest hold) is reported. T-257 holds exactly 30 calendar days (re-marked on that day's
-    fitted smile; an expiry inside the 30 days settles at delivery), the claim's 30-day P&L. T-222, T-263 and T-268 are event studies on named event calendars.
+    have conditional entries with a hold (30 and 14 days) and no named calendar. For T-257 the pooled estimate over every
+    signal day (overlapping holds, circular block bootstrap on the daily timeline with blocks of 2 x the longest actual
+    hold) is primary; n is the count of non-overlapping holds (greedy from the first signal) and the per-start range over
+    every start offset (as many as the longest hold) is reported. T-257 holds exactly 30 calendar days (re-marked on that
+    day's fitted smile; an expiry inside the 30 days settles at delivery), the claim's 30-day P&L. T-262's trial names
+    its procedure ('non-overlapping entries; block bootstrap'), so its primary statistic is the all-start pool of those
+    non-overlapping walks (each start offset's walk weighted equally, the mean the procedure averages over its start
+    phase; same timeline bootstrap and blocks); the every-signal-day pool is a secondary reading and a disagreement is
+    undecided (rule 11); each start's CI is reported (``judge_walks``). T-222, T-263 and T-268 are event studies on named
+    event calendars.
   * Below trial.min_n (rule 5) the verdict is never supported and a failing criterion counts only when it fails
     decisively (its bound at the pass's own confidence wholly on the wrong side, or the failure would persist at min_n).
 
@@ -502,9 +510,10 @@ def mean_ci(x, block: int = 1, n_boot: Optional[int] = None, seed: int = SEED, l
 
 
 def timeline_mean_ci(days: Sequence[str], vals, block: int, n_boot: Optional[int] = None, seed: int = SEED,
-                     level: float = 0.95) -> tuple:
+                     level: float = 0.95, weights=None) -> tuple:
     """Percentile CI of the mean of entries placed on their daily calendar (one value per day, NaN on days without
-    one), circular block bootstrap of calendar days with ``block``-day blocks (rule 10 pooled estimator)."""
+    one), circular block bootstrap of calendar days with ``block``-day blocks (rule 10 pooled estimator). ``weights``
+    (one per entry, default 1) makes it the CI of the weighted mean sum(w x) / sum(w) (T-262's all-start walk pool)."""
     n_boot = _nb(n_boot)
     vals = np.asarray(vals, float)
     if vals.size < 2:
@@ -514,13 +523,16 @@ def timeline_mean_ci(days: Sequence[str], vals, block: int, n_boot: Optional[int
     g = np.full(int(idx.max()) + 1, np.nan)
     g[idx] = vals
     ok = np.isfinite(g)
-    gz = np.where(ok, g, 0.0)
+    gw = ok.astype(float)
+    if weights is not None:
+        gw[idx] *= np.asarray(weights, float)
+    gz = np.where(ok, g, 0.0) * gw
     rng = np.random.default_rng(seed)
     out = []
     for s in range(0, n_boot, 250):
         k = min(250, n_boot - s)
         ii = _boot_idx(rng, g.size, block, k)
-        cnt = ok[ii].sum(axis=1)
+        cnt = gw[ii].sum(axis=1)
         sm = gz[ii].sum(axis=1)
         out.append(sm[cnt > 0] / cnt[cnt > 0])
     m = np.concatenate(out)
@@ -1563,11 +1575,43 @@ def delta_strike(fit: dict, target: float, kind: str, margin: float = 0.1) -> Op
     return K, smile_iv(fit, K)
 
 
+def print_forward(price: float, K: float, T: float, sig: float, kind: str, F0: float) -> Optional[float]:
+    """The forward F on which a Deribit print's own IV reproduces its coin price: Deribit quotes Black-76 on the expiry
+    forward with r = 0 in coin, call N(d1) - (K/F) N(d2), put (K/F) N(-d2) - N(-d1) (so C_btc - P_btc = 1 - K/F).
+    Newton from ``F0`` (the print's index); None when it does not converge within 0.6-1.6 x F0."""
+    if not (price > 0 and K > 0 and T > 0 and sig > 0 and F0 > 0) or kind not in ("call", "put"):
+        return None
+    v = sig * math.sqrt(T)
+    F = float(F0)
+    for _ in range(30):
+        d1 = (math.log(F / K) + 0.5 * v * v) / v
+        d2 = d1 - v
+        if kind == "call":
+            g, dg = _N(d1) - K / F * _N(d2) - price, K * _N(d2) / (F * F)
+        else:
+            g, dg = K / F * _N(-d2) - _N(-d1) - price, -K * _N(-d2) / (F * F)
+        if not dg or not math.isfinite(dg):
+            return None
+        Fn = min(max(F - g / dg, 0.5 * F), 2.0 * F)
+        if abs(Fn - F) <= 1e-10 * F:
+            return Fn if 0.6 * F0 < Fn < 1.6 * F0 else None
+        F = Fn
+    return None
+
+
+def _kind(t: dict) -> str:
+    k = str(t.get("type") or str(t.get("instrument_name", "")).rsplit("-", 1)[-1]).lower()
+    return "call" if k in ("call", "c") else "put" if k in ("put", "p") else ""
+
+
 def daily_smiles(trades: Sequence[dict], hours: tuple = (7, 9), max_dte: float = 400.0) -> dict:
-    """{day: {S, fits: {expiry: fit}}} from the day's sampled prints (``hours`` UTC): S = median index of the sample, one
-    smile per expiry at T = (expiry 08:00 - day 08:00) / 365 d."""
+    """{day: {S, fits: {expiry: fit}, fwd: {expiry: F}}} from the day's sampled prints (``hours`` UTC): S = median index
+    of the sample, one smile per expiry at T = (expiry 08:00 - day 08:00) / 365 d. F (T-262) = S x the median over the
+    expiry's prints within one standard deviation of the money (|ln(K/index)| <= IV sqrt(T)) of print_forward / index, the
+    forward each print's IV is quoted on (prints without a coin price give none)."""
     by = defaultdict(lambda: defaultdict(list))
     idx = defaultdict(list)
+    fr = defaultdict(lambda: defaultdict(list))
     for t in trades:
         try:
             ts = int(t["timestamp"])
@@ -1575,11 +1619,20 @@ def daily_smiles(trades: Sequence[dict], hours: tuple = (7, 9), max_dte: float =
             if not (hours[0] <= h < hours[1]):
                 continue
             d = _dday(ts)
-            e = t.get("expiry") or code_date(t["instrument_name"].split("-")[1])
-            by[d][e[:10]].append((float(t["strike"]), float(t["iv"]) / 100.0, float(t.get("amount") or 1.0)))
-            idx[d].append(float(t["index_price"]))
+            e = (t.get("expiry") or code_date(t["instrument_name"].split("-")[1]))[:10]
+            K, iv, ix = float(t["strike"]), float(t["iv"]) / 100.0, float(t["index_price"])
+            by[d][e].append((K, iv, float(t.get("amount") or 1.0)))
+            idx[d].append(ix)
         except (TypeError, ValueError, KeyError, AttributeError, IndexError):
             continue
+        try:
+            Tp = (expiry_ms(e) - ts) / DAY_MS / 365.0
+            if t.get("price") is not None and Tp > 0 and iv > 0 and K > 0 and abs(math.log(K / ix)) <= iv * math.sqrt(Tp):
+                F = print_forward(float(t["price"]), K, Tp, iv, _kind(t), ix)
+                if F is not None:
+                    fr[d][e].append(F / ix)
+        except (TypeError, ValueError, OverflowError):
+            pass
     out = {}
     for d in sorted(by):
         S = float(np.median(idx[d]))
@@ -1590,7 +1643,7 @@ def daily_smiles(trades: Sequence[dict], hours: tuple = (7, 9), max_dte: float =
                 f = smile_fit(pts, S, T)
                 if f is not None:
                     fits[e] = f
-        out[d] = {"S": S, "fits": fits}
+        out[d] = {"S": S, "fits": fits, "fwd": {e: S * float(np.median(v)) for e, v in fr[d].items() if e in fits}}
     return out
 
 
@@ -1804,83 +1857,225 @@ def b6b_drb_rr_skew_harvest(archive):
 
 # =================================================================================== T-262 calendar on inversion ==
 
-def calendar_trade(day: str, smiles: dict, settle: dict, slip: float = 0.0, iv_scale: float = 1.0,
-                   hold: int = T262_HOLD, thr: float = T262_THR) -> Optional[dict]:
-    """Long ATM call calendar (buy the ~90-DTE call, sell the 7-30 DTE call, same strike) entered when the front ATM IV
-    exceeds the back by more than ``thr``; front = the 7-30 DTE expiry with the most sample prints, back = the 60-120
-    DTE expiry nearest 90; K = the front's printed strike nearest S. Re-marked ``hold`` days later (first smile day in
-    hold..hold+2) at each leg's own fitted IV; a front that expired by then is worth its settlement intrinsic."""
-    sm = smiles[day]
-    S = sm["S"]
+T262_FRONTS = {
+    "most": "the 7-30 DTE expiry with the most sample prints",
+    "nearest30": "the 7-30 DTE expiry nearest 30 DTE",
+    "nearest7": "the nearest expiry at 7 DTE or more",
+    "monthly": "the last-Friday monthly in 7-30 DTE",
+    "outlives": f"the most-printed 7-30 DTE expiry that outlives the {T262_HOLD}-day hold (DTE > {T262_HOLD})",
+}
+
+
+def calendar_legs(day: str, sm: dict, front: str = "most", hold: int = T262_HOLD) -> Optional[tuple]:
+    """(front, back) expiries of a T-262 calendar on ``day``: the front by rule ``front`` (T262_FRONTS) among the 7-30 DTE
+    fits, the back = the 60-120 DTE fit nearest 90."""
     fr = [(f["n"], _dte(day, e), e) for e, f in sm["fits"].items() if 7 <= _dte(day, e) <= 30]
-    bk = [(abs(_dte(day, e) - 90), e) for e, f in sm["fits"].items() if 60 <= _dte(day, e) <= 120]
+    if front == "outlives":
+        fr = [c for c in fr if c[1] > hold]
+    elif front == "monthly":
+        fr = [c for c in fr if is_last_friday(c[2])]
+    bk = [(abs(_dte(day, e) - 90), e) for e in sm["fits"] if 60 <= _dte(day, e) <= 120]
     if not fr or not bk:
         return None
-    ef = max(fr)[2]
-    eb = min(bk)[1]
+    if front == "nearest30":
+        ef = min(fr, key=lambda c: (abs(c[1] - 30), c[2]))[2]
+    elif front == "nearest7":
+        ef = min(fr, key=lambda c: c[1])[2]
+    elif front in ("most", "outlives", "monthly"):
+        ef = max(fr)[2]
+    else:
+        raise ValueError(front)
+    return ef, min(bk)[1]
+
+
+def calendar_trade(day: str, smiles: dict, settle: dict, slip: float = 0.0, iv_scale: float = 1.0,
+                   hold: int = T262_HOLD, thr: float = T262_THR, front: str = "most", fees: bool = False) -> Optional[dict]:
+    """Long ATM call calendar (buy the ~90-DTE call, sell the 7-30 DTE call, same strike) entered when the front ATM IV
+    exceeds the back by more than ``thr``. Deribit quotes IVs as Black-76 on each expiry's own forward (r = 0), so an
+    expiry's ATM IV is its fitted smile at K = its forward F (daily_smiles' ``fwd``, recovered from the prints) and every
+    leg is priced Black-76 on its own expiry's forward at its fitted IV (USD per 1-coin leg), at entry and at the re-mark
+    ``hold`` days later (the first smile day in hold..hold+2 with the back's fit and forward); a front that expired by
+    then is worth its delivery-price intrinsic. Front by rule ``front`` (calendar_legs), back = the 60-120 DTE expiry
+    nearest 90, K = the front's printed strike nearest S. ``slip``: vol points against us per leg on entry and exit;
+    ``fees``: the module's Deribit schedule (taker on every leg traded, delivery on an expired front). None when a leg has
+    no recovered forward."""
+    sm = smiles[day]
+    S = sm["S"]
+    legs = calendar_legs(day, sm, front, hold)
+    if legs is None:
+        return None
+    ef, eb = legs
+    fw = sm.get("fwd") or {}
+    if ef not in fw or eb not in fw:
+        return None
     ff, fb = sm["fits"][ef], sm["fits"][eb]
-    inv = smile_iv(ff, S) - smile_iv(fb, S)
+    inv = smile_iv(ff, fw[ef]) - smile_iv(fb, fw[eb])
     if inv <= thr:
         return None
     K = min(ff["strikes"], key=lambda k: abs(k - S))
     Tf, Tb = _dte(day, ef) / 365, _dte(day, eb) / 365
-    cf0 = bs_price(S, K, Tf, max(smile_iv(ff, K) * iv_scale - slip, 0.01), "call")
-    cb0 = bs_price(S, K, Tb, smile_iv(fb, K) * iv_scale + slip, "call")
+    cf0 = bs_price(fw[ef], K, Tf, max(smile_iv(ff, K) * iv_scale - slip, 0.01), "call")
+    cb0 = bs_price(fw[eb], K, Tb, smile_iv(fb, K) * iv_scale + slip, "call")
+    fee = min(OPT_TAKER * S, OPT_CAP * cf0) + min(OPT_TAKER * S, OPT_CAP * cb0) if fees else 0.0
     x = None
     for k in range(hold, hold + 3):
         d = _add(day, k)
-        if d in smiles and eb in smiles[d]["fits"]:
+        if d in smiles and eb in smiles[d]["fits"] and eb in (smiles[d].get("fwd") or {}):
             x = d
             break
     if x is None:
         return None
     s2 = smiles[x]
-    S2 = s2["S"]
+    S2, fw2 = s2["S"], s2["fwd"]
     if ef <= x:
         if ef not in settle:
             return None
         vf = max(settle[ef] - K, 0.0)
+        if fees:
+            fee += min(OPT_DELIVERY * settle[ef], OPT_CAP * vf)
     else:
         f2 = s2["fits"].get(ef)
-        if f2 is None:
+        if f2 is None or ef not in fw2:
             return None
-        vf = bs_price(S2, K, _dte(x, ef) / 365, max(smile_iv(f2, K, S2) * iv_scale + slip, 0.01), "call")
-    vb = bs_price(S2, K, _dte(x, eb) / 365, max(smile_iv(s2["fits"][eb], K, S2) * iv_scale - slip, 0.01), "call")
-    pnl = (vb - vf) - (cb0 - cf0)
-    return {"day": day, "exit": x, "pnl": pnl / S, "inversion": inv, "front": ef, "back": eb, "debit": (cb0 - cf0) / S}
+        vf = bs_price(fw2[ef], K, _dte(x, ef) / 365, max(smile_iv(f2, K, S2) * iv_scale + slip, 0.01), "call")
+        if fees:
+            fee += min(OPT_TAKER * S2, OPT_CAP * vf)
+    vb = bs_price(fw2[eb], K, _dte(x, eb) / 365, max(smile_iv(s2["fits"][eb], K, S2) * iv_scale - slip, 0.01), "call")
+    if fees:
+        fee += min(OPT_TAKER * S2, OPT_CAP * vb)
+    pnl = (vb - vf) - (cb0 - cf0) - fee
+    return {"day": day, "exit": x, "pnl": pnl / S, "inversion": inv, "front": ef, "back": eb, "debit": (cb0 - cf0) / S,
+            "front_expired": ef <= x}
+
+
+def judge_walks(trades: list[dict], hold: int, min_n: int, n_boot: Optional[int] = None,
+                unit: str = "non-overlapping entries") -> tuple:
+    """T-262's trial procedure ('non-overlapping entries; block bootstrap; CI > 0') under rule 10. Primary: the all-start
+    pool of the non-overlapping walks (greedy from each of ``hold`` start offsets, ``hold`` = the longer of the nominal
+    and the longest actual hold), every walk weighted equally (entry i weighted sum_o [i in walk o] / n_o: the mean a
+    non-overlapping procedure averages in expectation over its start phase), 95% CI by a circular block bootstrap of the
+    daily timeline with blocks of 2 x hold. Secondary: the every-signal-day pool (judge_pooled). The criterion passes
+    when both readings pass, fails when both fail and is undecided (None) when they disagree (rule 11). Each start's own
+    walk CI (same blocks) and the number of starts passing are reported; n = the walk from the first signal."""
+    if not trades:
+        v, why = _decide([("signal entries", None, False)], 0, min_n, unit)
+        return v, why, {"n": 0, "entries": 0, "ok": None}
+    days = [t["day"] for t in trades]
+    exits = [t["exit"] for t in trades]
+    x = np.array([t["pnl"] for t in trades])
+    held = max((date.fromisoformat(b) - date.fromisoformat(a)).days for a, b in zip(days, exits))
+    hold = max(int(hold), int(held))
+    block = 2 * hold
+    walks = [g for g in (_greedy(days, exits, _add(days[0], o)) for o in range(hold)) if g]
+    w = np.zeros(x.size)
+    for g in walks:
+        w[g] += 1.0 / len(g)
+    mean = float((w * x).sum() / w.sum())
+    lo, hi = timeline_mean_ci(days, x, block, n_boot, weights=w)
+    starts = []
+    for g in walks:
+        sl, sh = timeline_mean_ci([days[i] for i in g], x[g], block, n_boot)
+        starts.append({"n": len(g), "mean": float(x[g].mean()), "ci": [sl, sh], "pass": sl is not None and sl > 0})
+    _, _, pooled = judge_pooled(trades, hold, min_n, None, n_boot)
+    plo, phi = pooled["ci"]
+    oks = [None if lo is None else bool(lo > 0), None if plo is None else bool(plo > 0)]
+    ok = None if None in oks else _agree(oks)
+    dec = hi is not None and hi <= 0 and phi is not None and phi <= 0
+    n = len(_greedy(days, exits))
+    k = sum(s["pass"] for s in starts)
+    crit = [(f"all-start non-overlapping mean P&L 95% CI > 0 (mean {_f(mean, 2, True, True)} of S, equal weight on each of "
+             f"{len(walks)} start offsets, CI {_ci((lo, hi), 2, True)}, {block}-day blocks; {k} of {len(walks)} starts pass "
+             f"alone) and the every-signal-day pool agrees (mean {_f(pooled['mean'], 2, True, True)} over {len(x)} entries, CI "
+             f"{_ci((plo, phi), 2, True)})" + (" [the two readings disagree: undecided]" if None not in oks and ok is None
+                                                else ""), ok, dec)]
+    v, why = _decide(crit, n, min_n, unit)
+    return v, why, {"n": n, "entries": int(x.size), "mean": mean, "ci": [lo, hi], "ok": ok, "block": block, "hold": hold,
+                    "longest_hold": int(held), "walks": len(walks), "entries_in_walks": int((w > 0).sum()),
+                    "hit": float((w * (x > 0)).sum() / w.sum()), "starts": starts, "starts_pass": int(k),
+                    "pooled": {"mean": pooled["mean"], "ci": [plo, phi], "hit": pooled["hit"]},
+                    "nonoverlap_mean": float(x[walks[0]].mean()), "per_start": pooled["per_start"]}
+
+
+def _cal_reading(tr: list[dict], n_boot: Optional[int]) -> dict:
+    if not tr:
+        return {"entries": 0, "ok": None}
+    v, _, d = judge_walks(tr, T262_HOLD, T262_MIN_N, n_boot)
+    return {"verdict": v, "entries": d["entries"], "n": d["n"], "mean": d["mean"], "ci": d["ci"], "ok": d["ok"],
+            "starts_pass": d["starts_pass"], "walks": d["walks"], "pooled_mean": d["pooled"]["mean"],
+            "pooled_ci": d["pooled"]["ci"]}
+
+
+def _cal_txt(name: str, r: dict) -> str:
+    if not r.get("entries"):
+        return f"{name}: no entries"
+    ok = {True: "passes", False: "fails", None: "undecided"}[r["ok"]]
+    return (f"{name}: {r['entries']} entries, n {r['n']}, all-start mean {_f(r['mean'], 2, True, True)} CI "
+            f"{_ci(r['ci'], 2, True)} (pooled {_f(r['pooled_mean'], 2, True, True)} CI {_ci(r['pooled_ci'], 2, True)}), {ok}")
 
 
 def calendar_claim(smiles: dict, settle: dict, n_boot: Optional[int] = None) -> dict:
+    days_in = [d for d in sorted(smiles) if CLAIM_START <= d <= CLAIM_END]
+
     def run(**kw):
-        return [t for t in (calendar_trade(d, smiles, settle, **kw) for d in sorted(smiles) if CLAIM_START <= d <= CLAIM_END)
-                if t is not None]
+        return [t for t in (calendar_trade(d, smiles, settle, **kw) for d in days_in) if t is not None]
     tr = run()
-    verdict, why, det = judge_pooled(tr, T262_HOLD, T262_MIN_N, None, n_boot)
+    verdict, why, det = judge_walks(tr, T262_HOLD, T262_MIN_N, n_boot)
     n = det["n"]
-    ctl = {}
+    nofwd = sum(1 for d in days_in for L in [calendar_legs(d, smiles[d])]
+                if L and not all(e in (smiles[d].get("fwd") or {}) for e in L))
+    ctl, fronts = {}, {}
     if tr:
-        z = run(slip=0.01)
-        ctl["1 vol point slippage per leg"] = float(np.mean([t["pnl"] for t in z])) if z else None
+        ctl["1 vol point slippage per leg"] = _cal_reading(run(slip=0.01), n_boot)
+        ctl["Deribit fees"] = _cal_reading(run(fees=True), n_boot)
+        ctl["fees + 1 vol point slippage"] = _cal_reading(run(slip=0.01, fees=True), n_boot)
         for s in (0.9, 1.1):
-            z = run(iv_scale=s)
-            ctl[f"IV x{s}"] = float(np.mean([t["pnl"] for t in z])) if z else None
-        z = [t for t in (calendar_trade(d, smiles, settle, thr=-1.0) for d in sorted(smiles) if CLAIM_START <= d <= CLAIM_END)
-             if t is not None]
-        ctl["every day (no inversion gate)"] = float(np.mean([t["pnl"] for t in z])) if z else None
-    stat = {"label": MP, "n": n, "min_n": T262_MIN_N, "judge": det, "controls": ctl,
-            "smile_days": sum(CLAIM_START <= d <= CLAIM_END for d in smiles)}
-    ps = det.get("per_start") or {}
+            ctl[f"IV x{s}"] = _cal_reading(run(iv_scale=s), n_boot)
+        ctl["every day (no inversion gate)"] = _cal_reading(run(thr=-1.0), n_boot)
+        for rule in T262_FRONTS:
+            if rule != "most":
+                fronts[rule] = _cal_reading(run(front=rule), n_boot)
+    flips = [k for k, r in list(ctl.items()) + [(f"front rule '{k}'", r) for k, r in fronts.items()]
+             if k != "every day (no inversion gate)" and r.get("entries") and r["ok"] != det.get("ok")]
+    borderline = bool(tr) and bool(flips)
+    exp_ = [t["pnl"] for t in tr if t["front_expired"]]
+    alive = [t["pnl"] for t in tr if not t["front_expired"]]
+    stat = {"label": MP, "n": n, "min_n": T262_MIN_N, "judge": det, "controls": ctl, "front_rules": fronts,
+            "front_rule": "most", "front_rule_text": T262_FRONTS, "borderline": borderline, "flips_under": flips,
+            "pnl_basis": "gross (the claim states no costs)", "smile_days": len(days_in), "no_forward_days": nofwd,
+            "front_expired_in_hold": {"entries": len(exp_), "mean": float(np.mean(exp_)) if exp_ else None,
+                                      "alive_entries": len(alive), "alive_mean": float(np.mean(alive)) if alive else None}}
+    st = det.get("starts") or []
+    lows = [s["ci"][0] for s in st if s["ci"][0] is not None]
     reason = (
-        f"T-262 {MP} at trade-fitted IVs: daily BTC smiles from the 07:00-09:00 UTC trade sample ({DAILY_TRADES_B}); ATM "
-        f"IV = smile at K = S. On every day {CLAIM_START}..{CLAIM_END} with front (7-30 DTE, most prints) ATM IV above back "
-        f"(60-120 DTE, nearest 90) by more than 5 vol points: buy the back ATM call, sell the front, same strike, Black-Scholes "
-        f"at each leg's fitted IV; re-marked 14 days later at that day's fitted IVs (a front expired by then at its "
-        f"delivery intrinsic). {det.get('entries', 0)} signal-day entries, pooled mean {_f(det.get('mean'), 2, True, True)} "
-        f"of S, 95% CI {_ci(det.get('ci'), 2, True)} ({det.get('block', 2 * T262_HOLD)}-day blocks), hit rate {_f(det.get('hit'), 2)}; n = {n} "
-        f"non-overlapping 14-day holds (per-start range over {ps.get('offsets', 0)} offsets: n {ps.get('n_min')}-"
-        f"{ps.get('n_max')}, mean {_f(ps.get('mean_min'), 2, True, True)} to {_f(ps.get('mean_max'), 2, True, True)}). "
-        f"Controls: " + "; ".join(f"{k} {_f(v, 2, True, True)}" for k, v in ctl.items())
-        + "; SPY VIX/VIX3M analogue not run here")
+        f"T-262 {MP} at trade-fitted IVs: daily BTC smiles from the 07:00-09:00 UTC trade sample ({DAILY_TRADES_B}); each "
+        f"expiry's forward F recovered from its near-the-money prints (the forward on which each print's own IV reproduces "
+        f"its coin price under Deribit's Black-76, r = 0); ATM IV = the smile at K = F of each expiry. On every day "
+        f"{CLAIM_START}..{CLAIM_END} with front ATM IV above back (60-120 DTE, nearest 90) by more than 5 vol points: buy the "
+        f"back call, sell the front, same strike (the front's printed strike nearest S), each leg priced Black-76 on its own "
+        f"expiry forward at its fitted IV; re-marked 14 days later on that day's forwards and fitted IVs (a front expired by "
+        f"then at its delivery intrinsic). Front rule: {T262_FRONTS['most']} (a choice the claim's '7-30 DTE' leaves open; "
+        f"the result depends on it, alternatives below). P&L gross (rule 9: the claim states no costs; fees and slippage are "
+        f"controls). Trial procedure (non-overlapping entries, block bootstrap) under rule 10: {det.get('entries', 0)} "
+        f"signal-day entries ({nofwd} smile days skipped for a leg without a recovered forward); all-start mean of the "
+        f"{det.get('walks', 0)} non-overlapping walks {_f(det.get('mean'), 2, True, True)} of S, 95% CI "
+        f"{_ci(det.get('ci'), 2, True)} ({det.get('block', 2 * T262_HOLD)}-day blocks; the walks take "
+        f"{det.get('entries_in_walks', 0)} of the entries); per start: n {min((s['n'] for s in st), default=None)}-"
+        f"{max((s['n'] for s in st), default=None)}, mean {_f(min((s['mean'] for s in st), default=None), 2, True, True)} to "
+        f"{_f(max((s['mean'] for s in st), default=None), 2, True, True)}, lower bound "
+        f"{_f(min(lows, default=None), 2, True, True)} to {_f(max(lows, default=None), 2, True, True)}, "
+        f"{det.get('starts_pass', 0)} of {det.get('walks', 0)} starts pass; every-signal-day pool (secondary) mean "
+        f"{_f((det.get('pooled') or {}).get('mean'), 2, True, True)}, CI {_ci((det.get('pooled') or {}).get('ci'), 2, True)}; hit "
+        f"rate {_f(det.get('hit'), 2)} (all-start) / {_f((det.get('pooled') or {}).get('hit'), 2)} (pooled); n = {n} "
+        f"non-overlapping 14-day holds. {len(exp_)} entries' front expired inside the hold (then a naked long back call; mean "
+        f"{_f(stat['front_expired_in_hold']['mean'], 2, True, True)}), {len(alive)} kept a live front (mean "
+        f"{_f(stat['front_expired_in_hold']['alive_mean'], 2, True, True)}). Controls: "
+        + "; ".join(_cal_txt(k, v) for k, v in ctl.items())
+        + "; SPY VIX/VIX3M analogue not run here. Other front rules: "
+        + "; ".join(_cal_txt(T262_FRONTS[k], v) for k, v in fronts.items())
+        + (f". BORDERLINE: the CI > 0 criterion reads differently under " + ", ".join(
+            k + (f" (n {r['n']} < min_n {T262_MIN_N})" if r.get("n", T262_MIN_N) < T262_MIN_N else "")
+            for k, r in list(ctl.items()) + [(f"front rule '{k}'", r) for k, r in fronts.items()] if k in flips)
+           if borderline else ""))
     return {"stat": stat, "n": n, "verdict": verdict, "reason": reason + f" — {why}"}
 
 

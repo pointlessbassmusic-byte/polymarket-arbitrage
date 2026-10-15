@@ -601,14 +601,173 @@ def test_judge_pooled_real_min_n():
 
 # ================================================================================ T-262 calendar on inversion ==
 
+def _with_fwd(sm, carry=0.05):
+    """Attach each expiry's forward F = S exp(carry T) to a synthetic smile world (daily_smiles' ``fwd``)."""
+    for d, s in sm.items():
+        s["fwd"] = {e: s["S"] * math.exp(carry * f["T"]) for e, f in s["fits"].items()}
+    return sm
+
+
 def test_calendar_claim_planted_passes_null_fails():
     inv = lambda x, T: 0.80 if T * 365 <= 35 else 0.50
     sm, st = _smile_world(500, _gbm(700, 0.35, 5), inv, horizon=125)     # low realised vol: the rich front decays
-    r = m.calendar_claim(sm, st, n_boot=NB)
+    r = m.calendar_claim(_with_fwd(sm), st, n_boot=NB)
     assert r["n"] >= 30 and r["verdict"] == "supported", r["reason"]
     sm, st = _smile_world(500, _gbm(700, 2.5, 5), inv, horizon=125)      # extreme realised vol: short front gamma loses
-    r = m.calendar_claim(sm, st, n_boot=NB)
+    r = m.calendar_claim(_with_fwd(sm), st, n_boot=NB)
     assert r["verdict"] == "not_supported", r["reason"]
+
+
+def _episodes(n_ep=40, run=14, gap=30, hold=14, walk_pnl=0.02, rest_pnl=0.05):
+    """Signal days in runs of ``run`` consecutive days, ``gap`` quiet days apart: a non-overlapping walk can take only
+    the first day of each run (P&L alternating +/- walk_pnl, mean 0); the other days (rest_pnl) only an overlapping
+    pool can take."""
+    tr, d0 = [], date(2022, 1, 3)
+    for k in range(n_ep):
+        for j in range(run):
+            d = (d0 + timedelta(days=k * (run + gap) + j)).isoformat()
+            tr.append({"day": d, "exit": m._add(d, hold), "pnl": (walk_pnl if k % 2 else -walk_pnl) if j == 0 else rest_pnl})
+    return tr
+
+
+def test_calendar_judge_is_the_all_start_pool_of_the_trials_non_overlapping_walks():
+    # regression (T-262 refutation, defect 1): the trial names 'non-overlapping entries; block bootstrap'. The old
+    # primary statistic pooled every overlapping signal day, so entries no non-overlapping walk can take decided a
+    # 'supported'. The criterion now reads the all-start pool of the walks (each start's walk weighted equally); the
+    # every-signal-day pool is secondary and a disagreement is undecided (rule 11), never a pass.
+    tr = _episodes()
+    v_old, _, old = m.judge_pooled(tr, m.T262_HOLD, m.T262_MIN_N, None, NB)
+    assert v_old == "supported" and old["ci"][0] > 0                     # the overlapping reading alone would pass
+    v, why, det = m.judge_walks(tr, m.T262_HOLD, m.T262_MIN_N, NB)
+    assert v == "inconclusive" and det["ok"] is None and "disagree" in why, why
+    assert det["ci"][0] < 0 < det["ci"][1] and det["pooled"]["ci"][0] > 0 and det["n"] >= m.T262_MIN_N
+    assert det["walks"] == det["hold"] == 14 and det["block"] == 28 and len(det["starts"]) == 14
+    assert det["entries_in_walks"] < len(tr) / 5 and det["starts_pass"] == 0
+    walk_means = [s["mean"] for s in det["starts"]]
+    assert det["mean"] == pytest.approx(np.mean(walk_means), abs=1e-12)  # equal weight on every start's walk
+    assert all(s["ci"][0] is not None and not s["pass"] for s in det["starts"])
+    # both readings fail -> not_supported at n >= min_n; both pass -> supported
+    tr0 = _episodes(rest_pnl=0.0)
+    assert m.judge_walks(tr0, m.T262_HOLD, m.T262_MIN_N, NB)[0] == "not_supported"
+    tr1 = [dict(t, pnl=0.01 + 0.001 * (i % 3)) for i, t in enumerate(_episodes())]
+    v, why, det = m.judge_walks(tr1, m.T262_HOLD, m.T262_MIN_N, NB)
+    assert v == "supported" and det["starts_pass"] == det["walks"], why
+
+
+def test_daily_smiles_recovers_each_expiry_forward_from_prints():
+    # regression (T-262 refutation, defect 3): Deribit IVs are Black-76 on each expiry's own forward (coin price =
+    # Black-76 / F, r = 0); the forward each print's IV is quoted on is recovered from its coin price
+    S, d = 40000.0, "2023-03-01"
+    trades = []
+    for e, F in (("2023-03-17", 40100.0), ("2023-05-26", 40800.0)):
+        for K in np.linspace(30000, 50000, 11):
+            for hh in (7, 8):
+                ts = _ms(d, hh)
+                Tp = (m.expiry_ms(e) - ts) / DAY / 365
+                for kind in ("call", "put"):
+                    iv = 0.6 + 0.05 * math.log(K / F)
+                    trades.append({"timestamp": ts, "instrument_name": f"BTC-X-{int(K)}-{kind[0].upper()}", "expiry": e,
+                                   "strike": float(K), "iv": iv * 100, "index_price": S, "amount": 1.0,
+                                   "price": m.bs_price(F, K, Tp, iv, kind) / F})
+    assert m.print_forward(trades[0]["price"], 30000.0, (m.expiry_ms("2023-03-17") - _ms(d, 7)) / DAY / 365,
+                           trades[0]["iv"] / 100, "call", S) == pytest.approx(40100.0, rel=1e-9)
+    sm = m.daily_smiles(trades)
+    assert sm[d]["fwd"]["2023-03-17"] == pytest.approx(40100.0, rel=1e-8)
+    assert sm[d]["fwd"]["2023-05-26"] == pytest.approx(40800.0, rel=1e-8)
+    for t in trades:
+        t.pop("price")
+    assert m.daily_smiles(trades)[d]["fwd"] == {}                       # no coin price: no forward, never spot
+
+
+def _cal_day(S=40000.0, front_iv=0.80, back=lambda x: 0.50, carry=0.10, day="2022-01-03"):
+    """One smile day plus its re-mark 14 days later: a 25-DTE front, an 88-DTE back, forwards S exp(carry T)."""
+    sm = {}
+    for d in (day, m._add(day, 14)):
+        fits, fwd = {}, {}
+        for e, ivf in (("2022-01-28", lambda x: front_iv), ("2022-04-01", back)):
+            T = m._dte(d, e) / 365
+            F = S * math.exp(carry * T)
+            pts = [(F * math.exp(z * math.sqrt(T)), ivf(z), 1.0) for z in np.linspace(-1, 1, 9)]
+            fits[e], fwd[e] = m.smile_fit(pts, S, T), F
+        sm[d] = {"S": S, "fits": fits, "fwd": fwd}
+    return sm
+
+
+def test_calendar_legs_priced_black76_on_each_expiry_forward_and_atm_at_the_forward():
+    # regression (T-262 refutation, defect 3): every leg is priced Black-76 on its own expiry's forward (entry and
+    # re-mark), not Black-Scholes on spot; ATM IV is read at K = F of each expiry; a leg without a forward is not priced
+    sm, day = _cal_day(), "2022-01-03"
+    x = m._add(day, 14)
+    t = m.calendar_trade(day, sm, {})
+    assert t is not None and t["front"] == "2022-01-28" and t["back"] == "2022-04-01" and t["exit"] == x
+    K = min(sm[day]["fits"]["2022-01-28"]["strikes"], key=lambda k: abs(k - 40000.0))
+    b76 = lambda d, e, iv: m.bs_price(sm[d]["fwd"][e], K, m._dte(d, e) / 365, iv, "call")
+    iv_f = lambda d: m.smile_iv(sm[d]["fits"]["2022-01-28"], K)
+    iv_b = lambda d: m.smile_iv(sm[d]["fits"]["2022-04-01"], K)
+    want = ((b76(x, "2022-04-01", iv_b(x)) - b76(x, "2022-01-28", iv_f(x)))
+            - (b76(day, "2022-04-01", iv_b(day)) - b76(day, "2022-01-28", iv_f(day)))) / 40000.0
+    assert t["pnl"] == pytest.approx(want, rel=1e-9, abs=1e-12)
+    spot = ((m.bs_price(40000.0, K, m._dte(x, "2022-04-01") / 365, iv_b(x), "call")
+             - m.bs_price(40000.0, K, m._dte(x, "2022-01-28") / 365, iv_f(x), "call"))
+            - (m.bs_price(40000.0, K, m._dte(day, "2022-04-01") / 365, iv_b(day), "call")
+               - m.bs_price(40000.0, K, m._dte(day, "2022-01-28") / 365, iv_f(day), "call"))) / 40000.0
+    assert abs(t["pnl"] - spot) > 1e-4                                   # Black-Scholes on spot is a different price
+    # ATM at the forward: a back smile rising with moneyness is 0.545 at spot (inversion 5.5 points) but 0.56 at its
+    # forward (2.4% above spot at 88 DTE: inversion 4 points) -> no entry
+    slope = lambda z: 0.56 + 0.30 * z
+    sm2 = _cal_day(front_iv=0.60, back=slope)
+    fb, Fb = sm2[day]["fits"]["2022-04-01"], sm2[day]["fwd"]["2022-04-01"]
+    assert m.smile_iv(fb, Fb) == pytest.approx(0.56, abs=1e-9) and 0.60 - m.smile_iv(fb, 40000.0) > 0.054
+    assert m.calendar_trade(day, sm2, {}) is None
+    del sm[x]["fwd"]["2022-04-01"]
+    assert m.calendar_trade(day, sm, {}) is None                        # no forward at the re-mark: not priced
+    del sm[day]["fwd"]["2022-01-28"]
+    assert m.calendar_trade(day, sm, {}) is None
+
+
+def test_calendar_fees_and_front_rules():
+    # regressions (T-262 refutation, defects 2, 4, 5): the module's fee schedule is a control; the front rule is a
+    # named choice with alternatives inside the claim's 7-30 DTE
+    sm, day = _cal_day(), "2022-01-03"
+    g, f = m.calendar_trade(day, sm, {}), m.calendar_trade(day, sm, {}, fees=True)
+    assert 0 < (g["pnl"] - f["pnl"]) * 40000.0 <= 4 * m.OPT_TAKER * 40000.0 + 1e-9
+    fits = {e: {"n": n} for e, n in (("2022-01-14", 50), ("2022-01-21", 30), ("2022-01-28", 20), ("2022-02-01", 10),
+                                     ("2022-04-01", 5), ("2022-01-07", 99))}
+    s = {"fits": fits}
+    want = {"most": "2022-01-14", "outlives": "2022-01-21", "nearest30": "2022-02-01", "nearest7": "2022-01-14",
+            "monthly": "2022-01-28"}
+    assert set(m.T262_FRONTS) == set(want)
+    for rule, e in want.items():
+        assert m.calendar_legs("2022-01-03", s, rule) == (e, "2022-04-01"), rule
+
+
+def test_calendar_claim_reports_cost_control_cis_front_rules_and_borderline(monkeypatch):
+    # regressions (T-262 refutation, defects 2 and 4): every cost control carries its CI and criterion, not only its
+    # mean; P&L basis is stated (rule 9); every front rule is reported; a pass that flips under a control is BORDERLINE
+    inv = lambda x, T: 0.80 if T * 365 <= 35 else 0.50
+    sm, st = _smile_world(500, _gbm(700, 0.35, 5), inv, horizon=125)
+    sm = _with_fwd(sm)
+    orig = m.calendar_trade
+
+    def slipped_loses(day, smiles, settle, slip=0.0, **kw):
+        t = orig(day, smiles, settle, slip=slip, **kw)
+        return dict(t, pnl=t["pnl"] - 1.0) if t is not None and slip else t
+    monkeypatch.setattr(m, "calendar_trade", slipped_loses)
+    r = m.calendar_claim(sm, st, n_boot=NB)
+    stat = r["stat"]
+    assert r["verdict"] == "supported" and stat["borderline"] and "BORDERLINE" in r["reason"], r["reason"]
+    assert "1 vol point slippage per leg" in stat["flips_under"]
+    for k in ("1 vol point slippage per leg", "Deribit fees", "fees + 1 vol point slippage", "IV x0.9", "IV x1.1"):
+        c = stat["controls"][k]
+        assert c["ci"][0] is not None and c["ok"] in (True, False, None), k
+    assert stat["controls"]["1 vol point slippage per leg"]["ok"] is False
+    assert set(stat["front_rules"]) == set(m.T262_FRONTS) - {"most"} and stat["front_rule"] == "most"
+    assert "gross" in stat["pnl_basis"] and "P&L gross" in r["reason"] and "fees + 1 vol point slippage" in r["reason"]
+    fe = stat["front_expired_in_hold"]
+    assert fe["entries"] + fe["alive_entries"] == stat["judge"]["entries"]
+    monkeypatch.setattr(m, "calendar_trade", orig)
+    r = m.calendar_claim(sm, st, n_boot=NB)
+    assert not r["stat"]["flips_under"] or r["stat"]["borderline"]
 
 
 def test_daily_trade_harnesses_missing_and_on_fake_archive():
@@ -625,7 +784,8 @@ def test_daily_trade_harnesses_missing_and_on_fake_archive():
                 for kind in ("call", "put"):
                     rows.append({"kind": "option-trade", "available_at": _iso(_ms(d, 8)), "value": {
                         "timestamp": _ms(d, 8), "instrument_name": "x", "expiry": e, "strike": float(K), "type": kind,
-                        "iv": (0.5 + 0.15 * x) * 100, "index_price": S, "amount": 1.0}})
+                        "iv": (0.5 + 0.15 * x) * 100, "index_price": S, "amount": 1.0,
+                        "price": m.bs_price(S, K, T, 0.5 + 0.15 * x, kind) / S}})
     b = {m.DAILY_TRADES_B: rows, m.DELIV_B: _deliv_rows({"2022-01-28": S, "2022-02-25": S})}
     for h in (m.b6b_drb_rr_skew_harvest, m.b6b_drb_calendar_inversion):
         stat, n, v, reason = _check(h(FakeArchive(b)))
