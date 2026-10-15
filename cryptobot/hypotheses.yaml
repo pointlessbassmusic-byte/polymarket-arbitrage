@@ -829,6 +829,20 @@
   preregistered: true
   trials_run: 1
 
+- id: kalshi-weather-forecast
+  title: "Kalshi's daily high-temperature contracts priced from day-ahead public forecasts: does the model beat the market's mid, and does trading the gap pay after the fee?"
+  source: "next step after the crypto and equity ideas closed (2026-10-15); Kalshi daily high-temperature series for 9 US cities (KXHIGHNY, CHI, MIA, AUS, DEN, LAX, PHIL, TDC, TBOS) settle on the NWS climate report's maximum, integer degrees F, 27k-565k contracts a day; Open-Meteo's previous-runs API serves the forecast each hour had one day ahead (no hindsight); an information edge, not speed or quoting"
+  claim: "A forecast of the day's maximum from Open-Meteo's day-ahead hourly forecast (temperature_2m_previous_day1, the station's coordinates, local day), corrected by the city's mean error and spread estimated only from earlier settled days, prices each Kalshi bucket (two tails and four 2-degree ranges) with a lower Brier score than the market's mid at 20:00 ET the evening before, and buying the side whose model probability exceeds its ask by more than the fee (0.07 p(1-p)) plus 2 cents earns > 0 per dollar."
+  test: "cryptobot.weather_study: settled markets 2026-08-08 to 2026-10-14 with hourly candles; decision at 20:00 ET on the day before (the bar ending at or before it); bucket probability from Normal(forecast + bias, sd) with a half-degree continuity correction on integer degrees, where bias and sd per city come from the settled values of days before the decision day (expanding window, first 15 days per city are training only); Brier of model vs mid over every quoted bucket; trades net of the fee, t clustered by city-day, halves by date. Second decision point at 10:00 ET on the day itself with the same day-ahead forecast (market has more information then). Trials: 2 decision points."
+  success: "Written before any price was pulled: CANDIDATE if at the 20:00 decision the model's Brier beats the mid and trades net >= +3% per dollar at cluster t >= 2.5 with both halves positive over >= 150 trades; then a paper rule for 30 days on the desk before real money. KILLED if the mid's Brier is lower at both decision points. Otherwise inconclusive."
+  data: "scratch weather/kalshi (settled markets + hourly candles), weather/forecast (Open-Meteo previous runs)"
+  result: "PRE-REGISTERED 2026-10-15; not run"
+  verdict: inconclusive
+  regime: "pending"
+  rerun: "python -m cryptobot.weather_study --scratch <dir> --fetch"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"
