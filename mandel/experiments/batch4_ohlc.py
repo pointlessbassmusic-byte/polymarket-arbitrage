@@ -42,7 +42,9 @@ Statistics
   95% interval lying wholly on the wrong side of the claimed bound (the bootstrap CI of the mean, difference or
   coefficient at or below the bound; the halves' own CIs on opposite sides of 0, or a half's at or below 0 where both
   must be positive; for a DSR, the Sharpe's one-sided 95% upper bound at or below 0, since the deflation benchmark is
-  never below 0; for T-304's trial correction, both of its routes). An interval decides only on >= 8 observations in
+  never below 0; for a one-sided p criterion, the bound at the pass's own confidence: the mirror p against the opposite
+  null from the same draws below the pass's level (T-348's p, studentized; T-421's p, centred; T-304's Holm route at
+  1 - 0.05/60); for T-304's trial correction, both of its routes). An interval decides only on >= 8 observations in
   >= 4 resampling units (blocks or clusters). Any other failure there is undecided (None), so the verdict is
   inconclusive; with too little data for the statistics at all the verdict is inconclusive. The criteria judged and
   the decisive failures are reported under ``rule5``.
@@ -455,14 +457,23 @@ def overnight_intraday(days: Sequence[str], opens, closes, divs=None, adj=None, 
             (f"p < 0.05 vs gap <= {min_gap * 1e4:.0f} bps (studentized block-{block} bootstrap)", p_thr < 0.05),
             ("gap positive in both halves", all(math.isfinite(h) and h > 0 for h in halves))]
     if n < min_n:
-        # rule 5: the gap and its p fail decisively when the gap's 95% CI lies wholly at or below 3 bps; the halves when a
-        # half's own block-bootstrap 95% CI lies wholly at or below 0
+        # rule 5: the gap fails decisively when its 95% CI lies wholly at or below 3 bps; its p (a one-sided 95% test) when the
+        # one-sided 95% studentized upper bound of the gap lies at or below 3 bps, i.e. the mirror p against gap >= 3 bps from
+        # the same studentized draws is < 0.05; the halves when a half's own block-bootstrap 95% CI lies wholly at or below 0
         bps = lambda v_: f"{v_ * 1e4:+.2f} bps"
-        gdec = _upper_dec(hi, min_gap, bps, n, math.ceil(n / block), what="gap's 95% CI")
+        nu = math.ceil(n / block)
+        gdec = _upper_dec(hi, min_gap, bps, n, nu, what="gap's 95% CI")
+        p_ge = float(block_bootstrap_pvalue(np.full(n, min_gap), d, n_boot=n_boot, block_len=block, seed=seed))
+        rep["p_gap_ge_threshold"] = p_ge
+        if _resolvable(n, nu):
+            pdec = (bool(p_ge < 0.05), f"one-sided 95% studentized upper bound of the gap {'at/below' if p_ge < 0.05 else 'above'} "
+                                       f"{min_gap * 1e4:.0f} bps (p vs gap >= {min_gap * 1e4:.0f} bps {p_ge:.3f})")
+        else:
+            pdec = (False, f"studentized bootstrap on {n} observations in {nu} resampling units, too few to decide")
         hcis = [(lab, *(_mean_ci(d[g_], block, n_boot, seed) if g_.sum() >= MIN_DECISIVE_OBS else (None, None)))
                 for lab, g_ in ((f"<{split}", early), (f">={split}", ~early))]
         hdec = _halves_dec(hcis, halves_n, [math.ceil(k / block) for k in halves_n], bps)
-        v, why = _apply_rule5(rep, [(*crit[0], *gdec), (*crit[1], *gdec), (*crit[2], *hdec)], n, min_n, "trading days")
+        v, why = _apply_rule5(rep, [(*crit[0], *gdec), (*crit[1], *pdec), (*crit[2], *hdec)], n, min_n, "trading days")
     else:
         v, why = _decide(crit, n, min_n, "trading days")
     rep.update(mean_night_bps=float(night.mean() * 1e4), mean_day_bps=float(dayr.mean() * 1e4), gap_bps=gap * 1e4,
@@ -847,15 +858,25 @@ def spread_shock(days: Sequence[str], highs, lows, closes, adj, vix: dict, start
             ("p < 0.05 (H0 coefficient <= 0)", p0 < 0.05), (f"DSR >= 0.95 over {n_trials} cells", dsr >= DSR_PASS),
             ("beats the VIX-only rule out of sample", beats)]
     if n_ev < min_events:
-        # rule 5: the coefficient fails decisively when its 95% CI lies wholly below 1 point, its p when the CI lies wholly at or
-        # below 0, the DSR when the rule's daily Sharpe is significantly at or below 0, and the out-of-sample comparison when the
+        # rule 5: the coefficient fails decisively when its 95% CI lies wholly below 1 point; its p (a one-sided 95% test) when
+        # the mirror centred p against coefficient >= 0 from the same draws is < 0.05 (the basic one-sided 95% upper bound at or
+        # below 0); the DSR when the rule's daily Sharpe is significantly at or below 0; and the out-of-sample comparison when the
         # one-sided 95% upper bound of the Sharpe difference is at or below 0. Every interval needs >= 8 events.
         pts = lambda v_: f"{v_ * 100:+.2f} points"
         nu = math.ceil(len(y) / block)
         sd_hi = (_sharpe_diff_lower(cs_net[test], vx_net[test], EQ_PPY, block, n_boot=n_boot, seed=seed, q=0.95)[1]
                  if beats is not None and len(test) >= 2 else float("nan"))
+        p_ge0 = _p_boot(-bb, -b, 0.0)
+        rep["p_coef_ge0"] = p_ge0
+        if not _resolvable(n_ev, nu):
+            pdec = (False, f"bootstrap on {n_ev} events in {nu} resampling units, too few to decide")
+        elif not math.isfinite(p_ge0):
+            pdec = (False, "no bootstrap p")
+        else:
+            pdec = (bool(p_ge0 < 0.05), f"one-sided 95% upper bound of the coefficient {'at/below' if p_ge0 < 0.05 else 'above'} 0 "
+                                        f"(p vs coefficient >= 0 {p_ge0:.3f})")
         r5 = [(*crit[1], *_upper_dec(hi, min_coef, pts, n_ev, nu, strict=True, what="coefficient's 95% CI")),
-                (*crit[2], *_upper_dec(hi, 0.0, pts, n_ev, nu, what="coefficient's 95% CI")),
+                (*crit[2], *pdec),
                 (*crit[3], *_dsr_dec(cs_net, n_ev)),
                 (*crit[4], *((False, "walk-forward window too short") if beats is None else
                              _upper_dec(sd_hi, 0.0, lambda v_: f"{v_:+.2f}", n_ev, math.ceil(len(test) / block),
@@ -998,11 +1019,19 @@ def breakout_vs_random(assets: dict, n: int = 55, atr_n: int = 20, mult: float =
     if nt < min_n:
         # rule 5: the difference fails decisively when its cluster 95% CI lies wholly at or below 0; the trial correction when
         # both of its routes fail decisively: the rule's trade-return Sharpe significantly at or below 0 (no DSR can pass) and
-        # the CI wholly at or below 0 (no Holm-adjusted p can reach 0.05)
+        # the Holm route at its own one-sided confidence 1 - 0.05/n_trials, i.e. n_trials x the opposite-tail p (H0: mean
+        # difference >= 0) from the same cluster draws < 0.05
         pct = lambda v_: f"{v_ * 100:+.2f}%"
         cdec = _upper_dec(hi, 0.0, pct, nt, K, what="cluster 95% CI")
         ddec = _dsr_dec(net, nt)
-        r5 = [(*crit[0], *cdec), (*crit[1], cdec[0] and ddec[0], f"DSR route: {ddec[1]}; Holm route: {cdec[1]}")]
+        p_less = _p_boot(-boot, -obs, 0.0)
+        rep["p_diff_ge0"] = p_less
+        if not _resolvable(nt, K):
+            hdec = (False, f"cluster bootstrap on {nt} trades in {K} clusters, too few to decide")
+        else:
+            hdec = (bool(n_trials * p_less < 0.05), f"{n_trials} x p vs difference >= 0 = {n_trials * p_less:.3f} "
+                                                   f"{'<' if n_trials * p_less < 0.05 else '>='} 0.05")
+        r5 = [(*crit[0], *cdec), (*crit[1], hdec[0] and ddec[0], f"DSR route: {ddec[1]}; Holm route: {hdec[1]}")]
         v, why = _apply_rule5(rep, r5, nt, min_n, "pooled trades")
     else:
         v, why = _decide(crit, nt, min_n, "pooled trades")

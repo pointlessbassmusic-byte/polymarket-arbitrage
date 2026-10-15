@@ -61,12 +61,18 @@ Sharpe's one-sided 95% upper bound lies at or below 0, i.e. the PSR against a ze
 Sharpes, is >= 0 at any sample size, so the DSR is then <= 0.05 too), or when the mean's 95% CI lies wholly at or
 below 0 (a one-sided 97.5% bound on the same sign); the PSR is reported in ``rule5`` and the reason. The QQQ/IWM
 criterion when either asset's 95% HAC interval of its mean net return lies wholly at or below 0 (HAC t <= -1.96, at
-least 8 days). T-428: the slope criterion when the slope's 95% block-bootstrap CI lies wholly above -0.2, the
-deflated-p criterion when it lies wholly at or above 0, and the reversal leg (when a 15:45 signal is supplied) when its
-annualised Sharpe's 95% block-bootstrap interval lies wholly at or below 0.5. A zero-width interval decides nothing. Any other failure there is undecided (None), so the verdict is inconclusive;
-under 8 (T-427) or 10 (T-428) usable days nothing is computed. At or above min_n every criterion is judged at face
-value, exactly as before. Below min_n the report's ``rule5`` holds the face-value and judged criteria and the decisive
-failures.
+least 8 days). T-428: the slope criterion when the slope's 95% block-bootstrap CI lies wholly above -0.2; the
+deflated-p criterion when that CI lies wholly at or above 0, or when the same HAC t that gives the pass's one-sided p,
+tested in the opposite direction (H0 b <= 0), gives p < alpha (0.01): 1 - Phi(t) < alpha, i.e. t > z(1 - alpha) = 2.326,
+the slope's one-sided 99% lower bound above 0 (the pass's own level; that opposite p is reported in ``rule5`` and the
+reason); and the reversal leg (when a 15:45 signal is supplied) when its annualised Sharpe's 95% block-bootstrap interval
+lies wholly at or below 0.5. A zero-width interval decides nothing. Any other failure there is undecided (None), so the
+verdict is inconclusive; under 8 (T-427) or 10 (T-428) usable days nothing is computed. At or above min_n every
+criterion is judged at face value, exactly as before. Below min_n the report's ``rule5`` holds the face-value and
+judged criteria and the decisive failures.
+
+House rule 10 (no arbitrary grid phase). Neither harness uses a cycle grid: T-427 and T-428 are daily series (one
+observation per usable session, every session used), so there is no start offset to choose.
 """
 
 from __future__ import annotations
@@ -534,8 +540,9 @@ def closing_reversal(sess: dict, l_decision=None, open_cost: float = 0.0001, n_c
     the last-half-hour return measured to 15:45 (the MOC decision state); without it the reversal-leg criterion is not
     implemented. ``others`` = {symbol: sessions} for the other declared assets (diagnostic slopes). Below ``min_n``
     usable days house rule 5 applies: never supported; the slope fails decisively when its 95% block-bootstrap CI lies
-    wholly above ``slope_max``, the deflated p when it lies wholly at or above 0, and the reversal leg when its
-    annualised Sharpe's 95% block-bootstrap interval lies wholly at or below ``sharpe_min``. Under 10 usable days
+    wholly above ``slope_max``; the deflated p when that CI lies wholly at or above 0 or when the opposite one-sided HAC
+    p from the same t (H0 b <= 0, 1 - Phi(t)) is < ``alpha`` (reported as ``p_opposite_hac``); and the reversal leg when
+    its annualised Sharpe's 95% block-bootstrap interval lies wholly at or below ``sharpe_min``. Under 10 usable days
     nothing is computed."""
     d = reversal_data(sess)
     n = len(d["y"])
@@ -621,20 +628,27 @@ def closing_reversal(sess: dict, l_decision=None, open_cost: float = 0.0001, n_c
             f"b <= {slope_max} and deflated p < {alpha}; a = {b[0] * 1e4:+.2f} bps, c = {b[2]:+.3f}; univariate "
             f"b {bu[1]:+.3f}; {leg_txt}" + (f"; {oth_txt}" if oth_txt else ""))
     if n < min_n:
-        # rule 5: the slope fails decisively when its 95% block-bootstrap CI lies wholly above -0.2, the deflated p when
-        # it lies wholly at or above 0; the reversal leg when its Sharpe's 95% block-bootstrap interval lies wholly at or
-        # below 0.5
+        # rule 5: the slope fails decisively when its 95% block-bootstrap CI lies wholly above -0.2. The deflated p (a
+        # one-sided test of H0 b >= 0 at alpha) when that CI lies wholly at or above 0, or when the same HAC t gives the
+        # opposite one-sided p (H0 b <= 0) < alpha: the slope's one-sided (1 - alpha) lower bound above 0, the pass's own
+        # level. The reversal leg when its Sharpe's 95% block-bootstrap interval lies wholly at or below 0.5
+        p_opp = 1.0 - _phi(t)                                       # P(Z >= t): opposite one-sided p, H0 b <= 0
+        p_dec = _ci_above(ci, 0.0) or bool(se[1] > 0 and p_opp < alpha)
         sh_ci = sharpe_block_ci(leg_net, _block(n), n_boot, seed) if leg_net is not None else (None, None)
         v, why, r5 = _rule5([
             (f"archived window covers the claimed {CLAIM_LABEL}", None if window_short(first, last) else True),
             (f"slope <= {slope_max}", bool(b[1] <= slope_max)),
             (f"deflated (Sidak, {n_cells} cells) one-sided p < {alpha}", p_defl < alpha),
             (f"reversal-leg net Sharpe > {sharpe_min} sized on the 15:45 state (needs sub-hourly bars)", leg_ok),
-        ], [False, _ci_above(ci, slope_max, strict=True), _ci_above(ci, 0.0), _ci_below(sh_ci, sharpe_min)], n, min_n)
+        ], [False, _ci_above(ci, slope_max, strict=True), p_dec, _ci_below(sh_ci, sharpe_min)], n, min_n)
         r5["reversal_leg_sharpe_ci95"] = list(sh_ci)
+        r5["p_opposite_hac"] = p_opp
+        rep["p_opposite_hac"] = p_opp
         sh_txt = (f"; reversal-leg Sharpe 95% block-bootstrap interval [{sh_ci[0]:+.2f}, {sh_ci[1]:+.2f}]"
                   if sh_ci[0] is not None else "")
-        rep.update(verdict=v, reason=head + sh_txt + " — " + why, rule5=r5)
+        opp_txt = (f"; opposite one-sided HAC p (H0 b <= 0, same t) {p_opp:.4f} (the deflated-p criterion fails "
+                   f"decisively below min_n when < {alpha}, or when the slope CI lies wholly at or above 0)")
+        rep.update(verdict=v, reason=head + sh_txt + opp_txt + " — " + why, rule5=r5)
         return rep
     v, why = _verdict([
         (f"at least {min_n} days", n >= min_n),

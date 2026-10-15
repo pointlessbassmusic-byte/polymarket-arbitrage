@@ -66,6 +66,11 @@ for T-208's quintiles), from fewer than 4 blocks of days, or an interval of zero
 failure there is undecided (None), so the verdict is inconclusive. At or above min_n every criterion is judged at face
 value, exactly as before. Below min_n the report's ``rule5`` holds the face-value and judged criteria and the decisive
 failures.
+
+House rule 10 (no arbitrary grid phase). No harness here rests on a non-overlapping cycle grid. T-343 and T-224 are
+daily series (every trading day, flagged on scheduled FOMC / CPI / Employment Situation dates); T-208 is an event study
+on the scheduled FOMC decision days; T-219 compares calendar-named days (quarterly third Fridays against all other
+Fridays). Every date is fixed by a published or computed calendar, so there is no start offset to choose.
 """
 
 from __future__ import annotations

@@ -22,7 +22,8 @@ import numpy as np
 
 from mandel.experiments.overfit import pbo_cscv
 from mandel.experiments.underlying import turn_of_month, weekday_effect
-from mandel.validation.backtest_eval import block_bootstrap_pvalue, deflated_sharpe_ratio, sharpe_ratio
+from mandel.validation.backtest_eval import (block_bootstrap_pvalue, deflated_sharpe_ratio, expected_max_sharpe, kurtosis, probabilistic_sharpe_ratio,
+                                             sharpe_ratio, skewness)
 
 
 # ------------------------------------------------------------------------ loading --
@@ -71,11 +72,12 @@ def monthly(days, closes):
 
 
 def weekly(days, closes, weekday: int = 6):
-    """Closes on the last available day of each ISO week (crypto: Sunday)."""
+    """Closes on the last available day of each week ending on ``weekday`` (0 = Monday .. 6 = Sunday): a day belongs to
+    the week that ends on the first ``weekday`` on or after it. The default 6 is the ISO week (crypto: Sunday close)."""
     last = {}
     for d, c in zip(days, closes):
-        y, w, _ = date.fromisoformat(d).isocalendar()
-        last[(y, w)] = (d, c)
+        x = date.fromisoformat(d)
+        last[x + timedelta(days=(weekday - x.weekday()) % 7)] = (d, c)
     ks = sorted(last)
     return [last[k][0] for k in ks], np.array([last[k][1] for k in ks])
 
@@ -469,14 +471,15 @@ def metals_tsmom(gld: tuple, slv: tuple, gcf: tuple, scf: tuple, cost_side: floa
                       + (f", excess over bills {ex*1e4:+.1f} bps/month" if have_bills else "") + f" — {why}"}
 
 
-def _crypto_weekly_pool(btc: tuple, eth: tuple, lb: int, cost_side: float, warmup: int = 26) -> tuple[list, np.ndarray, np.ndarray, int]:
+def _crypto_weekly_pool(btc: tuple, eth: tuple, lb: int, cost_side: float, warmup: int = 26, weekday: int = 6) -> tuple[list, np.ndarray, np.ndarray, int]:
     """Equal-weight BTC/ETH pool of the lb-week TSMOM long/flat rule and of the historical-mean strategy (long in week t
     when the expanding mean of the asset's weekly returns to t-1 is > 0), both charged cost_side per switch. Each asset's
     first ``warmup`` weeks are dropped from both legs before pooling, so the benchmark is never forced flat; the
-    benchmark's first live week carries no entry cost. Returns (weeks, rule, benchmark, number of BTC-only weeks)."""
+    benchmark's first live week carries no entry cost. Weeks end on ``weekday`` (default Sunday, see ``weekly``).
+    Returns (weeks, rule, benchmark, number of BTC-only weeks)."""
     legs = []
     for series in (btc, eth):
-        wd, wc = weekly(series[0], series[1]); r = wc[1:] / wc[:-1] - 1
+        wd, wc = weekly(series[0], series[1], weekday); r = wc[1:] / wc[:-1] - 1
         pos = np.zeros(len(r))
         for t in range(lb, len(r)):
             pos[t] = float(wc[t] / wc[t - lb] - 1 > 0)
@@ -498,7 +501,8 @@ def crypto_weekly_tsmom(btc: tuple, eth: tuple, cost_side: float = 0.003) -> dic
     """T-315: 1-week TSMOM long/flat on BTC and ETH (equal-weight pool): weekly difference vs the historical-mean long
     strategy (the claim's benchmark; each asset scored after its 26-week benchmark warm-up, both legs charged 30 bps per
     side per switch) > 0 with block bootstrap CI excluding 0 (block 8), 2019- difference > 0, DSR > 0.5 over lookbacks
-    1, 2, 4 weeks."""
+    1, 2, 4 weeks. Rule 10: the trial names the week end ('Sunday close used Monday open'), so weeks stay on the Sunday
+    (ISO-week) calendar; contrast crypto_weekly_v2 (T-486), which names none and pools all seven week ends."""
     ks, s, b, n_btc_only = _crypto_weekly_pool(btc, eth, 1, cost_side)
     d = s - b; lo, hi = _mean_ci(d, 8)
     post = np.array([x for k, x in zip(ks, d) if k >= "2019-01-01"])
@@ -915,24 +919,69 @@ def golden_cross_v2(btc, eth, cost_side: float = 0.0035, n_trials: int = 72) -> 
     return {**out, "n": out["BTC"]["n_days"], "verdict": v, "reason": "SMA through close t, return from close t+1; " + "; ".join(f"{k} from {x['start']}: Sharpe diff {x['diff']:+.2f} (95% CI {x['ci'][0]:+.2f} to {x['ci'][1]:+.2f}), DSR {x['dsr']:.2f} (n_trials {n_trials}, variance of 4 run variants)" for k, x in out.items()) + f" — {why}"}
 
 
-def crypto_weekly_v2(btc, eth, cost_side: float = 0.004, n_trials: int = 16) -> dict:
+WEEKDAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def _dsr_at_n(x: np.ndarray, n_trials: int, var_trials_sr: float, n_obs: int) -> float:
+    """deflated_sharpe_ratio of x with the sample length set to n_obs: for a pooled series of overlapping entries the
+    Sharpe, skew and kurtosis come from every entry, but the estimate's precision is that of n_obs non-overlapping periods
+    (the claim's units). With n_obs = len(x) it equals deflated_sharpe_ratio(x, n_trials, var_trials_sr)."""
+    if n_trials > 1 and not var_trials_sr > 0:
+        var_trials_sr = 1.0 / max(1, n_obs - 1)
+    return float(probabilistic_sharpe_ratio(sharpe_ratio(x), expected_max_sharpe(n_trials, var_trials_sr), n_obs, skewness(x), kurtosis(x)))
+
+
+def _weekly_phases(btc: tuple, eth: tuple, lb: int, cost_side: float) -> tuple[dict, list, np.ndarray]:
+    """Rule 10 for a weekly grid whose claim names no week end: a 7-day series has seven valid week-ending weekdays. Returns
+    ({weekday: (weeks, d = rule minus historical-mean, n BTC-only weeks)} from _crypto_weekly_pool on each grid, pooled
+    week-end days, pooled d): the pooled all-start series stacks the seven grids on one timeline ordered by week-end day,
+    i.e. a 1-week hold entered every day (overlapping entries), each entry carrying its own grid's switch costs."""
+    per = {}
+    for w in range(7):
+        ks, s, h, nb = _crypto_weekly_pool(btc, eth, lb, cost_side, weekday=w)
+        per[w] = (ks, s - h, nb)
+    order = sorted((k, w, i) for w, (ks, _, _) in per.items() for i, k in enumerate(ks))
+    return per, [k for k, _, _ in order], np.array([per[w][1][i] for _, w, i in order], dtype=float)
+
+
+def crypto_weekly_v2(btc, eth, cost_side: float = 0.004, n_trials: int = 16, block_weeks: int = 8) -> dict:
     """T-486: BTC+ETH equal weight, 1-week TSMOM minus the historical-mean strategy > 0 with 95% CI excluding 0, DSR > 0.95
     with the declared n_trials = 16, 2019- mean > 0. Costs 30 bps per side plus 10 bps slippage (0.4% per side) on both
     legs. Each asset's first 26 weeks (the benchmark's warm-up) are dropped from both legs before pooling; the weeks
     before ETH's warm-up ends are BTC-only and are counted in the report. Only lookbacks 1/2/4 of the 16 trials are run:
-    the DSR uses n_trials = 16 with the trial-Sharpe variance estimated from those 3."""
-    ks, s, h, n_btc_only = _crypto_weekly_pool(btc, eth, 1, cost_side)
-    d = s - h
-    lo, hi = _mean_ci(d, 8)
-    ts = []
-    for lb in (1, 2, 4):
-        _, sl, hl, _ = _crypto_weekly_pool(btc, eth, lb, cost_side); ts.append(sharpe_ratio(sl - hl))
-    dsr = deflated_sharpe_ratio(d, n_trials=n_trials, var_trials_sr=float(np.var(ts, ddof=1)))
+    the DSR uses n_trials = 16 with the trial-Sharpe variance estimated from those 3.
+    Rule 10: T-486 names no week end ('weekly series from daily closes'; T-315's Sunday close is not carried into the
+    restatement), so every criterion is scored on the pooled all-start series (_weekly_phases: the seven week-ending
+    grids stacked, a 1-week hold entered every day): the mean's percentile circular block bootstrap uses blocks of
+    ``block_weeks`` x 7 = 56 daily entries (the trial's 8 weeks, >= 2 x the 7-day hold), the 2019- mean is over the pooled
+    entries, and the DSR takes the pooled Sharpe, skew and kurtosis with the sample length in weeks (_dsr_at_n). n stays
+    in weeks (the shortest of the seven grids). Each week-ending grid's statistics and pass are reported, with the range
+    of its mean d and the count of grids that pass every criterion."""
+    block = max(block_weeks * 7, 2 * 7)
+    P = {lb: _weekly_phases(btc, eth, lb, cost_side) for lb in (1, 2, 4)}
+    per, ks, d = P[1]
+    n_weeks = min(len(x[1]) for x in per.values())
+    n_btc_only = int(np.median([x[2] for x in per.values()]))
+    lo, hi = _mean_ci(d, block)
+    dsr = _dsr_at_n(d, n_trials, float(np.var([sharpe_ratio(P[lb][2]) for lb in (1, 2, 4)], ddof=1)), n_weeks)
     post = np.array([x for k, x in zip(ks, d) if k >= "2019-01-01"])
     v, why = _verdict([("mean d > 0 with CI excluding 0", d.mean() > 0 and lo > 0), ("DSR > 0.95", dsr > 0.95), ("2019- mean d > 0", post.mean() > 0)])
-    return {"n_weeks": int(len(d)), "n_btc_only_weeks": int(n_btc_only), "first_week": ks[0] if ks else None, "cost_side_bps": cost_side * 1e4, "mean_bps": float(d.mean() * 1e4), "ci_bps": [lo * 1e4, hi * 1e4],
-            "dsr": float(dsr), "dsr_n_trials": n_trials, "post2019_bps": float(post.mean() * 1e4), "verdict": v,
-            "reason": f"weekly TSMOM minus historical-mean strategy {d.mean()*1e4:+.1f} bps/week over {len(d)} weeks ({n_btc_only} BTC-only; {cost_side*1e4:.0f} bps per side; 95% CI {lo*1e4:+.1f} to {hi*1e4:+.1f}), DSR {dsr:.2f} (n_trials {n_trials}), 2019- {post.mean()*1e4:+.1f} — {why}"}
+    grids = {}
+    for w, (kw, dw, _) in per.items():
+        lw, hw = _mean_ci(dw, block_weeks)
+        dsr_w = deflated_sharpe_ratio(dw, n_trials=n_trials, var_trials_sr=float(np.var([sharpe_ratio(P[lb][0][w][1]) for lb in (1, 2, 4)], ddof=1)))
+        pw = np.array([x for k, x in zip(kw, dw) if k >= "2019-01-01"])
+        grids[WEEKDAY_NAMES[w]] = {"n_weeks": int(len(dw)), "mean_bps": float(dw.mean() * 1e4), "ci_bps": [lw * 1e4, hw * 1e4], "dsr": float(dsr_w), "post2019_bps": float(pw.mean() * 1e4),
+                                   "pass": bool(dw.mean() > 0 and lw > 0 and dsr_w > 0.95 and pw.mean() > 0)}
+    means = [g["mean_bps"] for g in grids.values()]; n_pass = sum(g["pass"] for g in grids.values())
+    return {"n": n_weeks, "n_weeks": n_weeks, "n_daily_entries": int(len(d)), "n_btc_only_weeks": n_btc_only, "first_week": ks[0] if ks else None, "cost_side_bps": cost_side * 1e4,
+            "grid": "pooled all-start (1-week holds entered every day; the claim names no week end)", "block_daily_entries": block,
+            "mean_bps": float(d.mean() * 1e4), "ci_bps": [lo * 1e4, hi * 1e4], "dsr": float(dsr), "dsr_n_trials": n_trials, "post2019_bps": float(post.mean() * 1e4),
+            "per_week_end": grids, "per_week_end_mean_bps_range": [min(means), max(means)], "week_ends_passing": int(n_pass), "verdict": v,
+            "reason": f"weekly TSMOM minus historical-mean strategy, pooled over all 7 week-ending weekdays (1-week holds entered daily): {d.mean()*1e4:+.1f} bps/week over {n_weeks} weeks "
+                      f"({len(d)} daily entries; {n_btc_only} BTC-only weeks; {cost_side*1e4:.0f} bps per side; 95% CI {lo*1e4:+.1f} to {hi*1e4:+.1f}, blocks of {block} entries), "
+                      f"DSR {dsr:.2f} (n_trials {n_trials}, {n_weeks} weeks), 2019- {post.mean()*1e4:+.1f}; per week end mean {min(means):+.1f} to {max(means):+.1f} bps, "
+                      f"{n_pass}/7 week ends pass every criterion — {why}"}
 
 
 def metals_v2(gld, slv, gcf, scf, bill_days, bill_vals, cost_side: float = 0.0004, n_trials: int = 24, start: str = "2007-05") -> dict:

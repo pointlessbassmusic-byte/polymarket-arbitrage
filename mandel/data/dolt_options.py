@@ -112,7 +112,8 @@ BULK_IMPORT_AT = "2021-04-21T01:13:00+00:00"   # after the last bulk-import comm
 EVENING_UTC = "T22:00:00+00:00"                # after the 16:15 ET options close in both EST and EDT
 MIN_GAP = 0.005                                # stale check: candidate closes must be at least this far apart
 NOISE_FRAC = 1 / 3                             # stale check: parity noise at most this fraction of the gap
-HV_TOL = 0.00005 + 1e-9                        # stale check: hv_current is published to 4 decimals
+HV_TOL = 0.00006                               # stale check: half a 4-decimal unit plus 1e-5 for close-price precision
+HV_MOVE_MARGIN = 2 * HV_TOL                    # a vol row moves only when the rule session misses by more than this
 DEFAULT_RATE = 0.02                            # parity rate when no DTB3 value is available
 SPY_DIV_YIELD = 0.013
 VOL_SYMBOLS = ["SPY", "XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY", "QQQ", "IWM", "GLD", "TLT", "SLV", "USO"]
@@ -614,8 +615,10 @@ def stale_check_chain(rows: list[dict], closes: dict[str, float], rates: Optiona
 def stale_check_vol(rows: list[dict], closes_by_symbol: dict[str, dict[str, float]], tol: float = HV_TOL) -> dict[tuple[str, str], dict]:
     """{(symbol, snapshot_date): verdict} for volatility_history rows: which of the previous, rule and next sessions'
     30-session close-to-close vol equals ``hv_current`` (within ``tol``). 'rule' when the rule session matches (alone
-    or with a neighbour), 'moved' when exactly one other session matches and all three could be computed, otherwise
-    'undecidable'; 'unchecked' without closes or hv_current."""
+    or with a neighbour), 'moved' when exactly one other session matches, all three could be computed and the rule
+    session misses by more than HV_MOVE_MARGIN (a near-miss is close-price rounding, not a stale snapshot), otherwise
+    'undecidable'; 'unchecked' without closes or hv_current. On the full 2019-2026 history (12,884 rows) this moves 15
+    rows (the 2020-06-09 and 2021-03-17 stale days plus one forward move), against 24 at the earlier 5e-5 tolerance."""
     days_by_symbol = {s: sorted(c) for s, c in closes_by_symbol.items()}
     hv_cache: dict[tuple[str, str], Optional[float]] = {}
 
@@ -647,7 +650,7 @@ def stale_check_vol(rows: list[dict], closes_by_symbol: dict[str, dict[str, floa
         out[(sym, snap)] = res
         if "rule" in hits:
             continue
-        if len(hits) == 1 and all(x is not None for x in hvs.values()):
+        if len(hits) == 1 and all(x is not None for x in hvs.values()) and abs(hvs["rule"] - h) > HV_MOVE_MARGIN:
             k = hits[0]
             res.update(decision="moved", stale=True, quote_date=cands[k],
                        basis=(f"hv_current {h:.4f} equals the 30-session close-to-close vol ending {cands[k]} ({hvs[k]:.4f}), "

@@ -3,8 +3,8 @@ one-sided 95% pass criterion fails decisively only when it fails at the SAME con
 other side (not a two-sided 95% interval, which is one-sided 97.5%).
 
   * T-427 deflated p (DSR > 0.95): the PSR against a zero Sharpe is <= 0.05.
-  * T-368/T-431/T-478 'DSR > 0.95': the PSR against a zero Sharpe is <= 0.05 with the Newey-West t <= -1.645 (the
-    monthly books are serially correlated, so the PSR alone would overstate its confidence).
+  * T-368/T-431/T-478 'DSR > 0.95': the PSR against a zero Sharpe is <= 0.05, the pass statistic alone (round 3, r5e3:
+    the Newey-West t <= -1.645 agreement gate this round added was a deviation from rule 5 and is now reported only).
   * T-343 / T-208 / T-219 one-sided p < 0.05: the same test in the opposite direction on the same draws gives p < 0.05.
 
 At or above min_n nothing changes. No archive, no network."""
@@ -124,11 +124,16 @@ def test_momentum_dsr_fails_decisively_on_psr_vs_zero_and_changes_the_verdict():
     assert "PSR against a zero Sharpe" in rep["reason"]
 
 
-def test_momentum_dsr_psr_needs_the_serial_correlation_robust_t_to_agree():
-    rep = _mom(_mom_panel(0.02, 5))                                # PSR 0.046, but the books are autocorrelated
+def test_momentum_dsr_decides_on_the_psr_alone_without_the_newey_west_t():
+    # inverted in round 3 (r5e3): this test used to encode the HAC-agreement deviation (inconclusive here). The decisive
+    # flag mirrors the pass statistic alone, so PSR 0.046 <= 0.05 decides although the Newey-West t is only -1.45
+    rep = _mom(_mom_panel(0.02, 5))
     r5 = rep["rule5"]
     assert r5["psr_vs_zero_sharpe"] <= 0.05 and r5["nw_t_vs_zero"] > -1.645
-    assert rep["verdict"] == "inconclusive" and r5["decisive_failures"] == []
+    lo, hi = rep["ci_bps"]
+    assert lo < 0 < hi and hi > rep["perm_q95_bps"]               # mean and permutation criteria: not decisive
+    _decisive_only(rep, "DSR > 0.95 with 16 trials")
+    assert "reported only, not a decisive test" in rep["reason"]
 
 
 def test_momentum_at_min_n_is_judged_at_face_value_without_the_psr():

@@ -1074,27 +1074,64 @@ def skew_tail_prob(skew) -> np.ndarray:
 def skew_implied_gap(days, close, skew, vix, start: str = "1990-01-01", window: int = MONTH, margin: float = 0.02,
                      block: int = 6, n_boot: int = N_BOOT, seed: int = 0, min_n: int = 300,
                      thresholds: tuple = (125, 130, 135, 140), secondary: int = 135, table_max: float = 145.0,
-                     n_placebo: int = 1000) -> dict:
-    """T-228 on aligned daily arrays. Non-overlapping 21-day windows from ``start``; gap_t = P_SKEW(t) - y_t. Pass: one-sided
-    95% lower bound of the mean gap > ``margin`` (studentized block bootstrap, block 6 windows) and the mean gap > 0 in at
-    least 2 of 3 equal sub-periods. n = windows."""
+                     n_placebo: int = 1000, fresh=None, alt_close: Optional[dict] = None, index_label: str = "^GSPC") -> dict:
+    """T-228 on aligned daily arrays on the index's own trading calendar (SKEW and VIX as of each session; ``fresh`` marks
+    sessions with their own prints). gap_t = P_SKEW(t) - y_t, y_t = 1{ln(S_{t+21}/S_t) < -2 (VIX_t/100) sqrt(21/252)}.
+
+    Rule 10(b): the claim's non-overlapping 21-session grid has ``window`` equally valid start offsets. The primary
+    statistic is the POOLED mean gap over every daily entry from ``start`` (studentized circular block bootstrap, block
+    pool_block_len(window, block) = 126 sessions); each offset's grid (studentized, block ``block`` windows) is reported:
+    range of its mean and of its lower bound, and how many offsets pass. Criteria, on the pooled series: the one-sided 95%
+    lower bound > ``margin`` (the pass rule); the gap positive in EACH of three equal sub-periods (the procedure's
+    requirement, stricter than the pass rule's "at least 2 of 3", which is kept as its own criterion). n = the distinct
+    21-session holds the entries span (the claim's non-overlapping windows).
+
+    Controls (not criteria): the constant-normal benchmark (P = 2.28%); whether SKEW carries information about the
+    REALISED tail, i.e. the realised frequency above vs below SKEW ``secondary`` against circular shifts of the SKEW label
+    (permuting SKEW over the GAP would be uninformative: P is an increasing function of SKEW); the SKEW > thresholds
+    conditional gaps with PBO; SKEW above the white-paper table; ``alt_close`` ({label: closes aligned with days, NaN
+    where absent}) re-measures y on another price series where it exists (the SPY splice)."""
     days = list(days)
     close, skew, vix = (np.asarray(a, dtype=float) for a in (close, skew, vix))
-    t0 = next((i for i, d in enumerate(days) if d >= start), len(days))
-    ts = np.arange(t0, len(days) - window, window)
-    if ts.size < 8:
-        return {"n": int(ts.size), "verdict": "inconclusive", "reason": f"only {ts.size} non-overlapping windows — too few to test"}
-    r_w = np.log(close[ts + window] / close[ts])
-    y = (r_w < -2.0 * (vix[ts] / 100.0) * math.sqrt(window / PPY)).astype(float)
-    P = skew_tail_prob(skew[ts])
+    N = len(days)
+    t0 = next((i for i, d in enumerate(days) if d >= start), N)
+    cand = np.arange(t0, max(t0, N - window), dtype=np.int64)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        r_all = np.log(close[cand + window] / close[cand]) if cand.size else np.zeros(0)
+    ok = np.isfinite(skew[cand]) & np.isfinite(vix[cand]) & np.isfinite(r_all)
+    idx, r_w = cand[ok], r_all[ok]
+    n = n_holds(idx, window)
+    if n < 8:
+        return {"n": n, "verdict": "inconclusive", "reason": f"only {n} {window}-session holds — too few to test"}
+    thr_t = -2.0 * (vix[idx] / 100.0) * math.sqrt(window / PPY)
+    y = (r_w < thr_t).astype(float)
+    sk = skew[idx]
+    P = skew_tail_prob(sk)
     gap = P - y
-    bt = stud_mean(gap, block, n_boot, seed)
-    lb = lower_bound(bt, 0.95)
+    pb = pool_block_len(window, block)
+    bt = stud_mean(gap, pb, n_boot, seed)
+    lb, ub = lower_bound(bt, 0.95), upper_bound(bt, 0.95)
     ci = two_sided(bt)
-    thirds = [float(p.mean()) for p in np.array_split(gap, 3)]
+    parts = np.array_split(np.arange(idx.size), 3)
+    thirds = [float(gap[p].mean()) for p in parts]
+    third_lab = [f"{days[idx[p[0]]][:4]}-{days[idx[p[-1]]][:4]}" for p in parts]
     n_pos = sum(t > 0 for t in thirds)
-    bt_norm = stud_mean(0.0228 - y, block, n_boot, seed)
-    sk = skew[ts]
+    # rule 10(b): every grid offset
+    offs = []
+    off = offset_of(idx, window)
+    for k in range(window):
+        sel = off == k
+        g = gap[sel]
+        b_k = stud_mean(g, block, n_boot, seed)
+        if b_k is None:
+            continue
+        l_k = lower_bound(b_k, 0.95)
+        th = [float(q.mean()) for q in np.array_split(g, 3)]
+        offs.append({"offset": k, "first": days[idx[sel][0]], "n": int(g.size), "mean": b_k["est"], "lower": l_k,
+                     "thirds": th, "pass_bound": bool(l_k > margin), "pass": bool(l_k > margin and all(x > 0 for x in th))})
+    # controls
+    bt_norm = stud_mean(0.0228 - y, pb, n_boot, seed)
+    lb_norm = lower_bound(bt_norm, 0.95)
     cond = {}
     for thr in thresholds:
         m = sk > thr
@@ -1105,32 +1142,77 @@ def skew_implied_gap(days, close, skew, vix, start: str = "1990-01-01", window: 
         pbo = pbo_cscv(R, 8) if R.shape[0] >= 16 else None
     except (ValueError, ZeroDivisionError, FloatingPointError):
         pbo = None
-    rng = np.random.default_rng(seed + 3)
-    msec = sk > secondary
-    plc_p = None
-    if msec.any() and (~msec).any():
-        obs = gap[msec].mean()
-        null = np.array([gap[rng.permutation(msec)].mean() for _ in range(n_placebo)])
-        plc_p = float((np.sum(null >= obs) + 1) / (n_placebo + 1))
-    n = int(ts.size)
-    crit = [(f"mean gap one-sided 95% lower bound > {margin:.2f}", lb > margin, upper_bound(bt, 0.95) <= margin),
-            ("mean gap positive in >= 2 of 3 sub-periods", n_pos >= 2, False)]
-    verdict, why = _decide(crit, n, min_n, "non-overlapping 21d windows")
+    hi = sk > secondary
+    info = {"n_high": int(hi.sum()), "freq_high": float(y[hi].mean()) if hi.any() else None,
+            "freq_low": float(y[~hi].mean()) if (~hi).any() else None, "diff": None, "placebo_p": None}
+    if hi.any() and (~hi).any():
+        d_obs = info["freq_high"] - info["freq_low"]
+        m_ = idx.size
+        lo_s, hi_s = min(252, m_ // 4), max(min(252, m_ // 4) + 1, m_ - min(252, m_ // 4))
+        rng = np.random.default_rng(seed + 3)
+        null = []
+        for sh in rng.integers(lo_s, hi_s, n_placebo):
+            hs = np.roll(hi, int(sh))
+            if hs.any() and (~hs).any():
+                null.append(y[hs].mean() - y[~hs].mean())
+        null = np.asarray(null)
+        info["diff"] = float(d_obs)
+        info["placebo_p"] = float((np.sum(null >= d_obs) + 1) / (null.size + 1)) if null.size else None
+    alt = {}
+    for lab, ac in (alt_close or {}).items():
+        ac = np.asarray(ac, dtype=float)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            ra = np.log(ac[idx + window] / ac[idx])
+        use = np.isfinite(ra)
+        y2 = (np.where(use, ra, r_w) < thr_t).astype(float)
+        b2 = stud_mean(P - y2, pb, max(500, n_boot // 2), seed)
+        alt[lab] = {"from": days[idx[use][0]] if use.any() else None, "n_entries_on_it": int(use.sum()),
+                    "realised_freq": float(y2.mean()), "mean_gap": b2["est"], "lower": lower_bound(b2, 0.95)}
+    n_stale = None if fresh is None else int((~np.asarray(fresh, dtype=bool)[idx]).sum())
+    crit = [(f"POOLED mean gap one-sided 95% lower bound > {margin:.2f}", lb > margin, ub <= margin),
+            ("POOLED gap positive in EACH of the 3 sub-periods (the procedure's requirement; stricter than the pass rule)",
+             n_pos == 3, False),
+            ("POOLED gap positive in at least 2 of 3 sub-periods (the pass rule)", n_pos >= 2, False)]
+    verdict, why = _decide(crit, n, min_n, f"non-overlapping {window}-session windows (distinct holds)")
     sec = cond.get(str(secondary), {})
-    reason = (f"SKEW-implied P(21d < -2 VIX-sigma) averages {P.mean()*100:.2f}% vs realised {y.mean()*100:.2f}% over {n} "
-              f"non-overlapping 21d ^GSPC windows ({days[ts[0]]}..{days[ts[-1]]}); mean gap {bt['est']*100:+.2f} pp, one-sided 95% "
-              f"lower bound {lb*100:+.2f} pp (two-sided {_ci_s(tuple(x*100 for x in ci), 2)}) vs the {margin*100:.0f} pp margin; "
-              f"sub-period gaps " + "/".join(f"{x*100:+.2f}" for x in thirds) + f" pp ({n_pos} of 3 positive). Controls: "
-              f"constant-normal benchmark (P = 2.28%) gap {bt_norm['est']*100:+.2f} pp; SKEW > {secondary} conditional gap "
-              f"{_s(None if sec.get('gap') is None else sec['gap']*100, 2)} pp (n={sec.get('n', 0)}, shuffled-SKEW placebo p={_f(plc_p, 3)}); "
-              f"PBO across thresholds {'/'.join(map(str, thresholds))} {_f(pbo['pbo'] if pbo else None, 2)}; SKEW > {table_max:.0f} "
-              f"(beyond the white-paper table, formula extrapolated) {int(above.sum())} windows, gap "
-              f"{_s(float(gap[above].mean())*100 if above.any() else None, 2)} pp")
-    return {"n": n, "min_n": min_n, "mean_p_skew": float(P.mean()), "realised_freq": float(y.mean()), "mean_gap": bt["est"],
-            "lower_bound_95_one_sided": lb, "ci95": list(ci), "thirds": thirds, "normal_benchmark_gap": bt_norm["est"],
-            "conditional": cond, "pbo": pbo, "placebo_p_secondary": plc_p, "n_above_table": int(above.sum()),
-            "gap_above_table": float(gap[above].mean()) if above.any() else None, "first_window": days[ts[0]],
-            "last_window": days[ts[-1]], "verdict": verdict, "reason": reason + " — " + why}
+    n_off = len(offs)
+    reason = (f"{index_label} (the S&P 500 itself, as the claim words it, for the whole sample; each window is {window} sessions "
+              f"of its own calendar, SKEW and VIX the last print at or before the entry"
+              + (f", {n_stale} of {idx.size} entries on a carried print" if n_stale is not None else "")
+              + f"): SKEW-implied P(21d < -2 VIX-sigma) averages {P.mean()*100:.2f}% vs realised {y.mean()*100:.2f}%. POOLED over "
+              f"all {window} grid offsets ({idx.size} overlapping daily entries {days[idx[0]]}..{days[idx[-1]]} = {n} distinct "
+              f"{window}-session holds; studentized circular block bootstrap, block {pb} sessions): mean gap {bt['est']*100:+.2f} pp, "
+              f"one-sided 95% lower bound {lb*100:+.2f} pp (two-sided {_ci_s(tuple(x*100 for x in ci), 2)}) vs the {margin*100:.0f} "
+              f"pp margin; sub-period gaps " + "/".join(f"{l} {x*100:+.2f}" for l, x in zip(third_lab, thirds))
+              + f" pp ({n_pos} of 3 positive; the procedure requires all 3, the pass rule 2). Per grid offset ({n_off} "
+              f"non-overlapping grids, n {_rng([o['n'] for o in offs], 0).replace('+', '')} windows, block {block}): mean gap "
+              f"{_rng([o['mean'] for o in offs], 2, 100)} pp, one-sided lower bound {_rng([o['lower'] for o in offs], 2, 100)} pp; "
+              f"{sum(o['pass_bound'] for o in offs)}/{n_off} offsets clear the margin and {sum(o['pass'] for o in offs)}/{n_off} also "
+              f"have all three thirds positive. Controls: constant-normal benchmark (P = 2.28%) gap {bt_norm['est']*100:+.2f} pp "
+              f"(lower {_s(None if lb_norm is None else lb_norm * 100, 2)} pp) is "
+              + ("BELOW" if bt_norm["est"] <= margin else "above")
+              + f" the {margin*100:.0f} pp margin, so " + ("the excess over the margin comes from the SKEW level mapping (P_SKEW "
+                                                          "averages above 2.28%), not from realised tails being rarer than normal; "
+                                                          if bt_norm["est"] <= margin else "realised tails alone are rarer than normal by more than the margin; ")
+              + f"SKEW information on the REALISED tail: frequency {_f(None if info['freq_high'] is None else info['freq_high'] * 100, 2)}% "
+              f"with SKEW > {secondary} (n={info['n_high']}) vs {_f(None if info['freq_low'] is None else info['freq_low'] * 100, 2)}% "
+              f"otherwise, difference {_s(None if info['diff'] is None else info['diff'] * 100, 2)} pp, circular SKEW-shift placebo "
+              f"p={_f(info['placebo_p'], 3)} (one-sided: higher SKEW, more realised tails); SKEW > {secondary} conditional gap "
+              f"{_s(None if sec.get('gap') is None else sec['gap']*100, 2)} pp (n={sec.get('n', 0)} entries); PBO across thresholds "
+              f"{'/'.join(map(str, thresholds))} {_f(pbo['pbo'] if pbo else None, 2)}; SKEW > {table_max:.0f} (beyond the "
+              f"white-paper table, formula extrapolated) {int(above.sum())} entries, gap "
+              f"{_s(float(gap[above].mean())*100 if above.any() else None, 2)} pp"
+              + "".join(f"; {lab} (from {v['from']}, {v['n_entries_on_it']} entries on it): realised {v['realised_freq']*100:.2f}%, "
+                        f"pooled gap {v['mean_gap']*100:+.2f} pp, lower {_s(None if v['lower'] is None else v['lower'] * 100, 2)} pp"
+                        for lab, v in alt.items()))
+    return {"n": n, "min_n": min_n, "n_entries": int(idx.size), "block_days": pb, "mean_p_skew": float(P.mean()),
+            "realised_freq": float(y.mean()), "mean_gap": bt["est"], "lower_bound_95_one_sided": lb, "ci95": list(ci),
+            "thirds": thirds, "thirds_labels": third_lab, "grid_offsets": offs,
+            "normal_benchmark_gap": bt_norm["est"], "normal_benchmark_lower": lb_norm, "conditional": cond, "pbo": pbo,
+            "skew_information": info, "n_above_table": int(above.sum()),
+            "gap_above_table": float(gap[above].mean()) if above.any() else None, "alt_series": alt,
+            "entries_on_carried_print": n_stale, "first_window": days[idx[0]], "last_window": days[idx[-1]],
+            "verdict": verdict, "reason": reason + " — " + why}
 
 
 # ======================================================== T-229: SKEW-gated 25d/10d SPX put spread (model) ==
@@ -1234,27 +1316,37 @@ def put_spread_cycle(S: float, S1: float, T: float, r: float, q: float, sig_atm:
 
 
 def put_spread_skew(days, spx, skew, vix, rate, qy, atm_ratio: float, kappa: float, start: str = "1991-01-01",
-                    hold: int = MONTH, lookback: int = 252, pct: float = 0.20, mults: tuple = (0.5, 1.0, 2.0),
+                    dte: int = 30, lookback: int = 252, pct: float = 0.20, mults: tuple = (0.5, 1.0, 2.0),
                     block: int = 6, n_boot: int = N_BOOT, seed: int = 0, min_n: int = 300, min_low: int = 60,
-                    n_placebo: int = 2000, q_assumed=None) -> dict:
-    """T-229 on aligned daily arrays (^GSPC close, SKEW, VIX, continuous bill rate, dividend yield). Monthly entries every
-    ``hold`` sessions from ``start`` (after ``lookback`` SKEW values), held to expiry (the close ``hold`` sessions later;
-    T = calendar days / 365). ATM IV = VIX/100 x atm_ratio; slope = -kappa x mult x (SKEW - 100). Statistic: mean(payoff /
-    debit | SKEW_t < trailing p20) - mean(payoff / debit | all), studentized paired block bootstrap (block 6). Pass: > 0
+                    n_placebo: int = 2000, q_assumed=None, fresh=None, entries=None, expiries=None) -> dict:
+    """T-229 on aligned daily arrays on the index's own sessions (^GSPC close, SKEW, VIX, continuous bill rate, dividend
+    yield). Rule 10(a): "monthly 30-DTE" names SPX's standard monthly expiry calendar. Each expiry is the third Friday of
+    the month (the prior session when it is a holiday); the spread is bought at the close of the session nearest ``dte``
+    calendar days before it (ties to the earlier session), or at the previous expiry's close when that comes later (holds
+    never overlap), and settles on the ^GSPC close of the expiry session (T = calendar days / 365). ``entries`` /
+    ``expiries`` (aligned session indices) override the calendar. Entries need ``lookback`` prior SKEW values and a date
+    >= ``start``. ATM IV = VIX/100 x atm_ratio; slope = -kappa x mult x (SKEW - 100). Statistic: mean(payoff / debit |
+    SKEW_t < trailing p20) - mean(payoff / debit | all), studentized paired block bootstrap (block 6 entries). Pass: > 0
     with the two-sided 95% CI excluding zero, >= ``min_low`` low-SKEW entries, and > 0 at kappa x0.5 and x2.
     ``q_assumed`` (bool, aligned with days) marks days whose yield is an assumed constant; their entries are counted."""
     days = list(days)
     spx, skew, vix, rate, qy = (np.asarray(a, dtype=float) for a in (spx, skew, vix, rate, qy))
-    ords = np.array([date.fromisoformat(d).toordinal() for d in days])
+    ords = _ords(days)
     p_lo = trailing_pctl(skew, pct, lookback)
     t0 = max(lookback, next((i for i, d in enumerate(days) if d >= start), len(days)))
-    ts = np.arange(t0, len(days) - hold, hold)
-    if ts.size < 8:
-        return {"n": int(ts.size), "verdict": "inconclusive", "reason": f"only {ts.size} monthly entries — too few to test"}
-    res = {m: np.full(ts.size, np.nan) for m in mults}
-    debits = {m: np.full(ts.size, np.nan) for m in mults}
-    for i, t in enumerate(ts):
-        e = t + hold
+    if entries is None:
+        ent, exp = calendar_entries(days, sessions_for(days, monthly_expiry_dates(days)), dte, non_overlap=True)
+    else:
+        ent, exp = np.asarray(entries, dtype=np.int64), np.asarray(expiries, dtype=np.int64)
+    sel = (ent >= t0) & (exp < len(days))
+    ent, exp = ent[sel], exp[sel]
+    sel = np.isfinite(p_lo[ent]) & np.isfinite(skew[ent]) & np.isfinite(vix[ent]) & np.isfinite(spx[exp])
+    ent, exp = ent[sel], exp[sel]
+    if ent.size < 8:
+        return {"n": int(ent.size), "verdict": "inconclusive", "reason": f"only {ent.size} monthly entries — too few to test"}
+    res = {m: np.full(ent.size, np.nan) for m in mults}
+    debits = {m: np.full(ent.size, np.nan) for m in mults}
+    for i, (t, e) in enumerate(zip(ent, exp)):
         T = (ords[e] - ords[t]) / 365.0
         for m in mults:
             c = put_spread_cycle(spx[t], spx[e], T, rate[t], qy[t], vix[t] / 100.0 * atm_ratio, -kappa * m * (skew[t] - 100.0))
@@ -1262,11 +1354,15 @@ def put_spread_skew(days, spx, skew, vix, rate, qy, atm_ratio: float, kappa: flo
                 res[m][i] = c[1] / c[0]
                 debits[m][i] = c[0] / spx[t]
     ok = np.all([np.isfinite(res[m]) for m in mults], axis=0)
-    ts, low_all = ts[ok], (skew < p_lo)[ts[ok]] if ok.any() else np.zeros(0, bool)
+    ts, te = ent[ok], exp[ok]
+    low_all = (skew < p_lo)[ts] if ok.any() else np.zeros(0, bool)
     n = int(ts.size)
     n_drop = int((~ok).sum())
     if n < 8:
         return {"n": n, "verdict": "inconclusive", "reason": f"only {n} priceable monthly entries — too few to test"}
+    dtes = ords[te] - ords[ts]
+    held = te - ts
+    n_stale = None if fresh is None else int((~np.asarray(fresh, dtype=bool)[ts]).sum())
     qa = np.zeros(len(days), dtype=bool) if q_assumed is None else np.asarray(q_assumed, dtype=bool)
     n_qa = int(qa[ts].sum())
     allm = np.ones(n, dtype=bool)
@@ -1305,8 +1401,13 @@ def put_spread_skew(days, spx, skew, vix, rate, qy, atm_ratio: float, kappa: flo
              all(out_m[m]["ci"][1] is not None and out_m[m]["ci"][1] < 0 for m in others))]
     verdict, why = _decide(crit, n, min_n, "monthly entries")
     reason = (f"{MP} (BS legs: ATM IV = VIX x {atm_ratio:.3f}, put skew slope = -kappa (SKEW - 100) per unit ln(K/F), kappa "
-              f"{kappa:.5f}, held fixed through history; payoff on ^GSPC closes; no transaction costs, none stated in the claim): {n} monthly 30-DTE entries ({days[ts[0]]}..{days[ts[-1]]}"
+              f"{kappa:.5f}, held fixed through history; payoff on ^GSPC closes; no transaction costs, none stated in the claim): {n} monthly entries on "
+              f"SPX's standard monthly expiry calendar (third Friday, prior session on a holiday; bought at the close nearest {dte} calendar "
+              f"days before it, or at the previous expiry's close when later, so holds never overlap: {int(dtes.min())}-{int(dtes.max())} DTE, "
+              f"{int(held.min())}-{int(held.max())} sessions held; settled on the expiry session's close as the proxy for the AM settlement; "
+              f"{days[ts[0]]}..{days[te[-1]]}"
               + (f"; {n_drop} unpriceable dropped" if n_drop else "")
+              + (f"; {n_stale} entries on a carried SKEW/VIX print" if n_stale else "")
               + (f"; {n_qa} entries up to {days[ts[qa[ts]][-1]]} price on an ASSUMED dividend yield, see q" if n_qa else "")
               + f"), {n_low} with SKEW below its trailing 20th percentile; "
               f"mean payoff/debit low-SKEW {_f(b0['mean_low'], 3)} vs all {_f(b0['mean_all'], 3)}: difference {_s(b0['diff'], 3)} "
@@ -1318,6 +1419,8 @@ def put_spread_skew(days, spx, skew, vix, rate, qy, atm_ratio: float, kappa: flo
     return {"n": n, "min_n": min_n, "n_low": n_low, "by_kappa_mult": {str(m): v for m, v in out_m.items()}, "atm_ratio": atm_ratio,
             "kappa": kappa, "placebo_p": plc_p, "vix15_diff": None if bt15 is None else bt15["est"], "vix_tercile_diffs": strat,
             "dsr_low_skew": dsr, "dropped_entries": n_drop, "entries_assumed_q": n_qa, "first_entry": days[ts[0]], "last_entry": days[ts[-1]],
+            "calendar": "SPX monthly expiry (third Friday), entered ~30 DTE, non-overlapping", "dte_range": [int(dtes.min()), int(dtes.max())],
+            "sessions_held_range": [int(held.min()), int(held.max())], "last_expiry": days[te[-1]], "entries_on_carried_print": n_stale,
             "verdict": verdict, "reason": reason + " — " + why}
 
 
@@ -1355,7 +1458,9 @@ def vol_spread_test(days, iv_a, iv_b, px_a, px_b, window: int = 60, alt_windows:
     z-windows: 98.3%), win rate > 0.6, mean > 0 in both halves of the event sequence. The claim also asserts each side
     ("the realised spread falls short of an extreme-wide implied spread AND exceeds an extreme-narrow one"), so the mean
     of s*stat must be > 0 on the wide events (z > +thr) and on the narrow events (z < -thr), each side with >= ``min_n``
-    events; below min_n a side cannot pass and fails only decisively (its 98.3% CI wholly below zero). n = events."""
+    events; below min_n a side cannot pass and fails only decisively (its 98.3% CI wholly below zero). n = events.
+    Rule 10(c): events sit on data-determined dates (the z crossing), not on a grid, so there is no phase to vary; the
+    unconditional overlapping-daily control uses 2 x ``hold``-session blocks."""
     days = list(days)
     ev = vol_spread_events(days, iv_a, iv_b, px_a, px_b, window, thr, hold, block)
     x = ev["stat"]
@@ -1381,7 +1486,7 @@ def vol_spread_test(days, iv_a, iv_b, px_a, px_b, window: int = 60, alt_windows:
                        "n_wide": int((s2 > 0).sum()), "mean_wide": float(st2[s2 > 0].mean()) if (s2 > 0).any() else None,
                        "n_narrow": int((s2 < 0).sum()), "mean_narrow": float(st2[s2 < 0].mean()) if (s2 < 0).any() else None}
     sa = ev["stat_all"]
-    bt_u = stud_mean(sa, hold, n_boot, seed) if sa.size >= 8 else None
+    bt_u = stud_mean(sa, 2 * hold, n_boot, seed) if sa.size >= 8 else None
     plc_p = None
     if n >= 2 and sa.size > n:
         rng = np.random.default_rng(seed + 9)
@@ -1415,10 +1520,12 @@ def vol_spread_test(days, iv_a, iv_b, px_a, px_b, window: int = 60, alt_windows:
               f"{_s(bt['est'] if bt else None, 2)} vol pts, {level:.1%} CI {_s(ci_d[0], 2)} to {_s(ci_d[1], 2)} (95% {_s(ci95[0], 2)} to "
               f"{_s(ci95[1], 2)}); win rate {_f(wr, 2)}; halves {_s(halves[0], 2)}/{_s(halves[1], 2)}. By side (each a criterion): "
               f"{side_s}. Controls: unconditional "
-              f"implied-minus-realised spread {_s(bt_u['est'] if bt_u else None, 2)} vol pts ({_ci_s(two_sided(bt_u), 2)}); "
+              f"implied-minus-realised spread {_s(bt_u['est'] if bt_u else None, 2)} vol pts ({_ci_s(two_sided(bt_u), 2)}, "
+              f"{2 * hold}-session blocks); "
               f"random-entry placebo (matched count and signs) p={_f(plc_p, 3)}; other declared z-windows "
               + ", ".join(f"{w}d {_s(v['mean'], 2)} (n={v['n']}; wide {_s(v['mean_wide'], 2)} n={v['n_wide']}, narrow "
-                          f"{_s(v['mean_narrow'], 2)} n={v['n_narrow']})" for w, v in alt.items()))
+                          f"{_s(v['mean_narrow'], 2)} n={v['n_narrow']})" for w, v in alt.items())
+              + ". Rule 10: event entries on data-determined dates, no grid phase")
     return {"n": n, "min_n": min_n, "mean": bt["est"] if bt else None, "ci_deflated": list(ci_d), "ci95": list(ci95),
             "ci_level": level, "win_rate": wr, "halves": halves, "sides": sides, "alt_windows": alt,
             "unconditional_mean": bt_u["est"] if bt_u else None,
@@ -1501,22 +1608,43 @@ def _vix_fwd(fr: dict, u: int, T: float, vvix_scale: float) -> tuple:
     return math.sqrt(v * v if floored else fv) * math.exp(-0.5 * sig * sig * T), sig, floored
 
 
-def vix_call_overlay(fr: dict, budget: float = 0.01, hold: int = MONTH, delta: float = 0.25, vvix_scale: float = 1.0) -> dict:
+def _pad_paths(paths: list) -> np.ndarray:
+    """(n, hmax) array of ragged within-cycle value paths, each padded with its last (cycle-end) value: a flat tail adds
+    no peak and no trough, so drawdowns of the chained curve are unchanged and each row still ends at the cycle's value."""
+    if not paths:
+        return np.ones((0, 1))
+    h = max(len(p) for p in paths)
+    return np.array([np.concatenate([p, np.full(h - len(p), p[-1])]) for p in paths], dtype=float)
+
+
+def _pos_day(cyc: np.ndarray, h: int, pos: int) -> int:
+    """Session index of position ``pos`` on the chained padded curve (0 = the first cycle's start)."""
+    if pos <= 0:
+        return int(cyc[0][0])
+    k, j = divmod(pos - 1, h)
+    return int(min(cyc[k][0] + j + 1, cyc[k][1]))
+
+
+def vix_call_overlay(fr: dict, budget: float = 0.01, hold: int = MONTH, delta: float = 0.25, vvix_scale: float = 1.0,
+                     cycles=None) -> dict:
     """Per-cycle returns of SPY (total return) and of SPY with a rolling MODEL-PRICED 25-delta VIX call overlay. ``fr`` needs
-    vix, vix3m, vvix, adj, rate, ords. Each cycle (``hold`` sessions, T = calendar days / 365): F_adj = sqrt((93 VIX3M^2 -
+    vix, vix3m, vvix, adj, rate, ords. ``cycles``: (start, end) session pairs (the VIX expiry calendar in the harness);
+    default the non-overlapping ``hold``-session grid. Each cycle (T = calendar days / 365): F_adj = sqrt((93 VIX3M^2 -
     30 VIX^2)/63) exp(-sigma^2 T / 2), sigma = vvix_scale x VVIX / 100, Black-76 call at forward delta ``delta``, payoff
-    on spot VIX at expiry (SOQ proxy). A fraction b = budget x hold/252 of the portfolio buys calls, the rest holds SPY.
-    ``path_spy`` / ``path_hedged`` (cycles x hold) are the DAILY values relative to each cycle's start: the held call is
-    marked each session with the same pricer at that day's VIX, VIX3M, VVIX and bill rate (same strike, T left), and is
-    worth its payoff on the expiry session, so each path ends at the cycle's return."""
+    on spot VIX at the end session (SOQ proxy). A fraction b = budget x T (1%/yr prorated by calendar time) of the
+    portfolio buys calls, the rest holds SPY. ``path_spy`` / ``path_hedged`` (cycles x longest cycle, ragged cycles padded
+    with their end value) are the DAILY values relative to each cycle's start: the held call is marked each session with
+    the same pricer at that day's VIX, VIX3M, VVIX and bill rate (same strike, T left), and is worth its payoff on the
+    end session, so each path ends at the cycle's return."""
     n = len(fr["days"])
-    ts = np.arange(0, n - hold, hold)
-    b = budget * hold / PPY
-    out = {k: [] for k in ("start", "r_spy", "r_hedged", "rf", "prem", "strike", "fwd", "payoff", "fwd_floored",
-                           "path_spy", "path_hedged")}
-    for t in ts:
-        e = t + hold
+    cyc = grid_cycles(n, hold) if cycles is None else np.asarray(cycles, dtype=np.int64).reshape(-1, 2)
+    out = {k: [] for k in ("start", "end", "r_spy", "r_hedged", "rf", "prem", "strike", "fwd", "payoff", "fwd_floored",
+                           "budget_per_cycle")}
+    p_spy, p_hed = [], []
+    for t, e in cyc:
+        t, e = int(t), int(e)
         T = (fr["ords"][e] - fr["ords"][t]) / 365.0
+        b = budget * T
         r = float(fr["rate"][t])
         fwd, sig, floored = _vix_fwd(fr, t, T, vvix_scale)
         K = b76_call_strike(fwd, T, sig, delta)
@@ -1524,8 +1652,8 @@ def vix_call_overlay(fr: dict, budget: float = 0.01, hold: int = MONTH, delta: f
         pay = max(float(fr["vix"][e]) - K, 0.0)
         r_spy = float(fr["adj"][e] / fr["adj"][t] - 1.0)
         n_calls = b / prem if prem > 0 else 0.0
-        ps, ph = np.empty(hold), np.empty(hold)
-        for j in range(1, hold + 1):
+        ps, ph = np.empty(e - t), np.empty(e - t)
+        for j in range(1, e - t + 1):
             u = t + j
             if u < e:
                 Tu = (fr["ords"][e] - fr["ords"][u]) / 365.0
@@ -1535,9 +1663,10 @@ def vix_call_overlay(fr: dict, budget: float = 0.01, hold: int = MONTH, delta: f
                 cu = pay
             ps[j - 1] = fr["adj"][u] / fr["adj"][t]
             ph[j - 1] = (1.0 - b) * ps[j - 1] + n_calls * cu
-        out["path_spy"].append(ps)
-        out["path_hedged"].append(ph)
-        out["start"].append(int(t))
+        p_spy.append(ps)
+        p_hed.append(ph)
+        out["start"].append(t)
+        out["end"].append(e)
         out["r_spy"].append(r_spy)
         out["r_hedged"].append((1.0 - b) * (1.0 + r_spy) + (b * pay / prem if prem > 0 else 0.0) - 1.0)
         out["rf"].append(math.exp(r * T) - 1.0)
@@ -1546,31 +1675,38 @@ def vix_call_overlay(fr: dict, budget: float = 0.01, hold: int = MONTH, delta: f
         out["fwd"].append(fwd)
         out["payoff"].append(pay)
         out["fwd_floored"].append(bool(floored))
-    return {k: np.array(v) for k, v in out.items()} | {"budget_per_cycle": b}
+        out["budget_per_cycle"].append(b)
+    res = {k: np.array(v) for k, v in out.items()}
+    res["start"], res["end"] = res["start"].astype(np.int64), res["end"].astype(np.int64)
+    res["path_spy"], res["path_hedged"] = _pad_paths(p_spy), _pad_paths(p_hed)
+    return res
 
 
-def put_hedge_overlay(fr: dict, smile: Optional[Smile], budget: float = 0.01, hold: int = MONTH, delta: float = -0.10) -> dict:
-    """Control for T-239: the same budget on a MODEL-PRICED 30-DTE 10-delta SPY put, sigma(K) = VIX/100 x the captured
-    SPY smile ratio at K/S (flat VIX/100 without a smile), priced on the dividend forward, settled on the raw close.
-    ``path_hedged`` / ``path_spy`` are daily values relative to each cycle's start, the put marked each session with the
-    same pricer (that day's close, VIX, bill rate, dividend forward, smile ratio at the days left)."""
+def put_hedge_overlay(fr: dict, smile: Optional[Smile], budget: float = 0.01, hold: int = MONTH, delta: float = -0.10,
+                      cycles=None) -> dict:
+    """Control for T-239: the same budget (budget x T) on a MODEL-PRICED 10-delta SPY put held over each (start, end) cycle
+    (the SPX monthly expiries in the harness; default the ``hold``-session grid), sigma(K) = VIX/100 x the captured SPY
+    smile ratio at K/S and the days to expiry (flat VIX/100 without a smile), priced on the dividend forward, settled on
+    the raw close. ``path_hedged`` / ``path_spy`` are daily values relative to each cycle's start (ragged cycles padded with
+    their end value), the put marked each session with the same pricer."""
     n = len(fr["days"])
-    b = budget * hold / PPY
+    cyc = grid_cycles(n, hold) if cycles is None else np.asarray(cycles, dtype=np.int64).reshape(-1, 2)
 
     def sig_fn(V, S, dte):
         return (lambda K: max(V * smile.ratio(K / S, dte), 0.01)) if smile is not None else (lambda K: max(V, 0.01))
     rh, ru, ph_all, ps_all = [], [], [], []
-    for t in range(0, n - hold, hold):
-        e = t + hold
+    for t, e in cyc:
+        t, e = int(t), int(e)
         S = float(fr["close"][t])
         T = (fr["ords"][e] - fr["ords"][t]) / 365.0
+        b = budget * T
         r = float(fr["rate"][t])
         V = float(fr["vix"][t]) / 100.0
         Sx = S - _pv_div(fr, t, e, r)
-        sig = sig_fn(V, S, 30)
+        sig = sig_fn(V, S, int(fr["ords"][e] - fr["ords"][t]))
         K = strike_for_delta_smile(Sx, T, r, 0.0, sig, delta, "put", 0.2 * Sx, Sx)
         r_spy = float(fr["adj"][e] / fr["adj"][t] - 1.0)
-        ps = np.array([fr["adj"][t + j] / fr["adj"][t] for j in range(1, hold + 1)])
+        ps = np.array([fr["adj"][t + j] / fr["adj"][t] for j in range(1, e - t + 1)])
         prem = None if K is None else _bs(Sx, K, T, r, 0.0, sig(K), "put")
         if K is None:
             rh.append(r_spy)
@@ -1579,8 +1715,8 @@ def put_hedge_overlay(fr: dict, smile: Optional[Smile], budget: float = 0.01, ho
             pay = max(K - float(fr["close"][e]), 0.0)
             rh.append((1.0 - b) * (1.0 + r_spy) + (b * pay / prem if prem > 0 else 0.0) - 1.0)
             n_puts = b / prem if prem > 0 else 0.0
-            ph = np.empty(hold)
-            for j in range(1, hold + 1):
+            ph = np.empty(e - t)
+            for j in range(1, e - t + 1):
                 u = t + j
                 if u < e:
                     Su, ru_ = float(fr["close"][u]), float(fr["rate"][u])
@@ -1593,16 +1729,31 @@ def put_hedge_overlay(fr: dict, smile: Optional[Smile], budget: float = 0.01, ho
         ru.append(r_spy)
         ph_all.append(ph)
         ps_all.append(ps)
-    return {"r_hedged": np.array(rh), "r_spy": np.array(ru), "path_hedged": np.array(ph_all), "path_spy": np.array(ps_all)}
+    return {"r_hedged": np.array(rh), "r_spy": np.array(ru), "path_hedged": _pad_paths(ph_all), "path_spy": _pad_paths(ps_all)}
 
 
 def vix_hedge_test(fr: dict, smile: Optional[Smile] = None, budget: float = 0.01, hold: int = MONTH, target: float = 0.25,
-                   block: int = 12, scales: tuple = (0.8, 1.2), n_boot: int = N_BOOT, seed: int = 0, min_n: int = 180) -> dict:
-    """T-239. Pass: one-sided 95% lower bound of 1 - MDD(hedged)/MDD(SPY) > ``target``. Both maximum drawdowns are
-    measured on DAILY equity (the overlay marked to model every session), and the paired percentile bootstrap resamples
-    12-cycle blocks of the daily paths (the same blocks for both series). The Sharpe difference (excess of the bill, on
-    cycle returns) is reported, not required. n = monthly cycles."""
-    ov = vix_call_overlay(fr, budget, hold)
+                   block: int = 12, scales: tuple = (0.8, 1.2), n_boot: int = N_BOOT, seed: int = 0, min_n: int = 180,
+                   cal_days=None, cycles=None, put_cycles=None, grid_sensitivity: bool = True) -> dict:
+    """T-239. Rule 10(a): the "rolling 1-month" VIX call follows the VIX monthly expiry calendar (``vix_expiry_dates`` on
+    ``cal_days``, the exchange calendar used to find holidays, default the frame's days): bought at one expiry's close,
+    held to the next (28 or 35 calendar days), paid on spot VIX at that expiry's close. The SPY-put control rolls on SPX's
+    monthly expiries (third Fridays) the same way. ``cycles`` / ``put_cycles`` override the calendars. Pass: one-sided 95%
+    lower bound of 1 - MDD(hedged)/MDD(SPY) > ``target``. Both maximum drawdowns are measured on DAILY equity (the
+    overlay marked to model every session), and the paired percentile bootstrap resamples 12-cycle blocks of the daily
+    paths (the same blocks for both series). The Sharpe difference (excess of the bill, on cycle returns) is reported,
+    not required. Reported: the same overlay on each of the ``hold`` offsets of a ``hold``-session grid (point
+    reductions: range and how many exceed the target). n = monthly cycles."""
+    days = fr["days"]
+    nd = len(days)
+    cal = days if cal_days is None else cal_days
+    if cycles is None:
+        cycles = rolling_cycles(sessions_for(days, vix_expiry_dates(cal)))
+    if put_cycles is None:
+        put_cycles = rolling_cycles(sessions_for(days, monthly_expiry_dates(cal)))
+    cycles = np.asarray(cycles, dtype=np.int64).reshape(-1, 2)
+    cycles = cycles[(cycles[:, 0] >= 0) & (cycles[:, 1] < nd) & (cycles[:, 1] > cycles[:, 0])]
+    ov = vix_call_overlay(fr, budget, hold, cycles=cycles)
     n = int(ov["start"].size)
     if n < 8:
         return {"n": n, "verdict": "inconclusive", "reason": f"only {n} monthly cycles — too few to test"}
@@ -1612,65 +1763,100 @@ def vix_hedge_test(fr: dict, smile: Optional[Smile] = None, budget: float = 0.01
         base = float(_mdd_paths(ps)[0])
         return float(1.0 - _mdd_paths(ph)[0] / base) if base > 0 else None
     red_cycle_end = red(_as_paths(ov["r_hedged"]), _as_paths(ov["r_spy"]))     # cycle-end sampling, reported only
-    ppy = PPY / hold
+    lens = (ov["end"] - ov["start"]).astype(float)
+    ppy = PPY / float(lens.mean())
     sh_h, sh_u = sharpe_ratio(ov["r_hedged"] - ov["rf"], ppy), sharpe_ratio(ov["r_spy"] - ov["rf"], ppy)
-    hedge_pnl = ov["budget_per_cycle"] * (ov["payoff"] / ov["prem"] - 1.0)
+    bpc = ov["budget_per_cycle"]
+    hedge_pnl = bpc * (ov["payoff"] / ov["prem"] - 1.0)
     sens = {}
-    for s in scales:
-        o2 = vix_call_overlay(fr, budget, hold, vvix_scale=s)
-        sens[str(s)] = red(o2["path_hedged"], o2["path_spy"])
-    ph = put_hedge_overlay(fr, smile, budget, hold)
-    put_red = red(ph["path_hedged"], ph["path_spy"])
-    b = ov["budget_per_cycle"]
-    ts = ov["start"]
-    acc = np.array([[math.exp(float(fr["rate"][t]) * (fr["ords"][t + j] - fr["ords"][t]) / 365.0) for j in range(1, hold + 1)]
-                    for t in ts])
-    cash_red = red((1.0 - b) * ov["path_spy"] + b * acc, ov["path_spy"])
+    for sc in scales:
+        o2 = vix_call_overlay(fr, budget, hold, vvix_scale=sc, cycles=cycles)
+        sens[str(sc)] = red(o2["path_hedged"], o2["path_spy"])
+    pc = np.asarray(put_cycles, dtype=np.int64).reshape(-1, 2)
+    pc = pc[(pc[:, 0] >= 0) & (pc[:, 1] < nd) & (pc[:, 1] > pc[:, 0])]
+    ph = put_hedge_overlay(fr, smile, budget, hold, cycles=pc) if pc.shape[0] else None
+    put_red = red(ph["path_hedged"], ph["path_spy"]) if ph is not None else None
+    H = ov["path_spy"].shape[1]
+    acc = np.array([[math.exp(float(fr["rate"][t]) * (fr["ords"][min(t + j, e)] - fr["ords"][t]) / 365.0) for j in range(1, H + 1)]
+                    for t, e in zip(ov["start"], ov["end"])])
+    cash_red = red((1.0 - bpc[:, None]) * ov["path_spy"] + bpc[:, None] * acc, ov["path_spy"])
+    grid = []
+    if grid_sensitivity:
+        for k in range(hold):
+            gc = grid_cycles(nd, hold, k)
+            if gc.shape[0] >= 8:
+                og = vix_call_overlay(fr, budget, hold, cycles=gc)
+                grid.append({"offset": k, "n": int(gc.shape[0]), "reduction": red(og["path_hedged"], og["path_spy"])})
+    gred = [g["reduction"] for g in grid if g["reduction"] is not None]
     lb, ci = mr["lower_one_sided"], mr["ci95"]
     crit = [(f"one-sided 95% lower bound of the drawdown reduction (daily equity) > {target:.0%}", None if lb is None else lb > target,
              ci[1] is not None and ci[1] < target)]
     verdict, why = _decide(crit, n, min_n, "monthly cycles")
-    days = fr["days"]
-    t0 = int(ts[0])
+    cyc = np.stack([ov["start"], ov["end"]], axis=1)
     _, sp, st = _mdd_span(ov["path_spy"])
     _, hp, ht = _mdd_span(ov["path_hedged"])
+    dd = lambda pos: days[_pos_day(cyc, H, pos)]
     reason = (f"{MP} (Black-76 on F_adj = sqrt((93 VIX3M^2 - 30 VIX^2)/63) exp(-VVIX^2 T/2), sigma = VVIX/100, 25-delta strike, "
               f"marked daily with the same pricer, payoff on spot VIX at expiry; no transaction costs, none stated in the claim): {n} monthly cycles "
-              f"{days[t0]}..{days[ts[-1] + hold]}, budget {budget:.0%}/yr ({b*100:.3f}% per cycle); maximum drawdown on DAILY equity: SPY "
-              f"total return {mr['mdd_base']*100:.1f}% ({days[t0 + sp]}..{days[t0 + st]}) vs hedged {mr['mdd_hedged']*100:.1f}% "
-              f"({days[t0 + hp]}..{days[t0 + ht]}): reduction {_s(None if mr['reduction'] is None else mr['reduction']*100, 1)}%, one-sided 95% "
+              f"on the VIX expiry calendar (the Wednesday 30 days before the next month's third Friday, CBOE holiday rules; bought at one "
+              f"expiry's close and held to the next, {int(lens.min())}-{int(lens.max())} sessions) {days[int(ov['start'][0])]}..{days[int(ov['end'][-1])]}, "
+              f"budget {budget:.0%}/yr prorated by calendar time ({bpc.mean()*100:.3f}% per cycle on average); maximum drawdown on DAILY equity: SPY "
+              f"total return {mr['mdd_base']*100:.1f}% ({dd(sp)}..{dd(st)}) vs hedged {mr['mdd_hedged']*100:.1f}% "
+              f"({dd(hp)}..{dd(ht)}): reduction {_s(None if mr['reduction'] is None else mr['reduction']*100, 1)}%, one-sided 95% "
               f"lower bound {_s(None if lb is None else lb*100, 1)}% (two-sided {_ci_s(tuple(None if x is None else x*100 for x in ci), 1)}; "
               f"12-cycle blocks of daily paths, paired) vs {target:.0%}; on cycle-end points only the reduction would be "
               f"{_s(None if red_cycle_end is None else red_cycle_end * 100, 1)}% (reported). Sharpe (excess of the bill) hedged {sh_h:.2f} vs SPY {sh_u:.2f} (difference "
               f"{sh_h - sh_u:+.2f}, reported); hedge P&L {hedge_pnl.mean()*1e4:+.2f} bp of the portfolio per cycle, calls paid in "
               f"{int((ov['payoff'] > 0).sum())} of {n} cycles. IV-scale sensitivity (daily MDD; VVIX x "
-              + ", ".join(f"{k}: {_s(None if v is None else v * 100, 1)}%" for k, v in sens.items()) + "). Controls (daily MDD): 10-delta SPY put "
-              f"same budget ({'captured SPY smile' if smile is not None else 'flat VIX'}, marked daily) reduction "
+              + ", ".join(f"{k}: {_s(None if v is None else v * 100, 1)}%" for k, v in sens.items())
+              + f"). Rule 10 grid sensitivity (reported): the same overlay on the {len(grid)} offsets of a {hold}-session grid gives "
+              f"reductions {_rng(gred, 1, 100)}%, {sum(1 for x in gred if x > target)}/{len(grid)} above {target:.0%}. Controls (daily MDD): 10-delta SPY put "
+              f"same budget rolled on the SPX monthly expiries ({pc.shape[0]} cycles; {'captured SPY smile' if smile is not None else 'flat VIX'}, marked daily) reduction "
               f"{_s(None if put_red is None else put_red * 100, 1)}%; cash drag at the same budget "
               f"{_s(None if cash_red is None else cash_red * 100, 1)}%" + (f"; {int(ov['fwd_floored'].sum())} cycles with a negative forward variance used VIX" if ov['fwd_floored'].any() else "")
               + ". The traded version needs VIX option chain history (2 capture days archived)")
     return {"n": n, "min_n": min_n, "reduction": mr["reduction"], "lower_one_sided": lb, "ci95": ci, "mdd_spy": mr["mdd_base"],
-            "mdd_hedged": mr["mdd_hedged"], "mdd_spy_span": [days[t0 + sp], days[t0 + st]], "mdd_hedged_span": [days[t0 + hp], days[t0 + ht]],
-            "mdd_measure": "daily equity", "reduction_cycle_end_sampling": red_cycle_end, "sharpe_hedged": sh_h, "sharpe_spy": sh_u,
+            "mdd_hedged": mr["mdd_hedged"], "mdd_spy_span": [dd(sp), dd(st)], "mdd_hedged_span": [dd(hp), dd(ht)],
+            "mdd_measure": "daily equity", "calendar": "VIX monthly expiry, rolled at each expiry",
+            "first_cycle": days[int(ov["start"][0])], "last_expiry": days[int(ov["end"][-1])],
+            "cycle_sessions_range": [int(lens.min()), int(lens.max())],
+            "reduction_cycle_end_sampling": red_cycle_end, "sharpe_hedged": sh_h, "sharpe_spy": sh_u,
             "hedge_pnl_per_cycle": float(hedge_pnl.mean()), "scale_sensitivity": sens, "put_control_reduction": put_red,
-            "cash_drag_reduction": cash_red, "block": mr["block"], "verdict": verdict, "reason": reason + " — " + why}
+            "put_control_cycles": int(pc.shape[0]), "cash_drag_reduction": cash_red, "grid_offsets": grid,
+            "block": mr["block"], "verdict": verdict, "reason": reason + " — " + why}
 
 
 # =========================================================================== T-240: VVIX vs realised VIX vol ==
 
 def vvix_win_rate(days, vvix, vix, window: int = MONTH, bound: float = 0.70, block: int = 6, n_boot: int = N_BOOT,
-                  seed: int = 0, min_n: int = 200, spx=None, n_placebo: int = 1000) -> dict:
-    """T-240 on aligned daily arrays. Non-overlapping windows from the first day: win_t = 1{VVIX_t > 100 sqrt(252)
-    sd(dlnVIX over t..t+21)} (21 changes, ddof 1). Pass: the one-sided 95% lower bound of the win rate > ``bound`` under
-    BOTH the exact binomial (Clopper-Pearson) and a percentile block bootstrap (block 6 windows); mean premium VVIX - realised
-    > 0 in both halves. ``spx`` (aligned closes) adds the SPX VRP win-rate control. n = windows."""
+                  seed: int = 0, min_n: int = 200, spx=None, n_placebo: int = 1000, start: str = "2006-01-01",
+                  entries=None) -> dict:
+    """T-240 on daily arrays on a TRADING calendar (``days``: ^GSPC sessions in the harness; ``vix`` as of each session,
+    ``vvix`` NaN on a session without its own print). Rule 10(a): "non-overlapping months since 2006" names the calendar
+    month: each month enters at its first session with a VVIX print on or after ``start`` (``entries`` overrides), and
+    win_t = 1{VVIX_t > 100 sqrt(252) sd(dlnVIX over t..t+21)} (21 daily changes of spot VIX on the trading calendar,
+    ddof 1). Months have 19-23 sessions, so a window can run a session or two into the next month (more where VVIX's
+    first print of a month comes late, as in 2006); the overlap is reported. Pass: the one-sided 95% lower
+    bound of the win rate > ``bound`` under BOTH the exact binomial (Clopper-Pearson) and a percentile block bootstrap
+    (block 6 months); mean premium VVIX - realised > 0 in both halves. Reported: the 21-session grid, pooled over every
+    daily entry (percentile bootstrap, 126-session blocks) and on each of its 21 offsets (Clopper-Pearson lower bounds).
+    ``spx`` (aligned closes) adds the SPX VRP win-rate control. n = months."""
     days = list(days)
     vvix, vix = np.asarray(vvix, dtype=float), np.asarray(vix, dtype=float)
+    N = len(days)
+    m_all = N - window
+    if m_all < 8:
+        return {"n": max(m_all, 0), "verdict": "inconclusive", "reason": f"only {max(m_all, 0)} sessions with a forward window"}
     lr = np.diff(np.log(vix))
-    ts = np.arange(0, len(days) - window, window)
+    rv_all = 100.0 * math.sqrt(PPY) * sliding_window_view(lr, window)[:m_all].std(axis=1, ddof=1)
+    okv = np.isfinite(vvix) & (vvix > 0)
+    okv[:m_all] &= np.isfinite(rv_all)
+    okv[m_all:] = False
+    ts = month_first(days, ok=okv, start=start) if entries is None else np.asarray(entries, dtype=np.int64)
+    ts = ts[(ts < m_all) & okv[np.minimum(ts, N - 1)]]
     if ts.size < 8:
-        return {"n": int(ts.size), "verdict": "inconclusive", "reason": f"only {ts.size} windows — too few to test"}
-    rv = np.array([100.0 * math.sqrt(PPY) * float(np.std(lr[t:t + window], ddof=1)) for t in ts])
+        return {"n": int(ts.size), "verdict": "inconclusive", "reason": f"only {ts.size} months — too few to test"}
+    rv = rv_all[ts]
     win = (vvix[ts] > rv).astype(float)
     k, n = int(win.sum()), int(ts.size)
     cp1 = _binom_two_sided_ci(k, n, 0.10)
@@ -1681,37 +1867,65 @@ def vvix_win_rate(days, vvix, vix, window: int = MONTH, bound: float = 0.70, blo
     prem = vvix[ts] - rv
     halves = [float(p.mean()) for p in np.array_split(prem, 2)]
     hw = [float(p.mean()) for p in np.array_split(win, 2)]
+    ovl_all = np.maximum(ts[:-1] + window - ts[1:], 0)
+    ovl, n_ovl3 = int(ovl_all.max()), int((ovl_all > 2).sum())
+    # rule 10: the 21-session grid (reported)
+    gi = np.arange(int(ts[0]), m_all, dtype=np.int64)
+    gi = gi[okv[gi]]
+    gwin = (vvix[gi] > rv_all[gi]).astype(float)
+    gb = pct_means(gwin, pool_block_len(window, block), max(500, n_boot // 2), seed)
+    g_lo = float(np.quantile(gb, 0.05))
+    goff = offset_of(gi, window)
+    gcp = []
+    for q in range(window):
+        wq = gwin[goff == q]
+        if wq.size:
+            gcp.append({"offset": q, "n": int(wq.size), "rate": float(wq.mean()),
+                        "cp_lower": float(_binom_two_sided_ci(int(wq.sum()), int(wq.size), 0.10)[0])})
     spx_wr = None
     if spx is not None:
         lrs = np.diff(np.log(np.asarray(spx, dtype=float)))
         rvs = np.array([float(np.sum(lrs[t:t + window] ** 2)) * PPY / window for t in ts])
-        spx_wr = float(((vix[ts] / 100.0) ** 2 > rvs).mean())
+        oks = np.isfinite(rvs)
+        spx_wr = float(((vix[ts] / 100.0) ** 2 > rvs)[oks].mean()) if oks.any() else None
     rng = np.random.default_rng(seed + 13)
     plc = float(np.mean([(rng.permutation(vvix[ts]) > rv).mean() for _ in range(n_placebo)]))
     crit = [(f"one-sided 95% lower bound of the win rate > {bound:.2f} (min of Clopper-Pearson and block bootstrap)", lb > bound,
              max(cp1[1], float(np.quantile(boot, 0.95))) < bound),
             ("mean premium VVIX - realised > 0 in both halves", all(h > 0 for h in halves), False)]
-    verdict, why = _decide(crit, n, min_n, "non-overlapping 21d windows")
-    reason = (f"VVIX above the realised 21d vol of daily log changes in spot VIX in {k} of {n} non-overlapping windows "
-              f"({days[ts[0]]}..{days[ts[-1]]}): win rate {k/n:.3f}, one-sided 95% lower bound Clopper-Pearson {cp1[0]:.3f} / "
+    verdict, why = _decide(crit, n, min_n, "calendar months")
+    reason = (f"VVIX above the realised 21d vol of daily log changes in spot VIX in {k} of {n} calendar months, each entered at "
+              f"its first session with a VVIX print ({days[ts[0]]}..{days[ts[-1]]}; spot-VIX changes over 21 sessions of the "
+              f"trading calendar; a window runs at most {ovl} session(s) into the next month's, {n_ovl3} by more than 2, all where "
+              f"VVIX's history is sparse): win rate {k/n:.3f}, one-sided 95% lower bound Clopper-Pearson {cp1[0]:.3f} / "
               f"block bootstrap {b_lo1:.3f} (two-sided exact {cp2[0]:.3f}-{cp2[1]:.3f}) vs {bound:.2f}; mean premium "
-              f"{prem.mean():+.1f} vol pts, halves {halves[0]:+.1f}/{halves[1]:+.1f} (win rates {hw[0]:.2f}/{hw[1]:.2f}). Controls: "
-              f"SPX VRP win rate (VIX^2 > RV) on the same windows {_f(spx_wr, 3)}; shuffled-VVIX placebo win rate {plc:.3f}. "
+              f"{prem.mean():+.1f} vol pts, halves {halves[0]:+.1f}/{halves[1]:+.1f} (win rates {hw[0]:.2f}/{hw[1]:.2f}). Rule 10 "
+              f"grid sensitivity (reported): all {gi.size} daily entries pooled win rate {gwin.mean():.3f} (one-sided lower "
+              f"{g_lo:.3f}, {pool_block_len(window, block)}-session blocks); the {len(gcp)} offsets of the {window}-session grid give "
+              f"win rates {_rng([g['rate'] for g in gcp], 3)}, Clopper-Pearson lower bounds {_rng([g['cp_lower'] for g in gcp], 3)}, "
+              f"{sum(g['cp_lower'] > bound for g in gcp)}/{len(gcp)} above {bound:.2f}. Controls: "
+              f"SPX VRP win rate (VIX^2 > RV) in the same months {_f(spx_wr, 3)}; shuffled-VVIX placebo win rate {plc:.3f}. "
               "Spot VIX moves more than the futures VVIX refers to, so the comparison is conservative for the claim")
     return {"n": n, "min_n": min_n, "wins": k, "win_rate": k / n, "cp_lower_one_sided": cp1[0], "cp_two_sided": list(cp2),
             "boot_lower_one_sided": b_lo1, "lower_bound": lb, "mean_premium": float(prem.mean()), "premium_halves": halves,
             "win_rate_halves": hw, "spx_vrp_win_rate": spx_wr, "placebo_win_rate": plc, "first_window": days[ts[0]],
-            "last_window": days[ts[-1]], "verdict": verdict, "reason": reason + " — " + why}
+            "last_window": days[ts[-1]], "calendar": "calendar months, first session with a VVIX print",
+            "max_window_overlap": ovl, "windows_overlapping_over_2": n_ovl3,
+            "grid_pooled_rate": float(gwin.mean()), "grid_pooled_lower": g_lo, "grid_offsets": gcp,
+            "verdict": verdict, "reason": reason + " — " + why}
 
 
 def vix_call_ratio_secondary(days, vix, vix3m, vvix, rate, hold: int = MONTH, k1_off: float = 4.0, k2_off: float = 10.0,
-                             block: int = 6, n_boot: int = N_BOOT, seed: int = 0) -> dict:
+                             block: int = 6, n_boot: int = N_BOOT, seed: int = 0, cal_days=None, cycles=None) -> dict:
     """T-240 secondary: MODEL-PRICED 1x2 VIX call ratio (long 1 at F_adj + 4, short 2 at K1 + 10), Black-76 on F_adj with
-    VVIX as IV, settled on spot VIX; P&L in VIX points per cycle (premium received / paid carried at the bill)."""
-    ords = np.array([date.fromisoformat(d).toordinal() for d in days])
+    VVIX as IV, settled on spot VIX; P&L in VIX points per cycle (premium received / paid carried at the bill). Rule 10(a):
+    cycles roll on the VIX monthly expiries (``vix_expiry_dates`` on ``cal_days``, default ``days``); ``cycles`` overrides."""
+    days = list(days)
+    ords = _ords(days)
+    if cycles is None:
+        cycles = rolling_cycles(sessions_for(days, vix_expiry_dates(days if cal_days is None else cal_days)))
     pnl = []
-    for t in range(0, len(days) - hold, hold):
-        e = t + hold
+    for t, e in np.asarray(cycles, dtype=np.int64).reshape(-1, 2):
         T = (ords[e] - ords[t]) / 365.0
         sig = max(vvix[t] / 100.0, 0.05)
         fv = (93.0 * vix3m[t] ** 2 - 30.0 * vix[t] ** 2) / 63.0
@@ -1723,7 +1937,8 @@ def vix_call_ratio_secondary(days, vix, vix3m, vvix, rate, hold: int = MONTH, k1
         pnl.append(max(V - k1, 0.0) - 2.0 * max(V - k2, 0.0) - debit * math.exp(rate[t] * T))
     x = np.array(pnl)
     bt = stud_mean(x, block, n_boot, seed)
-    return {"n": int(x.size), "mean": float(x.mean()) if x.size else None, "ci95": list(two_sided(bt))}
+    return {"n": int(x.size), "mean": float(x.mean()) if x.size else None, "ci95": list(two_sided(bt)),
+            "calendar": "VIX monthly expiry, rolled at each expiry"}
 
 
 # ==================================================================== T-249: forward vs spot variance premium ==
@@ -1732,20 +1947,26 @@ def forward_variance_premium(days, px, vix, vix3m, cycle: int = 63, block_daily:
                              n_boot: int = N_BOOT, seed: int = 0, min_n: int = 60, excl_year: str = "2020",
                              n_shift: int = 500) -> dict:
     """T-249 on aligned daily arrays (px dividend-adjusted). F^2 = (93 VIX3M^2 - 30 VIX^2)/63; forward premium fraction
-    (F^2 - RV(22..63))/F^2, spot (VIX^2 - RV(1..21))/VIX^2; d = forward - spot. Pass: d > 0 with the two-sided 95% CI
-    excluding zero, on the non-overlapping 63-day cycles (studentized, block 2) AND on all daily starts (studentized,
-    block 63 = the overlap). The forward win rate (> 0.7) is reported, as the pass rule marks it. n = 63-day cycles."""
+    (F^2 - RV(22..63))/F^2, spot (VIX^2 - RV(1..21))/VIX^2; d = forward - spot, per daily start with F^2 > 0.
+
+    Rule 10(b): the trial's non-overlapping 63-session grid has 63 equally valid offsets. Primary statistic: the POOLED
+    mean of d over every daily start (studentized circular block bootstrap, block pool_block_len(cycle, block_cycle) =
+    126 sessions = 2 holds). Criteria: (1) the pooled difference > 0 with the two-sided 95% CI excluding zero (the pass
+    rule, on the rule-10 primary statistic); (2) the trial's own all-daily-starts test with ``block_daily``-session
+    blocks. Each offset's grid (studentized, block ``block_cycle`` cycles) is reported: range of its mean and CI bounds
+    and how many offsets pass. The forward win rate (> 0.7) is reported, as the pass rule marks it. n = the distinct
+    63-session holds the daily starts span (the cycle count of the claim's non-overlapping grid)."""
     days = list(days)
     px, vix, vix3m = (np.asarray(a, dtype=float) for a in (px, vix, vix3m))
-    n = len(days) - 63
-    if n < 100:
-        return {"n": 0, "verdict": "inconclusive", "reason": f"only {max(n, 0)} aligned days with a 63-day forward window — too few to test"}
+    n_all = len(days) - 63
+    if n_all < 100:
+        return {"n": 0, "verdict": "inconclusive", "reason": f"only {max(n_all, 0)} aligned days with a 63-day forward window — too few to test"}
     lr = np.diff(np.log(px))
-    rv_s, rv_f = _fwd_rv(lr, n, 1, 21), _fwd_rv(lr, n, 22, 63)
+    rv_s, rv_f = _fwd_rv(lr, n_all, 1, 21), _fwd_rv(lr, n_all, 22, 63)
 
     def parts(v3):
-        v2 = (vix[:n] / 100.0) ** 2
-        f2 = (93.0 * (v3[:n] / 100.0) ** 2 - 30.0 * v2) / 63.0
+        v2 = (vix[:n_all] / 100.0) ** 2
+        f2 = (93.0 * (v3[:n_all] / 100.0) ** 2 - 30.0 * v2) / 63.0
         okm = f2 > 0
         pf = np.where(okm, (f2 - rv_f) / np.where(okm, f2, 1.0), np.nan)
         ps = (v2 - rv_s) / v2
@@ -1753,48 +1974,61 @@ def forward_variance_premium(days, px, vix, vix3m, cycle: int = 63, block_daily:
 
     f2, v2, okm, pf, ps = parts(vix3m)
     d = pf - ps
-    cyc = np.arange(0, n, cycle)
-    cyc = cyc[okm[cyc]]
     didx = np.nonzero(okm)[0]
-    bt_c = stud_mean(d[cyc], block_cycle, n_boot, seed)
-    bt_d = stud_mean(d[didx], block_daily, n_boot, seed)
-    ci_c, ci_d = two_sided(bt_c), two_sided(bt_d)
-    nc = int(cyc.size)
-    win = float((f2[cyc] > rv_f[cyc]).mean()) if nc else None
-    halves = [float(p.mean()) for p in np.array_split(d[cyc], 2)] if nc >= 2 else [None, None]
-    keep = np.array([not days[i].startswith(excl_year) for i in cyc], dtype=bool)
-    ex = float(d[cyc][keep].mean()) if keep.any() else None
+    dd = d[didx]
+    n = n_holds(didx, cycle)
+    pb = pool_block_len(cycle, block_cycle)
+    bt_p = stud_mean(dd, pb, n_boot, seed)
+    bt_d = stud_mean(dd, block_daily, n_boot, seed)
+    ci_p, ci_d = two_sided(bt_p), two_sided(bt_d)
+    offs = []
+    off = offset_of(didx, cycle)
+    for k in range(cycle):
+        sel = didx[off == k]
+        b_k = stud_mean(d[sel], block_cycle, n_boot, seed)
+        if b_k is None:
+            continue
+        lo_k, hi_k = two_sided(b_k)
+        offs.append({"offset": k, "n": int(sel.size), "first": days[sel[0]], "mean": b_k["est"], "ci": [lo_k, hi_k],
+                     "pass": bool(b_k["est"] > 0 and lo_k is not None and lo_k > 0)})
+    win = float((f2[didx] > rv_f[didx]).mean())
+    halves = [float(p.mean()) for p in np.array_split(dd, 2)]
+    keep = np.array([not days[i].startswith(excl_year) for i in didx], dtype=bool)
+    ex = float(dd[keep].mean()) if keep.any() else None
     lvl = (f2 - rv_f) - (v2 - rv_s)
-    bt_l = stud_mean(lvl[cyc], block_cycle, n_boot, seed)
+    bt_l = stud_mean(lvl[didx], pb, n_boot, seed)
     rng = np.random.default_rng(seed + 17)
     null = []
     for _ in range(n_shift):
-        s = int(rng.integers(252, max(253, len(days) - 252)))
-        _, _, ok2, pf2, ps2 = parts(np.roll(vix3m, s))
-        c2 = np.arange(0, n, cycle)
-        c2 = c2[ok2[c2]]
-        if c2.size:
-            null.append(float(np.mean(pf2[c2] - ps2[c2])))
+        sh = int(rng.integers(252, max(253, len(days) - 252)))
+        _, _, ok2, pf2, ps2 = parts(np.roll(vix3m, sh))
+        if ok2.any():
+            null.append(float(np.mean(pf2[ok2] - ps2[ok2])))
     null = np.asarray(null)
-    plc_p = float((np.sum(null >= bt_c["est"]) + 1) / (null.size + 1)) if (null.size and bt_c) else None
-    crit = [("non-overlapping 63d cycles: paired difference > 0 with the 95% CI excluding zero",
-             None if ci_c[0] is None else (bt_c["est"] > 0 and ci_c[0] > 0), ci_c[1] is not None and ci_c[1] < 0),
-            ("all daily starts (63-day blocks): paired difference > 0 with the 95% CI excluding zero",
+    plc_p = float((np.sum(null >= bt_p["est"]) + 1) / (null.size + 1)) if (null.size and bt_p) else None
+    crit = [(f"POOLED over all {cycle} grid offsets ({pb}-session blocks): paired difference > 0 with the 95% CI excluding zero",
+             None if ci_p[0] is None else (bt_p["est"] > 0 and ci_p[0] > 0), ci_p[1] is not None and ci_p[1] < 0),
+            (f"all daily starts with {block_daily}-session blocks (the trial's procedure): paired difference > 0 with the 95% CI excluding zero",
              None if ci_d[0] is None else (bt_d["est"] > 0 and ci_d[0] > 0), ci_d[1] is not None and ci_d[1] < 0)]
-    verdict, why = _decide(crit, nc, min_n, "non-overlapping 63d cycles")
-    reason = (f"forward premium fraction (F^2 - RV22..63)/F^2 minus spot (VIX^2 - RV1..21)/VIX^2 over {nc} non-overlapping 63d "
-              f"cycles ({days[cyc[0]]}..{days[cyc[-1]]}): mean {_s(bt_c['est'] if bt_c else None, 3)} ({_ci_s(ci_c, 3)}); all "
-              f"{didx.size} daily starts {_s(bt_d['est'] if bt_d else None, 3)} ({_ci_s(ci_d, 3)}); mean forward fraction "
-              f"{np.nanmean(pf[cyc]):+.3f} vs spot {np.mean(ps[cyc]):+.3f}; forward win rate (F^2 > RV22..63) {_f(win, 2)} "
-              f"(reported; the pass marks the 0.7 line as reported). Walk-forward halves {_s(halves[0], 3)}/{_s(halves[1], 3)}; "
-              f"excluding {excl_year} {_s(ex, 3)}; level version (variance units) {_s(bt_l['est'] if bt_l else None, 4)} "
-              f"({_ci_s(two_sided(bt_l), 4)}); shifted-VIX3M placebo p={_f(plc_p, 3)}"
+    verdict, why = _decide(crit, n, min_n, f"non-overlapping {cycle}d cycles (distinct holds)")
+    n_off = len(offs)
+    reason = (f"forward premium fraction (F^2 - RV22..63)/F^2 minus spot (VIX^2 - RV1..21)/VIX^2. POOLED over all {cycle} grid "
+              f"offsets ({didx.size} daily starts {days[didx[0]]}..{days[didx[-1]]} = {n} distinct {cycle}-session holds; studentized "
+              f"circular block bootstrap, block {pb} sessions): mean {_s(bt_p['est'] if bt_p else None, 3)} ({_ci_s(ci_p, 3)}); with the "
+              f"trial's {block_daily}-session blocks {_ci_s(ci_d, 3)}. Per grid offset ({n_off} non-overlapping {cycle}d grids, n "
+              f"{_rng([o['n'] for o in offs], 0).replace('+', '')} cycles, block {block_cycle}): mean {_rng([o['mean'] for o in offs], 3)}, "
+              f"lower CI bound {_rng([o['ci'][0] for o in offs], 3)}, upper {_rng([o['ci'][1] for o in offs], 3)}; "
+              f"{sum(o['pass'] for o in offs)}/{n_off} offsets pass, {sum(o['ci'][1] is not None and o['ci'][1] < 0 for o in offs)}/{n_off} "
+              f"fail decisively. Mean forward fraction {np.nanmean(pf[didx]):+.3f} vs spot {np.mean(ps[didx]):+.3f}; forward win rate "
+              f"(F^2 > RV22..63) {_f(win, 2)} (reported; the pass marks the 0.7 line as reported). Walk-forward halves "
+              f"{_s(halves[0], 3)}/{_s(halves[1], 3)}; excluding {excl_year} {_s(ex, 3)}; level version (variance units) "
+              f"{_s(bt_l['est'] if bt_l else None, 4)} ({_ci_s(two_sided(bt_l), 4)}); shifted-VIX3M placebo p={_f(plc_p, 3)}"
               + (f"; {int((~okm).sum())} days with F^2 <= 0 excluded" if (~okm).any() else ""))
-    return {"n": nc, "min_n": min_n, "mean_cycles": bt_c["est"] if bt_c else None, "ci_cycles": list(ci_c),
-            "mean_daily": bt_d["est"] if bt_d else None, "ci_daily": list(ci_d), "n_daily": int(didx.size),
-            "forward_win_rate": win, "halves": halves, "excl_year_mean": ex, "level_mean": bt_l["est"] if bt_l else None,
-            "level_ci": list(two_sided(bt_l)), "placebo_p": plc_p, "first_cycle": days[cyc[0]], "last_cycle": days[cyc[-1]],
-            "verdict": verdict, "reason_core": reason, "why": why}
+    return {"n": n, "min_n": min_n, "n_daily": int(didx.size), "block_days": pb, "mean_pooled": bt_p["est"] if bt_p else None,
+            "ci_pooled": list(ci_p), "mean_daily": bt_d["est"] if bt_d else None, "ci_daily": list(ci_d),
+            "grid_offsets": offs, "forward_win_rate": win, "halves": halves, "excl_year_mean": ex,
+            "level_mean": bt_l["est"] if bt_l else None, "level_ci": list(two_sided(bt_l)), "placebo_p": plc_p,
+            "first_start": days[didx[0]], "last_start": days[didx[-1]], "verdict": verdict, "reason_core": reason, "why": why}
 
 
 def variance_strip(vals, expiry: str, quote_day: str, r: float, roots=("SPXW", "SPX")) -> Optional[dict]:
@@ -2011,47 +2245,70 @@ def realised_avg_corr(R: np.ndarray, w: Optional[np.ndarray] = None) -> float:
 def implied_vs_realised_corr(days, cor1m, comps: np.ndarray, names: Sequence[str], hold: int = MONTH, block: int = 6,
                              n_boot: int = N_BOOT, seed: int = 0, min_n: int = 240, start: str = "2006-01-01",
                              constituents: bool = False) -> dict:
-    """T-538 on aligned daily arrays: COR1M (index points) and component closes (k x n, dividend-adjusted). Non-overlapping
-    21-day windows from ``start``: gap = COR1M_t/100 - realised average correlation over t+1..t+21 (equal weights).
-    With ``constituents`` False the components are a proxy, and the claim's statistic (the index constituents) and its
-    straddle-book clause are not implemented; the proxy's interval is reported as a one-sided bound."""
+    """T-538 on aligned daily arrays: COR1M (index points) and component closes (k x n, dividend-adjusted). gap_t =
+    COR1M_t/100 - realised average correlation over t+1..t+21 (equal weights). Rule 10(b): the procedure's monthly
+    non-overlapping 21-session grid has 21 equally valid offsets; the primary statistic is the POOLED mean gap over
+    every daily start from ``start`` (studentized circular block bootstrap, block pool_block_len(hold, block) = 126
+    sessions), each offset's grid (block ``block`` windows) reported. With ``constituents`` False the components are a
+    proxy, and the claim's statistic (the index constituents) and its straddle-book clause are not implemented; the
+    proxy's interval is reported as a one-sided bound. n = distinct 21-session holds the entries span."""
     days = list(days)
     cor1m = np.asarray(cor1m, dtype=float)
     comps = np.asarray(comps, dtype=float)
     lr = np.diff(np.log(comps), axis=1)
-    t0 = next((i for i, d in enumerate(days) if d >= start), len(days))
-    ts = np.arange(t0, len(days) - hold, hold)
-    if ts.size < 8:
-        return {"n": int(ts.size), "verdict": "inconclusive", "reason": f"only {ts.size} monthly windows — too few to test"}
-    rho = np.array([realised_avg_corr(lr[:, t:t + hold].T) for t in ts])
-    gap = cor1m[ts] / 100.0 - rho
-    bt = stud_mean(gap, block, n_boot, seed)
+    N = len(days)
+    t0 = next((i for i, d in enumerate(days) if d >= start), N)
+    cand = np.arange(t0, max(t0, N - hold), dtype=np.int64)
+    rho_all = np.array([realised_avg_corr(lr[:, t:t + hold].T) for t in cand]) if cand.size else np.zeros(0)
+    gap_all = cor1m[cand] / 100.0 - rho_all if cand.size else np.zeros(0)
+    ok = np.isfinite(gap_all)
+    idx, gap, rho = cand[ok], gap_all[ok], rho_all[ok]
+    n = n_holds(idx, hold)
+    if n < 8:
+        return {"n": n, "verdict": "inconclusive", "reason": f"only {n} monthly windows — too few to test"}
+    pb = pool_block_len(hold, block)
+    bt = stud_mean(gap, pb, n_boot, seed)
     ci = two_sided(bt)
-    n = int(ts.size)
     halves = [float(p.mean()) for p in np.array_split(gap, 2)]
+    offs = []
+    off = offset_of(idx, hold)
+    for k in range(hold):
+        g = gap[off == k]
+        b_k = stud_mean(g, block, n_boot, seed)
+        if b_k is None:
+            continue
+        lo_k, hi_k = two_sided(b_k)
+        offs.append({"offset": k, "n": int(g.size), "mean": b_k["est"], "ci": [lo_k, hi_k],
+                     "pass": bool(lo_k is not None and lo_k > 0)})
     if constituents:
-        crit = [("lower 95% CI bound of mean(COR1M - realised constituent correlation) > 0", ci[0] > 0, ci[1] < 0)]
+        crit = [("POOLED lower 95% CI bound of mean(COR1M - realised constituent correlation) > 0", ci[0] > 0, ci[1] < 0)]
     else:
-        crit = [(f"proxy ({len(names)} sector SPDRs) lower 95% CI bound > 0 (a sector proxy bounds the claim from one side "
+        crit = [(f"proxy ({len(names)} sector SPDRs) POOLED lower 95% CI bound > 0 (a sector proxy bounds the claim from one side "
                  "only: sector correlations exceed constituent ones, so a proxy shortfall is not a failure)",
                  True if ci[0] > 0 else None, False),
                 ("realised average correlation of the index constituents (COR1M's top-50 S&P 500 names, cap-weighted): "
                  "constituent closes and weights are not archived", None, False)]
     crit.append(("vega-neutral short-index / long-constituent straddle book has positive mean P&L: needs index and "
                  "single-stock chain history", None, False))
-    verdict, why = _decide(crit, n, min_n, "monthly windows")
-    reason = (f"COR1M averages {cor1m[ts].mean():.1f} vs realised equal-weight average pairwise correlation of "
+    verdict, why = _decide(crit, n, min_n, "monthly windows (distinct 21-session holds)")
+    n_off = len(offs)
+    reason = (f"COR1M averages {cor1m[idx].mean():.1f} vs realised equal-weight average pairwise correlation of "
               f"{'the constituents' if constituents else 'the ' + str(len(names)) + ' sector SPDRs (' + '/'.join(names) + ')'} "
-              f"{rho.mean()*100:.1f} over {n} non-overlapping 21d windows ({days[ts[0]]}..{days[ts[-1]]}); mean gap "
-              f"{bt['est']*100:+.1f} pts ({_ci_s(tuple(x*100 for x in ci), 1)}), halves {halves[0]*100:+.1f}/{halves[1]*100:+.1f}")
+              f"{rho.mean()*100:.1f}. POOLED over all {hold} grid offsets ({idx.size} daily starts {days[idx[0]]}..{days[idx[-1]]} = "
+              f"{n} distinct {hold}-session holds; studentized circular block bootstrap, block {pb} sessions): mean gap "
+              f"{bt['est']*100:+.1f} pts ({_ci_s(tuple(x*100 for x in ci), 1)}), halves {halves[0]*100:+.1f}/{halves[1]*100:+.1f}. Per "
+              f"grid offset ({n_off} non-overlapping grids, n {_rng([o['n'] for o in offs], 0).replace('+', '')} windows, block {block}): "
+              f"mean gap {_rng([o['mean'] for o in offs], 1, 100)} pts, lower bound {_rng([o['ci'][0] for o in offs], 1, 100)} pts, "
+              f"{sum(o['pass'] for o in offs)}/{n_off} offsets with the lower bound > 0")
     if not constituents:
         reason += (". Proxy verdict: NOT an acceptable stand-in under the claim's wording ('the index constituents'): sector "
                    "baskets diversify away idiosyncratic risk, so their pairwise correlation is far above single-stock "
                    "correlation (the gap above is dominated by that bias, not by the correlation premium); XLC/XLRE and "
                    "cap weights are also missing, so the verdict is capped at inconclusive")
-    return {"n": n, "min_n": min_n, "mean_cor1m": float(cor1m[ts].mean() / 100), "mean_realised": float(rho.mean()),
-            "mean_gap": bt["est"], "ci95": list(ci), "halves": halves, "components": list(names), "proxy": not constituents,
-            "first_window": days[ts[0]], "last_window": days[ts[-1]], "verdict": verdict, "reason": reason + " — " + why}
+    return {"n": n, "min_n": min_n, "n_entries": int(idx.size), "block_days": pb, "mean_cor1m": float(cor1m[idx].mean() / 100),
+            "mean_realised": float(rho.mean()), "mean_gap": bt["est"], "ci95": list(ci), "halves": halves,
+            "grid_offsets": offs, "components": list(names), "proxy": not constituents,
+            "first_window": days[idx[0]], "last_window": days[idx[-1]], "verdict": verdict, "reason": reason + " — " + why}
 
 
 # ==================================================================================================== harnesses ==
@@ -2073,12 +2330,18 @@ def b6_surf_vrp_term_regime(archive):
     ratio = np.array([vix[d] / v3[d] for d in keep])
     sec = {}
     for s in (1.0, 0.81):
-        cy = short_strangle_cycles(fr, s)
-        rr = ratio[cy["start"]]
-        c, b = cy["pnl"][rr < 0.95], cy["pnl"][rr > 1.05]
-        sec[str(s)] = {"n_contango": int(c.size), "n_backwardation": int(b.size),
-                       "mean_contango_bp": float(c.mean() * 1e4) if c.size else None,
-                       "mean_backwardation_bp": float(b.mean() * 1e4) if b.size else None}
+        # rule 10(b): the strangle's 21-session grid has 21 offsets; pooled over every daily entry, per offset reported
+        cy = short_strangle_cycles(fr, s, starts=np.arange(len(keep) - MONTH))
+        st, pnl = cy["start"], cy["pnl"]
+        rr = ratio[st]
+        con, bwd = rr < 0.95, rr > 1.05
+        off = offset_of(st, MONTH)
+        diffs = [float(pnl[(off == k) & con].mean() - pnl[(off == k) & bwd].mean()) * 1e4
+                 for k in range(MONTH) if ((off == k) & con).any() and ((off == k) & bwd).any()]
+        sec[str(s)] = {"n_contango": int(con.sum()), "n_backwardation": int(bwd.sum()), "n_entries": int(st.size),
+                       "mean_contango_bp": float(pnl[con].mean() * 1e4) if con.any() else None,
+                       "mean_backwardation_bp": float(pnl[bwd].mean() * 1e4) if bwd.any() else None,
+                       "offset_diff_bp": diffs}
     rep["strangle_secondary"] = sec
     s1, s8 = sec["1.0"], sec["0.81"]
     reason = (f"21d SPY VRP (VIX^2 - next-21d realised variance) by VIX/VIX3M regime within VIX terciles, {rep['n_days']} daily "
@@ -2086,21 +2349,23 @@ def b6_surf_vrp_term_regime(archive):
               f"2007-12-04..2009-09-17, including 2008, is not in the sample; the 'with 2008' control cannot be run); backwardation "
               f"(> 1.05) on {rep['share_backwardation']*100:.1f}% of days, contango (< 0.95) on {rep['share_contango']*100:.1f}%. "
               f"{rep['reason_core']}. Excluding 2020: " + "/".join(_s(None if r.get('diff_var_ex_2020') is None else r['diff_var_ex_2020'] * 1e4, 1) for r in rep['terciles'])
-              + f" %^2. Secondary ({MP} short 16-delta 30-DTE strangle, flat smile, no costs, P&L per spot): contango "
-              f"{_s(s1['mean_contango_bp'], 1)} bp (n={s1['n_contango']}) vs backwardation {_s(s1['mean_backwardation_bp'], 1)} bp "
-              f"(n={s1['n_backwardation']}) at IV = VIX; at 0.81 x VIX {_s(s8['mean_contango_bp'], 1)} vs {_s(s8['mean_backwardation_bp'], 1)} bp "
-              f"(the short-premium level hinges on the IV scale; the traded version needs SPY chain history)")
+              + f" %^2. Secondary ({MP} short 16-delta 30-DTE strangle, flat smile, no costs, P&L per spot; POOLED over every daily "
+              f"entry = all {MONTH} offsets of the 21-session grid, rule 10): contango "
+              f"{_s(s1['mean_contango_bp'], 1)} bp (n={s1['n_contango']} entries) vs backwardation {_s(s1['mean_backwardation_bp'], 1)} bp "
+              f"(n={s1['n_backwardation']}) at IV = VIX, per-offset contango-minus-backwardation {_rng(s1['offset_diff_bp'], 1)} bp "
+              f"({sum(x > 0 for x in s1['offset_diff_bp'])}/{len(s1['offset_diff_bp'])} offsets > 0); at 0.81 x VIX "
+              f"{_s(s8['mean_contango_bp'], 1)} vs {_s(s8['mean_backwardation_bp'], 1)} bp (per offset {_rng(s8['offset_diff_bp'], 1)} bp) "
+              f"(the short-premium level hinges on the IV scale; the traded version needs SPY chain history). Rule 10: the VRP itself "
+              f"is a daily series (no grid phase)")
     rep.pop("reason_core")
     why = rep.pop("why")
     return _out(rep, rep["n"], rep["verdict"], reason + " — " + why)
 
 
 def _gspc_skew_vix(archive):
+    """(days, close, skew, vix, fresh) on ^GSPC's own sessions, SKEW and VIX as of each session (``gspc_calendar``)."""
     gd, gc, _ = _daily(archive, GSPC_B)
-    sk, vx = _index(archive, SKEW_B), _index(archive, VIX_B)
-    keep = [i for i, d in enumerate(gd) if d in sk and d in vx]
-    days = [gd[i] for i in keep]
-    return days, gc[keep], np.array([sk[d] for d in days]), np.array([vx[d] for d in days])
+    return gspc_calendar(gd, gc, _index(archive, SKEW_B), _index(archive, VIX_B))
 
 
 def b6_surf_skew_tail_frequency(archive):
@@ -2108,8 +2373,8 @@ def b6_surf_skew_tail_frequency(archive):
     miss = _missing(archive, [GSPC_B, SKEW_B, VIX_B])
     if miss:
         return miss
-    days, c, sk, vx = _gspc_skew_vix(archive)
-    rep = skew_tail_frequency(days, c, sk, vx)
+    days, c, sk, vx, fresh = _gspc_skew_vix(archive)
+    rep = skew_tail_frequency(days, c, sk, vx, fresh=fresh)
     return _out(rep, rep.get("n", 0), rep["verdict"], rep["reason"])
 
 
@@ -2118,8 +2383,14 @@ def b6_surf_skew_implied_tail_gap(archive):
     miss = _missing(archive, [GSPC_B, SKEW_B, VIX_B])
     if miss:
         return miss
-    days, c, sk, vx = _gspc_skew_vix(archive)
-    rep = skew_implied_gap(days, c, sk, vx)
+    days, c, sk, vx, fresh = _gspc_skew_vix(archive)
+    alt = None
+    if _has(archive, SPY_B):
+        sd, sc, sa = _daily(archive, SPY_B)
+        raw, adj = dict(zip(sd, sc)), dict(zip(sd, sa))
+        alt = {"SPY raw-close splice": np.array([raw.get(d, np.nan) for d in days]),
+               "SPY adjusted-close splice": np.array([adj.get(d, np.nan) for d in days])}
+    rep = skew_implied_gap(days, c, sk, vx, fresh=fresh, alt_close=alt)
     return _out(rep, rep.get("n", 0), rep["verdict"], rep["reason"])
 
 
@@ -2128,7 +2399,7 @@ def b6_surf_skew_cheap_put_spread(archive):
     miss = _missing(archive, [GSPC_B, SKEW_B, VIX_B, DTB3_B, SPY_B, KAPPA_CHAIN])
     if miss:
         return miss
-    days, c, sk, vx = _gspc_skew_vix(archive)
+    days, c, sk, vx, fresh = _gspc_skew_vix(archive)
     dtb3 = _series(archive, DTB3_B)
     rate = bill_rates(days, dtb3)
     sd, sc, sa = _daily(archive, SPY_B)
@@ -2147,7 +2418,7 @@ def b6_surf_skew_cheap_put_spread(archive):
         return _out({"calibration": cal}, 0, "inconclusive",
                     f"the 30-DTE SPX smile could not be calibrated from {KAPPA_CHAIN} (quote day {qd}): kappa needs the chain's put IVs "
                     "and the quote day's VIX and SKEW — the claim's model-priced debit is undefined without it")
-    rep = put_spread_skew(days, c, sk, vx, rate, qy, cal["atm_ratio"], cal["kappa"], q_assumed=q_assumed)
+    rep = put_spread_skew(days, c, sk, vx, rate, qy, cal["atm_ratio"], cal["kappa"], q_assumed=q_assumed, fresh=fresh)
     rep["calibration"] = cal
     rep["dividend_yield"] = {"source": "SPY trailing-12-month dividends / close, known at each close", "known_from": q_known,
                              "assumed_before": PRE_YIELD}
@@ -2198,9 +2469,12 @@ def b6_surf_vix_call_hedge(archive):
         return miss
     sd, sc, sa = _daily(archive, SPY_B)
     vix, v3, vv = _index(archive, VIX_B), _index(archive, VIX3M_B), _index(archive, VVIX_B)
-    keep = [d for d in sd if d in vix and d in v3 and d in vv and "2009-09-01" <= d]
-    fr = frame_on(sd, sc, sa, keep, _series(archive, DTB3_B), {"vix": vix, "vix3m": v3, "vvix": vv})
-    rep = vix_hedge_test(fr, _smile(archive))
+    keep = [d for d in sd if d in vix and d in v3 and "2009-09-01" <= d and d >= min(vv)]
+    vvf, _ = asof_series(keep, vv)                    # VVIX misses 2 SPY sessions after 2009: the last print, point in time
+    keep = [d for d, x in zip(keep, vvf) if math.isfinite(x)]
+    vv_on = {d: x for d, x in zip(keep, asof_series(keep, vv)[0])}
+    fr = frame_on(sd, sc, sa, keep, _series(archive, DTB3_B), {"vix": vix, "vix3m": v3, "vvix": vv_on})
+    rep = vix_hedge_test(fr, _smile(archive), cal_days=sd)      # SPY's sessions = the exchange calendar for holidays
     return _out(rep, rep.get("n", 0), rep["verdict"], rep["reason"])
 
 
@@ -2211,24 +2485,28 @@ def b6_surf_vvix_vs_realised(archive):
         return miss
     vix, vv = _index(archive, VIX_B), _index(archive, VVIX_B)
     spx = None
-    if _has(archive, GSPC_B):
+    first = min(vv) if vv else ""
+    if _has(archive, GSPC_B):                    # the trading calendar: ^GSPC's sessions (VIX also prints on some holidays)
         gd, gc, _ = _daily(archive, GSPC_B)
+        days = [d for d in gd if d >= first]
         g = dict(zip(gd, gc))
-        days = _align(vix, vv, g)
         spx = [g[d] for d in days]
     else:
-        days = _align(vix, vv)
-    rep = vvix_win_rate(days, [vv[d] for d in days], [vix[d] for d in days], spx=spx)
+        days = [d for d in sorted(vix) if d >= first]
+    vx_on, _ = asof_series(days, vix)
+    vv_on = np.array([vv.get(d, np.nan) for d in days])
+    rep = vvix_win_rate(days, vv_on, vx_on, spx=spx)
     if _has(archive, VIX3M_B) and _has(archive, DTB3_B) and "reason" in rep:
         v3 = _index(archive, VIX3M_B)
-        d3 = [d for d in days if d in v3]
+        d3 = [d for d in days if d in v3 and d >= "2009-09-18"]
         if len(d3) > 100:
-            sec = vix_call_ratio_secondary(d3, np.array([vix[d] for d in d3]), np.array([v3[d] for d in d3]),
-                                           np.array([vv[d] for d in d3]), bill_rates(d3, _series(archive, DTB3_B)))
+            vv3, _ = asof_series(d3, vv)
+            sec = vix_call_ratio_secondary(d3, asof_series(d3, vix)[0], np.array([v3[d] for d in d3]), vv3,
+                                           bill_rates(d3, _series(archive, DTB3_B)), cal_days=days)
             rep["call_ratio_secondary"] = sec
             rep["reason"] = rep["reason"].replace(" — ", f". Secondary ({MP} 1x2 VIX call ratio, long F_adj+4 / short 2x at +14, "
-                                                  f"Black-76 at VVIX, {sec['n']} cycles from {d3[0]}): mean P&L {_s(sec['mean'], 2)} VIX pts "
-                                                  f"({_ci_s(sec['ci95'], 2)}) — ", 1)
+                                                  f"Black-76 at VVIX, {sec['n']} cycles rolled on the VIX monthly expiries from {d3[0]}): "
+                                                  f"mean P&L {_s(sec['mean'], 2)} VIX pts ({_ci_s(sec['ci95'], 2)}) — ", 1)
     return _out(rep, rep.get("n", 0), rep["verdict"], rep["reason"])
 
 

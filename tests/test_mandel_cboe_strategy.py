@@ -2,7 +2,7 @@
 indices; launch date for back-tested rows), defect flags and market-closed-day rows, the VRO expiry / carried
 classification, the fetch loop (307 redirect, 403, 429 retry, local-only storage) on a mocked transport, and the
 index -> theory map against the registry. Fixtures are rows copied from the live files on 2026-10-15 (the 1987 crash
-shape is synthetic); no network."""
+shape and one SPAI OHLC row are synthetic); no network."""
 
 import json
 from pathlib import Path
@@ -25,6 +25,7 @@ SPAI_CSV = ("DATE,OPEN,HIGH,LOW,CLOSE\n02/03/2006,100.000000,100.000000,100.0000
             "12/29/2006,116.260000,116.260000,116.260000,116.260000\n01/02/2007,116.260000,116.260000,116.260000,116.260000\n"
             "01/03/2007,116.710000,116.710000,116.710000,116.710000\n08/14/2017,319.790000,319.790000,319.790000,319.790000\n"
             "08/15/2017,318.960000,318.960000,318.960000,318.960000\n11/04/2021,574.1,575.2,572.9,574.5\n11/05/2021,,,,573.930000\n")
+# The 11/04/2021 SPAI row is SYNTHETIC (distinct O/H/L/C to exercise OHLC parsing); the live file has 571.74 in all four.
 CLL_CSV = ("DATE,CLL\n08/26/2008,597.670000\n08/27/2008,600.680000\n09/29/2008,521.940000\n09/30/2008,536.620000\n"
            "10/14/2009,591.130000\n10/15/2009,592.600000\n10/16/2009,475.170000\n10/19/2009,478.530000\n"
            "11/21/2018,805.180000\n11/22/2018,805.180000\n11/23/2018,804.660000\n")

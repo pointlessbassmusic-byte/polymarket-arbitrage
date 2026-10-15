@@ -60,11 +60,16 @@ or below 0. Momentum: the mean criterion when the mean's 95% block-bootstrap CI 
 permutation criterion when it lies wholly at or below the permutation 95th percentile. 'DSR > 0.95' is a one-sided 95%
 test, so in both it fails decisively at the same confidence: when the Sharpe's one-sided 95% upper bound lies at or below
 0, i.e. the PSR against a zero Sharpe (``deflated_sharpe_ratio(net, n_trials=1)``) is <= 0.05 (the DSR's benchmark, the
-expected best of the trials' zero-skill Sharpes, is >= 0 at any sample size, so the DSR is then <= 0.05 too) and, since
-the PSR treats months as independent and these monthly books are serially correlated, the Newey-West t (6 lags) of the
-mean agrees at the same level (<= -1.645); or when the 95% interval above (carry's Sharpe, momentum's mean) lies wholly
-at or below 0, a one-sided 97.5% bound on the same sign. The PSR and the t are reported in ``rule5`` and the reason. A
-zero-width interval decides nothing. Under 48 months (4 blocks of the 12-month bootstrap) no interval is computed, no
+expected best of the trials' zero-skill Sharpes, is >= 0 at any sample size, so the DSR is then <= 0.05 too); or when
+the 95% interval above (carry's Sharpe, momentum's mean) lies wholly at or below 0, a one-sided 97.5% bound on the same
+sign. The flag mirrors the pass statistic alone, the iid PSR the DSR is built on (as ``batch4_ohlc._dsr_dec`` and
+``batch5_hourly`` do); the Newey-West t (6 lags) of the mean is reported next to the PSR in ``rule5`` and the reason, but
+it is a second statistic the pass never uses and gates nothing. A zero-width interval decides nothing.
+
+House rule 10 (no arbitrary grid phase). None of the three harnesses rests on an arbitrary-start grid. Carry (T-368,
+T-431) is a monthly book ranked on calendar-month OECD averages and traded at the month-end fixing; momentum (T-478)
+names month-end FRED spot rates and holds calendar months (first fixing of H to the first fixing of H+1). These are
+calendar-month statistics: the claim names the calendar, so the grid phase is not a free choice. Under 48 months (4 blocks of the 12-month bootstrap) no interval is computed, no
 failure can be decisive and the verdict is inconclusive. Any other failure below min_n is undecided (None), so the
 verdict is inconclusive. At or above min_n every criterion is judged at face value, exactly as before. Below min_n the
 report's ``criteria`` are the ones judged and ``rule5`` holds the face-value criteria and the decisive failures.
@@ -565,29 +570,26 @@ def _ci_below(lo, hi, bound: float) -> bool:
     return lo is not None and hi is not None and math.isfinite(lo) and math.isfinite(hi) and lo < hi and hi <= bound
 
 
-Z_ONE_SIDED_95 = 1.644854
-
-
 def _psr0_dec(x, n: int) -> tuple[float, float, bool]:
     """(PSR of ``x`` against a zero Sharpe, Newey-West t (6 lags) of its mean, decisive failure of 'DSR > 0.95' below
     min_n). The DSR criterion is a one-sided 95% test that the Sharpe beats the deflation benchmark, which is never below
     0; it fails decisively at the same confidence when the Sharpe's one-sided 95% upper bound lies at or below 0, i.e.
     the PSR against a zero Sharpe from the same returns is <= 1 - DSR_PASS (the DSR is then <= 0.05 against every
-    benchmark the trial can face). The PSR treats the months as independent and these monthly books are serially
-    correlated, so the serial-correlation-robust bound at the same level must agree: Newey-West t <= -1.645. Never
-    decisive under ``MIN_RULE5_MONTHS`` months or with a mean at or above 0 (the PSR's zero-denominator fallback)."""
+    benchmark the trial can face). The decisive flag mirrors the pass statistic alone (the iid PSR, as in
+    ``batch4_ohlc._dsr_dec`` and ``batch5_hourly``): the Newey-West t is a second statistic the pass never uses, so it is
+    returned and reported but does not gate the flag. Never decisive under ``MIN_RULE5_MONTHS`` months or with a mean
+    at or above 0 (the PSR's zero-denominator fallback)."""
     x = np.asarray(x, dtype=float)
     psr = float(deflated_sharpe_ratio(x, n_trials=1))
     t = nw_tstat(x, 6)
-    dec = (n >= MIN_RULE5_MONTHS and x.size >= MIN_RULE5_MONTHS and x.mean() < 0 and psr <= 1.0 - DSR_PASS
-           and math.isfinite(t) and t <= -Z_ONE_SIDED_95)
+    dec = n >= MIN_RULE5_MONTHS and x.size >= MIN_RULE5_MONTHS and x.mean() < 0 and psr <= 1.0 - DSR_PASS
     return psr, t, bool(dec)
 
 
 def _psr0_txt(psr: float, t: float) -> str:
-    return (f"; PSR against a zero Sharpe {psr:.3f}, Newey-West t {t:+.2f} (the DSR criterion fails decisively below "
-            f"min_n when the PSR is <= {1.0 - DSR_PASS:.2f} and the t <= -{Z_ONE_SIDED_95:.3f}: the Sharpe's one-sided 95% "
-            f"upper bound at or below 0)")
+    return (f"; PSR against a zero Sharpe {psr:.3f} (the DSR criterion fails decisively below min_n when the PSR is "
+            f"<= {1.0 - DSR_PASS:.2f}: the Sharpe's one-sided 95% upper bound at or below 0); Newey-West t {t:+.2f} "
+            f"(reported only, not a decisive test)")
 
 
 def _rule5(crit, decisive, n: int, min_n: int, unit: str) -> tuple[str, str, list, dict]:
@@ -715,8 +717,8 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
     'em' (4 EM trials + the G10 entry's 6). Below ``min_n`` test months house rule 5 applies: never supported; the
     Sharpe fails decisively when its stationary-bootstrap 95% interval lies wholly at or below ``sharpe_bar``, the
     lower-bound criterion when it lies wholly at or below 0, and the DSR (a one-sided 95% test) when the PSR against a
-    zero Sharpe is <= 0.05 with the Newey-West t <= -1.645 (the Sharpe's one-sided 95% upper bound at or below 0) or that
-    interval lies wholly at or below 0; the PSR and t are in ``rule5`` and the reason. Under 48 months nothing is
+    zero Sharpe is <= 0.05 (the Sharpe's one-sided 95% upper bound at or below 0) or that interval lies wholly at or
+    below 0; the PSR and the Newey-West t (reported only) are in ``rule5`` and the reason. Under 48 months nothing is
     computed."""
     universe = list(universe)
     sel = choose_weighting(panel, universe, train, cost_bps, admin, vix=vix)
@@ -772,9 +774,9 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
     if n < min_n:
         # rule 5: the Sharpe fails decisively when its stationary-bootstrap 95% interval lies wholly at or below the bar;
         # the lower-bound criterion when it lies wholly at or below 0. The DSR (> 0.95, one-sided 95%) is mirrored at its own
-        # confidence: the PSR against a zero Sharpe is <= 0.05 with the Newey-West t <= -1.645 (the Sharpe's one-sided 95%
-        # upper bound at or below 0; the benchmark, the expected best of the trials' zero-skill Sharpes, is >= 0), or the
-        # 95% interval lies wholly at or below 0 (a one-sided 97.5% bound on the same sign)
+        # confidence: the PSR against a zero Sharpe is <= 0.05 (the Sharpe's one-sided 95% upper bound at or below 0; the
+        # benchmark, the expected best of the trials' zero-skill Sharpes, is >= 0), or the 95% interval lies wholly at or
+        # below 0 (a one-sided 97.5% bound on the same sign). The Newey-West t is reported, not a gate
         lo_, hi_ = perf["boot_lo"], perf["boot_hi"]
         psr0, t0, dsr_dec = _psr0_dec(net, n)
         v, why, judged, r5 = _rule5(crit, [_ci_below(lo_, hi_, sharpe_bar), _ci_below(lo_, hi_, 0.0),
@@ -827,10 +829,10 @@ def momentum_report(panel: dict, *, universe: Sequence[str] = G10_FX, window: tu
     DSR > 0.95 at ``n_trials`` (family: formation 1/3/6/12 x thirds/top-bottom-2 x with/without differentials),
     mean above the 95th percentile of ``n_perm`` random-ranking books. Below ``min_n`` holding months house rule 5
     applies: never supported; the mean criterion fails decisively when the mean's 95% CI lies wholly at or below 0, the
-    DSR (a one-sided 95% test) when the PSR against a zero Sharpe is <= 0.05 with the Newey-West t <= -1.645 (the
-    Sharpe's one-sided 95% upper bound at or below 0) or that CI lies wholly at or below 0, the permutation criterion
-    when the CI lies wholly at or below the permutation 95th percentile; the PSR and t are in ``rule5`` and the reason.
-    Under 48 months nothing is computed."""
+    DSR (a one-sided 95% test) when the PSR against a zero Sharpe is <= 0.05 (the Sharpe's one-sided 95% upper bound at
+    or below 0) or that CI lies wholly at or below 0, the permutation criterion when the CI lies wholly at or below the
+    permutation 95th percentile; the PSR and the Newey-West t (reported only) are in ``rule5`` and the reason. Under 48
+    months nothing is computed."""
     universe = list(universe)
     ms = mrange(*window)
     bt = momentum_backtest(panel, universe, ms, 1, "thirds", True, cost_bps, True)
@@ -881,8 +883,8 @@ def momentum_report(panel: dict, *, universe: Sequence[str] = G10_FX, window: tu
     if n < min_n:
         # rule 5: the mean fails decisively when its 95% block-bootstrap CI lies wholly at or below 0; the permutation
         # criterion when it lies wholly at or below the permutation 95th percentile. The DSR (> 0.95, one-sided 95%) is
-        # mirrored at its own confidence: the PSR against a zero Sharpe is <= 0.05 with the Newey-West t <= -1.645
-        # (benchmark >= 0), or the mean's CI lies wholly at or below 0 (a one-sided 97.5% bound on the same sign)
+        # mirrored at its own confidence: the PSR against a zero Sharpe is <= 0.05 (benchmark >= 0), or the mean's CI lies
+        # wholly at or below 0 (a one-sided 97.5% bound on the same sign). The Newey-West t is reported, not a gate
         psr0, t0, dsr_dec = _psr0_dec(net, n)
         v, why, judged, r5 = _rule5(crit, [_ci_below(lo, hi, 0.0), dsr_dec or _ci_below(lo, hi, 0.0), _ci_below(lo, hi, q95)],
                                     n, min_n, "holding months")
