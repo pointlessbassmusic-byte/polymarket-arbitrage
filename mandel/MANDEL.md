@@ -103,6 +103,37 @@ Several are already enforced in code; those are marked.
     Enabling anything that moves real money is the user's decision, made
     with the gate's evidence in front of them.
 
+### Harness rules
+
+Every experiment harness (`mandel/experiments/*.py`) follows these rules. They come from an adversarial audit of
+the first 125 harnesses (81 confirmed defects, three fix rounds, each fix independently checked) and from
+refutation passes on every new 'supported' result. A harness that breaks one is a defect, whatever its verdict.
+
+1. **Test the claim exactly as worded.** Every horizon, asset, threshold and sub-period named in the claim or its
+   trial's `pass` is a criterion. Restating a claim is a new, superseding theory; the old verdict stands.
+2. **Unimplemented means not supported.** `underlying2._verdict`: any implemented criterion that fails gives
+   not_supported, any criterion that cannot be implemented (None) caps the verdict at inconclusive, and supported
+   needs every criterion implemented and passing.
+3. **min_n in the claim's own units** (cycles, trades, events, months), never in whatever the code happens to count.
+4. **Point in time.** A signal uses only data available at the decision; `available_at` is the earliest time a
+   market participant could know the value; forward windows start after the decision.
+5. **Below min_n only decisive failures count.** The verdict is never supported; a failing criterion counts only
+   when its bound at the pass's own confidence lies wholly on the wrong side (or the failure would persist at
+   min_n); any other failure is undecided (inconclusive).
+6. **Intervals for the statistic actually claimed.** Studentized or percentile block bootstrap; a difference is
+   bootstrapped paired on a shared timeline; blocks at least as long as any overlap; one- or two-sided as the pass
+   states.
+7. **Rates and Sharpe.** DTB3 is a discount yield (continuous rate -ln(1 - d·91/360)/(91/365)); funded strategies
+   compare Sharpe ratios on excess returns; 252 trading days a year (365 for crypto).
+8. **Options.** Settle on raw closes; price on the dividend forward when an ex-date falls inside the life;
+   model-priced results are labelled MODEL-PRICED and report their sensitivity to the IV scale.
+9. **Costs as the claim states; data limits are inconclusive, never errors.** A missing series or a window too
+   short names exactly what is missing.
+10. **No arbitrary grid phase.** If the claim names an entry or expiry calendar (monthly options = the standard
+    monthly expiry), use it. Otherwise a non-overlapping grid has as many valid start days as its hold length: the
+    pooled all-start estimate (overlapping entries, blocks at least twice the hold) is the primary statistic and the
+    per-start range is reported. Two 'supported' previews (T-540, T-154) failed this when checked.
+
 ## 3. The improvement loop
 
 ```
@@ -250,3 +281,15 @@ First-contact protocol, for when the user introduces a child:
   trend rules, calendar effects). Libraries: VENUES.md (123 venues,
   110 docs-verified), OPTIONS-STRATEGIES.md (180), UNDERLYING-STRATEGIES.md
   (130); every entry a theory (375 total). REPORT-2026-10-14-cycle3.md.
+- 2026-10-15  Cycle 4 (in progress). Data unlocks: Yahoo OHLC to 1927,
+  Ken French factors, AQR BAB, FOMC calendar, ALFRED CPI/payroll/GDP release
+  dates, G10+EM FX and OECD rates, hourly bars, Deribit funding/futures/
+  delivery, Cboe VX futures. Harness audit: 81 confirmed defects fixed in three
+  independently checked rounds; eight verdicts moved on re-run (T-350, T-241,
+  T-13, T-102 to not_supported; T-01, T-231, T-266, T-256 to inconclusive).
+  Harness rules written down (section 2). Batches 4 and 5 (45 harnesses) and
+  6a (43 options claims) built with write/review/fix workflows; every
+  'supported' preview gets an independent refutation pass before recording.
+  Unblock sweep of 129 blocked theories: 34 testable after a free fetch, led by
+  DoltHub's historical option chains (CC BY-SA). T-543 pre-registered as a
+  forward-only test. Data whose terms forbid redistribution is stored local-only.
