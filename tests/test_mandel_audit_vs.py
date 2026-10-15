@@ -330,7 +330,7 @@ def test_om6_one_significant_horizon_with_opposite_raw_signs_does_not_agree(monk
     assert multiscale_edge([], [])["signs_agree"] is True
     short = _byh(same); short[90] = short[90][:10]                      # 90d unscored: agreement at every horizon not shown
     monkeypatch.setattr(markets, "price_at_horizons", lambda *a, **k: short)
-    assert multiscale_edge([], [])["signs_agree"] is False
+    assert multiscale_edge([], [])["signs_agree"] is None               # undetermined, not a disagreement (audit round 2, mk2)
 
 
 # ------------------------------------------------------------------------------- OM-13 (T-04): gas per order --

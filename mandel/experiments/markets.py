@@ -10,6 +10,7 @@ Market harnesses: calibration of market prices, bundle-arbitrage scan, multi-sca
   bid_yes + bid_no > 1 (short) after fees, and how deep?
 - multiscale_edge: does the sign of the market's mean error (outcome minus price) agree across
   horizons and categories? A structural bias should survive coarse-graining; noise does not.
+  Intervals resample whole events; ``signs_agree`` is True / False / None (None: a registered horizon unscored).
 """
 
 from __future__ import annotations
@@ -135,41 +136,86 @@ def market_calibration(price_rows: Iterable[dict], market_rows: Iterable[dict], 
     return report
 
 
+def event_clusters(market_rows: Iterable[dict]) -> dict[str, str]:
+    """market id -> dependence cluster: events[0].id, else negRiskMarketID, else the market itself. Markets of one negRisk event are
+    mutually exclusive and resolve together, so they are one unit for resampling (same keys as run._event_keys)."""
+    out = {}
+    for r in market_rows:
+        m = r.get("value", {})
+        mid = str(m.get("id"))
+        ev = m.get("events")
+        if isinstance(ev, str):
+            try:
+                ev = json.loads(ev)
+            except ValueError:
+                ev = None
+        eid = ev[0].get("id") if isinstance(ev, list) and ev and isinstance(ev[0], dict) else None
+        out[mid] = f"event:{eid}" if eid is not None else (f"negrisk:{m['negRiskMarketID']}" if m.get("negRiskMarketID") else f"market:{mid}")
+    return out
+
+
+def _cluster_mean_ci(e: np.ndarray, keys: list, rng: np.random.Generator, n_boot: int, q=(0.025, 0.975)) -> tuple[float, float, int]:
+    """Percentile CI of the pooled mean sum(e)/count with whole clusters resampled (ratio estimator); also the number of clusters."""
+    _, inv = np.unique(np.asarray(keys, dtype=object).astype(str), return_inverse=True)
+    S = np.bincount(inv, weights=e); C = np.bincount(inv).astype(float); G = S.size
+    idx = rng.integers(0, G, size=(n_boot, G))
+    boots = S[idx].sum(axis=1) / C[idx].sum(axis=1)
+    lo, hi = (float(x) for x in np.quantile(boots, list(q)))
+    return lo, hi, int(G)
+
+
 def multiscale_edge(price_rows: Iterable[dict], market_rows: Iterable[dict], horizons_days=(1, 3, 7, 30, 90), n_boot: int = 1000, seed: int = 0) -> dict:
-    """Sign and bootstrap interval of mean(outcome - price) at each horizon, split by the favourite/longshot
-    buckets. The theory under test (ORIGINAL-IDEAS 3): a structural bias agrees in sign across scales."""
+    """Sign and event-clustered bootstrap interval of mean(outcome - price) at each horizon, split by the favourite/longshot
+    buckets. The theory under test (ORIGINAL-IDEAS 3): a structural bias agrees in sign across scales.
+
+    Intervals resample whole events (``event_clusters``), not markets: markets of one negRisk event are dependent. ``n_events``
+    is reported beside ``n``. ``signs_agree`` is three-valued, judged on the raw sign of every scored horizon's mean error:
+    False when a scored sign is 0 or two scored horizons differ in sign (decisive), None when the scored signs agree but a
+    registered horizon is unscored (< 30 markets), True only when every registered horizon is scored with one nonzero sign."""
+    market_rows = list(market_rows)
     outcomes = resolved_outcomes(market_rows)
+    cluster = event_clusters(market_rows)
     byh = price_at_horizons(price_rows, outcomes, horizons_days)
     rng = np.random.default_rng(seed)
-    out = {"horizons": {}, "buckets": {}, "close_anchor": _anchor_summary(outcomes)}
+    out = {"horizons": {}, "buckets": {}, "close_anchor": _anchor_summary(outcomes),
+           "ci_method": "event-clustered percentile bootstrap of sum(e)/count (events[0].id, else negRiskMarketID, else market)"}
+
+    def summary(rows):
+        e = np.array([o - p for p, o, _ in rows])
+        lo, hi, g = _cluster_mean_ci(e, [cluster.get(mid, f"market:{mid}") for _, _, mid in rows], rng, n_boot)
+        return {"n": int(e.size), "n_events": g, "mean_error": float(e.mean()), "ci": [lo, hi]}
+
     signs = []
     for h, rows in byh.items():
         if len(rows) < 30:
             continue
-        e = np.array([r[1] - r[0] for r in rows])
-        boots = rng.choice(e, size=(n_boot, e.size), replace=True).mean(axis=1)
-        lo, hi = np.quantile(boots, [0.025, 0.975])
-        out["horizons"][h] = {"n": int(e.size), "mean_error": float(e.mean()), "ci": [float(lo), float(hi)]}
-        signs.append(int(np.sign(e.mean())) if not (lo <= 0 <= hi) else 0)
+        s = out["horizons"][h] = summary(rows)
+        lo, hi = s["ci"]
+        signs.append(int(np.sign(s["mean_error"])) if not (lo <= 0 <= hi) else 0)
     for name, (lo_p, hi_p) in {"longshot_0_0.2": (0.0, 0.2), "mid_0.2_0.8": (0.2, 0.8), "favourite_0.8_1": (0.8, 1.0001)}.items():
         per_h = {}
         for h, rows in byh.items():
             sel = [r for r in rows if lo_p <= r[0] < hi_p]
             if len(sel) < 30:
                 continue
-            e = np.array([r[1] - r[0] for r in sel])
-            boots = rng.choice(e, size=(n_boot, e.size), replace=True).mean(axis=1)
-            lo, hi = np.quantile(boots, [0.025, 0.975])
-            per_h[h] = {"n": int(e.size), "mean_error": float(e.mean()), "ci": [float(lo), float(hi)]}
+            per_h[h] = summary(sel)
         out["buckets"][name] = per_h
     nonzero = [s for s in signs if s != 0]
     out["n_scales_significant"] = len(nonzero)
     out["n_scales_total"] = len(signs)
     # T-03 pass: signs agree across ALL horizons, judged on the raw sign of every horizon's mean error (a non-significant
-    # horizon still counts); a horizon with too few markets is unscored, so agreement across all horizons is not shown.
+    # horizon still counts). Scored horizons that already disagree (or sit at 0) falsify agreement whatever an unscored horizon
+    # would show; if the scored ones agree, an unscored registered horizon leaves agreement across all horizons undetermined.
     raw = [int(np.sign(v["mean_error"])) for v in out["horizons"].values()]
     out["raw_signs"] = {str(h): int(np.sign(v["mean_error"])) for h, v in out["horizons"].items()}
-    out["signs_agree"] = bool(len(raw) == len(tuple(horizons_days)) and 0 not in raw and len(set(raw)) == 1)
+    unscored = [h for h in horizons_days if h not in out["horizons"]]
+    out["unscored_horizons"] = [str(h) for h in unscored]
+    if 0 in raw or len(set(raw)) > 1:
+        out["signs_agree"] = False
+    elif unscored or not raw:
+        out["signs_agree"] = None
+    else:
+        out["signs_agree"] = True
     return out
 
 

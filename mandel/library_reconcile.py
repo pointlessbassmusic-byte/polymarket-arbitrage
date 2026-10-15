@@ -48,6 +48,12 @@ def reconcile(reg: dict, strategies: list[dict], kind: str, origin_prefix: str, 
                 for old in reg["theories"]:
                     if old["id"] == s["_supersedes"]:
                         old["notes"] += f" | superseded by {t['id']} (verifier-corrected wording)"
+                        # its verdict stands: unmap its harnesses so run_all no longer re-scores (rewrites) it
+                        frozen = old.setdefault("experiments_frozen", [])
+                        for h in old.get("experiments", []):
+                            if h not in frozen:
+                                frozen.append(h)
+                        old["experiments"] = []
             else:
                 t["notes"] += " | added by the verifier pass"
         reg["theories"] += nt

@@ -382,8 +382,12 @@ def _ma_pos(c: np.ndarray, fast: int, slow: int) -> np.ndarray:
     return pos
 
 
-def _apply(pos: np.ndarray, c: np.ndarray, cost_side: float) -> np.ndarray:
+def _apply(pos: np.ndarray, c: np.ndarray, cost_side: float, lag: int = 0) -> np.ndarray:
+    """Long/flat returns on the return grid (r[i] = close i -> close i+1), switch cost on the position actually held.
+    lag=0 holds pos[i] (signal through close i) over r[i]; lag=1 holds it from close i+1, over r[i+1]."""
     r = c[1:] / c[:-1] - 1; p = pos[:-1]
+    if lag:
+        p = np.concatenate([np.zeros(lag), pos[:-1 - lag]])
     ch = np.abs(np.diff(np.concatenate([[0.0], p])))
     return p * r - ch * cost_side
 
@@ -689,7 +693,7 @@ def low_vol_tilt(usmv: tuple, spy: tuple, splv: Optional[tuple] = None, sphb: Op
     crit = [("Sharpe diff lower bound > 0", lo > 0), ("positive in >= 3 of 4 rolling 5-year windows", sum(x > 0 for x in subs) >= 3 if len(subs) == 4 else None)]
     if not have_bills:
         crit.append(("Sharpe on daily excess returns over T-bills (T-bill series not supplied)", None))
-    out = {"n_days": int(n), "sharpe_usmv": _sr(ue, 252), "sharpe_spy": _sr(se, 252), "diff": obs, "lower": lo, "excess_over_bills": bool(have_bills), "window_days": window, "subwindows": subs,
+    out = {"n": int(n), "n_days": int(n), "sharpe_usmv": _sr(ue, 252), "sharpe_spy": _sr(se, 252), "diff": obs, "lower": lo, "excess_over_bills": bool(have_bills), "window_days": window, "subwindows": subs,
            "first_day": d[0] if d else None, "last_day": d[-1] if d else None}
     spread_txt = ""
     if splv is not None and sphb is not None:
@@ -887,17 +891,19 @@ def gem_v2(spy, efa, agg, bill_days, bill_vals) -> dict:
 
 def golden_cross_v2(btc, eth, cost_side: float = 0.0035, n_trials: int = 72) -> dict:
     """T-485: BTC 2015-04-: 50/200 Sharpe minus buy-and-hold > 0 with 95% interval excluding 0, DSR > 0.95 with the
-    declared n_trials = 72, ETH point estimate > 0. The 50/200 test starts at the rule's own first valid position
-    (return index 199; BTC also >= 2015-04-01), not at the 100/300 variant's warm-up. Only 4 of the 72 trials are run:
-    the DSR uses n_trials = 72 with the trial-Sharpe variance estimated from those 4 variants, each scored on its own
-    valid window (index slow-1 on, inside the claim window)."""
+    declared n_trials = 72, ETH point estimate > 0. Timing as the control states: SMA through close t, return from
+    close t+1, so every variant holds its day-t signal over close t+1 -> t+2 and pays switch costs on that lagged
+    position. The 50/200 test starts at the rule's own first held position (return index 200; BTC also >= 2015-04-01),
+    not at the 100/300 variant's warm-up. Only 4 of the 72 trials are run: the DSR uses n_trials = 72 with the
+    trial-Sharpe variance estimated from those 4 variants, each scored on its own valid window (index slow on, inside
+    the claim window)."""
     variants = [(50, 200), (20, 100), (100, 300), (10, 50)]
     out = {}
     for name, (days, c) in (("BTC", btc), ("ETH", eth)):
-        R = {f: _apply(_ma_pos(c, *f), c, cost_side) for f in variants}; bh = c[1:] / c[:-1] - 1
+        R = {f: _apply(_ma_pos(c, *f), c, cost_side, lag=1) for f in variants}; bh = c[1:] / c[:-1] - 1    # SMA through close t, return from close t+1
         ds = days[1:]; inwin = np.array([d >= "2015-04-01" for d in ds]) if name == "BTC" else np.ones(len(ds), bool)
         def own(f):
-            mm = inwin.copy(); mm[:f[1] - 1] = False; return mm
+            mm = inwin.copy(); mm[:f[1]] = False; return mm             # first held position: signal at slow-1, held from return index slow
         m = own((50, 200))
         g = R[(50, 200)][m]; b = bh[m]
         obs, lo, hi = _two_sided_sharpe_ci(g, b, 365, 30)
@@ -906,7 +912,7 @@ def golden_cross_v2(btc, eth, cost_side: float = 0.0035, n_trials: int = 72) -> 
         first = int(np.argmax(m)) if m.any() else None
         out[name] = {"diff": obs, "ci": [lo, hi], "dsr": float(dsr), "dsr_n_trials": n_trials, "start": ds[first] if first is not None else None, "n_days": int(m.sum())}
     v, why = _verdict([("BTC Sharpe diff > 0 with CI excluding 0", out["BTC"]["diff"] > 0 and out["BTC"]["ci"][0] > 0), ("BTC DSR > 0.95", out["BTC"]["dsr"] > 0.95), ("ETH diff > 0", out["ETH"]["diff"] > 0)])
-    return {**out, "n": out["BTC"]["n_days"], "verdict": v, "reason": "; ".join(f"{k} from {x['start']}: Sharpe diff {x['diff']:+.2f} (95% CI {x['ci'][0]:+.2f} to {x['ci'][1]:+.2f}), DSR {x['dsr']:.2f} (n_trials {n_trials}, variance of 4 run variants)" for k, x in out.items()) + f" — {why}"}
+    return {**out, "n": out["BTC"]["n_days"], "verdict": v, "reason": "SMA through close t, return from close t+1; " + "; ".join(f"{k} from {x['start']}: Sharpe diff {x['diff']:+.2f} (95% CI {x['ci'][0]:+.2f} to {x['ci'][1]:+.2f}), DSR {x['dsr']:.2f} (n_trials {n_trials}, variance of 4 run variants)" for k, x in out.items()) + f" — {why}"}
 
 
 def crypto_weekly_v2(btc, eth, cost_side: float = 0.004, n_trials: int = 16) -> dict:
@@ -958,8 +964,9 @@ def svxy_v2(svxy, vix, vix3m, cost_switch: float = 0.001, test_from: str = "2018
     DSR > 0.95 with n_trials = 6 thresholds (1.00, 1.025, 1.05, 1.075, 1.10, 1.15). Timing as the procedure states:
     signal at close t, position from close t+1 (the return earned on close t+1 -> t+2), switch cost on the lagged
     position. Cash days earn the T-bill rate known at the start of the day (bill_days/bill_vals, annual %) as the SGOV
-    proxy; without the T-bill series cash earns 0 and the SGOV criterion is not implemented (verdict capped at
-    inconclusive)."""
+    proxy, and both Sharpe ratios (and their difference) are on daily excess returns over that rate, so crediting cash
+    does not flatter the lower-volatility filtered leg; without the T-bill series cash earns 0, returns are raw and the
+    SGOV criterion is not implemented (verdict capped at inconclusive). The DSR is on s - b, where the bill cancels."""
     days, c = svxy[0], svxy[1]; r = c[1:] / c[:-1] - 1; ds = days[1:]; m = np.array([d >= test_from for d in ds])
     have_bills = bill_days is not None and bill_vals is not None and len(bill_days) > 0
     rf = _rf_per_period(days[:-1], bill_days, bill_vals, 252) if have_bills else np.zeros(len(r))
@@ -967,12 +974,13 @@ def svxy_v2(svxy, vix, vix3m, cost_switch: float = 0.001, test_from: str = "2018
         sig = np.array([float(d in vix and d in vix3m and vix3m[d] / vix[d] > th) for d in days[:-1]])    # VIX3M/VIX at close t
         pos = np.concatenate([[0.0], sig[:-1]])                       # held from close t+1: earns r[t+1]
         return (pos * r + (1 - pos) * rf - np.abs(np.diff(np.concatenate([[0.0], pos]))) * cost_switch)[m]
-    s = strat(1.05); b = r[m]
-    obs, lo = _sharpe_diff_lower(s, b, 252, 21, q=0.05)
+    s = strat(1.05); b = r[m]; rfm = rf[m]
+    obs, lo = _sharpe_diff_lower(s - rfm, b - rfm, 252, 21, q=0.05)                 # Sharpe on excess returns: pos*(r - rf) - cost vs r - rf
     dsr = deflated_sharpe_ratio(s - b, n_trials=6, trial_sharpes=[sharpe_ratio(strat(th) - b) for th in (1.0, 1.025, 1.05, 1.075, 1.10, 1.15)])
     crit = [("Sharpe diff > 0 with one-sided p < 0.05", obs > 0 and lo > 0), ("DSR > 0.95", dsr > 0.95)]
     if not have_bills:
         crit.append(("cash leg earns the T-bill rate as SGOV proxy (T-bill series not supplied)", None))
     v, why = _verdict(crit)
-    return {"n_test_days": int(m.sum()), "sharpe_diff": obs, "lower90": lo, "dsr": float(dsr), "cash_leg": "T-bill" if have_bills else "zero (bills not supplied)", "strategy_mean_bps_day": float(s.mean() * 1e4), "verdict": v,
-            "reason": f"SVXY contango filter (position from close t+1, cash at {'T-bill' if have_bills else '0'}) vs always, 2018-: Sharpe diff {obs:+.2f} (one-sided 95% lower {lo:+.2f}), DSR {dsr:.2f} — {why}"}
+    return {"n_test_days": int(m.sum()), "sharpe": _sr(s - rfm, 252), "always_sharpe": _sr(b - rfm, 252), "excess_over_bills": bool(have_bills), "sharpe_diff": obs, "lower90": lo, "dsr": float(dsr), "cash_leg": "T-bill" if have_bills else "zero (bills not supplied)", "strategy_mean_bps_day": float(s.mean() * 1e4), "verdict": v,
+            "reason": f"SVXY contango filter (position from close t+1, cash at {'T-bill' if have_bills else '0'}) vs always, 2018-: {'excess' if have_bills else 'raw'} Sharpe {_sr(s - rfm, 252):.2f} vs {_sr(b - rfm, 252):.2f}, "
+                      f"diff {obs:+.2f} (one-sided 95% lower {lo:+.2f}), DSR {dsr:.2f} — {why}"}

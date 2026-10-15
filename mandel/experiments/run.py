@@ -59,43 +59,64 @@ def _series_by_market(price_rows) -> dict[str, np.ndarray]:
 
 
 def harness_market_calibration(archive: Archive, horizons=(1, 3, 7, 30, 90), min_n: int = 300) -> tuple[dict, int, str, str]:
-    """T-01: Brier skill vs coin > 0 at EVERY registered horizon (1, 3, 7, 30, 90 days). A scored horizon with skill <= 0 falsifies
-    'every horizon'; otherwise each registered horizon must be scored on >= min_n markets (the trial's min_n, per horizon), else
-    inconclusive. n is the binding (smallest) per-horizon count."""
+    """T-01: Brier skill vs coin > 0 at EVERY registered horizon (1, 3, 7, 30, 90 days). A horizon scored on >= min_n markets (the
+    trial's min_n, per horizon) with skill <= 0 falsifies 'every horizon'. A thin horizon (n < min_n) with skill <= 0 falsifies only
+    when the failure would persist at min_n even if every missing market were forecast perfectly (n * Brier >= min_n * 0.25);
+    otherwise it, like an unscored or thin horizon, makes the result inconclusive. n is the binding (smallest) per-horizon count."""
     rep = market_calibration(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"), horizons_days=horizons)
     h = rep["horizons"]
     ns = {k: int(h.get(k, {}).get("n", 0)) for k in horizons}
     n = min(ns.values())
     usable = {k: h[k]["skill_vs_coin"] for k in horizons if "brier" in h.get(k, {}) and h[k].get("skill_vs_coin") is not None}
     rep["n_by_horizon"] = {str(k): v for k, v in ns.items()}
-    failing = {k: s for k, s in usable.items() if s <= 0}
+    failing = {k: s for k, s in usable.items() if s <= 0 and (ns[k] >= min_n or ns[k] * h[k]["brier"] >= min_n * 0.25)}
     if failing:
         return rep, n, "not_supported", "market price fails to beat the coin at " + ", ".join(f"{k}d (skill {s:.2f}, n {ns[k]})" for k, s in failing.items())
     missing = [k for k in horizons if k not in usable]
     thin = [k for k in horizons if k in usable and ns[k] < min_n]
     if missing or thin:
-        return rep, n, "inconclusive", (f"skill > 0 where scored, but the claim needs every horizon with n >= {min_n}: "
-                                        + ", ".join([f"{k}d unscored (n {ns[k]})" for k in missing] + [f"{k}d n {ns[k]}" for k in thin]))
+        return rep, n, "inconclusive", (f"skill > 0 at every horizon scored on n >= {min_n}, but the claim needs every horizon with n >= {min_n}: "
+                                        + ", ".join([f"{k}d unscored (n {ns[k]})" for k in missing]
+                                                    + [f"{k}d n {ns[k]}" + (f", skill {usable[k]:.2f} <= 0 on n < min_n" if usable[k] <= 0 else "") for k in thin]))
     worst_skill = min(usable.values())
     return rep, n, "supported", f"market price beats the coin at every horizon (min skill {worst_skill:.2f}; smallest horizon n {n})"
 
 
-def harness_multiscale_edge(archive: Archive) -> tuple[dict, int, str, str]:
-    rep = multiscale_edge(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"))
-    n = max((v["n"] for v in rep["horizons"].values()), default=0)
-    if rep["n_scales_total"] < 3:
-        return rep, n, "inconclusive", "fewer than three horizons had 30+ markets"
-    if rep["n_scales_significant"] == 0:
-        return rep, n, "not_supported", "no horizon shows a mean error whose interval excludes zero: no structural market bias to be consistent about"
-    verdict = "supported" if rep["signs_agree"] else "not_supported"
-    return rep, n, verdict, (f"{rep['n_scales_significant']}/{rep['n_scales_total']} horizons significant and signs agree" if rep["signs_agree"]
-                              else "significant horizons disagree in sign")
+def harness_multiscale_edge(archive: Archive, horizons=(1, 3, 7, 30, 90), min_n: int = 300) -> tuple[dict, int, str, str]:
+    """T-03: some horizon's interval excludes zero AND the raw sign of mean(outcome - price) agrees across every registered horizon.
+    markets.multiscale_edge gives signs_agree False (scored horizons disagree in sign), None (scored ones agree, a registered horizon is
+    unscored) or True. Checked in that order: raw signs disagree -> not_supported; no horizon significant -> not_supported; an unscored
+    horizon or any horizon below min_n (the trial's, per horizon) -> inconclusive; else supported. A failure counts only when decisive:
+    the disagreement is between horizons with n >= min_n (or between intervals wholly on opposite sides of zero), and 'none
+    significant' needs every registered horizon scored on n >= min_n; otherwise inconclusive. n is the binding per-horizon count."""
+    rep = multiscale_edge(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"), horizons_days=horizons)
+    H = rep["horizons"]
+    ns = {h: int(H.get(h, {}).get("n", 0)) for h in horizons}
+    n = min(ns.values())
+    rep["n_by_horizon"] = {str(h): v for h, v in ns.items()}
+    signs = {h: int(np.sign(H[h]["mean_error"])) for h in horizons if h in H}
+    adequate = {s for h, s in signs.items() if ns[h] >= min_n}
+    ci_sides = {(1 if H[h]["ci"][0] > 0 else -1) for h in signs if H[h]["ci"][0] > 0 or H[h]["ci"][1] < 0}
+    disagree_decisive = 0 in adequate or len(adequate) > 1 or len(ci_sides) > 1
+    thin = [f"{h}d unscored (n {ns[h]})" if h not in H else f"{h}d n {ns[h]}" for h in horizons if ns[h] < min_n or h not in H]
+    txt = "raw sign of mean(outcome - price) by horizon " + ", ".join(f"{h}d {H[h]['mean_error']:+.4f} (n {ns[h]})" for h in horizons if h in H) + \
+        f"; {rep['n_scales_significant']}/{rep['n_scales_total']} scored horizons with an interval excluding zero"
+    if rep["signs_agree"] is False and disagree_decisive:
+        return rep, n, "not_supported", txt + "; raw signs disagree across horizons"
+    if rep["n_scales_significant"] == 0 and not thin:
+        return rep, n, "not_supported", txt + "; no horizon's interval excludes zero: no structural market bias to be consistent about"
+    if rep["signs_agree"] is not True or rep["n_scales_significant"] == 0 or thin:
+        why = ("raw signs disagree only where n < min_n" if rep["signs_agree"] is False else "no horizon significant yet" if rep["n_scales_significant"] == 0
+               else "signs agree where scored")
+        return rep, n, "inconclusive", txt + f"; {why}, but the claim needs every horizon with n >= {min_n}" + (": " + ", ".join(thin) if thin else "")
+    return rep, n, "supported", txt + "; raw signs agree at every horizon"
 
 
 def harness_bundle_arb(archive: Archive, min_n: int = 200) -> tuple[dict, int, str, str]:
     """T-04: >= 1 after-fee LONG bundle mispricing (best-ask YES + best-ask NO + fee + gas < 1, depth >= 5 USD) per 100 markets in every
     snapshot, across >= 2 snapshots. One snapshot can falsify persistence (a snapshot below the rate) but cannot confirm it. Short-side
-    crosses (bids summing above 1) are outside the claim and reported only. A snapshot of fewer than min_n markets cannot confirm."""
+    crosses (bids summing above 1) are outside the claim and reported only. A snapshot of fewer than min_n markets can neither confirm
+    nor falsify: only snapshots of >= min_n markets count against the claim; a thin one below the rate leaves it inconclusive."""
     names = ["polymarket-books-snapshot"] * bool(_bundles_matching(archive, "polymarket-books-snapshot")) + [n for n in _bundles_matching(archive, "polymarket-books-2*")]
     snaps = []
     for name in names:
@@ -109,15 +130,18 @@ def harness_bundle_arb(archive: Archive, min_n: int = 200) -> tuple[dict, int, s
     if not snaps:
         return {"snapshots": []}, 0, "inconclusive", "no snapshot with 50+ markets"
     ok = [s["rate_per_100"] >= 1 for s in snaps]
-    verdict = "not_supported" if not all(ok) else ("supported" if len(snaps) >= 2 and all(s["markets"] >= min_n for s in snaps) else "inconclusive")
+    falsifying = [s for s in snaps if s["rate_per_100"] < 1 and s["markets"] >= min_n]
+    verdict = "not_supported" if falsifying else ("supported" if all(ok) and len(snaps) >= 2 and all(s["markets"] >= min_n for s in snaps) else "inconclusive")
     txt = "; ".join(f"{s['bundle'].replace('polymarket-books-', '')}: {s['found']} after-fee long bundles in {s['markets']} markets ({s['gross_long_candidates']} with YES+NO asks below 1 before fees; "
                     f"{s['short_after_fees_reported_only']} short-side, not counted), median round-trip spread {s['median_spread']:.3f}" for s in snaps)
-    return {"snapshots": snaps}, sum(s["markets"] for s in snaps), verdict, f"{len(snaps)} snapshot(s): {txt}"
+    return {"snapshots": snaps}, sum(s["markets"] for s in snaps), verdict, f"{len(snaps)} snapshot(s): {txt}" + \
+        (f"; a snapshot needs >= {min_n} markets to count" if verdict == "inconclusive" and any(s["markets"] < min_n for s in snaps) else "")
 
 
 def harness_multifractal(archive: Archive, max_markets: int = 40, n_shuffles: int = 200, min_n: int = 40) -> tuple[dict, int, str, str]:
     """T-06: > 25% of series with tau(q) concavity beyond the 95th percentile of 200 shuffles per series (the trial's count).
-    Fewer than min_n series cannot support the claim."""
+    Fewer than min_n series cannot support the claim, and falsify it only when the share would stay <= 25% at min_n even if every
+    missing series exceeded the null; otherwise inconclusive."""
     series = _series_by_market(archive.load("polymarket-price-history-daily"))
     long_enough = [(k, s) for k, s in series.items() if s.size >= 120]
     long_enough.sort(key=lambda kv: -kv[1].size)
@@ -128,19 +152,20 @@ def harness_multifractal(archive: Archive, max_markets: int = 40, n_shuffles: in
     n = len(results)
     if n < 10:
         return {"per_market": results}, n, "inconclusive", "fewer than 10 series of 120+ daily points"
-    frac = sum(1 for r in results if r["exceeds"]) / n
+    n_exceed = sum(1 for r in results if r["exceeds"]); frac = n_exceed / n
     verdict = "supported" if frac > 0.25 else "not_supported"
-    if verdict == "supported" and n < min_n:
+    if n < min_n and (verdict == "supported" or (n_exceed + min_n - n) / min_n > 0.25):
         verdict = "inconclusive"
     return {"fraction_exceeding_null": frac, "n_series": n, "n_shuffles": n_shuffles, "per_market": results[:40]}, n, verdict, \
         f"{frac:.0%} of {n} daily logit-price series show concavity beyond the shuffled null ({n_shuffles} shuffles; threshold 25%; chance ~5%)" + \
-        (f"; fewer than the {min_n} series the trial requires" if n < min_n else "")
+        (f"; fewer than the {min_n} series the trial requires" + ("; fails even if every missing series counted for the claim" if verdict == "not_supported" else "") if n < min_n else "")
 
 
 def harness_hurst(archive: Archive, max_markets: int = 40, n_null: int = 200, min_n: int = 40) -> tuple[dict, int, str, str]:
     """T-07: anti-persistence in a majority of markets, outside the shuffle null. Two criteria: share of series with H < 0.5 > 50%,
     and share significantly ANTI-persistent (H below its own 200-shuffle 2.5% quantile) > 25%. Series above the null (persistent)
-    count against the claim, never for it. Fewer than min_n series cannot support the claim."""
+    count against the claim, never for it. Fewer than min_n series cannot support the claim, and falsify it only when a criterion
+    would still fail at min_n even if every missing series were significantly anti-persistent; otherwise inconclusive."""
     series = _series_by_market(archive.load("polymarket-price-history-daily"))
     long_enough = sorted([(k, s) for k, s in series.items() if s.size >= 120], key=lambda kv: -kv[1].size)[:max_markets]
     rows = []
@@ -158,13 +183,14 @@ def harness_hurst(archive: Archive, max_markets: int = 40, n_null: int = 200, mi
     anti = sum(1 for r in fin if np.isfinite(r["null_lo"]) and r["H"] < r["null_lo"])
     persistent = sum(1 for r in fin if np.isfinite(r["null_hi"]) and r["H"] > r["null_hi"])
     verdict = "supported" if below > 0.5 and anti / n > 0.25 else "not_supported"
-    if verdict == "supported" and n < min_n:
+    n_below, pad = sum(1 for r in fin if r["H"] < 0.5), max(min_n - n, 0)
+    if n < min_n and (verdict == "supported" or ((n_below + pad) / min_n > 0.5 and (anti + pad) / min_n > 0.25)):
         verdict = "inconclusive"
     med = float(np.median(Hs)) if Hs.size else float("nan")
     return {"median_H": med, "n_series": n, "n_null": n_null, "share_H_below_half": below, "n_anti_persistent_outside_null": anti,
             "share_anti_persistent_outside_null": anti / n, "n_persistent_outside_null": persistent, "per_market": rows}, n, verdict, \
         (f"median H {med:.2f}; {below:.0%} of {n} series with H < 0.5 (need > 50%); {anti}/{n} significantly anti-persistent, below their "
-         f"{n_null}-shuffle null (need > 25%); {persistent} significantly persistent (count against)" + (f"; fewer than the {min_n} series the trial requires" if n < min_n else ""))
+         f"{n_null}-shuffle null (need > 25%); {persistent} significantly persistent (count against)" + (f"; fewer than the {min_n} series the trial requires" + ("; fails even if every missing series counted for the claim" if verdict == "not_supported" else "") if n < min_n else ""))
 
 
 def harness_markov(archive: Archive, max_markets: int = 60) -> tuple[dict, int, str, str]:
@@ -214,31 +240,66 @@ def harness_overfit(archive: Archive, max_markets: int = 150) -> tuple[dict, int
     return rep, n, verdict, f"best of {rep['n_variants']} momentum rules: Sharpe {rep['best_sharpe']:.3f}, DSR {rep['dsr_best']:.2f}, PBO {rep['pbo']:.2f}"
 
 
+_MOM_GRID = {k: p.default for k, p in inspect.signature(momentum_variants).parameters.items() if k in ("lookbacks", "holds")}
+
+
+def _momentum_pnl_by_time(series_t: list[tuple[np.ndarray, np.ndarray]], lookbacks=_MOM_GRID["lookbacks"], holds=_MOM_GRID["holds"]) -> list[tuple]:
+    """T-10's declared momentum rules with momentum_variants' own lb/hd construction, kept per rule with each return's end time and
+    market: [(name, pnl, t_end, market index)]. series_t: [(t, price)] per market, sorted by t. pnl[j] = sign(p[j+lb] - p[j]) *
+    r[j+lb] ends at t[j+lb+1]; hd > 1 keeps every hd-th return, as momentum_variants does. Nothing is truncated or aligned by row."""
+    out = []
+    for lb in lookbacks:
+        for hd in holds:
+            P, Te, M = [], [], []
+            for m, (t, s) in enumerate(series_t):
+                if lb + 1 >= s.size:
+                    continue
+                r = np.diff(s) / np.maximum(s[:-1], 1e-6)
+                sig = np.sign(s[lb:-1] - s[:-lb - 1])
+                pnl = sig[:len(r) - lb] * r[lb:lb + len(sig)]
+                te = np.asarray(t, dtype=float)[lb + 1:lb + 1 + pnl.size]
+                P.append(pnl[::hd]); Te.append(te[::hd]); M.append(np.full(len(pnl[::hd]), m))
+            if P:
+                out.append((f"mom_lb{lb}_h{hd}", np.concatenate(P), np.concatenate(Te), np.concatenate(M)))
+    return out
+
+
 def harness_holdout_sharpe(archive: Archive, max_markets: int = 150, min_n: int = 100) -> tuple[dict, int, str, str]:
-    """T-36: the in-sample best of the declared momentum rules (T-10's search) has holdout Sharpe <= 0. The pooled return matrix is split
-    once, the same for every rule: first half of the rows in-sample, second half holdout. Fewer than min_n holdout periods or series
-    cannot support the claim."""
-    series = _series_by_market(archive.load("polymarket-price-history-daily"))
-    prices = [s for _, s in sorted(series.items(), key=lambda kv: -kv[1].size)[:max_markets] if s.size >= 60]
-    if len(prices) < 20:
-        return {}, len(prices), "inconclusive", "fewer than 20 series"
-    R, names = momentum_variants(prices)
-    T, N = R.shape
-    k = T // 2
-    is_sr = np.array([sharpe_ratio(R[:k, j]) for j in range(N)])
+    """T-36: the in-sample best of the declared momentum rules (T-10's search) has holdout Sharpe <= 0. One calendar split, the same
+    for every rule: the cutoff is the median end time of all the rules' pooled returns; returns ending at or before it are in-sample,
+    later ones holdout (a bot tuned on a backtest faces a later period). Each rule's returns are rebuilt per market with their end times
+    (T-10's construction), so every rule is ranked on the same markets and dates. Fewer than min_n holdout periods or series: inconclusive
+    whatever the sign (no interval to call a failure decisive)."""
+    rows = {}
+    for r in archive.load("polymarket-price-history-daily"):
+        v = r["value"]
+        rows.setdefault(v["market_id"], []).append((float(v["t"]), float(v["p"])))
+    series = {k: sorted(v) for k, v in rows.items()}
+    picked = [v for _, v in sorted(series.items(), key=lambda kv: -len(kv[1]))[:max_markets] if len(v) >= 60]
+    if len(picked) < 20:
+        return {}, len(picked), "inconclusive", "fewer than 20 series"
+    rules = _momentum_pnl_by_time([(np.array([t for t, _ in v]), np.array([p for _, p in v])) for v in picked])
+    cutoff = float(np.median(np.concatenate([te for _, _, te, _ in rules])))
+    split = [(name, pnl[te <= cutoff], pnl[te > cutoff], m[te <= cutoff], m[te > cutoff]) for name, pnl, te, m in rules]
+    is_sr = np.array([sharpe_ratio(x) for _, x, _, _, _ in split])
     best = int(np.argmax(is_sr))
-    ho = float(sharpe_ratio(R[k:, best]))
-    n = T - k
-    stat = {"n_variants": int(N), "n_periods": int(T), "n_holdout_periods": int(n), "n_series": len(prices), "split": "first half of pooled rows in-sample, second half holdout",
-            "is_best_variant": names[best], "is_best_sharpe": float(is_sr[best]), "holdout_sharpe": ho}
-    if ho > 0:
-        verdict = "not_supported"
-    elif n < min_n or len(prices) < min_n:
+    name, x_is, x_ho, m_is, m_ho = split[best]
+    ho = float(sharpe_ratio(x_ho))
+    n = int(x_ho.size)
+    stat = {"n_variants": len(rules), "n_series": len(picked), "split": "one calendar cutoff for every rule: median end time of the pooled returns",
+            "cutoff_t": cutoff, "cutoff_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(cutoff)),
+            "n_is_periods": int(x_is.size), "n_holdout_periods": n, "n_is_markets": int(np.unique(m_is).size), "n_holdout_markets": int(np.unique(m_ho).size),
+            "per_rule_is_holdout_periods": {nm: [int(a.size), int(b.size)] for nm, a, b, _, _ in split},
+            "is_best_variant": name, "is_best_sharpe": float(is_sr[best]), "holdout_sharpe": ho}
+    if n < min_n or len(picked) < min_n:
         verdict = "inconclusive"
+    elif ho > 0:
+        verdict = "not_supported"
     else:
         verdict = "supported"
-    return stat, n, verdict, (f"in-sample best of {N} momentum rules {names[best]} (IS Sharpe {is_sr[best]:+.4f}) has holdout Sharpe {ho:+.4f} over {n} periods "
-                              f"from {len(prices)} series (pass: <= 0)" + (f"; below min_n {min_n}" if verdict == "inconclusive" else ""))
+    return stat, n, verdict, (f"in-sample best of {len(rules)} momentum rules {name} (IS Sharpe {is_sr[best]:+.4f} over {x_is.size} periods to {stat['cutoff_utc']} UTC) "
+                              f"has holdout Sharpe {ho:+.4f} over {n} later periods from {len(picked)} series (pass: <= 0)"
+                              + (f"; below min_n {min_n}" if verdict == "inconclusive" else ""))
 
 
 def harness_controls(archive: Archive, ledger: Ledger, n_markets: int = 200) -> tuple[dict, int, str, str]:
@@ -300,7 +361,8 @@ def _cluster_mean_ci(e: np.ndarray, keys: list, n_boot: int, seed: int, q=(0.025
 def harness_longshot(archive: Archive, horizon: int = 7, hi_p: float = 0.10, n_boot: int = 2000, seed: int = 0, min_n: int = 300) -> tuple[dict, int, str, str]:
     """T-02: in the under-0.10 bucket at the 7d horizon, mean(outcome - price) < 0 (classic longshot bias:
     cheap YES over-priced). Event-clustered bootstrap 95% interval (markets of one event resampled together); the upper bound must be
-    below zero. Below the trial's min_n markets a failing bound still falsifies, but a passing one is only inconclusive."""
+    below zero. Below the trial's min_n markets a passing bound is only inconclusive, and a failing one falsifies only when the whole
+    interval lies above zero (decisive); an interval straddling zero on thin data is inconclusive."""
     market_rows = list(archive.load("polymarket-closed-markets"))
     outcomes = resolved_outcomes(market_rows)
     rows = price_at_horizons(archive.load("polymarket-price-history-daily"), outcomes, horizons_days=(horizon,))[horizon]
@@ -314,7 +376,7 @@ def harness_longshot(archive: Archive, horizon: int = 7, hi_p: float = 0.10, n_b
             "ci_method": "event-clustered percentile bootstrap (events[0].id, else negRiskMarketID, else market)",
             "yes_events": int(sum(1 for p, o, _ in picked if o == 1)), "mean_price": float(np.mean([p for p, _, _ in picked]))}
     if hi >= 0:
-        verdict = "not_supported"
+        verdict = "not_supported" if sel.size >= min_n or lo > 0 else "inconclusive"
     elif sel.size < min_n:
         verdict = "inconclusive"
     else:
@@ -323,10 +385,11 @@ def harness_longshot(archive: Archive, horizon: int = 7, hi_p: float = 0.10, n_b
                                           f"{stat['yes_events']} YES events of {sel.size} markets in {n_events} events" + (f"; below min_n {min_n}" if verdict == "inconclusive" else ""))
 
 
-def harness_horizon_monotone(archive: Archive, horizons=(1, 3, 7, 30, 90), required=(1, 7, 30, 90), min_n: int = 300) -> tuple[dict, int, str, str]:
-    """T-13: skill(1d) > skill(7d) > skill(30d) > skill(90d), strictly, no tolerance (the registered pass). 3d is reported only.
-    Any strict-order violation among the scored required horizons falsifies the chain; otherwise every required horizon must be
-    scored on >= min_n markets (the trial's min_n, per horizon), else inconclusive. n is the binding per-horizon minimum."""
+def harness_horizon_monotone(archive: Archive, horizons=(1, 3, 7, 30, 90), required=(1, 3, 7, 30, 90), min_n: int = 300) -> tuple[dict, int, str, str]:
+    """T-13: skill increases monotonically as the horizon shortens (90d -> 1d) over the claim's data (T-01's horizons, 3d included):
+    skill(1d) > skill(3d) > skill(7d) > skill(30d) > skill(90d), strictly, no tolerance. A strict-order violation between two horizons
+    both scored on >= min_n markets (the trial's min_n, per horizon) falsifies the chain; a violation involving a thinner horizon, an
+    unscored horizon or a thin one leaves it inconclusive. n is the binding per-horizon minimum."""
     rep = market_calibration(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"), horizons_days=horizons)
     H = rep["horizons"]
     skills = {h: H[h]["skill_vs_coin"] for h in horizons if "brier" in H.get(h, {}) and H[h].get("skill_vs_coin") is not None}
@@ -334,25 +397,29 @@ def harness_horizon_monotone(archive: Archive, horizons=(1, 3, 7, 30, 90), requi
     n = min(ns[h] for h in required)
     avail = [h for h in required if h in skills]
     violations = [(a, b) for i, a in enumerate(avail) for b in avail[i + 1:] if not skills[a] > skills[b]]
+    decisive = [(a, b) for a, b in violations if ns[a] >= min_n and ns[b] >= min_n]
     missing = [h for h in required if h not in skills]
     thin = [h for h in required if h in skills and ns[h] < min_n]
     stat = {"skills": {str(h): skills[h] for h in horizons if h in skills}, "n_by_horizon": {str(h): ns[h] for h in horizons},
             "required": list(required), "monotone": not violations and not missing}
-    txt = "skill by horizon " + ", ".join(f"{h}d {skills[h]:.3f}" for h in horizons if h in skills) + " (3d reported only)"
-    if violations:
-        return stat, n, "not_supported", txt + "; strict order fails: " + ", ".join(f"skill({a}d) <= skill({b}d)" for a, b in violations)
-    if missing or thin:
-        return stat, n, "inconclusive", txt + f"; the chain needs every one of {', '.join(f'{h}d' for h in required)} with n >= {min_n}: " + \
+    txt = "skill by horizon " + ", ".join(f"{h}d {skills[h]:.3f}" for h in horizons if h in skills)
+    if decisive:
+        return stat, n, "not_supported", txt + f"; strict order fails on n >= {min_n}: " + ", ".join(f"skill({a}d) <= skill({b}d)" for a, b in decisive)
+    if violations or missing or thin:
+        return stat, n, "inconclusive", txt + "".join(f"; skill({a}d) <= skill({b}d) with n < {min_n}" for a, b in violations) + \
+            f"; the chain needs every one of {', '.join(f'{h}d' for h in required)} with n >= {min_n}: " + \
             ", ".join([f"{h}d unscored (n {ns[h]})" for h in missing] + [f"{h}d n {ns[h]}" for h in thin])
-    return stat, n, "supported", txt + " (strictly decreasing 1d > 7d > 30d > 90d)"
+    return stat, n, "supported", txt + " (strictly decreasing " + " > ".join(f"{h}d" for h in required) + ")"
 
 
 def harness_point_in_time(archive: Archive) -> tuple[dict, int, str, str]:
-    """T-19: does honouring available_at change a verdict? Runs the Fear & Greed harness with the naive join
-    (lag 0) and the honest one (lag 1). Pass: the verdicts differ. The sign of the fear-side effect is reported only."""
+    """T-19: does honouring available_at change a verdict? Runs the Fear & Greed harness with the naive join on observed_at
+    (lag -1: the forward window starts at close(d-1), before day d's index was published) and the point-in-time one (lag 0: the
+    first close at or after available_at = observed_at + 24 h). Pass: the verdicts differ. The sign of the fear-side effect is
+    reported only."""
     fng = list(archive.load("crypto-fear-greed-history")); px = list(archive.load("daily-history-BTC-USD"))
-    naive = fear_greed_forward_returns(fng, px, lag_days=0, n_boot=500)
-    honest = fear_greed_forward_returns(fng, px, lag_days=1, n_boot=500)
+    naive = fear_greed_forward_returns(fng, px, lag_days=-1, n_boot=500)
+    honest = fear_greed_forward_returns(fng, px, lag_days=0, n_boot=500)
     changed = naive["verdict"] != honest["verdict"]
     dn, dh = naive.get("d_fear", float("nan")), honest.get("d_fear", float("nan"))
     sign_flip = bool(dn is not None and dh is not None and np.isfinite(dn) and np.isfinite(dh) and np.sign(dn) != np.sign(dh))
@@ -454,8 +521,19 @@ def _overlay_pair(archive: Archive, strategy: str, versus: str = "benchmark"):
     """Runs the overlay at VIX and at today's measured ATM/VIX ratio; returns both and a sensitivity reading."""
     a = _overlay(archive, strategy, 1.0); b = _overlay(archive, strategy, IV_SCALE_TODAY)
     va = overlay_verdict(a, versus=versus); vb = overlay_verdict(b, versus=versus)
-    va["p_value_sharpe_diff"] = _sharpe_diff_p(a["returns"], a["benchmark"]); vb["p_value_sharpe_diff"] = _sharpe_diff_p(b["returns"], b["benchmark"])
+    for v, rep in ((va, a), (vb, b)):
+        v["p_value_sharpe_diff"] = _sharpe_diff_p(*_sharpe_basis(rep))
+        v["p_value_sharpe_diff_basis"] = rep.get("sharpe_basis", "raw")
     return {"at_vix": va, "at_iv_scale_0.81": vb, "model_priced": True, "note": MODEL_NOTE}, a, b
+
+
+def _sharpe_basis(rep: dict) -> tuple[np.ndarray, np.ndarray]:
+    """(strategy, benchmark) per-cycle returns on the basis of the Sharpes overlay_backtest reports: funded positions (stock legs,
+    cash-secured put) and the buy-and-hold benchmark in excess of the per-cycle bill; an unfunded straddle raw (already an excess return)."""
+    bill = np.asarray(rep["bill_returns"], dtype=float)
+    funded = rep.get("strategy") not in ("short_straddle", "long_straddle")
+    s = np.asarray(rep["returns"], dtype=float)
+    return (s - bill if funded else s), np.asarray(rep["benchmark"], dtype=float) - bill
 
 
 def harness_covered_call(archive: Archive):
@@ -694,8 +772,9 @@ def _u2_gold_autumn_v2(a):
 
 
 def _u2_low_vol_tilt(a):
-    usmv, spy = _ls(a, "USMV"), _ls(a, "SPY")
-    return _with_n(u2.low_vol_tilt(usmv, spy, _ls(a, "SPLV"), _ls(a, "SPHB")), max(len(set(usmv[0]) & set(spy[0])) - 1, 0))
+    """T-384's Sharpe difference is on daily excess returns over T-bills: underlying2.low_vol_tilt subtracts the bill known at t-1."""
+    usmv, spy = _ls(a, "USMV"), _ls(a, "SPY"); b = _bill(a)
+    return _with_n(u2.low_vol_tilt(usmv, spy, _ls(a, "SPLV"), _ls(a, "SPHB"), bill_days=b[0], bill_vals=b[1]), max(len(set(usmv[0]) & set(spy[0])) - 1, 0))
 
 
 def _u2_golden_cross(a, v2: bool):
@@ -715,7 +794,7 @@ U2_HARNESSES = {
     "btc_monday": _u2(lambda a: (lambda s: _with_n(u2.btc_monday(*s), _n_returns(s)))(_ls(a, "BTC-USD"))),
     "gold_autumn": _u2(lambda a: (lambda g: _with_n(u2.gold_autumn(g, _ls(a, "GC=F")), _n_returns(g)))(_ls(a, "GLD"))),
     "golden_cross_crypto": _u2(lambda a: _u2_golden_cross(a, v2=False)),
-    "metals_tsmom": _u2(lambda a: u2.metals_tsmom(_ls(a, "GLD"), _ls(a, "SLV"), _ls(a, "GC=F"), _ls(a, "SI=F"))),
+    "metals_tsmom": _u2(lambda a: (lambda b: u2.metals_tsmom(_ls(a, "GLD"), _ls(a, "SLV"), _ls(a, "GC=F"), _ls(a, "SI=F"), bill_days=b[0], bill_vals=b[1]))(_bill(a))),
     "crypto_weekly_tsmom": _u2(lambda a: u2.crypto_weekly_tsmom(_ls(a, "BTC-USD"), _ls(a, "ETH-USD"))),
     "btc_reversal": _u2(lambda a: u2.btc_reversal(*_ls(a, "BTC-USD"))),
     "gem_dual_momentum": _u2(lambda a: u2.gem(_ls(a, "SPY"), _ls(a, "EFA"), _ls(a, "AGG"), *_bill(a))),
@@ -747,10 +826,10 @@ def _dh(*syms: str) -> list[str]:
 # Every bundle each U2 harness actually loads (asserted against a load trace in tests/test_mandel_audit_rw.py).
 U2_BUNDLES = {"tom_replication": _dh(*TOM_ASSETS), "quarter_end_reversal": _dh("IWM"), "santa_rally": _dh("^GSPC", "SPY"),
               "january_small_cap": _dh("IWM", "SPY", "^RUT", "^GSPC"), "sell_in_may": _dh("^GSPC", "SPY"), "opex_week": _dh("SPY"), "btc_monday": _dh("BTC-USD"),
-              "gold_autumn": _dh("GLD", "GC=F"), "golden_cross_crypto": _dh("BTC-USD", "ETH-USD"), "metals_tsmom": _dh("GLD", "SLV", "GC=F", "SI=F"),
+              "gold_autumn": _dh("GLD", "GC=F"), "golden_cross_crypto": _dh("BTC-USD", "ETH-USD"), "metals_tsmom": _dh("GLD", "SLV", "GC=F", "SI=F") + ["fred-DTB3"],
               "crypto_weekly_tsmom": _dh("BTC-USD", "ETH-USD"), "btc_reversal": _dh("BTC-USD"), "gem_dual_momentum": _dh("SPY", "EFA", "AGG") + ["fred-DTB3"],
               "sector_rotation": _dh(*u2.SECTORS, "SPY") + ["fred-DTB3"], "svxy_regime": _dh("SVXY") + ["cboe-VIX-history", "cboe-VIX3M-history"],
-              "low_vol_tilt": _dh("USMV", "SPY", "SPLV", "SPHB"),
+              "low_vol_tilt": _dh("USMV", "SPY", "SPLV", "SPHB") + ["fred-DTB3"],
               "santa_v2": _dh("^GSPC"), "sell_in_may_v2": _dh("^GSPC"), "btc_monday_v2": _dh("BTC-USD"), "gold_autumn_v2": _dh("GLD"),
               "opex_week_v2": _dh("SPY"), "tom_replication_v2": _dh(*TOM_ASSETS), "low_vol_v2": _dh("USMV", "SPY") + ["fred-DTB3"], "btc_reversal_v2": _dh("BTC-USD"),
               "sector_rotation_v2": _dh(*u2.SECTORS, "SPY") + ["fred-DTB3"], "gem_v2": _dh("SPY", "EFA", "AGG") + ["fred-DTB3"], "golden_cross_v2": _dh("BTC-USD", "ETH-USD"),
@@ -791,6 +870,11 @@ def _structure_ctx(archive):
         days, closes = u2.load_series(archive, "SPY", adjusted=False)
         _SC.clear(); _SC[key] = Ctx(days, closes, index_closes(archive.load("cboe-VIX-history")), index_closes(archive.load("fred-DTB3")), list(_load_many(archive, "spy-smile-*")))
     return _SC[key]
+
+
+# The model-priced structure claims evaluated by structure_claims.evaluate, one harness each (structure_t_100 ... structure_t_517).
+STRUCTURE_IDS = ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]
+STRUCTURE_THEORY = {f"structure_{c.replace('-', '_').lower()}": c for c in STRUCTURE_IDS}
 
 
 def _structure_harness(cid):
@@ -837,7 +921,8 @@ XA_HARNESSES = {
     "btc_short_put": _xh(lambda a: _xa().short_put_mean(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), -0.25, 30, 30, "2021-04-01", "DVOL"), "n_cycles"),
     "btc_low_dvol_straddle": _xh(lambda a: _xa().conditional_straddle(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), 60, 60, "2022-01-01", 365, 0.20, "DVOL"), "n_entries"),
     "btc_protective_put": _xh(lambda a: _xa().protective_put_calmar(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), "2021-04-01"), "n_cycles"),
-    "btc_inverse_covered_call": _xh(lambda a: _xa().inverse_covered_call_btc(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), "2021-04-01"), "n_cycles"),
+    "btc_inverse_covered_call": _xh(lambda a: _xa().inverse_covered_call_btc(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), "2021-04-01",
+                                                                             delivery=_xa().delivery_prices(a.load("deribit-delivery-prices-btc"))), "n_cycles"),
     "gld_covered_call": _xh(lambda a: _xa().covered_call_vs_hold(*_px(a, "GLD"), _ix(a, "cboe-GVZ-history"), _ix(a, "fred-DTB3"), 0.30, 30, 21, 12, "2009-10-01", "GVZ", (0.20, 0.30, 0.40)), "n_cycles"),
     "gld_put_write": _xh(lambda a: _xa().short_put_mean(*_px(a, "GLD"), _ix(a, "cboe-GVZ-history"), _ix(a, "fred-DTB3"), -0.25, 30, 21, "2009-10-01", "GVZ"), "n_cycles"),
     "gld_low_gvz_straddle": _xh(lambda a: _xa().conditional_straddle(*_px(a, "GLD"), _ix(a, "cboe-GVZ-history"), _ix(a, "fred-DTB3"), 90, 63, "2010-01-01", 252, 0.20, "GVZ"), "n_entries"),
@@ -857,7 +942,7 @@ XA_BUNDLES = {
     "gvz_vix_extremes": _dh("GLD", "SPY") + ["cboe-GVZ-history", "cboe-VIX-history"],
     "eth_btc_dvol_ratio": _dh("ETH-USD", "BTC-USD") + ["deribit-dvol-ETH-history", "deribit-dvol-BTC-history"],
     "gold_silver_ratio_extreme": _dh("GLD", "SLV"), "gvz_vix_zscore_slope": ["cboe-GVZ-history", "cboe-VIX-history"],
-    "btc_covered_call": _BTC_OPT, "btc_short_put": _BTC_OPT, "btc_low_dvol_straddle": _BTC_OPT, "btc_protective_put": _BTC_OPT, "btc_inverse_covered_call": _BTC_OPT,
+    "btc_covered_call": _BTC_OPT, "btc_short_put": _BTC_OPT, "btc_low_dvol_straddle": _BTC_OPT, "btc_protective_put": _BTC_OPT, "btc_inverse_covered_call": _BTC_OPT + ["deribit-delivery-prices-btc"],
     "gld_covered_call": _GLD_OPT, "gld_put_write": _GLD_OPT, "gld_low_gvz_straddle": _GLD_OPT,
 }
 # The registered null of the theory each XA harness tests (XA_MAP), recorded with every result.
@@ -870,7 +955,7 @@ XA_NULLS = {
     "ovx_var_premium": "mean OVX^2 - realised USO variance <= 0 (block-bootstrap CI)",
     "multi_asset_short_var": "Sharpe(equal-vega SPX/GLD/USO/TLT short variance) - Sharpe(SPX alone) <= 0 (block bootstrap)",
     "gvz_vix_extremes": "mean of s*[ln(RV_GLD/RV_SPY) - ln(GVZ/VIX)] after band exits <= 0 (block-bootstrap CI)",
-    "eth_btc_dvol_ratio": "mean of [ln(RV_ETH/RV_BTC) - ln(DVOL_ETH/DVOL_BTC)] after low-ratio signals <= 0 (block-bootstrap CI)",
+    "eth_btc_dvol_ratio": "mean of [RV_ETH/RV_BTC - DVOL_ETH/DVOL_BTC] after signals below the trailing 365-day 20th percentile <= 0 (block-bootstrap CI)",
     "gold_silver_ratio_extreme": "mean 180-day forward log change of GLD/SLV after a 5-year 90th-percentile exceedance >= 0 (bootstrap)",
     "gvz_vix_zscore_slope": "OLS slope of the 20-day forward change in log(GVZ/VIX) on its z-score >= 0 (bootstrap, per half)",
     "btc_covered_call": "Sharpe(covered call) - Sharpe(hold) <= 0; model-priced at flat DVOL", "btc_short_put": "mean short-put P&L <= 0; model-priced at flat DVOL",
@@ -937,11 +1022,13 @@ BATCH_BUNDLES = {
 
 
 def _batch_null(name: str) -> str:
-    """The null of the theory a batch harness tests, as registered in its trial."""
-    tid = BATCH_THEORY.get(name)
+    """The null of the theory a batch or structure harness tests, as registered in its trial."""
+    tid = BATCH_THEORY.get(name) or STRUCTURE_THEORY.get(name)
     reg = load_registry() if tid else None
     t = next((t for t in reg["theories"] if t["id"] == tid), None) if reg else None
-    return f"{tid}: {t['trial']['null']}" if t else "see the harness docstring"
+    if t:
+        return f"{tid}: {t['trial']['null']}" + ("; model-priced" if name in STRUCTURE_THEORY else "")
+    return f"{tid}: mean P&L = 0 at the stated pricing; model-priced" if name in STRUCTURE_THEORY else "see the harness docstring"
 
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     """INDEX entries matching the pattern. Listing is not availability: bundles kept off git have INDEX entries on every checkout."""
@@ -1006,7 +1093,7 @@ HARNESSES: dict[str, Callable] = {
     **OM2_HARNESSES,
     **XA_HARNESSES,
     **BATCH_HARNESSES,
-    **{f"structure_{c.replace('-', '_').lower()}": _structure_harness(c) for c in ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]},
+    **{f"structure_{c.replace('-', '_').lower()}": _structure_harness(c) for c in STRUCTURE_IDS},
 }
 BUNDLES_NEEDED = {
     "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -1038,7 +1125,7 @@ BUNDLES_NEEDED = {
     **OM2_BUNDLES,
     **XA_BUNDLES,
     **BATCH_BUNDLES,
-    **{f"structure_{c.replace('-', '_').lower()}": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3", "spy-smile-*"] for c in ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]},
+    **{f"structure_{c.replace('-', '_').lower()}": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3", "spy-smile-*"] for c in STRUCTURE_IDS},
 }
 
 
@@ -1174,4 +1261,4 @@ def _null_for(name: str) -> str:
         "btc_weekend_variance": "weekend variance >= 3x weekday variance",
         **XA_NULLS,
     }.get(name, "see the harness docstring in mandel/experiments/underlying2.py (null stated per criterion)" if name in U2_HARNESSES
-          else _batch_null(name) if name in BATCH_HARNESSES else "n/a")
+          else _batch_null(name) if name in BATCH_HARNESSES or name in STRUCTURE_THEORY else "n/a")

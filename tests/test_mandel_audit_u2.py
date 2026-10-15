@@ -430,8 +430,8 @@ def test_golden_cross_scores_from_the_50_200_warm_up():
 def test_golden_cross_v2_window_and_declared_trials():
     btc, eth = _crypto("2014-09-17", "2019-12-31", 18), _crypto("2017-11-09", "2021-12-31", 19)
     rep = u2.golden_cross_v2(btc, eth)
-    assert rep["BTC"]["start"] == "2015-04-05"                                 # first valid 50/200 position inside 2015-04-
-    assert rep["ETH"]["start"] == eth[0][200]
+    assert rep["BTC"]["start"] == "2015-04-06"                                 # first held 50/200 position inside 2015-04- (round 2: return from close t+1)
+    assert rep["ETH"]["start"] == eth[0][201]
     assert rep["BTC"]["dsr_n_trials"] == 72 and rep["n"] == rep["BTC"]["n_days"]
 
 

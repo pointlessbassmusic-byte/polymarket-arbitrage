@@ -161,14 +161,15 @@ def test_om9_horizon_monotone_is_strict_without_tolerance(pm_archive, monkeypatc
     assert verdict == "not_supported" and not stat["monotone"] and "skill(30d) <= skill(90d)" in reason
 
 
-def test_om9_horizon_monotone_needs_every_named_horizon_and_ignores_3d(pm_archive, monkeypatch):
+def test_om9_horizon_monotone_needs_every_named_horizon_including_3d(pm_archive, monkeypatch):
     # 90d below 20 rows is unscored: was 'supported' on 1/3/7/30; now inconclusive
     _stub_calibration(monkeypatch, {1: _h(400, .86), 3: _h(400, .85), 7: _h(400, .78), 30: _h(400, .70), 90: _h(15, 0)})
     assert run.harness_horizon_monotone(pm_archive)[2] == "inconclusive"
-    # 3d is not in the registered chain: 1d < 3d does not falsify 1d > 7d > 30d > 90d (the old adjacent check said not_supported)
+    # round 2 (rule 1): the claim is monotone from 90d to 1d over T-01's horizons, 3d included, so 1d < 3d on n >= 300 falsifies it
+    # (round 1 dropped 3d from the chain and called this supported)
     _stub_calibration(monkeypatch, {1: _h(400, .80), 3: _h(400, .85), 7: _h(400, .78), 30: _h(400, .70), 90: _h(400, .65)})
     stat, n, verdict, reason = run.harness_horizon_monotone(pm_archive)
-    assert verdict == "supported" and stat["skills"]["3"] == .85
+    assert verdict == "not_supported" and stat["skills"]["3"] == .85 and "skill(1d) <= skill(3d)" in reason
 
 
 # ----------------------------------------------------------------------------- OM-14a (T-04): long side only --
@@ -279,13 +280,20 @@ def test_om5_t36_is_scored_by_holdout_sharpe_of_the_is_best_rule(tmp_path, monke
     R = rng.normal(0, 0.01, size=(400, 21))
     R[:200, 3] += 0.02                                             # in-sample winner: rule 3
     R[200:, 3] += 0.005                                            # ... still positive out of sample -> T-36 fails
-    monkeypatch.setattr(run, "momentum_variants", lambda prices: (R, [f"r{j}" for j in range(21)]))
+
+    def rules(M):
+        # round 2: rules are split on one calendar cutoff (the median return end time), not by pooled row; here every rule's returns end
+        # at t = 0..T-1, so the cutoff halves them exactly as the old row split did
+        t = np.arange(M.shape[0], dtype=float)
+        return lambda series_t: [(f"r{j}", M[:, j], t, np.zeros(M.shape[0], int)) for j in range(M.shape[1])]
+
+    monkeypatch.setattr(run, "_momentum_pnl_by_time", rules(R))
     stat, n, verdict, reason = run.harness_holdout_sharpe(a)
     assert stat["is_best_variant"] == "r3" and stat["holdout_sharpe"] > 0 and verdict == "not_supported" and n == 200
     R2 = R.copy(); R2[200:, 3] -= 0.02
-    monkeypatch.setattr(run, "momentum_variants", lambda prices: (R2, [f"r{j}" for j in range(21)]))
+    monkeypatch.setattr(run, "_momentum_pnl_by_time", rules(R2))
     assert run.harness_holdout_sharpe(a)[2] == "supported"
-    monkeypatch.setattr(run, "momentum_variants", lambda prices: (R2[125:275], [f"r{j}" for j in range(21)]))
+    monkeypatch.setattr(run, "_momentum_pnl_by_time", rules(R2[125:275]))
     stat, n, verdict, reason = run.harness_holdout_sharpe(a)
     assert stat["holdout_sharpe"] <= 0 and (n, verdict) == (75, "inconclusive")     # 75 holdout periods < min_n 100
     reg = {"theories": [{"id": "T-10", "experiments": ["dsr_pbo_harness"]}, {"id": "T-36", "experiments": ["dsr_pbo_harness"]}]}
@@ -389,6 +397,7 @@ def test_om12_u2_harnesses_report_the_observations_they_rest_on(tmp_path, monkey
     syms = ["QQQ", "IWM", "TLT", "GLD", "GC=F", "USMV", "SPY", "SPLV", "SPHB"]
     bundles = {run._dh(s)[0]: _daily_rows(s, 100 + np.arange(400.0)) for s in syms}
     bundles.update({run._dh(s)[0]: _daily_rows(s, 100 + np.arange(2000.0)) for s in ("BTC-USD", "ETH-USD")})   # 2010-12 .. 2016-05
+    bundles["fred-DTB3"] = _daily_rows("DTB3", 2.0 * np.ones(400))      # round 2: low_vol_tilt now takes the T-bill series (T-384 excess returns)
     a = FakeArchive(tmp_path, bundles)
     for name in ["tom_replication", "btc_monday", "gold_autumn", "golden_cross", "low_vol_tilt", "gold_autumn_v2", "tom_replication_v2", "golden_cross_v2"]:
         monkeypatch.setattr(u2, name, lambda *x, **k: {"verdict": "not_supported", "reason": "stub"})

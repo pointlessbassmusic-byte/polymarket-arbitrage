@@ -123,9 +123,18 @@ def forward_variance_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
 T231_MIN_CYCLES = 70        # T-231 trial.min_n, in non-overlapping 63-day cycles
 
 
+def _significantly_negative(x: np.ndarray) -> bool:
+    """Mean of x below 0 with the 95% CI wholly below 0: the mirror one-sided test (H0: mean >= 0) rejects at 2.5%, by the same studentized
+    block bootstrap as the pass-side test. Under 8 points no bootstrap runs, so nothing can be shown and the answer is False."""
+    return len(x) >= 8 and float(x.mean()) < 0 and block_bootstrap_pvalue(-x, np.zeros_like(x), n_boot=2000, block_len=2) < 0.025
+
+
 def term_vs_spot_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
     """T-231: (F^2 - RV[22..63]) - (VIX^2 - RV[1..21]) > 0 with F^2 = (3*VIX3M^2 - VIX^2)/2; conditional forward premium
-    (VIX3M/VIX > 1.10) positive in both halves. Non-overlapping 63-day cycles."""
+    (VIX3M/VIX > 1.10) positive in both halves. Non-overlapping 63-day cycles.
+    Below trial.min_n (70 cycles) the verdict cannot be supported, and a failing criterion decides only when it fails decisively: the main
+    premium's 95% CI lies wholly at or below 0, or a conditional half's mean is significantly negative. A non-significant shortfall there,
+    or a sample under 8 cycles (no bootstrap), is inconclusive."""
     days, (vix, v3), S = _aligned_index_and_price([vix_rows, vix3m_rows], spy_rows, "SPY")
     r = np.diff(np.log(S))
     d, cond, ts = [], [], []
@@ -135,16 +144,25 @@ def term_vs_spot_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
         d.append(fwd - spot); ts.append(t)
         if v3[t] / vix[t] > 1.10:
             cond.append(fwd)
-    d = np.array(d); cond = np.array(cond)
-    p = block_bootstrap_pvalue(d, np.zeros_like(d), n_boot=2000, block_len=2) if len(d) >= 8 else 1.0
+    d = np.array(d, dtype=float); cond = np.array(cond, dtype=float)
+    mean = float(d.mean()) if len(d) else float("nan")
+    p = block_bootstrap_pvalue(d, np.zeros_like(d), n_boot=2000, block_len=2) if len(d) >= 8 else None   # under 8 cycles: no test, never a decision
     h = len(cond) // 2
-    halves = [float(cond[:h].mean()) if h else float("nan"), float(cond[h:].mean()) if len(cond) - h else float("nan")]
-    ok = d.mean() > 0 and p < 0.025 and all(x > 0 for x in halves)
-    short = len(d) < T231_MIN_CYCLES                 # trial.min_n: a pass below it is not a confirmation (a failing criterion still fails)
-    return {"n_cycles": int(len(d)), "min_n": T231_MIN_CYCLES, "mean_term_minus_spot_var": float(d.mean()), "p_value": p, "n_conditional": int(len(cond)),
-            "conditional_forward_premium_halves": halves, "verdict": ("inconclusive" if short else "supported") if ok else "not_supported",
-            "reason": f"forward premium minus spot premium {d.mean():+.4f} (variance units) over {len(d)} non-overlapping 63d cycles, p={p:.3f}; conditional (VIX3M/VIX>1.10, n={len(cond)}) forward premium halves {halves[0]:+.4f}/{halves[1]:+.4f}"
-                      + (f"; {len(d)} cycles is below the trial min_n {T231_MIN_CYCLES}, so a pass cannot confirm" if short else "")}
+    parts = [cond[:h], cond[h:]]
+    halves = [float(x.mean()) if len(x) else float("nan") for x in parts]
+    full = len(d) >= T231_MIN_CYCLES
+    # (name, passes, fails decisively: the failure stands below trial.min_n because its interval lies wholly on the wrong side)
+    rows = [("forward premium > spot premium, 95% CI excluding 0", p is not None and mean > 0 and p < 0.025, _significantly_negative(d)),
+            ("conditional (VIX3M/VIX > 1.10) forward premium positive in both halves", all(x > 0 for x in halves), any(_significantly_negative(x) for x in parts))]
+    criteria = [(name, bool(ok)) if (full or ok or decisive) else (name + " (fails, not decisively, below min_n: undecided)", None)
+                for name, ok, decisive in rows]
+    criteria.append((f"sample reaches trial min_n {T231_MIN_CYCLES} cycles ({len(d)} so far)", True if full else None))
+    verdict, why = _verdict(criteria)
+    return {"n_cycles": int(len(d)), "min_n": T231_MIN_CYCLES, "mean_term_minus_spot_var": mean, "p_value": p, "n_conditional": int(len(cond)),
+            "conditional_forward_premium_halves": halves, "criteria": [[c, ok] for c, ok in criteria], "verdict": verdict,
+            "reason": f"forward premium minus spot premium {mean:+.4f} (variance units) over {len(d)} non-overlapping 63d cycles, "
+                      + (f"p={p:.3f}" if p is not None else "p n/a (under 8 cycles)")
+                      + f"; conditional (VIX3M/VIX>1.10, n={len(cond)}) forward premium halves {halves[0]:+.4f}/{halves[1]:+.4f}; verdict: {why}"}
 
 
 
