@@ -35,6 +35,16 @@ def test_binomial_ci_and_sign_test():
     assert abs(om._sign_test_p(9, 10) - 11 / 1024) < 1e-12
 
 
+def _dtb3_for(rc):
+    """DTB3 discount-basis quote (%) whose continuous 91-day rate is rc (inverse of om._dtb3_cont)."""
+    return (1 - math.exp(-rc * 91 / 365)) * 360 / 91 * 100
+
+
+def _dgs2_for(rc):
+    """DGS2 bond-equivalent quote (%) whose continuous rate is rc (inverse of om._semiannual_cont)."""
+    return 200 * (math.exp(rc / 2) - 1)
+
+
 def _chain(spot, day, r, sigma, half_spread, expiries_dte, strikes):
     rows = []
     cap = date.fromisoformat(day)
@@ -50,20 +60,21 @@ def _chain(spot, day, r, sigma, half_spread, expiries_dte, strikes):
 def test_boxes_recover_the_pricing_rate():
     day = "2026-10-14"; spot = 5000.0; r = 0.045
     rows = _chain(spot, day, r, 0.2, 0.0, [120, 240], range(4300, 5701, 100))
-    dtb3 = [{"value": {"day": day, "value": 4.0}}]; dgs2 = [{"value": {"day": day, "value": 4.0}}]
+    rb = math.log(1.04)                                   # bills dated the session before the capture (no same-day look-ahead), flat curve at rb
+    dtb3 = [{"value": {"day": "2026-10-13", "value": _dtb3_for(rb)}}]; dgs2 = [{"value": {"day": "2026-10-13", "value": _dgs2_for(rb)}}]
     bx = om.box_rates(rows, spot, day, dtb3, dgs2, (90, 365))
     assert bx and all(abs(b["r_mid"] - r) < 1e-6 and abs(b["r_lend"] - r) < 1e-6 for b in bx)
     wide = om.box_rates(_chain(spot, day, r, 0.2, 0.5, [120], range(4300, 5701, 100)), spot, day, dtb3, dgs2, (90, 365))
     assert all(b["r_lend"] < r < b["r_borrow"] for b in wide)            # paying spreads lowers the lending rate, raises borrowing
     rep = om.box_lending([(day, spot, rows)], dtb3, dgs2)
-    spread_bp = (r - math.log(1.04)) * 1e4
+    spread_bp = (r - rb) * 1e4
     assert abs(rep["days"][0]["median_spread_bp"] - spread_bp) < 1 and rep["verdict"] in ("inconclusive", "not_supported")
 
 
 def test_parity_on_a_clean_european_chain():
     day = "2026-10-14"; spot = 100.0; r = math.log(1.04)
     rows = _chain(spot, day, r, 0.25, 0.05, [45, 90], np.arange(80, 121, 1.0))
-    rep = om.parity_check([(day, "XYZ", spot, rows)], [{"value": {"day": day, "value": 4.0}}])
+    rep = om.parity_check([(day, "XYZ", spot, rows)], [{"value": {"day": "2026-10-13", "value": _dtb3_for(r)}}])
     d = rep["per_day"][0]
     assert d["violation_rate"] == 0.0 and abs(d["median_rate_gap_bp"]) < 1 and rep["verdict"] == "inconclusive"
 
@@ -95,7 +106,7 @@ def test_v2_boxes_parity_and_forward_adjustment():
     rows = _chain(spot, day, r, 0.2, 0.0, [90, 300], range(4300, 5701, 100))
     for row in rows:                                    # give rows an OCC-like symbol so roots split
         row["value"]["sym"] = "SPXW" + row["value"]["expiry"].replace("-", "")[2:] + ("C" if row["value"]["type"] == "call" else "P")
-    dtb3 = [{"value": {"day": day, "value": (math.exp(r) - 1) * 100}}]
+    dtb3 = [{"value": {"day": "2026-10-13", "value": _dtb3_for(r)}}]
     mid = om.box_mid_v2([(day, spot, rows)], dtb3)
     assert abs(mid["days"][0]["median_bp"]) < 1 and mid["verdict"] == "not_supported"     # 0 bp spread is outside [15, 80]
     rows_sp = _chain(spot, day, r, 0.2, 0.05, [90, 300], range(4300, 5701, 100))

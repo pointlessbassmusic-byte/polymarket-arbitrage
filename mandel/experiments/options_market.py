@@ -605,38 +605,56 @@ def _boxes_v2(rows, spot, day, dte_range, moneyness=0.15, min_width_frac=0.05, s
 
 
 def box_mid_v2(captures, dtb3_rows, n_boot: int = 2000, seed: int = 0) -> dict:
-    """T-503: median mid box lending rate (60-120 DTE, |K/S-1| <= 15%) minus the 3-month bill in [15, 80] bp with the 95% bootstrap CI
-    inside [0, 120] bp on day one; persistence over 20 capture days (until then the verdict can only be not_supported or inconclusive)."""
+    """T-503: median mid box lending rate over ALL strike pairs with both legs bid > 0 (60-120 DTE, |K/S-1| <= 15%, no strike-grid or
+    width filter, as the procedure states) minus the continuously compounded 3-month bill in [15, 80] bp with the 95% bootstrap CI inside
+    [0, 120] bp on day one; persistence over 20 captured days with no stated tolerance: every one of the first 20 days must pass, so any
+    failing day among them is decisive. The $25-grid / width >= 5% subset is reported as a robustness row only."""
     d3 = index_closes(dtb3_rows); rng = np.random.default_rng(seed); days = []
     for day, spot, rows in captures:
-        bx = [b for b in _boxes_v2(rows, spot, day, (60, 120), step=25) if b["r_mid"] is not None]
+        bx = [b for b in _boxes_v2(rows, spot, day, (60, 120), min_width_frac=0.0, step=None) if b["r_mid"] is not None]
         if not bx:
             continue
-        sp = np.array([(b["r_mid"] - _bill_cont(d3, day)) * 1e4 for b in bx])
+        bill = _bill_used(d3, day); b0 = bill["bill_cont_bp"] / 1e4
+        sp = np.array([(b["r_mid"] - b0) * 1e4 for b in bx])
         bs = np.array([np.median(rng.choice(sp, sp.size)) for _ in range(n_boot)]); lo, hi = np.quantile(bs, [0.025, 0.975])
-        days.append({"day": day, "n_boxes": len(bx), "median_bp": float(np.median(sp)), "ci_bp": [float(lo), float(hi)], "pass": bool(15 <= np.median(sp) <= 80 and lo >= 0 and hi <= 120)})
+        sub = np.array([(b["r_mid"] - b0) * 1e4 for b in bx if b["k1"] % 25 == 0 and b["k2"] % 25 == 0 and b["k2"] - b["k1"] >= 0.05 * spot])
+        days.append({"day": day, "n_boxes": len(bx), "median_bp": float(np.median(sp)), "ci_bp": [float(lo), float(hi)], "pass": bool(15 <= np.median(sp) <= 80 and lo >= 0 and hi <= 120),
+                     "robustness_step25_wide": {"n_boxes": int(sub.size), "median_bp": float(np.median(sub)) if sub.size else None}, "bill": bill})
     if not days:
         return {"n_days": 0, "verdict": "inconclusive", "reason": "no SPX captures with 60-120 DTE boxes on this machine"}
-    d0 = days[0]; persist = (sum(d["pass"] for d in days) / len(days) >= 0.8) if len(days) >= 20 else None
-    verdict = "not_supported" if not d0["pass"] else ("inconclusive" if persist is None else ("supported" if persist else "not_supported"))
+    d0 = days[0]
+    persist = False if not all(d["pass"] for d in days[:20]) else (True if len(days) >= 20 else None)
+    verdict, why = _verdict([(f"day one ({d0['day']}): median in [15, 80] bp with the 95% CI inside [0, 120] bp", d0["pass"]),
+                             (f"persistence: in range on every one of the first 20 captured days ({min(len(days), 20)} so far)", persist)])
+    rb = d0["robustness_step25_wide"]
     return {"n_days": len(days), "days": days, "verdict": verdict,
-            "reason": f"day one {d0['day']}: {d0['n_boxes']} boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median {d0['median_bp']:+.0f} bp (95% CI {d0['ci_bp'][0]:+.0f} to {d0['ci_bp'][1]:+.0f}); needs [15, 80] with CI in [0, 120]" + ("; later days: " + ", ".join(f"{d['day']} {d['median_bp']:+.0f} bp ({'in' if d['pass'] else 'out of'} range)" for d in days[1:]) if len(days) > 1 else "")
-                      + ("" if persist is not None else f"; persistence needs 20 capture days ({len(days)} so far)") + "; the CI resamples boxes that share strikes, so it understates uncertainty"}
+            "reason": f"day one {d0['day']}: {d0['n_boxes']} boxes (SPX and SPXW, 60-120 DTE, all strike pairs), mid box rate minus bill median {d0['median_bp']:+.0f} bp (95% CI {d0['ci_bp'][0]:+.0f} to {d0['ci_bp'][1]:+.0f}); needs [15, 80] with CI in [0, 120]"
+                      + (f" (robustness, $25 grid and width >= 5% of spot: {rb['median_bp']:+.0f} bp over {rb['n_boxes']} boxes)" if rb["median_bp"] is not None else "")
+                      + ("; later days: " + ", ".join(f"{d['day']} {d['median_bp']:+.0f} bp ({'in' if d['pass'] else 'out of'} range)" for d in days[1:]) if len(days) > 1 else "")
+                      + ("" if persist is not None else f"; persistence needs 20 capture days ({len(days)} so far)") + f"; the CI resamples boxes that share strikes, so it understates uncertainty; verdict: {why}"}
 
 
 def box_borrow_v2(captures, dtb3_rows) -> dict:
-    """T-506: median executable short-box borrowing rate (180-730 DTE) minus the bill < 50 bp on day one and on >= 80% of capture days."""
+    """T-506: median OVER EXPIRIES (per (root, expiry) median, then the median of those) of the executable short-box borrowing rate
+    (180-730 DTE, wide boxes) minus the bill < 50 bp on day one and on >= 80% of capture days. The pooled box median is reported."""
     d3 = index_closes(dtb3_rows); days = []
     for day, spot, rows in captures:
         bx = [b for b in _boxes_v2(rows, spot, day, (180, 730), step=25) if b["r_borrow"] is not None]
         if bx:
-            m = float(np.median([(b["r_borrow"] - _bill_cont(d3, day)) * 1e4 for b in bx])); days.append({"day": day, "n_boxes": len(bx), "median_bp": m, "pass": m < 50})
+            bill = _bill_used(d3, day); b0 = bill["bill_cont_bp"] / 1e4
+            groups = defaultdict(list)
+            for b in bx:
+                groups[(b["root"], b["expiry"])].append((b["r_borrow"] - b0) * 1e4)
+            per = {f"{r} {e}": float(np.median(v)) for (r, e), v in sorted(groups.items())}
+            m = float(np.median(list(per.values())))
+            days.append({"day": day, "n_boxes": len(bx), "n_expiries": len(per), "median_bp": m, "pass": m < 50, "per_expiry_median_bp": per,
+                         "pooled_median_bp": float(np.median([x for v in groups.values() for x in v])), "bill": bill})
     if not days:
         return {"n_days": 0, "verdict": "inconclusive", "reason": "no SPX captures with 180-730 DTE boxes on this machine"}
     d0 = days[0]; share = sum(d["pass"] for d in days) / len(days)
     verdict = "not_supported" if not d0["pass"] else ("supported" if len(days) >= 20 and share >= 0.8 else "inconclusive")
     return {"n_days": len(days), "days": days, "verdict": verdict,
-            "reason": f"day one {d0['day']}: executable short-box borrowing rate is bill {d0['median_bp']:+.0f} bp over {d0['n_boxes']} boxes (needs < +50 bp)" + ("; later days: " + ", ".join(f"{d['day']} {d['median_bp']:+.0f} bp" for d in days[1:]) if len(days) > 1 else "")}
+            "reason": f"day one {d0['day']}: executable short-box borrowing rate is bill {d0['median_bp']:+.0f} bp, median over {d0['n_expiries']} expiries ({d0['n_boxes']} boxes; pooled box median {d0['pooled_median_bp']:+.0f} bp) (needs < +50 bp)" + ("; later days: " + ", ".join(f"{d['day']} {d['median_bp']:+.0f} bp" for d in days[1:]) if len(days) > 1 else "")}
 
 
 def parity_v2(captures, dtb3_rows, n_side: int = 5, n_boot: int = 2000, seed: int = 0) -> dict:
@@ -645,7 +663,7 @@ def parity_v2(captures, dtb3_rows, n_side: int = 5, n_boot: int = 2000, seed: in
     < 2%; still < 2% on >= 16 of the first 20 capture days."""
     d3 = index_closes(dtb3_rows); rng = np.random.default_rng(seed); days = []
     for day, spot, rows in captures:
-        r = _bill_cont(d3, day); cap = datetime.strptime(day, "%Y-%m-%d"); flags = []
+        bill = _bill_used(d3, day); r = bill["bill_cont_bp"] / 1e4; cap = datetime.strptime(day, "%Y-%m-%d"); flags = []
         for (root, exp), legs in _chain_by_root_expiry(rows).items():
             dte = (datetime.strptime(exp, "%Y-%m-%d") - cap).days
             if dte < 1:
@@ -659,7 +677,7 @@ def parity_v2(captures, dtb3_rows, n_side: int = 5, n_boot: int = 2000, seed: in
             flags += list(np.abs(F - med) > band)
         if flags:
             f = np.array(flags, float); bs = np.array([rng.choice(f, f.size).mean() for _ in range(n_boot)])
-            days.append({"day": day, "pairs": int(f.size), "share": float(f.mean()), "upper95": float(np.quantile(bs, 0.95)), "pass": bool(f.mean() < 0.02 and np.quantile(bs, 0.95) < 0.02)})
+            days.append({"day": day, "pairs": int(f.size), "share": float(f.mean()), "upper95": float(np.quantile(bs, 0.95)), "pass": bool(f.mean() < 0.02 and np.quantile(bs, 0.95) < 0.02), "bill": bill})
     if not days:
         return {"n_days": 0, "verdict": "inconclusive", "reason": "no SPX captures on this machine"}
     d0 = days[0]

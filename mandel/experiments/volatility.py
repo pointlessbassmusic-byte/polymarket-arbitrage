@@ -19,6 +19,7 @@ are an upper bound. Every result carries ``model_priced: True``.
 
 from __future__ import annotations
 
+import bisect
 import math
 from datetime import datetime, timezone
 from typing import Iterable, Optional
@@ -50,6 +51,17 @@ def price_closes(rows: Iterable[dict], symbol: Optional[str] = None) -> dict[str
         if symbol and v.get("symbol") != symbol:
             continue
         out[datetime.fromtimestamp(float(v["t"]), tz=timezone.utc).strftime("%Y-%m-%d")] = float(v["close"])
+    return out
+
+
+def adj_closes(rows: Iterable[dict], symbol: Optional[str] = None) -> dict[str, float]:
+    """{day: adjclose} (dividend-adjusted) for rows that carry it; empty when the history has no adjclose."""
+    out = {}
+    for r in rows:
+        v = r["value"]
+        if (symbol and v.get("symbol") != symbol) or v.get("adjclose") is None:
+            continue
+        out[datetime.fromtimestamp(float(v["t"]), tz=timezone.utc).strftime("%Y-%m-%d")] = float(v["adjclose"])
     return out
 
 
@@ -99,12 +111,16 @@ def _block_shift_null(x: np.ndarray, stat, n_boot: int, seed: int, min_shift: in
 
 
 def skew_tail(skew_rows: Iterable[dict], price_rows: Iterable[dict], window: int = 21, drop: float = -0.05, symbol: Optional[str] = None,
-              n_boot: int = 2000, seed: int = 0) -> dict:
+              n_boot: int = 2000, seed: int = 0, min_n: int = 2000) -> dict:
+    """T-52 pass: difference > 0, p < 0.05, both halves > 0. A half with <= 20 top- or bottom-quintile days is not testable:
+    that criterion is then unimplemented (None), so the verdict caps at inconclusive instead of passing on the other half.
+    Fewer than ``min_n`` aligned forward windows (the trial's min_n, in days) is inconclusive."""
+    from mandel.experiments.underlying2 import _verdict          # lazy: underlying2 -> underlying -> volatility
     idx = index_closes(skew_rows); px = price_closes(price_rows, symbol)
     days, sk, S = _aligned(idx, px)
     n = len(S) - window
-    if n < 500:
-        return {"n": n, "verdict": "inconclusive", "reason": f"only {n} aligned days"}
+    if n < min_n:
+        return {"n": n, "min_n": min_n, "verdict": "inconclusive", "reason": f"only {n} aligned days (min_n {min_n})"}
     fwd = np.log(S[window:] / S[:-window]); sk = sk[:n]
     lo_q, hi_q = np.quantile(sk, [0.2, 0.8])
     def stat(s):
@@ -118,12 +134,16 @@ def skew_tail(skew_rows: Iterable[dict], price_rows: Iterable[dict], window: int
         s = sk[a:b]; f = fwd[a:b]; hi = s >= hi_q; lo = s <= lo_q
         return float((f[hi] < drop).mean() - (f[lo] < drop).mean()) if hi.sum() > 20 and lo.sum() > 20 else float("nan")
     halves = [stat_on(0, half), stat_on(half, n)]
-    ok = p < 0.05 and d > 0 and all(h > 0 for h in halves if not math.isnan(h))
-    return {"n": int(n), "window": window, "drop": drop, "crash_prob_top_minus_bottom": d, "p_value": p, "halves": halves,
+    untestable = any(math.isnan(h) for h in halves)
+    verdict, why = _verdict([("difference > 0", d > 0), ("block-shift p < 0.05", p < 0.05),
+                             ("both halves > 0" + (" (half not testable: <= 20 top- or bottom-quintile days)" if untestable else ""),
+                              None if untestable else all(h > 0 for h in halves))])
+    return {"n": int(n), "min_n": min_n, "window": window, "drop": drop, "crash_prob_top_minus_bottom": d, "p_value": p, "halves": halves,
+            "halves_testable": not untestable,
             "crash_prob_top": float((fwd[sk >= hi_q] < drop).mean()), "crash_prob_bottom": float((fwd[sk <= lo_q] < drop).mean()),
             "mean_fwd_top": float(fwd[sk >= hi_q].mean()), "mean_fwd_bottom": float(fwd[sk <= lo_q].mean()),
-            "verdict": "supported" if ok else "not_supported",
-            "reason": f"P({window}d drop < {drop:.0%}) top SKEW quintile {float((fwd[sk >= hi_q] < drop).mean()):.3f} vs bottom {float((fwd[sk <= lo_q] < drop).mean()):.3f} (diff {d:+.3f}, block-shift p={p:.3f}, halves {halves[0]:+.3f}/{halves[1]:+.3f})"}
+            "verdict": verdict,
+            "reason": f"P({window}d drop < {drop:.0%}) top SKEW quintile {float((fwd[sk >= hi_q] < drop).mean()):.3f} vs bottom {float((fwd[sk <= lo_q] < drop).mean()):.3f} (diff {d:+.3f}, block-shift p={p:.3f}, halves {halves[0]:+.3f}/{halves[1]:+.3f}); {why}"}
 
 
 def term_structure_reversion(vix_rows: Iterable[dict], vix3m_rows: Iterable[dict], window: int = 21, n_boot: int = 2000, seed: int = 0) -> dict:
@@ -155,29 +175,40 @@ def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_
                      hold_days: int = 21, call_delta: float = 0.30, put_delta: float = -0.30, q: float = 0.0, iv_scale: float = 1.0) -> dict:
     """Monthly (hold_days) non-overlapping cycles. Options priced by Black-Scholes at entry with VIX/100 as IV and
     the bill rate; settled at intrinsic value at exit. Returns per-cycle simple returns on the position's notional.
-    strategies: covered_call, cash_secured_put, collar, short_straddle, long_straddle, buy_and_hold."""
-    px = price_closes(price_rows, symbol); vx = index_closes(vix_rows)
+    strategies: covered_call, cash_secured_put, collar, short_straddle, long_straddle, buy_and_hold.
+
+    Options are priced on the price-only close, but every stock leg (buy-and-hold, covered call, collar) also earns the
+    dividends paid over the cycle, adjclose[t1]/adjclose[t0] - close[t1]/close[t0] (zero when the rows carry no adjclose),
+    just as the cash-secured put earns bill interest on its strike. ``sharpe`` and ``benchmark_sharpe`` are Sharpe ratios
+    of returns in excess of the per-cycle bill return exp(r*T) - 1 for funded positions (stock legs, cash-secured put);
+    a straddle is unfunded, so its return is already an excess return and is not reduced by the bill."""
+    price_rows = list(price_rows)
+    px = price_closes(price_rows, symbol); adj = adj_closes(price_rows, symbol); vx = index_closes(vix_rows)
     rt = index_closes(rate_rows) if rate_rows is not None else {}
     days = sorted(d for d in px if d in vx)
     S = np.array([px[d] for d in days]); iv = np.array([vx[d] / 100.0 * iv_scale for d in days])
+    A = np.array([adj.get(d, np.nan) for d in days])
     rate = np.array([rt.get(d, np.nan) for d in days]) / 100.0
     rate = np.where(np.isnan(rate), np.nanmean(rate) if np.isfinite(np.nanmean(rate)) else 0.0, rate)
     T = hold_days / TRADING_DAYS
-    rets, bh = [], []
+    rets, bh, bill = [], [], []
     for i in range(0, len(S) - hold_days, hold_days):
         s0, s1, sig, r = S[i], S[i + hold_days], max(iv[i], 0.02), rate[i]
+        a0, a1 = A[i], A[i + hold_days]
+        div = float(a1 / a0 - s1 / s0) if (np.isfinite(a0) and np.isfinite(a1) and a0 > 0) else 0.0   # dividend return over the cycle
+        dcash = s0 * div                                                                               # per share held
         if strategy == "buy_and_hold":
-            pnl, notional = s1 - s0, s0
+            pnl, notional = s1 - s0 + dcash, s0
         elif strategy == "covered_call":
             k = bs.strike_for_delta(s0, T, r, sig, call_delta, "call", q); prem = float(bs.price(s0, k, T, r, sig, "call", q))
-            pnl, notional = (s1 - s0) + prem - max(s1 - k, 0.0), s0
+            pnl, notional = (s1 - s0) + dcash + prem - max(s1 - k, 0.0), s0
         elif strategy == "cash_secured_put":
             k = s0; prem = float(bs.price(s0, k, T, r, sig, "put", q))
             pnl, notional = prem - max(k - s1, 0.0) + k * (math.exp(r * T) - 1), k
         elif strategy == "collar":
             kc = bs.strike_for_delta(s0, T, r, sig, call_delta, "call", q); kp = bs.strike_for_delta(s0, T, r, sig, put_delta, "put", q)
             pc = float(bs.price(s0, kc, T, r, sig, "call", q)); pp = float(bs.price(s0, kp, T, r, sig, "put", q))
-            pnl, notional = (s1 - s0) + pc - pp - max(s1 - kc, 0.0) + max(kp - s1, 0.0), s0
+            pnl, notional = (s1 - s0) + dcash + pc - pp - max(s1 - kc, 0.0) + max(kp - s1, 0.0), s0
         elif strategy in ("short_straddle", "long_straddle"):
             k = s0; prem = float(bs.price(s0, k, T, r, sig, "call", q)) + float(bs.price(s0, k, T, r, sig, "put", q))
             pay = abs(s1 - k)
@@ -185,58 +216,125 @@ def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_
             notional = s0
         else:
             raise ValueError(strategy)
-        rets.append(pnl / notional); bh.append((s1 - s0) / s0)
-    rets, bh = np.array(rets), np.array(bh)
+        rets.append(pnl / notional); bh.append((s1 - s0) / s0 + div); bill.append(math.exp(r * T) - 1)
+    rets, bh, bill = np.array(rets), np.array(bh), np.array(bill)
+    funded = strategy not in ("short_straddle", "long_straddle")
     ppy = TRADING_DAYS / hold_days
     def dd(x):
         c = np.cumprod(1 + x); peak = np.maximum.accumulate(c); return float((c / peak - 1).min())
     return {"strategy": strategy, "symbol": symbol, "model_priced": True, "iv_scale": iv_scale, "n_cycles": int(len(rets)), "first_day": days[0], "last_day": days[min(len(days) - 1, (len(rets)) * hold_days)],
-            "mean_cycle_return": float(rets.mean()), "sharpe": float(sharpe_ratio(rets, ppy)), "cagr": float(np.prod(1 + rets) ** (ppy / max(len(rets), 1)) - 1), "max_drawdown": dd(rets),
-            "benchmark_sharpe": float(sharpe_ratio(bh, ppy)), "benchmark_cagr": float(np.prod(1 + bh) ** (ppy / max(len(bh), 1)) - 1), "benchmark_max_drawdown": dd(bh),
-            "returns": rets, "benchmark": bh}
+            "mean_cycle_return": float(rets.mean()), "sharpe": float(sharpe_ratio(rets - bill if funded else rets, ppy)), "cagr": float(np.prod(1 + rets) ** (ppy / max(len(rets), 1)) - 1), "max_drawdown": dd(rets),
+            "benchmark_sharpe": float(sharpe_ratio(bh - bill, ppy)), "benchmark_cagr": float(np.prod(1 + bh) ** (ppy / max(len(bh), 1)) - 1), "benchmark_max_drawdown": dd(bh),
+            "sharpe_basis": ("excess of the per-cycle 3m bill" if funded else "raw (unfunded position: already an excess return)") + "; benchmark excess of the bill",
+            "dividends_included": bool(np.isfinite(A).any()), "benchmark_total_return": bool(np.isfinite(A).any()),
+            "returns": rets, "benchmark": bh, "bill_returns": bill}
 
 
 def overlay_verdict(rep: dict, versus: str = "benchmark", n_boot: int = 2000, seed: int = 0) -> dict:
     """Mean-return test of the strategy against buy-and-hold (versus='benchmark') or against zero (versus='zero')."""
     rets = rep["returns"]; inc = rep["benchmark"] if versus == "benchmark" else np.zeros_like(rets)
+    arrays = ("returns", "benchmark", "bill_returns")
     if len(rets) < 24:
-        return {**{k: v for k, v in rep.items() if k not in ("returns", "benchmark")}, "verdict": "inconclusive", "reason": f"only {len(rets)} cycles"}
+        return {**{k: v for k, v in rep.items() if k not in arrays}, "verdict": "inconclusive", "reason": f"only {len(rets)} cycles"}
     p = block_bootstrap_pvalue(rets, inc, n_boot=n_boot, seed=seed)
     d = rets - inc
-    out = {k: v for k, v in rep.items() if k not in ("returns", "benchmark")}
+    out = {k: v for k, v in rep.items() if k not in arrays}
     out.update({"p_value_mean_excess": float(p), "mean_excess_per_cycle": float(d.mean()), "halves": [float(d[:len(d) // 2].mean()), float(d[len(d) // 2:].mean())], "versus": versus})
     return out
 
 
-def implied_move_vs_realised(surface_rows: Iterable[dict], price_rows_by_symbol: dict[str, dict[str, float]], target_dte: int = 30, min_captures: int = 30) -> dict:
+def _quote_day(available_at: str, days_sorted: list[str]) -> Optional[str]:
+    """The trading day the capture's quotes belong to. A capture before 13:30 UTC (pre-open) carries the previous session's
+    quotes, so it maps to the last trading day strictly before the capture day; a capture from 13:30 UTC on carries that
+    day's live quotes and maps to its own day when that day traded. Weekend and pre-open captures collapse onto one day."""
+    s = (available_at or "").strip()
+    day = s[:10]
+    if len(day) < 10:
+        return None
+    hhmm = s[11:16] if len(s) >= 16 else "00:00"
+    if hhmm >= "13:30":
+        j = bisect.bisect_right(days_sorted, day) - 1          # same day allowed
+    else:
+        j = bisect.bisect_left(days_sorted, day) - 1           # strictly before
+    return days_sorted[j] if j >= 0 else None
+
+
+def implied_move_vs_realised(surface_rows: Iterable[dict], price_rows_by_symbol: dict[str, dict[str, float]], target_dte: int = 30, min_captures: int = 30,
+                             n_boot: int = 2000, seed: int = 0) -> dict:
     """From the daily surface captures: the ATM straddle's implied move (% of spot) at the expiry nearest target_dte vs the
-    realised |log return| from the capture day to that expiry. Needs the expiry to have passed; inconclusive until
-    ``min_captures`` resolved captures exist. Statistic: mean(implied - realised) in % and the share of captures where the
-    implied move exceeded the realised one."""
+    realised |log return| from the quote's own spot to that expiry. Statistic: mean(implied - realised) in %, equal weight per
+    capture day (the symbols of one capture are averaged first), and the share of symbol-captures where implied exceeded realised.
+
+    Point in time: the realised move starts at the quote's own underlying (row['underlying']; the close of the quote day when
+    absent), not at the close of the capture day, because pre-open captures carry the previous session's quotes. DTE and the
+    ~target_dte expiry are measured from that quote day.
+
+    Dependence: consecutive daily captures share all but one session of their realised windows and the symbols are
+    cross-correlated, so the test is the studentized block bootstrap of the per-day series with the block at least as long as
+    the realised window (in captures). The sample gate counts independent expiry cycles (non-overlapping captures: the next
+    one counted starts at or after the previous one's expiry), not rows: fewer than ``min_captures`` (the trial's min_n) is
+    inconclusive. Needs the expiry to have passed."""
     by_capture: dict[tuple, list[dict]] = {}
     for r in surface_rows:
         v = r["value"]; cap = (r.get("available_at") or "")[:10]
-        by_capture.setdefault((v["symbol"], cap), []).append(v)
+        by_capture.setdefault((v["symbol"], cap), []).append({**v, "_available_at": r.get("available_at") or ""})
+    sorted_days = {s: sorted(px) for s, px in price_rows_by_symbol.items() if px}
     pairs = []
     for (sym, cap), rows in by_capture.items():
         px = price_rows_by_symbol.get(sym)
-        if not px or cap not in px:
+        if not px:
             continue
-        row = min(rows, key=lambda v: abs(v["dte"] - target_dte))
+        qd = _quote_day(rows[0]["_available_at"], sorted_days[sym])
+        if qd is None:
+            continue
+        q_date = datetime.strptime(qd, "%Y-%m-%d").date()
+        def dte_q(v):
+            try:
+                return (datetime.strptime(v["expiry"], "%Y-%m-%d").date() - q_date).days
+            except (KeyError, ValueError):
+                return 10 ** 6
+        row = min(rows, key=lambda v: abs(dte_q(v) - target_dte))
         exp = row["expiry"]
-        exp_day = max((d for d in px if d <= exp), default=None)
-        if exp_day is None or exp_day <= cap or exp > max(px):
+        sd = sorted_days[sym]
+        j = bisect.bisect_right(sd, exp) - 1                      # last close on or before the expiry
+        exp_day = sd[j] if j >= 0 else None
+        if exp_day is None or exp_day <= qd or exp > sd[-1]:
             continue                                              # expiry not yet observed
-        realised = abs(math.log(px[exp_day] / px[cap])) * 100
-        pairs.append((sym, cap, exp, row["implied_move_pct"], realised))
-    n = len(pairs)
-    out = {"n_resolved_captures": n, "n_captures_total": len(by_capture), "min_captures": min_captures}
-    if n < min_captures:
-        out.update({"verdict": "inconclusive", "reason": f"{n}/{min_captures} captures with an expired ~{target_dte}d expiry (chain capture started 2026-10-14)"}); return out
-    imp = np.array([p[3] for p in pairs]); real = np.array([p[4] for p in pairs])
-    d = imp - real
-    p = block_bootstrap_pvalue(imp, real, n_boot=2000, block_len=5)
-    out.update({"mean_implied_pct": float(imp.mean()), "mean_realised_pct": float(real.mean()), "mean_diff_pct": float(d.mean()), "share_implied_exceeds": float((d > 0).mean()), "p_value": float(p),
-                "verdict": "supported" if (p < 0.05 and d.mean() > 0) else "not_supported",
-                "reason": f"implied move {imp.mean():.2f}% vs realised {real.mean():.2f}% over {n} resolved captures (implied larger on {float((d > 0).mean())*100:.0f}%, p={p:.3f})"})
+        spot = row.get("underlying")
+        anchor = float(spot) if spot is not None and float(spot) > 0 else px.get(qd)
+        if not anchor or anchor <= 0 or row.get("implied_move_pct") is None:
+            continue
+        realised = abs(math.log(px[exp_day] / anchor)) * 100
+        pairs.append((sym, qd, exp_day, float(row["implied_move_pct"]), realised))
+    # one observation per capture (quote) day: mean over the symbols resolved that day
+    by_day: dict[str, list] = {}
+    for sym, qd, exp_day, imp, real in pairs:
+        by_day.setdefault(qd, []).append((imp, real, exp_day))
+    qdays = sorted(by_day)
+    imp_d = np.array([np.mean([x[0] for x in by_day[d]]) for d in qdays]); real_d = np.array([np.mean([x[1] for x in by_day[d]]) for d in qdays])
+    exp_of = {d: max(x[2] for x in by_day[d]) for d in qdays}
+    n_cycles, nxt = 0, None
+    for d in qdays:                                               # greedy non-overlapping captures
+        if nxt is None or d >= nxt:
+            n_cycles += 1; nxt = exp_of[d]
+    block_len = max([bisect.bisect_left(qdays, exp_of[d]) - i for i, d in enumerate(qdays)], default=1)   # captures sharing d's window
+    n = len(qdays)
+    out = {"n_resolved_captures": n, "n_symbol_captures": len(pairs), "n_independent_cycles": n_cycles, "n_captures_total": len(by_capture),
+           "min_captures": min_captures, "min_n_unit": "independent expiry cycles", "block_len": int(block_len),
+           "anchor": "quote's own underlying (row['underlying']); DTE from the quote day"}
+    if n:
+        d = imp_d - real_d
+        out.update({"mean_implied_pct": float(imp_d.mean()), "mean_realised_pct": float(real_d.mean()), "mean_diff_pct": float(d.mean()),
+                    "share_implied_exceeds": float(np.mean([p[3] > p[4] for p in pairs]))})
+    if n_cycles < min_captures or n < 8:
+        out.update({"verdict": "inconclusive", "reason": f"{n_cycles}/{min_captures} independent ~{target_dte}d expiry cycles ({n} resolved capture days, "
+                                                          f"{len(pairs)} symbol-captures; overlapping captures share one realised path; chain capture started 2026-10-14)"})
+        return out
+    from mandel.experiments.underlying2 import _verdict          # lazy: underlying2 -> underlying -> volatility
+    d = imp_d - real_d
+    p = block_bootstrap_pvalue(imp_d, real_d, n_boot=n_boot, block_len=block_len, seed=seed)
+    verdict, why = _verdict([("mean(implied - realised) > 0", d.mean() > 0), (f"block-bootstrap p < 0.05 (per-day series, block {block_len} captures)", p < 0.05)])
+    out.update({"p_value": float(p), "verdict": verdict,
+                "reason": f"implied move {imp_d.mean():.2f}% vs realised {real_d.mean():.2f}% over {n} resolved capture days ({n_cycles} independent expiry cycles; "
+                          f"implied larger on {out['share_implied_exceeds']*100:.0f}% of {len(pairs)} symbol-captures), block-bootstrap p={p:.3f}; {why}"})
     return out

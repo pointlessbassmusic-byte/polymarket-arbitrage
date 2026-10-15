@@ -17,10 +17,12 @@ def _day(i, t0=1_700_000_000):
 
 
 def _derived_rows(mentions_by_ticker):
+    # captured on the day itself, before the 16:00 New York close that starts the close(day) -> close(day+1) window
+    # (audit OM-4: this helper used to capture at 01:00 UTC the next day, after the decision time, with a placeholder source "x")
     rows = []
     for t, ms in mentions_by_ticker.items():
         for i, m in enumerate(ms):
-            rows.append({"available_at": _day(i + 1) + "T01:00:00+00:00", "value": {"source": "x", "ticker": t, "day": _day(i), "mentions": m}})
+            rows.append({"available_at": _day(i) + "T15:00:00+00:00", "value": {"source": "reddit", "ticker": t, "day": _day(i), "mentions": m}})
     return rows
 
 
