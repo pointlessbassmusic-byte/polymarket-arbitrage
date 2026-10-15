@@ -27,6 +27,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
@@ -109,12 +110,18 @@ class Archive:
         h = hashlib.sha256()
         n = 0
         with file_lock(self.index_path):                      # one lock for bundle + index; merges concurrent writers
-            with gzip.open(path, "wt", encoding="utf-8", compresslevel=9) as f:
-                for r in rows:
-                    line = json.dumps(r, ensure_ascii=False, separators=(",", ":"), default=str)
-                    f.write(line + "\n")
-                    h.update(line.encode("utf-8"))
-                    n += 1
+            part = path.with_name(path.name + ".partial")      # written whole, then renamed: a kill mid-write leaves the
+            try:                                               # stored bundle intact (rows may stream from it meanwhile)
+                with gzip.open(part, "wt", encoding="utf-8", compresslevel=9) as f:
+                    for r in rows:
+                        line = json.dumps(r, ensure_ascii=False, separators=(",", ":"), default=str)
+                        f.write(line + "\n")
+                        h.update(line.encode("utf-8"))
+                        n += 1
+                os.replace(part, path)
+            except BaseException:
+                part.unlink(missing_ok=True)
+                raise
             size = path.stat().st_size
             entry = BundleEntry(name=safe, kind=kind, path=self._rel(path), created_at=utcnow_iso(),
                                 rows=n, bytes=size, sha256=h.hexdigest(), tags=sorted(set(tags)), recipe=recipe,

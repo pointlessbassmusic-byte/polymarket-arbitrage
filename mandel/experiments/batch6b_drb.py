@@ -1781,9 +1781,17 @@ def rr_claim(smiles: dict, settle: dict, n_boot: Optional[int] = None) -> dict:
     return {"stat": stat, "n": n, "verdict": verdict, "reason": reason + f" — {why}"}
 
 
+def _stream_values(archive, name: str, kind: str):
+    """Values of a bundle's rows of ``kind`` available when it was captured, streamed (the daily trade bundle holds ~3M
+    rows: materialising them as _rows does needs several GB)."""
+    cap = getattr(archive.get(name), "created_at", None)
+    for r in archive.load(name):
+        if r.get("kind", kind) == kind and not (cap and r.get("available_at") and r["available_at"] > cap):
+            yield r["value"]
+
+
 def _daily_inputs(archive):
-    return _cached(archive, ("daily_smiles",), lambda: daily_smiles([r["value"] for r in _rows(archive, DAILY_TRADES_B)
-                                                                     if r.get("kind", "option-trade") == "option-trade"]))
+    return _cached(archive, ("daily_smiles",), lambda: daily_smiles(_stream_values(archive, DAILY_TRADES_B, "option-trade")))
 
 
 def b6b_drb_rr_skew_harvest(archive):

@@ -7,7 +7,9 @@ All three come from Deribit's public history API (no key; per-IP rate limits; ``
 module imports (``trades_in_window``, ``deribit_option_instruments``, ``expiry_listings``, ``parse_instrument``,
 ``_get`` with its retries and Retry-After handling). Bundle names and row schemas are the ones declared in
 ``mandel.experiments.batch6b_drb.REQUESTS``; the harness readers (``fomc_inputs``, ``dvolf_inputs``, ``daily_smiles``)
-are run on these rows in the tests.
+are run on these rows in the tests. Below, HIST = https://history.deribit.com/api/v2/public/ and LIVE =
+https://www.deribit.com/api/v2/public/. A window is fetched only once it ended at least an hour ago (``HISTORY_LAG_MS``),
+so a window still filling on the history server is never stored as complete.
 
 1. ``deribit-option-trades-fomc`` (T-263). For every scheduled FOMC decision 2022-2026 in the ``fomc-meetings`` bundle
    whose statement time has passed: decision time = 14:00 America/New_York on the decision day (the statement time of
@@ -89,6 +91,7 @@ import math
 import os
 import shutil
 import sys
+import signal
 import tempfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -104,6 +107,7 @@ from mandel.data.options_misc import (DAY_MS, DERIBIT_HISTORY, PAGE_SECONDS, _ar
 
 LIVE = "https://www.deribit.com/api/v2/public/"
 HOUR_MS = 3_600_000
+HISTORY_LAG_MS = HOUR_MS            # a window is fetched only once it ended this long ago (history.deribit.com may trail the tape)
 LICENCE_NOTE = ("Deribit states no data licence (no redistribution right) and the repo is public: local disk only "
                 "(in_git=False), rebuild from this recipe")
 MERGE_SECONDS_PER_ROW = 40e-6       # one streamed re-write of a stored row (gunzip, parse, merge, dump, gzip -9; 300k-row bench)
@@ -281,7 +285,7 @@ def fomc_windows(meetings: Iterable[dict], listings: Optional[dict[int, dict]] =
         if not day or day in seen or not m.get("scheduled", True) or not (first <= day <= last):
             continue
         dms = fomc_decision_ms(day)
-        if dms > now:
+        if dms + HISTORY_LAG_MS > now:
             continue
         seen.add(day)
         known = m.get("available_at") or ((m.get("start") or day)[:10] + "T00:00:00+00:00")
@@ -372,6 +376,8 @@ def fetch_deribit_fomc_trades(store=None, meetings: Optional[list[dict]] = None,
     if dry_run:
         rep["_plan"] = {**_fomc_plan(windows, min_interval), "instrument_calls": 0 if instruments is not None else 2,
                         "instrument_mb_each": 77, "min_interval": min_interval}
+        return []
+    if not windows:                                         # nothing left to fetch: skip the instrument downloads
         return []
     own = client is None
     c = client or _client()
@@ -626,7 +632,7 @@ def fetch_deribit_dvol_futures(store=None, limit: Optional[int] = None, dry_run:
     done: set[str] = set()
     try:
         insts = instruments if instruments is not None else dvol_future_instruments(c, th_inst, retries=retries, backoff=max(backoff, 1.0) if backoff else 0)
-        insts = [x for x in insts if x.get("expiration_timestamp") is not None and int(x["expiration_timestamp"]) <= now
+        insts = [x for x in insts if x.get("expiration_timestamp") is not None and int(x["expiration_timestamp"]) + HISTORY_LAG_MS <= now
                  and str(x["instrument_name"]).startswith(DVOLF_PREFIX)]
         if have:
             rep["_already_stored"] = sorted(x["instrument_name"] for x in insts if x["instrument_name"] in have)
@@ -634,7 +640,7 @@ def fetch_deribit_dvol_futures(store=None, limit: Optional[int] = None, dry_run:
         if limit is not None:
             insts = insts[:limit]
         rep["_instruments"] = len(insts)
-        if deliveries is None:
+        if deliveries is None and insts:
             deliveries, dinfo = delivery_prices(DVOL_INDEX, c, th, retries=retries, backoff=backoff)
             rep["_delivery_prices"] = dinfo
         for x in insts:
@@ -709,11 +715,11 @@ def daily_window(day: str, hours: tuple = DAILY_HOURS) -> tuple[int, int]:
 
 
 def sample_days(first: str = DAILY_FIRST, last: str = DAILY_LAST, hours: tuple = DAILY_HOURS, now_ms: Optional[int] = None) -> list[str]:
-    """Every UTC day in [first, last] whose sample window has ended."""
+    """Every UTC day in [first, last] whose sample window ended at least HISTORY_LAG_MS ago."""
     now = _now_ms() if now_ms is None else now_ms
     out, d, end = [], date.fromisoformat(first), date.fromisoformat(last)
     while d <= end:
-        if daily_window(d.isoformat(), hours)[1] <= now:
+        if daily_window(d.isoformat(), hours)[1] + HISTORY_LAG_MS <= now:
             out.append(d.isoformat())
         d += timedelta(days=1)
     return out
@@ -809,7 +815,11 @@ def fetch_deribit_daily_trades(store=None, currency: str = "BTC", first: str = D
     archive = _archive(store)
     name = daily_bundle(currency)
     keep_rows = (archive is None) if keep_rows is None else keep_rows
-    cal = sorted(set(days)) if days is not None else sample_days(first, last, hours, now_ms)
+    if days is not None:
+        now = _now_ms() if now_ms is None else now_ms
+        cal = sorted(d for d in set(days) if daily_window(d, hours)[1] + HISTORY_LAG_MS <= now)
+    else:
+        cal = sample_days(first, last, hours, now_ms)
     stored: dict[str, bool] = {}
     stored_rows = 0
     if archive is not None:
@@ -902,6 +912,10 @@ def fetch_deribit_daily_trades(store=None, currency: str = "BTC", first: str = D
 
 # ============================================================================================ command line ==
 
+def _sigterm(signum, frame):
+    raise KeyboardInterrupt(f"signal {signum}")
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="python3 -m mandel.data.deribit_history",
                                 description="Fetch the Deribit history bundles of T-263 (fomc), T-268 (dvol) and T-257/T-262 (daily).")
@@ -918,6 +932,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--chunk-days", type=int, default=DAILY_CHUNK_DAYS)
     p.add_argument("--min-interval", type=float, default=0.25)
     a = p.parse_args(argv)
+    signal.signal(signal.SIGTERM, _sigterm)                 # a kill (timeout, session stop) stores complete windows like Ctrl-C
     if a.preview:
         store = None
     else:

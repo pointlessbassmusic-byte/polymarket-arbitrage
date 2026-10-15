@@ -24,7 +24,7 @@ def test_every_batch_harness_is_wired_with_declared_bundles():
 
 # Declared but not yet fetched: the harness only probes for it, so run_all records "missing data bundles" (inconclusive) until the
 # named fetch stores it. Remove an entry once its bundle is archived.
-AWAITING_FETCH = {"deribit-dvol-futures-trades"}
+AWAITING_FETCH: set[str] = set()
 
 
 def test_batch_bundles_are_archived_names():

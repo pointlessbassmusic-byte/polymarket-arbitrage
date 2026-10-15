@@ -146,3 +146,9 @@ mandel/archive/data/deribit-box-monthly.jsonl.gz
 
 # Scratch pickles an agent may drop at the repo root (never part of the repo)
 /*.pkl
+# a bundle being written (Archive.store renames it into place when complete; left behind only by a killed write)
+mandel/archive/*/*.partial
+# Deribit trade history (no redistribution licence): local only
+mandel/archive/data/deribit-option-trades-fomc.jsonl.gz
+mandel/archive/data/deribit-dvol-futures-trades.jsonl.gz
+mandel/archive/data/deribit-option-trades-daily-BTC.jsonl.gz

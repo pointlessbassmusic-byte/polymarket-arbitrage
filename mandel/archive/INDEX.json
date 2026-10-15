@@ -4144,6 +4144,49 @@
    "parked_reason": "",
    "in_git": false,
    "schema": "kind option-trade: value = raw Deribit trade {trade_id, trade_seq, timestamp (ms), instrument_name, price (coin), mark_price, iv, index_price, amount, contracts?, direction, tick_direction, block_trade_id?} + {catalyst, currency, expiry, expiry_code, strike, type}; available_at = trade time | kind catalyst-window: value = {catalyst, currency, event, category, event_date, event_time, time_basis, event_time_basis (realised (ex post) | scheduled | statutory date, conventional time | approximate (ex post); 'realised (ex post)' = block-height event whose exact time and expiry boundary were not known in advance), entry_day, exit_day, window_start, window_end, target_expiry, target_expiry_code, target_listed_at, target_settlement_period, targets, trades_seen, trades_kept, pages, complete (these four are fetch metadata, not market information), known_since, known_since_basis|known_since_hint, available_basis}; available_at = max(end of the verified known_since day, target_listed_at) when known_since is verified, else the event time"
+  },
+  "deribit-dvol-futures-trades": {
+   "name": "deribit-dvol-futures-trades",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-dvol-futures-trades.jsonl.gz",
+   "created_at": "2026-10-15T18:46:44.555754+00:00",
+   "rows": 3716,
+   "bytes": 76678,
+   "sha256": "b78cda10696b362700dbca9f267425c9a99457ecda941e3a8823def05b5718b7",
+   "tags": [
+    "T-268",
+    "crypto",
+    "deribit",
+    "dvol",
+    "futures",
+    "trades"
+   ],
+   "recipe": "GET https://history.deribit.com/api/v2/public/get_instruments?currency=USDC&kind=future&expired=true (keep BTCDVOL_USDC-*), then per instrument GET https://history.deribit.com/api/v2/public/get_last_trades_by_instrument_and_time?instrument_name=<name>&start_timestamp=<expiry_ms - 8*86400000>&end_timestamp=<expiry_ms>&count=1000&include_old=true&sorting=asc, paged forward; delivery price from GET https://www.deribit.com/api/v2/public/get_delivery_prices?index_name=btcdvol_usdc (paged by offset; https://www.deribit.com/api/v2/public/get_last_settlements_by_instrument answers 'instrument is not active' for expired instruments), else https://www.deribit.com/api/v2/public/get_last_settlements_by_currency?currency=USDC&type=delivery; via mandel.data.deribit_history.fetch_deribit_dvol_futures; 0.25s pacing, 4 tries with exponential backoff. Trade available_at = trade time; settlement available_at = expiry. Instruments stored: BTCDVOL_USDC-1JAN25..BTCDVOL_USDC-31MAY23 (42). Deribit states no data licence (no redistribution right) and the repo is public: local disk only (in_git=False), rebuild from this recipe",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind future-trade: value = {instrument_name, expiry (ISO UTC), timestamp (ms), price, mark_price, index_price (the BTC DVOL index), amount, direction}, available_at = trade time | kind future-settlement: value = {instrument_name, expiry, delivery_price}, available_at = expiry | kind future-window (fetch metadata, not market information): value = {instrument_name, expiry, listed_at, window_start, window_end, trades_seen, pages, complete, settlement_source}, available_at = expiry"
+  },
+  "deribit-option-trades-fomc": {
+   "name": "deribit-option-trades-fomc",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-option-trades-fomc.jsonl.gz",
+   "created_at": "2026-10-15T18:49:45.087707+00:00",
+   "rows": 82473,
+   "bytes": 2979875,
+   "sha256": "8b4287c8eb30b635bb49cba029283100cef11214102eae018e0be40bd3cb484a",
+   "tags": [
+    "T-263",
+    "crypto",
+    "deribit",
+    "events",
+    "fomc",
+    "options",
+    "trades"
+   ],
+   "recipe": "GET https://history.deribit.com/api/v2/public/get_last_trades_by_currency_and_time?currency=BTC&kind=option&start_timestamp=<decision_ms - 86400000>&end_timestamp=<decision_ms - 1>&count=1000&include_old=true&sorting=asc, paged forward (mandel.data.options_misc.trades_in_window), for every scheduled FOMC decision 2022-01-01..2026-12-31 in fomc-meetings whose statement time had passed (decision_ms = 14:00 America/New_York on decision_day), keeping only the first expiry after the decision listed before it (listing = min creation_timestamp from https://history.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option, expired=true and false); via mandel.data.deribit_history.fetch_deribit_fomc_trades; 0.25s pacing, 4 tries with exponential backoff on 429/5xx. Trade available_at = trade time; window available_at = max(meeting known, target listing). Windows stored: 2022-01-26:BTC, 2022-03-16:BTC, 2022-05-04:BTC, 2022-06-15:BTC, 2022-07-27:BTC, 2022-09-21:BTC, 2022-11-02:BTC, 2022-12-14:BTC, 2023-02-01:BTC, 2023-03-22:BTC, 2023-05-03:BTC, 2023-06-14:BTC, 2023-07-26:BTC, 2023-09-20:BTC, 2023-11-01:BTC, 2023-12-13:BTC, 2024-01-31:BTC, 2024-03-20:BTC, 2024-05-01:BTC, 2024-06-12:BTC, 2024-07-31:BTC, 2024-09-18:BTC, 2024-11-07:BTC, 2024-12-18:BTC, 2025-01-29:BTC, 2025-03-19:BTC, 2025-05-07:BTC, 2025-06-18:BTC, 2025-07-30:BTC, 2025-09-17:BTC, 2025-10-29:BTC, 2025-12-10:BTC, 2026-01-28:BTC, 2026-03-18:BTC, 2026-04-29:BTC, 2026-06-17:BTC, 2026-07-29:BTC, 2026-09-16:BTC. Deribit states no data licence (no redistribution right) and the repo is public: local disk only (in_git=False), rebuild from this recipe",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind option-trade: value = raw Deribit trade {trade_id, trade_seq, timestamp (ms), instrument_name, price (coin), mark_price, iv, index_price, amount, contracts?, direction, tick_direction, block_trade_id?} + {decision_day, currency, expiry, expiry_code, strike, type}; only the target expiry; available_at = trade time | kind fomc-window: value = {decision_day, decision_time (14:00 America/New_York, ISO UTC), currency, target_expiry, target_expiry_code, target_listed_at, window_start, window_end (= decision_time, exclusive), complete, trades_seen, trades_kept, pages (these four are fetch metadata, not market information), available_basis}; available_at = max(fomc-meetings available_at of the meeting, target_listed_at)"
   }
  }
 }

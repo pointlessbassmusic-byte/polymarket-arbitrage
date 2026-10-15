@@ -914,7 +914,11 @@ def conditional_forward_v2(vix_rows, vix3m_rows, spy_rows) -> dict:
     return {"n": n, "n_entries": int(x.size), "mean_var": float(x.mean()), "p": p, "halves": halves, "grid_starts": ss,
             "verdict": "supported" if ok else ("inconclusive" if p is None else "not_supported"),
             "reason": f"{n} non-overlapping contango cycles; rule 10 (no entry calendar named): POOLED over all {x.size} contango days (every start of the 63d grid, "
-                      f"overlapping, 126-entry blocks): forward variance minus realised (days 22-63) {x.mean():+.4f} ({p_txt}), halves {halves[0]:+.4f}/{halves[1]:+.4f}; {stxt}"}
+                      f"overlapping, 126-entry blocks): forward variance minus realised (days 22-63) {x.mean():+.4f} ({p_txt}), halves {halves[0]:+.4f}/{halves[1]:+.4f}; {stxt}"
+                      f" — the pass needs the pooled mean > 0 with one-sided p < 0.025 (the 95% CI excluding zero) and both halves > 0: "
+                      + ("all hold" if ok else "not computable" if p is None else "fails"
+                         + ("" if p < 0.025 else f" (p {p:.4f} >= 0.025: the 95% CI includes zero)")
+                         + ("" if all(z > 0 for z in halves) else " (a half is <= 0)"))}
 
 
 def vix9d_v2(vix9d_rows, spy_rows) -> dict:

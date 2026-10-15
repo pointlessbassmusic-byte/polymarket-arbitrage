@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `a106886a6a094386`). 477 theories. supported 37, not_supported 118, inconclusive 15, untested 169, blocked 130, parked 8.
+Rendered from `registry.json` (hash `82749339a37f24fa`). 477 theories. supported 47, not_supported 175, inconclusive 35, untested 91, blocked 117, parked 12.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (37)
+## Supported (47)
 
 ### T-06 · price-series-are-multifractal
 
@@ -20,6 +20,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: multifractal_scaling
 - result X-2fb589be: supported — 30% of 40 daily logit-price series show concavity beyond the shuffled null (threshold 25%; chance ~5%)
 - result X-85bebeee: supported — 28% of 40 daily logit-price series show concavity beyond the shuffled null (200 shuffles; threshold 25%; chance ~5%)
+- result X-13833502: supported — 28% of 40 daily logit-price series show concavity beyond the shuffled null (200 shuffles; threshold 25%; chance ~5%)
 
 ### T-07 · prices-are-anti-persistent
 
@@ -35,6 +36,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: hurst_ci
 - result X-485f95d2: supported — median H 0.35; 12/40 series outside their shuffle null (threshold 25%)
 - result X-2d6b0510: supported — median H 0.35; 80% of 40 series with H < 0.5 (need > 50%); 12/40 significantly anti-persistent, below their 200-shuffle null (need > 25%); 0 significantly persistent (count against)
+- result X-f1af37b6: supported — median H 0.35; 80% of 40 series with H < 0.5 (need > 50%); 12/40 significantly anti-persistent, below their 200-shuffle null (need > 25%); 0 significantly persistent (count against)
 - note: a bounded price is mean-reverting by construction near the edges; the verdict says structure exists, not that it is tradable
 
 ### T-10 · simple-rule-search-overfits
@@ -51,6 +53,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: dsr_pbo_harness
 - result X-cd5674d2: supported — best of 21 momentum rules: Sharpe -0.031, DSR 0.00, PBO 0.90
 - result X-82a019fd: supported — best of 21 momentum rules: Sharpe -0.031, DSR 0.00, PBO 0.90
+- result X-e48361c0: supported — best of 21 momentum rules: Sharpe -0.031, DSR 0.00, PBO 0.90
 
 ### T-11 · scoring-path-controls-hold
 
@@ -66,6 +69,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: controls
 - result X-aa7f417a: supported — coin 0.25, oracle 0.0, market 0.024331208750000007: scoring path intact
 - result X-664c674d: supported — coin 0.25, oracle 0.0, market 0.024225094059405948: scoring path intact
+- result X-129843a3: supported — coin 0.25, oracle 0.0, market 0.024225094059405948: scoring path intact
 
 ### T-36 · tuned-indicator-bot-fails-out-of-sample
 
@@ -81,6 +85,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: dsr_pbo_harness
 - result X-cd5674d2: supported — best of 21 momentum rules: Sharpe -0.031, DSR 0.00, PBO 0.90
 - result X-3ba2e1c3: supported — in-sample best of 21 momentum rules mom_lb3_h3 (IS Sharpe -0.0264 over 6367 periods to 2025-08-12 00:00 UTC) has holdout Sharpe -0.0581 over 6220 later periods from 150 series (pass: <= 0)
+- result X-119ef908: supported — in-sample best of 21 momentum rules mom_lb3_h3 (IS Sharpe -0.0264 over 6367 periods to 2025-08-12 00:00 UTC) has holdout Sharpe -0.0581 over 6220 later periods from 150 series (pass: <= 0)
 - note: the dsr_pbo verdict (overfit) is the same statement from the other side
 
 ### T-48 · variance-risk-premium-spx
@@ -97,6 +102,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vrp_spx
 - result X-c3f695ac: supported — implied 21.0 vs realised 18.6 vol pts over 8459 days (1993-01-29..2026-09-11); VRP positive on 84% of days, block-bootstrap p=0.0140, halves +0.0103/+0.0092
 - result X-aa8c7df3: supported — implied 21.0 vs realised 18.6 vol pts over 8460 days (1993-01-29..2026-09-14); VRP positive on 84% of days, block-bootstrap p=0.0150, halves +0.0103/+0.0092
+- result X-08a0d9ca: supported — implied 21.0 vs realised 18.6 vol pts over 8460 days (1993-01-29..2026-09-14); VRP positive on 84% of days, block-bootstrap p=0.0150, halves +0.0103/+0.0092
 
 ### T-49 · variance-risk-premium-btc
 
@@ -112,6 +118,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vrp_btc
 - result X-c41a0dfb: supported — implied 62.9 vs realised 54.9 vol pts over 2000 days (2021-03-24..2026-09-13); VRP positive on 71% of days, block-bootstrap p=0.0010, halves +0.1535/+0.0345
 - result X-7972f2f2: supported — implied 62.9 vs realised 54.9 vol pts over 2001 days (2021-03-24..2026-09-14); VRP positive on 71% of days, block-bootstrap p=0.0010, halves +0.1535/+0.0344
+- result X-4bd10592: supported — implied 62.9 vs realised 54.9 vol pts over 2001 days (2021-03-24..2026-09-14); VRP positive on 71% of days, block-bootstrap p=0.0010, halves +0.1535/+0.0344
 
 ### T-50 · variance-risk-premium-gold
 
@@ -127,6 +134,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vrp_gold
 - result X-eb9af641: supported — implied 18.7 vs realised 16.9 vol pts over 4267 days (2009-09-18..2026-09-11); VRP positive on 79% of days, block-bootstrap p=0.0040, halves +0.0084/+0.0040
 - result X-b2950263: supported — implied 18.7 vs realised 16.9 vol pts over 4268 days (2009-09-18..2026-09-14); VRP positive on 79% of days, block-bootstrap p=0.0045, halves +0.0084/+0.0041
+- result X-8afc2b22: supported — implied 18.7 vs realised 16.9 vol pts over 4268 days (2009-09-18..2026-09-14); VRP positive on 79% of days, block-bootstrap p=0.0045, halves +0.0084/+0.0041
 
 ### T-53 · vix-term-structure-reversion
 
@@ -142,6 +150,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: term_structure_reversion
 - result X-47917835: supported — 21d change in VIX after backwardation -6.09 vs contango +0.45 pts (diff -6.54, block-shift p=0.0005, halves -5.43/-7.53; backwardation on 8% of days)
 - result X-c287ea93: supported — 21d change in VIX after backwardation -6.09 vs contango +0.45 pts (diff -6.54, block-shift p=0.0005, halves -5.43/-7.53; backwardation on 8% of days)
+- result X-1e2b6853: supported — 21d change in VIX after backwardation -6.09 vs contango +0.45 pts (diff -6.54, block-shift p=0.0005, halves -5.43/-7.53; backwardation on 8% of days)
 
 ### T-59 · turn-of-month-effect
 
@@ -157,6 +166,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: turn_of_month
 - result X-bc27e9fd: supported — turn-of-month days +9.0 bps/day vs others +1.6 (diff +7.4 bps, block-bootstrap p=0.0020, halves +8.8/+5.9)
 - result X-3c158b05: supported — turn-of-month days +9.0 bps/day vs others +2.7 (diff +6.3 bps, block-bootstrap p=0.0065, halves +7.8/+4.8)
+- result X-371f3448: supported — turn-of-month days +9.0 bps/day vs others +2.7 (diff +6.3 bps, block-bootstrap p=0.0065, halves +7.8/+4.8)
 
 ### T-63 · variance-risk-premium-oil
 
@@ -172,6 +182,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vrp_oil
 - result X-888bbcd8: supported — implied 41.8 vs realised 36.7 vol pts over 4267 days (2009-09-18..2026-09-11); VRP positive on 79% of days, block-bootstrap p=0.0015, halves +0.0314/+0.0483
 - result X-2a418ad7: supported — implied 41.8 vs realised 36.7 vol pts over 4268 days (2009-09-18..2026-09-14); VRP positive on 79% of days, block-bootstrap p=0.0015, halves +0.0313/+0.0484
+- result X-62ccd582: supported — implied 41.8 vs realised 36.7 vol pts over 4268 days (2009-09-18..2026-09-14); VRP positive on 79% of days, block-bootstrap p=0.0015, halves +0.0313/+0.0484
 
 ### T-64 · variance-risk-premium-bonds
 
@@ -187,6 +198,22 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vrp_bonds
 - result X-b147605f: supported — implied 15.5 vs realised 14.4 vol pts over 5697 days (2004-01-02..2026-09-11); VRP positive on 72% of days, block-bootstrap p=0.0220, halves +0.0019/+0.0044
 - result X-1593db1c: supported — implied 15.5 vs realised 14.4 vol pts over 5698 days (2004-01-02..2026-09-14); VRP positive on 72% of days, block-bootstrap p=0.0215, halves +0.0019/+0.0044
+- result X-2a2420a3: supported — implied 15.5 vs realised 14.4 vol pts over 5698 days (2004-01-02..2026-09-14); VRP positive on 72% of days, block-bootstrap p=0.0215, halves +0.0019/+0.0044
+
+### T-113 · jade-lizard
+
+**Claim.** A 1-month SPY jade lizard (short 30-delta put, short 30-delta call, long call 1% of S above it, priced at VIX IV; model-priced; months with credit < width skipped) has a positive mean P&L per unit of naked-put margin over 1993-2026.
+
+- kind: options-strategy · origin: options-library:volatility, https://www.tastylive.com/concepts-strategies/jade-lizard, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf
+- statistic: mean P&L / (0.2 x S) with block bootstrap CI; number of skipped months reported
+- null: mean <= 0
+- procedure: monthly cycles; solve the 30-delta strikes at VIX IV; enter only when Cr >= w; payoff from the SPY close
+- data: SPY, VIX, DTB3 · min n: 250
+- pass: lower CI > 0 and positive in both walk-forward halves
+- controls: Overlaps the neutral/income family; DSR counts it once across families. Flat pricing understates the put credit and overstates the call credit relative to real skew; recheck with chain mids at 60 days.
+- harness: b6_dir_jade_lizard
+- result X-f5e50a1d: supported — MODEL-PRICED, no transaction costs (none stated in the claim) (legs at VIX IV flat, 30-delta strikes solved at that IV on the dividend forward, r = prior DTB3 print, the credit carried in bills to expiry at the prior prints day by day): SPY 1-month jade lizard; rule 10(b), the claim names no entry calendar: primary statistic pooled over all 21 start offsets of the non-overlapping 21-session grid = 8463 overlapping daily entries 1993-01-29 to 2026-09-14 (circular block bootstrap, 42-day blocks = 2 x hold); n = 403 distinct 21-session holds in the window; 6572 of 8463 entries entered (1891 skipped with credit < 1% of S, 22.3%), n = 313 entered months; median credit over entered cycles +1.37% of S; mean P&L / (0.2 S) +2.740% (95% CI +1.753% to +3.615%); walk-forward halves +2.758% / +2.723%; per start offset (non-overlapping grid, block-6 percentile): lower CI > 0: 21 of 21 start offsets pass (per-offset +2.44% to +3.08%, lower CI +1.16% to +2.06%), both halves positive in 21 of 21, both criteria in 21 of 21; entered per offset 305-323 of about 403; IV-scale sensitivity (not in the pass rule; short premium, so the edge hinges on the IV level): s=0.81 +0.707%, s=0.90 +1.714%; the trial's control 'recheck on chain mids at 60 days' is still pending: the archive holds 2 chain days, so a traded test needs chain history — all criteria pass
+- note: from the options-library library: Jade Lizard; harness suggestion: harness 'jade_lizard_condition' in options.py reading chain capture; shares strike-by-delta selector with bwb harness | verifier: corrected claim/trial | 2026-10-15 re-run: MODEL-PRICED at VIX IV; the edge is the short-premium VRP and shrinks with the IV scale (+0.71% at s = 0.81). The trial's control 'recheck on chain mids at 60 days' is pending: 2 chain days are archived.
 
 ### T-114 · big-lizard
 
@@ -202,6 +229,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_114
 - result X-84bd401c: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean +0.4% (95% CI +0.2 to +0.6); s=0.90 mean +0.5% (95% CI +0.2 to +0.7) — all criteria pass
 - result X-0c32d400: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; percentile block-bootstrap CIs): smile mean +0.4% (95% CI +0.2 to +0.6); s=0.90 (call at VIX x r(1.02)) mean +0.9% (95% CI +0.7 to +1.1) — all criteria pass
+- result X-870b8064: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; percentile block-bootstrap CIs, block 42 days): smile mean +0.4% (95% CI +0.2 to +0.5) [pooled over 21 starts; per-start means +0.3% to +0.4%, 21 of 21 starts pass]; s=0.90 (call at VIX x r(1.02)) mean +0.8% (95% CI +0.6 to +1.0) [pooled over 21 starts; per-start means +0.8% to +0.9%, 21 of 21 starts pass] — all criteria pass
 - note: from the options-library library: Big Lizard; harness suggestion: harness 'big_lizard_condition' sharing straddle engine | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-115 · strip
@@ -218,6 +246,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_115
 - result X-b486bff8: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): strip-straddle s=0.81 mean -6.7% (95% CI -10.4 to -2.9); strip-straddle s=0.9 mean -6.1% (95% CI -9.4 to -2.7); strip-straddle s=1.0 mean -5.6% (95% CI -8.6 to -2.5) — all criteria pass
 - result X-b9aaaeb9: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; studentized block-bootstrap CIs): strip-straddle s=0.81 mean -6.7% (95% CI -10.4 to -2.5); strip-straddle s=0.9 mean -6.1% (95% CI -9.5 to -2.3); strip-straddle s=1.0 mean -5.6% (95% CI -8.6 to -2.1) — all criteria pass
+- result X-89b22193: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; studentized block-bootstrap CIs, block 42 days): strip-straddle s=0.81 mean -6.7% (95% CI -10.2 to -2.7) [pooled over 21 starts; per-start means -7.2% to -6.1%, 21 of 21 starts pass]; strip-straddle s=0.9 mean -6.1% (95% CI -9.3 to -2.5) [pooled over 21 starts; per-start means -6.5% to -5.6%, 21 of 21 starts pass]; strip-straddle s=1.0 mean -5.6% (95% CI -8.4 to -2.3) [pooled over 21 starts; per-start means -5.9% to -5.1%, 21 of 21 starts pass] — all criteria pass
 - note: from the options-library library: Strip; harness suggestion: include in 'straddle_vrp' harness as a ratio parameter (calls, puts) in {(1,1),(1,2),(2,1)} | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-116 · strap
@@ -234,7 +263,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_116
 - result X-61fd43e1: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): strap-strip s=0.81 mean +13.3% (95% CI +5.7 to +20.6); strap-strip s=0.9 mean +12.1% (95% CI +5.3 to +18.7); strap-strip s=1.0 mean +11.0% (95% CI +4.9 to +17.0) — all criteria pass
 - result X-a346d37e: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; percentile block-bootstrap CIs): strap-strip s=0.81 mean +13.3% (95% CI +5.7 to +20.6); strap-strip s=0.9 mean +12.1% (95% CI +5.3 to +18.7); strap-strip s=1.0 mean +11.0% (95% CI +4.9 to +17.0) — all criteria pass
+- result X-026a0107: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; percentile block-bootstrap CIs, block 42 days): strap-strip s=0.81 mean +13.3% (95% CI +6.6 to +20.2) [pooled over 21 starts; per-start means +12.2% to +14.2%, 21 of 21 starts pass]; strap-strip s=0.9 mean +12.2% (95% CI +6.1 to +18.3) [pooled over 21 starts; per-start means +11.1% to +12.9%, 21 of 21 starts pass]; strap-strip s=1.0 mean +11.1% (95% CI +5.6 to +16.6) [pooled over 21 starts; per-start means +10.2% to +11.8%, 21 of 21 starts pass] — all criteria pass
 - note: from the options-library library: Strap; harness suggestion: same ratio parameter in 'straddle_vrp' | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-123 · gamma-scalping-long-straddle
+
+**Claim.** A 30-DTE ATM SPY straddle bought at BS(0.90*VIX) and delta-hedged daily at that entry vol has negative mean P&L per unit vega over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://emanuelderman.com/wp-content/uploads/1999/02/gs-volatility_swaps.pdf, https://public.econ.duke.edu/~boller/Published_Papers/rfs_09.pdf
+- statistic: mean hedged P&L/vega over non-overlapping cycles, studentized block-bootstrap CI; run at s in {0.81, 0.90, 1.00}; secondary: correlation of P&L with (RV_21 - (s*VIX)^2)
+- null: mean hedged P&L = 0
+- procedure: Each cycle: price the straddle at s*VIX_t; each day compute BS delta (bs.greeks) at the entry vol, hedge at the SPY close, charge 1 bp per share traded; sum to expiry
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 390
+- pass: upper CI < 0 at s = 0.90; report the s at which the sign flips
+- controls: Daily (not intraday) hedging; cost declared; VIX is SPX; q = 0 with unadjusted closes; report the variance-term share of P&L vs hedging error; BTZ 1990-2007 as an external anchor (monthly %^2 units).
+- harness: b6_var_gamma_scalp_long_straddle
+- result X-78f814bf: supported — MODEL-PRICED long 30-DTE ATM SPY straddle at s x VIX, delta-hedged daily at the entry vol on raw closes, ex-dates projected from SPY's quarterly schedule, 1 bp per share traded, cash at the bill rate; rule 10 (no entry calendar in the claim): 8460 daily entries 1993-01-29..2026-09-14 = 403 cycles: POOLED over all 21 grid offsets (8460 overlapping daily entries = 403 distinct 21-day holds; studentized circular block bootstrap, block 126 days): mean -1.98 vol pts per unit vega (CI -2.46 to -1.37) at s=0.90; per grid offset (21 non-overlapping grids, n 401-403, block 6 cycles): mean -2.14 to -1.86, upper bound -1.52 to -1.14, 21/21 offsets pass; s=0.81: pooled mean -0.20 (CI -0.70 to +0.52), 0/21 offsets with upper bound < 0; s=1.00: pooled mean -3.95 (CI -4.49 to -3.36), 21/21 offsets with upper bound < 0; secondary corr(P&L, RV21 - (s VIX)^2), RV21 from raw-close price returns: s=0.81 0.53 in $ (0.65 per unit vega), s=0.90 0.52 in $ (0.67 per unit vega), s=1.00 0.49 in $ (0.68 per unit vega); variance term (0.5 Gamma Sx^2 ((dSx/Sx)^2 - sigma^2 dt) on the dividend forward) -1.68 vs hedging error and costs -0.30 vol pts per vega at s=0.90: variance-term share of summed P&L 0.87; sign flips at s = 0.800 (pooled entries); q=0 control (spot, no dividend forward) -2.04 (CI -2.54 to -1.40); prior-day VIX close (VIX closes 16:15 ET, SPY 16:00) -1.97 (CI -2.47 to -1.33); BTZ anchor (monthly %^2): mean (VIX^2 - RV21)/12 on ^GSPC close-to-close price returns, 4534 daily entries 1990-01-02..2007-12-31 (217 cycles) +12.5, grid offsets +11.1 to +13.7, vs BTZ's published mean VRP of about 18 (VIX^2 minus the realised variance of the month just ended from 5-minute returns inside the trading day: it leaves out the overnight return, so its RV is lower and its VRP higher than a close-to-close one) — all criteria pass
+- note: from the options-library library: Gamma Scalping a Long Straddle (delta-neutral); harness suggestion: harness 'gamma_scalp_vrp' in options.py: functions bs_delta, hedge_path(prices, vix_entry, r, cost_bps) returning per-trade P&L; verdict via block_bootstrap_pvalue and a reported VRP series; a sibling 'dvol_vrp' harness runs the same on BTC with DVOL as IV (bundles deribit-dvol-daily, btc-daily-closes) | verifier: corrected claim/trial
 
 ### T-126 · long-put
 
@@ -250,6 +295,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_126
 - result X-ef87c11c: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): put-call s=1.0 mean -33.2% (95% CI -51.1 to -14.7); put-call s=0.9 mean -36.5% (95% CI -56.3 to -15.9) — all criteria pass
 - result X-7e14bd33: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; percentile block-bootstrap CIs): put-call s=1.0 mean -33.2% (95% CI -51.1 to -14.7); put-call s=0.9 mean -36.5% (95% CI -56.3 to -15.9) — all criteria pass
+- result X-c8a55583: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; percentile block-bootstrap CIs, block 42 days): put-call s=1.0 mean -33.4% (95% CI -49.9 to -16.9) [pooled over 21 starts; per-start means -35.4% to -30.6%, 21 of 21 starts pass]; put-call s=0.9 mean -36.7% (95% CI -55.0 to -18.3) [pooled over 21 starts; per-start means -38.9% to -33.6%, 21 of 21 starts pass] — all criteria pass
 - note: from the options-library library: Long Put; harness suggestion: vix_priced_option_returns(strategy='long_put', dte=30) paired with long_call output | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-130 · bear-put-spread
@@ -266,6 +312,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_130
 - result X-c50f79b2: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): bear put spread mean -40.3% (95% CI -50.5 to -29.7); bear put - bull call mean -53.5% (95% CI -72.1 to -34.6) — all criteria pass
 - result X-87b98a57: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; percentile block-bootstrap CIs): bear put spread mean -40.3% (95% CI -50.5 to -29.7); bear put - bull call mean -53.5% (95% CI -72.1 to -34.6) — all criteria pass
+- result X-3d192b64: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; standard monthly expiry calendar (third Friday or the prior session; entered at the previous monthly expiry); percentile block-bootstrap CIs, block 6 cycles): bear put spread mean -39.9% (95% CI -49.8 to -29.1); bear put - bull call mean -54.9% (95% CI -71.8 to -37.2) — all criteria pass
 - note: from the options-library library: Bear Put Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bear_put_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-131 · bull-put-credit-spread
@@ -282,7 +329,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_131
 - result X-072c25c9: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): bull put spread mean +5.6% (95% CI +3.6 to +7.5); win rate 0.92, worst/median credit 30.1 — all criteria pass
 - result X-2b7c636c: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; percentile block-bootstrap CIs): bull put spread mean +5.6% (95% CI +3.6 to +7.5); win rate 0.92, worst/median credit 30.1 — all criteria pass
+- result X-442a2325: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; standard monthly expiry calendar (third Friday or the prior session; entered at the previous monthly expiry); percentile block-bootstrap CIs, block 6 cycles): bull put spread mean +4.8% (95% CI +2.8 to +6.8); win rate 0.92, worst/median credit 33.4 — all criteria pass
 - note: from the options-library library: Bull Put Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bull_put_spread', dte=30, strikes=('OTM5','OTM10')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-135 · ladder-christmas-tree
+
+**Claim.** A 1-month 1-3-2 SPY call Christmas tree (A = ATM, w = 2.5%, priced at VIX IV; model-priced) finishes inside its profit zone [K1 + D, K4 - D/2] more often than the zone's Black-Scholes risk-neutral probability at entry over 1993-2026 (VRP narrows the realised distribution and positive drift moves mass into the zone just above spot).
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-christmas-tree-spread-calls
+- statistic: realised zone hit rate minus the mean risk-neutral zone probability at entry, with block bootstrap CI
+- null: hit rate <= risk-neutral probability
+- procedure: monthly cycles; price the 4 strikes at VIX IV; compute the zone; count months in which the SPY close lands in the zone; RN probability from the same lognormal (N(d2) differences)
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: lower CI of (hit - RN) > 0
+- controls: Correction: the original direction (hit rate below RN because drift carries SPY past the zone) does not hold up. Monthly drift is about 1% and the zone spans about +1% to +7%, so drift and VRP both push mass into the zone; the claim was reversed. The zone is defined from model prices only; report ATM and ITM anchors.
+- harness: b6_dir_christmas_tree
+- result X-5cce8455: supported — MODEL-PRICED, no transaction costs (none stated in the claim) (4 strikes at VIX IV flat, dividend forward; zone and RN probability from the same lognormal): SPY 1-month 1-3-2 call tree, ATM anchor, w = 2.5%; rule 10(b), the claim names no entry calendar: primary statistic pooled over all 21 start offsets of the non-overlapping 21-session grid = 8463 overlapping daily entries 1993-01-29 to 2026-09-14 (circular block bootstrap, 42-day blocks = 2 x hold); n = 403 distinct 21-session holds in the window; median zone [+0.97%, +7.02%] around spot; hit rate +48.8% vs mean RN +31.5%: hit - RN +17.32% (95% CI +13.90% to +20.93%); per start offset (non-overlapping grid, block-6 percentile): lower CI > 0: 21 of 21 start offsets pass (per-offset +14.42% to +20.32%, lower CI +9.58% to +15.19%); ITM anchor (A = 0.975 S, report only) hit - RN +18.48% (95% CI +15.36% to +21.57%); mechanism (report only): annualised sd of log(S_T/F) +15.9% vs mean VIX IV +19.5%, mean log return per cycle +0.71%; hit - RN at IV scales (not in the pass rule): s=0.81 +15.35%, s=0.90 +16.18% — all criteria pass
+- note: from the options-library library: Ladder / Christmas Tree (1-3-2 and 1-1-1); harness suggestion: vix_priced_option_returns(strategy='call_tree_132', dte=30, width=0.025) with zone_hit_rate statistic | verifier: corrected claim/trial
 
 ### T-148 · straddle-calendar
 
@@ -300,6 +363,51 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-8f04150f: supported — forward vol (VIX/VIX3M, days 21-63) exceeds realised by +6.21 vol pts on average (87% of 4229 days since 2009-09-18); halves +6.42/+5.99 (p 0.000/0.012); sign test 59/68 p=0.0000
 - note: from the options-library library: Straddle calendar (time spread of straddles / forward-vol trade); harness suggestion: forward_variance_premium(vix_rows, vix3m_rows, price_rows) in experiments/volatility.py alongside variance_risk_premium; then a model-priced straddle-calendar P&L using the two-expiry simulator as a secondary check. | superseded by T-510 (verifier-corrected wording)
 
+### T-152 · calendarised-butterfly
+
+**Claim.** In the top-decile months of VIX increase since 2007-12, a calendarised ATM SPY butterfly (+/-3% wings at 60 DTE, 2x ATM body at 30 DTE) loses less per unit of debit by the front expiry than the 30-DTE butterfly on the same strikes, model-priced.
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-butterfly-spread-calls, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-calls
+- statistic: Mean paired difference in P&L/debit (time fly minus plain fly) within top-decile delta-VIX holding periods
+- null: Zero difference in the spike decile (paired bootstrap)
+- procedure: Monthly entries since 2007-12. Black-Scholes pricing from VIX/VIX3M. Revalue both structures at T1 and sort by delta-VIX over the hold. Paired bootstrap; walk-forward halves.
+- data: SPY closes, VIX, VIX3M, FRED 3-month bill · min n: 15
+- pass: Spike-decile difference > 0 with the 95% CI excluding 0
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced (flat smile). Costs on 6 vs 4 contracts. Pin risk modelled at mid minus half the spread. The overall mean P&L is reported but is not the claim.
+- harness: b6_term_calendarised_fly
+- result X-8c2b7bf1: supported — MODEL-PRICED SPY calendarised butterfly (long 60-DTE calls at 0.97 S and 1.03 S at the VIX/VIX3M interpolation, short 2 x 30-DTE ATM at VIX; wings re-priced at the front expiry at that day's VIX) vs the 30-DTE butterfly on the same strikes (VIX); P&L / debit at the front expiry after half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on 6 vs 4 contracts; pin risk: the time fly's wings are exited at T1 at model mid minus half the spread and every expiring leg (body; all three plain-fly strikes) settles at intrinsic on the raw close; rule 10(b), the claim names no entry calendar: primary statistic pooled over all 21 start offsets of the non-overlapping 21-session grid = 4724 overlapping daily entries 2007-12-03 to 2026-09-14 (circular block bootstrap, 42-entry blocks >= 2 x the 21-session hold); n = 23 spike-decile months (mean per start offset, the claim's unit); top delta-VIX decile over the hold = 473 daily entries (delta-VIX >= +5.50 pts). Spike-decile mean P&L/debit time fly -2.62% vs plain -61.84%: paired difference +59.22% (95% CI +39.72% to +77.58%, timeline block-42 percentile bootstrap, decile re-drawn per resample); each start offset's non-overlapping monthly grid alone (timeline block-6 bootstrap; pass = CI lower > 0; the earlier single grid started 2007-12-04, the first FRED VXV print, which the claim does not specify): 18 of 21 start offsets pass (per-offset statistic +38.92% to +74.18%, CI lower bound -5.80% to +48.40%); walk-forward halves with the full-sample decile (report only, not the pass rule) +73.87% (95% CI +63.18% to +83.48%, n 10 months < min_n 15) / +47.01% (95% CI +19.98% to +65.61%, n 12 months < min_n 15); all entries (not the claim): mean P&L/debit time fly -2.39%, plain +11.28%, difference -13.67%; pin-risk sensitivity (every expiring leg also closed at T1 at intrinsic minus half the 0-DTE spread, 8 vs 8 fills): +59.56% (95% CI +40.09% to +77.90%); mean debit +2.71% vs +0.68% of spot; claim window: daily entries from 2007-12-03 (the claim's 'since 2007-12', every session); the archived VIX3M starts 2009-09-18, so before it VIX stands in for VIX3M (house data guidance; the back legs are then priced at VIX), a PROXY on 452 daily entries and 66 of 473 spike-decile entries (2007-12, 2008-02, 2008-05, 2008-06, 2008-08, 2008-09, 2008-10, 2008-11, 2008-12, 2009-01, 2009-02); proxy error against the real VIX3M on 4293 overlap days: VIX - VIX3M mean -1.94 vol pts (mean |error| 2.23), on the 60-DTE back-leg IV mean -1.46 vol pts (mean |error| 1.68); sensitivities (report only, pooled, block 42): real VIX3M only, from its first print 2009-09-18: spike-decile difference +54.21% (95% CI +32.32% to +73.23%, 21 spike-decile months, 2009-09-18 to 2026-09-14); VIX3M proxied from VIX/VIX6M in total variance from the first VIX6M print 2008-01-02 (VIX before it; proxy vs real VIX3M on 4293 overlap days: mean error +0.92 vol pts, mean |error| 1.03): +61.49% (95% CI +40.47% to +80.06%, 23 spike-decile months); IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): spike-decile difference s=0.81 +44.71%, s=0.90 +51.80% — all criteria pass
+- note: from the options-library library: Calendarised (time) butterfly; harness suggestion: Two-expiry simulator with K-slot strikes; add the plain butterfly as the control leg set and report by delta-VIX decile. | verifier: corrected claim/trial | 2026-10-15 re-run: supported on the pooled all-start estimate (+59.2%, CI +39.7 to +77.6); 18 of 21 single grid phases pass; the walk-forward halves (+73.9%, +47.0%) are each below min_n 15 months (report only).
+
+### T-168 · put-spread-collar
+
+**Claim.** Over 1993-02 to 2026-10, the Cboe CLLZ zero-cost put-spread collar index has no higher monthly Sharpe ratio (excess over 3m T-bill) than SPY total return.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/daily_prices/CLLZ_History.csv, https://www.cboe.com/us/indices/indicesproducts/
+- statistic: Sharpe(CLLZ) - Sharpe(SPY TR) on month-end excess returns
+- null: Sharpe(CLLZ) > Sharpe(SPY TR) (the put-spread collar improves risk-adjusted return)
+- procedure: Cboe CDN CLLZ_History.csv (1986-06 onward); SPY TR from Yahoo chart adjclose (1993 onward); DTB3; studentized block bootstrap of the Sharpe difference; walk-forward halves; also report the mean return difference in months with SPX < -5% to show the bounded protection
+- data: CLLZ 10,151 rows; SPY closes plus dividends; FRED DTB3 · min n: 380
+- pass: Bootstrap 95% CI upper bound of the Sharpe difference <= 0.05 and point estimate <= 0 (rejecting the null requires the CI to lie below a small positive margin)
+- controls: CLL and PPUT as full-floor comparators; price-only SPX as a sensitivity
+- harness: b6b_hedge_cllz_sharpe
+- result X-47e71844: supported — CLLZ vs SPY monthly excess returns over 3m T-bill (DTB3), 1993-02..2026-10 (405 months): monthly Sharpe 0.1389 vs 0.1748, difference -0.0359 (95% CI -0.0639 to -0.0128, studentized block bootstrap, block 6; block 12 CI -0.0598 to -0.0151); annualised reading -0.124 (CI -0.221 to -0.044), upper <= 0.05 on that scale (reported); halves (walk-forward, split 2009-12): -0.028 / -0.032; live (post-launch) months only, 2015-09.. (134): -0.0272 (CI -0.0888 to +0.0235); in the 40 months with SPX < -5%: CLLZ -5.89% vs SPY -7.57% (difference +1.68%); controls (reported, not criteria): CLL (2008-) 2008-08.. diff -0.015 (CI -0.084 to +0.131; annualised CI -0.291 to +0.455: upper above the 0.05 margin on both scales); PPUT 1993-02.. diff -0.035 (CI -0.077 to +0.042; annualised CI -0.265 to +0.145: upper above the 0.05 margin on the annualised scale); CLLZ vs price-only SPX 1993-02.. diff -0.001 (CI -0.029 to +0.023; annualised CI -0.102 to +0.079: upper above the 0.05 margin on the annualised scale); without the partial 2026-10 (404 months): -0.0361 (CI -0.0643 to -0.0125); CLLZ launched 2015-08-03: its rows before then are Cboe's back-test, 22.5 of the window's 33.7 years (67%); the last month, 2026-10, is partial: the paired panel ends 2026-10-13 (each leg's last close available at its bundle's capture: CLLZ 2026-10-14, SPY 2026-10-13, SPX 2026-10-13), not at the month's last session 2026-10-30; month-ends moved by a missing close: CLLZ has no close on 1997-01-31, so 1997-01 ends on 1997-01-30 for every leg; unflagged one-day spike-and-revert prints dropped like flagged bad prints (each leg >= 2.5% and >= 2x the SPX move, opposite signs): CLL (control) 2020-02-28 (-5.35% then +12.36% while SPX -0.82% / +4.60%) — all criteria pass
+- note: from the options-library library: Put-spread collar (Cboe CLLZ zero-cost put-spread collar); harness suggestion: Today: CLLZ 1986- CAGR 8.14% vol 11.6% maxDD -47.2% worst month -17.1% vs SPX price CAGR 8.94% vol 15.2%; the -47% drawdown is the fingerprint of the short tail. | verifier: corrected claim/trial | 2026-10-15 re-run: supported as worded (CLLZ has no higher Sharpe than SPY: -0.036 per month, CI -0.064 to -0.013). 67% of the window is Cboe's back-test before CLLZ's 2015-08-03 launch; post-launch months alone give -0.027 (CI -0.089 to +0.024), which also meets the pass (upper <= 0.05, point <= 0).
+
+### T-170 · cash-secured-put
+
+**Claim.** Over 2007-01 to 2026-10, the Cboe PUT (ATM put-write) index has a higher monthly Sharpe ratio (excess over 3m T-bill) than the BXM (ATM buy-write) index.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/cash-secured-put, https://www.optionseducation.org/strategies/all-strategies/naked-put-uncovered-put-short-put
+- statistic: Sharpe(PUT) - Sharpe(BXM) on month-end excess returns, 2007-01 onward
+- null: Sharpe(PUT) <= Sharpe(BXM) (parity: no difference)
+- procedure: Cboe CDN PUT_History.csv. It has only 1-2 rows per year before 2007-01-03, with gaps up to 1,159 days, so start in 2007. Align with BXM_History.csv; excess returns over DTB3; studentized block bootstrap; walk-forward halves
+- data: PUT (daily from 2007-01-03), BXM, FRED DTB3; PUTY 1986- and WPUT/PUTD 2006- as secondary arms · min n: 220
+- pass: Bootstrap 95% CI of the Sharpe difference > 0 in the full sample, with the same sign in both halves
+- controls: PUTY vs BXY (both 2% OTM, 1988-) as a longer parity check
+- harness: b6b_bw_put_vs_bxm
+- result X-66d68491: supported — BACK-TESTED INDEX VALUES: 5 of 236 months use PUT values back-tested by Cboe before its 2007-06-20 launch. ASSUMPTION: the claim describes the published index histories, so back-tested months are used; they were not known at the time they describe (published at launch) and Cboe chose each index design after seeing that history. PUT vs BXM month-end excess returns over the 3-month bill (DTB3 discount yield -> continuous, accrued daily at the prior print), 236 months 2007-02..2026-09 on the common calendar (rule 10(a): the claim names month-end sampling; the indices roll on the third Friday). Annualised Sharpe PUT 0.554 vs BXM 0.442: difference +0.112 (CI +0.030 to +0.188) by the studentized CBB (Bartlett-HAC): paired circular block bootstrap, 12-month blocks, each resample studentized by the Ledoit-Wolf delta-method gradient with a fixed Bartlett(12) long-run variance (mean of 5 seeds x 2000 resamples, Monte Carlo s.e. of the lower end 0.0011; percentile CI +0.031 to +0.196; one-sided p 0.004). Ledoit-Wolf (2008) test (boot.time.inference: prewhitened Parzen HAC s.e. on the sample, Goetze-Kuensch block s.e. in circular-block resamples, b = 12; reported, not a criterion: the trial names only a studentized block bootstrap): +0.112 (symmetric CI +0.020 to +0.204, two-sided bootstrap p 0.019, mean of 5 seeds; its prewhitened Parzen HAC test alone: s.e. 0.0444, p 0.012, CI +0.025 to +0.199). Parts (judged on point estimates): first half 2007-02..2016-11 +0.146 (CI +0.058 to +0.228); second half 2016-12..2026-09 +0.081 (CI -0.095 to +0.246). Post-launch months only (from 2007-06-20, 231 months): +0.113 (CI +0.028 to +0.188); Ledoit-Wolf (2008) test +0.113 (symmetric CI +0.021 to +0.204, two-sided bootstrap p 0.022; its prewhitened Parzen HAC test alone: s.e. 0.0448, p 0.012, CI +0.025 to +0.200). Block-length sensitivity (studentized CBB (Bartlett-HAC)): 6 months CI +0.027 to +0.185, 24 months CI +0.012 to +0.201, 36 months CI -0.001 to +0.196. Roll-date sampling sensitivity (237 roll-to-roll periods): +0.091 (CI +0.029 to +0.156). Window: the first monthly return is 2007-02 (PUT_History.csv has no 2006-12 month-end row: its last row before 2007 is 2004-03-16, and daily rows start 2007-01-03), so the claim's 2007-01 is missing; the last is 2026-09 (the final month, data to 2026-10-14, is incomplete). With the partial first and last months added (2007-01-03..2026-10-14): +0.111 (CI +0.029 to +0.186). Secondary arms (not criteria): PUTY - BXM 294 months from 2002-04 +0.012 (CI -0.099 to +0.122); 236 months from 2007-02 +0.005 (CI -0.117 to +0.138); WPUT - BXM 248 months from 2006-02 -0.112 (CI -0.345 to +0.125); 236 months from 2007-02 -0.121 (CI -0.359 to +0.126); PUTD - BXM 248 months from 2006-02 +0.218 (CI +0.072 to +0.383); 236 months from 2007-02 +0.222 (CI +0.076 to +0.392). Parity control PUTY - BXY (both 2% OTM, 459 months from 1988-07): -0.086 (CI -0.256 to +0.073). Scope: the support covers the PUT and BXM indices only (the claim names them); 2% OTM (PUTY), weekly (WPUT), the PUTY - BXY parity control show no put-write edge (no 95% CI above 0); dynamic (PUTD) shows one (95% CI above 0) — all criteria pass
+- note: from the options-library library: Cash-secured put / put-write (Cboe PUT, WPUT, PUTD); harness suggestion: Note: PUT_History.csv appears sparse in early years (4,984 rows for 35 years) - validate day counts before monthly sampling; computed WPUT 2006- CAGR 4.84% vol 9.6% maxDD -28.6%, PUTD 9.67%/12.0%. | verifier: corrected claim/trial | 2026-10-15 re-run: scope: supported for PUT vs BXM on the published histories 2007-02..2026-09 (PUT has no 2006-12 month-end, October 2026 is incomplete; partial-month sensitivity leaves the verdict unchanged; 5 months are pre-launch back-test values). The edge does not generalise to the other put-write arms: PUTY-BXM +0.005 (CI -0.117 to +0.138), WPUT-BXM -0.121.
+
 ### T-175 · covered-call-ibit
 
 **Claim.** From 2021-03-24 to 2026-10, Deribit BTC DVOL exceeds the subsequent 30-calendar-day realised volatility of BTC daily closes by more than 5 vol points on average.
@@ -314,6 +422,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: dvol_gap_5pts
 - result X-f7120cfc: supported — BTC DVOL implied minus realised over 30 periods: +8.4055 vol pts since 2021-03-24 (95% CI +5.3997 to +11.4100), halves +12.1785/+4.6324 — all criteria pass
 - result X-eca8ed72: supported — BTC DVOL implied minus realised over 30 periods: +8.4010 vol pts since 2021-03-24 (95% CI +5.3927 to +11.4266), halves +12.1785/+4.6273 — all criteria pass
+- result X-e0a01a1d: supported — BTC DVOL implied minus realised over 30 periods: +8.4010 vol pts since 2021-03-24 (95% CI +5.3927 to +11.4266), halves +12.1785/+4.6273 — all criteria pass
 - note: from the options-library library: Covered call on IBIT / BTC ETF; harness suggestion: Already close to the BTC-VRP harness; add the conditional-on-percentile split and report expected premium capture per 30-delta covered call via Black-Scholes at DVOL. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-216 · opex-gamma-pin-short-straddle
@@ -330,6 +439,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: ohlc_opex_pin_straddle
 - result X-ace3719a: supported — MODEL-PRICED (BS, sigma = Thursday VIX, T=1/252): 395 opex vs 1253 other Fridays 1993-02-05..2026-10-09; short-straddle P&L +26.99 vs +17.85 bps of spot, difference +9.14 bps (95% block-8 CI +1.81..+16.31, p=0.005); settled on raw closes |SPY_Fri - SPY_Thu| with the known dividend priced into the forward S_thu - D on the 132 ex-dividend Fridays (132 of them opex); as-worded sensitivity at r = q = 0 ignoring the dividend: +6.57, CI -0.76..+13.77 (not supported, so the verdict depends on how the dividend is treated); with all ex-dividend Fridays dropped: +10.15, CI +2.05..+18.11; $1-strike distance opex 0.256 vs 0.250 (perm p=0.760) — all criteria pass
 - result X-93130d94: supported — MODEL-PRICED (BS, sigma = Thursday VIX, T=1/252): 395 opex vs 1253 other Fridays 1993-02-05..2026-10-09; short-straddle P&L +26.99 vs +17.85 bps of spot, difference +9.14 bps (95% block-8 CI +1.81..+16.31, p=0.005); settled on raw closes |SPY_Fri - SPY_Thu| with the known dividend priced into the forward S_thu - D on the 132 ex-dividend Fridays (132 of them opex); as-worded sensitivity at r = q = 0 ignoring the dividend: +6.57, CI -0.76..+13.77 (not supported, so the verdict depends on how the dividend is treated); with all ex-dividend Fridays dropped: +10.15, CI +2.05..+18.11; control, opex Fridays with FOMC/CPI excluded (46 dropped, 45 for CPI): +8.01 bps (CI +0.61..+15.26), same Fridays out of both groups +7.74 bps (CI +0.29..+15.07), Thursday CPI also dropped +6.37 bps (CI -1.51..+14.14); $1-strike distance opex 0.256 vs 0.250 (perm p=0.760) — all criteria pass
+- result X-dccb283a: supported — MODEL-PRICED (BS, sigma = Thursday VIX, T=1/252): 395 opex vs 1253 other Fridays 1993-02-05..2026-10-09; short-straddle P&L +26.99 vs +17.85 bps of spot, difference +9.14 bps (95% block-8 CI +1.81..+16.31, p=0.005); settled on raw closes |SPY_Fri - SPY_Thu| with the known dividend priced into the forward S_thu - D on the 132 ex-dividend Fridays (132 of them opex); as-worded sensitivity at r = q = 0 ignoring the dividend: +6.57, CI -0.76..+13.77 (not supported, so the verdict depends on how the dividend is treated); with all ex-dividend Fridays dropped: +10.15, CI +2.05..+18.11; control, opex Fridays with FOMC/CPI excluded (46 dropped, 45 for CPI): +8.01 bps (CI +0.61..+15.26), same Fridays out of both groups +7.74 bps (CI +0.29..+15.07), Thursday CPI also dropped +6.37 bps (CI -1.51..+14.14); IV-scale sensitivity (report only, not a criterion; every sigma x s): s=0.81 +9.74 (CI +2.43..+16.95), s=0.90 +9.43 (CI +2.06..+16.62), s=1.10 +8.90 (CI +1.55..+16.06), s=1.20 +8.70 (CI +1.34..+15.90) bps; $1-strike distance opex 0.256 vs 0.250 (perm p=0.760) — all criteria pass
 - note: from the options-library library: Monthly opex gamma pin (short ATM straddle / iron butterfly on heavy-OI strikes); harness suggestion: Add a GEX estimator (sum over strikes of OI*gamma*spot^2*0.01 with sign convention calls +, puts -) once chain captures accumulate; join to the opex clustering test. | verifier: corrected claim/trial | Scope (2026-10-15): supported for the MODEL-PRICED straddle (sigma = Thursday VIX, T = 1/252), priced on the dividend forward on ex-dividend Fridays. The 132 quarterly opex Fridays are SPY ex-dividend days; at r = q = 0 with the dividend ignored the difference is +6.57 bps with a CI of -0.76..+13.77, so the as-priced reading matters. With every ex-dividend Friday dropped the result holds (+10.15 bps, CI +2.05..+18.11). A traded-price test needs 1-day implied vol on opex Thursdays (chain captures). CPI-day exclusion control pending (task: CPI-calendar controls). | 2026-10-15: CPI-day exclusion control done (macro-release-cpi archived): opex Fridays with FOMC/CPI excluded +8.01 bps (CI +0.61..+15.26); Thursday CPI also dropped +6.37 bps (CI -1.51..+14.14), a sensitivity that touches 0.
 
 ### T-224 · metals-macro-event-straddle
@@ -345,7 +455,38 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Placebo dates; exclude 2020-03; compare with the SPX result.
 - harness: macro_gld_event_straddle
 - result X-6e050abd: supported — MODEL-PRICED short 1-day ATM GLD straddle (BS, sigma=GVZ(T-1), T=1/252) 2009-09-21..2026-10-13: event mean +7.2 vs non-event +15.3 bps of spot; difference -8.1 bps (95% CI -15.2 to -1.7, one-sided p=0.0095) over 328 event days (FOMC 136, CPI 203) / 3955 other; |r|/(GVZ/sqrt252) event 0.74 vs other 0.65; FOMC -20.1, CPI -1.3 bps; placebo +/-7d +1.0 bps; ex Mar-2020 -8.6 bps; SPY/VIX same events -6.2 bps — all criteria pass
+- result X-2965eac1: supported — MODEL-PRICED short 1-day ATM GLD straddle (BS, sigma=GVZ(T-1), T=1/252) 2009-09-21..2026-10-13: event mean +7.2 vs non-event +15.3 bps of spot; difference -8.1 bps (95% CI -15.2 to -1.7, one-sided p=0.0095) over 328 event days (FOMC 136, CPI 203) / 3955 other; |r|/(GVZ/sqrt252) event 0.74 vs other 0.65; FOMC -20.1, CPI -1.3 bps; placebo +/-7d +1.0 bps; ex Mar-2020 -8.6 bps; SPY/VIX same events -6.2 bps; IV-scale sensitivity (sigma scaled, settlement unchanged; reported only, not a criterion): x0.81 difference -8.1 bps (95% CI -15.2 to -1.7, one-sided p=0.0090), x1.20 difference -8.2 bps (95% CI -15.3 to -1.7, one-sided p=0.0100) — all criteria pass
 - note: from the options-library library: Metals macro-event straddle (FOMC / CPI / NFP) on GC or GLD; harness suggestion: Generalise the VIX-as-IV straddle harness to (underlying, vol index) pairs: (SPY,VIX), (GLD,GVZ), (BTC,DVOL), (QQQ,VXN). | verifier: corrected claim/trial | Scope (2026-10-15): supported for the claim as worded, a MODEL-PRICED straddle at sigma = GVZ(T-1). GVZ is 30-day implied vol; on event days the true 1-day implied vol carries the event premium, so a traded short straddle collects more than this model and the gap would shrink. A traded test needs event-day 1-day GLD implied vol.
+
+### T-228 · put_skew_ratio_sale
+
+**Claim.** The CBOE SKEW-implied risk-neutral probability of a 30-day S&P 500 log return below -2 sigma, P = 0.0228 + 0.0270*(SKEW-100)/10 (the white paper's Gram-Charlier mapping: 2.3% at SKEW 100, 14.45% at 145), exceeds the realised frequency of 21-trading-day returns below -2*(VIX/100)*sqrt(21/252) by more than 2 percentage points on average.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf, https://www.cboe.com/tradable_products/vix/vix_historical_data/
+- statistic: Mean over windows of P_SKEW(t) - 1{r_{t,t+21} < -2*(VIX_t/100)*sqrt(21/252)}.
+- null: Mean gap <= 0.02.
+- procedure: Non-overlapping 21d windows since 1990 (^GSPC closes before SPY's 1993 start); studentized block bootstrap; require the gap to be positive in each of three sub-periods. Report the SKEW > 135 conditional gap only as a secondary, with PBO across thresholds 125/130/135/140.
+- data: CBOE SKEW and VIX history and ^GSPC/SPY closes (archive). Index-only: this tests the tail premium the strategy sells, not the 1x2's P&L, which needs 10d/25d IVs from chain capture. · min n: 300
+- pass: Lower 95% bound of the mean gap > 0.02, and the gap is positive in at least 2 of 3 sub-periods.
+- controls: Constant-normal benchmark (P = 2.28%) to show SKEW adds information; shuffled-SKEW placebo. SKEW readings above 145 (154.7 on 2026-10-13) are outside the white-paper table and use the formula's extrapolation; report them separately.
+- harness: b6_surf_skew_implied_tail_gap
+- result X-1c42240d: supported — ^GSPC (the S&P 500 itself, as the claim words it, for the whole sample; each window is 21 sessions of its own calendar, SKEW and VIX the last print at or before the entry, 20 of 9242 entries on a carried print): SKEW-implied P(21d < -2 VIX-sigma) averages 8.54% vs realised 1.05%. POOLED over all 21 grid offsets (9242 overlapping daily entries 1990-01-02..2026-09-14 = 441 distinct 21-session holds; studentized circular block bootstrap, block 126 sessions): mean gap +7.49 pp, one-sided 95% lower bound +6.52 pp (two-sided 95% CI +6.34 to +8.41) vs the 2 pp margin; sub-period gaps 1990-2002 +5.83/2002-2014 +6.15/2014-2026 +10.49 pp (3 of 3 positive; the procedure requires all 3, the pass rule 2). Per grid offset (21 non-overlapping grids, n 440 to 441 windows, block 6): mean gap +6.14 to +8.28 pp, one-sided lower bound +4.54 to +7.29 pp; 21/21 offsets clear the margin and 21/21 also have all three thirds positive. Controls: constant-normal benchmark (P = 2.28%) gap +1.23 pp (lower +0.42 pp) is BELOW the 2 pp margin, so the excess over the margin comes from the SKEW level mapping (P_SKEW averages above 2.28%), not from realised tails being rarer than normal; SKEW information on the REALISED tail: frequency 0.79% with SKEW > 135 (n=1516) vs 1.10% otherwise, difference -0.31 pp, circular SKEW-shift placebo p=0.608 (one-sided: higher SKEW, more realised tails); SKEW > 135 conditional gap +13.58 pp (n=1516 entries); PBO across thresholds 125/130/135/140 0.01; SKEW > 145 (beyond the white-paper table, formula extrapolated) 595 entries, gap +16.17 pp; SPY raw-close splice (from 1993-01-29, 8463 entries on it): realised 1.06%, pooled gap +7.48 pp, lower +6.44 pp; SPY adjusted-close splice (from 1993-01-29, 8463 entries on it): realised 1.02%, pooled gap +7.52 pp, lower +6.50 pp — all criteria pass
+- note: from the options-library library: Put-skew richness sale (1x2 put ratio spread, delta-hedged); harness suggestion: Add a 'skew_implied_tail' statistic to harness_skew_tail using the CBOE white-paper mapping (100 -> 2.3%, 145 -> 14.45%, interpolate); P&L of the 1x2 needs surface_summary 10d/25d IVs, which accumulate from today. | verifier: corrected claim/trial | 2026-10-15 re-run: supported as worded, but the excess over the 2 pp margin comes from the SKEW-to-probability mapping: a constant-normal benchmark gives +1.23 pp (below the margin), and SKEW carries no information about realised tails (frequency 0.79% with SKEW > 135 vs 1.10% otherwise, shift placebo p 0.61). SKEW's implied tail probability overstates realised tails; it is not a tail predictor.
+
+### T-234 · variance_strip_replication
+
+**Claim.** VIX^2 exceeds the subsequently realised 21-trading-day S&P 500 variance in more than 75% of non-overlapping months since 1990.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://en.wikipedia.org/wiki/Variance_swap, https://www.cboe.com/tradable_products/vix/vix_historical_data/
+- statistic: Win rate of 1{(VIX_t/100)^2 > RV_{t,t+21}}; secondary: mean ln(RV/VIX^2) and the dollar P&L of a short variance swap with vega notional 1.
+- null: Win rate <= 0.75.
+- procedure: Monthly non-overlapping cycles since 1990-01, with VIX as the strike and ^GSPC closes for RV (SPY from 1993 as a check; price returns, no dividends); exact binomial CI plus a block bootstrap; walk-forward thirds. Measure the strip-vs-VIX^2 truncation error on the captured SPX chain.
+- data: CBOE VIX (archive), ^GSPC/SPY closes. Model-free: VIX is the strip's fair strike. Today's SPX chain (29,918 contracts) for the discretisation check. · min n: 300
+- pass: Lower 95% bound of the win rate > 0.75 and positive in all three thirds; truncation error < 5% of the strike on the captured chain (reported, not part of the pass).
+- controls: ATM-straddle-only VRP (should be smaller: the smile adds premium); shuffled-returns placebo; dividend-adjusted SPY as a check on the ^GSPC price-return RV.
+- harness: b6_var_variance_strip_win_rate
+- result X-a774b108: supported — model-free: (VIX/100)^2 vs next 21-day ^GSPC realised variance (price returns); rule 10 (the claim names months): 441 calendar months entered at the first session with a VIX close, 1990-01-02..2026-09-01 (a 21-session window overlaps the next month's by at most 6 sessions in short months): win rate 370/441 = 0.839 (Clopper-Pearson 0.801-0.872; block bootstrap 0.800-0.873); thirds 0.878 (CP 0.813-0.926, bootstrap 0.823-0.925), 0.823 (CP 0.752-0.881, bootstrap 0.748-0.891), 0.816 (CP 0.744-0.875, bootstrap 0.748-0.878) [reading applied: the point win rate > 0.75 in each third; the stricter reading, every third's lower bound > 0.75, does not hold]; mean ln(RV/VIX^2) -0.622, mean VRP +9.33 %^2/month, short var swap (vega notional 1) +2.75 per cycle; robustness (not in the pass): month-end anchor 0.843 (CP lower 0.806, n 440); 21-day grid pooled over all offsets 0.859 (bootstrap 0.826-0.889, 9238 entries), per-offset CP lower 0.798 to 0.845, 21/21 offsets pass; shuffled-returns placebo win rate 0.585; dividend-adjusted SPY check win rate 0.837 (n 404; index 0.834 on those months); SPY price-return (raw close) check win rate 0.832 (n 404; index 0.834 on those months); ATM-straddle-only VRP control (MODEL-PRICED: no ATM-IV history is archived, so ATM IV = s x VIX; expected smaller): harness_short_straddle ratio s=0.810 win rate 0.658, mean VRP -3.16 %^2/month, 0.90 s=0.900 win rate 0.769, mean VRP +2.43 %^2/month, measured on the captured SPY smile s=0.799 win rate 0.626, mean VRP -3.83 %^2/month vs VIX 0.839, +9.33; strip vs VIX^2 on the captured SPX chain (reported, not in the pass; tolerance < 5%): 2026-10-13 -2.6% [capture 2026-10-14 11:12 UTC inside Cboe's overnight SPX session (20:15-09:15 ET): live overnight quotes, not the 16:15 ET close the VIX prints; chain-implied spot +0.13% vs the 2026-10-13 close], 2026-10-14 +8.7% BREACHES the 5% tolerance (a positive error is the wrong sign for truncation, which drops wing strikes and biases the strip down) [capture 2026-10-15 07:10 UTC inside Cboe's overnight SPX session (20:15-09:15 ET): live overnight quotes, not the 16:15 ET close the VIX prints; chain-implied spot -0.46% vs the 2026-10-14 close] — all criteria pass
+- note: from the options-library library: Variance swap replication by 1/K^2 strip (log contract); harness suggestion: Wrap harness_vrp_spx's implied-minus-realised statistic in the log form and add a 'strip_from_chain' function in mandel/options that sums 2/(T*K^2)*mid over the current CBOE chain to compare with VIX^2. | verifier: corrected claim/trial
 
 ### T-244 · gold_vrp_gvz
 
@@ -361,6 +502,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gvz_var_premium_thirds
 - result X-e4186ff5: supported — GVZ^2 vs GLD implied minus realised over 21 periods: +0.0062 variance since 2009-09-18 (95% CI +0.0032 to +0.0089), thirds +0.0091/+0.0065/+0.0031 — all criteria pass
 - result X-26ff7ed2: supported — GVZ^2 vs GLD implied minus realised over 21 periods: +0.0062 variance since 2009-09-18 (95% CI +0.0032 to +0.0089), thirds +0.0091/+0.0065/+0.0031 — all criteria pass
+- result X-ab1091dd: supported — GVZ^2 vs GLD implied minus realised over 21 periods, pooled over every daily entry (all 21 phases of the non-overlapping 21-day cycles, house rule 10; 4268 days = 204 cycles, blocks of 42 days): +0.0062 variance since 2009-09-18 (95% CI +0.0027 to +0.0092), thirds +0.0091/+0.0065/+0.0031; per phase +0.0054 to +0.0074, 21 of 21 phases pass on their own — all criteria pass
 - note: from the options-library library: Gold volatility premium (GVZ) via GLD straddles / GC strangles; harness suggestion: harness_vrp_gold exists; add the ratio-to-SPX comparison and a 15-delta strangle pricer; add SLV ATM IV from surface_summary for the silver twin. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-246 · btc_dvol_vrp
@@ -377,7 +519,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: dvol_var_premium
 - result X-b01e58de: supported — DVOL^2 vs BTC implied minus realised over 30 periods: +0.0940 variance since 2021-03-24 (95% CI +0.0539 to +0.1348), halves +0.1535/+0.0345 — all criteria pass
 - result X-73d614a4: supported — DVOL^2 vs BTC implied minus realised over 30 periods: +0.0940 variance since 2021-03-24 (95% CI +0.0540 to +0.1345), halves +0.1535/+0.0344 — all criteria pass
+- result X-a25e88fc: supported — DVOL^2 vs BTC implied minus realised over 30 periods, pooled over every daily entry (all 30 phases of the non-overlapping 30-day cycles, house rule 10; 2001 days = 67 cycles, blocks of 60 days): +0.0940 variance since 2021-03-24 (95% CI +0.0493 to +0.1436), halves +0.1535/+0.0344; per phase +0.0690 to +0.1341, 30 of 30 phases pass on their own — all criteria pass
 - note: from the options-library library: BTC/ETH volatility premium (DVOL vs realised) via Deribit inverse straddles; harness suggestion: harness_vrp_btc and harness_vrp_eth exist; add the worst-decile share, a funding sensitivity parameter and an inverse-payoff conversion in the payoff engine (payoff in BTC = payoff_usd / S_T). | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
+
+### T-255 · btc-vrp-short-straddle
+
+**Claim.** Model-priced (BS at DVOL, daily rehedge on daily closes): a delta-hedged short 30-day ATM BTC straddle has positive mean P&L per cycle over 2021-04 to 2026-09, with a studentized block-bootstrap 95% CI above zero.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://insights.deribit.com/exchange-updates/dvol-deribit-implied-volatility-index/, https://www.deribit.com/api/v2/public/get_historical_volatility?currency=BTC
+- statistic: Mean hedged P&L per non-overlapping 30-day cycle (normalised by premium); reported alongside the mean of DVOL^2 - RV^2_30d
+- null: Mean hedged P&L <= 0
+- procedure: DVOL daily from get_volatility_index_data (paged from 2021-03-24); realised vol from BTC closes; simulate a daily delta-hedged straddle with BS at sigma = DVOL; studentized block bootstrap; walk-forward halves; deflated Sharpe over threshold variants
+- data: DVOL 2021-03-24..today (~2,030 days, verified paging); BTC closes · min n: 36
+- pass: CI excludes 0 pooled and the sign holds in both halves; Sharpe of hedged P&L > 0.5 after fees
+- controls: SPY/VIX hedged straddle as positive control (model-priced); shuffled-DVOL negative control; 1 bp/day funding; haircut the premium by the DVOL-ATM IV gap (estimated from history.deribit.com trade IVs)
+- harness: b6_xc_btc_hedged_straddle
+- result X-b56d12eb: supported — MODEL-PRICED (BS at DVOL, r = q = 0, daily delta hedge on daily closes; self-financed at r = 0, so the P&L is an excess P&L): short 30-day ATM BTC straddle. POOLED over all 30 start offsets of the non-overlapping 30-day grid (house rule 10: the claim names no entry calendar; 1979 daily entries 2021-04-01..2026-08-31 = 66 distinct 30-day cycles; studentized circular block bootstrap, blocks of 90 days): mean hedged P&L +14.3% of premium (95% CI +10.2% to +18.1%), halves +15.7%/+12.9%; after fees (0.03% option fee per leg, 0.05% perp taker on hedge trades, 1 bp/day funding) mean +11.2% (CI +7.0% to +15.2%), Sharpe 1.34 annualised x sqrt(365/30) (needs > 0.5; 0.38 per cycle). Per grid offset (30 grids of 65 to 66 non-overlapping cycles, blocks of 3 cycles): mean +10.8% to +18.6%, CI lower bound +3.9% to +13.3%, halves' lower mean +5.5% to +18.3%, after-fee Sharpe 0.84 to 1.98 annualised (0.24 to 0.57 per cycle); 30/30 offsets pass all three criteria; offset 0 (the grid from 2021-04-01): mean +17.2%, CI +12.0% to +22.4%, Sharpe 1.78. Mean DVOL^2 - RV^2(30d) +0.0935 (positive in 71% of entries); measured 30-day ATM mark IV / DVOL = 0.945 on 2 Deribit book capture(s); IV-scale sensitivity (gross mean) s=0.850 -0.3%, s=0.900 +5.1%, s=0.945 (measured) +9.5%, s=0.950 +9.9%, s=1.000 +14.3%; at the measured ATM/DVOL scale 0.945: mean +9.5% (CI +5.2% to +13.5%), after fees Sharpe 0.71 annualised; the trial's haircut (the DVOL-ATM IV gap per cycle from history.deribit.com trade IVs) needs the Deribit option-trade history, which is not archived yet: the measured scale comes from 2 book captures in October 2026, a low-vol regime, and the gap is not constant over 2021-2026, so a constant scale can overstate the haircut-adjusted premium in other years; entry-vol hedge +14.8%; shuffled-DVOL placebo over 100 permutations: median +6.9% (5-95% +5.2% to +8.5%); the actual +14.3% is above 100/100 of them (one-sided permutation p = 0.010); the shuffle keeps the unconditional DVOL level, so it keeps the level VRP and a positive placebo is expected: it tests only the timing part of the edge; DSR over 5 DVOL-RV30 threshold variants on each offset's grid 0.75 to 1.00; with the archived Deribit BTC-PERPETUAL funding signed by the hedge's direction in place of the flat 1 bp/day (funding 1.8% of premium per cycle vs 1.1%): net mean +10.5% (CI +6.3% to +14.6%), halves +12.5%/+8.5%, Sharpe 1.20 annualised (0.34 per cycle); SPY/VIX hedged short straddle (positive control, pooled over all 21 offsets of its 21-session grid) +19.4% of premium over 65 cycles (per-offset mean +17.3% to +21.6%); DVOL is a variance-swap level that sits above ATM IV, so pricing the ATM straddle at DVOL overstates the premium: the edge hinges on the IV level — all criteria pass
+- note: from the options-library library: BTC variance risk premium harvest (delta-hedged short straddle); harness suggestion: Existing BTC VRP harness (cycle 3) extended with hedged straddle simulation in Position + daily rehedge | verifier: corrected claim/trial | 2026-10-15 re-run: MODEL-PRICED at DVOL. At the measured 30-day ATM/DVOL scale 0.945 (2 book captures, October 2026) the mean is +9.5% of premium (CI +5.2 to +13.5), after-fee Sharpe 0.71; the refuter's per-cycle haircut from history.deribit.com trade IVs (0.814-0.98 over 2021-2026) gave net +8.1%, Sharpe 0.97, still passing. The trial's own per-cycle haircut runs once deribit-option-trades-daily-BTC is archived.
 
 ### T-271 · gold-vrp-short-strangle
 
@@ -393,6 +551,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gvz_var_premium_halves
 - result X-c5b6056b: supported — GVZ^2 vs GLD implied minus realised over 21 periods: +0.0062 variance since 2009-10-01 (95% CI +0.0032 to +0.0089), halves +0.0083/+0.0041 — all criteria pass
 - result X-4c9ff56d: supported — GVZ^2 vs GLD implied minus realised over 21 periods: +0.0062 variance since 2009-10-01 (95% CI +0.0032 to +0.0089), halves +0.0083/+0.0041 — all criteria pass
+- result X-b8cf2713: supported — GVZ^2 vs GLD implied minus realised over 21 periods, pooled over every daily entry (all 21 phases of the non-overlapping 21-day cycles, house rule 10; 4259 days = 203 cycles, blocks of 42 days): +0.0062 variance since 2009-10-01 (95% CI +0.0028 to +0.0092), halves +0.0083/+0.0041; per phase +0.0052 to +0.0074, 21 of 21 phases pass on their own — all criteria pass
 - note: from the options-library library: Gold variance risk premium (delta-hedged short strangle on GLD/GC); harness suggestion: Clone the SPY/VIX VRP harness with GVZ/GLD inputs | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-279 · metals-put-write
@@ -407,9 +566,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: CI > 0 pooled and positive mean in both halves
 - controls: SPY/VIX put-write (PUT index behaviour) as positive control; GVZ - 2 vol points sensitivity
 - harness: gld_put_write
-- result X-70072aa5: supported — MODEL-PRICED at flat GVZ: 0.25-delta short put mean +0.33% of spot per cycle over 203 cycles (95% CI +0.16 to +0.49), halves +0.14/+0.51 — all criteria pass
 - result X-460817bd: supported — MODEL-PRICED at flat GVZ: 0.25-delta short put mean +0.33% of strike per cycle over 203 cycles (95% CI +0.16 to +0.49), halves +0.14/+0.51 — all criteria pass
 - result X-99ef77b8: supported — MODEL-PRICED at flat GVZ: 0.25-delta short put mean +0.33% of strike per cycle over 203 cycles (95% CI +0.16 to +0.49), halves +0.14/+0.51 — all criteria pass
+- result X-8846da32: supported — MODEL-PRICED at flat GVZ: 0.25-delta short put mean +0.35% of strike per cycle over 202 cycles from 2009-10-16 on the standard monthly expiry calendar (third Friday, the prior session on a holiday), each written at one expiry close and settled at the next (95% CI +0.17 to +0.52), halves +0.36/+0.35, 1 calendar cycle dropped for a missing index value on entry (2020-10-16) — all criteria pass
 - note: from the options-library library: Metals put-write for accumulation (GLD/SLV cash-secured; GC/SI SPAN); harness suggestion: Shares loop with gold-covered-call; kind='put' | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-320 · crypto-short-term-reversal
@@ -424,9 +583,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: strategy is supported only if the net difference's lower interval bound > 0; otherwise the claim (no tradable reversal) stands
 - controls: look-ahead via trailing quantiles; survivorship in the cross-section (delisted coins) handled by using the trailing market-cap list at formation; costs 0.6% round trip; multiple testing via DSR; regime: 2015-2019 vs 2020-2026
 - harness: btc_reversal
-- result X-0d11fe29: supported — 492 bottom-decile days: next-day excess +8.8 bps gross, -51.2 net of 0.6% (95% CI -76.9 to -24.6) — no tradable reversal: the claim holds
 - result X-5add37e1: supported — 492 bottom-decile days: next-day excess +8.8 bps gross, -51.2 net of 0.6% (95% CI -76.9 to -24.6) — no tradable reversal: the claim holds
 - result X-a95bab1b: supported — 492 bottom-decile days: next-day excess +8.9 bps gross, -51.1 net of 0.6% (95% CI -76.9 to -24.6) — no tradable reversal: the claim holds
+- result X-251e752a: supported — 492 bottom-decile days: next-day excess +8.9 bps gross, -51.1 net of 0.6% (95% CI -76.9 to -24.6) — no tradable reversal: the claim holds
 - note: from the underlying-library library: Crypto short-term reversal (time-series BTC/ETH and cross-section of coins); harness suggestion: ts_reversal_quantile: generic conditional-next-return test with trailing quantile thresholds, reusable for SPY/QQQ | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-469 (verifier-corrected wording)
 
 ### T-332 · index-etf-daily-technical-reversal
@@ -442,6 +601,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: trading at the same close that defines IBS is optimistic (MOC orders must be sent before the final print), so next-open/next-close execution is reported. Costs: 1 bp spread per side, zero commission. Multiple testing: 12 trials plus prior T-58/T-10/T-36. Regime: post-2013 weakening reported; VIX terciles.
 - harness: ohlc_ibs_reversal
 - result X-660e7d9f: supported — SPY IBS<0.2 on 1310 of 6725 days 2000-01-03..2026-09-29: next-day +15.93 vs unconditional +3.90 bps, difference +12.03 bps (95% stationary-bootstrap CI +5.14..+19.55; needs lower > 2); block-shift p=0.0005; halves +16.66 / +7.10 bps; DSR 0.976 over 12 trials; execution diagnostics: next-open-to-close +7.54 bps, next-close entry +6.89 bps — all criteria pass
+- result X-87c1a610: supported — SPY IBS<0.2 on 1310 of 6725 days 2000-01-03..2026-09-29: next-day +15.93 vs unconditional +3.90 bps, difference +12.03 bps (95% stationary-bootstrap CI +5.14..+19.55; needs lower > 2); block-shift p=0.0005; halves +16.66 / +7.10 bps; DSR 0.976 over 12 trials; execution diagnostics: next-open-to-close +7.54 bps, next-close entry +6.89 bps — all criteria pass
 - note: from the underlying-library library: Index ETF daily technical reversal (RSI(2), Bollinger, IBS, down-day streak); harness suggestion: daily_rule_grid: declared indicator set, conditional-mean test, split-sample sign check, dsr_pbo_harness feed (parallels the Polymarket T-10 harness) | verifier: corrected claim/trial | Scope (2026-10-15): min_n 2000 is counted in trading days (6,725 in the window); the signal fires on 1,310 days. The pass statistic trades at the close that defines IBS (optimistic for MOC); next-open-to-close +7.5 bps and next-close entry +6.9 bps are reported as execution diagnostics, both above the 2 bps bar but not tested against it.
 
 ### T-436 · crypto-calendar-effects
@@ -458,6 +618,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: btc_monday_v2
 - result X-6198668a: supported — BTC Monday +36.5 bps vs other days (p=0.012), halves +52.8/+20.1 — all criteria pass
 - result X-e5c606da: supported — BTC Monday +36.5 bps vs other days (p=0.013), halves +52.9/+20.2 — all criteria pass
+- result X-51420fd9: supported — BTC Monday +36.5 bps vs other days (p=0.013), halves +52.9/+20.2 — all criteria pass
 - note: from the underlying-library library: Crypto calendar effects: Monday, month-turn, expiry, holidays; harness suggestion: weekday_contrast(days, closes, 'Mon', 'rest', calendar=7) beside weekday_effect; turn_of_month on 7-day calendars; last_fridays-based event_day_effect two-sided; data/fetch.py coinbase_candles(product, 3600) with paging for the hours arm. | verifier-corrected restatement of T-354, whose verdict tested the earlier wording and stands | READ WITH CARE: the verifier's restatement dropped the Bonferroni correction over seven weekdays that T-354 carried. Uncorrected p = 0.012 passes; corrected it would be about 0.08. Mandel has also tested BTC weekend vs weekday (T-62, not supported) and the BTC weekday family, so the honest multiplicity is at least seven. A Monday-only strategy net of a 0.4% round trip has Sharpe 0.18 vs buy-and-hold 0.99 (T-354): the effect is not tradable at retail cost.
 
 ### T-510 · straddle-calendar
@@ -474,6 +635,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: forward_variance_premium
 - result X-8f04150f: supported — forward vol (VIX/VIX3M, days 21-63) exceeds realised by +6.21 vol pts on average (87% of 4229 days since 2009-09-18); halves +6.42/+5.99 (p 0.000/0.012); sign test 59/68 p=0.0000
 - result X-a3e70303: supported — forward vol (VIX/VIX3M, days 21-63) exceeds realised by +6.21 vol pts on average (87% of 4230 days since 2009-09-18); halves +6.42/+6.00 (p 0.000/0.010); sign test 59/68 p=0.0000
+- result X-3afb94b3: supported — forward vol (VIX/VIX3M, days 21-63) exceeds realised by +6.21 vol pts on average (87% of 4230 days since 2009-09-18); halves +6.42/+6.00 (p 0.000/0.010; the trial's daily series, rule 10 unaffected); sign test on non-overlapping 63d windows (rule 10, no entry calendar named): POOLED over all 63 grid starts, 87% of 4230 overlapping entries positive, block bootstrap (126-day blocks) p=0.0005; each of the 63 grid starts alone: share positive 0.84 to 0.90, 63 of 63 pass (sign test p < 0.05)
 - note: from the options-library library: Straddle calendar (time spread of straddles / forward-vol trade); harness suggestion: Already harnessed as T-148, forward_variance_premium in experiments/options_market.py (not volatility.py). The archived verdict is supported: +6.21 vol points, positive on 87% of 4,229 days since 2009-09-18, halves +6.42/+5.99, sign test 59/68. Next: a model-priced delta-hedged reverse straddle-calendar P&L through the two-expiry simulator, to check that the premium survives four-leg costs. | verifier-corrected restatement of T-148, whose verdict tested the earlier wording and stands
 
 ### T-512 · crude-ovx-vrp
@@ -490,6 +652,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: ovx_var_premium
 - result X-40ab469d: supported — OVX^2 vs USO implied minus realised over 21 periods: +0.0397 variance since 2009-10-01 (95% CI +0.0130 to +0.0635), halves +0.0311/+0.0484 — all criteria pass
 - result X-a9bf4b49: supported — OVX^2 vs USO implied minus realised over 21 periods: +0.0398 variance since 2009-10-01 (95% CI +0.0128 to +0.0639), halves +0.0311/+0.0485 — all criteria pass
+- result X-3313ccaf: supported — OVX^2 vs USO implied minus realised over 21 periods, pooled over every daily entry (all 21 phases of the non-overlapping 21-day cycles, house rule 10; 4259 days = 203 cycles, blocks of 42 days): +0.0398 variance since 2009-10-01 (95% CI +0.0130 to +0.0663), halves +0.0311/+0.0485; per phase +0.0264 to +0.0829, 18 of 21 phases pass on their own — all criteria pass
 - note: from the options-library library: Crude oil variance risk premium (OVX on USO) short strangle; harness suggestion: Clone the GVZ VRP harness with OVX/USO inputs; cboe_index_history('OVX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py
 
 ### T-514 · gvz-vix-relative-vol
@@ -506,6 +669,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gvz_vix_zscore_slope
 - result X-46f63ac4: supported — GVZ/VIX 20-day reversion: slope on z-score -0.0837 (upper -0.0598) and -0.0723 (upper -0.0397) in the two halves, 201 samples — all criteria pass
 - result X-3c8945e5: supported — GVZ/VIX 20-day reversion: slope on z-score -0.0837 (upper -0.0598) and -0.0723 (upper -0.0397) in the two halves, 201 samples — all criteria pass
+- result X-b20b70c0: supported — GVZ/VIX 20-day reversion, pooled over all 20 phases of the non-overlapping 20-day samples (house rule 10; 4018 daily entries = 201 samples, blocks of 40 days): slope on z-score -0.0774 (upper -0.0553) and -0.0817 (upper -0.0577) in the two halves; half slopes per phase -0.1021 to -0.0538, 20 of 20 phases pass on their own — all criteria pass
 - note: from the options-library library: Gold vs equity implied-vol spread (GVZ/VIX relative value); harness suggestion: Ratio z-score harness over cboe_index_history('GVZ') and ('VIX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py
 
 ### T-515 · btc-weekend-theta
@@ -520,10 +684,25 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Pooled 95% CI of the ratio entirely < 0.9, and ratio < 1 in at least 70% of years
 - controls: Same ratio for ETH; shuffled weekday labels as null; exclude the top 1% |returns| as a robustness check
 - harness: btc_weekend_ratio_v2
-- result X-696b70b5: supported — BTC weekend/weekday squared-return ratio 0.47 (95% CI 0.38-0.57, needs entirely < 0.9); below 1 in 100% of years (needs 70%)
 - result X-a15a3182: supported — BTC weekend/weekday squared-return ratio 0.47 (95% CI 0.38-0.57, needs entirely < 0.9); below 1 in 100% of years (needs 70%)
 - result X-177cecd0: supported — BTC weekend/weekday squared-return ratio 0.47 (95% CI 0.38-0.57, needs entirely < 0.9); below 1 in 100% of years (needs 70%)
+- result X-633005f6: supported — BTC weekend/weekday squared-return ratio 0.47 (95% CI 0.38-0.57, needs entirely < 0.9); below 1 in 100% of years (needs 70%)
 - note: from the options-library library: Weekend theta harvest (24/7 pricing vs weekend realised vol); harness suggestion: Extend underlying.weekend_effect to variance ratios; later confirm the pricing side with weekend-daily trade IVs | verifier-corrected restatement of T-264, whose verdict tested the earlier wording and stands
+
+### T-516 · digital-tight-vertical
+
+**Claim.** For SPY 30-day digital puts at K = 0.97S, the risk-neutral probability N(-d2) computed at VIX IV (model-priced) exceeds the realised frequency of SPY closing below K over 1993-2026 (downside digitals are overpriced).
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://en.wikipedia.org/wiki/Binary_option, https://api.elections.kalshi.com/trade-api/v2/series/KXINX
+- statistic: realised frequency minus mean N(-d2), with block bootstrap CI; Brier score of N(-d2) vs climatology
+- null: realised frequency >= mean risk-neutral probability
+- procedure: non-overlapping 21-day cycles; K = 0.97S; N(-d2) at VIX/100, r = DTB3; outcome 1{S_T < K}
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: upper CI of (realised - RN) < 0
+- controls: Flat IV ignores skew, which raises the market's digital-put price further (the slope term -dC/dK includes the skew), so the real overpricing is larger than modelled. Follow-up (blocked): compare SPXW tight-vertical probabilities with Kalshi KXINX mids at synchronised snapshots.
+- harness: b6_dir_digital_put
+- result X-b2c26a56: supported — MODEL-PRICED, no transaction costs (none stated in the claim) (N(-d2) at VIX IV flat, K = 0.97 S, dividend forward, r = prior DTB3 print): SPY 21-session (about 30-day) digital puts; rule 10(b), the claim names no entry calendar: primary statistic pooled over all 21 start offsets of the non-overlapping 21-session grid = 8463 overlapping daily entries 1993-01-29 to 2026-09-14 (circular block bootstrap, 42-day blocks = 2 x hold); n = 403 distinct 21-session holds in the window; realised frequency of S_T < K +16.3% vs mean N(-d2) +28.0%: realised - RN -11.72% (95% CI -14.35% to -9.03%); per start offset (non-overlapping grid, block-6 percentile): upper CI < 0: 21 of 21 start offsets pass (per-offset -14.31% to -9.94%, upper CI -11.17% to -5.90%); Brier (report only) N(-d2) 0.1513 vs point-in-time expanding climatology 0.1413 over 8191 entries, difference +0.0100 (95% CI +0.0008 to +0.0185): N(-d2) scores worse than climatology; at IV scales (not in the pass rule; flat IV ignores skew, a traded digital needs chain history): s=0.81 RN +23.5%, diff -7.19% (95% CI -9.85% to -4.52%), s=0.90 RN +25.8%, diff -9.49% (95% CI -12.14% to -6.81%); the upper CI reaches 0 at an IV scale about 0.66 x VIX — all criteria pass
+- note: from the options-library library: Digital (Binary) via Tight Vertical Spread; harness suggestion: digital_calibration(symbol='SPY', moneyness=0.97, dte=21) using proper scoring in mandel/forecasts.py; Kalshi follow-up after 30 synchronised SPXW + KXINX snapshots | added by the verifier pass
 
 ### T-517 · seagull
 
@@ -539,23 +718,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_517
 - result X-19a801eb: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): seagull mean +0.9% (95% CI +0.6 to +1.2); halves +0.68%/+1.14% — all criteria pass
 - result X-b780aa15: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; percentile block-bootstrap CIs): seagull mean +0.9% (95% CI +0.6 to +1.2); halves +0.69%/+1.14% — all criteria pass
+- result X-07b81d33: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; standard monthly expiry calendar (third Friday or the prior session; entered at the previous monthly expiry); percentile block-bootstrap CIs, block 6 cycles): seagull mean +0.9% (95% CI +0.5 to +1.2); halves +0.70%/+1.01% — all criteria pass
 - note: from the options-library library: Seagull (Put-Financed Call Spread); harness suggestion: overlay_backtest(strategy='seagull', k_put='zero_cost') in mandel/experiments/volatility.py | added by the verifier pass | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
-
-### T-530 · calendar_vol_spread
-
-**Claim.** Conditional on VIX3M/VIX > 1.10 at entry, the 1-to-3-month SPX forward variance F^2 = (93*VIX3M^2 - 30*VIX^2)/63 exceeds the SPY variance realised over trading days 22-63 after entry on average, so the far leg of a reverse calendar is sold above its subsequent realised variance.
-
-- kind: options-strategy · origin: options-library:relative-value-surface, https://www.cboe.com/tradable_products/vix/term_structure/, https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX3M_History.csv
-- statistic: Mean of F^2 - RV(22..63), both annualised, over entries with VIX3M/VIX > 1.10.
-- null: Conditional mean <= 0.
-- procedure: Daily VIX and VIX3M from 2009-09-18 (the free VIX3M file starts there, not 2007) and SPY closes. Non-overlapping 63d cycles (~68 in total, fewer conditional), plus all daily starts with a 63-day-block studentized bootstrap. Walk-forward over declared thresholds 1.05/1.10/1.15, deflated.
-- data: CBOE VIX and VIX3M (archive), SPY closes. Index-implied variance, not option prices; the calendar's own P&L needs chain history. · min n: 40
-- pass: Conditional mean > 0 with the 95% CI excluding zero, positive in both halves of 2009-2026.
-- controls: Unconditional forward premium (harness_forward_variance); shuffled-ratio placebo; sensitivity run excluding 2020.
-- harness: conditional_forward_v2
-- result X-eb6f8b95: supported — 63 contango entries: forward variance minus realised (days 22-63) +0.0220 (p=0.0005), halves +0.0185/+0.0254
-- result X-d4ada054: supported — 63 contango entries: forward variance minus realised (days 22-63) +0.0220 (p=0.0005), halves +0.0185/+0.0254
-- note: from the options-library library: Calendar vol spread (ATM time spread, long or reverse); harness suggestion: harness_forward_variance (T-148, uses 93/30/63) and harness_term_vs_spot (T-231, uses the cruder (3*VIX3M^2 - VIX^2)/2) already compute this gap; add the VIX3M/VIX gate and unify both on the 93/30/63 formula. The calendar P&L comes from build_position with two expiries once captures exist. | verifier-corrected restatement of T-231, whose verdict tested the earlier wording and stands
 
 ### T-534 · vix_contango_short_call_spread
 
@@ -571,6 +735,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: contango_forward_v2
 - result X-f0f50dc7: supported — contango months: VIX 21 days later below F_adj in 141/177 = 80% (95% CI 0.73-0.85, needs lower > 0.60), below unadjusted F in 83%; mean F_adj - VIX(t+21) +2.13, p=0.0005
 - result X-fc0a22c8: supported — contango months: VIX 21 days later below F_adj in 141/177 = 80% (95% CI 0.73-0.85, needs lower > 0.60), below unadjusted F in 83%; mean F_adj - VIX(t+21) +2.13, p=0.0005
+- result X-50f4ab3a: supported — 177 non-overlapping contango months; rule 10 (no entry calendar named): POOLED over all 2728 contango days (every start of the 21d grid, overlapping, 42-day blocks): VIX 21 days later below F_adj in 2148/2728 = 79% (95% CI 0.74-0.83, needs lower > 0.60), below unadjusted F in 82%; mean F_adj - VIX(t+21) +1.89, p=0.0005; each of the 21 grid starts alone: frequency 0.73 to 0.84, 20 of 21 pass
 - note: from the options-library library: VIX futures roll-down harvest via short VIX call spread; harness suggestion: harness_vix_forward_contango (T-238) runs the data part; add F_adj and the Black-76 call-spread pricer (sigma = VVIX/100, T from the VIX monthly calendar). | verifier-corrected restatement of T-238, whose verdict tested the earlier wording and stands
 
 ### T-535 · vix_spike_reversion_put
@@ -587,9 +752,25 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: spike_forward_v2
 - result X-d74fdd76: supported — 23 spike events since 2009-09-18: VIX 21 days later below F_adj in 19/23 (0.61-0.95), below unadjusted F in 83%, below spot in 83%
 - result X-5fa20844: supported — 23 spike events since 2009-09-18: VIX 21 days later below F_adj in 19/23 (0.61-0.95), below unadjusted F in 83%, below spot in 83%
+- result X-28339e58: supported — 23 spike events since 2009-09-18: VIX 21 days later below F_adj in 19/23 (0.61-0.95), below unadjusted F in 83%, below spot in 83%; robustness, all 145 event days pooled (overlapping, 42-day timeline blocks): below F_adj 72% (0.53-0.94), below spot 84% (0.72-0.98) (rule 10 does not apply: event entries, independent of where the data starts)
 - note: from the options-library library: VIX spike mean-reversion via long VIX put / put spread; harness suggestion: harness_vix_spike (T-241) runs this; add F_adj and report the exact event count. | verifier-corrected restatement of T-241, whose verdict tested the earlier wording and stands
 
-## Not Supported (118)
+### T-540 · variance-swap-replication
+
+**Claim.** Short 30-day variance struck at (VIX_t/100)^2 and settled on the next 21 trading days' SPY close-to-close realised variance has positive mean P&L in monthly variance units over 1993-2026.
+
+- kind: options-strategy · origin: options-library:volatility, https://emanuelderman.com/wp-content/uploads/1999/02/gs-volatility_swaps.pdf, https://en.wikipedia.org/wiki/Variance_swap
+- statistic: mean of (VIX_t^2 - RV21_{t+}) / 12 in percent-squared per month over non-overlapping cycles; studentized block-bootstrap CI; report skew, kurtosis, worst cycle
+- null: mean = 0
+- procedure: RV21 = (252/21) * sum of squared daily log returns over t+1..t+21; non-overlapping cycles
+- data: cboe-VIX-history, daily-history-SPY · min n: 390
+- pass: lower CI > 0; robust to excluding the single worst cycle is NOT required (the tail is the point), but report it
+- controls: SPX vs SPY basis; close-to-close vs 5-minute RV (BTZ use 5-minute RV, which runs lower); no cap; vrp_spx already supports this in vol units (T-48), so this is the variance-unit and tail-statistics restatement.
+- harness: b6_var_variance_swap_units
+- result X-a7f44bf6: supported — short variance struck at VIX^2, settled on SPY close-to-close returns; rule 10 (no entry calendar in the claim): 8460 daily entries 1993-01-29..2026-09-14 = 403 cycles: POOLED over all 21 grid offsets (8460 overlapping daily entries = 403 distinct 21-day holds; studentized circular block bootstrap, block 126 days): mean +8.12 %^2/month (CI +1.43 to +11.22); per grid offset (21 non-overlapping grids, n 401-403, block 6 cycles): mean +7.23 to +8.95, lower bound -0.95 to +3.84, 17/21 offsets pass; skew -7.60, kurtosis 93.0, worst cycle -630.8 entered 2020-02-26; ex-worst: pooled without the 41 entries overlapping it +9.44 (CI +4.54 to +12.30), per offset without its own worst cycle +8.60 to +10.36; units sensitivity (strike (VIX/100)^2 x 30/365 vs the un-annualised sum of 21 squared returns, %^2): pooled +7.62 (CI +0.91 to +10.78), 15/21 offsets pass; dividend-adjusted SPY basis +8.23 (pooled, 8460 entries); ^GSPC (SPX vs SPY) basis +8.81 (pooled, 8460 entries); close-to-close vs intraday RV (BTZ use 5-minute RV; not archived): on hourly SPY bars 2023-11-14..2026-09-14 (709 entries) intraday-only RV is 0.56 x close-to-close and the mean P&L +15.84 vs +7.09: close-to-close RV runs higher, so this test is conservative on the control; overlapping daily windows (T-48 vol units) VRP +2.45 vol pts, p 0.0140 (reported) — all criteria pass
+- note: from the options-library library: Variance Swap Replication (long / short variance via 1/K^2 strip); harness suggestion: Extend 'vrp_spx' (mandel/experiments/volatility.variance_risk_premium) with a variance-unit, non-overlapping mode and tail statistics; the same mode for vrp_btc and vrp_gold. | added by the verifier pass | 2026-10-15 re-run: supported pooled over all 21 start offsets (+8.12 %^2/month, CI +1.43 to +11.22); 17 of 21 single grids pass; worst cycle -630.8 entered 2020-02-26 (skew -7.6, kurtosis 93): the tail is the point, as the trial says.
+
+## Not Supported (175)
 
 ### T-02 · longshot-bias
 
@@ -605,6 +786,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: longshot_bias
 - result X-59df1d8a: not_supported — <0.1 bucket at 7d: mean(outcome-price) +0.0184, 95% [+0.0022, +0.0388], 8 YES events of 284
 - result X-ad24c88b: not_supported — <0.1 bucket at 7d: mean(outcome-price) +0.0208, event-clustered 95% [+0.0022, +0.0510], 9 YES events of 277 markets in 91 events
+- result X-665c4ab0: not_supported — <0.1 bucket at 7d: mean(outcome-price) +0.0208, event-clustered 95% [+0.0022, +0.0510], 9 YES events of 277 markets in 91 events
 - note: sub-claim read from the market_calibration calibration table; automated as harness longshot_bias (7d, <0.10, bootstrap interval). Reading 2026-10-14: the <0.10 bucket (mean price 0.008-0.014) resolves YES at 0.010 (1d), 0.007 (3d), 0.028 (7d), 0.020 (30d), 0.019 (90d): at 7d+ slightly MORE often than priced, the reverse of the classic longshot bias, on 5-8 YES events per horizon. A lead, not a finding.
 
 ### T-04 · yes-no-bundle-arbitrage-exists
@@ -619,9 +801,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: >= 1 mispricing per 100 markets, persisting across >= 2 snapshots
 - controls: fees 150 bps taker, gas estimate, min depth 5 USD; snapshots are a sample of time
 - harness: bundle_arb_scan
-- result X-8ca82b68: not_supported — 0 after-fee bundle mispricings in 268 markets (one snapshot)
 - result X-71e7a200: not_supported — 2 snapshot(s): snapshot: 0 after-fee in 268 markets (0 with YES+NO asks below 1 before fees), median round-trip spread 0.020; 2026-10-15: 0 after-fee in 277 markets (0 with YES+NO asks below 1 before fees), median round-trip spread 0.020
 - result X-12f8332a: not_supported — 2 snapshot(s): snapshot: 0 after-fee long bundles in 268 markets (0 with YES+NO asks below 1 before fees; 0 short-side, not counted), median round-trip spread 0.020; 2026-10-15: 0 after-fee long bundles in 277 markets (0 with YES+NO asks below 1 before fees; 0 short-side, not counted), median round-trip spread 0.020
+- result X-515a635d: not_supported — 2 snapshot(s): snapshot: 0 after-fee long bundles in 268 markets (0 with YES+NO asks below 1 before fees; 0 short-side, not counted), median round-trip spread 0.020; 2026-10-15: 0 after-fee long bundles in 277 markets (0 with YES+NO asks below 1 before fees; 0 short-side, not counted), median round-trip spread 0.020
 - note: one snapshot so far; the claim needs repeated snapshots (half-life) before parking
 
 ### T-13 · skill-rises-toward-resolution
@@ -638,6 +820,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: horizon_monotone
 - result X-b7b7c690: supported — skill by horizon 1d 0.858, 3d 0.855, 7d 0.778, 30d 0.719, 90d 0.701 (non-increasing)
 - result X-0e02429c: not_supported — skill by horizon 1d 0.780, 3d 0.795, 7d 0.743, 30d 0.735, 90d 0.689; strict order fails on n >= 300: skill(1d) <= skill(3d)
+- result X-29198603: not_supported — skill by horizon 1d 0.780, 3d 0.795, 7d 0.743, 30d 0.735, 90d 0.689; strict order fails on n >= 300: skill(1d) <= skill(3d)
 - note: automated as harness horizon_monotone (1-point tolerance). Reading 2026-10-14: skill 0.70 (90d), 0.72 (30d), 0.78 (7d), 0.86 (3d), 0.86 (1d): monotone as claimed; the 1d/3d tie is within noise.
 
 ### T-19 · point-in-time-changes-a-verdict
@@ -654,6 +837,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: point_in_time_check
 - result X-95aa94c7: not_supported — naive not_supported (d_fear +0.0003) vs point-in-time not_supported (d_fear +0.0001): no change on this harness
 - result X-983681da: not_supported — naive not_supported (d_fear -0.0006) vs point-in-time not_supported (d_fear +0.0003): no verdict change on this harness; d_fear sign flips (reported only)
+- result X-5cf19b6b: not_supported — naive not_supported (d_fear -0.0006) vs point-in-time not_supported (d_fear +0.0003): no verdict change on this harness; d_fear sign flips (reported only)
 - note: harness point_in_time_check runs the Fear & Greed test naive (lag 0) and honest (lag 1) and asks whether the verdict or sign changes; one harness only so far
 
 ### T-51 · variance-risk-premium-nasdaq
@@ -670,6 +854,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vrp_nasdaq
 - result X-a052edc2: not_supported — implied 22.6 vs realised 20.6 vol pts over 4275 days (2009-09-14..2026-09-11); VRP positive on 80% of days, block-bootstrap p=0.0950, halves +0.0104/+0.0063
 - result X-710ccee8: not_supported — implied 22.6 vs realised 20.6 vol pts over 4276 days (2009-09-14..2026-09-14); VRP positive on 80% of days, block-bootstrap p=0.0935, halves +0.0104/+0.0063
+- result X-90274944: not_supported — implied 22.6 vs realised 20.6 vol pts over 4276 days (2009-09-14..2026-09-14); VRP positive on 80% of days, block-bootstrap p=0.0935, halves +0.0104/+0.0063
 
 ### T-52 · skew-predicts-crashes
 
@@ -685,6 +870,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: skew_tail
 - result X-4b59c8db: not_supported — P(21d drop < -5%) top SKEW quintile 0.068 vs bottom 0.123 (diff -0.055, block-shift p=0.880, halves +nan/+0.069)
 - result X-3a9fe359: not_supported — P(21d drop < -5%) top SKEW quintile 0.067 vs bottom 0.123 (diff -0.055, block-shift p=0.881, halves +nan/+0.068); failed: difference > 0; block-shift p < 0.05 (not implemented: both halves > 0 (half not testable: <= 20 top- or bottom-quintile days))
+- result X-7398722d: not_supported — P(21d drop < -5%) top SKEW quintile 0.067 vs bottom 0.123 (diff -0.055, block-shift p=0.881, halves +nan/+0.068); failed: difference > 0; block-shift p < 0.05 (not implemented: both halves > 0 (half not testable: <= 20 top- or bottom-quintile days))
 - note: literature finds SKEW a weak predictor; this is the test, not the belief
 
 ### T-58 · trend-rules-beat-buy-and-hold
@@ -701,6 +887,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: trend_rules
 - result X-1974bcf3: not_supported — 0/8 assets where the best of 6 trend rules beats buy-and-hold after deflation (median DSR 0.99, median PBO 0.45); SPY: best tsmom126 SR 0.64 vs B&H 0.55, DSR 1.00, PBO 0.20; QQQ: best tsmom126 SR 0.53 vs B&H 0.40, DSR 0.99, PBO 0.43; GLD: best tsmom126 SR 0.65 vs B&H 0.63, DSR 0.99, PBO 0.29; SLV: best tsmom252 SR 0.42 vs B&H 0.39, DSR 0.86, PBO 0.64; TLT: best tsmom63 SR 0.09 vs B&H 0.05, DSR 0.41, PBO 0.53; IWM: best tsmom252 SR 0.39 vs B&H 0.40, DSR 0.94, PBO 0.47; BTC-USD: best ma50 SR 1.48 vs B&H 1.12, DSR 1.00, PBO 0.11; ETH-USD: best ma50 SR 1.02 vs B&H 0.66, DSR 0.99, PBO 0.60
 - result X-094704b4: not_supported — 1/8 assets where the best of 6 trend rules beats buy-and-hold on Sharpe (block-bootstrap p < 0.05) with DSR > 0.95 over 48 trials (median DSR 0.43, median PBO 0.38); SPY: best tsmom252 SR 0.74 vs B&H 0.64 (p=0.200), DSR 0.72, PBO 0.36; QQQ: best tsmom126 SR 0.56 vs B&H 0.43 (p=0.189), DSR 0.34, PBO 0.40; GLD: best tsmom126 SR 0.65 vs B&H 0.63 (p=0.415), DSR 0.52, PBO 0.29; SLV: best tsmom252 SR 0.42 vs B&H 0.39 (p=0.415), DSR 0.17, PBO 0.64; TLT: best tsmom63 SR 0.30 vs B&H 0.29 (p=0.453), DSR 0.05, PBO 0.30; IWM: best tsmom252 SR 0.43 vs B&H 0.46 (p=0.587), DSR 0.15, PBO 0.50; BTC-USD: best ma50 SR 1.47 vs B&H 1.11 (p=0.049), DSR 0.99, PBO 0.11; ETH-USD: best ma50 SR 1.02 vs B&H 0.66 (p=0.116), DSR 0.76, PBO 0.60
+- result X-381b3b37: not_supported — 1/8 assets where the best of 6 trend rules beats buy-and-hold on Sharpe (block-bootstrap p < 0.05) with DSR > 0.95 over 48 trials (median DSR 0.43, median PBO 0.38); SPY: best tsmom252 SR 0.74 vs B&H 0.64 (p=0.200), DSR 0.72, PBO 0.36; QQQ: best tsmom126 SR 0.56 vs B&H 0.43 (p=0.189), DSR 0.34, PBO 0.40; GLD: best tsmom126 SR 0.65 vs B&H 0.63 (p=0.415), DSR 0.52, PBO 0.29; SLV: best tsmom252 SR 0.42 vs B&H 0.39 (p=0.415), DSR 0.17, PBO 0.64; TLT: best tsmom63 SR 0.30 vs B&H 0.29 (p=0.453), DSR 0.05, PBO 0.30; IWM: best tsmom252 SR 0.43 vs B&H 0.46 (p=0.587), DSR 0.15, PBO 0.50; BTC-USD: best ma50 SR 1.47 vs B&H 1.11 (p=0.049), DSR 0.99, PBO 0.11; ETH-USD: best ma50 SR 1.02 vs B&H 0.66 (p=0.116), DSR 0.76, PBO 0.60
 
 ### T-60 · weekday-effect
 
@@ -716,6 +903,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: weekday_effect
 - result X-cd38bf54: not_supported — strongest weekday Fri: -5.1 bps vs rest (Bonferroni p=0.425, halves agree True)
 - result X-da0d36f5: not_supported — strongest weekday Mon: +1.3 bps vs rest (Bonferroni p=1.000, halves agree True)
+- result X-41550db4: not_supported — strongest weekday Mon: +1.3 bps vs rest (Bonferroni p=1.000, halves agree True)
 
 ### T-61 · gold-silver-ratio-reverts
 
@@ -731,6 +919,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gold_silver_ratio
 - result X-3983c31f: not_supported — 716 signal days (|z|>2.0); mean 21d move back toward the mean -0.0058 log units (block-shift p=0.739, halves -0.0175/+0.0119)
 - result X-4e86823c: not_supported — 716 signal days (|z|>2.0); mean 21d move back toward the mean -0.0058 log units (block-shift p=0.739, halves -0.0175/+0.0119); failed: mean > 0; block-shift p < 0.05; both halves > 0
+- result X-aed6c899: not_supported — 716 signal days (|z|>2.0); mean 21d move back toward the mean -0.0058 log units (block-shift p=0.739, halves -0.0175/+0.0119); failed: mean > 0; block-shift p < 0.05; both halves > 0
 
 ### T-62 · crypto-weekend-effect
 
@@ -746,6 +935,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: crypto_weekend
 - result X-45ddf2f7: not_supported — weekend +12.1 bps/day vs weekday +20.1 (diff -8.0, two-sided block-bootstrap p=0.402, halves -14.1/-1.9); weekend vol is 0.72x weekday vol
 - result X-c5c063b9: not_supported — weekend +12.1 bps/day vs weekday +20.0 (diff -7.9, two-sided block-bootstrap p=0.405, halves -14.1/-1.7); weekend vol is 0.72x weekday vol
+- result X-8de11ddf: not_supported — weekend +12.1 bps/day vs weekday +20.0 (diff -7.9, two-sided block-bootstrap p=0.405, halves -14.1/-1.7); weekend vol is 0.72x weekday vol
 
 ### T-65 · variance-risk-premium-russell
 
@@ -761,6 +951,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vrp_russell
 - result X-3f3a7dbe: not_supported — implied 24.9 vs realised 22.2 vol pts over 4268 days (2009-09-16..2026-09-11); VRP positive on 83% of days, block-bootstrap p=0.0950, halves +0.0151/+0.0098
 - result X-8aa0cd5f: not_supported — implied 24.9 vs realised 22.2 vol pts over 4269 days (2009-09-16..2026-09-14); VRP positive on 83% of days, block-bootstrap p=0.0945, halves +0.0151/+0.0098
+- result X-37b377c0: not_supported — implied 24.9 vs realised 22.2 vol pts over 4269 days (2009-09-16..2026-09-14); VRP positive on 83% of days, block-bootstrap p=0.0945, halves +0.0151/+0.0098
 
 ### T-67 · variance-risk-premium-eth
 
@@ -776,6 +967,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vrp_eth
 - result X-80732af2: not_supported — implied 77.4 vs realised 74.4 vol pts over 2000 days (2021-03-24..2026-09-13); VRP positive on 64% of days, block-bootstrap p=0.2019, halves +0.1137/-0.0218
 - result X-ea153b37: not_supported — implied 77.4 vs realised 74.4 vol pts over 2001 days (2021-03-24..2026-09-14); VRP positive on 64% of days, block-bootstrap p=0.2019, halves +0.1137/-0.0217
+- result X-3cffc77d: not_supported — implied 77.4 vs realised 74.4 vol pts over 2001 days (2021-03-24..2026-09-14); VRP positive on 64% of days, block-bootstrap p=0.2019, halves +0.1137/-0.0217
 
 ### T-100 · long-straddle
 
@@ -791,23 +983,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_100
 - result X-ac351508: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): s=0.81 mean -5.9% (95% CI -13.2 to +1.7); s=0.9 mean -15.3% (95% CI -21.9 to -8.4); s=1.0 mean -23.7% (95% CI -29.7 to -17.6) — failed: s=0.81: upper CI < 0
 - result X-53693711: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; studentized block-bootstrap CIs): s=0.81 mean -6.1% (95% CI -12.8 to +3.0); s=0.9 mean -15.4% (95% CI -21.5 to -7.2); s=1.0 mean -23.8% (95% CI -29.3 to -16.5) — failed: s=0.81: upper CI < 0
+- result X-251ff505: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; studentized block-bootstrap CIs, block 42 days): s=0.81 mean -4.6% (95% CI -9.4 to +1.5) [pooled over 21 starts; per-start means -7.9% to -1.7%, 2 of 21 starts pass]; s=0.9 mean -14.1% (95% CI -18.4 to -8.6) [pooled over 21 starts; per-start means -17.1% to -11.5%, 21 of 21 starts pass]; s=1.0 mean -22.6% (95% CI -26.6 to -17.7) [pooled over 21 starts; per-start means -25.3% to -20.3%, 21 of 21 starts pass] — failed: s=0.81: upper CI < 0
 - note: from the options-library library: Long Straddle; harness suggestion: new module mandel/experiments/options.py with bs_price/bs_greeks and straddle_vrp(spy, vix, tbill); register harness 'straddle_vrp' in HARNESSES in mandel/experiments/run.py with bundles ['spy-daily-closes','cboe-vix-daily','fred-tbill-3m']; verdict via block_bootstrap_pvalue from mandel/validation/backtest_eval.py | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
-### T-102 · long-strangle
+### T-103 · short-strangle
 
-**Claim.** A 30-DTE SPY long strangle at +/-5% strikes, bought at the smile-scaled VIX model price and held to expiry, has negative mean P&L per unit premium over 1993-2026 (MODEL-PRICED proxy).
+**Claim.** A 30-DTE SPY short strangle at +/-5% strikes, priced with the smile-scaled VIX model, has a higher Sharpe ratio than the ATM short straddle priced on the same model and the same entry dates, 1993-2026 (MODEL-PRICED proxy).
 
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-strangle-long-combination, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf
-- statistic: mean P&L/premium, non-overlapping 21-day cycles, studentized block-bootstrap CI; secondary: realised frequency of S_{t+21} inside [K_p, K_c] vs the model's risk-neutral probability
-- null: mean P&L = 0
-- procedure: Price each leg with mandel/options/bs.price at sigma = VIX_t x r(moneyness). Pay at intrinsic on S_{t+21}. Repeat at flat VIX (reported as the overpriced bound) and with the put ratio scaled by SKEW_t/SKEW_2026-10-14.
-- data: daily-history-SPY, cboe-VIX-history, cboe-SKEW-history, fred-DTB3, options-surface-2026-10-14 (smile ratios) · min n: 390
-- pass: upper CI < 0 under the smile-scaled model AND under the SKEW-scaled sensitivity
-- controls: Width pre-registered at 5% (3% and 8% reported, deflated with n_trials = 3). The smile ratios come from one day: verdict capped at 'proxy' until 60 capture days refit them. Width varies with vol level; also report a delta-rule version.
-- harness: structure_t_102
-- result X-56e4027b: inconclusive — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -42.4% (95% CI -67.5 to -8.7) — implemented criteria pass; not implemented: SKEW-scaled put sensitivity
-- result X-e2acd1d2: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; studentized block-bootstrap CIs): smile mean -42.4% (95% CI -64.4 to +19.0) — failed: smile: upper CI < 0 (not implemented: SKEW-scaled put sensitivity)
-- note: from the options-library library: Long Strangle; harness suggestion: harness 'strangle_vrp' in options.py; parameter width in {3,5,8}% declared up front and fed to deflated_sharpe_ratio(n_trials=3) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-strangle, https://public.econ.duke.edu/~boller/Published_Papers/rfs_09.pdf
+- statistic: paired Sharpe difference (strangle - straddle) of per-cycle returns on notional; studentized block bootstrap via compare_strategies
+- null: no Sharpe difference
+- procedure: Same entry dates as the short-straddle harness; price both structures with the smile-scaled model and pay at intrinsic.
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 (smile ratios) · min n: 390
+- pass: paired Sharpe difference p < 0.05 with strangle > straddle; same sign under the flat-VIX and SKEW-scaled sensitivities
+- controls: Width fixed at 5% before looking. The same 5%-of-premium cost haircut applies to both. Report PSR, max drawdown and skew. Proxy cap until 60 capture days refit the smile ratios.
+- harness: b6b_chain_strangle_vs_straddle
+- result X-e3bda8ef: not_supported — MODEL-PRICED 30-DTE SPY short strangle (+/- 5% strikes) vs ATM short straddle, smile-scaled VIX model (captured spy-smile IV/VIX on 2 quote days, held fixed through history), dividend forward, DTB3, 5%-of-premium haircut on both, settled on raw closes, per-cycle excess return on notional; on the short-straddle harness's entry dates (rule 10(a): overlay_backtest's monthly expiry calendar, written at one third-Friday expiry close and settled at the next): 403 cycles 1993-02-19..2026-09-18 (27-36 calendar days): per-cycle Sharpe strangle 0.0756 vs straddle -0.0484 (x sqrt(12) annualised 0.262 vs -0.168), difference +0.1240 (95% CI +0.0275 to +0.2091, two-sided p 0.0090; one-sided p by (block, seed) (2, 0) 0.0030, (2, 1) 0.0090, (2, 2) 0.0085, (3, 0) 0.0060, (3, 1) 0.0110, (3, 2) 0.0060, (6, 0) 0.0065, (6, 1) 0.0040, (6, 2) 0.0035, (12, 0) 0.0050, (12, 1) 0.0015, (12, 2) 0.0025); compare_strategies mean-difference p 0.0005 (block 6); flat VIX -0.0172, SKEW-scaled +0.0622; IV scale 0.9 +0.1373, 1.1 +0.1175; PSR strangle 0.890, straddle 0.149; max drawdown strangle -38.5%, straddle -68.8%; skew of per-cycle returns strangle -5.94, straddle -3.00; DIAGNOSTIC only (not the named calendar, never a criterion): the 21-session daily all-start grid, 8460 entries 1993-01-29..2026-09-14, pooled smile +0.1858 (one-sided p 0.0005 at block 42, 0.0005 at block 126), flat VIX +0.0297, SKEW-scaled +0.1048; per start offset (21 of 21): smile +0.1433 to +0.2519 (20 pass at one-sided p < 0.05, 0 negative), flat VIX -0.0066 to +0.0916 (1 of 21 offsets negative), SKEW-scaled +0.0734 to +0.1508 (0 of 21 negative), compare_strategies mean-difference p 0.0010 to 0.0020, max drawdown strangle -36.7% to -14.6%, straddle -62.6% to -33.8% — failed: same sign under flat VIX (difference -0.0172) (not implemented: proxy cap: smile ratios refit on >= 60 capture days (2 so far))
+- note: from the options-library library: Short Strangle; harness suggestion: harness 'short_strangle_vs_straddle' using compare_strategies from mandel/validation/backtest_eval.py on per-trade P&L series | verifier: corrected claim/trial
 
 ### T-104 · long-butterfly
 
@@ -823,6 +1015,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_104
 - result X-6c62e346: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -8.9% (95% CI -15.6 to -1.9); s=0.90 mean +12.1% (95% CI +3.9 to +20.5) — failed: smile: lower CI > 0
 - result X-ddb49077: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; studentized block-bootstrap CIs): smile mean -8.9% (95% CI -16.5 to -2.2); s=0.90 mean +12.1% (95% CI +3.4 to +20.1) — failed: smile: lower CI > 0
+- result X-a9ed2826: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; studentized block-bootstrap CIs, block 42 days): smile mean -11.2% (95% CI -15.7 to -6.8) [pooled over 21 starts; per-start means -13.6% to -7.4%, 0 of 21 starts pass]; s=0.90 mean +9.9% (95% CI +4.7 to +15.1) [pooled over 21 starts; per-start means +6.4% to +16.3%, 12 of 21 starts pass] — failed: smile: lower CI > 0
 - note: from the options-library library: Long Butterfly (call or put); harness suggestion: harness 'butterfly_density' in options.py; same bundles; can reuse a generic multi_leg_payoff(legs, S_T) helper | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-105 · short-butterfly
@@ -839,6 +1032,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_105
 - result X-71227f64: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean +5.7% (95% CI -0.5 to +11.7) — failed: smile: upper CI < 0
 - result X-065c7e94: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; percentile block-bootstrap CIs): smile mean +5.7% (95% CI -0.5 to +11.7) — failed: smile: upper CI < 0
+- result X-3e86c188: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; percentile block-bootstrap CIs, block 42 days): smile mean +7.8% (95% CI +4.0 to +11.7) [pooled over 21 starts; per-start means +5.4% to +10.6%, 0 of 21 starts pass] — failed: smile: upper CI < 0
 - note: from the options-library library: Short Butterfly (call or put); harness suggestion: same 'butterfly_density' harness emits both signs | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-106 · iron-butterfly
@@ -855,6 +1049,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_106
 - result X-7a424f37: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -9.3% (95% CI -15.9 to -2.3); s=0.90 mean +11.5% (95% CI +3.4 to +19.9) — failed: smile: lower CI > 0
 - result X-c1573e0b: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; studentized block-bootstrap CIs): smile mean -9.3% (95% CI -16.9 to -2.6); s=0.90 mean +11.5% (95% CI +2.9 to +19.5) — failed: smile: lower CI > 0
+- result X-4ea6e979: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; studentized block-bootstrap CIs, block 42 days): smile mean -11.5% (95% CI -16.1 to -7.2) [pooled over 21 starts; per-start means -13.9% to -7.8%, 0 of 21 starts pass]; s=0.90 mean +9.4% (95% CI +4.2 to +14.6) [pooled over 21 starts; per-start means +5.8% to +15.7%, 11 of 21 starts pass] — failed: smile: lower CI > 0
 - note: from the options-library library: Iron Butterfly (short, credit); harness suggestion: harness 'iron_fly_vs_straddle' with compare_strategies | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-107 · reverse-iron-butterfly
@@ -871,6 +1066,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_107
 - result X-ebe24649: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean +6.2% (95% CI -0.1 to +12.1); s=0.90 mean -8.8% (95% CI -14.2 to -3.7) — failed: smile: upper CI < 0
 - result X-a20c1cdc: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; percentile block-bootstrap CIs): smile mean +6.2% (95% CI -0.1 to +12.1); s=0.90 mean -8.8% (95% CI -14.2 to -3.7) — failed: smile: upper CI < 0
+- result X-88a5c09c: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; percentile block-bootstrap CIs, block 42 days): smile mean +8.3% (95% CI +4.5 to +12.1) [pooled over 21 starts; per-start means +5.9% to +11.0%, 0 of 21 starts pass]; s=0.90 mean -7.0% (95% CI -10.3 to -3.6) [pooled over 21 starts; per-start means -9.1% to -4.5%, 17 of 21 starts pass] — failed: smile: upper CI < 0
 - note: from the options-library library: Reverse Iron Butterfly (long, debit); harness suggestion: same 'iron_fly_vs_straddle' harness, sign flipped, with decile conditioning | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-109 · iron-condor
@@ -887,6 +1083,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_109
 - result X-a5fdc39b: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -3.3% (95% CI -8.4 to +1.7) — failed: smile: lower CI > 0
 - result X-85f781ce: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 273 cycles, trial min_n 260; studentized block-bootstrap CIs): smile mean -3.3% (95% CI -9.5 to +1.3) — failed: smile: lower CI > 0
+- result X-10f43eb1: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 273 cycles, trial min_n 260; no entry calendar named: all 31 starts of the 31-day grid pooled (daily entries), per-start range reported; studentized block-bootstrap CIs, block 62 days): smile mean -4.6% (95% CI -8.7 to -1.1) [pooled over 31 starts; per-start means -7.8% to -1.1%, 0 of 31 starts pass] — failed: smile: lower CI > 0
 - note: from the options-library library: Iron Condor (short, credit); harness suggestion: harness 'iron_condor_breach' in options.py; implied breach probability from norm_cdf already in backtest_eval.py | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-110 · reverse-iron-condor
@@ -903,7 +1100,38 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_110
 - result X-2b560d7e: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -0.3% (95% CI -26.1 to +26.0) — failed: smile: upper CI < 0
 - result X-cf21e5db: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 273 cycles, trial min_n 260; percentile block-bootstrap CIs): smile mean -0.3% (95% CI -26.1 to +26.0) — failed: smile: upper CI < 0
+- result X-4098b207: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 273 cycles, trial min_n 260; no entry calendar named: all 31 starts of the 31-day grid pooled (daily entries), per-start range reported; percentile block-bootstrap CIs, block 62 days): smile mean +3.3% (95% CI -12.7 to +19.9) [pooled over 31 starts; per-start means -7.0% to +11.3%, 0 of 31 starts pass] — failed: smile: upper CI < 0
 - note: from the options-library library: Reverse Iron Condor (long, debit); harness suggestion: same 'iron_condor_breach' harness, sign flipped | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-119 · call-ratio-backspread
+
+**Claim.** A 60-DTE SPY 1:2 call backspread (short ATM, long 2x 25-delta calls), entered at mid on captured chains and held to expiry, has negative mean P&L per unit max loss: realised upside rarely reaches the upper breakeven.
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-ratio-call-spread
+- statistic: mean P&L/max loss with studentized block-bootstrap CI
+- null: mean P&L = 0
+- procedure: Delta-selected strikes from daily chains; mid and bid/ask fills; settle at expiry
+- data: options-chain-SPY-<date>, daily-history-SPY · min n: 250
+- pass: upper CI < 0 at mid fills
+- controls: Rule fixed; credit/debit frequency reported descriptively; IBIT and GLD runs reported as cross-asset contrasts.
+- harness: b6b_dolt_backspread
+- result X-0b00e203: not_supported — T-119 SPY 1:2 call backspread (short 1 ATM call, long 2 25-delta calls; expiry nearest 60 DTE within +/-7 days; DoltHub end-of-day SPY quotes 2019-02-08..2026-10-14 (1232 quote days from 1291 snapshots; 59 duplicate snapshots of a quote day dropped, 2 stale-moved kept on their quote day); settled at intrinsic on SPY's raw close on the expiry date, early exercise ignored as the claim holds to expiry): 707 entry days (41 distinct 67-day holds), 2019-02-15..2026-08-07; mid fills (the claim and the pass): mean -0.078 (pooled over 707 entry days in 391 weeks; block 20 weeks (2x hold) CI -0.202 to +0.051; block 39 weeks (4x hold) CI -0.185 to +0.032) -> upper 95% CI < 0: no (week-weighted, reported: mean -0.080, CI -0.208 to +0.047); every entry uses its entry-close quotes as the live proxy (the archive stamps every dolt-chain-SPY row available at 22:00Z on its snapshot date, after the 16:15 ET fill); snapshot-date sensitivity (drops the 31 entries whose snapshot was taken on a weekend, holiday or moved day; no kept entry is point in time either): mid mean -0.084 (CI -0.213 to +0.058); per start (rule 10: 4 non-overlapping chains from the entry days of the first hold, 4 distinct, 45-45 trades each, block 2 trades): mean -0.140 to -0.105, upper bound +0.077 to +0.106, 0/4 pass; executable (sell the ATM call at the bid, buy the 25-delta calls at the ask), reported: mean -0.084 (pooled over 707 entry days in 391 weeks; block 20 weeks (2x hold) CI -0.206 to +0.044; block 39 weeks (4x hold) CI -0.191 to +0.025); credit/debit (control, descriptive): credit at mid on 100.0% of entries (mean net credit +6.42 = +1.27% of S; executable +6.32); mean max loss 16.19 = 3.24% of S; the claim's mechanism (reported, no threshold stated): 11.9% of trades settled above the upper breakeven K2 + (K2 - K1) - credit; ratio of means (mean P&L / mean max loss at mid) -0.078; early-exercise sensitivity (a call is exercised at a cum-dividend close when the dividend exceeds its time value, BS put at the entry vendor IV, r = 0): mean -0.050 (CI -0.189 to +0.087); with $0.65/contract per leg at executable fills: mean -0.085; DTE tolerance sensitivity at mid: +/-4 DTE: n 509, mean -0.093 (CI -0.221 to +0.034); +/-14 DTE: n 1101, mean -0.080 (CI -0.208 to +0.056); 25-delta leg vendor delta 0.18-0.32; skipped quote days: no expiry within 60 +/- 7 DTE 480; unresolved (expiry after the last archived close) 26; no usable 25-delta call 16; 25-delta strike not above the ATM strike 3; the GLD and IBIT controls cannot run (DoltHub has neither symbol) — failed: mid fills (the claim and the pass): upper 95% CI < 0 for the mean, robust over blocks of 2/4x the hold
+- note: from the options-library library: Call Ratio Backspread; harness suggestion: harness 'backspread_credit_frequency' in options.py | verifier: corrected claim/trial
+
+### T-121 · front-ratio-spread
+
+**Claim.** A 45-DTE SPY put front-ratio (long 40-delta put, short two 20-delta puts), entered at mid on captured chains and held to expiry, has positive mean P&L per unit of naked-leg margin.
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-ratio-call-spread
+- statistic: mean P&L/margin with studentized block-bootstrap CI
+- null: mean P&L = 0
+- procedure: Delta-selected strikes; mid and bid/ask fills; settle at expiry
+- data: options-chain-SPY-<date>, daily-history-SPY · min n: 250
+- pass: lower CI > 0 at bid/ask with a stress month in the sample
+- controls: Rule fixed; tail absent from short samples, so the verdict is capped at inconclusive.
+- harness: b6b_dolt_put_front_ratio
+- result X-cd21ab67: not_supported — T-121 SPY put front-ratio (long 1 40-delta put, short 2 20-delta puts) (expiry nearest 45 DTE within +/-7 days, strikes by vendor delta within 0.075; DoltHub end-of-day SPY quotes 2019-02-08..2026-10-14 (1232 quote days from 1291 snapshots; 59 duplicate snapshots of a quote day dropped, 2 stale-moved kept on their quote day); settled at intrinsic on SPY's raw close on the expiry date, early exercise ignored as the claim holds to expiry; naked-leg margin = Reg-T/CBOE naked put on one uncovered short put: premium + max(20% x S - OTM amount, 10% x K), OTM = max(S - K, 0), premium at the fill, the uncovered leg being one 20-delta put (the other is covered by the long 40-delta put)): 565 entry days (54 distinct 52-day holds), 2019-02-08..2026-08-31; mid fills (the claim): mean +0.010 (pooled over 565 entry days in 396 weeks; block 15 weeks (2x hold) CI -0.011 to +0.029; block 30 weeks (4x hold) CI -0.013 to +0.029) -> lower 95% CI > 0: no (week-weighted, reported: mean +0.008, CI -0.019 to +0.025); bid/ask fills (the pass): mean +0.008 (pooled over 565 entry days in 396 weeks; block 15 weeks (2x hold) CI -0.013 to +0.028; block 30 weeks (4x hold) CI -0.016 to +0.028) -> lower 95% CI > 0: no (week-weighted, reported: mean +0.006, CI -0.022 to +0.024); every entry uses its entry-close quotes as the live proxy (the archive stamps every dolt-chain-SPY row available at 22:00Z on its snapshot date, after the 16:15 ET fill); snapshot-date sensitivity (drops the 24 entries whose snapshot was taken on a weekend, holiday or moved day; no kept entry is point in time either): mid mean +0.009 (CI -0.012 to +0.030); exec mean +0.008 (CI -0.014 to +0.029); bid/ask per start (rule 10: 4 non-overlapping chains from the entry days of the first hold, 4 distinct, 47-48 trades each, block 2 trades): mean -0.024 to -0.021, lower bound -0.202 to -0.189, 0/4 pass; mid per start (rule 10: 4 non-overlapping chains from the entry days of the first hold, 4 distinct, 47-48 trades each, block 2 trades): mean -0.023 to -0.020, lower bound -0.200 to -0.187, 0/4 pass; stress: VIX >= 40 months with an open trade 2020-02, 2020-03, 2020-04, 2020-06, 2020-10, 2025-04; months with SPY >= 10% below its 63-session high (reported) 2020-02, 2020-03, 2020-04, 2020-05, 2022-02, 2022-03, 2022-04, 2022-05, 2022-06, 2022-07, 2022-09, 2022-10, 2022-11, 2023-10, 2025-03, 2025-04; 46 trades open across a stress session, mean bid/ask ratio -0.093, without them +0.017; worst trade (bid/ask) -1.333 entered 2020-01-29, expiry 2020-03-20; credit at mid on 42.1% of entries (mean -0.37); mean naked-leg margin 79.37 = 14.94% of S; ratio of means at bid/ask +0.011; with $0.65/contract per leg at bid/ask: mean +0.008; DTE tolerance sensitivity at bid/ask: +/-4 DTE: n 367, mean +0.014 (CI -0.005 to +0.036); +/-14 DTE: n 961, mean +0.003 (CI -0.034 to +0.021); skipped quote days: no expiry within 45 +/- 7 DTE 623; unresolved (expiry after the last archived close) 26; no usable 40- or 20-delta put 18 — failed: mid fills (the claim): lower 95% CI > 0 for the mean, robust over blocks of 2/4x the hold; bid/ask fills (the pass): lower 95% CI > 0 for the mean, robust over blocks of 2/4x the hold
+- note: from the options-library library: Front Ratio Spread (short ratio call / put spread); harness suggestion: harness 'front_ratio_skew' sharing the delta selector | verifier: corrected claim/trial
 
 ### T-124 · short-vol-with-wings
 
@@ -919,6 +1147,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_124
 - result X-03436e65: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -4.4% (95% CI -8.7 to -0.5); wings x1.5 mean -8.9% (95% CI -13.2 to -4.8) — failed: smile: lower CI > 0; wings x1.5: lower CI > 0
 - result X-804b88ef: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; studentized block-bootstrap CIs): smile mean -4.4% (95% CI -9.5 to -0.6); wing prices x1.5 mean -7.7% (95% CI -13.1 to -3.5); wing prices x2.0 (sensitivity, not in the pass rule) mean -10.4% (95% CI -16.1 to -6.0) — failed: smile: lower CI > 0; wing prices x1.5: lower CI > 0
+- result X-d6c4f63c: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; studentized block-bootstrap CIs, block 42 days): smile mean -5.2% (95% CI -8.1 to -2.7) [pooled over 21 starts; per-start means -6.8% to -3.4%, 0 of 21 starts pass]; wing prices x1.5 mean -8.4% (95% CI -11.7 to -5.6) [pooled over 21 starts; per-start means -10.0% to -6.9%, 0 of 21 starts pass]; wing prices x2.0 (sensitivity, not in the pass rule) mean -11.1% (95% CI -14.6 to -8.1) — failed: smile: lower CI > 0; wing prices x1.5: lower CI > 0
 - note: from the options-library library: Short Vol with Wings (tail-protected short straddle/strangle); harness suggestion: harness 'winged_short_vol' built on compare_strategies with wing-price multiplier sensitivity; later re-run on chain capture when available | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-125 · long-call
@@ -935,6 +1164,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_125
 - result X-1d7ea485: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): s=1.0 mean -7.7% (95% CI -16.9 to +1.3); s=0.9 mean +2.3% (95% CI -7.9 to +12.3) — failed: s=1.0: upper CI < 0; s=0.9: upper CI < 0
 - result X-aeb3c086: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; studentized block-bootstrap CIs): s=1.0 q=0.0% mean -10.5% (95% CI -19.3 to -1.6); s=0.9 q=0.0% mean -1.2% (95% CI -10.7 to +8.7); s=1.0 q=1.8% mean -7.1% (95% CI -16.2 to +2.3); s=0.9 q=1.8% mean +3.0% (95% CI -7.0 to +13.5) — failed: s=0.9 q=0.0%: upper CI < 0; s=1.0 q=1.8%: upper CI < 0; s=0.9 q=1.8%: upper CI < 0
+- result X-e67714f3: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; studentized block-bootstrap CIs, block 42 days): s=1.0 q=0.0% mean -9.2% (95% CI -17.5 to -0.7) [pooled over 21 starts; per-start means -11.3% to -7.2%, 10 of 21 starts pass]; s=0.9 q=0.0% mean +0.3% (95% CI -8.8 to +9.7) [pooled over 21 starts; per-start means -2.0% to +2.5%, 0 of 21 starts pass]; s=1.0 q=1.8% mean -5.7% (95% CI -14.3 to +3.2) [pooled over 21 starts; per-start means -7.9% to -3.6%, 0 of 21 starts pass]; s=0.9 q=1.8% mean +4.6% (95% CI -5.0 to +14.5) [pooled over 21 starts; per-start means +2.2% to +6.9%, 0 of 21 starts pass] — failed: s=0.9 q=0.0%: upper CI < 0; s=1.0 q=1.8%: upper CI < 0; s=0.9 q=1.8%: upper CI < 0
 - note: from the options-library library: Long Call; harness suggestion: vix_priced_option_returns(strategy='long_call', dte=30, strike='ATM') in mandel/experiments/options.py; reuse block_bootstrap_pvalue and deflated_sharpe_ratio | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-127 · short-naked-call
@@ -951,7 +1181,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_127
 - result X-7cde2127: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): Sharpe put minus call -0.59 (one-sided 95% lower -1.33); short call mean +0.4% (95% CI +0.3 to +0.5) — failed: Sharpe(put) > Sharpe(call), one-sided p < 0.05
 - result X-1157681c: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; percentile block-bootstrap CIs): Sharpe put minus call -0.59 (one-sided 95% lower -1.33); short call mean +0.4% (95% CI +0.3 to +0.5) — failed: Sharpe(put) > Sharpe(call), one-sided p < 0.05
+- result X-01dbc2cb: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; standard monthly expiry calendar (third Friday or the prior session; entered at the previous monthly expiry); percentile block-bootstrap CIs, block 6 cycles): Sharpe put minus call -0.52 (one-sided 95% lower -1.06); short call mean +0.3% (95% CI +0.2 to +0.5) — failed: Sharpe(put) > Sharpe(call), one-sided p < 0.05
 - note: from the options-library library: Short (Naked) Call; harness suggestion: vix_priced_option_returns(strategy='short_call', dte=30, strike='OTM5') compared to short_put | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-128 · short-naked-put
+
+**Claim.** Selling a 1-month ATM SPY put at VIX IV (model-priced), fully collateralised in 3-month bills with the PUT-index construction, has a higher Sharpe ratio than SPY buy-and-hold over 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/naked-put-uncovered-put-short-put, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_SP_500_PutWrite_Indices_Methodology.pdf
+- statistic: annualised Sharpe difference (putwrite minus SPY) with studentized block bootstrap p-value; also the max drawdown ratio
+- null: Sharpe(putwrite) <= Sharpe(SPY)
+- procedure: third-Friday roll; strike = nearest strike at or below spot; premium = BS put at VIX IV; collateral earns DTB3; settle at the SPY close (proxy for the SOQ); walk-forward halves; repeat at iv_scale 0.9
+- data: SPY, VIX, DTB3; benchmark check against the actual Cboe PUT index daily history (cdn.cboe.com PUT_History.csv: 4,983 rows from 1991-03-04 to 2026-10-13, with gaps) · min n: 300
+- pass: p < 0.05 at both iv_scale 1.0 and 0.9, holding in both walk-forward halves
+- controls: Correction: VIX is usually above ATM IV, so pricing the ATM put at VIX overstates the premium and the result is optimistic, not conservative; the 0.9 x VIX run and the comparison with the real PUT index guard this. Sharpe flatters negatively skewed returns, so report skew, kurtosis and PSR. SPY is price-only unless total return is reconstructed; state the dividend convention.
+- harness: b6b_bw_putwrite_vs_spy
+- result X-3d662f03: not_supported — MODEL-PRICED (Black-Scholes put at VIX/100 x scale on SPY's escrowed-dividend forward; no transaction costs, none stated): SPY 1-month put at the nearest $1 strike at or below the close, written at each monthly expiry close on the whole account (PUT-index construction: premium and K collateral in 3-month bills), settled on SPY's raw close (SOQ proxy); 403 monthly expiry-to-expiry cycles 1993-02-19..2026-09-18 (rule 10(a): the standard monthly expiry, third Friday or the prior session; 27-36 calendar days). SPY buy-and-hold is total return (adjclose: dividends reinvested). Excess-return Sharpe putwrite 0.861 vs SPY 0.547: IV x1.00 difference +0.315 (CI +0.012 to +0.554), p 0.022 (first half +0.447 (p 0.007), second half +0.172 (p 0.322)); IV x0.90 +0.075 (CI -0.153 to +0.270), p 0.284 (first half +0.192 (p 0.042), second half -0.051 (p 0.672)); x0.81 sensitivity -0.142 (CI -0.307 to +0.008); exact-ATM strike (x1.00) +0.360 (CI +0.066 to +0.597). VIX overstates SPY's ATM IV, so x1.00 flatters the put-write. Putwrite excess skew -4.16, kurtosis 31.5, PSR vs SPY's Sharpe 0.875; max drawdown putwrite -30.5% vs SPY -47.9% (ratio 0.64). Benchmark check vs the actual Cboe PUT (236 roll-to-roll cycles from 2007): tracking error 2.72%/yr, bias +3.33%/yr, corr 0.976; Sharpe model 0.782 vs PUT 0.496 — failed: IV x1.00 second half: p < 0.05 (diff +0.172, p=0.322); IV x0.90 full sample: p < 0.05 (diff +0.075, p=0.284); IV x0.90 second half: p < 0.05 (diff -0.051, p=0.672)
+- note: from the options-library library: Short (Naked / Cash-Secured) Put; harness suggestion: putwrite_vs_spy() reproducing the Cboe PUT methodology with VIX pricing; later swap in captured SPY chain mids | verifier: corrected claim/trial
 
 ### T-129 · bull-call-spread
 
@@ -967,6 +1213,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_129
 - result X-856f5dfa: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): bull call spread mean +13.2% (95% CI +2.2 to +23.7); spread - long call mean +20.9% (95% CI +17.5 to +24.7) — failed: bull call spread: upper CI < 0
 - result X-86dc6336: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; percentile block-bootstrap CIs): bull call spread mean +13.2% (95% CI +2.2 to +23.7); spread - long call mean +20.9% (95% CI +17.5 to +24.7) — failed: bull call spread: upper CI < 0
+- result X-949a4dfe: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; standard monthly expiry calendar (third Friday or the prior session; entered at the previous monthly expiry); percentile block-bootstrap CIs, block 6 cycles): bull call spread mean +15.0% (95% CI +4.8 to +24.7); spread - long call mean +19.6% (95% CI +16.3 to +23.2) — failed: bull call spread: upper CI < 0
 - note: from the options-library library: Bull Call Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bull_call_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-132 · bear-call-credit-spread
@@ -983,7 +1230,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_132
 - result X-591cc927: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): bear call spread mean +3.9% (95% CI +0.7 to +7.1) — failed: upper CI <= 0
 - result X-bdb9f113: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; percentile block-bootstrap CIs): bear call spread mean +3.9% (95% CI +0.7 to +7.1) — failed: bear call spread: upper CI <= 0
+- result X-354acc99: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; standard monthly expiry calendar (third Friday or the prior session; entered at the previous monthly expiry); percentile block-bootstrap CIs, block 6 cycles): bear call spread mean +2.9% (95% CI -0.2 to +6.1) — failed: bear call spread: upper CI <= 0
 - note: from the options-library library: Bear Call Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bear_call_spread', dte=30, strikes=('OTM3','OTM6')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-133 · ratio-front-spread-1x2
+
+**Claim.** A 1-month zero-cost 1x2 SPY call ratio spread (long 1 ATM call, short 2 calls at the strike where 2C(K2) = C(K1), all priced at VIX IV; model-priced) has a positive mean monthly P&L per unit spot, yet loses more than 3x its median gain in more than 3% of months, over 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/short-ratio-put-spread
+- statistic: mean P&L per unit spot with block bootstrap CI; frequency of months with a loss > 3x the median gain, with binomial CI
+- null: mean <= 0, or tail frequency <= 3%
+- procedure: monthly cycles; solve K2 for zero cost at that month's VIX; long 1 call at S, short 2 at K2; payoff from the SPY close
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: lower CI of the mean > 0 AND tail-frequency lower CI > 3% (both pre-registered)
+- controls: Flat IV overprices the OTM shorts relative to the real smile, so the real zero-cost K2 sits closer to ATM (more negative gamma); report by VIX tercile; recheck with chain mids at 60 days.
+- harness: b6_dir_ratio_1x2
+- result X-78d24028: not_supported — MODEL-PRICED, no transaction costs (none stated in the claim) (all legs at VIX IV flat, K2 solved for zero cost each entry on the dividend forward, any net premium carried in bills): SPY 1-month 1x2 call ratio; rule 10(b), the claim names no entry calendar: primary statistic pooled over all 21 start offsets of the non-overlapping 21-session grid = 8463 overlapping daily entries 1993-01-29 to 2026-09-14 (circular block bootstrap, 42-day blocks = 2 x hold); n = 403 distinct 21-session holds in the window; median K2 +2.60% above spot; mean P&L / S +0.786% (95% CI +0.693% to +0.876%); median gain +0.998%, losses > 3x it in 75 of 8463 entries = +0.89% (block-42 bootstrap 95% CI +0.47% to +1.48%; needs lower > 3%); per start offset (non-overlapping grid; mean block-6 percentile, tail Clopper-Pearson): mean lower CI > 0: 21 of 21 start offsets pass (per-offset +0.719% to +0.841%, lower CI +0.587% to +0.698%); tail lower CI > 3%: 0 of 21 start offsets pass (per-offset +0.00% to +1.49%, tail lower CI +0.00% to +0.55%); both criteria in 0 of 21; reading check (report only): with the median of all entries (+0.365%) as the base, +3.01% (CI +1.69% to +5.68%); by VIX tercile (mean, tail freq): low +0.499%/+0.6%, mid +0.686%/+0.7%, high +1.172%/+0.5%; IV-scale sensitivity of the mean (not in the pass rule): s=0.81 +0.358%, s=0.90 +0.570%; the trial's control 'recheck on chain mids at 60 days' is still pending: the archive holds 2 chain days, so a traded test needs chain history — failed: frequency of losses > 3x median gain: lower CI > 3%
+- note: from the options-library library: Ratio Vertical Front Spread (1x2 Call or Put Ratio Spread); harness suggestion: vix_priced_option_returns(strategy='ratio_call_1x2', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial
 
 ### T-134 · backspread-1x2
 
@@ -999,7 +1262,278 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: structure_t_134
 - result X-19107292: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): all months mean +0.1% (95% CI -0.1 to +0.3); VIX<15 (n=140) mean -0.0% (95% CI -0.1 to +0.1) — failed: all months: upper CI < 0; VIX<15 (n=140): lower CI > 0
 - result X-30692d85: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; percentile block-bootstrap CIs): all months mean +0.1% (95% CI -0.1 to +0.3); VIX<15 (n=140) mean -0.0% (95% CI -0.1 to +0.1) — failed: all months: upper CI < 0; VIX<15 (n=140): lower CI > 0
+- result X-2cd9ae76: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 300; standard monthly expiry calendar (third Friday or the prior session; entered at the previous monthly expiry); percentile block-bootstrap CIs, block 6 cycles): all months mean +0.2% (95% CI +0.1 to +0.4); VIX<15 (n=137) mean +0.0% (95% CI -0.1 to +0.2) — failed: all months: upper CI < 0; VIX<15 (n=137): lower CI > 0
 - note: from the options-library library: Backspread (1x2 Long Ratio: Call or Put); harness suggestion: vix_priced_option_returns(strategy='put_backspread_1x2', dte=30, condition='vix<15') | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-137 · synthetic-long-short-stock
+
+**Claim.** In captured SPX (European), SPY, GLD and IBIT chains, the mid-price synthetic forward K + C - P deviates from the parity forward by more than the two half-spreads plus 10 bps of spot in fewer than 1% of near-ATM strike-expiry pairs (no exploitable conversion/reversal edge for a retail API account).
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/synthetic-long-stock, https://www.optionseducation.org/strategies/all-strategies/synthetic-short-stock
+- statistic: share of pairs with |K + C_mid - P_mid - F| > half-spread(C) + half-spread(P) + 0.001*S, where F = S*exp((r-q)T) for SPX, and for American SPY/GLD/IBIT the check is against the American no-arbitrage bounds S - PV(div) - K <= C - P <= S - K*exp(-rT)
+- null: share >= 1%
+- procedure: for each daily capture, take the 3 strikes nearest spot for every expiry; r from FRED DTB3; q for SPX/SPY implied from the SPX box/parity regression (dividends are not in the free data list); cluster CIs by capture day
+- data: CBOE delayed chains for _SPX, SPY, GLD, IBIT (daily capture from 2026-10-14); DTB3 · min n: 500
+- pass: share < 1% with a day-clustered 95% CI entirely below 1%
+- controls: Delayed (15-min) quotes can be stale: exclude crossed or zero bids. SPX is the clean European control. The repo's T-181 parity_check (mandel/experiments/options_market.py) already regresses C - P on K: run both.
+- harness: b6_xc_parity_deviation_scan
+- result X-16ddfa68: not_supported — 888 near-ATM pairs (3 strikes nearest the quote-day close, every expiry) over 2 quote day(s) ['2026-10-13', '2026-10-14']: 142 outside parity +/- (half-spreads + 10 bp of spot) = 15.99% (needs < 1%); day-clustered CI n/a: 2 capture days, needs >= 5. By chain: GLD 0.0% of 177 (by DTE 31-90 0%/27, 91-365 0%/48, <=30 0%/78, >365 0%/24), bill-to-2y curve 0.0%; IBIT 7.1% of 168 (by DTE 31-90 4%/27, 91-365 0%/36, <=30 9%/75, >365 13%/30), bill-to-2y curve 4.8%; SPX 37.7% of 345 (by DTE 31-90 4%/75, 91-365 94%/96, <=30 1%/138, >365 100%/36), literal K + C - P 35.1%, at its own box rate 0.0%, bill-to-2y curve 36.8%; SPY 0.0% of 198 (by DTE 31-90 0%/33, 91-365 0%/60, <=30 0%/75, >365 0%/30), bill-to-2y curve 0.0%. Spot timing: the short-dated parity (median K e^(-rT) + C - P + PV(D) over the 4 strikes nearest the close at 1-10 DTE) puts the quote-synchronous spot at GLD 2026-10-13 -2.2 bp, IBIT 2026-10-13 -6.0 bp, SPX 2026-10-13 +16.1 bp, SPY 2026-10-13 +1.6 bp, GLD 2026-10-14 -3.1 bp, IBIT 2026-10-14 +14.0 bp, SPX 2026-10-14 -43.6 bp, SPY 2026-10-14 -7.0 bp from the quote-day close (SPX's is S e^(-qT), within about 4 bp of S, and is reported only: SPX is judged on its own regression forward, where the close enters only the tolerance); IBIT 2026-10-14: 12/84 flagged at the close (12 upper, 0 lower) vs 1 at the implied spot (46.240 -> 46.305, +14.0 bp), so 11 are spot-timing artefacts (the close print is not synchronous with the captured option quotes), not a conversion/reversal edge. With the American bounds judged at that spot the pooled share is 14.86% (132/888). With SPX judged at its own box rate (the most lenient reading) it is 1.35% (12/888) at the close and 0.23% (2/888) at the quote-synchronous spot: the lenient reading clears 1% once the stale close is replaced, so the failure rests on the bill-financed SPX parity forward alone. SPX parity forward F = S e^(r - q)T with r the 3-month bill (DTB3) and q from the intercept of the C - P on K regression; SPX options discount at their box rate, above the 3-month bill and rising with maturity, so long-dated SPX pairs sit outside a bill-financed parity forward while the cross-strike fit at the box rate is tight; American SPY/GLD/IBIT checked against S - PV(D) - K <= C - P <= S - K e^(-rT); T-181 parity_check (C - P regressed on K, 10 strikes, >= 30 DTE): implied rate minus bill SPX 2026-10-13 +70 bp, SPX 2026-10-14 +56 bp, SPY 2026-10-13 -657 bp, SPY 2026-10-14 -589 bp (its slope rate is noise-dominated for SPY's $1 strikes); rule 10(c): statistics on fixed capture days, no cycle grid, so no grid phase to vary — failed: pooled share of near-ATM pairs outside parity +/- (half-spreads + 10 bp of spot) < 1% (142/888 = 15.99%) (not implemented: day-clustered 95% CI entirely below 1% (2 capture days; needs >= 5))
+- note: from the options-library library: Synthetic Long / Short Stock (Combo); harness suggestion: parity_deviation_scan(symbols=['SPY','GLD','IBIT']) over the chain archive | verifier: corrected claim/trial
+
+### T-138 · risk-reversal-directional
+
+**Claim.** Months in which the CBOE SKEW index at entry is in its top quintile (steep put skew) are followed by a higher mean 1-month P&L on a bullish SPY risk reversal (long 5%-OTM call, short 5%-OTM put, legs priced at VIX IV; model-priced) than months in the bottom quintile, 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://en.wikipedia.org/wiki/Risk_reversal, https://insights.deribit.com/exchange-updates/dvol-deribit-implied-volatility-index/
+- statistic: difference in mean monthly P&L per unit spot, top minus bottom SKEW quintile, studentized block bootstrap
+- null: difference <= 0
+- procedure: monthly cycles from SPY inception (1993); quintiles of SKEW computed on the full history and also on an expanding window; legs priced at VIX IV; payoff from the SPY close
+- data: SPY, VIX, CBOE SKEW daily, DTB3 · min n: 300
+- pass: lower CI of the difference > 0 in both the full-sample and expanding-window quintile definitions
+- controls: Flat pricing means the entry premium does not vary with skew, so this isolates the conditional return of the underlying wings (a SKEW timing test). A real skew-premium test needs chain capture (60+ days, follow-up). Under flat pricing the structure is a small debit, not a credit; state this. SPY starts in 1993, so the sample is 1993-2026, not 1990.
+- harness: b6_dir_risk_reversal_skew
+- result X-93c696cc: not_supported — MODEL-PRICED, no transaction costs (none stated in the claim) (both legs at VIX IV flat, so the entry premium does not vary with SKEW: this isolates the conditional wing payoff, a SKEW timing test; under flat pricing the structure is a small debit, median +0.08% of S, carried in bills): SPY 1-month risk reversal (long 1.05 S call, short 0.95 S put) from 1993 (SPY inception, not 1990); rule 10(b), the claim names no entry calendar: primary statistic pooled over all 21 start offsets of the non-overlapping 21-session grid = 8463 overlapping daily entries 1993-01-29 to 2026-09-14 (circular block bootstrap, 42-day blocks = 2 x hold); n = 403 distinct 21-session holds in the window; per-offset intervals are studentized block-6; full-history SKEW cutoffs 113.9/132.2; full quintiles: top 1809 entries mean -0.16%, bottom 1491 mean -0.12%, difference -0.04% (studentized block-42 95% CI -0.61% to +0.74%); per start offset lower CI > 0: 0 of 21 start offsets pass (per-offset -0.83% to +0.58%, lower CI -2.30% to -0.06%); expanding quintiles: top 4095 entries mean -0.15%, bottom 660 mean +0.02%, difference -0.17% (studentized block-42 95% CI -0.84% to +1.06%); per start offset lower CI > 0: 0 of 21 start offsets pass (per-offset -0.67% to +0.77%, lower CI -1.78% to -0.47%); IV-scale sensitivity of the all-entry mean (not in the pass rule): s=0.81 -0.08%, s=0.90 -0.10%; a real skew-premium test needs chain capture (60+ days, pending) — failed: full-sample quintiles: top - bottom lower CI > 0; expanding-sample quintiles: top - bottom lower CI > 0
+- note: from the options-library library: Risk Reversal (Directional, OTM Combo); harness suggestion: conditional_option_returns(strategy='risk_reversal_25d', condition='SKEW quintile'); follow-up skew_premium_harvest once chains have 60 days | verifier: corrected claim/trial
+
+### T-139 · leaps-stock-replacement
+
+**Claim.** A SPY 1-year 20%-ITM call priced at VIX3M IV (VIX before 2007; model-priced), rolled annually with the rest of the capital in 3-month bills, earns a lower annualised return than SPY over 1993-2026 but with a smaller maximum drawdown.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-call, https://www.law.cornell.edu/uscode/text/26/1256
+- statistic: annualised return difference (LEAPS + bills minus SPY) with block bootstrap CI; ratio of max drawdowns
+- null: return difference >= 0, or drawdown ratio >= 1
+- procedure: annual cycles plus 12 monthly-staggered cohorts; K = 0.8*S; BS at VIX3M/100 (VIX before 2007-12), r = DTB3, q = constant assumption; hold to expiry; (S - C) earns DTB3; compare against SPY under the same dividend convention as q
+- data: SPY, VIX, VIX3M, DTB3 · min n: 30
+- pass: return difference upper CI < 0 AND drawdown ratio < 1 (both pre-registered); report that n of independent annual cycles is about 33
+- controls: Correction: by put-call parity, call + (S - C) in bills = SPY + a 1-year 20%-OTM put financed at the bill rate (with dividends via q), so the original claim (higher return, drawdown >= 1.5x SPY) contradicted the structure, since loss per cycle is capped at C. The return difference equals the embedded put's P&L. IV proxy mismatch: 1-year IV is usually above VIX3M, so the put cost is understated (stated).
+- harness: b6_dir_leaps_replacement
+- result X-57623c6d: not_supported — MODEL-PRICED, no transaction costs (none stated in the claim) (1-year call K = 0.8 S at VIX3M IV from 2009-09-18, VIX before (the archive's VIX3M starts there, not at the claim's 2007-12), flat, on the dividend forward with r = prior DTB3 print, re-marked daily at that day's IV; S - C in 3-month bills; SPY total return, the same dividend convention): rule 10(b), the claim names no entry calendar: primary statistic pooled over all 252 start offsets of the non-overlapping 252-session grid = 8232 overlapping daily entries 1993-01-29 to 2025-10-10 (circular block bootstrap, 504-day blocks = 2 x hold); n = 33 distinct 252-session holds in the window (the trial expects about 33 independent annual cycles); median call premium +21.5% of S; pooled annualised return difference -0.77% (95% CI -1.60% to +0.37%; the difference is the embedded 20%-OTM put's P&L); max-drawdown ratio mean 0.82 over all 252 offset paths; per start offset (non-overlapping annual cycles, block-2 percentile): return difference upper CI < 0: 70 of 252 start offsets pass (per-offset -1.55% to +0.18%, upper CI -0.98% to +3.07%); drawdown ratio < 1: 252 of 252 start offsets pass (per-offset ratio 0.69 to 0.93); both in 70 of 252; the trial's 12 monthly-staggered cohorts (offsets 0, 21, ..., 231; report only): return difference -0.74%, drawdown ratio mean 0.81; pooled return difference at IV scale 0.90 -0.39%, 1.10 -1.19% (1-year IV usually sits above VIX3M, so the put cost is understated; not in the pass rule) — failed: annualised return difference (LEAPS + bills - SPY) upper CI < 0
+- note: from the options-library library: LEAPS Call as Stock Replacement; harness suggestion: vix_priced_option_returns(strategy='leaps_itm20', dte=365, iv_source='VIX3M', cohorts='monthly') | verifier: corrected claim/trial
+
+### T-140 · deep-itm-call-stock-substitute
+
+**Claim.** A monthly-rolled SPY 10%-ITM call priced at VIX IV (model-priced), held with the rest of the capital (S - C) in 3-month bills, has a daily-return correlation above 0.98 with SPY and an annualised shortfall versus SPY below 1 percentage point over 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-call, https://www.cboe.com/tradable_products/sp_500/spx_options/specifications/
+- statistic: correlation of daily portfolio returns (call re-marked by BS at that day's VIX, plus bills) with SPY; annualised shortfall vs SPY under the same dividend convention as q; block bootstrap CIs
+- null: correlation <= 0.98 or shortfall >= 1 pp
+- procedure: monthly roll at K = 0.9*S at VIX IV; mark daily; compute portfolio returns and shortfall relative to SPY
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: correlation lower CI > 0.98 AND shortfall upper CI < 1 pp
+- controls: Correction: the original drag bound (DTB3*K/S + 1pp) compared an unfunded option with SPY. With the bills included, parity makes the shortfall equal the P&L of the embedded 10%-OTM 1-month put (premium minus payoff), which is the quantity tested. Bid-ask on deep-ITM strikes is not in the history; add it once chain capture reaches 20 days.
+- harness: b6_dir_deep_itm_call
+- result X-cbfc46bf: not_supported — MODEL-PRICED, no transaction costs (none stated in the claim) (call K = 0.9 S at VIX IV flat on the dividend forward, re-marked daily at that day's VIX; S - C in 3-month bills at the prior DTB3 prints; SPY total return): rule 10(a), 'monthly-rolled' = SPY's standard monthly options (third Friday, prior session on a holiday), bought at one monthly expiry close and rolled at the next (27-36 days); 403 monthly rolls, 8452 daily returns 1993-02-19 to 2026-09-18; median call premium +10.2% of S; correlation 0.9424 (block-21 percentile 95% CI 0.8987 to 0.9830; needs lower > 0.98); annualised shortfall -0.58 pp (95% CI -2.61 to +1.10 pp; needs upper < 1 pp; equals the embedded 10%-OTM put's P&L); robustness (rule 10 grid reading, not the pass rule): the 21 start offsets of a 21-session roll grid: correlation lower CI > 0.98: 0 of 21 start offsets pass (per-offset 0.9337 to 0.9543, lower CI 0.8936 to 0.9241); shortfall upper CI < 1 pp: 0 of 21 start offsets pass (per-offset +0.09 pp to +1.15 pp, upper CI +1.58 pp to +2.64 pp); both in 0 of 21; shortfall at IV scales (not in the pass rule; a traded test needs chain history and deep-ITM bid-ask): s=0.81 -1.63 pp, s=0.90 -1.19 pp — failed: daily-return correlation with SPY lower CI > 0.98; annualised shortfall vs SPY upper CI < 1 pp
+- note: from the options-library library: Deep ITM Call as Short-Dated Stock Substitute; harness suggestion: vix_priced_option_returns(strategy='deep_itm_call', dte=30, strike='ITM10', daily_marks=True) | verifier: corrected claim/trial
+
+### T-143 · long-calendar-spread
+
+**Claim.** A 30/60-DTE ATM SPY call calendar held to the front expiry, model-priced (front IV = VIX, back IV = VIX/VIX3M total-variance interpolation to 60 days), has a higher mean P&L per unit of debit on entries made when VIX/VIX3M >= 1.0 than on entries made when VIX/VIX3M <= 0.9.
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-calls, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-puts
+- statistic: Difference in mean P&L/debit to the front expiry between entries with VIX/VIX3M >= 1.0 and entries with VIX/VIX3M <= 0.9
+- null: No regime difference: the VIX/VIX3M regime label is circularly block-shifted against the P&L series
+- procedure: Run from 2007-12-04, the first VIX3M date (verified in FRED VXVCLS). On each trading day, price 30- and 60-DTE ATM calls with Black-Scholes (front IV = VIX; back IV from the total-variance interpolation w(60) = w(30) + (w(93) - w(30))*(60-30)/(93-30), where w = IV^2*T). Hold 21 trading days, then revalue the far leg at the IV interpolated that day and the SPY close. Use a studentized block bootstrap (block 21) on the daily series, a plain bootstrap on non-overlapping monthly entries, deflation for the thresholds tested, and walk-forward halves.
+- data: SPY daily closes, CBOE VIX and VIX3M daily history, FRED 3-month bill rate (all free and in the data list) · min n: 30
+- pass: Regime difference > 0 with p < 0.05 after deflating for thresholds (0.9/0.95/1.0), with the same sign in both walk-forward halves. A sensitivity rerun at today's measured SPY 30/60-DTE ATM IV spread from the chain capture.
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV because it includes the skew, so using VIX as ATM IV overstates premium levels. This trial is model-priced, not market-priced, and runs on a flat smile. The verdict stays 'model-only' until at least 120 daily chain captures confirm the real front-vs-back ATM IV spread. Costs and pin risk at T1 are modelled by closing both legs at mid minus half the spread. Backwardation entries cluster in 2008, 2011, 2020 and 2022, so report the result with each of those episodes left out.
+- harness: b6_term_long_calendar
+- result X-10a49f0d: not_supported — MODEL-PRICED (model-only until >= 120 daily chain captures confirm the front/back ATM IV spread; 2 archived) 30/60-DTE ATM SPY call calendar, front IV = VIX, back IV = VIX/VIX3M total-variance interpolation, held to the front expiry (21 sessions) and the back leg re-priced at that day's VIX for its last 30 days; costs = half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on 4 fills (open both legs, close both at T1); daily entries 2009-09-18 to 2026-09-14. P&L/debit: VIX/VIX3M >= 1.0 mean -6.92% on 325 days vs <= 0.9 mean -8.29% on 2516 days, difference +1.37%; block-shift p (shifts >= 42 sessions) = 0.4098 (x3 thresholds = 1.0000); studentized block-42 bootstrap one-sided 98.33% bounds -26.40% / +41.71% (p x3 = 1.0000; the trial's block 21 gives a lower bound of -26.51%, report only); walk-forward halves +11.41% / -7.82%; sensitivity rerun with the back IV shifted -1.20 vol pts to the captured spread (latest capture whose quote day has VIX and VIX3M closes, 2026-10-13: chain 60-30 ATM IV spread +0.82 vs model +2.03 vol pts; quote day 2026-10-14 skipped: its index closes post-date the index capture): difference -0.50%; rule 10: the trial enters on every session, which is itself the pooled all-offset estimate = 4272 overlapping daily entries 2009-09-18 to 2026-09-14 (circular block bootstrap, 42-entry blocks >= 2 x the 21-session hold); n = 325 daily entries in the smaller regime (the trial's unit); the trial's non-overlapping monthly entries at every start offset (plain bootstrap, report only; pass = difference > 0, deflated one-sided 98.33% lower bound > 0 and both halves > 0; about 15 high-regime months per offset): 1 of 21 start offsets pass (per-offset statistic -25.86% to +40.22%, lower bound -78.41% to +0.31%); leave-one-year-out differences: ex-2008 no entries in window, ex-2011 -12.76%, ex-2020 +5.11%, ex-2022 +1.64%; the trial's 2007-12 start predates the archive's VIX3M (first print 2009-09-18), so the test runs from that print; window sensitivity (report only, VIX3M proxied from VIX/VIX6M from the first VIX6M print 2008-01-02; 2007-12 has no archived term index; proxy vs real VIX3M on 4293 overlap days: mean error +0.92 vol pts, mean |error| 1.03): regime difference +22.60% over 2008-01-02 to 2026-09-14 (432 entries on the VIX/VIX6M VIX3M proxy); IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): regime difference s=0.81 -1.95%, s=0.90 -0.39% — failed: difference > 0 with block-shift p x3 < 0.05; studentized block-42 bootstrap: one-sided 98.33% lower bound > 0; difference > 0 in both walk-forward halves; sensitivity rerun at the captured 30/60-DTE ATM IV spread: difference > 0
+- note: from the options-library library: Long calendar (horizontal) spread; harness suggestion: Add a two-expiry mode to the payoff engine: Position.value_at(t=T1) that settles legs with T<=T1 at intrinsic and reprices legs with T>T1 via bs.price at a supplied IV; then calendar_model_backtest(price_rows, vix_rows, vix3m_rows, front_dte, back_dte, strike_rule) in experiments/volatility.py reusing _block_shift_null and _halves_agree. | verifier: corrected claim/trial
+
+### T-144 · short-calendar-spread
+
+**Claim.** A 30/60-DTE ATM SPY short call calendar, entered only on days when VIX3M/VIX >= 1.15 (steep contango) and closed at the front expiry, has positive mean P&L, model-priced (front IV = VIX, back IV = VIX/VIX3M total-variance interpolation).
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/short-calendar-spread-calls, https://www.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/abs/risk-premia-and-the-vix-term-structure/56572D1F060448571BD8F597C732D9C3
+- statistic: Mean P&L per conditional entry as a fraction of the far leg's premium
+- null: Zero conditional mean (studentized block bootstrap); for the placebo, the regime label is block-shifted
+- procedure: Daily entries since 2007-12-04 on days meeting the gate. Price with Black-Scholes from VIX/VIX3M. Revalue the far short at T1 (21 trading days) with the IV interpolated that day. Studentized block bootstrap (block 21), walk-forward halves, and deflation for the 1.10/1.15/1.20 thresholds.
+- data: SPY closes, CBOE VIX, VIX3M, FRED 3-month bill · min n: 60
+- pass: Conditional mean > 0 with the 95% CI excluding 0 in both halves after deflation, surviving removal of the five largest VIX-spike months
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced, and runs on a flat smile. A VIX-level tercile control checks that the result is not just a low-VIX effect. Unconditional entry is reported alongside. Cost is half the bid-ask on four fills, from today's SPY chain spreads.
+- harness: b6_term_short_calendar
+- result X-87edcdcc: not_supported — MODEL-PRICED short 30/60-DTE ATM SPY call calendar (long the 30-DTE front at VIX, short the back at the VIX/VIX3M interpolation), closed at the front expiry with the back re-priced at that day's VIX; P&L per unit of the back leg's premium after half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on 4 fills; daily entries 2009-09-18 to 2026-09-14 on days with VIX3M/VIX >= 1.15: 1753 conditional entries, mean +1.99%; deflated (x3 thresholds) studentized block-42 98.33% CIs: all first half +3.08% (n 876, 98.33% CI -2.99% to +9.99%); all second half +0.89% (n 877, 98.33% CI -4.57% to +5.76%); ex-spikes first half +3.38% (n 852, 98.33% CI -2.63% to +10.51%); ex-spikes second half +1.49% (n 853, 98.33% CI -3.64% to +6.18%) (the trial's block 21, report only: lower bounds -2.04% / -3.69% / -1.50% / -2.89%); rule 10: the trial enters on every session, which is itself the pooled all-offset estimate = 4272 overlapping daily entries 2009-09-18 to 2026-09-14 (circular block bootstrap, 42-entry blocks >= 2 x the 21-session hold); n = 1753 conditional daily entries (the trial's unit); robustness, the gate on each start offset of a non-overlapping 21-session grid (about 85 conditional months each, studentized block-6 CIs; pass = all four criteria): 0 of 21 start offsets pass (per-offset statistic -1.45% to +4.37%, lowest of the four 98.33% lower bounds -19.21% to -4.27%); spike months removed: 2020-03, 2025-04, 2015-08, 2018-02, 2010-05 (48 entries); placebo (gate block-shifted >= 42 sessions) p = 0.6807; unconditional mean +2.41% on 4272 days (95% CI +0.82% to +4.03%); other gates (report only): >= 1.10 n 2730 mean +2.00%, >= 1.20 n 827 mean +2.69%; VIX-tercile control of the conditional mean: low +1.93% (n 953), mid +1.01% (n 597), high +5.13% (n 203); the trial's 2007-12 start predates the archive's VIX3M (first print 2009-09-18), so the test runs from that print; window sensitivity (report only, VIX3M proxied from VIX/VIX6M from the first VIX6M print 2008-01-02; 2007-12 has no archived term index; proxy vs real VIX3M on 4293 overlap days: mean error +0.92 vol pts, mean |error| 1.03): conditional mean +2.19% over 2008-01-02 to 2026-09-14 (432 entries on the VIX/VIX6M VIX3M proxy); IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): conditional mean s=0.81 +6.42%, s=0.90 +4.19% — failed: all first half: mean > 0 with the 98.33% studentized CI excluding 0; all second half: mean > 0 with the 98.33% studentized CI excluding 0; ex-spikes first half: mean > 0 with the 98.33% studentized CI excluding 0; ex-spikes second half: mean > 0 with the 98.33% studentized CI excluding 0
+- note: from the options-library library: Short (reverse) calendar spread; harness suggestion: Reuse calendar_model_backtest with legs reversed and an entry mask from the VIX3M/VIX ratio; report conditional/unconditional means side by side with the existing term_structure_reversion output. | verifier: corrected claim/trial
+
+### T-145 · long-diagonal-spread
+
+**Claim.** On SPY, a 0.70-delta/90-DTE long call vs 0.30-delta/30-DTE short call diagonal, with the short rolled monthly and the long replaced at 30 DTE, has a higher annualised Sharpe ratio than the 30-DTE vertical call spread on the same strikes rolled monthly, model-priced (VIX as the 30-DTE IV, VIX/VIX3M total-variance interpolation for 90 DTE).
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/concepts-strategies/diagonal-spread, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-calls
+- statistic: Difference in annualised Sharpe between the diagonal and the vertical
+- null: Zero difference; monthly P&L pairs permuted between the two strategies
+- procedure: Monthly entries since 2007-12. Black-Scholes pricing with daily mark-to-model. Paired bootstrap on monthly P&L, walk-forward halves, deflated Sharpe for the pair.
+- data: SPY closes, VIX, VIX3M, FRED 3-month bill · min n: 150
+- pass: Sharpe difference > 0 with the bootstrap 95% CI excluding 0 in both halves, and PBO < 0.5
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. A flat smile overstates SPY OTM call premia, so rerun with a SKEW-index tilt. Report how often each entry met tastylive's setup rules. Costs come from today's SPY chain spreads.
+- harness: b6_term_long_diagonal
+- result X-58e4c1d3: not_supported — MODEL-PRICED SPY diagonal: 0.70-delta call bought at 90 DTE (VIX/VIX3M interpolated IV, VIX6M past 93 days) and sold at 30 DTE, plus a 0.30-delta 30-DTE short call (VIX) rolled monthly, vs the 30-DTE vertical on the same strikes (both at VIX) rolled monthly; marked to model at each monthly roll (the statistic is monthly P&L); monthly excess P&L per unit of spot (P&L minus the debit's bill return); costs half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on every open and close; rule 10(a): monthly options = SPY's standard monthly expiry (third Friday, or the prior session when it is a holiday); each cycle buys at one monthly expiry close and rolls at the next (27-36 calendar days; 27/29/34/36 when a Good Friday moves an expiry to Thursday), 204 cycles entered 2009-09-18 to 2026-08-21, the last settling 2026-09-18; the 90-DTE long is the monthly expiry three cycles out, replaced at the roll where it has one cycle left; 204 months 2009-09-18 to 2026-08-21. Annualised Sharpe diagonal +1.49 vs vertical +1.49: difference -0.00 (95% CI -0.11 to +0.12); halves +0.09 (95% CI -0.10 to +0.25) / -0.06 (95% CI -0.18 to +0.09); paired-swap permutation p (trial null, report only) 0.5022; PBO 0.9143; deflated Sharpe of the diagonal (2 trials) 1.0000; SKEW-tilt rerun (report only): difference -0.14 (95% CI -0.23 to -0.03); tastylive setup (net debit < strike width) met on 100% of 102 long entries; 2 months with the short strike at or below the long strike; robustness (report only, not the calendar the claim names): each start offset of a 21-session roll grid, pass = both halves' Sharpe-difference CI lower > 0 and PBO < 0.5: 0 of 21 start offsets pass (per-offset statistic -0.08 to +0.12, lower half bound -0.35 to -0.07); the trial's 2007-12 start predates the archive's VIX3M (first print 2009-09-18), so the test runs from that print; window sensitivity (report only, VIX3M proxied from VIX/VIX6M from the first VIX6M print 2008-01-02; 2007-12 has no archived term index; proxy vs real VIX3M on 4293 overlap days: mean error +0.92 vol pts, mean |error| 1.03): Sharpe difference +0.01 over 2008-01-18 to 2026-08-21 (20 entries on the VIX/VIX6M VIX3M proxy); IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): Sharpe difference s=0.81 -0.15, s=0.90 -0.08 — failed: first half: Sharpe difference 95% CI lower > 0; second half: Sharpe difference 95% CI lower > 0; PBO < 0.5 (CSCV, 8 partitions, diagonal vs vertical)
+- note: from the options-library library: Long diagonal spread (bullish call / bearish put); harness suggestion: Extend the two-expiry payoff mode with a roll schedule (list of (dte, action) tuples) so diagonals, PMCC and collars share one simulator; output Sharpe/PBO through the existing overfit module. | verifier: corrected claim/trial
+
+### T-146 · double-calendar
+
+**Claim.** Entered on the same days and held to the front expiry, a +/-5% 30/60-DTE double calendar on SPY has a lower standard deviation of P&L as a percentage of debit than the ATM single calendar of the same expiries, model-priced (VIX/VIX3M).
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/double-diagonal-spread, https://www.tastylive.com/concepts-strategies/calendar-spread
+- statistic: Ratio of standard deviations of P&L/debit (double / single), paired by entry date
+- null: Ratio = 1 (variance-ratio test via paired bootstrap of non-overlapping monthly entries)
+- procedure: Daily entries since 2007-12-04 with Black-Scholes pricing from VIX/VIX3M (OTM legs at the same flat IV; a SKEW-based tilt as a sensitivity), revalued at T1. Non-overlapping monthly subsample for CIs; walk-forward halves.
+- data: SPY closes, VIX, VIX3M, SKEW, FRED 3-month bill · min n: 150
+- pass: Std ratio < 0.9 with the 95% CI excluding 1 in both halves
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. A flat smile understates the put wing. Commissions for 8 fills vs 4. Pin risk modelled by closing at mid minus half the spread at T1. The OTM debit is smaller, so also report std of P&L per unit of max loss.
+- harness: b6_term_double_calendar
+- result X-3c150160: not_supported — MODEL-PRICED SPY +/-5% double calendar (0.95 S put calendar + 1.05 S call calendar, 30/60 DTE, flat IV per expiry) vs the ATM call calendar, entered on the same days, held to the front expiry (back legs re-priced at that day's VIX for 30 days); P&L / debit after half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on 8 vs 4 fills (open and close at T1; no commission amount is stated, so none beyond the half-spread); rule 10(b), the claim names no entry calendar: primary statistic pooled over all 21 start offsets of the non-overlapping 21-session grid = 4272 overlapping daily entries 2009-09-18 to 2026-09-14 (circular block bootstrap, 42-entry blocks >= 2 x the 21-session hold); n = 204 distinct non-overlapping monthly holds (the trial's unit); mean debit +1.62% vs +1.09% of spot. Std ratio (double / single) +0.796 (95% CI +0.665 to +0.949); halves +0.802 (95% CI +0.598 to +1.032) / +0.780 (95% CI +0.650 to +0.898) (paired block-42 percentile bootstrap); the trial's non-overlapping monthly subsample at every start offset (paired block-6 bootstrap; pass = ratio < 0.9 and CI upper < 1 in both halves): 5 of 21 start offsets pass (per-offset statistic +0.636 to +0.929, higher half upper bound +0.828 to +1.467); per unit of max loss (debit + costs: a long calendar is never worth less than 0 at T1) +0.796; SKEW-tilt rerun (report only) +0.848; the trial's 2007-12 start predates the archive's VIX3M (first print 2009-09-18), so the test runs from that print; window sensitivity (report only, VIX3M proxied from VIX/VIX6M from the first VIX6M print 2008-01-02; 2007-12 has no archived term index; proxy vs real VIX3M on 4293 overlap days: mean error +0.92 vol pts, mean |error| 1.03): std ratio +0.795 over 2008-01-02 to 2026-09-14 (432 entries on the VIX/VIX6M VIX3M proxy); IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): std ratio s=0.81 +0.918, s=0.90 +0.842 — failed: first half: 95% CI of the ratio excludes 1 (upper < 1)
+- note: from the options-library library: Double calendar spread; harness suggestion: Same two-expiry simulator as the single calendar with a strike list; add SKEW-index tilt as an optional smile adjustment (put IV = VIX + k*(SKEW-100)). | verifier: corrected claim/trial
+
+### T-147 · double-diagonal
+
+**Claim.** On SPY, a double diagonal (near 0.16-delta strangle at 30 DTE, far 0.10-delta wings at 60 DTE) has a higher mean P&L per unit of max loss than the 30-DTE iron condor on the same strikes when entered with VIX below its trailing 1-year median, model-priced.
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/double-diagonal-spread, https://www.tastylive.com/concepts-strategies/diagonal-spread
+- statistic: Mean P&L / max loss for the double diagonal minus that of the iron condor, on low-VIX entry days
+- null: Zero difference; paired monthly P&L permuted between the two structures
+- procedure: Monthly entries since 2007-12 on days with VIX below its trailing 252-day median. Black-Scholes pricing from VIX/VIX3M, with a SKEW tilt as a sensitivity. Revalue at T1; paired bootstrap; walk-forward halves.
+- data: SPY closes, VIX, VIX3M, SKEW, FRED 3-month bill · min n: 80
+- pass: Difference > 0 with the 95% CI excluding 0 in both halves, holding with and without the SKEW tilt
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. Costs on eight fills vs four. Max-loss normalisation uses the realised far-wing value at T1.
+- harness: b6_term_double_diagonal
+- result X-63ef8ec5: not_supported — MODEL-PRICED SPY double diagonal (short 0.16-delta 30-DTE strangle at VIX, long 0.10-delta 60-DTE wings at the VIX/VIX3M interpolation, closed at the front expiry with the wings re-priced at that day's VIX) vs the 30-DTE iron condor on the same strikes (VIX, held to expiry); entries when VIX < its trailing 252-session median (2405 of 4272 daily entries); rule 10(b), the claim names no entry calendar: primary statistic pooled over all 21 start offsets of the non-overlapping 21-session grid = 4272 overlapping daily entries 2009-09-18 to 2026-09-14 (circular block bootstrap, 42-entry blocks >= 2 x the 21-session hold); n = 114 low-VIX monthly entries (mean per start offset, the trial's unit); costs half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on 8 vs 4 fills; max loss of the diagonal = debit + costs - the lowest T1 value over spot (wings at T1's realised IV), of the condor = wider wing - credit + costs. Mean P&L / max loss +3.58% vs +10.32%; difference [flat IV] full -6.75% (95% CI -8.19% to -4.97%), halves -7.20% (95% CI -9.26% to -4.56%) / -6.29% (95% CI -8.24% to -3.91%); [SKEW tilt] full -7.66% (95% CI -9.26% to -5.79%), halves -8.35% (95% CI -10.54% to -5.53%) / -6.98% (95% CI -9.07% to -4.42%) (paired block-42 percentile bootstrap over the low-VIX entries); the trial's monthly grid at every start offset (paired block-6 bootstrap; pass = every series > 0 with the CI excluding 0 in both halves): 0 of 21 start offsets pass (per-offset statistic -8.03% to -5.74%, lowest half lower bound -11.67% to -10.28%); block sign-flip permutation p (report only) 1.0000; median strikes (K/S) 0.919/0.959/1.045/1.095; the trial's 2007-12 start predates the archive's VIX3M (first print 2009-09-18), so the test runs from that print; window sensitivity (report only, VIX3M proxied from VIX/VIX6M from the first VIX6M print 2008-01-02; 2007-12 has no archived term index; proxy vs real VIX3M on 4293 overlap days: mean error +0.92 vol pts, mean |error| 1.03): flat-IV difference -6.58% over 2008-04-08 to 2026-09-14 (189 entries on the VIX/VIX6M VIX3M proxy); IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): flat-IV difference s=0.81 -5.00%, s=0.90 -5.94% — failed: flat IV, first half: difference > 0 with the 95% CI excluding 0; flat IV, second half: difference > 0 with the 95% CI excluding 0; SKEW tilt, first half: difference > 0 with the 95% CI excluding 0; SKEW tilt, second half: difference > 0 with the 95% CI excluding 0
+- note: from the options-library library: Double diagonal spread; harness suggestion: Two-expiry simulator with four legs; add an iron-condor control leg set in the same run and report the paired difference. | verifier: corrected claim/trial
+
+### T-149 · ratio-calendar
+
+**Claim.** Re-sized to vega-neutral at each weekly entry and held 5 trading days, the SPY 30/90-DTE ATM ratio call calendar has weekly P&L whose absolute Spearman correlation with the weekly change in VIX is below 0.3, model-priced (VIX/VIX3M term interpolation).
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/concepts-strategies/calendar-spread, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/short-calendar-spread-calls
+- statistic: Spearman correlation of 5-day P&L with delta-VIX over the same 5 days
+- null: |rho| >= 0.3 (block bootstrap of the correlation)
+- procedure: Weekly entries since 2007-12. Black-Scholes pricing with front IV = VIX and back IV from the VIX/VIX3M total-variance interpolation; n set from model vegas at entry. Revalue after 5 trading days with the new interpolated IVs and SPY close. Block bootstrap (block 4 weeks); walk-forward halves. The 1:1 calendar is the comparison.
+- data: SPY closes, VIX, VIX3M, FRED 3-month bill · min n: 300
+- pass: Upper bound of the 95% CI of |rho| < 0.3 in both halves
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. Gamma losses co-move with VIX spikes, so also report the correlation of the delta-hedged P&L. Separate top-decile VIX-spike weeks. Costs on 2.7 fills.
+- harness: b6_term_ratio_calendar
+- result X-396ecf5b: not_supported — MODEL-PRICED SPY 30/90-DTE ATM ratio call calendar re-sized vega-neutral at each entry (short n x 30-DTE at VIX per long 90-DTE at the VIX/VIX3M interpolation; median n 1.72), held 5 sessions and re-priced with that day's interpolated IVs; 5-day P&L per unit of spot after half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on 1 + n contract fills; rule 10(b), the claim names no entry calendar: primary statistic pooled over all 5 start offsets of the non-overlapping 5-session grid = 4288 overlapping daily entries 2009-09-18 to 2026-10-06 (circular block bootstrap, 20-entry blocks >= 2 x the 5-session hold); n = 858 distinct 5-session holds = weeks (the trial's unit) (the trial's 4-week block = 20 daily entries). Spearman(P&L, delta-VIX) +0.638 (95% CI +0.601 to +0.672, |rho| upper 0.672); halves +0.652 (95% CI +0.601 to +0.699, |rho| upper 0.699) / +0.625 (95% CI +0.578 to +0.666, |rho| upper 0.666); the weekly grid at every start offset (block-4-week bootstrap; pass = |rho| upper < 0.3 in both halves): 0 of 5 start offsets pass (per-offset statistic +0.619 to +0.651, higher half |rho| upper +0.713 to +0.732); 1:1 calendar +0.372 (95% CI +0.316 to +0.422, |rho| upper 0.422); delta-hedged ratio P&L -0.384 (95% CI -0.440 to -0.331, |rho| upper 0.440); without the top-decile VIX-spike holds +0.562; the trial's 2007-12 start predates the archive's VIX3M (first print 2009-09-18), so the test runs from that print; window sensitivity (report only, VIX3M proxied from VIX/VIX6M from the first VIX6M print 2008-01-02; 2007-12 has no archived term index; proxy vs real VIX3M on 4293 overlap days: mean error +0.92 vol pts, mean |error| 1.03): Spearman rho +0.619 over 2008-01-02 to 2026-10-06 (432 entries on the VIX/VIX6M VIX3M proxy); IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): Spearman rho s=0.81 +0.666, s=0.90 +0.653 — failed: first half: upper bound of the 95% CI of |rho| < 0.3; second half: upper bound of the 95% CI of |rho| < 0.3
+- note: from the options-library library: Ratio (vega-weighted) calendar spread; harness suggestion: Add fractional qty support to the two-expiry simulator (already numeric in Leg) and a sizing hook that sets qty from model vegas at entry. | verifier: corrected claim/trial
+
+### T-150 · poor-mans-covered-call
+
+**Claim.** On SPY, a PMCC (0.80-delta 12-month LEAPS replaced at 90 DTE, plus a monthly 0.30-delta short call) does not have a higher annualised Sharpe ratio, measured on capital deployed, than the stock-based covered call with the same short-call rule, model-priced (LEAPS IV = VIX3M, short IV = VIX).
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.optionsplaybook.com/blogs/poor-mans-covered-call-how-to-run-a-covered-call-strategy-for-less-capital, https://www.tastylive.com/concepts-strategies/diagonal-spread
+- statistic: Difference in annualised Sharpe (PMCC minus covered call), monthly returns on capital deployed
+- null: Sharpe(PMCC) > Sharpe(CC): the claim is falsified if the paired-bootstrap 95% CI of the difference lies entirely above 0
+- procedure: Monthly rebalance since 2007-12, Black-Scholes pricing and daily mark-to-model, roll rules as in the claim. Paired block bootstrap of the Sharpe difference (run.py _sharpe_diff_p); walk-forward halves. Sensitivity at today's SPY 12-month ATM IV vs VIX3M from the chain capture.
+- data: SPY closes and dividends, VIX, VIX3M, FRED 3-month bill · min n: 150
+- pass: The claim survives if the CI of the Sharpe difference includes 0 or lies below it in both halves; return on capital and drawdown are also reported
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, and VIX3M (93-day) is a coarse proxy for 365-day IV (sensitivity +/-3 vol points), so this trial is model-priced, not market-priced. The covered call receives dividends and the PMCC does not. Costs on monthly rolls.
+- harness: b6_term_pmcc
+- result X-0716df12: not_supported — MODEL-PRICED SPY poor man's covered call (0.80-delta 12-month LEAPS call at VIX3M IV, replaced at 90 DTE; monthly 0.30-delta 30-DTE short call at VIX; no dividends) vs the covered call (SPY total return + the same short call), marked to model at each monthly roll; monthly returns on capital deployed (PMCC: LEAPS value - short premium, median +18.4% of spot; CC: spot - premium) in excess of the bill; costs half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on the monthly short-call fills and the LEAPS rolls; rule 10(a): monthly options = SPY's standard monthly expiry (third Friday, or the prior session when it is a holiday); each cycle buys at one monthly expiry close and rolls at the next (27-36 calendar days; 27/29/34/36 when a Good Friday moves an expiry to Thursday), 204 cycles entered 2009-09-18 to 2026-08-21, the last settling 2026-09-18; the LEAPS is the monthly expiry twelve cycles out, replaced at the roll where it has three cycles (about 90 days) left; 204 months 2009-09-18 to 2026-08-21. Annualised Sharpe PMCC +1.42 vs CC +1.19: difference +0.23 (95% CI -0.15 to +0.57); halves +0.38 (95% CI +0.09 to +0.61) / +0.07 (95% CI -0.50 to +0.52) (the claim survives a half unless its CI lies entirely above 0); return on capital +77.9% vs +19.0% a year, max drawdown -75.2% vs -30.4%; LEAPS-IV sensitivity (report only): VIX3M - 3 vol pts: +0.18 (95% CI -0.41 to +0.67); VIX3M + 3 vol pts: +0.20 (95% CI -0.11 to +0.47); chain 12-month ATM IV / VIX3M = 0.965: +0.23 (95% CI -0.17 to +0.58) (chain capture, quote day 2026-10-13: 12-month ATM IV 17.33 vs VIX3M 17.96); robustness (report only, not the calendar the claim names): each start offset of a 21-session roll grid, pass = neither half's CI lies entirely above 0: 0 of 21 start offsets pass (per-offset statistic -0.00 to +0.61, highest half lower bound +0.01 to +0.33); the trial's 2007-12 start predates the archive's VIX3M (first print 2009-09-18), so the test runs from that print; window sensitivity (report only, VIX3M proxied from VIX/VIX6M from the first VIX6M print 2008-01-02; 2007-12 has no archived term index; proxy vs real VIX3M on 4293 overlap days: mean error +0.92 vol pts, mean |error| 1.03): Sharpe difference +0.30 over 2008-01-18 to 2026-08-21 (20 entries on the VIX/VIX6M VIX3M proxy); IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): Sharpe difference s=0.81 -0.11, s=0.90 +0.08 — failed: first half: Sharpe difference 95% CI includes 0 or lies below it
+- note: from the options-library library: Poor man's covered call (PMCC / LEAPS diagonal); harness suggestion: Roll-schedule simulator shared with diagonals; add a 'capital deployed' denominator option (debit vs stock price) to overlay_verdict so ROC and absolute return are both reported. | verifier: corrected claim/trial
+
+### T-151 · leaps-collar
+
+**Claim.** A LEAPS collar on SPY (12-month -0.25-delta put rolled at 90 DTE, monthly 0.30-delta calls) has a higher annualised Sharpe ratio than the same-delta standard collar with both put and call at 30 DTE rolled monthly, model-priced.
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/collar, https://www.optionsplaybook.com/blogs/poor-mans-covered-call-how-to-run-a-covered-call-strategy-for-less-capital
+- statistic: Difference in annualised Sharpe (LEAPS collar minus standard collar); max drawdown and the credit-coverage ratio reported alongside
+- null: Zero Sharpe difference; paired monthly returns permuted between the two strategies
+- procedure: Monthly rebalance since 2007-12 with Black-Scholes pricing (put IV = VIX3M proxy, call IV = VIX) and daily mark-to-model. Paired block bootstrap; walk-forward halves. Sensitivity at today's SPY 12-month 25-delta put IV from the chain.
+- data: SPY closes and dividends, VIX, VIX3M, FRED 3-month bill · min n: 150
+- pass: Sharpe difference > 0 with the 95% CI excluding 0 in both halves
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, and VIX3M is a coarse proxy for 365-day IV (sensitivity +/-3 vol points), so this trial is model-priced, not market-priced. A flat smile underprices the OTM put: rerun with a SKEW-index tilt. Dividends are credited to the stock leg in both strategies.
+- harness: b6_term_leaps_collar
+- result X-24b761f5: not_supported — MODEL-PRICED SPY LEAPS collar (SPY + 12-month -0.25-delta put at VIX3M IV replaced at 90 DTE + monthly 0.30-delta 30-DTE short call at VIX) vs the standard collar (SPY + 30-DTE -0.25-delta put and 0.30-delta call, both at VIX, rolled monthly), marked to model at each monthly roll; dividends credited to SPY in both; monthly excess return on the net outlay; costs half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on every option fill; rule 10(a): monthly options = SPY's standard monthly expiry (third Friday, or the prior session when it is a holiday); each cycle buys at one monthly expiry close and rolls at the next (27-36 calendar days; 27/29/34/36 when a Good Friday moves an expiry to Thursday), 204 cycles entered 2009-09-18 to 2026-08-21, the last settling 2026-09-18; the LEAPS put is the monthly expiry twelve cycles out, replaced at the roll where it has three cycles (about 90 days) left; 204 months 2009-09-18 to 2026-08-21. Annualised Sharpe LEAPS collar +1.50 vs standard +1.53: difference -0.04 (95% CI -0.40 to +0.38); halves +0.12 (95% CI -0.16 to +0.52) / -0.13 (95% CI -0.67 to +0.53); paired-swap permutation p (trial null, report only) 0.5382; max drawdown -13.6% vs -12.9%; credit coverage (call premium / net put cost) 3.83 vs 1.20; sensitivities (report only): VIX3M - 3 vol pts: +0.04 (95% CI -0.31 to +0.45); VIX3M + 3 vol pts: -0.11 (95% CI -0.48 to +0.30); chain 12-month 25-delta put IV / VIX3M = 1.126: -0.07 (95% CI -0.45 to +0.34); SKEW tilt (45-day smile shape): -0.08 (95% CI -0.43 to +0.31) (chain capture, quote day 2026-10-13: 12-month 25-delta put IV 20.22 vs VIX3M 17.96); robustness (report only, not the calendar the claim names): each start offset of a 21-session roll grid, pass = both halves' Sharpe-difference CI lower > 0: 1 of 21 start offsets pass (per-offset statistic +0.16 to +0.45, lower half bound -0.77 to +0.00); the trial's 2007-12 start predates the archive's VIX3M (first print 2009-09-18), so the test runs from that print; window sensitivity (report only, VIX3M proxied from VIX/VIX6M from the first VIX6M print 2008-01-02; 2007-12 has no archived term index; proxy vs real VIX3M on 4293 overlap days: mean error +0.92 vol pts, mean |error| 1.03): Sharpe difference +0.31 over 2008-01-18 to 2026-08-21 (20 entries on the VIX/VIX6M VIX3M proxy); IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): Sharpe difference s=0.81 -0.46, s=0.90 -0.25 — failed: first half: Sharpe difference 95% CI lower > 0; second half: Sharpe difference 95% CI lower > 0
+- note: from the options-library library: LEAPS collar (long-dated put, serial short calls); harness suggestion: Roll-schedule simulator with an underlying leg; reuse overlay_backtest's drawdown function (dd) and overlay_verdict for the benchmark comparison. | verifier: corrected claim/trial
+
+### T-153 · jelly-roll
+
+**Claim.** On every SPY chain capture from 2026-10-14 on, the mid-price 30/60-DTE jelly roll at strikes within +/-5% of spot deviates from bill-implied carry, K(exp(-r*T1) - exp(-r*T2)) - PV(div), by less than half the sum of the four legs' bid-ask spreads for at least 95% of strikes.
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.law.cornell.edu/uscode/text/26/1256, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-calls
+- statistic: Per capture: the share of strikes with |roll_mid - fair| <= 0.5 * sum of the four legs' spreads; median absolute deviation in cents
+- null: Share < 0.95 (a binomial test per capture)
+- procedure: For each capture, compute the roll at every strike in the band from chain mids, r from FRED, and PV(div) from SPY's quarterly dividend schedule. Repeat on SPX (European; uses each expiry's parity-implied forward) to isolate the early-exercise premium. Accumulate captures; a single capture can falsify.
+- data: CBOE SPY and SPX chain captures from 2026-10-14 (mid, bid, ask per leg), FRED 3-month bill, SPY dividend schedule · min n: 200
+- pass: Share >= 0.95 on every capture (one failing day falsifies); confirmation at 60 captures
+- controls: Exclude zero-bid legs and spreads > 5% of mid. Delayed snapshots may not be synchronous across legs. Ex-dividend-spanning expiries are reported separately (that was a second claim and is now a diagnostic). Compare the SPX result with T-181 parity_check.
+- harness: b6b_chain_jelly_roll
+- result X-fc398775: not_supported — SPY mid jelly roll vs bill carry K(e^-rT1 - e^-rT2) - PV(div), strikes within +/- 5% of the quote-day close (a positive deviation is a roll richer than bill carry): 2026-10-13 quotes (2026-10-14): roll 2026-11-13/2026-12-18 (31/66 DTE, spans the 2026-12-18 ex-date, PV(div) 1.875) 4/38 strikes within tolerance (10.5%; one-sided 95% upper bound 22.5%, binomial p of H0 share < 95%: 1.000; median deviation +1.076, median |dev| 107.6 cents; 38 strikes excluded by the zero-bid / 5%-spread rule); by bill primary/DTB3 2026-10-09 10.5%, primary/DGS3MO 2026-10-09 (ref) 10.5%; ex-dividend-free pair (the controls' separate report, also required to fail) 2026-11-13/2026-11-30 (31/48 DTE) 41/49 (83.7%, one-sided 95% upper bound 91.6%, median deviation -0.169; by bill alt/DTB3 2026-10-09 83.7%, alt/DGS3MO 2026-10-09 (ref) 83.7%); SPX control (SPXW 2026-11-12/2026-12-18, parity forwards) 53/53 (100.0%) -> fail (decisive: every reading's upper bound below 95%); 2026-10-14 quotes (2026-10-15): roll 2026-11-13/2026-12-18 (30/65 DTE, spans the 2026-12-18 ex-date, PV(div) 1.875) 1/57 strikes within tolerance (1.8%; one-sided 95% upper bound 8.1%, binomial p of H0 share < 95%: 1.000; median deviation +1.113, median |dev| 111.3 cents; 20 strikes excluded by the zero-bid / 5%-spread rule); by bill primary/DTB3 2026-10-13 1.8%, primary/DGS3MO 2026-10-13 (ref) 14.0%; ex-dividend-free pair (the controls' separate report, also required to fail) 2026-11-13/2026-11-30 (30/47 DTE) 58/63 (92.1%, one-sided 95% upper bound 96.8%, median deviation -0.150; by bill alt/DTB3 2026-10-13 92.1%, alt/DGS3MO 2026-10-13 (ref) 90.5%); SPX control (SPXW 2026-11-13/2026-12-18, parity forwards) 106/106 (100.0%) -> fail. The 30/60 pair spans the projected ex-date; the ex-dividend-free pair, which no dividend touches, is held to the same test, so neither the dividend forecast nor American early exercise around the ex-date decides the verdict; T-181 parity_check on SPX (C - P regressed on K, 10 strikes, >= 30 DTE), implied rate minus bill: 2026-10-13 +70 bp, 2026-10-14 +56 bp — failed: share >= 95% on every capture (0 pass, 2 fail, 0 undecided of 2; one failing capture falsifies) (not implemented: confirmation at 60 captures (2 so far); n >= trial min_n (95 of 200 strikes over captures))
+- note: from the options-library library: Jelly roll (synthetic time spread / financing trade); harness suggestion: jelly_roll_check(chain_rows, rate, dividends) producing per-capture deviation statistics; store in the options-surface file so it accumulates daily. | verifier: corrected claim/trial
+
+### T-154 · zebra
+
+**Claim.** A monthly 30-DTE SPY call ZEBRA (long 2 delta-0.70 calls, short 1 ATM call, priced at VIX IV; model-priced) has a lower mean monthly P&L than a delta-matched SPY position (entry delta x 1 share) over 1993-2026.
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/concepts-strategies/zebra
+- statistic: mean of (ZEBRA P&L - delta_0 x SPY P&L)/S with block bootstrap CI
+- null: mean difference >= 0
+- procedure: monthly cycles; solve the 0.70-delta strike at VIX IV; payoff from the SPY close; the cash difference earns DTB3
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: upper CI < 0
+- controls: The net extrinsic paid (about 0.25% of S per month under flat pricing) is the cost tested against the convexity gained. Flat IV misprices the ITM call wing; rerun on chain mids at 60 days.
+- harness: b6_dir_zebra
+- result X-54e06747: not_supported — MODEL-PRICED, no transaction costs (none stated in the claim) (both strikes at VIX IV flat, 0.70-delta strike solved at that IV on the dividend forward; the cash difference delta0*S - debit earns the prior DTB3 prints day by day; SPY total return): SPY call ZEBRA; rule 10(a): SPY standard monthly expiries (third Friday, prior session on a holiday), entered at the last session on or before 30 calendar days ahead, 403 cycles 1993-02-17 to 2026-08-19 (30-31 calendar days to expiry); median entry delta 0.888, median 0.70-delta strike -2.50% vs spot, median net extrinsic paid +0.40% of S; mean difference +0.076% of S (95% CI -0.095% to +0.280%, block-6 percentile); halves (report only) -0.169% / +0.319%; robustness (not the claim's calendar, not the pass rule): the 21-session grid pooled over all 21 start offsets (8463 daily entries, 42-day blocks) mean -0.025% (95% CI -0.118% to +0.080%); upper CI < 0: 2 of 21 start offsets pass (per-offset -0.152% to +0.049%, upper CI -0.044% to +0.214%); IV-scale sensitivity (not in the pass rule; the net extrinsic is priced off the IV level): s=0.81 +0.262%, s=0.90 +0.169%; the trial's control 'recheck on chain mids at 60 days' is still pending: the archive holds 2 chain days, so a traded test needs chain history — failed: mean (ZEBRA - delta0 x SPY) / S upper CI < 0
+- note: from the options-library library: ZEBRA (zero extrinsic back ratio); harness suggestion: Add a 'zero-extrinsic solver' to strategies.py (choose K1 so 2*extrinsic(K1) = extrinsic(K2)) and run through the roll-schedule simulator; compare to leaps-stock-replacement in the same report. | verifier: corrected claim/trial
+
+### T-155 · roll-out-up-down
+
+**Claim.** For a 0.16-delta 45-DTE SPY short put that is tested (delta beyond -0.30) at 21 DTE, rolling it out at the same strike to the next monthly does not produce a higher mean P&L per day than closing it and opening a fresh 0.16-delta 45-DTE put, model-priced (VIX as IV).
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/news-insights/how-to-roll-options-position, https://www.optionsplaybook.com/blogs/poor-mans-covered-call-how-to-run-a-covered-call-strategy-for-less-capital
+- statistic: Mean P&L per day held, roll path minus close-and-reset path, paired by entry
+- null: Roll path P&L/day > reset path. The claim is falsified if the paired-bootstrap 95% CI of the difference lies entirely above 0.
+- procedure: Daily entries since 1993-01-29 (SPY inception; VIX exists from 1990, but SPY prices do not). Black-Scholes pricing from VIX. At 21 DTE apply the 'tested' trigger; simulate both paths to the next cycle's 21-DTE exit. Paired block bootstrap; walk-forward halves.
+- data: SPY closes, VIX, FRED 3-month bill · min n: 200
+- pass: The claim survives if the CI of (roll - reset) includes 0 or lies below it in both halves; the variance ratio is reported
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV and has no skew, so this trial is model-priced, not market-priced; rerun with a SKEW tilt. Both paths pay the same number of fills. Margin-time cost charged at the bill rate.
+- harness: b6_term_roll_tested_put
+- result X-3e10c60c: not_supported — MODEL-PRICED SPY 0.16-delta short put (VIX as IV) sold on the monthly expiry nearest 45 DTE, entered every session 1993-01-29 to 2026-08-17 (8444 entries; DTE at entry median 45, range 28-63); rule 10(a): the claim names the monthly calendar ('to the next monthly'), so expiries are SPY's standard monthly expiries (third Friday, or the prior session when it is a holiday); the test is at the put's own expiry's 21-DTE close (delta < -0.30 at that day's VIX), tested on 1133 of 8444 entries in 120 expiry cycles (1993-04-13 to 2026-06-18); roll = buy back, sell the same strike on the next monthly expiry; reset = buy back, sell a fresh 0.16-delta put (the strike rule at the test close) on that same next monthly expiry; both paths exit at that expiry's 21-DTE close, the same day (25-38 calendar days after the test: the next cycle, 28 or 35 days, moved by holidays); P&L per day held from the decision per unit of spot, after half-spread per fill from 11885 OTM SPY quotes on 2026-10-13, 2026-10-14 (30-DTE ATM 0.45 bp of spot, 60-DTE 5% OTM 0.26 bp, 365-DTE 15% from spot 0.45 bp) on 3 fills per path and margin-time at the bill rate. Roll - reset: +3.196 bp (95% CI +2.003 bp to +4.323 bp); halves +1.865 bp (95% CI +0.252 bp to +3.329 bp) / +4.524 bp (95% CI +3.480 bp to +5.615 bp) (paired block-104 percentile bootstrap over the tested entries; the claim survives a half unless its CI lies entirely above 0); rule 10(b): the trial enters on every session, which is itself the pooled all-start estimate, so blocks are 104 tested entries = 2 x the longest entry-to-exit hold (52 sessions) (report only: blocks of 2 x the longest 25-session decision-to-exit window, halves' lower bounds +0.123 bp / +2.872 bp; the trial's block 21: +0.152 bp / +2.362 bp); sensitivity (report only), one entry about 45 DTE before each monthly expiry (403 entries, DTE 44-46): roll - reset +2.210 bp (95% CI +0.727 bp to +3.744 bp) on 58 tested cycles, halves +1.494 bp (95% CI -0.075 bp to +2.852 bp) / +2.925 bp (95% CI +0.566 bp to +5.205 bp) (block-6 cycles); robustness (report only), entering k sessions before the 21-DTE test for each calendar offset k present in at least 90% of the cycles (one entry per cycle, about 56 tested each, block-6 bootstrap; pass = neither half's CI lies entirely above 0): 0 of 18 start offsets pass (per-offset statistic +2.382 bp to +4.196 bp, higher half lower bound +0.337 bp to +3.817 bp); mean roll +3.940 bp vs reset +0.744 bp per day; variance ratio (roll / reset) 6.068; whole-life variant (report only, P&L from entry per day from entry) +1.807 bp (95% CI +1.156 bp to +2.415 bp); SKEW-tilt rerun (report only) +1.600 bp (95% CI +0.462 bp to +2.590 bp) on 1203 tested entries; IV-scale sensitivity (report only; every IV x s, s = 0.81 is the captured SPY ATM IV / VIX ratio; the traded version needs chain history, 2 capture days archived): roll - reset s=0.81 +2.686 bp/day (95% CI +1.533 bp to +3.762 bp, 1399 tested), s=0.90 +2.938 bp/day (95% CI +1.733 bp to +4.004 bp, 1276 tested) — failed: first half: 95% CI of (roll - reset) P&L/day includes 0 or lies below it; second half: 95% CI of (roll - reset) P&L/day includes 0 or lies below it
+- note: from the options-library library: Rolling a short option (out / up / down); harness suggestion: Roll-schedule simulator with conditional actions (on delta/DTE triggers); expose roll vs reset as two action lists over the same price path. | verifier: corrected claim/trial
+
+### T-156 · theta-harvest-45dte
+
+**Claim.** For model-priced 45-DTE 1SD SPY short strangles, exiting at 21 DTE yields a higher mean P&L per day in the trade than holding to expiration.
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/concepts-strategies/managing-winners, https://www.tastylive.com/news-insights/How-Capital-Allocation-Impacts-Volatility
+- statistic: Mean P&L per day in the trade, 21-DTE exit minus hold-to-expiry, paired by entry; the 50% rule and the standard deviations are reported alongside
+- null: No difference between exit rules (exit labels permuted within entry)
+- procedure: Daily entries since 1993-01-29 (SPY inception), with VIX as IV for the Black-Scholes premium and daily mark-to-model to trigger exits. Non-overlapping monthly entries for the CIs; paired bootstrap; walk-forward halves; deflate for the three rules.
+- data: SPY daily closes, VIX daily history, FRED 3-month bill · min n: 300
+- pass: (21-DTE - hold) P&L/day > 0 with the CI excluding 0 in both halves after deflation
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV (it overstates 0.16-delta call premium and understates put skew), so this trial is model-priced, not market-priced; SKEW-tilt sensitivity. Commissions $0.65/contract; margin-time cost. Compare with the existing harness_short_straddle outputs.
+- harness: b6_var_theta_harvest_45dte
+- result X-daad6f05: not_supported — MODEL-PRICED 45-DTE 0.16-delta SPY short strangle at VIX on the dividend forward, marked daily at VIX, settled on raw closes, $0.65/contract; rule 10 (the trial names monthly entries): 403 entries on SPY's monthly expiry calendar (third Friday, prior session on a holiday; entered 44-46 DTE) 1993-02-02..2026-08-04, P&L per day in bp of entry spot: full sample +0.094 bp of spot per day (CI -0.216 to +0.566); P&L/day by rule (bp, sd): hold +1.45 (4.71), dte21 +1.55 (3.72), target50 +3.69 (6.09), target50_or_dte21 +3.14 (5.63); half 1 (201 entries): +0.232 bp/day (CI -0.269 to +1.208); half 2 (202 entries): -0.043 bp/day (CI -0.411 to +0.350); IV sensitivity of the mean difference (bp/day) 0.81 +0.141, 0.90 +0.108, captured_smile +0.514; trial's daily entries (reported, not in the verdict): 8450 entries, mean -0.230 bp/day (CI -0.372 to -0.081, block 186 days), halves -0.182 (CI -0.410 to +0.085)/-0.279 (CI -0.465 to -0.127); margin-time cost not charged (P&L per day already scales by time); the traded version needs SPY chain history (2 capture days archived) — failed: half 1: (21-DTE - hold) P&L/day > 0, 98.33% CI (Bonferroni, 3 rules) excludes 0; half 2: (21-DTE - hold) P&L/day > 0, 98.33% CI (Bonferroni, 3 rules) excludes 0
+- note: from the options-library library: Time-decay harvesting (45 DTE short premium, managed at 50% or 21 DTE); harness suggestion: Extend overlay_backtest with exit rules (profit_target, dte_exit) and report P&L/day; the BTC version runs on DVOL/realised-vol from Deribit with the same code path. | verifier: corrected claim/trial
+
+### T-157 · theta-ladder
+
+**Claim.** A 4-rung weekly ladder of quarter-size 0.16-delta SPY short puts, each managed at 50% or 21 DTE, has a maximum drawdown at least 15% smaller than a single full-size 45-DTE monthly entry managed the same way, model-priced (VIX as IV).
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/news-insights/How-Capital-Allocation-Impacts-Volatility, https://www.tastylive.com/concepts-strategies/managing-winners
+- statistic: Ratio of max drawdowns (ladder / single entry); mean monthly P&L per unit of margin and the standard deviation are reported alongside
+- null: Drawdown ratio >= 0.85 (compared across block-bootstrap resampled paths)
+- procedure: Daily simulation since 1993-01-29 (SPY inception) with VIX-as-IV pricing. The single-entry book enters monthly at 45 DTE; the ladder enters weekly at a quarter size; identical exit rules. Studentized block bootstrap; walk-forward halves.
+- data: SPY closes, VIX, FRED 3-month bill · min n: 300
+- pass: Drawdown ratio < 0.85 with the bootstrap CI upper bound < 1 in both halves
+- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. Four times the fills are charged. Strikes are set on different days, so the average moneyness differs; report delta-matched results. Same total margin.
+- harness: b6_var_theta_ladder
+- result X-dad7f2ce: not_supported — MODEL-PRICED 0.16-delta 45-DTE SPY short puts at VIX on the dividend forward, marked daily, closed at 50% of credit or 21 DTE, $0.65/contract per fill (four times the fills for the ladder); rule 10 (the claim names weekly and monthly entries): 1753 ladder rungs on the weekly Friday expiry calendar vs 403 entries on the monthly (third-Friday) expiry calendar, each entered 45 DTE before its expiry, over 405 months 1993-01-29..2026-09-03; drawdowns of the additive P&L per unit notional, paired percentile block bootstrap (block 63 days): full span ratio 1.245 (MDD ladder 19.5% vs single 15.6% of notional, 95% CI 0.51-2.14); half 1: ratio 1.245 (CI 0.51-2.24); half 2: ratio 0.986 (CI 0.39-2.02); mean monthly P&L per unit margin ladder +0.38% (sd 2.34%) vs single +0.47% (sd 1.99%); open notional 0.39 vs 0.36; delta-matched (both 0.16 at entry): mean K/S 0.938 vs 0.937; IV sensitivity of the full-span ratio s=0.81 1.244, s=0.90 1.252; sensitivity, first-session-of-month/week entries at entry + 45 days (the previous anchors): full ratio 0.554, halves 0.665/0.554 (CI upper 1.02/0.88); the traded version needs SPY chain history (2 capture days archived) — failed: half 1: drawdown ratio < 0.85 with bootstrap CI upper < 1; half 2: drawdown ratio < 0.85 with bootstrap CI upper < 1
+- note: from the options-library library: Theta ladder (staggered-expiry short premium); harness suggestion: Roll-schedule simulator run with an entry cadence parameter (weekly vs monthly) and a size parameter; drawdown via overlay_backtest's dd helper. | verifier: corrected claim/trial
+
+### T-159 · vix-term-structure-regime-filter
+
+**Claim.** Within each VIX-level tercile, the 21-day SPY variance risk premium (VIX^2 minus the subsequent 21-trading-day realised variance) is higher on days when VIX/VIX3M < 0.95 than on days when VIX/VIX3M > 1.05.
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://www.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/abs/risk-premia-and-the-vix-term-structure/56572D1F060448571BD8F597C732D9C3, https://www.macroption.com/vix3m/
+- statistic: Contango-minus-backwardation difference in mean VRP (variance units, and vol points), within each VIX tercile; model-priced strangle P&L reported as a secondary
+- null: No regime difference, with the regime label circularly block-shifted against the VRP series (as in term_structure_reversion)
+- procedure: Daily since 2007-12-04. Compute the ratio and the forward 21-day VRP; stratify by VIX tercile. Studentized block bootstrap (block 21); walk-forward halves; deflate for the thresholds 0.90/0.95/1.00/1.05.
+- data: CBOE VIX and VIX3M history, SPY closes (data-only for the VRP; FRED 3-month bill for the strangle secondary) · min n: 60
+- pass: Difference > 0 with p < 0.05 after deflation, in both halves and in at least 2 of 3 VIX terciles (the high tercile holds most backwardation days)
+- controls: VIX level (terciles). Regime autocorrelation (block null). Report with and without 2008 and 2020. The strangle secondary is model-priced (VIX overstates ATM IV; flat smile).
+- harness: b6_surf_vrp_term_regime
+- result X-bd91ae4f: not_supported — 21d SPY VRP (VIX^2 - next-21d realised variance) by VIX/VIX3M regime within VIX terciles, 4272 daily entries 2009-09-18..2026-09-14 (the archive's VIX3M starts 2009-09-18, so the procedure's 2007-12-04..2009-09-17, including 2008, is not in the sample; the 'with 2008' control cannot be run); backwardation (> 1.05) on 2.7% of days, contango (< 0.95) on 80.7%. low (VIX 9.1-14.9): 1411 contango / 0 backwardation days, no difference; mid (VIX 14.9-19.3; 1259/1 days) diff -192.3 %^2 (-5.89 vol pts) [not testable: < 60 days in a regime]; high (VIX 19.3-82.7; 778/115 days) diff +499.5 %^2 (+4.71 vol pts), 95% CI -525.7 to +7238.3, p stud 0.157 / block-shift 0.045 -> deflated x4 0.628, halves -104.4/+917.6 -> fail (p stud with 42-day blocks 0.127, reported). Excluding 2020: n/a/-177.1/-134.7 %^2. Secondary (MODEL-PRICED short 16-delta 30-DTE strangle, flat smile, no costs, P&L per spot; POOLED over every daily entry = all 21 offsets of the 21-session grid, rule 10): contango +37.9 bp (n=3448 entries) vs backwardation +78.6 bp (n=116) at IV = VIX, per-offset contango-minus-backwardation -164.0 to +231.4 bp (5/21 offsets > 0); at 0.81 x VIX +4.5 vs +1.1 bp (per offset -159.9 to +253.1 bp) (the short-premium level hinges on the IV scale; the traded version needs SPY chain history). Rule 10: the VRP itself is a daily series (no grid phase) — failed: high VIX tercile: contango-minus-backwardation VRP > 0 with deflated p < 0.05 and > 0 in both halves (high fails) (not implemented: low VIX tercile: contango-minus-backwardation VRP > 0 with deflated p < 0.05 and > 0 in both halves [not testable: 0 backwardation / 1411 contango days, need 60 each]; mid VIX tercile: contango-minus-backwardation VRP > 0 with deflated p < 0.05 and > 0 in both halves [not testable: 1 backwardation / 1259 contango days, need 60 each]; at least 2 of 3 VIX terciles pass (low not testable (0 backwardation / 1411 contango days, need 60 each); mid not testable (1 backwardation / 1259 contango days, need 60 each); high fails))
+- note: from the options-library library: VIX term-structure regime filter (VIX3M/VIX gate for premium selling); harness suggestion: term_structure_conditional_pnl(vix_rows, vix3m_rows, price_rows, strategy) in experiments/volatility.py reusing overlay_backtest for the strangle path and variance_risk_premium for the VRP; register alongside vix-term-structure-reversion. | verifier: corrected claim/trial
 
 ### T-160 · vix-futures-calendar
 
@@ -1014,7 +1548,113 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Margin outlay as capital. Roll-date convention. Report with and without Feb 2018 and Mar 2020. Some rows have Settle = 0 (e.g. the 2013 file) and must be filtered. The VIX3M - VIX slope serves as a free cross-check of the basis.
 - harness: vx_calendar_gated
 - result X-c5827bb7: not_supported — VX M1-M2 calendar (short M1 / long M2, $1,000/pt) on CBOE daily settlements 2013-05-22..2026-10-14, n=3373 daily intervals (2013 rows with Settle = 0 dropped, so the first settlement is 2013-05-20; 0 intervals bridged a missing settle, booking $0 absolute held P&L and $0 absolute spread move across gaps, 0 trades deferred, 0 stale closes); held on 93% of days under the point-in-time gate (VIX/VIX3M < 1 at the previous close); costs $2/contract/leg on every leg traded (149 rolls at $8, 167 gate entries/exits at $4, total $1,860). Mean net $3.9/day, 95% CI [-$9.8, $16.8] (n >= 2500: True); first half mean -$7.6, CI [-$29.0, $10.8]; second half mean $15.3, CI [-$3.0, $33.3] (each needs mean > 0 and lower > 0). Sharpe 0.17 (x sqrt 252), 1% CVaR -$1,844/day (-$1,878 on held days), max drawdown -$27,981; without 2018-02/2020-03: mean $5.7, CI [-$7.5, $18.5]; ungated always-on mean $12.9; lag-0 gate (15-min look-ahead) mean $7.2, halves CI [-$21.6, $14.2] and [-$0.3, $34.5]; block-shifted gate placebo: 100% of 155 shifts reach the actual gross mean $4.4; basis cross-check corr(M2 - M1, VIX3M - VIX) = 0.87. Margin outlay is not archived (the statistic is dollars per spread) — failed: first half 2013-05-22..2020-01-29: mean > 0 and studentized block-21 95% CI excludes 0; second half 2020-01-30..2026-10-14: mean > 0 and studentized block-21 95% CI excludes 0
+- result X-133c5bea: not_supported — VX M1-M2 calendar (short M1 / long M2, $1,000/pt) on CBOE daily settlements 2013-05-22..2026-10-14, n=3373 daily intervals (2013 rows with Settle = 0 dropped, so the first settlement is 2013-05-20; 0 intervals bridged a missing settle, booking $0 absolute held P&L and $0 absolute spread move across gaps, 0 trades deferred, 0 stale closes); held on 93% of days under the point-in-time gate (VIX/VIX3M < 1 at the previous close); costs $2/contract/leg on every leg traded (149 rolls at $8, 167 gate entries/exits at $4, total $1,860). Mean net $3.9/day, 95% CI [-$9.8, $16.8] (n >= 2500: True); first half mean -$7.6, CI [-$29.0, $10.8]; second half mean $15.3, CI [-$3.0, $33.3] (each needs mean > 0 and lower > 0). Sharpe 0.17 (x sqrt 252), 1% CVaR -$1,844/day (-$1,878 on held days), max drawdown -$27,981; without 2018-02/2020-03: mean $5.7, CI [-$7.5, $18.5]; ungated always-on mean $12.9; lag-0 gate (15-min look-ahead) mean $7.2, halves CI [-$21.6, $14.2] and [-$0.3, $34.5]; block-shifted gate placebo: 100% of 155 shifts reach the actual gross mean $4.4; basis cross-check corr(M2 - M1, VIX3M - VIX) = 0.87. Margin outlay is not archived (the statistic is dollars per spread) — failed: first half 2013-05-22..2020-01-29: mean > 0 and studentized block-21 95% CI excludes 0; second half 2020-01-30..2026-10-14: mean > 0 and studentized block-21 95% CI excludes 0
 - note: from the options-library library: VIX futures / VIX options calendar (term-structure roll trade); harness suggestion: Add a cboe_vx_settlements ingest (per-contract daily settlement CSVs) and a continuous-contract builder; then vx_calendar_backtest with the regime gate; register as a theory blocked on ingest. | verifier: corrected claim/trial
+
+### T-161 · covered-call-atm-buywrite
+
+**Claim.** Over 2002-03 to 2026-10, monthly excess returns of the Cboe BXM index over the 3-month T-bill have a positive Jensen alpha against SPY total-return excess returns (beta ~0.63), i.e. ATM overwriting adds return beyond its reduced equity exposure.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/covered-call-buy-write, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_BuyWrite_Indices_Methodology.pdf
+- statistic: Intercept (annualised alpha) of an OLS regression of BXM monthly excess return on SPY total-return monthly excess return
+- null: alpha <= 0 (overwriting is just de-risking; no variance premium captured)
+- procedure: Pull BXM_History.csv (Cboe CDN; it redirects to cdn-api.cboe.com and starts 2002-03-22). Build SPY total return from the Yahoo chart endpoint with events=div / adjclose (the archived daily-history-SPY rows hold only the unadjusted close). Take FRED DTB3, sample month-ends, run OLS with HAC standard errors, stationary block bootstrap (12-month blocks) of alpha, and split into walk-forward halves.
+- data: BXM 2002-03-22 onward (6,177 daily rows); SPY closes plus dividends 1993 onward; FRED DTB3 · min n: 280
+- pass: Bootstrap 95% CI of annualised alpha > 0 in the full sample, with a positive point estimate in both halves
+- controls: Israelov & Nielsen decomposition: compare with a beta-matched SPY-TR/T-bill blend; price-only SPX as a sensitivity (it biases against SPX by ~2%/yr of dividends)
+- harness: b6b_bw_bxm_alpha
+- result X-f5ad4c58: not_supported — BXM month-end excess return on SPY total-return (adjclose) excess return, both over the 3-month bill (DTB3 discount yield -> continuous, accrued daily at the prior print), 294 months 2002-04..2026-09 (rule 10(a): month-end sampling named by the trial). Annualised alpha -0.78%/yr, stationary bootstrap (mean block 12 months; mean of 5 seeds x 2000 resamples) 95% CI -2.86% to +1.16%, Newey-West(12) t -0.77; beta 0.629 (CI +0.550 to +0.687; the claim's '~0.63' is descriptive, not a pass criterion). Halves: first half 2002-04..2014-06 +0.09%/yr (CI -1.78% to +2.20%); second half 2014-07..2026-09 -1.35%/yr (CI -5.29% to +1.93%). Controls: BXM excess Sharpe 0.454 vs the beta-matched SPY-TR/bill blend 0.602 (= SPY's); price-only ^GSPC benchmark alpha +0.36%/yr (beta 0.629; biased toward BXM by the omitted dividends); arms vs SPY TR: BXMD -0.03%/yr (beta 0.81, from 2002-04), BXY -0.13%/yr (beta 0.78, from 2002-04), BXMH -0.29%/yr (beta 0.82, from 2002-04), BXMC +0.01%/yr (beta 0.69, from 2002-04), BXMW -1.23%/yr (beta 0.55, from 2012-07) (BXN/BXR need NDX/RUT benchmarks; not run). BXM launched 2002-04-30: 1 of 294 months use back-tested values (Cboe back-tests published at launch; the claim describes the index histories, so they are used, not treated as known at the time) — failed: stationary-bootstrap 95% CI of annualised alpha > 0 (lower -2.86%); second half 2014-07..2026-09: alpha > 0 (-1.35%/yr)
+- note: from the options-library library: Covered call / buy-write (ATM, BXM-style); harness suggestion: Add BXM, BXMD, BXY, BXMW, BXMH, BXMC, BXN, BXR to CBOE_INDICES in mandel/data/options.py (same CSV format, single column). Sanity numbers computed today: BXM 2002-2026 CAGR 6.23% vol 10.6% maxDD -40% beta 0.63 vs SPX price-only CAGR 8.11% vol 14.8%. | verifier: corrected claim/trial
+
+### T-163 · covered-call-weekly-ladder
+
+**Claim.** Over 2012-06 to 2026-10, the Cboe BXMW multi-week buy-write has a higher monthly Sharpe ratio (excess over 3m T-bill) than the monthly BXM buy-write.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/BXMW_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/BXMW_History.csv
+- statistic: Sharpe(BXMW) - Sharpe(BXM) on month-end excess returns from 2012-06-29
+- null: Difference <= 0
+- procedure: Cboe CDN BXMW_History.csv vs BXM_History.csv; month-end excess returns over DTB3; studentized block bootstrap of the Sharpe difference; split pre/post 2020
+- data: BXMW 2012-06-29 onward (3,589 rows), BXM, FRED DTB3 · min n: 160
+- pass: 95% CI of the Sharpe difference excludes 0 from below, with the same sign in both halves
+- controls: Beta-matched SPY-TR blend; cost sensitivity: subtract 4x roll costs at 0.05% of notional per roll
+- harness: b6b_bw_bxmw_vs_bxm
+- result X-1f452751: not_supported — BACK-TESTED INDEX VALUES: 38 of 171 months use BXMW values back-tested by Cboe before its 2015-08-03 launch. ASSUMPTION: the claim describes the published index histories, so back-tested months are used; they were not known at the time they describe (published at launch) and Cboe chose each index design after seeing that history. BXMW vs BXM month-end excess returns over the 3-month bill (DTB3 discount yield -> continuous, accrued daily at the prior print), 171 months 2012-07..2026-09 on the common calendar (rule 10(a): the claim names month-end sampling; the indices roll on the third Friday). Annualised Sharpe BXMW 0.718 vs BXM 0.646: difference +0.071 (CI -0.092 to +0.249) by the studentized CBB (Bartlett-HAC): paired circular block bootstrap, 12-month blocks, each resample studentized by the Ledoit-Wolf delta-method gradient with a fixed Bartlett(12) long-run variance (mean of 5 seeds x 2000 resamples, Monte Carlo s.e. of the lower end 0.0009; percentile CI -0.093 to +0.280; one-sided p 0.211). Ledoit-Wolf (2008) test (boot.time.inference: prewhitened Parzen HAC s.e. on the sample, Goetze-Kuensch block s.e. in circular-block resamples, b = 12; reported, not a criterion: the trial names only a studentized block bootstrap): +0.071 (symmetric CI -0.096 to +0.239, two-sided bootstrap p 0.405, mean of 5 seeds; its prewhitened Parzen HAC test alone: s.e. 0.0799, p 0.372, CI -0.085 to +0.228). Parts (judged on point estimates): pre-2020 +0.164 (CI -0.204 to +0.615); 2020- +0.010 (CI -0.159 to +0.159). Post-launch months only (from 2015-08-03, 133 months, below min_n 160): -0.026 (CI -0.177 to +0.090); Ledoit-Wolf (2008) test -0.026 (symmetric CI -0.214 to +0.162, two-sided bootstrap p 0.773; its prewhitened Parzen HAC test alone: s.e. 0.0820, p 0.752, CI -0.186 to +0.135). Block-length sensitivity (studentized CBB (Bartlett-HAC)): 6 months CI -0.091 to +0.245, 24 months CI -0.093 to +0.277, 36 months CI -0.104 to +0.314. Roll-date sampling sensitivity (171 roll-to-roll periods): -0.007 (CI -0.127 to +0.083) (the trial's procedure names the pre/post-2020 split; equal-count halves first half 2012-07..2019-07 +0.155, second half 2019-08..2026-09 +0.019). Cost sensitivity (4 rolls x 0.05% of notional a month for BXMW, 1 x 0.05% for BXM): -0.153 (CI -0.327 to +0.008). beta-matched SPY-TR/bill blends (171 common months; a blend has SPY's excess Sharpe 0.939): BXMW beta 0.55, alpha -1.23%/yr (t -0.87), BXM beta 0.57, alpha -1.49%/yr (t -0.88) — failed: full-sample 95% CI of Sharpe(BXMW) - Sharpe(BXM) > 0 (studentized CBB (Bartlett-HAC)) (lower -0.092)
+- note: from the options-library library: Multi-week / laddered covered call (BXMW, weekly overwriting); harness suggestion: Computed today: BXMW 2012- CAGR 7.72% vol 8.25% maxDD -30.6%; BXM same era needs re-alignment to 2012 start. | verifier: corrected claim/trial
+
+### T-166 · collar
+
+**Claim.** Over 2008-08 to 2026-10, the Cboe CLL 95-110 collar index has a lower CAGR than a beta-matched (OLS beta ~0.63) SPY-total-return/T-bill blend.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/collar-protective-collar, https://cdn.cboe.com/api/global/us_indices/governance/CLL_Methodology.pdf
+- statistic: CAGR(CLL) - CAGR(blend), where blend = beta*SPY TR + (1-beta)*T-bill, rebalanced monthly
+- null: CAGR(CLL) >= CAGR(blend)
+- procedure: Cboe CDN CLL_History.csv (2008-08-26 onward; the methodology base date is 1986 but the free CSV starts 2008; it has gaps up to 11 days, so use month-ends); SPY TR from the Yahoo chart adjclose; DTB3; estimate beta on the first half and apply it out of sample to the second; block bootstrap
+- data: CLL 4,520 rows, SPY closes plus dividends, FRED DTB3 · min n: 200
+- pass: Bootstrap 95% CI of the CAGR difference entirely below 0
+- controls: CLL1M and CLL3M (2004-) as alternative collars; PPUT (put only) to isolate the call leg; CLLZ (1986-) as the long-history collar
+- harness: b6b_hedge_collar_cll_vs_blend
+- result X-7d7b4e5d: not_supported — CLL vs beta-matched SPY-TR/T-bill blend (monthly rebalanced) over 2008-08..2026-10 (219 months, base 2008-08-26, last 2026-10-13): OLS beta 0.51 on the window (claim ~0.63); CAGR CLL +8.28% vs blend +7.37% (SPY TR +12.58%, bill +1.44%): difference +0.91%, 95% CI -3.49% to +4.03% (block 6 months, beta re-estimated per resample; block 12: CI -3.59% to +3.98%); out of sample (beta 0.40 from the first half, second half 2017-09..): diff +3.93% (CI +0.13% to +8.07%); at the claim's beta 0.63: blend +8.71%, diff -0.44% (CI -2.79% to +2.18%) (reported); return(s) ending ['2009-10-16'] excluded from every leg (flagged level step); compounded across the excluded return(s) ['2009-10-16'] as published: CAGR +6.96%, diff -0.50% (CI -6.18% to +3.19%); with the screened spike print(s) kept: beta 0.50, CAGR +8.28%, diff +0.97% (CI -3.54% to +4.26%); live (post-launch) months only, 2008-10.. (217): beta 0.50, diff +1.46% (CI -3.26% to +5.13%); controls: PPUT (same window) 2008-08..2026-10 beta 0.70, CAGR +9.98% vs blend +9.31%, diff +0.67% (CI -3.34% to +4.40%); CLLZ (same window) 2008-08..2026-10 beta 0.73, CAGR +8.23% vs blend +9.71%, diff -1.48% (CI -3.36% to +0.62%); CLL launched 2008-09-30: its rows before then are Cboe's back-test, 0.1 of the window's 18.1 years (1%); CLL1M and CLL3M are not archived (controls not run); unflagged one-day spike-and-revert prints dropped like flagged bad prints (each leg >= 2.5% and >= 2x the SPX move, opposite signs): CLL 2020-02-28 (-5.35% then +12.36% while SPX -0.82% / +4.60%); CLL repeats one close over 2019-01-03..2019-01-10 (6 sessions), 2019-01-11..2019-01-18 (6 sessions) (unflagged stale runs, kept): no month-end falls inside, so no monthly return is affected — failed: 95% CI of CAGR(CLL) - CAGR(blend) entirely below 0 (upper +4.03%; 0/6 bootstrap variants (block length x seed) pass)
+- note: from the options-library library: Collar (protective collar, Cboe CLL 95-110); harness suggestion: Today: CLL 2008- CAGR 6.96% vol 12.3% maxDD -26.3% beta 0.51 vs SPX price CAGR 10.5% maxDD ~-34% (2020) / -57% (2009 not in sample start). | verifier: corrected claim/trial
+
+### T-169 · protective-put
+
+**Claim.** Over 1993-02 to 2026-10, the Cboe PPUT index has a CAGR more than 1%/yr below a beta-matched (OLS beta ~0.73) SPY-total-return/T-bill blend.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/protective-put-married-put, https://cdn.cboe.com/api/global/us_indices/governance/PPUT_Methodology.pdf
+- statistic: CAGR(PPUT) - CAGR(blend), blend = beta*SPY TR + (1-beta)*T-bill rebalanced monthly
+- null: CAGR(PPUT) - CAGR(blend) >= -1%/yr
+- procedure: Cboe CDN PPUT_History.csv (1986-06 onward), SPY TR (Yahoo chart adjclose, 1993-), DTB3; estimate beta out of sample (first half), apply to the second; monthly block bootstrap; VRP cross-check: VIX vs forward 21-day SPX realised vol since 1990
+- data: PPUT 10,145 rows, SPY closes plus dividends, DTB3, VIX 1990- · min n: 380
+- pass: Bootstrap 95% CI of the CAGR difference entirely below -1%/yr
+- controls: Exclude 2008 and 2020 one at a time; PPUT3M (2004-) as the tail variant
+- harness: b6b_hedge_pput_vs_blend
+- result X-80fa69b3: not_supported — PPUT vs beta-matched SPY-TR/T-bill blend (monthly rebalanced) over 1993-02..2026-10 (405 months, base 1993-01-29, last 2026-10-13): OLS beta 0.73 on the window (claim ~0.73); CAGR PPUT +7.85% vs blend +8.82% (SPY TR +10.87%, bill +2.57%): difference -0.96%, 95% CI -3.32% to +1.35% (block 6 months, beta re-estimated per resample; block 12: CI -3.12% to +1.32%); out of sample (beta 0.71 from the first half, second half 2009-12..): diff +0.05% (CI -2.04% to +2.76%); at the claim's beta 0.73: blend +8.80%, diff -0.95% (CI -2.65% to +0.91%) (reported); excluding 2008: diff -1.68% (CI -3.73% to +0.61%); 2020: diff -1.61% (CI -3.60% to +0.34%); live (post-launch) months only, 2015-09.. (134): beta 0.75, diff -0.13% (CI -4.26% to +5.48%); controls: PPUT3M (2004-) 2004-03..2026-10 beta 0.76, CAGR +8.67% vs blend +8.98%, diff -0.31% (CI -2.53% to +1.70%); PPUT launched 2015-08-03: its rows before then are Cboe's back-test, 22.5 of the window's 33.7 years (67%); unflagged one-day spike-and-revert prints dropped like flagged bad prints (each leg >= 2.5% and >= 2x the SPX move, opposite signs): PPUT3M (control) 2004-05-04 (+11.51% then -10.06% while SPX +0.18% / +0.18%); VRP cross-check: VIX minus forward 21-day ^GSPC RV since 1990 averages +4.10 vol pts (CI +3.36 to +4.67, block 42 days, 9238 days) — failed: 95% CI of CAGR(PPUT) - CAGR(blend) entirely below -1%/yr (upper +1.35%; 0/6 bootstrap variants (block length x seed) pass)
+- note: from the options-library library: Protective put / married put (Cboe PPUT 5% OTM); harness suggestion: Today: PPUT 1986- CAGR 8.02% vol 12.3% maxDD -42% worst month -10.6% (vs SPX -19.6% ex 1987 crash months): protection shows up in the worst month but costs ~1%/yr vs SPX price-only CAGR 8.91%. | verifier: corrected claim/trial
+
+### T-171 · the-wheel
+
+**Claim.** In a model-priced simulation (Black-Scholes with VIX as the implied vol, not market prices) on SPX from 1990 to 2026, a wheel whose call strike is constrained to be >= the cost basis has a lower Sharpe ratio than the same wheel writing an unconstrained 30-delta call.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/cash-secured-put, https://www.optionseducation.org/strategies/all-strategies/covered-call-buy-write
+- statistic: Sharpe(basis-constrained wheel) - Sharpe(unconstrained 30-delta wheel), model-priced
+- null: Difference >= 0 (the basis rule helps or is neutral)
+- procedure: Model-priced backtest on SPX daily since 1990 (IV = VIX, with an OTM adjustment from SKEW as a sensitivity), 30-45 DTE cycles, 10 bps slippage. Gate: the same pricer must first reproduce BXM (2002-) and PUT (2007-) monthly returns with tracking error < 2%/yr, or results do not count. Block bootstrap of the paired Sharpe difference.
+- data: SPX daily 1975-, VIX 1990-, SKEW 1990-, BXM/PUT histories for calibration, FRED DTB3 · min n: 400
+- pass: Calibration gate passed AND the 95% CI of the Sharpe difference < 0
+- controls: Constant-IV pricer to show sensitivity; ATM-both-phases wheel vs the actual PUT index as an external check
+- harness: b6b_bw_wheel_basis
+- result X-9c038379: not_supported — MODEL-PRICED (Black-Scholes at VIX/100 on ^GSPC closes with SPY's trailing dividend yield; settled on the expiry-session close as the SOQ proxy): 440 monthly expiry-to-expiry cycles 1990-01-19..2026-09-18 (rule 10(a): the standard monthly expiry, third Friday or the prior session; 27-36 calendar days); the held index accrues dividends every session at the q known at the prior close, as BXM and PUT accrue SPX dividends daily (not in SPY's quarterly ex-date lumps); 49 cycles price with, and accrue, the ASSUMED q = 3.0% (before SPY's first full year). Wheel: sell the 30-delta put (nearest 5-point strike) on the whole cash account; when assigned, hold the index (total return) and sell 30-delta calls until called away; the constrained arm floors the call strike at the cost basis (assignment strike minus premiums since the wheel cycle began). 10 bps of the index per option written and per index trade at assignment or call-away. The trial's 30-45 DTE band is not met exactly: a continuously invested wheel on the standard calendar has 28- or 35-day cycles. Excess-return Sharpe constrained 0.630 vs unconstrained 0.607: difference +0.023 (CI -0.067 to +0.108) (studentized paired block bootstrap, 12-cycle blocks, mean of 5 seeds; one-sided p for a negative difference 0.695); time in stock 38% vs 29%, assignments 44 vs 46, basis floor binding in 58 call months. Sensitivities (not criteria): iv_x0.90 +0.070 (CI -0.049 to +0.193), iv_x0.81 +0.068 (CI -0.063 to +0.199), no_slippage +0.007 (CI -0.089 to +0.085), constant_iv_20pct +0.081 (CI -0.050 to +0.230), skew_line +0.013 (CI -0.084 to +0.095) (SKEW line kappa 0.01782 from options-chain-SPX-2026-10-14). External check: ATM-both-phases wheel vs the actual PUT index (236 cycles): TE 2.49%/yr, corr 0.980. Gate (the claim's pricer at IV x1.00, closes, no costs): BXM TE 2.35%/yr over 291 cycles (bias +5.00%/yr, corr 0.982; largest monthly gaps 2008-11-21 +4.6%, 2008-12-19 +3.5%, 2020-06-19 +2.9%); PUT TE 2.53%/yr over 236 cycles (bias +3.61%/yr, corr 0.980; largest monthly gaps 2008-11-21 +4.1%, 2020-04-17 -4.0%, 2010-05-21 +3.8%); the pricer misses the gate, so by the trial's rule the comparison does not count — failed: calibration gate: the BS-at-VIX pricer tracks BXM (2002-) and PUT (2007-) monthly roll-to-roll returns within 2%/yr (TE BXM 2.35%, PUT 2.53%); 95% CI of the Sharpe difference < 0 (upper +0.108)
+- note: from the options-library library: The wheel (cash-secured put -> assignment -> covered call -> called away); harness suggestion: Reuse the model-priced overlay harness; calibrate it to BXM/PUT first (now downloadable) and report the calibration error as a gate. | verifier: corrected claim/trial
+
+### T-172 · covered-strangle
+
+**Claim.** Over 1988-06 to 2026-10, the Cboe CMBO covered combo index has a higher monthly Sharpe ratio (excess over 3m T-bill) than the BXY 2% OTM buy-write, i.e. adding the ATM short put on T-bill collateral improves risk-adjusted return.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/covered-strangle-covered-combination, https://cdn.cboe.com/api/global/us_indices/governance/CMBO_Methodology.pdf
+- statistic: Sharpe(CMBO) - Sharpe(BXY) on month-end excess returns
+- null: Sharpe(CMBO) <= Sharpe(BXY)
+- procedure: Cboe CDN CMBO_History.csv (1986-06) and BXY_History.csv (1988-06); align; excess over DTB3; studentized block bootstrap; walk-forward halves; report worst-5% months as a secondary description
+- data: Cboe CDN histories, FRED DTB3 · min n: 400
+- pass: Bootstrap 95% CI of the Sharpe difference > 0, with the same sign in both halves
+- controls: Beta-matched SPY-TR blend (CMBO beta ~0.66); PUTY 2% OTM put-write as the put-only arm
+- harness: b6b_bw_cmbo_vs_bxy
+- result X-b1cbc563: not_supported — BACK-TESTED INDEX VALUES: 326 of 459 months use CMBO values back-tested by Cboe before its 2015-08-03 launch; 213 of 459 months use BXY values back-tested by Cboe before its 2006-03-20 launch. ASSUMPTION: the claim describes the published index histories, so back-tested months are used; they were not known at the time they describe (published at launch) and Cboe chose each index design after seeing that history. CMBO vs BXY month-end excess returns over the 3-month bill (DTB3 discount yield -> continuous, accrued daily at the prior print), 459 months 1988-07..2026-09 on the common calendar (rule 10(a): the claim names month-end sampling; the indices roll on the third Friday). Annualised Sharpe CMBO 0.623 vs BXY 0.634: difference -0.011 (CI -0.068 to +0.049) by the studentized CBB (Bartlett-HAC): paired circular block bootstrap, 12-month blocks, each resample studentized by the Ledoit-Wolf delta-method gradient with a fixed Bartlett(12) long-run variance (mean of 5 seeds x 2000 resamples, Monte Carlo s.e. of the lower end 0.0009; percentile CI -0.061 to +0.051; one-sided p 0.669). Ledoit-Wolf (2008) test (boot.time.inference: prewhitened Parzen HAC s.e. on the sample, Goetze-Kuensch block s.e. in circular-block resamples, b = 12; reported, not a criterion: the trial names only a studentized block bootstrap): -0.011 (symmetric CI -0.065 to +0.044, two-sided bootstrap p 0.694, mean of 5 seeds; its prewhitened Parzen HAC test alone: s.e. 0.0262, p 0.682, CI -0.062 to +0.041). Parts (judged on point estimates): first half 1988-07..2007-07 +0.060 (CI -0.051 to +0.161); second half 2007-08..2026-09 -0.060 (CI -0.114 to -0.014). Post-launch months only (from 2015-08-03, 133 months, below min_n 400): -0.064 (CI -0.156 to +0.010); Ledoit-Wolf (2008) test -0.064 (symmetric CI -0.160 to +0.033, two-sided bootstrap p 0.159; its prewhitened Parzen HAC test alone: s.e. 0.0395, p 0.107, CI -0.141 to +0.014). Block-length sensitivity (studentized CBB (Bartlett-HAC)): 6 months CI -0.067 to +0.043, 24 months CI -0.076 to +0.063, 36 months CI -0.082 to +0.080. Roll-date sampling sensitivity (460 roll-to-roll periods): -0.017 (CI -0.073 to +0.036). Worst 5% of months (23): mean CMBO -7.92%, BXY -8.32%. Put-only arm PUTY - BXY: -0.086 (CI -0.256 to +0.073). beta-matched SPY-TR/bill blends (404 common months; a blend has SPY's excess Sharpe 0.602): CMBO beta 0.67, alpha +0.27%/yr (t 0.36), BXY beta 0.77, alpha +0.52%/yr (t 0.79) (SPY exists from 1993) — failed: full-sample 95% CI of Sharpe(CMBO) - Sharpe(BXY) > 0 (studentized CBB (Bartlett-HAC)) (lower -0.068); second half 2007-08..2026-09 (230 months): point-estimate difference > 0 (-0.060; judged on the point estimate, studentized CBB (Bartlett-HAC) CI -0.114 to -0.014)
+- note: from the options-library library: Covered strangle / covered combination (Cboe CMBO); harness suggestion: Today: CMBO 1986- CAGR 9.37% vol 11.0% maxDD -42.7% worst month -17.3% beta 0.66. | verifier: corrected claim/trial
+
+### T-174 · covered-put
+
+**Claim.** In a model-priced simulation (Black-Scholes at VIX, not market prices) of short SPX + short monthly ATM SPX puts with T-bill interest on proceeds, the CAGR is negative in at least 90% of rolling 120-month windows from 1990 to 2026.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/all-strategies-en, https://www.optionseducation.org/strategies/all-strategies-en
+- statistic: Fraction of rolling 120-month windows with negative CAGR (model-priced)
+- null: Fraction < 0.9
+- procedure: Model-priced with VIX-as-IV on SPX daily, monthly rolls, T-bill interest on short proceeds, dividends owed on the short; pricer must first pass the BXM/PUT calibration gate
+- data: SPX price 1975-, SPY dividends (Yahoo chart events=div), VIX 1990-, FRED DTB3 · min n: 300
+- pass: Fraction of negative windows >= 0.9
+- controls: Short SPX alone to isolate the put income
+- harness: b6b_bw_covered_put
+- result X-3e616bfc: not_supported — MODEL-PRICED (Black-Scholes put at VIX/100 on ^GSPC with SPY's trailing dividend yield; no transaction costs, none stated): 440 monthly expiry-to-expiry cycles 1990-01-19..2026-09-18 (rule 10(a): the standard monthly expiry, third Friday or the prior session; 27-36 calendar days); the held index accrues dividends every session at the q known at the prior close, as BXM and PUT accrue SPX dividends daily (not in SPY's quarterly ex-date lumps); 49 cycles price with, and accrue, the ASSUMED q = 3.0% (before SPY's first full year). Per unit of notional, each month: short the index and the ATM put (PUT rule: first 5-point strike at or below), the short-sale and put proceeds earn the 3-month bill, dividends are owed on the short, the put settles on the expiry close. Full-period CAGR +0.46%; 107 of 321 rolling 120-month windows have CAGR < 0 (share 0.333; window CAGRs -5.49% to +8.03%). Sensitivities (share negative): iv_x0.90 0.760, iv_x0.81 0.935, collateral_also_earns_bills 0.315, short_SPX_alone 0.966, short_SPX_alone_collateral_earns 0.900. The trial requires the pricer to pass the BXM/PUT calibration gate first (the claim's pricer at IV x1.00, closes, no costs): BXM TE 2.35%/yr over 291 cycles (bias +5.00%/yr, corr 0.982; largest monthly gaps 2008-11-21 +4.6%, 2008-12-19 +3.5%, 2020-06-19 +2.9%); PUT TE 2.53%/yr over 236 cycles (bias +3.61%/yr, corr 0.980; largest monthly gaps 2008-11-21 +4.1%, 2020-04-17 -4.0%, 2010-05-21 +3.8%) — failed: calibration gate: the BS-at-VIX pricer tracks BXM (2002-) and PUT (2007-) monthly roll-to-roll returns within 2%/yr (TE BXM 2.35%, PUT 2.53%); share of 120-month windows with CAGR < 0 >= 0.90 (107 of 321 = 0.333)
+- note: from the options-library library: Covered put (short stock + short put); harness suggestion: Low priority: include for completeness of the payoff library; the claim is mostly a sanity check of the engine's sign conventions. | verifier: corrected claim/trial
 
 ### T-176 · deribit-covered-call-inverse
 
@@ -1030,6 +1670,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: btc_inverse_covered_call
 - result X-7bb88d2c: not_supported — MODEL-PRICED at flat DVOL: 25-delta 30-day BTC call against 1 BTC earns +0.0058 BTC per cycle on average over 67 cycles (95% CI -0.0052 to +0.0162); spot closes stand in for Deribit delivery prices — failed: 95% CI of the mean > 0
 - result X-821aad1c: not_supported — MODEL-PRICED at flat DVOL: 25-delta 30-day BTC call against 1 BTC earns +0.0054 BTC per cycle on average (premium 0.0237 BTC at S_0) over 67 cycles (95% CI -0.0050 to +0.0152); Deribit delivery prices on day +31 — failed: 95% CI of the mean > 0
+- result X-a33115e9: not_supported — MODEL-PRICED at flat DVOL: 25-delta 30-day BTC call against 1 BTC earns +0.0062 BTC per cycle on average (premium 0.0234 BTC at S_0) over 65 cycles from 2021-04-29 on the Deribit monthly expiry calendar (last Friday 08:00 UTC), each written at the last daily close before one expiry (the Thursday) and settled at the last close before the next (95% CI -0.0064 to +0.0169); Deribit delivery prices at each expiry (08:00 UTC, the day after the last close before it) — failed: 95% CI of the mean > 0
 - note: from the options-library library: Deribit covered call on BTC/ETH inventory (inverse options); harness suggestion: Mandel's deribit_book + DVOL fetchers already exist; add public/get_delivery_prices (free, 2,638 daily records) so expiries settle at the official TWAP rather than a close. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states; spot closes stand in for Deribit delivery prices (30-minute TWAP)
 
 ### T-177 · covered-call-metals
@@ -1046,7 +1687,38 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gvz_gap_2pts
 - result X-b7862591: not_supported — GVZ/GLD implied minus realised over 21 periods: +2.3535 vol pts since 2009-09-18 (95% CI +1.7626 to +2.9158), halves +2.8537/+1.8533 — failed: lower 95% CI > 2.0
 - result X-dc722fd2: not_supported — GVZ/GLD implied minus realised over 21 periods: +2.3535 vol pts since 2009-09-18 (95% CI +1.7626 to +2.9158), halves +2.8537/+1.8533 — failed: lower 95% CI > 2.0
+- result X-d15e8aec: not_supported — GVZ/GLD implied minus realised over 21 periods: +2.3535 vol pts since 2009-09-18 (95% CI +1.7626 to +2.9158), halves +2.8537/+1.8533 — failed: lower 95% CI > 2.0
 - note: from the options-library library: Covered call on gold/silver (GLD/SLV equity route; GC/SI futures-options route); harness suggestion: GVZ history is already fetched; add GLD/SLV daily closes (free) and reuse the VRP harness; GC futures closes are not free - use GLD as the proxy. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
+
+### T-179 · iron-condor-cndr
+
+**Claim.** From 1990 to 2026, CNDR's monthly excess return over the 1-month T-bill rises with the roll-day gap between VIX and trailing 21-day SPX realised volatility (positive regression slope).
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/CNDR_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/CNDR_History.csv
+- statistic: OLS slope of monthly CNDR excess return (roll to roll) on (VIX at roll - trailing 21-day SPX realised vol)
+- null: Slope <= 0
+- procedure: Cboe CDN CNDR_History.csv sampled at 3rd-Friday roll dates; VIX history; SPX realised vol from Cboe SPX daily; FRED DTB3; HAC standard errors; block bootstrap; walk-forward halves
+- data: CNDR 1986- (use 1990- for VIX), SPX daily, VIX, DTB3 · min n: 400
+- pass: Bootstrap 95% CI of the slope > 0, with the same sign in both halves
+- controls: Beta to SPX near zero (0.13 today); add SPX month return as a regressor to separate the variance premium from direction
+- harness: b6b_hedge_cndr_vrp_gap
+- result X-30b8aabf: not_supported — CNDR roll-to-roll excess return (3rd-Friday closes, 1990-01-19..2026-09-18, 438 rolls) on VIX - trailing 21-day ^GSPC RV at the roll (mean gap 3.81 vol pts): slope +0.00018 per vol pt (HAC t 1.00), 95% CI -0.00015 to +0.00054 (studentized pairs block bootstrap, block 6); bill = DTB3 as the 1-month proxy; fed funds (DFF): +0.00018 (CI -0.00015 to +0.00054); zero rate: +0.00020 (CI -0.00015 to +0.00058); halves (split 2008-04-18) +0.00021 / +0.00010; with the SPX roll-to-roll return as a second regressor the gap coefficient is +0.00017 (HAC t 0.89), SPX beta 0.110 (reported); live (post-launch) rolls only, 2015-08-03.. (131): +0.00009 (CI -0.00022 to +0.00044); CNDR launched 2015-08-03: its rows before then are Cboe's back-test, 25.5 of the window's 36.7 years (70%) — failed: 95% CI of the slope > 0 (CI -0.00015 to +0.00054; 0/6 bootstrap variants (block length x seed) pass, every bill proxy agrees)
+- note: from the options-library library: Iron condor benchmark overlay (Cboe CNDR: short 20-delta strangle, long 5-delta wings, over T-bills); harness suggestion: CNDR is the cleanest free realised series for the SPX variance premium harness; add it as a validation target for the model-priced condor. | verifier: corrected claim/trial
+
+### T-180 · cboe-benchmark-replication
+
+**Claim.** A Black-Scholes overlay simulation on SPX (model-priced, with VIX as the implied vol and FRED DTB3 as the rate) reproduces the monthly returns of BXM (2002-2026) and PUT (2007-2026) with R^2 > 0.95 and annualised tracking error below 2%.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_BuyWrite_Indices_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/BXMD_History.csv
+- statistic: R^2 and annualised tracking error between simulated and actual monthly returns for BXM and PUT (secondary: BXMD, CNDR)
+- null: R^2 <= 0.95 or TE >= 2%/yr for either BXM or PUT
+- procedure: Simulate each index's strike/roll rule on SPX daily with VIX (SKEW-based OTM adjustment for BXMD/CNDR as a documented sensitivity), compare with downloaded histories, and report by sub-period. Use SPX price plus SPY dividends (Yahoo chart events=div) for the total-return leg.
+- data: SPX daily, VIX, SKEW, DTB3, SPY dividends, Cboe benchmark CSVs · min n: 220
+- pass: R^2 > 0.95 and TE < 2%/yr for both BXM and PUT; document the shortfall for BXMD/CNDR (skew)
+- controls: Price-only vs total-return SPX; VWAP vs close fill assumption
+- harness: b6b_hedge_bs_replication
+- result X-63ffe887: not_supported — MODEL-PRICED: Black-Scholes overlay on ^GSPC (sigma = VIX, DTB3, q = trailing SPY yield, 3rd-Friday close rolls, raw-close settlement, SPY dividends spread over each quarter for the total-return leg): BXM 2002-04-19..2026-09-18: roll-to-roll (291) R^2 0.964 (1:1 0.949), TE 2.35%, mean actual - sim -5.05%/yr; month-end (293) R^2 0.953, TE 2.32%; halves R^2 0.956/0.972; sensitivities (roll R^2 / TE): iv x0.9 0.966 / 2.29%, iv x1.1 0.961 / 2.48%, dividends lumped on SPY ex-dates 0.958 / 2.55%, price-only SPX 0.964 / 2.34%, settle at the ^GSPC open (SOQ proxy) 0.966 / 2.34%; PUT 2007-01-19..2026-09-18: roll-to-roll (236) R^2 0.960 (1:1 0.953), TE 2.53%, mean actual - sim -3.60%/yr; month-end (236) R^2 0.935, TE 2.75%; halves R^2 0.951/0.970; sensitivities (roll R^2 / TE): iv x0.9 0.961 / 2.50%, iv x1.1 0.957 / 2.61%, settle at the ^GSPC open (SOQ proxy) 0.955 / 2.71%; BXMD (0.30-delta call at VIX, documented): roll R^2 0.979, TE 2.37%; month-end R^2 0.972, TE 2.17%; CNDR (20/5-delta condor at VIX, documented; collateral rule not modelled, so TE is not computed): R^2 0.621 over 291 rolls, implied notional slope 1.36; VWAP-vs-close fill not testable (no intraday option prices archived); BXM launched 2002-04-30: its rows before then are Cboe's back-test, 0.0 of the window's 24.5 years (0%); PUT launched 2007-06-20: its rows before then are Cboe's back-test, 0.4 of the window's 19.7 years (2%) — failed: BXM TE < 2%/yr (roll-to-roll 2.35%, month-end 2.32%); PUT TE < 2%/yr (roll-to-roll 2.53%, month-end 2.75%) (not implemented: PUT R^2 > 0.95 (roll-to-roll 0.960, month-end 0.935, the bases disagree))
+- note: from the options-library library: Buy-write benchmark family map (BXM/BXMD/BXY/BXMW/BXMH/BXN/BXR/PUT/CLL/CLLZ/CMBO/PPUT/BFLY/CNDR) as replication targets; harness suggestion: This is the first thing to run: extend cboe_index_history to the list above (the CDN 307-redirects to cdn-api.cboe.com; httpx follow_redirects is already on), then calibrate the model-priced overlay harness against it. | verifier: corrected claim/trial
 
 ### T-181 · put-call-parity-synthetic-forward
 
@@ -1060,10 +1732,40 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Violation fraction < 2% and |median r_impl - r_bill| < 50 bp on day one; stable over 20 captured days.
 - controls: Exclude strikes with zero bid; use mids not lasts; re-run with quotes aged < 15 min; placebo: shuffle puts across adjacent strikes to confirm the statistic detects artificial violations.
 - harness: parity_forward
-- result X-adaf1657: not_supported — SPY 2026-10-14: 3.8% of 320 pairs outside half-spread, implied rate -693 bp vs bill; SPX 2026-10-14: 3.1% of 540 pairs outside half-spread, implied rate +91 bp vs bill (claim: < 2% and within 50 bp, stable over 20 days); the implied rate from ten strikes is noise-dominated for SPY's $1 strikes, so the violation rate is the reliable half
 - result X-ddf2141f: not_supported — SPY 2026-10-14: 3.8% of 320 pairs outside half-spread, implied rate -693 bp vs bill; SPY 2026-10-15: 0.3% of 320 pairs outside half-spread, implied rate -568 bp vs bill; SPX 2026-10-14: 3.1% of 540 pairs outside half-spread, implied rate +91 bp vs bill; SPX 2026-10-15: 1.3% of 520 pairs outside half-spread, implied rate +82 bp vs bill (claim: < 2% and within 50 bp, stable over 20 days); the implied rate from ten strikes is noise-dominated for SPY's $1 strikes, so the violation rate is the reliable half
 - result X-1dfce7cb: not_supported — SPY 2026-10-14: implied rate -712 bp vs bill, 3.8% of 320 pairs off a free cross-strike fit by more than the half-spread; SPY 2026-10-15: implied rate -587 bp vs bill, 0.3% of 320 pairs off a free cross-strike fit by more than the half-spread; SPX 2026-10-14: implied rate +72 bp vs bill, 3.1% of 540 pairs off a free cross-strike fit by more than the half-spread; SPX 2026-10-15: implied rate +63 bp vs bill, 1.3% of 520 pairs off a free cross-strike fit by more than the half-spread (claim: within 50 bp and < 2% violations against F_theo on day one, stable over 20 days); the free-fit violation rate is a diagnostic, not the claim's F_theo statistic; the implied rate from ten strikes is noise-dominated for SPY's $1 strikes; verdict: failed: day one: |median r_impl - r_bill| < 50 bp for every symbol (SPX 2026-10-14, SPY 2026-10-14); stable over the first 20 captured days: rate gap within 50 bp on every one of them (not implemented: violation fraction |F_impl - F_theo| > half-spread < 2%, F_theo = S e^{rT} - FV(D) (needs a dividend schedule the inputs do not carry))
+- result X-d6f09cab: not_supported — SPY 2026-10-14: implied rate -712 bp vs bill, 3.8% of 320 pairs off a free cross-strike fit by more than the half-spread; SPY 2026-10-15: implied rate -587 bp vs bill, 0.3% of 320 pairs off a free cross-strike fit by more than the half-spread; SPX 2026-10-14: implied rate +72 bp vs bill, 3.1% of 540 pairs off a free cross-strike fit by more than the half-spread; SPX 2026-10-15: implied rate +63 bp vs bill, 1.3% of 520 pairs off a free cross-strike fit by more than the half-spread (claim: within 50 bp and < 2% violations against F_theo on day one, stable over 20 days); the free-fit violation rate is a diagnostic, not the claim's F_theo statistic; the implied rate from ten strikes is noise-dominated for SPY's $1 strikes; verdict: failed: day one: |median r_impl - r_bill| < 50 bp for every symbol (SPX 2026-10-14, SPY 2026-10-14); stable over the first 20 captured days: rate gap within 50 bp on every one of them (not implemented: violation fraction |F_impl - F_theo| > half-spread < 2%, F_theo = S e^{rT} - FV(D) (needs a dividend schedule the inputs do not carry))
 - note: from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r, divs) -> per-(K,T) table; wire into payoff engine as a 2-leg template; daily job appends to data/options/parity/. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-505 (verifier-corrected wording)
+
+### T-184 · synthetic-long-stock
+
+**Claim.** For SPY expiries with 180-365 DTE, the executable financing rate of an ATM synthetic long (call at ask, put at bid, dividends from SPY's trailing four distributions) is below the 3-month bill + 50 bp in at least 80% of expiries, i.e. at least 100 bp cheaper than a benchmark retail margin rate of bill + 150 bp.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.optionseducation.org/strategies/all-strategies-en, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity
+- statistic: r_impl_exec - r_bill per expiry, r_impl_exec solving C_ask - P_bid = S - PV(D) - K e^{-r T}.
+- null: r_impl_exec - r_bill >= 50 bp in more than 20% of expiries.
+- procedure: Day one on SPY (QQQ/IWM/GLD/IBIT as replications): ATM strike per expiry with 180-365 DTE; PV(D) from trailing distributions on the known quarterly ex-dates; compute r_impl_exec and r_impl_mid; compare to DGS3MO; repeat daily.
+- data: CBOE delayed SPY chain, FRED DGS3MO, SPY trailing four quarterly distributions (4 public numbers entered by hand; not in the listed feeds). GLD/IBIT replications need no dividends. · min n: 20
+- pass: >= 80% of expiries with r_impl_exec - r_bill < 50 bp on day one and on >= 80% of captured days.
+- controls: Sensitivity to +/-10% dividend forecast; mid-based rate; exclude expiries with a zero-bid leg; GLD/IBIT dividend-free replication.
+- harness: b6b_chain_synthetic_long
+- result X-0cbfdd19: not_supported — SPY ATM synthetic long, call at ask / put at bid, PV(D) from the trailing four distributions on the projected quarterly ex-dates, r_impl_exec - bill per expiry: 2026-10-13: close/DGS3MO 2026-10-09 (ref) 25.0% of 4, sync/DGS3MO 2026-10-09 (ref) 25.0% of 4 -> fail (DTB3 beside it, not deciding: close/DTB3 2026-10-09 0.0% of 4, sync/DTB3 2026-10-09 0.0% of 4); 2026-10-14: close/DGS3MO 2026-10-13 (ref) 50.0% of 4, sync/DGS3MO 2026-10-13 (ref) 0.0% of 4 -> undecided (DTB3 beside it, not deciding: close/DTB3 2026-10-13 25.0% of 4, sync/DTB3 2026-10-13 0.0% of 4); detail: 2026-10-13 (close/DGS3MO 2026-10-09 (ref)): 2027-06-17 K 780 +69.4 bp (mid +55.1, PV(D) 5.59), 2027-06-30 K 780 +48.9 bp (mid +36.3, PV(D) 5.59), 2027-09-17 K 780 +97.6 bp (mid +62.0, PV(D) 7.41), 2027-09-30 K 778 +78.3 bp (mid +43.9, PV(D) 7.41); dividends -10%: 1/4; dividends +10%: 0/4; GLD replication (no dividend) gaps +19, +9, +50, +49 bp; IBIT replication (no dividend) gaps +159, +112, +146 bp; 2026-10-14 (close/DGS3MO 2026-10-13 (ref)): 2027-06-17 K 770 +57.3 bp (mid +43.0, PV(D) 5.59), 2027-06-30 K 770 +39.0 bp (mid +24.9, PV(D) 5.59), 2027-09-17 K 770 +63.8 bp (mid +49.6, PV(D) 7.41), 2027-09-30 K 770 +49.2 bp (mid +36.6, PV(D) 7.41); dividends -10%: 3/4; dividends +10%: 1/4; GLD replication (no dividend) gaps +25, +22, +78, +78 bp; IBIT replication (no dividend) gaps +302, +138, +120 bp; QQQ/IWM replications not run (their ex-dividend schedules are not archived) — failed: day one (2026-10-13 quotes): share of 180-365 DTE expiries with r_impl_exec - r_bill < 50 bp (r_bill = FRED DGS3MO) >= 80.0% (close/DGS3MO 2026-10-09 (ref) 25.00% of 4, one-sided 95% upper 75.1%, sync/DGS3MO 2026-10-09 (ref) 25.00% of 4, one-sided 95% upper 75.1%; DTB3 beside it, not deciding: close/DTB3 2026-10-09 0.00% of 4, sync/DTB3 2026-10-09 0.00% of 4) (not implemented: on >= 80% of captured days (0 pass, 1 fail, 1 undecided of 2; needs >= 5 days); n >= trial min_n (8 of 20 expiry observations over capture days))
+- note: from the options-library library: Synthetic long stock (combo); harness suggestion: Template [call+, put-]; payoff engine must reproduce a straight line; parity.py reports r_impl_askbid alongside r_impl_mid. | verifier: corrected claim/trial
+
+### T-185 · synthetic-short-stock
+
+**Claim.** For SPY expiries before 2026-12-18 with 30-64 DTE (no dividend inside T), the executable implicit borrow cost of an ATM synthetic short, r_bill - r_impl with r_impl solving C_bid - P_ask = S - K e^{-r T}, is below 50 bp/yr in at least 80% of (K, T) pairs within +/- 2% of spot.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.optionseducation.org/strategies/all-strategies-en, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity
+- statistic: Share of near-ATM pairs with r_bill - r_impl_exec < 50 bp.
+- null: Share < 80% (synthetic shorts in SPY cost more than 50 bp/yr over general collateral).
+- procedure: Day one: SPY chain, expiries strictly before the ex-date, strikes within +/- 2%; compute r_impl_exec from put ask / call bid; compare to DGS3MO; repeat daily; replicate on GLD and IBIT with no dividend (their expense ratios reduce the forward via the underlying market and are reported separately).
+- data: CBOE delayed SPY/GLD/IBIT chains, FRED DGS3MO. · min n: 20
+- pass: Share >= 80% on day one and on >= 80% of captured days.
+- controls: Mid-price version; stale-quote filter; exclude zero-bid legs; compare with the SPX box rate to separate the bill-vs-option-financing basis from borrow.
+- harness: b6b_chain_synthetic_short
+- result X-e4010567: not_supported — SPY ATM synthetic short, r_impl from C_bid - P_ask = S - K e^-rT, 30-64 DTE before 2026-12-18, strikes within +/- 2% of spot, implicit borrow r_bill - r_impl: 2026-10-13: close/DGS3MO 2026-10-09 (ref) 79.8% of 124, sync/DGS3MO 2026-10-09 (ref) 76.6% of 124 -> fail (DTB3 beside it, not deciding: close/DTB3 2026-10-09 84.7% of 124, sync/DTB3 2026-10-09 78.2% of 124); 2026-10-14: close/DGS3MO 2026-10-13 (ref) 0.0% of 120, sync/DGS3MO 2026-10-13 (ref) 77.4% of 124 -> fail (DTB3 beside it, not deciding: close/DTB3 2026-10-13 0.0% of 120, sync/DTB3 2026-10-13 81.5% of 124); controls: 2026-10-13 (close/DGS3MO 2026-10-09 (ref)): median executable borrow +12.0 bp, mid -3.0 bp; SPXW box - bill +8.6 bp (2026-11-27); GLD replication (no dividend, expense ratio not removed) 0/45 below 50 bp, median +81.2 bp; IBIT replication (no dividend, expense ratio not removed) 0/12 below 50 bp, median +123.4 bp; 2026-10-14 (close/DGS3MO 2026-10-13 (ref)): median executable borrow +99.1 bp, mid +79.5 bp; SPXW box - bill +27.3 bp (2026-11-27); GLD replication (no dividend, expense ratio not removed) 0/45 below 50 bp, median +115.2 bp; IBIT replication (no dividend, expense ratio not removed) 12/12 below 50 bp, median -70.9 bp; stale-quote filter not implementable (the capture carries no per-quote timestamps) — failed: day one (2026-10-13 quotes): share of near-ATM pairs with r_bill - r_impl_exec < 50 bp (r_bill = FRED DGS3MO) >= 80.0% (close/DGS3MO 2026-10-09 (ref) 79.84% of 124, one-sided 95% upper 85.6%, sync/DGS3MO 2026-10-09 (ref) 76.61% of 124, one-sided 95% upper 82.7%; DTB3 beside it, not deciding: close/DTB3 2026-10-09 84.68% of 124, sync/DTB3 2026-10-09 78.23% of 124); on >= 80% of captured days (0 pass, 2 fail, 0 undecided of 2; needs >= 5 days)
+- note: from the options-library library: Synthetic short stock (combo); harness suggestion: Template [put+, call-]; parity.py implicit_borrow column. | verifier: corrected claim/trial
 
 ### T-186 · long-box-spread-lend
 
@@ -1077,9 +1779,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Day-one median spread in [15, 80] bp with >= 80% of boxes positive; maintained over 20 captured days.
 - controls: Use mid and executable prices; drop legs with zero bid; compare to SPXW vs SPX AM-settled to check settlement effects; check that r_box is strike-invariant (if not, parity noise dominates).
 - harness: spx_box_lending
-- result X-a110b91c: not_supported — 1 capture day(s); latest 2026-10-14: 1680 boxes, executable lending spread over bills median -5 bp (mid +69 bp), 45% positive; claim needs [15, 80] bp and 80% positive on 80% of 20+ days
 - result X-b8a1631b: not_supported — 2 capture day(s); latest 2026-10-15: 1680 boxes, executable lending spread over bills median -39 bp (mid +69 bp), 18% positive; claim needs [15, 80] bp and 80% positive on 80% of 20+ days
 - result X-0faed075: not_supported — 2 capture day(s); day one 2026-10-14: executable spread median -20 bp (fail); latest 2026-10-15: 1680 boxes, executable lending spread over bills median -53 bp (mid +54 bp), 7% positive; claim needs [15, 80] bp and 80% positive on day one and on 80% of 20+ days; verdict: failed: day one (2026-10-14): median executable spread in [15, 80] bp with >= 80% of boxes positive (not implemented: maintained on >= 80% of >= 20 captured days (2 so far))
+- result X-1108a3bf: not_supported — 2 capture day(s); day one 2026-10-14: executable spread median -20 bp (fail); latest 2026-10-15: 1680 boxes, executable lending spread over bills median -53 bp (mid +54 bp), 7% positive; claim needs [15, 80] bp and 80% positive on day one and on 80% of 20+ days; verdict: failed: day one (2026-10-14): median executable spread in [15, 80] bp with >= 80% of boxes positive (not implemented: maintained on >= 80% of >= 20 captured days (2 so far))
 - note: from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2) and daily box_curve; payoff engine test asserts flat K2-K1. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-503 (verifier-corrected wording)
 
 ### T-187 · short-box-spread-borrow
@@ -1094,10 +1796,25 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Median advantage > 100 bp on day one and on >= 80% of captured days.
 - controls: Check strike-invariance; drop expiries with zero-bid legs; compare SPX vs XSP implied rates (should match).
 - harness: spx_box_borrowing
-- result X-8a3bbd3c: not_supported — 1 capture day(s); latest 2026-10-14: 1440 boxes, borrowing via short box beats bill+150 bp by a median -4 bp (claim: > 100 bp on 80% of 20+ days)
 - result X-fb00bd60: not_supported — 2 capture day(s); latest 2026-10-15: 1440 boxes, borrowing via short box beats bill+150 bp by a median -27 bp (claim: > 100 bp on 80% of 20+ days)
 - result X-e9a80339: not_supported — 2 capture day(s); day one 2026-10-14: median advantage +15 bp; latest 2026-10-15: 1440 boxes, borrowing via short box beats bill+150 bp by a median -8 bp (claim: > 100 bp on day one and on 80% of days, 10+ days to confirm); verdict: failed: day one (2026-10-14): median advantage over bill + 150 bp > 100 bp (not implemented: advantage > 100 bp on >= 80% of >= 10 captured days (2 so far))
+- result X-b114ed57: not_supported — 2 capture day(s); day one 2026-10-14: median advantage +15 bp; latest 2026-10-15: 1440 boxes, borrowing via short box beats bill+150 bp by a median -8 bp (claim: > 100 bp on day one and on 80% of days, 10+ days to confirm); verdict: failed: day one (2026-10-14): median advantage over bill + 150 bp > 100 bp (not implemented: advantage > 100 bp on >= 80% of >= 10 captured days (2 so far))
 - note: from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; report borrow curve. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-506 (verifier-corrected wording)
+
+### T-188 · box-treasury-convenience-yield
+
+**Claim.** Daily changes in the SPX box-minus-bill spread (60-120 DTE, mid prices) are positively correlated with daily changes in VIX, with correlation above 0.2.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.nber.org/papers/w26138, https://en.wikipedia.org/wiki/Box_spread
+- statistic: Pearson correlation of d(r_box - r_bill) with d(VIX), studentized block bootstrap CI.
+- null: Correlation <= 0.
+- procedure: Build a daily SPX box-rate series from captured chains; join DGS3MO and VIX; block bootstrap (5-day blocks) of the correlation; report the mean spread separately.
+- data: Daily SPX chain capture (none before 2026-10-14), FRED DGS3MO, CBOE VIX history. · min n: 120
+- pass: Correlation > 0.2 with the 95% CI excluding 0.
+- controls: Fixed strike-pair rule; exclude < 30 DTE; mid series for the statistic, executable for P&L; check robustness to dropping FOMC days.
+- harness: b6b_misc_box_bill_vix_corr
+- result X-221aebb6: not_supported — T-188 daily changes 2004-01-05..2018-03-19, n = 3547 changes on the days box rates, DTB3 and VIX all print. Box rates: van Binsbergen-Diamond-Grotteria SPX box-implied rates (box-rates-bdg; a research series published 2021-11-23, available_at that date for every row, so no trader saw it in real time; the claim is a contemporaneous correlation with no trading decision, so rule 4 does not restrict it) at 6/12/18-month constant maturities: the claim's 60-120 DTE box is not in the data, so the correlation is decided on two stand-ins that must agree: box 6m (the shortest observed) and box 3m linearly extrapolated from 6m and 12m (= 1.5 box6m - 0.5 box12m), each minus the 3-month bill (FRED DTB3, a discount yield, as the continuous rate of rule 7; DGS3MO, which the trial names, is not archived), same-day prints. Correlation of d(spread) with d(VIX), studentized circular block bootstrap with the trial's 5-day blocks, two-sided 95%: box6m-bill r 0.033 [-0.017, +0.101]; box3m-bill r 0.027 [-0.031, +0.091] (criterion: point > 0.2 and lower > 0 on both). Reported: maturity-matched box6m - gov6m r 0.070 [+0.019, +0.135], box12m - gov12m r 0.138 [+0.070, +0.249]; 20-day blocks: r 0.033 [-0.018, +0.104] / r 0.027 [-0.020, +0.089]; dropping the 115 changes ending on FOMC decision days: r 0.042 [-0.012, +0.107] / r 0.035 [-0.028, +0.099]; sub-periods (box6m-bill / box3m-bill): 2004-2007 0.00 / 0.02, 2008-2009 0.09 / 0.07, 2010-2018 -0.00 / -0.00; mean spread level (reported separately, bp): box6m-bill 54.4 (sd 31.3), box3m-bill 50.7 (sd 33.9), box6m-gov6m 35.2 (sd 21.9), box12m-gov12m 36.8 (sd 20.4) — failed: correlation > 0.2 (box6m-bill/box3m-bill: 0.033, 0.027); 95% CI excludes 0 on the positive side (box6m-bill/box3m-bill: lower -0.017, -0.031) (not implemented: box rate at the claim's 60-120 DTE from mid prices (box-rates-bdg has 6/12/18-month constant maturities only))
+- note: from the options-library library: Box-vs-Treasury convenience-yield trade; harness suggestion: box.py daily series -> mandel/experiments/box_bill_spread.py joining FRED + VIX; bootstrap via existing block bootstrap. | verifier: corrected claim/trial
 
 ### T-192 · pin-risk-expiration-pinning
 
@@ -1115,6 +1832,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-89d6979d: not_supported — SPY close's distance to the nearest $1 on 255 monthly opex days 0.255 vs 0.249 on other days (ratio 1.03, need <= 0.90; p=0.755); lower in 9/22 years
 - note: from the options-library library: Expiration pin risk management and pinning trade; harness suggestion: mandel/experiments/pinning.py on SPY closes; later join captured OI to test OI-weighted pins. | harness tests monthly third-Friday opex only; SPY has expired every trading day since 2022, so 'weekly expiration days' no longer have a non-expiry comparison group | superseded by T-502 (verifier-corrected wording)
 
+### T-197 · cash-and-carry-options
+
+**Claim.** Across the daily history of expired and live Deribit BTC quarterly futures, the median annualised basis of the second-nearest quarterly over the index exceeds the same-day FRED 3-month bill by at least 100 bp.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false, https://docs.deribit.com/api-reference/market-data/public-ticker
+- statistic: Median over days of [ln(F_q2 / S) x 365/DTE - r_bill]; block-bootstrap CI.
+- null: Median <= 100 bp.
+- procedure: Pull daily closes for every quarterly via get_tradingview_chart_data (works for expired instruments, e.g. BTC-27DEC24, verified); spot proxy = BTC daily close (or BTC-PERPETUAL close at the same tick); compute annualised basis of the second quarterly; join DGS3MO; studentized block bootstrap (block 20 days); walk-forward by year.
+- data: Deribit public API (chart data for expired dated futures), BTC daily closes, FRED DGS3MO. · min n: 500
+- pass: Median > 100 bp with the 95% CI excluding 100 bp and the sign holding in a majority of calendar years.
+- controls: Timestamp alignment of futures and spot closes; exclude the final 7 days before each expiry; ETH replication; report 2022 separately (basis compression).
+- harness: b6b_drb_quarterly_basis
+- result X-047acafb: not_supported — T-197 daily 2019-05-01..2026-10-15, n = 2725 days: annualised log basis of the second-nearest live Deribit BTC quarterly (deribit-quarterly-futures-btc 1D chart close, 08:00 UTC) over the Deribit BTC index at the same tick (funding-history index_price; the index is archived from 2019-05-01), ln(F/S) x 365/DTE (85-189 DTE), minus the same-day 3-month bill (FRED DTB3 discount yield converted to a continuous rate per rule 7; the archive has no DGS3MO). Median excess +331 bp (median basis 617 bp, bill 367 bp). Studentized circular block bootstrap 95% CI: 20-day blocks [+254 bp, +415 bp] (percentile [+250 bp, +406 bp]); 189-day blocks [+74 bp, +680 bp] (percentile [+91 bp, +552 bp]). The trial names 20-day blocks; each day's basis is a quote on a forward window of up to 189 days, so rule 6 requires blocks at least that long: the CI criterion is decided on 189-day blocks only (studentized and percentile must agree) and the 20-day CI is reported, not deciding (a trial block below the rule minimum is replaced, as in T-364). Yearly medians: 2019 +421 bp, 2020 +688 bp, 2021 +1049 bp, 2022 -34 bp, 2023 -82 bp, 2024 +588 bp, 2025 +257 bp, 2026 -10 bp. Controls: excluding the final 7 days before each nearest-quarterly expiry +340 bp; 2022 alone -34 bp; nearest quarterly +283 bp; share of days above 100 bp 69%; with the 2018-12-22..2019-04 bars on the Yahoo daily close as spot (8 h before the futures close) +304 bp over 2855 days; ETH replication not run (no ETH quarterly bundle) — failed: block-bootstrap 95% CI excludes 100 bp on the upper side on 189-day blocks (lower +74 bp studentized, +91 bp percentile; the trial's 20-day blocks, shorter than the rule-6 minimum, give lower +254 bp, not deciding)
+- note: from the options-library library: Cash-and-carry with options (spot vs synthetic short / dated future); harness suggestion: mandel/options/deribit_basis.py (futures curve snapshot) feeding both this and the box entry; payoff template [underlying+, put+, call-]. | verifier: corrected claim/trial
+
 ### T-198 · perp-funding-vs-synthetic-carry
 
 **Claim.** Over non-overlapping 90-day windows since 2020, cumulative BTC-PERPETUAL funding received by a short perp exceeds the annualised basis of the front quarterly future paid at window start (pro-rated to 90 days) in at least 50% of windows.
@@ -1128,7 +1860,38 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: ETH replication; drop top 1% funding prints; account for taker fees on four legs; options-synthetic version tested separately on captured chains.
 - harness: carry_perp_funding_vs_quarterly
 - result X-e906b9f3: not_supported — 27 non-overlapping 90-day windows from 2020-01-01 (front quarterly with >= 7 days to expiry, F and Deribit index both at 08:00 UTC): funding_90d > basis_90d in 15/27 = 56% (need >= 50%); mean funding_90d +1.75 pp, mean basis_90d +1.63 pp, mean difference +0.12 pp, 95% block-bootstrap CI [-0.70, +0.93] pp (need lower > 0) — failed: mean difference's 95% block-bootstrap CI above 0
+- result X-1618349b: not_supported — house rule 10: no window calendar is named, so every daily start from 2020-01-01 is a window (08:00 UTC, front quarterly with >= 7 days to expiry, F and Deribit index both at 08:00 UTC) and the criteria are judged on all 2390 overlapping 90-day windows pooled over the 90 start offsets (the sample holds 27 non-overlapping windows; per-offset grids 26-27): funding_90d > basis_90d in 43.8% (need >= 50%); mean funding_90d +1.69 pp, mean basis_90d +1.83 pp, mean difference -0.14 pp, 95% circular-block bootstrap CI (blocks of 180 daily starts) [-0.71, +0.58] pp (need lower > 0). Per offset (reported, not judged): share 31%-59% with 21 of 90 offsets >= 50%; mean difference -0.76 to +1.42 pp; CI lower bound -1.71 to -0.30 pp with 0 of 90 offsets above 0; 0 of 90 offsets pass both; the grid from 2020-01-01 (offset 0): 27 windows, share 56%, mean +0.12 pp, CI [-0.70, +0.93] pp — failed: share of windows with funding_90d > basis_90d >= 50%; mean difference's 95% block-bootstrap CI above 0
 - note: from the options-library library: Perpetual funding vs dated-future/option-synthetic carry; harness suggestion: mandel/ingest deribit funding history -> mandel/experiments/perp_funding_carry.py with block bootstrap. | verifier: corrected claim/trial
+
+### T-199 · gld-options-implied-gold-carry
+
+**Claim.** At 90-365 DTE, the GLD option-implied financing rate from ATM +/- 3 mid prices lies within 50 bp of (FRED 3-month bill - 0.40%) in at least 90% of strike/expiry pairs on the capture day.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity, https://www.optionseducation.org/strategies/all-strategies-en
+- statistic: Share of pairs with |r_impl - (r_bill - 0.40%)| <= 50 bp.
+- null: Share < 90% (a material lease/borrow premium is priced).
+- procedure: Day one: GLD and SLV chains; ATM +/- 3 strikes at expiries 90-365 DTE; r_impl from mids; compare with DGS3MO - fee; repeat daily; report SLV separately.
+- data: CBOE delayed GLD/SLV chains, FRED DGS3MO. No dividends. · min n: 30
+- pass: Share >= 90% on day one and on >= 80% of captured days.
+- controls: Executable vs mid; strike-invariance; compare the residual against the SPX box-bill spread (option-market financing basis) to avoid attributing it to lease rates.
+- harness: b6_xc_gld_implied_carry
+- result X-6f856e67: not_supported — GLD option-implied financing rate from ATM +/- 3 mids at 90-365 DTE vs the trial's 3-month bill, FRED DGS3MO - 0.40% (bond-equivalent print dated before the quote day, continuous ln(1 + y 91/365) / (91/365); fred-DGS3MO is not archived yet, so its prints come from DGS3MO_REF (FRED fredgraph.csv, read once on 2026-10-15) until the bundle is archived; DGS3MO sits 6.9 to 9.0 bp above the DTB3 proxy (both continuous), which would give day one 43/56 and pass on 0/2 days; day one with the bill 10 bp higher or lower: 98% / 75% within): 2026-10-13 (GLD 381.67, bill 422.8 bp cont. from the 2026-10-09 print, DGS3MO_REF (fred-DGS3MO not archived)): 50/56 = 89.3% within (1 pair short of 90%; the nearest pair outside the band misses it by 2.3 bp); next to it, the DTB3 proxy 413.8 bp cont. (2026-10-09 print, -9.0 bp vs DGS3MO) gives 43/56 = 76.8%, median residual +33 bp, residual slope -5.8 bp per 1% of moneyness (American puts carry an early-exercise premium at high strikes), executable band overlaps the target in 100% of pairs, share with the bill shifted -10/+10 bp 75%/98%, median residual net of the SPXW box-bill basis -18 bp; 2026-10-14 (GLD 375.99, bill 423.8 bp cont. from the 2026-10-13 print, DGS3MO_REF (fred-DGS3MO not archived)): 52/56 = 92.9% within (1 pair to spare); next to it, the DTB3 proxy 416.8 bp cont. (2026-10-13 print, -6.9 bp vs DGS3MO) gives 47/56 = 83.9%, median residual +33 bp, residual slope -5.6 bp per 1% of moneyness (American puts carry an early-exercise premium at high strikes), executable band overlaps the target in 100% of pairs, share with the bill shifted -10/+10 bp 79%/98%, median residual net of the SPXW box-bill basis -28 bp; SLV (reported separately, bill - 0.50%): 2026-10-13 96% of 56 within (median residual -41 bp), 2026-10-14 82% of 56 within (median residual -39 bp); rule 10(c): statistics on fixed capture days, no cycle grid, so no grid phase to vary — failed: day one (2026-10-13 quotes): share of pairs within 50 bp of bill - 0.40% >= 90% (50/56 = 89.3%) (not implemented: share >= 90% on >= 80% of captured days (1/2 days so far; judged over all captured days from 5 days))
+- note: from the options-library library: GLD options-implied gold carry (ETF parity for metals); harness suggestion: parity.py with q = expense ratio as continuous 'dividend'; report per-symbol implied carry. | verifier: corrected claim/trial
+
+### T-202 · covered-call-short-put-equivalence
+
+**Claim.** Over their common daily history in Cboe's published files, the annualised return of the Cboe S&P 500 PutWrite Index (PUT) exceeds that of the BuyWrite Index (BXM) by between 0 and 1.5 percentage points.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity, https://www.optionseducation.org/strategies/all-strategies-en
+- statistic: Annualised return difference PUT - BXM from monthly returns; studentized block-bootstrap CI.
+- null: Difference <= 0 or >= 1.5 pp/yr.
+- procedure: Download PUT and BXM daily histories (free Cboe CSVs); monthly returns; block bootstrap of the difference; walk-forward by decade; report monthly correlation as a diagnostic.
+- data: Cboe PUT and BXM index histories (free download, not yet ingested; PUT dashboard lists daily data since January 2007, with longer back-calculated history); FRED bills to explain the collateral-yield component. · min n: 200
+- pass: 95% CI of the difference inside (0, 1.5) pp/yr.
+- controls: BXMD (OTM calls) for strike dependence; check that 2008 and 2020 drawdowns coincide; T-bill collateral yield subtracted as an explanation test.
+- harness: b6b_bw_put_bxm_return_gap
+- result X-b6a74212: not_supported — PUT and BXM month-end total returns over their common daily history (236 months 2007-02..2026-09; PUT_History.csv is daily only from 2007-01-03; rule 10(a): monthly sampling). Annualised return (CAGR) PUT +7.16% vs BXM +5.97%: difference +1.19 pp/yr, studentized block-bootstrap (12-month blocks, mean of 5 seeds) 95% CI +0.14 pp to +2.27 pp (percentile CI +0.24 pp to +2.12 pp); arithmetic 12 x mean difference +1.10 pp (CI +0.11 pp to +2.15 pp). Decades: 2007-2016 +1.83 pp (CI +0.79 pp to +3.06 pp), 2017-2026 +0.51 pp (CI -1.40 pp to +2.69 pp). Monthly correlation 0.979; bill return over the window +1.59%/yr (PUT's collateral income; BXM holds the index instead); max drawdowns within 2008: PUT -29.86%, BXM -31.45%; 2020: PUT -20.68%, BXM -22.22%. Strike control PUT - BXMD -1.23 pp (CI -3.31 pp to +1.42 pp). PUT launched 2007-06-20: 5 of 236 months use back-tested values (Cboe back-tests published at launch; the claim describes the index histories, so they are used, not treated as known at the time); post-launch (from 2007-06-20, 231 months) +1.21 pp (CI +0.15 pp to +2.31 pp) — failed: 95% CI upper end < 1.5 pp/yr (upper +2.27 pp)
+- note: from the options-library library: Covered call / cash-secured put equivalence (synthetic identity trade); harness suggestion: mandel/ingest cboe_index_history(PUT, BXM); experiments/putwrite_vs_buywrite.py with block bootstrap. | verifier: corrected claim/trial
 
 ### T-208 · implied-vs-realised-move-filter
 
@@ -1143,6 +1906,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Placebo on random non-event days; partial out VIX level; close-to-close vs close-to-open realised definitions (open requires OHLC, not in the current data list).
 - harness: macro_fomc_im_hm_filter
 - result X-65240d9f: not_supported — MODEL-PRICED long 1-day ATM SPY straddle (BS, sigma=VIX(T-1), T=1/252) on 253 scheduled FOMC days 1995-02-01..2026-09-16; OOS 2010+ (133 events): Spearman rho(IM/HM, long P&L) -0.030 (permutation p=0.3621); Q1-Q5 with 1994-2009 cutoffs +5.3 bps of spot (95% CI -28.3 to +40.1; Q1 n=30, Q5 n=41); in-sample rho +0.085, VIX-partialled OOS rho -0.041, return-on-debit OOS rho -0.024, close-to-open OOS rho -0.096, random-day placebo mean rho +0.039 — failed: OOS Spearman rho < -0.1; OOS one-sided permutation p < 0.05; OOS Q1-Q5 95% CI excludes 0
+- result X-d8906f1e: not_supported — MODEL-PRICED long 1-day ATM SPY straddle (BS, sigma=VIX(T-1), T=1/252) on 253 scheduled FOMC days 1995-02-01..2026-09-16; OOS 2010+ (133 events): Spearman rho(IM/HM, long P&L) -0.030 (permutation p=0.3621); Q1-Q5 with 1994-2009 cutoffs +5.3 bps of spot (95% CI -28.3 to +40.1; Q1 n=30, Q5 n=41); in-sample rho +0.085, VIX-partialled OOS rho -0.041, return-on-debit OOS rho -0.024, close-to-open OOS rho -0.096, random-day placebo mean rho +0.039; IV-scale sensitivity (sigma scaled, settlement unchanged; reported only, not a criterion): x0.81 OOS rho -0.025 (permutation p=0.3854), Q1-Q5 +1.0 bps (95% CI -33.7 to +36.3), x1.20 OOS rho -0.043 (permutation p=0.3122), Q1-Q5 +9.7 bps (95% CI -23.2 to +44.1) — failed: OOS Spearman rho < -0.1; OOS one-sided permutation p < 0.05; OOS Q1-Q5 95% CI excludes 0
 - note: from the options-library library: Implied-move vs realised-move signal (conditional straddle, sign chosen by IM/HM); harness suggestion: Build an 'event-move table' harness (event_type, date, IM, HM, realised) as the shared dataset for the whole family; VIX-as-IV SPX FOMC version first. | verifier: corrected claim/trial
 
 ### T-214 · spx-macro-event-straddle
@@ -1158,6 +1922,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Placebo dates (FOMC +/- 7 days); exclude 2008-09 and 2020-03; trailing ratio of 1-day to 30-day realised vol as a scale check.
 - harness: fomc_spx_event_straddle
 - result X-38efc61c: not_supported — MODEL-PRICED short 1-day ATM SPY straddle (BS, sigma=VIX(T-1), T=1/252): FOMC minus non-FOMC mean P&L -6.2 bps of spot over 261 FOMC / 7980 other days; 1994-2010 -0.9 bps (95% CI -14.0 to +12.2, 136 FOMC days); 2011-2026 -12.0 bps (95% CI -24.4 to -0.4, 125 FOMC days); |r|/(VIX/sqrt252) FOMC 0.67 vs other 0.61; placebo +/-7d +3.1 bps; ex Sep-2008/Mar-2020 -6.8 bps — failed: 1994-2010 FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0
+- result X-22fc17ae: not_supported — MODEL-PRICED short 1-day ATM SPY straddle (BS, sigma=VIX(T-1), T=1/252): FOMC minus non-FOMC mean P&L -6.2 bps of spot over 261 FOMC / 7980 other days; 1994-2010 -0.9 bps (95% CI -14.0 to +12.2, 136 FOMC days); 2011-2026 -12.0 bps (95% CI -24.4 to -0.4, 125 FOMC days); |r|/(VIX/sqrt252) FOMC 0.67 vs other 0.61; placebo +/-7d +3.1 bps; ex Sep-2008/Mar-2020 -6.8 bps — failed: 1994-2010 FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0
 - note: from the options-library library: SPX macro-event straddle (FOMC / CPI / NFP): event vol vs realised; harness suggestion: VIX-as-IV straddle pricer over an event-date list; run the identical code for CPI and NFP dates once BLS release calendars are loaded (also free). | verifier: corrected claim/trial
 
 ### T-215 · pre-fomc-drift-call-spread
@@ -1173,6 +1938,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Random-date placebo; exclude unscheduled meetings; subtract the unconditional mean.
 - harness: fomc_pre_drift_oos
 - result X-a98432dc: not_supported — SPY FOMC-day close-to-close +10.6 bps vs non-FOMC +6.2 bps over 2012-2026 (117 FOMC days): difference +4.4 bps, 95% block-bootstrap CI -15.1 to +23.3 (HAC -15.0 to +23.8), random-date placebo p=0.327; 1994-2011 difference +31.4 bps; MODEL-PRICED 1% call spread FOMC +2.0 vs other +0.7 bps of spot — failed: 95% CI excludes 0 (lower bound > 0)
+- result X-d05909d2: not_supported — SPY FOMC-day close-to-close +10.6 bps vs non-FOMC +6.2 bps over 2012-2026 (117 FOMC days): difference +4.4 bps, 95% block-bootstrap CI -15.1 to +23.3 (HAC -15.0 to +23.8), random-date placebo p=0.327; 1994-2011 difference +31.4 bps; MODEL-PRICED 1% call spread FOMC +2.0 vs other +0.7 bps of spot — failed: 95% CI excludes 0 (lower bound > 0)
 - note: from the options-library library: Pre-FOMC announcement drift call spread; harness suggestion: Event-window return harness with (T-1 close -> T open) and (T-1 close -> T close) variants; flag that intraday 13:55 is the true target. | verifier: corrected claim/trial
 
 ### T-219 · triple-witching-close-gamma
@@ -1188,7 +1954,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Monthly non-quarterly opex Fridays as a separate control; exclude witching days with FOMC; pre/post-2010 split.
 - harness: macro_triple_witching_straddle
 - result X-00792bd7: not_supported — MODEL-PRICED long 1-day ATM SPY straddle Thursday close to Friday close (BS, sigma=VIX(Thu), T=1/252) 1993-02-05..2026-10-09; dividend: priced on the dividend forward F = S_Thu(1 - D/S_Thu) on ex-dividend Fridays, K = S_Thu, settled on raw closes (ex-dividend on 132 of 132 witching and 0 other Fridays, mean D/S 44.5 bps): witching Fridays -25.0 vs other Fridays -19.6 bps of spot; difference -5.4 bps (95% CI -16.7 to +6.1) over 132 witching / 1516 other Fridays, permutation p=0.7960; dividend-neutral |r|/(VIX/sqrt252) witching 0.51 vs other 0.62; vs monthly opex +3.0 bps; ex FOMC weeks -11.6 bps; pre-2010 -7.4 bps, 2010+ -3.2 bps; difference with the dividend ignored (q = 0, raw move) +2.3, previous ex-date yield as forecast -5.5, dividend-adjusted closes -13.2 bps — failed: witching-minus-other mean long P&L > 0; 95% CI excludes 0 (lower bound > 0); permutation p < 0.05
+- result X-c131b554: not_supported — MODEL-PRICED long 1-day ATM SPY straddle Thursday close to Friday close (BS, sigma=VIX(Thu), T=1/252) 1993-02-05..2026-10-09; dividend: priced on the dividend forward F = S_Thu(1 - D/S_Thu) on ex-dividend Fridays, K = S_Thu, settled on raw closes (ex-dividend on 132 of 132 witching and 0 other Fridays, mean D/S 44.5 bps): witching Fridays -25.0 vs other Fridays -19.6 bps of spot; difference -5.4 bps (95% CI -16.7 to +6.1) over 132 witching / 1516 other Fridays, permutation p=0.7960; dividend-neutral |r|/(VIX/sqrt252) witching 0.51 vs other 0.62; vs monthly opex +3.0 bps; ex FOMC weeks -11.6 bps; pre-2010 -7.4 bps, 2010+ -3.2 bps; difference with the dividend ignored (q = 0, raw move) +2.3, previous ex-date yield as forecast -5.5, dividend-adjusted closes -13.2 bps; IV-scale sensitivity (sigma scaled, settlement unchanged; reported only, not a criterion): x0.81 difference -7.0 bps (95% CI -18.3 to +4.3, permutation p=0.8631), x1.20 difference -4.2 bps (95% CI -16.0 to +7.0, permutation p=0.7436) — failed: witching-minus-other mean long P&L > 0; 95% CI excludes 0 (lower bound > 0); permutation p < 0.05
 - note: from the options-library library: Triple witching / quarterly rebalance close (long gamma into the close); harness suggestion: Event-day realised-move comparison harness (event dates vs matched weekday controls) with VIX-as-IV straddle pricer. | verifier: corrected claim/trial
+
+### T-220 · vix-settlement-soq
+
+**Claim.** A VIX call credit spread (short front-future+2, long +5 higher) expiring at the Wednesday SOQ and sold 3 trading days before settlement when VIX3M/VIX > 1.1 has a positive mean return on max loss net of half-spreads.
+
+- kind: options-strategy · origin: options-library:event-driven, https://www.cboe.com/tradable_products/vix/vix_options/, https://www.cboe.com/tradable_products/vix/vix_options/specifications/
+- statistic: Mean return on max loss with bootstrap CI; preliminary: mean (VRO - VIX close on the prior day) on settlement days vs mean daily VIX change on other Wednesdays.
+- null: Mean return <= 0.
+- procedure: Settlement calendar since 2006 (computable); front-future level from Cboe CFE settlement history; option entry credit from captured VIX chains (from today) or Black-76 with VVIX as vol-of-vol (MODEL-PRICED); settlement from VRO (free Cboe CSV since 2008).
+- data: VIX, VIX3M daily OHLC (listed); VRO and VVIX daily history (free Cboe CSVs, not in the current list); VIX futures settlement history (free CFE files, not wired); VIX option chain captures from 2026-10-14. · min n: 60
+- pass: Mean > 0 with 95% CI excluding 0.
+- controls: Backwardation subsample; non-settlement Wednesdays for the SOQ-deviation check; exclude 2008, 2018-02, 2020-03 as robustness.
+- harness: b6b_hedge_vix_soq_credit_spread
+- result X-1c908327: not_supported — MODEL-PRICED (Black-76 on the expiring VX future at VVIX; sale at the close 3 exchange sessions before the monthly SOQ when VIX3M/VIX > 1.1, K1 = F + 2, K2 = K1 + 5; the fill is priced at the sale close; rule 12: the gate and the strike choice come from one information set, read at the previous close and at the entry close as the live proxy, and the readings must agree): [previous close] 110 gated trades (2013-01-16..2026-09-16), mean net credit 0.113 (mid 0.183), net credit <= 0 in 55, win rate 92.7%, 0 max losses, mean return on max loss +0.87% (95% CI -1.11% to +2.45%, block 3; 0/6 bootstrap variants (block length x seed) pass); skipped: no clean VRO settlement 1; [entry close] 111 gated trades (2013-01-16..2026-09-16), mean net credit 0.091 (mid 0.161), net credit <= 0 in 43, win rate 92.8%, 0 max losses, mean return on max loss +0.59% (95% CI -2.15% to +2.04%, block 3; 0/6 bootstrap variants (block length x seed) pass); skipped: no clean VRO settlement 1; chain-calibrated Black-76 (K1 x1.07, K2 x1.75 VVIX, the per-leg IV measured on the 2026-10-13 capture; the trial's captured-chain pricing covers only sales from the first capture on, none settled yet, so this is its historical stand-in): [previous close] n 110, mean -0.41% (CI -2.62% to +0.68%; 0/6 bootstrap variants (block length x seed) pass); [entry close] n 111, mean -0.53% (CI -4.77% to +0.59%; 0/6 bootstrap variants (block length x seed) pass); VVIX-flat pricing bias: on 2026-10-13 Black-76 at flat VVIX prices the spread at 0.193 against a market mid of 0.140 (+38%, in the strategy's favour) — the only calibration day with both prices, so the bias over the sample is unmeasured and the VVIX-flat result carries it (hence the chain-calibrated pricing decides too); cost assumption: half-spreads 0.040 + 0.030 per spread measured on the 2026-10 captures and applied to every year (no historical VIX option quotes are archived, 38% of the mean mid credit); robustness: [previous close] mean > 0 up to x1.60 the measured half-spreads; CI excluding 0 in every bootstrap variant not even at zero half-spreads; [entry close] mean > 0 up to x1.41 the measured half-spreads; CI excluding 0 in every bootstrap variant not even at zero half-spreads; net credit <= 0 after half-spreads in 55 of 110 trades at the previous close, 43 of 111 trades at the entry close: they are COUNTED as sold, because the claim fixes the structure (short F+2, long +5) and the timing, not a minimum credit, every spread is a credit at mid, and dropping them would add a price-based rule the claim does not state (such a trade cannot gain, so counting it is the conservative choice); the 'net credit > 0 at the decision (credit priced in each reading's own information set)' sensitivity drops them; sample: the VX futures file starts 2013-01-02, so the trial's settlement calendar since 2006 (VRO since 2008) cannot be tested before then (no front-future level); where the 2013 rows carry settle 0 the VX close (16:15 ET, stamped at the same 21:30Z as the settle) is the documented proxy: 4 trades at the previous close, 4 trades at the entry close use it (2013-01-16, 2013-02-13, 2013-03-20, 2013-04-17); sensitivities: mixed information sets (gate at the previous close, strikes from the entry-day settlement: the earlier spec, not allowed under rule 12): n 110, mean +1.28% (CI +0.19% to +2.67%; 3/6 bootstrap variants (block length x seed) pass, MARGINAL: the bootstrap variants disagree) [would decide: undecided; primary: fail], net credit > 0 at the decision (credit priced in each reading's own information set): previous close n 84, mean +1.38% (CI -1.36% to +3.24%; 0/6 bootstrap variants (block length x seed) pass) / entry close n 68, mean +1.54% (CI -3.70% to +3.87%; 0/6 bootstrap variants (block length x seed) pass) [would decide: fail; primary: fail], settles only (no VX-close proxy, so no sale before 2013-05-20): previous close n 106, mean +1.02% (CI -1.13% to +2.61%; 0/6 bootstrap variants (block length x seed) pass) / entry close n 107, mean +0.73% (CI -2.16% to +2.23%; 0/6 bootstrap variants (block length x seed) pass) [would decide: fail; primary: fail], IV x0.8: previous close n 110, mean -0.54% (CI -2.53% to +0.70%) / entry close n 111, mean -0.90% (CI -3.88% to +0.28%), IV x1.2: previous close n 110, mean +2.52% (CI +0.27% to +4.48%) / entry close n 111, mean +2.37% (CI -0.26% to +4.07%), IV x1.5: previous close n 110, mean +5.24% (CI +2.66% to +7.70%) / entry close n 111, mean +5.31% (CI +2.57% to +7.43%), half-spreads x2: previous close n 110, mean -0.56% (CI -2.63% to +1.01%) / entry close n 111, mean -0.82% (CI -3.42% to +0.53%), unrounded strikes (F+2, F+7): previous close n 110, mean +1.06% (CI -0.80% to +2.71%) / entry close n 111, mean +0.53% (CI -1.93% to +1.85%), backwardation control (VIX3M/VIX < 1): previous close n 15, mean +2.94% (CI -42.12% to +14.61%) / entry close n 14, mean -0.76% (CI -25.42% to +8.90%), excluding 2008, 2018-02, 2020-03 (gated trades in them: 0 at the previous close, 0 at the entry close; the 2008 exclusion is vacuous: 2008 predates the VX file): previous close n 110, mean +0.87% (CI -1.23% to +2.48%) / entry close n 111, mean +0.59% (CI -2.04% to +1.98%); captured chains: 2026-10-13 F 16.84 K 19/24: market mid credit 0.140 vs model 0.193, half-spreads 0.035/0.025, Black-76 IV 0.91/1.50 = 1.07/1.75 x VVIX, 2026-10-14 F 17.65 K 20/25: market mid credit 0.260 vs model n/a, half-spreads 0.045/0.035, Black-76 IV 1.22/1.72; preliminary SOQ check, INDICATIVE ONLY (not a pass criterion; 217 monthly settlements from 2008-07-16): mean VRO - prior VIX close +0.06 vs mean daily VIX change on 729 other Wednesdays -0.13 (difference +0.19, CI -0.00 to +0.39, percentile circular block bootstrap of the date-ordered timeline, block 8) — failed: mean return on max loss > 0 with 95% CI excluding 0 under every information-set reading (rule 12) and both named pricings (rule 11) (previous close, VVIX-flat: 0/6 bootstrap variants (block length x seed) pass; entry close, VVIX-flat: 0/6 bootstrap variants (block length x seed) pass; previous close, chain-calibrated Black-76: 0/6 bootstrap variants (block length x seed) pass; entry close, chain-calibrated Black-76: 0/6 bootstrap variants (block length x seed) pass)
+- note: from the options-library library: VIX settlement (Wednesday SOQ) trades; harness suggestion: VIX settlement calendar generator + VIX/VIX3M OHLC event harness; add VIX futures history fetch (Cboe CFE CSVs) for the futures-based version. | verifier: corrected claim/trial | 2026-10-15 re-run: rule 12 decided it: the VIX3M/VIX gate and the strike choice read at one information set, at the previous close and at the entry close as the live proxy; both readings fail (means +0.87% and +0.59% of max loss, CIs include 0) and chain-calibrated pricing is negative in both.
 
 ### T-221 · crypto-macro-event-straddle
 
@@ -1204,7 +1986,53 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: fomc_btc_event_straddle
 - result X-bd896fa6: not_supported — MODEL-PRICED short 1-day ATM BTC straddle (BS, sigma=DVOL 00:00 UTC, T=1/365) since 2021-04-01: FOMC minus non-FOMC mean P&L -40.6 bps of spot (95% CI -101.1 to +19.1) over 44 FOMC / 1979 other days; |r|/(DVOL/sqrt365) FOMC 0.71 vs other 0.63; weekdays only -13.5 bps; coin accounting -36.1 bps; CPI-pooled variant not run (no CPI calendar) — failed: FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0
 - result X-d2e0bbe4: not_supported — MODEL-PRICED short 1-day ATM BTC straddle (BS, sigma=DVOL 00:00 UTC, T=1/365) since 2021-04-01: FOMC minus non-FOMC mean P&L -40.6 bps of spot (95% CI -101.1 to +19.1) over 44 FOMC / 1979 other days; |r|/(DVOL/sqrt365) FOMC 0.71 vs other 0.63; weekdays only -13.5 bps; coin accounting -36.1 bps; pooled FOMC+CPI (reported, not a criterion) -51.7 bps (95% CI -95.8 to -9.9) over 109 event days (44 FOMC, 66 CPI); CPI only -58.0 bps (95% CI -119.7 to -1.4); FOMC vs non-macro days -42.5 bps (95% CI -109.1 to +18.3, random non-macro-day placebo p=0.084) — failed: FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0
+- result X-8cd5ab77: not_supported — MODEL-PRICED short 1-day ATM BTC straddle (BS, sigma=DVOL 00:00 UTC, T=1/365) since 2021-04-01: FOMC minus non-FOMC mean P&L -40.6 bps of spot (95% CI -101.1 to +19.1) over 44 FOMC / 1979 other days; |r|/(DVOL/sqrt365) FOMC 0.71 vs other 0.63; weekdays only -13.5 bps; coin accounting -36.1 bps; pooled FOMC+CPI (reported, not a criterion) -51.7 bps (95% CI -95.8 to -9.9) over 109 event days (44 FOMC, 66 CPI); CPI only -58.0 bps (95% CI -119.7 to -1.4); FOMC vs non-macro days -42.5 bps (95% CI -109.1 to +18.3, random non-macro-day placebo p=0.084) — failed: FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0
 - note: from the options-library library: Crypto macro-event straddle on Deribit (FOMC / CPI) - DVOL vs realised; harness suggestion: Reuse the BTC VRP harness (DVOL vs realised) with an event-date mask; add inverse-option payoff mode to the payoff engine (payoff/S_T). | verifier: corrected claim/trial | 2026-10-15: the reported pooled FOMC+CPI variant gives -51.7 bps (95% CI -95.8 to -9.9) over 109 event days and CPI-only -58.0 bps (CI -119.7 to -1.4); not a pass criterion here (FOMC alone fails), so it is pre-registered as the forward test T-543.
+
+### T-223 · deribit-expiry-max-pain-pin
+
+**Claim.** An 8-hour ATM BTC short straddle model-priced with DVOL-as-IV (T = 8/(24*365)), sold at 00:00 UTC and settled on the 08:00 UTC price, has a higher mean P&L on Deribit monthly-expiry Fridays than on other Fridays.
+
+- kind: options-strategy · origin: options-library:event-driven, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false, https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data
+- statistic: Difference in mean MODEL-PRICED P&L (monthly-expiry Fridays minus other Fridays), bootstrap CI; mean |00-08 UTC return| by group (permutation test).
+- null: Monthly-expiry mean P&L <= other-Friday mean P&L.
+- procedure: BTC-PERPETUAL hourly candles from public/get_tradingview_chart_data (available back to 2019; a proxy for the settlement index), DVOL 1D for pricing (from 2021-04); monthly expiry calendar (last Friday). Max-pain convergence (|S_08 - K_maxpain| vs |S_00 - K_maxpain|) needs OI captures.
+- data: Deribit public hourly perp candles, DVOL history, expiry calendar. · min n: 60
+- pass: Difference > 0 with 95% CI excluding 0.
+- controls: Weekly vs monthly split; exclude expiries coinciding with FOMC/CPI; ETH separately.
+- harness: b6b_drb_expiry_friday_straddle
+- result X-3c1a0a3e: not_supported — T-223 MODEL-PRICED (Black-Scholes, K = S_00, IV = BTC DVOL known at 00:00 UTC, T = 8/(24 x 365), r = DTB3 continuous): short ATM straddle sold at Friday 00:00 UTC on the Deribit BTC index (funding-history index_price; the claim's procedure names BTC-PERPETUAL candles as a proxy for that index) and settled at the actual 08:00 UTC Deribit delivery price (30-minute TWAP; deribit-delivery-prices-btc), 290 Fridays 2021-03-26..2026-10-09, n = 67 monthly-expiry (last) Fridays vs 223 other Fridays. Mean P&L per unit spot monthly +52.64 bp vs other +36.90 bp: difference +15.74 bp 95% CI [-15 bp, +45 bp] (paired circular block bootstrap over the Friday timeline, 4-Friday blocks); in USD +1.5 [-222.9, +188.8]. Mean |00-08 return| monthly minus other -15.46 bp (permutation p one-sided 0.821). IV-scale sensitivity (difference per unit spot): x0.9 +15.71 bp, x1.1 +15.77 bp. Controls: excluding FOMC/CPI-coincident Fridays 9 dropped, difference +17.21 bp; settled on the 08:00 index print difference +11.40 bp; Yahoo hourly BTC (00:00 open, 07:00-bar close, BTC DVOL) 104 Fridays 2024-10-18..2026-10-09, 24 monthly, difference -26.94 bp [-95 bp, +24 bp]; Yahoo hourly ETH (00:00 open, 07:00-bar close, ETH DVOL) 104 Fridays 2024-10-18..2026-10-09, 24 monthly, difference -15.42 bp [-113 bp, +58 bp]; quarterly-expiry Fridays minus non-monthly Fridays +23.42 bp, non-quarterly monthly minus non-monthly +11.73 bp (every Friday is a weekly expiry) — failed: monthly-expiry minus other-Friday mean P&L > 0 with 95% CI excluding 0 (per unit spot +15.74 bp [-15 bp, +45 bp]; USD +1.5 [-222.9, +188.8]; 4-Friday blocks; both units must agree)
+- note: from the options-library library: Deribit expiry max-pain pin (sell the 08:00 UTC settlement straddle); harness suggestion: Deribit hourly index fetcher + expiry calendar; max-pain calculator from book summary OI. | verifier: corrected claim/trial
+
+### T-227 · risk_reversal_skew
+
+**Claim.** Since 1991, the frequency of 21-trading-day S&P 500 log returns below -2 VIX-implied sigma is not higher, by 1 percentage point or more, in windows starting with CBOE SKEW above its trailing 252-day 80th percentile than in windows starting with SKEW below its 20th percentile (the extra put premium a high-SKEW risk reversal sells is not paid back by more realised left-tail events).
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf, https://www.optionseducation.org/strategies/all-strategies/short-straddle
+- statistic: Difference (high-SKEW minus low-SKEW) in the frequency of r_{t,t+21} < -2*(VIX_t/100)*sqrt(21/252) on ^GSPC; secondary: difference in realised 21d skewness of daily returns.
+- null: freq_high - freq_low >= 0.01 (SKEW carries real information about future left tails).
+- procedure: Daily SKEW and VIX since 1990-01; ^GSPC closes (archive daily-history--GSPC, because SPY only starts in 1993-01); trailing 252-day SKEW percentile, so the first usable window is in 1991. Use overlapping daily-start 21d windows with a 21-day-block studentized bootstrap, because non-overlapping windows leave only ~85 per quintile and a handful of tail events. Reject the null if the bootstrap 95% upper bound of the difference is < 0.01. Deflate for the two cut pairs tried (80/20 and 90/10).
+- data: CBOE SKEW and VIX daily history and ^GSPC daily closes, all in the archive. Index data only, no option prices. · min n: 300
+- pass: 95% upper bound of (freq_high - freq_low) < 0.01, and the realised-skewness difference is not significantly negative (p > 0.1) in both halves 1991-2008 and 2009-2026.
+- controls: Shuffled-SKEW placebo; VIX-tercile stratification (SKEW must not proxy for the VIX level); sensitivity run excluding Oct-2008 and Mar-2020; repeat with the 21-day SKEW change instead of its level.
+- harness: b6_surf_skew_tail_frequency
+- result X-e2bef5fd: not_supported — ^GSPC 21d log return below -2 VIX-sigma: high-SKEW (> trailing p80) 1.46% of 2262 windows vs low-SKEW (< p20) 1.16% of 1990 (1991-01-02..2026-09-14, daily overlapping starts); difference +0.30 pp, one-sided 97.5% upper bound +2.52 pp (two-sided 95% CI -1.23 to +2.52) vs the 1 pp margin; realised-skewness difference 1991-2008 -0.038 (one-sided p for negative 0.289); 2009-2026 -0.286 (one-sided p for negative 0.000). Controls: halves' frequency difference -0.25/+0.84 pp; 90/10 cut +0.09 pp (upper +2.12); excluding windows touching 2008-10/2020-03 +0.00 pp (upper +1.23); 21-day SKEW change instead of level +0.48 pp (upper +1.54); within VIX terciles +0.06/+1.37/-0.13 pp; shifted-SKEW placebo mean +0.07 pp. Rule 10 (daily starts are the trial's design, no grid phase): with 42-session blocks the upper bound is +2.58 pp; the 21 non-overlapping 21-session grids (block 6 windows, 80 to 108 windows in the smaller group) give differences -3.16 to +1.92 pp, upper bounds -0.41 to +5.63 pp, 2/21 below the margin (reported). Calendar: 21 ^GSPC sessions per window; SKEW/VIX as of each session (20 of 8989 entries on a carried print) — failed: freq_high - freq_low one-sided 97.5% upper bound (95% deflated for 2 cut pairs) < 0.01; realised-21d-skewness difference not significantly negative in 2009-2026 (one-sided p > 0.1)
+- note: from the options-library library: Risk reversal (25-delta skew trade); harness suggestion: Extend harness_skew_tail: bucket by SKEW percentile, compare CBOE-table implied 2-sigma probability vs realised frequency; log skew-vega P&L once surface_summary 25d put/call IVs have 60+ captures. | verifier: corrected claim/trial
+
+### T-229 · skew_cheap_put_spread
+
+**Claim.** Model-priced: a 30-DTE 25d/10d SPX put spread bought only in months when CBOE SKEW is below its trailing 252-day 20th percentile has a higher mean ratio of expiry payoff to entry debit than the same spread bought every month.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf
+- statistic: mean(payoff/debit | SKEW < p20) - mean(payoff/debit | all months). The debit is model-priced with BS: ATM IV = VIX/100 times the ATM-to-VIX ratio measured on the captured SPX chain; strike IVs come from a linear-in-log-moneyness smile with slope kappa*(SKEW-100), kappa calibrated once on the 2026-10-14 SPX surface. Payoff from ^GSPC at expiry.
+- null: Difference <= 0.
+- procedure: Monthly 30-DTE entries since 1991, held to expiry (21 trading days, non-overlapping); walk-forward trailing percentile; studentized block bootstrap of the difference; deflated Sharpe of the conditional series. Rerun with kappa x0.5 and x2, because the smile model drives the debit.
+- data: CBOE SKEW and VIX, ^GSPC/SPY closes (model-priced, not market prices); today's SPX surface for kappa. Switch to captured 25d/10d IVs once surface_summary stores 10d and 36+ monthly captures exist. · min n: 300
+- pass: Difference > 0 with the 95% CI excluding zero, at least 60 low-SKEW entries, and the sign unchanged at kappa x0.5 and x2.
+- controls: Random-timing placebo with the same entry count; VIX-tercile stratification; a VIX < 15 gate as an alternative rule counted in the deflation.
+- harness: b6_surf_skew_cheap_put_spread
+- result X-445e5d1a: not_supported — calibration on options-chain-SPX-2026-10-14 (captured 2026-10-14T11:12 UTC, before the US open: quote day 2026-10-13; the parity forward 7842.2 vs that day's ^GSPC close 7805.5 suggests extended-hours quotes; SPXW 2026-11-12, 30 DTE): ATM IV at the forward 11.99 vs VIX 15.27 (ratio 0.785), put slope -0.976 per unit ln(K/F) over 24 puts (10-30 delta, rmse 0.12 vol pts) at SKEW 154.74 -> kappa 0.01782. Dividend yield q: SPY's trailing 12-month yield from 1994-01-31 (when it first becomes computable); entries before that use an ASSUMED constant q = 3.0% stated ex ante (no point-in-time S&P 500 yield is archived). MODEL-PRICED (BS legs: ATM IV = VIX x 0.785, put skew slope = -kappa (SKEW - 100) per unit ln(K/F), kappa 0.01782, held fixed through history; payoff on ^GSPC closes; no transaction costs, none stated in the claim): 427 monthly entries on SPX's standard monthly expiry calendar (third Friday, prior session on a holiday; bought at the close nearest 30 calendar days before it, or at the previous expiry's close when later, so holds never overlap: 27-30 DTE, 17-22 sessions held; settled on the expiry session's close as the proxy for the AM settlement; 1991-01-18..2026-09-18; 1 unpriceable dropped; 1 entry on a carried SKEW/VIX print; 37 entries up to 1994-01-21 price on an ASSUMED dividend yield, see q), 71 with SKEW below its trailing 20th percentile; mean payoff/debit low-SKEW 0.658 vs all 0.725: difference -0.067 (95% CI -0.405 to +0.335); kappa sensitivity x0.5 -0.084 (95% CI -0.403 to +0.281), x2.0 -0.006 (95% CI -0.392 to +0.520). Controls: random-timing placebo p=0.595; VIX < 15 gate difference -0.076 (n=141); within VIX terciles -0.613/+0.449/-0.058; deflated Sharpe (2 gates) of the low-SKEW per-entry return 0.051. The debit hinges on the IV proxy; the traded version needs SPX chain history (2 capture days archived); ATM-ratio sensitivity (IV = VIX, ratio 1.0): difference +0.033 (95% CI -0.237 to +0.388) — failed: mean(payoff/debit | SKEW < trailing p20) - mean(all) > 0 with the two-sided 95% CI excluding zero; difference > 0 (sign unchanged) at kappa x0.5 and x2.0
+- note: from the options-library library: SKEW-conditioned tail hedge (put spread when skew is cheap); harness suggestion: Reuse the monthly model-priced cycle of harness_vrp_spx with a SKEW gate; swap in real 10d/25d IVs from surface_summary when available. | verifier: corrected claim/trial
 
 ### T-232 · vega_neutral_gamma_long
 
@@ -1220,7 +2048,83 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vix9d_conditional
 - result X-d311688d: not_supported — 156 signals (VIX9D below trailing 10d realised): next-9d RV^2 - VIX9D^2 mean -0.0084, realised wins 17%, p=0.644
 - result X-bda12d5b: not_supported — 156 signals (VIX9D below trailing 10d realised): next-9d RV^2 - VIX9D^2 mean -0.0084, realised wins 17%, p=0.644
+- result X-2e3ff097: not_supported — 156 non-overlapping signal cycles (VIX9D below trailing 10d realised); rule 10 (no entry calendar named): POOLED over all 736 signal days (every start of the 9d grid, overlapping, 18-entry blocks): next-9d RV^2 - VIX9D^2 mean -0.0091, realised wins 18%, p=0.759; each of the 9 grid starts alone: mean -0.0192 to -0.0015, 0 of 9 pass
 - note: from the options-library library: Vega-neutral gamma-positive straddle swap (reverse calendar straddle); harness suggestion: New harness_gamma_swap built on harness_term_structure's index loader plus a daily-rehedge simulator (bs.delta) over SPY closes. | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists | superseded by T-533 (verifier-corrected wording)
+
+### T-233 · vrp_short_straddle_hedged
+
+**Claim.** Model-priced: a daily delta-hedged short 30-DTE SPY ATM straddle priced at ATM IV = 0.81 x VIX (the ATM-to-VIX ratio used by harness_short_straddle, to be recalibrated on the captured SPY surface) earns a positive mean P&L per monthly cycle after a 0.5 vol-point round-trip cost.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.optionseducation.org/strategies/all-strategies/short-straddle, https://en.wikipedia.org/wiki/Variance_swap
+- statistic: Mean cycle P&L / straddle premium for the BS-priced, daily-rehedged short straddle.
+- null: Mean <= 0.
+- procedure: Monthly non-overlapping cycles from 1993-02 (SPY) with VIX-scaled IV and FRED DTB3 rates; hedge at daily closes; studentized block bootstrap; walk-forward thirds; deflated Sharpe over the IV scales {1.0, 0.9, 0.81} and hedge frequencies tried.
+- data: CBOE VIX, SPY closes and FRED DTB3. Model-priced: the captured ATM IV/VIX ratio replaces the 0.81 scale as chain history accrues. · min n: 300
+- pass: Mean > 0 with the 95% CI excluding zero at IV scale 0.81 and at the scale measured on the capture; deflated Sharpe p < 0.05; positive in all three thirds.
+- controls: Unhedged short straddle; buy-and-hold SPY (harness_controls); shuffled-VIX placebo.
+- harness: b6_var_vrp_short_straddle_hedged
+- result X-b734534f: not_supported — MODEL-PRICED short 30-DTE ATM SPY straddle, delta-hedged daily at the entry vol on raw closes, dividend forward (ex-dates projected from SPY's quarterly schedule), 0.5 vol-pt round trip; rule 10 (the claim names monthly cycles): 403 cycles on SPY's monthly expiry calendar (third Friday, prior session on a holiday; entered 27-30 DTE, mean 28.7, non-overlapping) 1993-02-19..2026-08-21; measured ATM IV / VIX = 0.799 at 30 DTE (mean of 2 captured SPY smile quote days): s=0.810: mean -3.60% of premium (CI -7.17 to -0.31), thirds -3.8%/-4.3%/-2.7%; s=0.799 (measured on the capture): mean -5.12% of premium (CI -8.74 to -1.81), thirds -5.3%/-5.9%/-4.2%; DSR 0.000 over 8 variants; IV-scale sensitivity (daily hedge, mean % of premium) s=0.80 -5.1, s=0.81 -3.6, s=0.90 +7.0, s=1.00 +16.6; controls: unhedged -1.37%, shuffled-VIX placebo -20.25%, +1 bp/share hedge cost -4.81%; cross-check, not in the verdict: 21-day grid pooled over all offsets at s=0.81 -2.55% (CI -5.96 to +0.50, 8460 daily entries); the edge hinges on the IV level (the traded version needs SPY chain history (2 capture days archived)) — failed: s=0.810: mean > 0 with 95% CI excluding 0; s=0.810: mean > 0 in all three thirds; s=0.799 (measured on the capture): mean > 0 with 95% CI excluding 0; s=0.799 (measured on the capture): mean > 0 in all three thirds; deflated Sharpe p < 0.05 (DSR > 0.95; 8 variants: IV scales x hedge daily/weekly)
+- note: from the options-library library: VRP harvest: delta-hedged short ATM straddle; harness suggestion: harness_vrp_spx and harness_short_straddle already compute this; add the daily-rehedge path and costs; cross-asset twins harness_vrp_nasdaq/russell/gold/oil/bonds/btc/eth. | verifier: corrected claim/trial
+
+### T-235 · iv_rv_spread_conditional
+
+**Claim.** Scaling a short 21-day S&P 500 variance position struck at VIX^2 by max(z, 0), where z is the entry z-score of VIX minus a walk-forward HAR realised-vol forecast, gives a higher Sharpe ratio than the constant-notional short over the same months.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.cboe.com/tradable_products/vix/vix_historical_data/, https://www.optionseducation.org/strategies/all-strategies/short-straddle
+- statistic: Sharpe(scaled) - Sharpe(constant) of the monthly P&L N_t*((VIX_t/100)^2 - RV_{t,t+21}).
+- null: Sharpe difference <= 0 (the spread carries no timing information).
+- procedure: HAR(1,5,22) fitted walk-forward (expanding window, refit monthly); monthly cycles since 1991 using ^GSPC closes; studentized bootstrap of the Sharpe difference; PBO across the declared scaling rules (on/off at z > 0.5, z > 1, linear max(z,0)).
+- data: CBOE VIX and ^GSPC/SPY closes. Model-free variance P&L: the straddle implementation is model-priced and reported separately. Twins: DVOL + BTC, GVZ + GLD (archive). · min n: 300
+- pass: Sharpe difference > 0 at p < 0.05 and PBO < 0.3.
+- controls: VIX-level-only scaling (shows the realised forecast adds information beyond the VIX level); random-z placebo; top-tercile share of P&L reported descriptively.
+- harness: b6_var_iv_rv_spread_scaled
+- result X-a54d5155: not_supported — model-free short 21-day ^GSPC variance struck at VIX^2; rule 10 (the claim names monthly cycles): 429 calendar months entered at the first session with a VIX close 1991-01-02..2026-09-01, HAR(1,5,22) refit monthly on an expanding window: annualised Sharpe scaled 0.78 vs constant 0.64 (per-cycle difference +0.041, studentized one-sided p 0.292, 95% CI -0.131 to +0.442); on/off z>0.5 0.94, z>1 0.77; PBO 0.343; controls: VIX-level-only scaling Sharpe 0.19, random-z placebo -0.06, top-tercile-z share of scaled P&L 0.99; robustness (not in the verdict): month-end anchor diff -0.132 (p 0.933); 21-day grid offsets: diff -0.145 to +0.019, p 0.382 to 0.931, 0/21 pass — failed: Sharpe(linear max(z,0)) - Sharpe(constant) > 0 at one-sided p < 0.05; PBO < 0.3 across the three declared rules
+- note: from the options-library library: Conditional VRP: trade only when implied-minus-realised spread is wide; harness suggestion: Add a 'gate' argument to harness_vrp_spx / harness_vrp_btc accepting a spread z-score and report deflated Sharpe vs the ungated run. | verifier: corrected claim/trial
+
+### T-237 · cross_index_vol_spread
+
+**Claim.** After the 60-day z-score of VXN - VIX passes +/-2, the statistic s*[(VXN - VIX) - (RV_QQQ - RV_SPY)] over the next 21 trading days, with s = +1 for z > +2 and -1 for z < -2, is positive on average: the realised spread falls short of an extreme-wide implied spread and exceeds an extreme-narrow one.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.cboe.com/tradable_products/vix/vix_historical_data/, https://www.optionseducation.org/strategies/all-strategies/short-straddle
+- statistic: Mean of s*[(VXN_t - VIX_t) - (RV_QQQ - RV_SPY)_{t,t+21}] over event entries; secondary: model-priced vega-neutral straddle-pair P&L.
+- null: Mean <= 0 (the implied spread is an unbiased forecast of the realised spread).
+- procedure: Daily VXN from 2009-09-14 (the free file starts there, not 2001), VIX, SPY and QQQ closes; event entries with non-overlapping 21d holds; studentized block bootstrap; walk-forward z-window (40/60/120 declared, deflated).
+- data: CBOE VIX, VXN and RVX (archive); SPY, QQQ and IWM closes (archive). Index-implied vols, model-free for the statistic. · min n: 30
+- pass: Mean > 0 with the 95% CI excluding zero, win rate > 0.6, same sign in both halves.
+- controls: Unconditional spread (no signal); random-entry placebo with a matched count; RVX-VIX replication with IWM.
+- harness: b6_surf_cross_index_vol_spread
+- result X-f61b21fd: not_supported — VXN-VIX / QQQ-SPY: 88 events (2010-02-09..2026-08-28; z-window 60, |z| > 2.0, non-overlapping 21d holds, 41 wide / 47 narrow); mean s[(implied spread) - (realised spread)] +0.77 vol pts, 98.3% CI +0.14 to +1.35 (95% +0.28 to +1.25); win rate 0.64; halves +0.57/+0.97. By side (each a criterion): wide side 41 events, mean -0.35 vol pts (95% CI -1.14 to +0.43; 98.3% -1.31 to +0.62), win rate 0.46; narrow side 47 events, mean +1.75 vol pts (95% CI +1.13 to +2.46; 98.3% +1.00 to +2.64), win rate 0.79. Controls: unconditional implied-minus-realised spread -0.71 vol pts (95% CI -1.04 to -0.42, 42-session blocks); random-entry placebo (matched count and signs) p=0.002; other declared z-windows 40d +0.86 (n=100; wide -0.31 n=42, narrow +1.71 n=58), 120d +0.56 (n=63; wide -0.51 n=34, narrow +1.81 n=29). Rule 10: event entries on data-determined dates, no grid phase; RVX-VIX / IWM replication: 95 events, mean +0.35 (95% -0.31 to +0.95), win rate 0.55 — failed: wide side (z > +2.0, s = +1): mean s*stat > 0 with >= 30 events, i.e. the realised spread falls short of the extreme-wide implied spread (41 events, mean -0.35)
+- note: from the options-library library: Cross-index vol spread (QQQ vs SPY, IWM vs SPY straddle pairs); harness suggestion: Pair harness_vrp_nasdaq and harness_vrp_spx outputs: new harness_vol_spread computing the implied-minus-realised spread differential conditioned on the VXN-VIX z-score. | verifier: corrected claim/trial
+
+### T-239 · vix_call_hedge
+
+**Claim.** Model-priced: over 2009-09 to 2026, a rolling 1-month 25-delta VIX call overlay with a fixed premium budget of 1% of portfolio value per year reduces SPY's maximum drawdown by more than 25% relative to unhedged SPY.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.cboe.com/tradable_products/vix/vix_options/specifications/, https://www.cboe.com/tradable_products/vix/vix_historical_data/
+- statistic: 1 - MDD(hedged)/MDD(unhedged); secondary: Sharpe difference and hedge P&L per cycle.
+- null: Drawdown reduction <= 25%.
+- procedure: Monthly cycles from 2009-09 (VIX3M start). The call is priced with Black-76 on F_adj = sqrt((93*VIX3M^2 - 30*VIX^2)/63)*exp(-(VVIX/100)^2*T/2) with sigma = VVIX/100 (model-priced); payoff on spot VIX at expiry as the SOQ proxy. Block bootstrap of the drawdown ratio by resampling 12-month blocks; budget fixed ex ante.
+- data: CBOE VIX, VIX3M and VVIX (archive), SPY closes. Model-priced: no VIX option or futures history. · min n: 180
+- pass: Lower 95% bound of the drawdown reduction > 25%, with the Sharpe difference reported (not required to be positive).
+- controls: SPX 10-delta put hedge with the same budget (model-priced at VIX x skew scale); cash-drag control at the same budget.
+- harness: b6_surf_vix_call_hedge
+- result X-f49a2a7a: not_supported — MODEL-PRICED (Black-76 on F_adj = sqrt((93 VIX3M^2 - 30 VIX^2)/63) exp(-VVIX^2 T/2), sigma = VVIX/100, 25-delta strike, marked daily with the same pricer, payoff on spot VIX at expiry; no transaction costs, none stated in the claim): 203 monthly cycles on the VIX expiry calendar (the Wednesday 30 days before the next month's third Friday, CBOE holiday rules; bought at one expiry's close and held to the next, 17-25 sessions) 2009-10-21..2026-09-16, budget 1%/yr prorated by calendar time (0.083% per cycle on average); maximum drawdown on DAILY equity: SPY total return 33.7% (2020-02-19..2020-03-23) vs hedged 26.5% (2020-02-19..2020-03-23): reduction +21.5%, one-sided 95% lower bound -2.4% (two-sided 95% CI -3.1 to +22.4; 12-cycle blocks of daily paths, paired) vs 25%; on cycle-end points only the reduction would be +26.8% (reported). Sharpe (excess of the bill) hedged 0.93 vs SPY 0.88 (difference +0.05, reported); hedge P&L -1.89 bp of the portfolio per cycle, calls paid in 10 of 203 cycles. IV-scale sensitivity (daily MDD; VVIX x 0.8: +26.2%, 1.2: +18.4%). Rule 10 grid sensitivity (reported): the same overlay on the 21 offsets of a 21-session grid gives reductions +7.1 to +25.2%, 1/21 above 25%. Controls (daily MDD): 10-delta SPY put same budget rolled on the SPX monthly expiries (204 cycles; captured SPY smile, marked daily) reduction +17.1%; cash drag at the same budget +0.1%. The traded version needs VIX option chain history (2 capture days archived) — failed: one-sided 95% lower bound of the drawdown reduction (daily equity) > 25%
+- note: from the options-library library: VIX call hedge (rolling long OTM VIX calls); harness suggestion: Monthly model-priced overlay in the harness_vrp_spx style with the VVIX-as-IV pricer; report hedged vs unhedged via harness_controls. | verifier: corrected claim/trial
+
+### T-240 · vix_call_spread_ratio
+
+**Claim.** The realised 21-trading-day volatility of daily log changes in spot VIX is below the entry VVIX in more than 70% of non-overlapping months since 2006.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.cboe.com/tradable_products/vix/vix_options/specifications/, https://www.cboe.com/tradable_products/vix/vix_historical_data/
+- statistic: Win rate of 1{VVIX_t > 100*sqrt(252)*sd(dlnVIX_{t..t+21})}; secondary: model-priced 1x2 P&L with Black-76 on F_adj and VVIX as IV.
+- null: Win rate <= 0.70.
+- procedure: Daily VVIX from 2006-03-06 (not 2007) and VIX; non-overlapping 21d windows (~245); exact binomial CI plus block bootstrap; walk-forward halves. Spot VIX realises more vol than the futures VVIX refers to, so the test is biased against the claim (conservative).
+- data: CBOE VVIX and VIX (archive); VIX3M for the forward proxy in the secondary. · min n: 200
+- pass: Lower 95% bound of the win rate > 0.70; positive premium in both halves.
+- controls: SPX VRP win rate (VIX^2 vs RV^2) for scale; shuffled-VVIX placebo.
+- harness: b6_surf_vvix_vs_realised
+- result X-7f1908d5: not_supported — VVIX above the realised 21d vol of daily log changes in spot VIX in 90 of 247 calendar months, each entered at its first session with a VVIX print (2006-03-06..2026-09-01; spot-VIX changes over 21 sessions of the trading calendar; a window runs at most 8 session(s) into the next month's window, 1 by more than 2: 2006-04; 1 month(s) entered after their first session, which had no VVIX print): win rate 0.364, one-sided 95% lower bound Clopper-Pearson 0.313 / block bootstrap 0.316 (two-sided exact 0.304-0.428) vs 0.70; mean premium -21.9 vol pts, halves -24.9/-18.8 (win rates 0.31/0.42). Rule 10 grid sensitivity (reported): all 5103 daily entries pooled win rate 0.356 (one-sided lower 0.311, 126-session blocks); the 21 offsets of the 21-session grid give win rates +0.321 to +0.384, Clopper-Pearson lower bounds +0.272 to +0.332, 0/21 above 0.70. Controls: SPX VRP win rate (VIX^2 > RV) in the same months 0.810; shuffled-VVIX placebo win rate 0.373. Spot VIX moves more than the futures VVIX refers to, so the comparison is conservative for the claim. Secondary (MODEL-PRICED 1x2 VIX call ratio, long F_adj+4 / short 2x at +14, Black-76 at VVIX, 203 cycles rolled on the VIX monthly expiries from 2009-09-18): mean P&L -0.58 VIX pts (95% CI -1.12 to -0.31) — failed: one-sided 95% lower bound of the win rate > 0.70 (min of Clopper-Pearson and block bootstrap); mean premium VVIX - realised > 0 in both halves
+- note: from the options-library library: VIX call spread and call ratio (defined-cost vol hedge / vol-of-vol sale); harness suggestion: New harness_vvix_vrp using cboe_index_history('VVIX') with realised vol of log VIX; reuse harness_vrp_spx structure. | verifier: corrected claim/trial
 
 ### T-241 · vix_spike_reversion_put
 
@@ -1234,9 +2138,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Report both frequencies with CIs; strategy passes only if P(VIX_{t+21} < F) > 0.5 with the 95% CI excluding 0.5, otherwise record 'forward is fair' as the finding.
 - controls: All-days baseline; VIX > 30 without backwardation.
 - harness: vix_spike_forward
-- result X-a1f4f715: supported — 23 spike events (VIX>30, backwardation): VIX 21 days later below the forward in 19/23 (0.61-0.95), below spot in 19/23 (0.61-0.95)
 - result X-b9399c71: supported — 23 spike events (VIX>30, backwardation): VIX 21 days later below the forward in 19/23 (0.61-0.95), below spot in 19/23 (0.61-0.95); the pass rule (strategy passes) is met, which REFUTES the claim sentence that the curve already prices the decline
 - result X-d52e3c83: not_supported — 23 spike events (VIX>30, backwardation): VIX 21 days later below the forward in 19/23 (0.61-0.95), below spot in 19/23 (0.61-0.95); the curve UNDER-prices the reversion (the strategy-side pass rule is met), which refutes the claim sentence that the curve already prices the decline (that reading is T-535); verdict: failed: P(VIX_t+21 < F) < 0.5; excess reversion beyond F not significant (exact 95% CI not above 0.5) (not implemented: put spread struck at F vs at spot: positive expectancy only when struck at spot (VVIX-priced P&L simulation); sample reaches trial min_n 25 events (23 so far))
+- result X-ba679106: not_supported — 23 spike events (VIX>30, backwardation): VIX 21 days later below the forward in 19/23 (0.61-0.95), below spot in 19/23 (0.61-0.95); the curve UNDER-prices the reversion (the strategy-side pass rule is met), which refutes the claim sentence that the curve already prices the decline (that reading is T-535); robustness, all 145 event days pooled (overlapping, 42-day timeline blocks): below F 75% (0.56-0.96), below spot 84% (0.72-0.98) (rule 10 does not apply: event entries, independent of where the data starts); verdict: failed: P(VIX_t+21 < F) < 0.5; excess reversion beyond F not significant (exact 95% CI not above 0.5) (not implemented: put spread struck at F vs at spot: positive expectancy only when struck at spot (VVIX-priced P&L simulation); sample reaches trial min_n 25 events (23 so far))
 - note: from the options-library library: VIX spike mean-reversion via long VIX put / put spread; harness suggestion: Add a 'backwardation event' study to harness_term_structure; event count will be small (~25-40 since 2007), report exact CIs. | WORDING CONFLICT: the claim sentence says VIX lands below the forward in fewer than 50% of spikes; the pass rule asks for more than 50% with the CI above 0.5. The verdict follows the pass rule. On 2026-10-14 data (19/23 below forward, CI 0.61-0.95) the pass rule is met and the claim sentence is refuted. Small n (23 non-overlapping events); in-sample. | superseded by T-535 (verifier-corrected wording)
 
 ### T-242 · vxx_uvxy_decay_options
@@ -1252,6 +2156,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Unconditional VXX drift (also expected negative); random-entry placebo; worst-month table; SVXY-based proxy run (sign-flipped, leverage-adjusted) as a cross-check.
 - harness: vx_vxx_contango_decay
 - result X-a09c37e5: not_supported — VXX (current series B, zero-volume bars dropped) 2018-01-29..2026-10-13: n=87 non-overlapping 21-day cycles entered at the close after a VIX3M/VIX > 1.1 close (need >= 80); mean log return -3.9% (median -6.1%), one-sided 95% studentized block-3 upper bound -1.0% (need < -3.0%), 95% CI [-6.8%, -0.5%]. Controls: unconditional mean -4.6% over 104 cycles; random-entry placebo: 71% of 2000 draws at or below the conditional mean; lag-0 entry mean -3.8% (n=87); fixed-grid phases -5.5% to -1.8%; walk-forward threshold 1.2 (first half to 2022-06-03) gives second-half mean -4.6% (n=22); DSR of the short-VXX cycle over 5 thresholds 0.884; worst cycles (largest VXX gains) 2018-02-01 +40%, 2022-02-09 +34%, 2025-03-26 +30%; SVXY proxy (sign-flipped, -1x to 2018-02-27 then -0.5x) 2011-10-04..2026-10-13: n=156, mean -5.0%, upper bound -2.6%, pre-2018 cycles 68 mean -7.2%. Secondary, reported separately: MODEL-PRICED: Black-Scholes, long ATM / short 17.5% OTM VXX puts, 75 DTE, marked after 21 trading days; IV = point-in-time scale x VVIX/100; DTB3 rate; no skew, no spread: n=78, mean P&L +16.2% of the debit (debit 7.1% of spot, IV proxy 61%), win rate 64% — failed: one-sided 95% studentized block-3 bootstrap upper bound of the conditional mean < -0.03
+- result X-32710c11: not_supported — VXX (current series B, zero-volume bars dropped) 2018-01-29..2026-10-13: n=87 non-overlapping 21-day cycles entered at the close after a VIX3M/VIX > 1.1 close (the maximal non-overlapping set; need >= 80); rule 10: the claim names no entry calendar, so the primary statistic is pooled over all 1301 qualifying daily entries (overlapping 21-day holds; studentized circular block bootstrap, blocks of 63 entries, at least twice the hold); per start offset: the sequential scan (86-87 cycles) mean -4.4% to -3.9%, upper bound -1.9% to -1.0%, 0/21 offsets pass; the fixed 21-session grid phases (52-68 cycles, together the pooled entries) mean -5.5% to -1.8%, upper bound -2.9% to +5.6%, 0/21 phases pass. Pooled mean log return -3.7% (median -6.0%), one-sided 95% studentized block-63 upper bound -0.8% (need < -3.0%), 95% CI [-7.0%, -0.2%]. Controls (pooled daily entries): unconditional mean -4.9% over 2166 entries (104 cycles); random-entry placebo: 74% of 2000 draws of 87 entries at or below the pooled conditional mean; lag-0 entry mean -3.6% (1302 entries); walk-forward threshold 1.0 (first half to 2022-06-03) gives second-half mean -5.7% (1019 entries, 51 cycles); DSR of the short-VXX cycle over 5 thresholds 0.876 (sample length 87 cycles); worst entry months (largest VXX gains) 2020-02-18 +161%, 2024-07-05 +74%, 2018-09-28 +41%; SVXY proxy (sign-flipped, -1x to 2018-02-27 then -0.5x) 2011-10-04..2026-10-13: n=156 cycles (2441 pooled entries), mean -3.9%, upper bound -1.1%, pre-2018 cycles 68 mean -6.0%. Secondary, reported separately: MODEL-PRICED: Black-Scholes, long ATM / short 17.5% OTM VXX puts, 75 DTE, marked after 21 trading days; IV = point-in-time scale x VVIX/100; DTB3 rate; no skew, no spread: n=1197 pooled entries, mean P&L +15.5% of the debit (debit 7.1% of spot, IV proxy 61%), win rate 63% — failed: one-sided 95% studentized block-63 bootstrap upper bound of the pooled conditional mean < -0.03
 - note: from the options-library library: VXX / UVXY decay harvest with options (put spreads, call spreads, diagonals); harness suggestion: Add VXX/UVXY/SVXY to CHAIN_SYMBOLS and to the daily closes fetch; then a harness_vxx_decay in the harness_term_structure style. | verifier: corrected claim/trial
 
 ### T-243 · vvix_vol_of_vol
@@ -1266,9 +2171,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Mean gap > 10 with 99% CI excluding zero; quartile means monotone increasing; simulated Sharpe > 0.3 after costs with worst-month loss < 5x average monthly gain.
 - controls: Shuffled VVIX placebo; realised vol of the forward proxy F instead of spot VIX as a lower-variance check.
 - harness: vvix_premium
-- result X-ba2577e8: not_supported — VVIX exceeds realised VIX vol by -21.3 pts on average over 5102 days (p for gap > 10: 1.0000); quartile gaps -30.1/-19.0/-19.6/-16.3 NOT monotone
 - result X-b139bb3f: not_supported — VVIX exceeds realised VIX vol by -21.3 pts on average over 5102 days (p for gap > 10: 1.0000); quartile gaps -30.1/-19.0/-19.6/-16.3 NOT monotone; note: VVIX is the implied vol of VIX futures, which move less than spot VIX, so comparing it with spot-VIX realised vol (as the claim does) understates any vol-of-vol premium
 - result X-041e6dcb: not_supported — VVIX exceeds realised VIX vol by -21.3 pts on average over 5103 days (p for gap > 10: 1.0000); quartile gaps -30.1/-19.0/-19.6/-16.3 NOT monotone; note: VVIX is the implied vol of VIX futures, which move less than spot VIX, so comparing it with spot-VIX realised vol (as the claim does) understates any vol-of-vol premium
+- result X-a88fb7ff: not_supported — VVIX exceeds realised VIX vol by -21.3 pts on average over 5103 days (rule 10: all 21 starts of the 21d grid pooled, 42-day blocks; p for gap > 10: 1.0000); quartile gaps -30.1/-19.0/-19.6/-16.3 NOT monotone; each of the 21 grid starts alone: mean gap -22.7 to -20.0, 0 of 21 pass; note: VVIX is the implied vol of VIX futures, which move less than spot VIX, so comparing it with spot-VIX realised vol (as the claim does) understates any vol-of-vol premium
 - note: from the options-library library: Vol-of-vol trade: VIX straddle / strangle vs VVIX; harness suggestion: Same harness_vvix_vrp as the VIX call ratio entry; add the quartile split and a strangle pricer. | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists | the claim compares VVIX with spot-VIX realised vol; VVIX prices VIX futures, which are less volatile than spot, so a fair test of the vol-of-vol premium needs VIX futures history (CFE, not yet captured) | superseded by T-536 (verifier-corrected wording)
 
 ### T-245 · oil_bond_vrp_ovx_vxtlt
@@ -1285,6 +2190,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: multi_asset_short_var
 - result X-e6c23238: not_supported — equal-vega short variance on SPX/GLD/USO/TLT Sharpe 0.95 vs SPX alone 1.13 over 204 months since 2009-09-18 (diff -0.17, one-sided lower -0.41; halves +0.35/-0.26) — failed: Sharpe diff > 0 with one-sided p < 0.05; positive in both halves
 - result X-dfbd6504: not_supported — equal-vega short variance on SPX/GLD/USO/TLT Sharpe 0.95 vs SPX alone 1.13 over 204 months since 2009-09-18 (diff -0.17, one-sided lower -0.41; halves +0.35/-0.26) — failed: Sharpe diff > 0 with one-sided p < 0.05; positive in both halves
+- result X-af4983e0: not_supported — equal-vega short variance on SPX/GLD/USO/TLT Sharpe 0.70 vs SPX alone 0.59, pooled over all 21 phases of the non-overlapping 21-day cycles (house rule 10; 4268 daily entries = 204 cycles since 2009-09-18, blocks of 63 days): diff +0.10, one-sided lower -0.04; halves +0.41/+0.09; per phase -0.20 to +0.26, 5 of 21 phases pass on their own — failed: Sharpe diff > 0 with one-sided p < 0.05
 - note: from the options-library library: Oil and bond volatility premium (OVX via USO, VXTLT via TLT); harness suggestion: harness_vrp_oil and harness_vrp_bonds exist; add a portfolio aggregator over the harness outputs with the correlation matrix. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
 
 ### T-247 · cross_asset_vol_ratio
@@ -1301,7 +2207,38 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gvz_vix_extremes
 - result X-00e1fb1e: not_supported — GVZ/VIX extremes: 90 signals, mean -0.052 log units (95% CI -0.145 to +0.038), win rate 0.46 — failed: mean > 0 with CI excluding 0; win rate > 0.6
 - result X-35dc52fb: not_supported — GVZ/VIX extremes: 90 non-overlapping signals, mean -0.052 log units (95% CI -0.145 to +0.038), win rate 0.46; unconditional mean over all 3512 post-warm-up days +0.127 — failed: mean > 0 with CI excluding 0; win rate > 0.6
+- result X-ebe8314f: not_supported — GVZ/VIX extremes: 90 non-overlapping signals, mean -0.052 log units (95% CI -0.145 to +0.038), win rate 0.46; unconditional mean over all 3512 post-warm-up days +0.127 — failed: mean > 0 with CI excluding 0; win rate > 0.6
 - note: from the options-library library: Cross-asset implied vol ratio trades (GVZ/VIX, DVOL/VIX, OVX/VIX); harness suggestion: Combine harness_vrp_gold and harness_vrp_spx outputs into a ratio harness; the DVOL/VIX version joins harness_vrp_btc. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
+
+### T-249 · forward_variance_term_premium
+
+**Claim.** Since 2009-09, the 1-to-3-month SPX forward variance premium as a fraction of implied, (F^2 - RV(22..63))/F^2 with F^2 = (93*VIX3M^2 - 30*VIX^2)/63, exceeds the spot 30-day premium fraction (VIX^2 - RV(1..21))/VIX^2 on average.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://en.wikipedia.org/wiki/Variance_swap, https://www.cboe.com/tradable_products/vix/term_structure/
+- statistic: Mean paired difference [(F^2 - RV_fwd)/F^2] - [(VIX^2 - RV_spot)/VIX^2] per entry.
+- null: Paired difference <= 0.
+- procedure: Daily VIX and VIX3M from 2009-09-18, SPY closes; non-overlapping 63d cycles (~68) plus all daily starts with a 63-day-block studentized bootstrap; walk-forward halves. Strip discretisation error is measured on the captured SPX chain at the two expiries.
+- data: CBOE VIX and VIX3M (archive), SPY closes, captured SPX chain. Model-free. · min n: 60
+- pass: Paired difference > 0 with the 95% CI excluding zero; forward win rate > 0.7 (reported).
+- controls: Shuffled-VIX3M placebo; sensitivity run excluding 2020; level (not ratio) version as in harness_term_vs_spot.
+- harness: b6_surf_forward_variance_premium
+- result X-6ae5939f: not_supported — forward premium fraction (F^2 - RV22..63)/F^2 minus spot (VIX^2 - RV1..21)/VIX^2. POOLED over all 63 grid offsets (4230 daily starts 2009-09-18..2026-07-15 = 68 distinct 63-session holds; studentized circular block bootstrap, block 126 sessions): mean +0.043 (95% CI -0.407 to +0.178); with the trial's 63-session blocks 95% CI -0.400 to +0.206. Per grid offset (63 non-overlapping 63d grids, n 67 to 68 cycles, block 2): mean -0.182 to +0.498, lower CI bound -2.059 to +0.004, upper +0.135 to +3.965; 2/63 offsets pass, 0/63 fail decisively. Mean forward fraction +0.262 vs spot +0.219; forward win rate (F^2 > RV22..63) 0.87 (reported; the pass marks the 0.7 line as reported). Walk-forward halves +0.129/-0.044; excluding 2020 +0.081; level version (variance units) +0.0098 (95% CI +0.0029 to +0.0143); shifted-VIX3M placebo p=0.002. Strip discretisation (captured SPX chains, reported): options-chain-SPX-2026-10-14 (quotes 2026-10-13): 30d strip 15.07 vs VIX 15.27 (-0.20; strikes 113), 93d strip 17.58 vs VIX3M 17.96 (-0.38; strikes 627/291), forward 18.65 vs index 19.11; options-chain-SPX-2026-10-15 (quotes 2026-10-14): 30d strip 14.44 vs VIX 16.87 (-2.43; strikes 151), 93d strip 18.87 vs VIX3M 18.79 (+0.08; strikes 290), forward 20.65 vs index 19.64 (both captures precede the US open, so their quotes may be extended-hours quotes rather than the quote day's close; zero bids truncate the strip, which is part of the error measured) — failed: POOLED over all 63 grid offsets (126-session blocks): paired difference > 0 with the 95% CI excluding zero; all daily starts with 63-session blocks (the trial's procedure): paired difference > 0 with the 95% CI excluding zero
+- note: from the options-library library: Forward-start variance / term-premium strip (long far strip, short near strip); harness suggestion: Same extension of harness_term_structure as the calendar entry; add the premium-to-implied ratio and a two-expiry strip builder in mandel/options. | verifier: corrected claim/trial
+
+### T-250 · sector_correlation_trade
+
+**Claim.** Implied cross-sector correlation computed from SPY and the nine original SPDR sector ETFs' 30-day ATM IVs exceeds the subsequently realised 21-day correlation of the same ETFs (same formula on realised vols, SPY sector weights) by more than 0.05 on average.
+
+- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://en.wikipedia.org/wiki/Dispersion_trading, https://www.cboe.com/tradable_products/vix/vix_historical_data/
+- statistic: Mean of rho_implied(t) - rho_realised(t..t+21).
+- null: Mean <= 0.05.
+- procedure: Daily chain captures of SPY and the 9 sectors give implied correlation per day; realised correlation from the archived sector closes; non-overlapping 21d cycles; studentized block bootstrap; walk-forward after 2 years.
+- data: Daily CBOE chain capture of SPY plus XLB/XLE/XLF/XLI/XLK/XLP/XLU/XLV/XLY (sector chains are NOT yet in CHAIN_SYMBOLS); sector closes are archived (XLRE and XLC are missing and have short histories). · min n: 36
+- pass: Lower 95% bound of the mean > 0.05 over at least 36 cycles; positive in > 65% of non-crisis months (reported).
+- controls: COR1M as an external implied-correlation check; VIX-tercile stratification; crisis months (VIX > 30) reported separately.
+- harness: b6b_volh_sector_corr_premium
+- result X-931dd4dd: not_supported — T-250 on dolt-volhistory (vendor iv_current; 1293 snapshot dates, 1199 quote sessions with all ten IVs on one quote session; dropped: 38 missing an IV, 25 missing a symbol, 2 with mixed quote dates, 27 duplicate quote sessions, 2 with a vendor iv_current glitch; 0 without closes) and daily-history adjclose for SPY and XLB, XLE, XLF, XLI, XLK, XLP, XLU, XLV, XLY. iv_current tenor evidence: SPY chain ATM IV interpolated in total variance matches iv_current best at 30 days over 1193 snapshots (median |diff| at 30d 0.13 vol pts, 90% within 0.5 pts; 21d 0.35, 45d 0.52); SPY iv_current vs VIX/100: corr 0.985, VIX above it by 3.2 pts on average and on 100% of days, as a 30-day ATM IV sits below the variance-swap VIX; sector rows assumed the same field. hv_current re-computed from the closes used: 0.987..0.999 share matching per symbol. WEIGHTS (data limit, rule 9): no point-in-time SPY sector weights are archived; judged schemes anchor_nearest, anchor_2019, anchor_2024, regression_pit (anchors 2019-12-31, 2024-12-31 approximate year-end S&P 500 sector weights typed in, drifted by raw-close price relatives, normalised over the nine; regression_pit = trailing 252-session NNLS, strictly point in time): anchor_nearest mean XLB 2.6, XLE 3.9, XLF 14.2, XLI 9.6, XLK 34.9, XLP 6.8, XLU 2.9, XLV 13.4, XLY 11.7%; regression_pit mean XLB 1.8, XLE 4.0, XLF 13.4, XLI 5.9, XLK 35.8, XLP 7.1, XLU 3.4, XLV 13.1, XLY 15.5%. Realised: zero-mean 21-session vol of adjclose log returns after the quote close. IV sanity screen (a symbol's iv_current moving more than 2x or less than 1/2 against the median of its previous 3 unflagged values, relative to the median move of all ten on the snapshot; point in time): dropped 2 snapshot(s) with a vendor IV glitch (XLV 2020-01-06 iv_current 0.3373 vs 0.1242 (median of its previous 3 unflagged), hv 0.0798, 2.5x relative to the market-wide move 1.07x; XLK 2021-11-03 iv_current 1.2518 vs 0.1650 (median of its previous 3 unflagged), hv 0.1704, 7.3x relative to the market-wide move 1.03x); largest move kept XLB 2019-12-27 1.86x; as-is with the glitches kept (reported): anchor_nearest +0.009 (lower -0.021/-0.029); anchor_2019 +0.011 (lower -0.020/-0.027); anchor_2024 +0.009 (lower -0.022/-0.029); regression_pit +0.012 (lower -0.018/-0.023), entry-weighted +0.020, implied |rho| > 1 2, 2020 +0.028 (screened +0.031), 2021 -0.019 (screened -0.004), verdict not_supported. 1179 snapshot sessions 2019-02-08..2026-09-15 with a resolved 21-session window (20 unresolved at the end); window spans up to 35 calendar days, so blocks are 2x/4x 6 weeks. Headline weights anchor_nearest: implied correlation averages 0.463, realised 0.440; POOLED week-weighted mean of rho_imp - rho_real +0.011 (two-sided 95% CI -0.026..+0.050/-0.034..+0.057), entry-weighted +0.022 (one-sided lower -0.015, reported). Criterion vs 0.05: FAIL (one-sided upper bound <= 0.05 under every scheme and block, the rule-5 decisive reading: no). n = 87 cycles (fewest in the 5 per-start non-overlapping chains, 87-87, one from each snapshot session in the first 21 sessions; the entries span 92 distinct 21-session holds) vs min_n 36. Per-start chains (anchor_nearest): mean +0.001..+0.007, one-sided lower -0.032..-0.026, 0/5 clear 0.05; other schemes pass anchor_2019 0/5, anchor_2024 0/5, regression_pit 0/5. Reported: non-crisis months positive 54% of 69 (> 65%: no; reported, not judged); crisis months (VIX > 30) 23, mean -0.017 over 273 entries vs non-crisis +0.034; VIX terciles low +0.014, mid +0.047, high +0.007; COR1M mean 0.240 vs sector implied 0.463, corr levels 0.78, changes 0.66; walk-forward after 2 years (from 2021-02-08) +0.012 (lower -0.029); by year 2019 -0.00, 2020 +0.03, 2021 -0.00, 2022 -0.12, 2023 +0.02, 2024 +0.02, 2025 +0.06, 2026 +0.12; strict point in time (drop weekend/holiday snapshots) +0.014 (lower -0.021, 1124 entries); demeaned +0.013 (lower -0.018), raw_close +0.007 (lower -0.025), equal -0.017 (lower -0.055), anchor_nearest_unnormalised +0.008 (lower -0.031); direct weighted pairwise realised sector correlation 0.459 vs the formula's 0.440 (corr 0.96); |rho| > 1: implied 1, realised 21 — failed: POOLED week-weighted mean of rho_imp - rho_real: one-sided 95% lower bound > 0.05 under every weight scheme and block (anchor_nearest +0.011 (lower -0.019/-0.026 at 12/24-week blocks: FAIL); anchor_2019 +0.013 (lower -0.018/-0.025 at 12/24-week blocks: FAIL); anchor_2024 +0.011 (lower -0.020/-0.026 at 12/24-week blocks: FAIL); regression_pit +0.014 (lower -0.016/-0.021 at 12/24-week blocks: FAIL)) (not implemented: point-in-time SPY sector weights (not archived: year-end anchors (approximate, typed in) drifted by price, and a trailing NNLS regression; data limit, rule 9))
+- note: from the options-library library: Correlation trade via index vs sector/sub-basket straddles (QQQ vs XLK, SPY vs sector ETFs); harness suggestion: Same harness_dispersion as the index-vs-components entry with the sector list; implied correlation from surface_summary ATM IVs. | verifier: corrected claim/trial
 
 ### T-253 · btc-covered-call
 
@@ -1317,6 +2254,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: btc_covered_call
 - result X-130e1ef5: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta covered call Sharpe 0.51 vs hold 0.38 over 67 cycles (diff +0.13, 95% CI -0.05 to +0.41; halves +0.19/+0.12), DSR 0.44, MDD -60% vs -73% — failed: Sharpe diff 95% CI excludes 0
 - result X-a681b36c: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta covered call Sharpe 0.51 vs hold 0.38 over 67 cycles (diff +0.13, 95% CI -0.05 to +0.41; halves +0.19/+0.12), DSR probability 0.44 (deflated Sharpe > 0 needs > 0.5), MDD -60% vs -73% — failed: Sharpe diff 95% CI excludes 0; deflated Sharpe > 0 (DSR probability > 0.5)
+- result X-f857e5ff: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta covered call Sharpe 0.55 vs hold 0.42 over 65 cycles from 2021-04-29 on the Deribit monthly expiry calendar (last Friday 08:00 UTC), each written at the last daily close before one expiry (the Thursday) and settled at the last close before the next (diff +0.13, 95% CI -0.11 to +0.42; halves +0.22/+0.09), DSR probability 0.43 (deflated Sharpe > 0 needs > 0.5), MDD -58% vs -73% — failed: Sharpe diff 95% CI excludes 0; deflated Sharpe > 0 (DSR probability > 0.5)
 - note: from the options-library library: BTC covered call on coin inventory; harness suggestion: mandel.data.options.deribit_dvol_history + BTC closes -> bs.price with sigma=DVOL; payoff via Position; bootstrap from validation | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-254 · btc-cash-secured-put
@@ -1331,9 +2269,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Pooled 95% bootstrap CI of the mean > 0 and a positive mean in both halves
 - controls: Fee min(0.0003 BTC, 12.5% of premium) per contract; slippage 5% of premium; repeat at DVOL - 5 vol points (the 25-delta put can trade below DVOL, which is a variance-swap index)
 - harness: btc_short_put
-- result X-a9d5ba07: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta short put mean +0.88% of spot per cycle over 67 cycles (95% CI -0.44 to +2.15), halves +0.80/+0.96 — failed: 95% CI of the mean > 0
 - result X-af2e1a54: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta short put mean +0.88% of strike per cycle over 67 cycles (95% CI -0.44 to +2.15), halves +0.80/+0.96 — failed: 95% CI of the mean > 0
 - result X-e15fd8af: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta short put mean +0.88% of strike per cycle over 67 cycles (95% CI -0.44 to +2.15), halves +0.80/+0.96 — failed: 95% CI of the mean > 0
+- result X-d1356138: not_supported — MODEL-PRICED at flat DVOL: 0.25-delta short put mean +1.00% of strike per cycle over 65 cycles from 2021-04-29 on the Deribit monthly expiry calendar (last Friday 08:00 UTC), each written at the last daily close before one expiry (the Thursday) and settled at the last close before the next (95% CI -0.24 to +2.15), halves +1.07/+0.94 — failed: 95% CI of the mean > 0
 - note: from the options-library library: Coin-secured / cash-secured put to accumulate BTC or metal; harness suggestion: Same loop as btc-covered-call with kind='put'; reuse VRP harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-258 · funding-carry-option-hedged
@@ -1349,7 +2287,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Unhedged carry as comparison; months with negative funding included; call priced at DVOL + 5 vol points (the 10-delta call wing usually trades above DVOL)
 - harness: carry_funding_call_hedged
 - result X-f07adf1e: not_supported — MODEL-PRICED (BS at DVOL, 10-delta 30-DTE call). 66 months 2021-04..2026-09: mean funding +0.43%/month, mean call premium +0.74%, mean payoff +1.22%; net carry mean +0.909%/month, studentized 95% CI [-0.029, +3.156]% (need lower > 0); Sharpe of net over DTB3 0.44 (need > 1); unhedged mean +0.431%, Sharpe 0.69; DVOL+5 hedge mean +0.665% — failed: studentized block-bootstrap 95% CI of mean monthly net carry above 0; annualised Sharpe of monthly net carry over DTB3 > 1
+- result X-42639223: not_supported — MODEL-PRICED (BS at DVOL, 10-delta 30-DTE call). 66 months 2021-04..2026-09: mean funding +0.43%/month, mean call premium +0.74%, mean payoff +1.22%; net carry mean +0.909%/month, studentized 95% CI [-0.029, +3.156]% (need lower > 0); Sharpe of net over DTB3 0.44 (need > 1); unhedged mean +0.431%, Sharpe 0.69; DVOL+5 hedge mean +0.665% — failed: studentized block-bootstrap 95% CI of mean monthly net carry above 0; annualised Sharpe of monthly net carry over DTB3 > 1
 - note: from the options-library library: Perpetual funding carry hedged with options; harness suggestion: Add deribit_funding_history to mandel.data.options; monthly aggregation; hedge from DVOL | verifier: corrected claim/trial
+
+### T-261 · inverse-quanto-short-strangle
+
+**Claim.** Model-priced (BS at DVOL, daily rehedge on closes): for a short 15-delta inverse BTC strangle, the variance of 30-day USD P&L when hedged with the coin-corrected delta is at least 20% lower than when hedged with the naive BS delta, 2021-04 to 2026-09.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
+- statistic: Ratio of USD P&L variance (corrected hedge / naive hedge)
+- null: Ratio >= 0.8
+- procedure: Simulate daily-rehedged short strangles on BTC closes with IV = DVOL; book the premium in coin; compute USD P&L under both hedge rules; bootstrap the variance ratio
+- data: BTC closes; DVOL from 2021-03-24 · min n: 36
+- pass: Upper end of the 95% CI of the variance ratio < 0.8
+- controls: The same test on a USDC-linear strangle must give ratio ~1; vary collateral treatment (premium only vs premium + collateral)
+- harness: b6_xc_inverse_strangle_hedge
+- result X-51c9d9c3: not_supported — MODEL-PRICED (BS at DVOL, r = q = 0, daily hedge on closes): short 15-delta inverse BTC strangle, premium booked in coin (mean 0.0269 BTC). POOLED over all 30 start offsets of the non-overlapping 30-day grid (house rule 10: the claim names no entry calendar; 1979 daily entries 2021-04-01..2026-08-31 = 66 distinct 30-day cycles; paired circular block bootstrap, blocks of 90 days): var(USD P&L) corrected / naive = 0.873 (95% CI 0.793 to 0.979; needs upper < 0.8). Per grid offset (30 grids of 65 to 66 non-overlapping cycles, blocks of 3 cycles): ratio 0.778 to 0.944, CI upper end 0.884 to 1.110; 0/30 offsets pass; offset 0 (the grid from 2021-04-01): 0.798 (CI 0.717 to 0.905). Pooled controls: per unit of entry spot 0.853 (CI 0.754 to 0.985); with the Deribit initial margin (mean 0.227 BTC) also held in coin 0.156 (CI 0.124 to 0.200); USDC-linear control: the correct rule hedges identically (ratio 1.000), the coin correction misapplied gives 0.957 — failed: POOLED over all 30 grid offsets: upper end of the 95% CI of var(corrected) / var(naive) < 0.8
+- note: from the options-library library: Inverse-settled short strangle with coin-payoff (quanto) correction; harness suggestion: Add an inverse-payoff flag to payoff.Leg (divide USD payoff by S_T, premium in coin) and the corrected delta to bs.greeks | verifier: corrected claim/trial
 
 ### T-264 · btc-weekend-theta
 
@@ -1365,6 +2319,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: btc_weekend_variance
 - result X-1d68b098: not_supported — weekend (Fri->Mon) variance / 3x weekday variance: CI below 0.9 in 2/10 years (need 70%); ratios 2017:0.53, 2018:0.61, 2019:0.79, 2020:0.43, 2021:0.72, 2022:0.86, 2023:0.93, 2024:0.95, 2025:0.55, 2026:0.33
 - result X-6122d1b6: not_supported — weekend (Fri->Mon) variance / 3x weekday variance: CI below 0.9 in 2/10 years (need 70%); ratios 2017:0.53, 2018:0.61, 2019:0.79, 2020:0.43, 2021:0.72, 2022:0.86, 2023:0.93, 2024:0.95, 2025:0.55, 2026:0.34
+- result X-6f714008: not_supported — weekend (Fri->Mon) variance / 3x weekday variance: CI below 0.9 in 2/10 years (need 70%); ratios 2017:0.53, 2018:0.61, 2019:0.79, 2020:0.43, 2021:0.72, 2022:0.86, 2023:0.93, 2024:0.95, 2025:0.55, 2026:0.34
 - note: from the options-library library: Weekend theta harvest (24/7 pricing vs weekend realised vol); harness suggestion: Pure closes-based test; later confirm pricing side with Deribit daily-expiry captures | superseded by T-515 (verifier-corrected wording)
 
 ### T-267 · btc-protective-put
@@ -1381,7 +2336,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: btc_protective_put
 - result X-a4d32b86: not_supported — MODEL-PRICED at flat DVOL: BTC + rolling 10-delta 90-day puts Calmar 0.13 vs hold 0.07 over 22 cycles (diff +0.06, 95% lower -0.42; thirds +0.10/-2.20/-0.08) — failed: Calmar difference 95% CI > 0; positive in >= 2 of 3 windows
 - result X-1767f28c: not_supported — MODEL-PRICED at flat DVOL: BTC + 10-delta 90-DTE puts rolled every 30 days Calmar 0.10 vs hold 0.09 over 67 roll periods since 2021-04-01 (daily-path MDD -73% vs -77%, gross premium 20.1% of spot a year; diff +0.01, 95% lower -0.12; thirds +0.04/-1.07/+0.05) — failed: Calmar difference 95% CI > 0
+- result X-bf1ceaec: not_supported — MODEL-PRICED at flat DVOL: BTC + 10-delta 90-DTE puts rolled every 30 days, pooled over all 30 roll phases (house rule 10: the mean over the phases on the 1964 days since 2021-04-30 on which all of them hold a put; n = 67 roll periods, the most any phase holds; blocks of 180 days) Calmar 0.09 vs hold 0.07 (daily-path MDD -72% (mean over phases) vs -77%, gross premium 19.8% of spot a year; diff +0.03, 95% lower -0.12; thirds +0.04/-0.88/+0.05; per phase -0.00 to +0.05, 0 of 30 phases pass on their own) — failed: Calmar difference 95% CI > 0
 - note: from the options-library library: Protective put / tail hedge on BTC inventory sized by DVOL; harness suggestion: Payoff engine rolling template; reuse covered-call loop | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
+
+### T-269 · cme-btc-options-1256
+
+**Claim.** For a top-bracket US individual (37% ordinary, 20% long-term, NIIT ignored), a CME BTC futures covered call has a higher mean annual after-tax return than an IBIT covered call over 2021-2025. Pre-tax P&L is model-priced at DVOL; the CME futures carry is proxied by the Deribit dated-futures basis; IBIT option P&L is short-term and IBIT share gains are long-term when held > 1 year.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.law.cornell.edu/uscode/text/26/1256
+- statistic: Mean annual after-tax return difference (CME - IBIT)
+- null: Difference <= 0
+- procedure: Take pre-tax monthly P&L from the btc-covered-call simulation; CME version subtracts the futures basis (annualised, from history.deribit.com dated-futures trades vs index_price) and taxes all P&L 60/40 (26.8% blended) marked at year end; IBIT version taxes option P&L at 37% and share P&L at 20% on realisation (subject to qualified-covered-call rules). Note the identity: on equal pre-tax gains the 1256 edge is 0.102 x gain, so 3 pp/yr needs a pre-tax return >= 29.4%, not 20%.
+- data: Simulated P&L from btc-covered-call; Deribit futures trade history (basis proxy); statutory rates · min n: 5
+- pass: Mean difference > 0 across years with bootstrap over years; sensitivity table over basis levels
+- controls: Zero-return year (difference ~ -basis); loss years (1256 three-year carryback)
+- harness: b6b_drb_cme_ibit_tax
+- result X-c595e83c: not_supported — T-269 MODEL-PRICED (Black-Scholes at BTC DVOL known at entry, no skew): 25-delta call written on 1 BTC at each Deribit monthly expiry (last Friday 08:00 UTC delivery price) and settled at the next, 57 cycles; years by expiry, 2021 starts at 2021-03-26 (DVOL begins 2021-03-24, so 2021 is April-December). Returns are over each year's starting spot. Tax (statutory, NIIT ignored): IBIT call P&L short-term at 37%, IBIT share P&L long-term at 20% (liquidation basis; held > 1 year as the claim states; qualified-covered-call and straddle rules not modelled), CME all P&L 60/40 = 26.8% marked at year end; losses earn the rate (offset against other gains). CME carry = the Deribit dated-futures basis (nearest quarterly with >= 7 days, ln(F/index) x 365/DTE at the entry tick) paid for each cycle; the futures collateral earns nothing (as the trial models it). IBIT did not exist before 2024-01-11 and its 0.25% fee is not charged (costs as the claim states). 2021: pre-tax +6.2% (calls +18.0%, BTC -11.7%, basis 8.1%), IBIT +1.9%, CME -1.4%, diff -3.3%; 2022: pre-tax -42.9% (calls +22.0%, BTC -64.9%, basis 1.6%), IBIT -38.1%, CME -32.6%, diff +5.5%; 2023: pre-tax +133.2% (calls -23.9%, BTC +157.1%, basis 8.0%), IBIT +110.6%, CME +91.6%, diff -19.0%; 2024: pre-tax +77.4% (calls -46.9%, BTC +124.4%, basis 17.3%), IBIT +69.9%, CME +44.0%, diff -25.9%; 2025: pre-tax +16.4% (calls +23.0%, BTC -6.6%, basis 7.2%), IBIT +9.2%, CME +6.7%, diff -2.5%. Mean difference -9.04%, bootstrap over years 95% CI [-18.62%, +0.39%]. Sensitivity, mean difference at a flat basis: 0.0% -2.86%, 2.5% -4.88%, 5.0% -6.91%, 7.5% -8.94%, 10.0% -10.97%, 15.0% -15.05%; with the bill earned on CME collateral (taxed at 37%) -6.32%; loss-carry control (no outside gains; 1256 three-year carryback) -8.00%; zero-return-year control (difference = -basis x 0.732) -6.18%; IV-scale sensitivity x0.9 -9.71%, x1.1 -8.42%. Identity: diff = 0.102 x calls - 0.068 x BTC - 0.732 x basis per year — failed: mean annual after-tax difference CME - IBIT > 0 (mean -9.04%); bootstrap over years 95% CI excludes 0 on the upper side (lower -18.62%)
+- note: from the options-library library: CME Bitcoin options futures-style (1256) covered/short premium; harness suggestion: Post-processing layer on existing covered-call P&L; tax function with 1256 flag | verifier: corrected claim/trial
 
 ### T-270 · gold-covered-call
 
@@ -1397,6 +2368,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gld_covered_call
 - result X-e5665ac0: not_supported — MODEL-PRICED at flat GVZ: 0.30-delta covered call Sharpe 0.70 vs hold 0.57 over 203 cycles (diff +0.12, 95% CI -0.04 to +0.32; halves +0.03/+0.29), DSR 0.22, MDD -28% vs -43% — failed: Sharpe diff 95% CI excludes 0
 - result X-6fc32c1c: not_supported — MODEL-PRICED at flat GVZ: 0.30-delta covered call Sharpe 0.70 vs hold 0.57 over 203 cycles (diff +0.12, 95% CI -0.04 to +0.32; halves +0.03/+0.29), DSR probability 0.22 (deflated Sharpe > 0 needs > 0.5), MDD -28% vs -43% — failed: Sharpe diff 95% CI excludes 0; deflated Sharpe > 0 (DSR probability > 0.5)
+- result X-8410b34f: not_supported — MODEL-PRICED at flat GVZ: 0.30-delta covered call Sharpe 0.78 vs hold 0.57 over 202 cycles from 2009-10-16 on the standard monthly expiry calendar (third Friday, the prior session on a holiday), each written at one expiry close and settled at the next (diff +0.21, 95% CI +0.03 to +0.43; halves +0.33/+0.12), DSR probability 0.38 (deflated Sharpe > 0 needs > 0.5), MDD -23% vs -43%, 1 calendar cycle dropped for a missing index value on entry (2020-10-16) — failed: deflated Sharpe > 0 (DSR probability > 0.5)
 - note: from the options-library library: Gold covered call (GLD / GC-OG) using GVZ as the IV reference; harness suggestion: cboe_index_history('GVZ') exists in mandel.data.options (CBOE_INDICES); add GLD to the closes feed; reuse VRP harness with GVZ | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-272 · gvz-low-long-straddle
@@ -1413,6 +2385,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gld_low_gvz_straddle
 - result X-4d1156f7: not_supported — MODEL-PRICED at flat GVZ: 90-day ATM straddles bought with GVZ below its trailing 20% quantile return +12.1% on premium vs -0.5% on all days (1131 of 3974 daily entries; diff 95% CI -5.9 to +32.1, overlapping entries, block = holding period) — failed: difference 95% CI > 0
 - result X-877d8dc2: not_supported — MODEL-PRICED at flat GVZ: 90-day ATM straddles bought with GVZ below its trailing 20% quantile return +20.6% on premium over 38 non-overlapping entries (conditional mean > 0) vs -0.5% on all 3974 daily entries (diff +21.1, 95% CI -2.9 to +45.9; 1131 low-GVZ days in all) — failed: difference 95% CI > 0
+- result X-f41b9769: not_supported — MODEL-PRICED at flat GVZ: 90-day ATM straddles bought with GVZ below its trailing 20% quantile return +20.6% on premium over 38 non-overlapping entries (conditional mean > 0) vs -0.5% on all 3974 daily entries (diff +21.1, 95% CI -2.9 to +45.9; 1131 low-GVZ days in all) — failed: difference 95% CI > 0
 - note: from the options-library library: GVZ low-percentile long gold vol (crisis convexity); harness suggestion: Percentile harness shared with dvol-percentile-vega | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
 
 ### T-273 · gold-event-vol
@@ -1429,6 +2402,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: fomc_gvz_event_change
 - result X-dfd2c227: not_supported — GVZ change from the close before to the close after 135 scheduled FOMC decision days (2009-11-04..2026-09-16): mean +0.053 vol pts (95% CI -0.247 to +0.385), 56% declining (sign-test p=0.0841); weekday-matched non-event 2-day change -0.086; VIX positive control +0.009 pts (95% CI -0.414 to +0.437) — failed: mean GVZ change < 0 with 95% CI excluding 0
 - result X-f24ee748: not_supported — GVZ change from the close before to the close after 135 scheduled FOMC decision days (2009-11-04..2026-09-16): mean +0.053 vol pts (95% CI -0.247 to +0.385), 56% declining (sign-test p=0.0841); weekday-matched non-macro 2-day change -0.095; VIX positive control +0.009 pts (95% CI -0.414 to +0.437); CPI-date repeat (reported, not a criterion): GVZ -0.083 pts (95% CI -0.292 to +0.135, 59% declining, n=203), windows without an FOMC day -0.026 pts (95% CI -0.250 to +0.205, 56% declining, n=181), VIX -0.114 pts (95% CI -0.507 to +0.360, 67% declining, n=203) — failed: mean GVZ change < 0 with 95% CI excluding 0
+- result X-35bd4a37: not_supported — GVZ change from the close before to the close after 135 scheduled FOMC decision days (2009-11-04..2026-09-16): mean +0.053 vol pts (95% CI -0.247 to +0.385), 56% declining (sign-test p=0.0841); weekday-matched non-macro 2-day change -0.095; VIX positive control +0.009 pts (95% CI -0.414 to +0.437); CPI-date repeat (reported, not a criterion): GVZ -0.083 pts (95% CI -0.292 to +0.135, 59% declining, n=203), windows without an FOMC day -0.026 pts (95% CI -0.250 to +0.205, 56% declining, n=181), VIX -0.114 pts (95% CI -0.507 to +0.360, 67% declining, n=203) — failed: mean GVZ change < 0 with 95% CI excluding 0
 - note: from the options-library library: Gold event vol (FOMC/CPI straddle on GLD); harness suggestion: Event-date table in mandel/knowledge; paired-difference harness over cboe_index_history('GVZ') | verifier: corrected claim/trial
 
 ### T-274 · gold-silver-ratio-options
@@ -1445,7 +2419,23 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gold_silver_ratio_extreme
 - result X-5beb6789: not_supported — GLD/SLV above its 5-year 90th percentile: 16 independent episodes, 180-day change -0.042 (one-sided 90% upper +0.010), hit rate 0.62 — failed: mean < 0 at 90% confidence
 - result X-731b4b2d: not_supported — GLD/SLV above its 5-year 90th percentile: 16 independent episodes, 180-calendar-day change -0.058 (one-sided 90% upper +0.002), hit rate 0.56 — failed: mean < 0 at 90% confidence (one-sided); hit rate > 60%
+- result X-61fead11: not_supported — GLD/SLV above its 5-year 90th percentile: 16 independent episodes, 180-calendar-day change -0.058 (one-sided 90% upper +0.002), hit rate 0.56 — failed: mean < 0 at 90% confidence (one-sided); hit rate > 60%
 - note: from the options-library library: Gold-silver ratio options trade; harness suggestion: Underlying-ratio harness now; option overlay once SLV surface_summary history exists | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
+
+### T-275 · silver-call-backspread
+
+**Claim.** Model-priced with SLV's trailing 60-day realised vol as a flat IV (no VRP, no skew, so optimistic), 1x2 SLV call backspreads (0.50/0.25 delta, 90 DTE) entered monthly have positive mean P&L over 2006-2026.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.law.cornell.edu/uscode/text/26/1256
+- statistic: Mean P&L per backspread (as % of SLV price); skewness reported
+- null: Mean <= 0
+- procedure: SLV closes; monthly entries priced with BS at trailing 60-day RV; hold to expiry; block bootstrap; repeat with RV + 5 vol points (VRP) and with captured SLV IV/skew once available
+- data: SLV daily closes (Yahoo, from 2006-04); SLV IV from chain capture later · min n: 100
+- pass: Mean CI > 0 under RV pricing and still > 0 at RV + 5 vol points; final verdict on captured IV
+- controls: Same on GLD; shuffled returns (kills tail clustering)
+- harness: b6b_misc_slv_call_backspread
+- result X-9856d560: not_supported — T-275 MODEL-PRICED (Black-Scholes at a flat IV = SLV's trailing 60-day realised vol: no VRP, no skew, so optimistic): short 1 call at 0.50 delta, long 2 at 0.25 delta (strikes from the delta at the pricing vol; mean K1/S 1.018, K2/S 1.130), SLV raw (split-adjusted) closes (ex-dividend dates in the data: 0; an escrowed forward would be used inside a life), r = DTB3 known at entry (rule 7), net credit carried to expiry, P&L in % of S at entry. Rule 10(a): one cycle per standard monthly expiry (third Friday), entered at the last session on or before 90 calendar days ahead and settled at the expiry close (90-92-day lives); 239 backspreads 2006-08-18..2026-09-18. Mean P&L, two-sided 95% circular block bootstrap CI (blocks of 6 and 12 cycles >= the 3-cycle overlap): at RV mean +0.808% [-0.484%, +2.430%][6] [-0.455%, +2.422%][12], skew 2.94, hit 0.67; at RV + 5 vol points mean +0.247% [-0.891%, +1.661%][6] [-0.867%, +1.698%][12], skew 2.28, hit 0.67. IV sensitivity (reported): IV x0.9 mean +1.154% [-0.231%, +2.888%][6] [-0.210%, +2.893%][12], skew 3.24, hit 0.66; IV x1.2 mean +0.238% [-0.889%, +1.618%][6] [-0.853%, +1.656%][12], skew 2.10, hit 0.67; RV + 10 vol points mean -0.222% [-1.280%, +1.038%][6] [-1.278%, +0.996%][12], skew 1.33, hit 0.67. Robustness (not the claim's calendar): pooled entry every session, 5022 entries, mean +0.840% [-0.363%, +2.361%] (124-session blocks = 2 x hold). Controls: shuffled SLV returns mean +0.175% [-0.793%, +1.223%][6] [-0.782%, +1.214%][12], skew 1.54, hit 0.64; GLD same rule mean +0.114% [-0.349%, +0.582%][6] [-0.323%, +0.560%][12], skew 0.70, hit 0.62. Final verdict on captured IV: SLV chains are captured on 2026-10-14, 2026-10-15 only, so no historical backspread can be priced on captured IV/skew — failed: mean P&L 95% CI > 0 at RV (mean +0.808% of S, lower -0.484% [6-cycle blocks], -0.455% [12-cycle blocks]); mean P&L 95% CI > 0 at RV + 5 vol points (mean +0.247% of S, lower -0.891% [6-cycle blocks], -0.867% [12-cycle blocks]) (not implemented: final verdict on captured SLV IV/skew (not implementable: no captured SLV IV history))
+- note: from the options-library library: Silver call backspread (squeeze convexity); harness suggestion: Payoff engine template with K1/K2 rules; realised-vol proxy pricing flagged as model-priced | verifier: corrected claim/trial
 
 ### T-302 · crypto-trend-sma-50-200
 
@@ -1459,9 +2449,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Drawdown reduction > 40% on BTC and ETH; Sharpe difference lower 95% bound > -0.2; DSR > 0.5 for the golden cross
 - controls: Look-ahead: close at 00:00 UTC, trade next day; survivorship: BTC/ETH are survivors among thousands of coins, so the claim is per-asset not for 'crypto'; costs: 25 bps per side plus 10 bps slippage; multiple testing: whole grid; regime: report per halving cycle (2014-16, 2016-20, 2020-24, 2024-) and flag that 3 cycles is the effective sample
 - harness: golden_cross_crypto
-- result X-3f905d4b: not_supported — BTC: MDD -70% vs -83% (-17%), Sharpe 1.07 vs 1.10 (lower -0.39), DSR 1.00; ETH: MDD -78% vs -79% (-2%), Sharpe 0.70 vs 0.77 (lower -0.60), DSR 0.94 — failed: BTC drawdown reduction > 40%; BTC Sharpe diff lower bound > -0.2; ETH drawdown reduction > 40%; ETH Sharpe diff lower bound > -0.2
 - result X-2988e0ba: not_supported — BTC: MDD -70% vs -83% (-17%), Sharpe 1.07 vs 1.10 (lower -0.39), DSR 1.00; ETH: MDD -78% vs -79% (-2%), Sharpe 0.70 vs 0.77 (lower -0.60), DSR 0.94 — failed: BTC drawdown reduction > 40%; BTC Sharpe diff lower bound > -0.2; ETH drawdown reduction > 40%; ETH Sharpe diff lower bound > -0.2
 - result X-31c71edc: not_supported — BTC: MDD -70% vs -83% (-17%), Sharpe 1.05 vs 1.10 (lower -0.41), DSR 1.00; ETH: MDD -78% vs -86% (-10%), Sharpe 0.68 vs 0.62 (lower -0.47), DSR 0.94 — failed: BTC drawdown reduction > 40%; BTC Sharpe diff lower bound > -0.2; ETH drawdown reduction > 40%; ETH Sharpe diff lower bound > -0.2
+- result X-f23b1407: not_supported — BTC: MDD -70% vs -83% (-17%), Sharpe 1.05 vs 1.10 (lower -0.41), DSR 1.00; ETH: MDD -78% vs -86% (-10%), Sharpe 0.68 vs 0.62 (lower -0.47), DSR 0.94 — failed: BTC drawdown reduction > 40%; BTC Sharpe diff lower bound > -0.2; ETH drawdown reduction > 40%; ETH Sharpe diff lower bound > -0.2
 - note: from the underlying-library library: Crypto trend: 50/200 SMA and 12-week momentum on BTC and ETH; harness suggestion: trend.py sma_cross(prices, fast, slow) and donchian(prices, n); harness crypto_trend_vs_bh over BTC/ETH bundles; add Coinbase candle fetcher (api.exchange.coinbase.com/products/BTC-USD/candles, verified) as a second source to check Yahoo closes. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-485 (verifier-corrected wording)
 
 ### T-303 · crypto-trend-funding-filter
@@ -1477,6 +2467,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: only funding records timestamped before the decision; percentile window strictly trailing; survivorship: n/a; costs: 25 bps per side plus 10 bps slippage on every extra state change; multiple testing: joint count with sibling funding entries; regime: report 2021-22 and 2023-26 halves
 - harness: carry_trend_funding_filter
 - result X-45363c88: not_supported — 2113 days 2021-01-01..2026-10-14: Sharpe filtered 0.64 vs unfiltered 0.57, difference 0.067 with 95% interval [-0.099, 0.230] (need > 0 and excluding 0); placebo difference -0.028 interval [-0.163, 0.114] (need to include 0); DSR 0.043 (need > 0.95); 10 funding-driven activations (need >= 10) — failed: Sharpe difference > 0 with paired block-bootstrap 95% interval excluding 0; DSR of daily filtered-minus-unfiltered returns > 0.95 (n_trials = 39)
+- result X-e8e687fa: not_supported — 2113 days 2021-01-01..2026-10-14: Sharpe filtered 0.64 vs unfiltered 0.57, difference 0.067 with 95% interval [-0.099, 0.230] (need > 0 and excluding 0); placebo difference -0.028 interval [-0.163, 0.114] (need to include 0); DSR 0.043 (need > 0.95); 10 funding-driven activations (need >= 10) — failed: Sharpe difference > 0 with paired block-bootstrap 95% interval excluding 0; DSR of daily filtered-minus-unfiltered returns > 0.95 (n_trials = 39)
 - note: from the underlying-library library: Funding-rate-aware crypto trend (crowding filter on BTC/ETH trend signals); harness suggestion: New fetcher mandel/data/deribit.py: funding_history(instrument, start, end) paging by 14 days into bundle deribit-funding-<instrument> with available_at = timestamp; harness funding_filter_vs_trend in trend.py sharing the sma rule; report activation count as a hard inconclusive gate. | verifier: corrected claim/trial
 
 ### T-304 · donchian-breakout-atr-stop
@@ -1492,6 +2483,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: signal on close t, fill at close t+1; dividend adjustment of OHLC; survivorship: survivor ETFs/crypto only, single-stock version blocked; costs: 5 bps ETFs, 25+10 bps crypto per side, plus gap slippage when the close-to-close move through the stop exceeds the stop; multiple testing: 60 trials; regime: trades by decade and VIX tercile
 - harness: ohlc_donchian_atr_breakout
 - result X-d019c368: not_supported — 658 closed trades across 8 assets (181 asset-year clusters): rule mean net +2.39% vs matched random entries +1.57% (same costs), difference +0.82% (cluster 95% CI -0.26..+2.17, p=0.0956, 60-trial Bonferroni 1.000); trade-return DSR 0.998 over 60; vs cost-free random +0.65%; trade skew +9.69 — failed: mean difference > 0 with cluster-bootstrap 95% CI excluding 0
+- result X-c050a2c0: not_supported — 658 closed trades across 8 assets (181 asset-year clusters): rule mean net +2.39% vs matched random entries +1.57% (same costs), difference +0.82% (cluster 95% CI -0.26..+2.17, p=0.0956, 60-trial Bonferroni 1.000); trade-return DSR 0.998 over 60; vs cost-free random +0.65%; trade skew +9.69 — failed: mean difference > 0 with cluster-bootstrap 95% CI excluding 0
 - note: from the underlying-library library: Donchian channel breakout and all-time-high entry with ATR trailing stop; harness suggestion: trend.py donchian_atr(ohlc, n, atr_mult) returning trade list and daily returns; harness breakout_expectancy with the matched-hold random-entry control; extend the Yahoo bundle schema to keep open/high/low (currently close and volume). | verifier: corrected claim/trial
 
 ### T-305 · dual-momentum-gem
@@ -1506,9 +2498,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Sharpe difference >= 0 with lower 95% bound > -0.15, drawdown reduction > 25%, PBO < 0.5 across lookbacks
 - controls: Look-ahead: month-end close used next day; survivorship: ETFs chosen are the paper's, no selection; costs: 3 bps per switch; multiple testing: lookback and structural variants counted; regime: the 2003-2026 window has only two large bear markets (2008, 2022) and one flash (2020); report the result with and without 2008
 - harness: gem_dual_momentum
-- result X-681555d4: error — harness raised NameError
 - result X-289f61db: not_supported — GEM Sharpe 0.80 vs 60/40 0.87 (diff -0.07, lower -0.48), MDD -21% vs -32%, PBO 0.39 over 265 months — failed: Sharpe diff >= 0 with lower bound > -0.15 (not implemented: ensemble lowers outcome variance)
 - result X-267f9afa: not_supported — GEM excess Sharpe 0.59 vs 60/40 0.64 (diff -0.05, lower -0.43), MDD -24% vs -33%, PBO 0.60 over 264 months (fills at the next day's close, 3 bps per switch) — failed: Sharpe diff >= 0 with lower bound > -0.15; PBO < 0.5 (not implemented: ensemble lowers outcome variance)
+- result X-b076e943: not_supported — GEM excess Sharpe 0.59 vs 60/40 0.64 (diff -0.05, lower -0.43), MDD -24% vs -33%, PBO 0.60 over 264 months (fills at the next day's close, 3 bps per switch) — failed: Sharpe diff >= 0 with lower bound > -0.15; PBO < 0.5 (not implemented: ensemble lowers outcome variance)
 - note: from the underlying-library library: Dual momentum (Antonacci GEM): relative + absolute momentum between US and foreign equity with a bond fallback; harness suggestion: trend.py dual_momentum(prices_dict, lookback, fallback) -> monthly weights; harness gem_vs_6040 with pbo_cscv across the lookback grid. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-480 (verifier-corrected wording)
 
 ### T-306 · xs-momentum-etf-rotation
@@ -1523,9 +2515,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Alpha > 0 with 95% interval excluding 0 and above the 95th percentile of the permutation null; PBO < 0.5; sign of alpha positive in each leave-one-out subset
 - controls: Look-ahead: ranks from month-end closes, trade next open; survivorship: sector SPDRs are a fixed, complete set since 1998 (no bias); costs: 3-5 bps per side, turnover about 30-50% per month; multiple testing: grid counted; regime: report by decade, exclude 2000-02 and 2008 as robustness
 - harness: sector_rotation
-- result X-61ec30e0: error — harness raised NameError
 - result X-0667ba9d: not_supported — sector top-3 alpha +17.3 bps/month over 322 months (95% CI -5.9 to +41.0; random-pick 95th pct +19.5), PBO 0.29, leave-one-out min -1.4 — failed: alpha > 0 with CI excluding 0; alpha above 95th pct of permutation null; alpha > 0 leaving out each sector
 - result X-e8562d46: not_supported — sector top-3 alpha +17.3 bps/month over 322 months (95% CI -5.9 to +41.0; cost-matched random-pick 95th pct +23.2), PBO 0.29, leave-one-sector-out min -1.4, leave-one-decade-out 2000s +4.5/2010s +33.1/2020s +11.7 — failed: alpha > 0 with CI excluding 0; alpha above 95th pct of permutation null; alpha > 0 leaving out each sector
+- result X-76080490: not_supported — sector top-3 alpha +17.3 bps/month over 322 months (95% CI -5.9 to +41.0; cost-matched random-pick 95th pct +23.2), PBO 0.29, leave-one-sector-out min -1.4, leave-one-decade-out 2000s +4.5/2010s +33.1/2020s +11.7 — failed: alpha > 0 with CI excluding 0; alpha above 95th pct of permutation null; alpha > 0 leaving out each sector
 - note: from the underlying-library library: Cross-sectional ETF momentum (sector and asset-class rotation); harness suggestion: trend.py xs_momentum(prices_df, lookback, skip, top_k, long_short) -> weights; harness xs_etf_momentum with within-month rank permutation null; reuse pbo_cscv. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-475 (verifier-corrected wording)
 
 ### T-312 · trend-metals-gold-silver
@@ -1540,9 +2532,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Difference > 0 with interval excluding 0; drawdown reduction > 25%; sign agrees between ETF and chained-futures series; DSR > 0.5
 - controls: Look-ahead: month-end close used next day; survivorship: ETFs chosen ex ante, all survive; costs: 3-5 bps ETFs, GLD expense 40 bps/yr included via price; multiple testing: variants counted; regime: report per regime episode (5 episodes), flag the 2013 gold crash and 2011 silver crash as single-day gap risk for breakout variants
 - harness: metals_tsmom
-- result X-394ef7eb: supported — metals TSMOM minus always-long -15.0 bps/month over 234 months (95% CI -54.3 to +21.4), drawdown -31% vs -51% (-40%), futures -19.9, DSR 0.99 — all criteria pass
 - result X-59b357ad: not_supported — metals TSMOM minus always-long -15.0 bps/month over 234 months (95% CI -54.3 to +21.4), drawdown -31% vs -51% (-40%), futures -19.9, DSR 0.99 — failed: difference > 0 with CI excluding 0
 - result X-22d2e29d: not_supported — metals TSMOM minus historical-mean strategy -4.9 bps/month over 233 months from 2007-06 (95% CI -42.6 to +31.0), drawdown -31% vs buy-and-hold -51% (-40%), futures -7.0 over the same 233 months, DSR 0.99, excess over bills +70.1 bps/month — failed: difference vs historical-mean > 0 with CI excluding 0
+- result X-ea21c42c: not_supported — metals TSMOM minus historical-mean strategy -4.9 bps/month over 233 months from 2007-06 (95% CI -42.6 to +31.0), drawdown -31% vs buy-and-hold -51% (-40%), futures -7.0 over the same 233 months, DSR 0.99, excess over bills +70.1 bps/month — failed: difference vs historical-mean > 0 with CI excluding 0
 - note: from the underlying-library library: Trend following on precious metals (gold and silver ETFs and chained futures); harness suggestion: collect_history for GLD, SLV, IAU, GC=F, SI=F, PPLT, PALL; trend.py functions from the TSMOM entry with an inverse-vol combiner; harness metals_trend with a roll-day mask for =F symbols. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-487 (verifier-corrected wording)
 
 ### T-315 · btc-eth-short-horizon-tsmom
@@ -1557,9 +2549,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Difference > 0 with interval excluding 0 after 30 bps per side costs; 2019-2026 sub-period difference > 0; DSR > 0.5
 - controls: Look-ahead: Sunday close used Monday open; survivorship: two surviving assets, per-asset claim; costs: 30 bps per side applied to every switch (~25 switches/yr); multiple testing: grid counted; regime: per halving cycle
 - harness: crypto_weekly_tsmom
-- result X-9cf9dbda: supported — weekly TSMOM minus always-long -46.3 bps/week over 630 weeks (95% CI -91.8 to +2.3), 2019- -40.5, DSR 0.99 — all criteria pass
 - result X-33eb058b: not_supported — weekly TSMOM minus always-long -46.3 bps/week over 630 weeks (95% CI -91.8 to +2.3), 2019- -40.5, DSR 0.99 — failed: difference > 0 with CI excluding 0; 2019- difference > 0
 - result X-b83f8cf1: not_supported — weekly TSMOM minus historical-mean strategy -41.3 bps/week over 604 weeks (164 BTC-only before ETH's warm-up ends; 95% CI -90.7 to +7.5), 2019- -39.9, DSR 0.99 — failed: difference vs historical-mean > 0 with CI excluding 0; 2019- difference > 0
+- result X-2f386b0a: not_supported — weekly TSMOM minus historical-mean strategy -41.3 bps/week over 604 weeks (164 BTC-only before ETH's warm-up ends; 95% CI -90.7 to +7.5), 2019- -39.9, DSR 0.99 — failed: difference vs historical-mean > 0 with CI excluding 0; 2019- difference > 0
 - note: from the underlying-library library: Short-horizon time-series momentum in BTC and ETH (1-4 week); harness suggestion: trend.py sign_lookback on weekly resample; harness btc_weekly_tsmom; reuse crypto_trend_vs_bh infrastructure. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-486 (verifier-corrected wording)
 
 ### T-333 · overnight-intraday-reversal
@@ -1575,6 +2567,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: trade at the opening auction print. Costs: 1 bp per side plus auction slippage for size. Survivorship: stock variants biased. Multiple testing: 6 variants. Regime: pre/post 2013, VIX terciles.
 - harness: ohlc_gap_fade
 - result X-e6d84c5e: not_supported — 1952 gap trades |o|>0.50% 2000-01-03..2026-09-30 (902 long, 1050 short): mean net -6.25 bps after 2 bps RT (95% CI -12.45..-0.15); gap net of the ex-date dividend (108 ex-dividend days, 38 traded; raw-gap sensitivity: 1954 trades, 40 on ex-dividend days, mean -6.64 bps, CI -12.92..-0.56; 36 days change side); halves <2013-01-01 -7.34 / >=2013-01-01 -5.03 bps; DSR 0.000 over 6 variants; diagnostic corr(o,i) +0.018 (95% CI -0.036..+0.069); IBIT control (expected no edge) 540 trades, mean -11.2 bps — failed: 95% lower bound of mean net per trade > 0; DSR > 0.95 over 6 variants
+- result X-c4995dc5: not_supported — 1952 gap trades |o|>0.50% 2000-01-03..2026-09-30 (902 long, 1050 short): mean net -6.25 bps after 2 bps RT (95% CI -12.45..-0.15); gap net of the ex-date dividend (108 ex-dividend days, 38 traded; raw-gap sensitivity: 1954 trades, 40 on ex-dividend days, mean -6.64 bps, CI -12.92..-0.56; 36 days change side); halves <2013-01-01 -7.34 / >=2013-01-01 -5.03 bps; DSR 0.000 over 6 variants; diagnostic corr(o,i) +0.018 (95% CI -0.036..+0.069); IBIT control (expected no edge) 540 trades, mean -11.2 bps — failed: 95% lower bound of mean net per trade > 0; DSR > 0.95 over 6 variants
 - note: from the underlying-library library: Overnight vs intraday return reversal; harness suggestion: overnight_intraday_decomp: OHLC decomposition, correlation test, gap-fade simulator, IBIT control | verifier: corrected claim/trial
 
 ### T-341 · pre-fomc-announcement-drift
@@ -1591,6 +2584,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: fomc_statement_day_drift
 - result X-3b985170: not_supported — SPY statement-day return +21.6 bps (net of 2 bps) vs other days +4.2 bps over 261 statement days 1994-01-03..2026-10-13: net difference +17.4 bps (95% CI +3.1 to +31.5), p=0.0070 (H0 diff<=0; p vs 15 bps 0.384); 2016-2026 -5.3 bps; secondary Holm p QQQ +26.2 bps p_holm=0.060, IWM +23.9 bps p_holm=0.070, TLT +7.2 bps p_holm=0.409, GLD +7.0 bps p_holm=0.431, BTC-USD +6.8 bps p_holm=0.431 — failed: 2016-2026 net difference > 0
 - result X-15befc42: not_supported — SPY statement-day return +21.6 bps (net of 2 bps) vs other days +4.2 bps over 261 statement days 1994-01-03..2026-10-13: net difference +17.4 bps (95% CI +3.1 to +31.5), p=0.0070 (H0 diff<=0; p vs 15 bps 0.384); 2016-2026 -5.3 bps; secondary Holm p QQQ +26.2 bps p_holm=0.060, IWM +23.9 bps p_holm=0.070, TLT +7.2 bps p_holm=0.409, GLD +7.0 bps p_holm=0.431, BTC-USD +6.8 bps p_holm=0.431; CPI overlap (flag, not a criterion): 20 statement days are CPI sessions, without them +11.8 bps (p=0.0495; 2016-2026 -7.4), all CPI sessions out of both groups +11.7 bps (p=0.0550; 2016-2026 -7.5) — failed: 2016-2026 net difference > 0
+- result X-f071b157: not_supported — SPY statement-day return +21.6 bps (net of 2 bps) vs other days +4.2 bps over 261 statement days 1994-01-03..2026-10-13: net difference +17.4 bps (95% CI +3.1 to +31.5), p=0.0070 (H0 diff<=0; p vs 15 bps 0.384); 2016-2026 -5.3 bps; secondary Holm p QQQ +26.2 bps p_holm=0.060, IWM +23.9 bps p_holm=0.070, TLT +7.2 bps p_holm=0.409, GLD +7.0 bps p_holm=0.431, BTC-USD +6.8 bps p_holm=0.431; CPI overlap (flag, not a criterion): 20 statement days are CPI sessions, without them +11.8 bps (p=0.0495; 2016-2026 -7.4), all CPI sessions out of both groups +11.7 bps (p=0.0550; 2016-2026 -7.5) — failed: 2016-2026 net difference > 0
 - note: from the underlying-library library: Pre-FOMC announcement drift; harness suggestion: events.py: fomc_dates() fetcher (parse statement URLs by year, cache to mandel/data as 'fomc-dates'), then event_day_effect(days, closes, event_days, offset=-1, n_boot=2000) generalizing turn_of_month's paired block bootstrap; add subsample argument. | verifier: corrected claim/trial
 
 ### T-342 · fomc-cycle-even-weeks
@@ -1606,6 +2600,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: scheduled dates only. Survivorship: n/a. Costs: about 28 round trips/yr at 1-2 bps (about 30-55 bps/yr), charged. Multiple testing: week indexing fixed to the published definition, 5 variants Holm. Regime: halves, ZLB years flagged.
 - harness: fomc_cycle_even_weeks
 - result X-93025618: not_supported — SPY even FOMC-cycle weeks +7.55 bps/day (net of 2 bps per block, 24 blocks/yr) vs odd +0.73 bps/day over 4385+3818 days 1994-01-03..2026-10-13: net difference +6.8 bps/day (95% CI +2.1 to +11.9), p=0.0050; 1994-2009 +12.1, 2010-2026 +1.8, 2017-2026 -5.2; random-offset placebo p=0.002 (gross +7.18 vs placebo 95th pct +4.14); week 0 = days -1..+3 then 5-day weeks — failed: 2017-2026 net difference > 0
+- result X-f302407b: not_supported — SPY even FOMC-cycle weeks +7.55 bps/day (net of 2 bps per block, 24 blocks/yr) vs odd +0.73 bps/day over 4385+3818 days 1994-01-03..2026-10-13: net difference +6.8 bps/day (95% CI +2.1 to +11.9), p=0.0050; 1994-2009 +12.1, 2010-2026 +1.8, 2017-2026 -5.2; random-offset placebo p=0.002 (gross +7.18 vs placebo 95th pct +4.14); week 0 = days -1..+3 then 5-day weeks — failed: 2017-2026 net difference > 0
 - note: from the underlying-library library: FOMC-cycle even-week effect; harness suggestion: events.py: fomc_cycle_week(days, statement_days) -> week index per day; even_week_effect(days, closes, statement_days, cost_bps=1.5) with the cycle-shift placebo; verdict format as weekday_effect. | verifier: corrected claim/trial
 
 ### T-343 · macro-announcement-day-premium
@@ -1621,6 +2616,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: scheduled dates only; shutdown-delayed releases (Oct 2013, autumn 2025) use the actual release day, flagged. Survivorship: n/a. Costs: about 32 round trips/yr at 1-2 bps, charged. Multiple testing: 6 variants plus 3 types (Holm). Regime: halves; 2008 and 2020 flagged; overlap with pre-FOMC days declared.
 - harness: macro_announcement_day_premium
 - result X-05b99f6b: not_supported — SPY release-day close-to-close +8.93 bps (net of 2 bps per round trip, 30/yr) vs other days +3.92 bps over 1047 release days (CPI 403, jobs 404, FOMC 261) 1993-02-01..2026-10-13: net difference +5.01 bps/day (gross +6.95; 95% CI -3.3 to +13.0), p=0.1034 (H0 diff<=0; p vs 5 bps 0.487); 1993-2009 +12.7 bps, 2010-2026 -2.7 bps; per type CPI +0.6 (Holm p 0.473), Employment Situation +4.6 (Holm p 0.473), FOMC +17.7 (Holm p 0.022); FOMC-excluded +2.5 bps (p=0.297); net Sharpe, each day type annualised by sqrt of its days/yr (31 release, 221 other): release 0.41 vs other 0.50 (release-only strategy, flat otherwise, 0.41); primary Holm p over 5 variants 0.517 — failed: studentized block-bootstrap p < 0.05; 2010-2026 net difference > 0
+- result X-1eeb3e18: not_supported — SPY release-day close-to-close +8.93 bps (net of 2 bps per round trip, 30/yr) vs other days +3.92 bps over 1047 release days (CPI 403, jobs 404, FOMC 261) 1993-02-01..2026-10-13: net difference +5.01 bps/day (gross +6.95; 95% CI -3.3 to +13.0), p=0.1034 (H0 diff<=0; p vs 5 bps 0.487); 1993-2009 +12.7 bps, 2010-2026 -2.7 bps; per type CPI +0.6 (Holm p 0.473), Employment Situation +4.6 (Holm p 0.473), FOMC +17.7 (Holm p 0.022); FOMC-excluded +2.5 bps (p=0.297); net Sharpe, each day type annualised by sqrt of its days/yr (31 release, 221 other): release 0.41 vs other 0.50 (release-only strategy, flat otherwise, 0.41); primary Holm p over 5 variants 0.517 — failed: studentized block-bootstrap p < 0.05; 2010-2026 net difference > 0
 - note: from the underlying-library library: Scheduled macro announcement-day premium (CPI, jobs, FOMC, GDP, ISM); harness suggestion: data/fetch.py: fred_release_dates(release_id) cached as 'fred-release-dates-<id>'; events.py: event_day_effect(days, closes, event_days, offset=0) shared with pre-FOMC; per-type loop with Bonferroni as in weekday_effect. | verifier: corrected claim/trial
 
 ### T-344 · turn-of-month-replication
@@ -1635,9 +2631,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: at least 3 of 5 assets with difference > 0, p < 0.05, both halves > 0
 - controls: look-ahead (none: calendar), survivorship (n/a), costs (12 rt/yr at 1-2 bps for ETFs, 20-60 bps for BTC at retail taker fees: charged), multiple testing (5 assets + 4 variants = 9 declared trials; the pass rule is a joint count), regime dependence (halves per asset)
 - harness: tom_replication
-- result X-4d5f471c: not_supported — turn-of-month replicates on 2/5 assets (need 3): QQQ +5.9 bps net, p=0.061; IWM +7.8 bps net, p=0.016; TLT +0.1 bps net, p=0.424; GLD -0.5 bps net, p=0.518; BTC-USD +13.7 bps net, p=0.038 — failed: at least 3 of 5 assets pass
 - result X-9a309bb4: not_supported — turn-of-month replicates on 2/5 assets (need 3): QQQ +5.9 bps net, p=0.061; IWM +7.8 bps net, p=0.016; TLT +0.1 bps net, p=0.424; GLD -0.5 bps net, p=0.518; BTC-USD +13.7 bps net, p=0.038 — failed: at least 3 of 5 assets pass
 - result X-38a6588c: not_supported — turn-of-month replicates on 2/5 assets (need 3): QQQ +5.9 bps net, p=0.061; IWM +7.8 bps net, p=0.016; TLT +0.1 bps net, p=0.424; GLD -0.5 bps net, p=0.518; BTC-USD +13.5 bps net, p=0.041 — failed: at least 3 of 5 assets pass
+- result X-689377f2: not_supported — turn-of-month replicates on 2/5 assets (need 3): QQQ +5.9 bps net, p=0.061; IWM +7.8 bps net, p=0.016; TLT +0.1 bps net, p=0.424; GLD -0.5 bps net, p=0.518; BTC-USD +13.5 bps net, p=0.041 — failed: at least 3 of 5 assets pass
 - note: from the underlying-library library: Turn-of-the-month premium: cross-asset and sub-window replication; harness suggestion: Extend run.py: loop turn_of_month(days, closes) over the five symbols after fetch_yahoo_history for QQQ/IWM/TLT/GLD (social.py yahoo_history is the fetcher); add window and payday variants as parameters (before, after, mid=(14,16)). | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-443 (verifier-corrected wording)
 
 ### T-346 · quarter-end-window-dressing
@@ -1670,6 +2666,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: none. Survivorship: n/a. Costs: 252 round trips/yr at 1 bp (2 bp sensitivity). Multiple testing: 6 assets plus 3 variants (Holm). Regime: halves; Yahoo's 'open' may be the first print rather than the auction price, flagged; dividend adjustment mandatory.
 - harness: ohlc_overnight_vs_intraday
 - result X-5ba41761: not_supported — SPY 1993-02-01..2026-10-13 (8483 days, 136 ex-dividend nights with D/C added back): overnight +4.03 vs intraday +0.74 bps/day, gap +3.29 bps (95% CI +1.05..+5.55; one-sided 95% lower bound +1.44; claim: at least 3 bps), p=0.404 vs gap <= 3 bps (the pass criterion; p=0.0025 vs equal means, the trial's stated null, shows only that the gap is positive); halves <2010-01-01 +5.19 / >=2010-01-01 +1.38 bps; secondary Sharpe overnight net 1 bp 0.72 (2 bp 0.48) vs buy-hold 0.65; open==close on 1.0% of days (flagged) — failed: p < 0.05 vs gap <= 3 bps (studentized block-10 bootstrap)
+- result X-66b0c4ee: not_supported — SPY 1993-02-01..2026-10-13 (8483 days, 136 ex-dividend nights with D/C added back): overnight +4.03 vs intraday +0.74 bps/day, gap +3.29 bps (95% CI +1.05..+5.55; one-sided 95% lower bound +1.44; claim: at least 3 bps), p=0.404 vs gap <= 3 bps (the pass criterion; p=0.0025 vs equal means, the trial's stated null, shows only that the gap is positive); halves <2010-01-01 +5.19 / >=2010-01-01 +1.38 bps; secondary Sharpe overnight net 1 bp 0.72 (2 bp 0.48) vs buy-hold 0.65; open==close on 1.0% of days (flagged) — failed: p < 0.05 vs gap <= 3 bps (studentized block-10 bootstrap)
 - note: from the underlying-library library: Overnight vs intraday return split (the night effect); harness suggestion: social.py yahoo_history: keep open/high/low; experiments/volatility.price_ohlc(rows) returning aligned arrays; events.py: overnight_intraday(days, opens, closes, cost_bps=1.0) with paired block bootstrap and net Sharpe. | verifier: corrected claim/trial
 
 ### T-350 · santa-claus-rally
@@ -1684,9 +2681,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: excess > 1 pp with placement-bootstrap p < 0.05 on ^GSPC (n ~ 98) and positive on SPY; barometers pass only if sign-agreement exceeds the drift-adjusted binomial 95th percentile
 - controls: look-ahead (none), survivorship (n/a), costs (1 rt/yr), multiple testing (6 variants; the window was chosen by Hirsch after looking at data, so treat 1950-1972 as in-sample and 1973-2026 as the real test), regime dependence (halves; overlap with TOM removed as a sensitivity)
 - harness: santa_rally
-- result X-77358286: supported — Santa window excess over the average 7-day window +1.38 pp on ^GSPC over 98 years (placement p=0.000), SPY +0.49 pp, halves +2.14/+0.61 — all criteria pass
 - result X-22d944f4: supported — Santa window excess over the average 7-day window +1.38 pp on ^GSPC over 98 years (placement p=0.000), SPY +0.49 pp, halves +2.14/+0.61 — all criteria pass
 - result X-2450086d: not_supported — Santa window excess over the average 7-day window +1.38 pp on ^GSPC over 98 years (placement p=0.000), halves +2.14/+0.61; SPY +0.49 pp over 33 years, halves +0.89/+0.12 — failed: SPY excess >= 1 pp (1993-)
+- result X-83672e35: not_supported — Santa window excess over the average 7-day window +1.38 pp on ^GSPC over 98 years (placement p=0.000), halves +2.14/+0.61; SPY +0.49 pp over 33 years, halves +0.89/+0.12 — failed: SPY excess >= 1 pp (1993-)
 - note: from the underlying-library library: Santa Claus rally and turn-of-year indicators; harness suggestion: events.py: fixed_window_vs_random(days, closes, window_fn, length=7, n_boot=2000) where window_fn returns the Santa window per year; barometer_sign_test(days, closes, rule) for the indicator variants. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-440 (verifier-corrected wording)
 
 ### T-351 · january-small-cap-effect
@@ -1718,9 +2715,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: difference > 50 bps/month with p < 0.05 on ^GSPC 1928-2026, SPY 1993-2026 difference > 0, 2002-2026 difference > 0
 - controls: look-ahead (none), survivorship (n/a), costs (2 rt/yr; sector rotation 12 legs/yr), multiple testing (7 variants + 12-month grid; DSR over 19), regime dependence (pre/post-publication split is pre-registered; 2008 and 2020 crash months fall in different halves, flagged)
 - harness: sell_in_may
-- result X-eef67ea9: not_supported — Nov-Apr minus May-Oct +40 bps/month on ^GSPC over 98 years from 1928 (p=0.051); SPY +50; post-2002 +43 — failed: p < 0.05
 - result X-f434df42: not_supported — Nov-Apr minus May-Oct +40 bps/month on ^GSPC over 98 years from 1928 (p=0.051); SPY +50; post-2002 +43 — failed: ^GSPC difference > 50 bps/month; p < 0.05
 - result X-e7437d51: not_supported — Nov-Apr minus May-Oct +40 bps/month on ^GSPC over 98 years from 1928 (p=0.051); SPY +50; post-2002 +43 — failed: ^GSPC difference > 50 bps/month; p < 0.05; SPY difference >= 50 bps/month (1993-)
+- result X-e374104e: not_supported — Nov-Apr minus May-Oct +40 bps/month on ^GSPC over 98 years from 1928 (p=0.051); SPY +50; post-2002 +43 — failed: ^GSPC difference > 50 bps/month; p < 0.05; SPY difference >= 50 bps/month (1993-)
 - note: from the underlying-library library: Sell in May / Halloween indicator and month-of-year seasonality; harness suggestion: events.py: half_year_effect(days, closes, start_month=11, end_month=4) returning monthly means, block-bootstrap p, Sharpe of switching vs buy-and-hold; month_of_year_grid(days, closes) with Bonferroni, mirroring weekday_effect. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-441 (verifier-corrected wording)
 
 ### T-353 · opex-week-triple-witching
@@ -1735,9 +2732,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: opex-week excess > 20 bps, Bonferroni p < 0.05, both halves positive
 - controls: look-ahead (none), survivorship (n/a), costs (12 rt/yr at 1-2 bps), multiple testing (7 variants; Bonferroni on the 3 week arms), regime dependence (halves; the rise of weekly/0DTE options after 2016 and 2022 flagged as a mechanism change)
 - harness: opex_week
-- result X-4ecac469: not_supported — SPY opex week +24.4 vs other weeks +23.2 bps (excess +1.2, Bonferroni p=1.000, halves +18.1/-15.8) — failed: Bonferroni p < 0.05; both halves positive
 - result X-c1129583: not_supported — SPY opex week +24.4 vs other weeks +23.2 bps (excess +1.2, Bonferroni p=1.000, halves +18.1/-15.8) — failed: excess > 20 bps; Bonferroni p < 0.05; both halves positive
 - result X-d802443d: not_supported — SPY opex week +21.7 vs other weeks +22.9 bps (excess -1.2, Bonferroni p=1.000, halves +19.8/-22.1) — failed: excess > 20 bps; Bonferroni p < 0.05; both halves positive
+- result X-e5573ba3: not_supported — SPY opex week +21.7 vs other weeks +22.9 bps (excess -1.2, Bonferroni p=1.000, halves +19.8/-22.1) — failed: excess > 20 bps; Bonferroni p < 0.05; both halves positive
 - note: from the underlying-library library: Options-expiration week and triple witching; harness suggestion: events.py: third_fridays(days) and last_fridays(days); week_type_effect(days, closes, week_flag_fn) producing weekly returns and the paired bootstrap; witching_day_effect reuses event_day_effect. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-438 (verifier-corrected wording)
 
 ### T-354 · crypto-calendar-effects
@@ -1752,9 +2749,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Monday excess > 20 bps, Bonferroni p < 0.05, both halves positive, and the net-of-maker-fee (0.4% per round trip) weekly strategy Sharpe > buy-and-hold (expected fail on costs even if the effect exists)
 - controls: look-ahead (none), survivorship (BTC/ETH only, no dead coins), costs (52 rt/yr at 0.4-0.6%: charged, decisive), multiple testing (7 variants + 7 weekdays; Bonferroni), regime dependence (halves; 2017 and 2021 bubbles flagged; T-62's weekend null is a prior)
 - harness: btc_monday
-- result X-c698c81e: not_supported — BTC Monday +36.5 bps vs other days (Bonferroni p=0.112); Monday-only net of 0.4% Sharpe 0.18 vs buy-and-hold 0.99 — failed: Bonferroni p < 0.05; net Monday strategy Sharpe > buy-and-hold
 - result X-f79ca263: not_supported — BTC Monday +36.5 bps vs other days (Bonferroni p=0.112); Monday-only net of 0.4% Sharpe 0.18 vs buy-and-hold 0.99 — failed: Bonferroni p < 0.05; net Monday strategy Sharpe > buy-and-hold
 - result X-9b84676e: not_supported — BTC Monday +36.5 bps vs other days (Bonferroni p=0.077); Monday-only net of 0.4% Sharpe 0.18 vs buy-and-hold 0.98 — failed: Bonferroni p < 0.05; net Monday strategy Sharpe > buy-and-hold
+- result X-0366a70a: not_supported — BTC Monday +36.5 bps vs other days (Bonferroni p=0.077); Monday-only net of 0.4% Sharpe 0.18 vs buy-and-hold 0.98 — failed: Bonferroni p < 0.05; net Monday strategy Sharpe > buy-and-hold
 - note: from the underlying-library library: Crypto calendar effects: weekday, month-turn, derivatives expiry and trading-hours; harness suggestion: Reuse weekday_effect and turn_of_month on BTC/ETH; add last_fridays-based event_day_effect two-sided; hours arm waits on data/fetch.py coinbase_candles(product, granularity=3600) with paging. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-436 (verifier-corrected wording)
 
 ### T-356 · gold-seasonality
@@ -1769,10 +2766,26 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: difference > 5 bps/day, p < 0.05, both halves positive, post-2013 difference > 0
 - controls: look-ahead (none), survivorship (n/a), costs (1-2 rt/yr at 2-3 bps), multiple testing (7 variants + 12-month grid; Bonferroni), regime dependence (halves; 2011 top and 2020, 2024-25 rallies flagged; the published reversal is the pre-registered expectation)
 - harness: gold_autumn
-- result X-415ea23a: not_supported — GLD Sep-Nov minus other months -2.26 bps/day (p=0.725), halves +3.76/-8.26, post-2013 -8.09; GC=F -2.46 — failed: difference > 5 bps/day; p < 0.05; both halves positive; post-2013 > 0
 - result X-4396480e: not_supported — GLD Sep-Nov minus other months -2.26 bps/day (p=0.725), halves +3.76/-8.26, post-2013 -8.09; GC=F -2.46 — failed: difference > 5 bps/day; p < 0.05; both halves positive; post-2013 > 0
 - result X-08b2d59b: not_supported — GLD Sep-Nov minus other months -2.26 bps/day (p=0.725), halves +3.76/-8.26, post-2013 -8.09; GC=F -2.56 — failed: difference > 5 bps/day; p < 0.05; both halves positive; post-2013 > 0; GC=F difference >= 5 bps/day (2000-)
+- result X-140f43ba: not_supported — GLD Sep-Nov minus other months -2.26 bps/day (p=0.725), halves +3.76/-8.26, post-2013 -8.09; GC=F -2.56 — failed: difference > 5 bps/day; p < 0.05; both halves positive; post-2013 > 0; GC=F difference >= 5 bps/day (2000-)
 - note: from the underlying-library library: Gold seasonality: autumn effect, Indian wedding season and Lunar New Year; harness suggestion: events.py: month_set_effect(days, closes, months={9,10,11}) sharing code with half_year_effect; month_of_year_grid(days, closes) with Bonferroni; run over GLD, GC=F, SLV, GDX. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-437 (verifier-corrected wording)
+
+### T-361 · post-fomc-monetary-momentum
+
+**Claim.** Over 1994-2026, SPY's cumulative return over the 15 trading days starting at the close of t+2 after a scheduled FOMC statement is higher after expansionary surprises (DGS2 down more than 5 bps on day t) than after contractionary ones (up more than 5 bps) by at least 1 percentage point, with both halves positive.
+
+- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://www.nber.org/papers/w24748, https://www.federalreserve.gov/monetarypolicy/fomchistorical2019.htm
+- statistic: Mean 15-day SPY return after expansionary minus after contractionary meetings (pp).
+- null: Zero gap. Permutation of surprise labels across meetings (10,000); bootstrap over meetings.
+- procedure: Classify each scheduled meeting by the DGS2 change; entry at the t+2 close respects H.15 publication. Halves 1994-2009 / 2010-2026; ZLB meetings 2009-2015 (compressed DGS2 moves) reported separately. 6 variants Holm.
+- data: daily-history-SPY (stored); fred-DGS2 (stored; fredgraph.csv keyless, verified to 2026-10-09); FOMC dates (Fed site); ^FVX via Yahoo; Polymarket Fed markets (stored); Kalshi KXFEDDECISION via /historical. · min n: 120
+- pass: Gap > 1 pp with permutation p < 0.05 and both halves positive; the long-only expansionary arm's Sharpe beats buy-and-hold over matched windows.
+- controls: Look-ahead: entry after DGS2 is published (t+2); the ^FVX variant uses same-day closes. Survivorship: n/a. Costs: up to 16 legs/yr at 1-2 bps. Multiple testing: 6 variants. Regime: halves and ZLB split.
+- harness: fomc_monetary_momentum
+- result X-bf82b216: inconclusive — only 85 expansionary+contractionary meetings (min_n 120); SPY 15 trading days from the t+2 close: after 50 expansionary (DGS2 < -5 bps) +0.42% vs 35 contractionary -0.30% of 261 classified meetings: net gap +0.64 pp (95% CI -1.34 to +2.74), permutation p=0.2097; 1994-2009 +0.67 pp, 2010-2026 +0.70 pp; ZLB 2009-2015 +3.94 pp; long-only arm Sharpe 0.05 vs buy-and-hold 0.52 (1994-01-03..2026-10-09, excess over T-bills) — inconclusive: only 85 of 261 classified meetings enter the gap (min_n 120); criteria on this sample, not used for the verdict: failed: net gap > 1 pp; permutation p < 0.05; long-only expansionary arm Sharpe > buy-and-hold Sharpe
+- result X-a809c4fb: not_supported — only 85 expansionary+contractionary meetings (min_n 120); lower-tail permutation p (H1 gap < 0) 0.7904; SPY 15 trading days from the t+2 close: after 50 expansionary (DGS2 < -5 bps) +0.42% vs 35 contractionary -0.30% of 261 classified meetings: net gap +0.64 pp (95% CI -1.34 to +2.74), permutation p=0.2097; 1994-2009 +0.67 pp, 2010-2026 +0.70 pp; ZLB 2009-2015 +3.94 pp; long-only arm Sharpe 0.05 vs buy-and-hold 0.52 (1994-01-03..2026-10-09, excess over T-bills) — not_supported: only 85 expansionary+contractionary meetings, below the trial's min_n 120, so the verdict cannot be supported and a failing criterion counts only when it fails decisively, its 95% interval wholly on the wrong side of the claimed bound or, for a one-sided 5% test, the mirror one-sided test from the same draws rejecting at 5% (house rule 5): failed: long-only expansionary arm Sharpe > buy-and-hold Sharpe (fails decisively below min_n) (not implemented: net gap > 1 pp (fails, not decisively, below min_n: undecided); permutation p < 0.05 (fails, not decisively, below min_n: undecided); n >= trial min_n (85 of 120 expansionary+contractionary meetings)) (criteria at face value: not_supported, failed: net gap > 1 pp; permutation p < 0.05; long-only expansionary arm Sharpe > buy-and-hold Sharpe)
+- note: from the underlying-library library: Post-FOMC directional drift (monetary momentum); harness suggestion: data/fetch.py: fred_series('DGS2') (the FRED route exists); events.py: post_event_directional_drift(days, closes, event_days, signal_by_event, horizon=15, threshold_bps=5) with label permutation and block bootstrap. | verifier: corrected claim/trial
 
 ### T-362 · crypto-cme-cash-and-carry
 
@@ -1787,6 +2800,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: days to expiry from the exchange calendar; spot sampled at the futures settle time; DTB3 known on the day. Yahoo's front-month roll date is undocumented: drop observations within 3 days of expiry, and cross-check the continuous series against listed contracts (BTCZ26.CME has data from 2024-12) where they overlap. Costs: 20 bp round trip plus CME fees ($2.5-6 per 5-BTC contract). Margin earns T-bills. Survivorship: none (single asset). Multiple testing: 10 trials into the DSR. Regimes: pre/post FTX (2022-11) and pre/post spot ETF (2024-01) reported separately.
 - harness: carry_cme_cash_and_carry
 - result X-952748a4: not_supported — 57 test contract-months 2022-01..2026-09 (h = DTB3 + 3%, entered 26; exit at the 16:00 London index, the trial's BRR proxy): mean annualised excess over DTB3 on capital +0.14%, one-sided 95% lower bound -0.57% (need > 0); DSR 0.095 (need > 0.95); mean settlement slippage +0.103% of spot; control with the mean 15:00/16:00 London index as exit (not in the verdict): mean +1.01%, lower bound +0.35%, DSR 0.991; claim window 2018-01..2026-09 covered: no, 17 contract-months (2018-01..2019-05) have no settle-synchronous spot; fit window covered from 2019-06 with mean +5.47% over 31 contracts — failed: one-sided 95% studentized block-bootstrap lower bound of mean annualised excess > 0; DSR > 0.95 (n_trials = 10) (not implemented: claim window from 2018-01 covered by settle-synchronous spot)
+- result X-926afbde: not_supported — 57 test contract-months 2022-01..2026-09 (h = DTB3 + 3%, entered 26; exit at the 16:00 London index, the trial's BRR proxy): mean annualised excess over DTB3 on capital +0.14%, one-sided 95% lower bound -0.57% (need > 0); DSR 0.095 (need > 0.95); mean settlement slippage +0.103% of spot; control with the mean 15:00/16:00 London index as exit (not in the verdict): mean +1.01%, lower bound +0.35%, DSR 0.991; claim window 2018-01..2026-09 covered: no, 17 contract-months (2018-01..2019-05) have no settle-synchronous spot; fit window covered from 2019-06 with mean +5.47% over 31 contracts — failed: one-sided 95% studentized block-bootstrap lower bound of mean annualised excess > 0; DSR > 0.95 (n_trials = 10) (not implemented: claim window from 2018-01 covered by settle-synchronous spot)
 - note: from the underlying-library library: Crypto cash-and-carry via CME/Coinbase dated futures; harness suggestion: mandel/experiments/carry.py: basis_carry(spot, fut, rf, cost_bps) reusing ratio_reversion bootstrap; add Yahoo BTC=F/ETH=F/MBT=F to the daily-history bundles | verifier: corrected claim/trial
 
 ### T-363 · crypto-perpetual-funding-carry
@@ -1802,6 +2816,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: funding is known only after each hour (available_at = record timestamp). Inverse-contract P&L is converted to USD at each mark. Costs: taker 5-10 bp per side plus the observed spot-perp spread. Liquidation is modeled for linear perps at 2x with the daily mark. Survivorship: BTC and ETH only, but venue survivorship applies (FTX perps no longer exist, so the result is Deribit-specific). Deribit is not US-accessible, so the US claim needs the Kraken/CDE replication. Regimes reported: 2020 crash, 2021 bull, 2022 FTX, 2024+ ETF era. 12 trials deflated.
 - harness: carry_perp_funding_threshold
 - result X-4644d81f: not_supported — test 2023-01-01..2026-09-30, 1369 days, 372 in position, 118 switches overall (threshold DTB3 + 4%, 10 bp per side per leg): Sharpe of daily excess, pessimistic / central / optimistic spread = -1.35 / -0.64 / 0.40 (need > 1; funding-only -0.80); one-sided 95% lower bound -2.53 / -2.00 / -1.15 (need > 0.3); DSR 0.000 / 0.001 / 0.191 (need > 0.95); perp mark history not archived, spread reconstructed from funding with |u| <= 0.05%; cost read as 10 bp per side for the whole position instead of per leg: Sharpe 0.40 / 1.94 / 4.02; hysteresis control (exit < DTB3) central Sharpe 1.13 — failed: test Sharpe > 1.0 after costs and perp-spot spread (spread-bounded); stationary-bootstrap one-sided 95% lower bound of Sharpe > 0.3 (spread-bounded); DSR > 0.95 with n_trials = 12 (spread-bounded)
+- result X-236388dc: not_supported — test 2023-01-01..2026-09-30, 1369 days, 372 in position, 118 switches overall (threshold DTB3 + 4%, 10 bp per side per leg): Sharpe of daily excess, pessimistic / central / optimistic spread = -1.35 / -0.64 / 0.40 (need > 1; funding-only -0.80); one-sided 95% lower bound -2.53 / -2.00 / -1.15 (need > 0.3); DSR 0.000 / 0.001 / 0.191 (need > 0.95); perp mark history not archived, spread reconstructed from funding with |u| <= 0.05%; cost read as 10 bp per side for the whole position instead of per leg: Sharpe 0.40 / 1.94 / 4.02; hysteresis control (exit < DTB3) central Sharpe 1.13 — failed: test Sharpe > 1.0 after costs and perp-spot spread (spread-bounded); stationary-bootstrap one-sided 95% lower bound of Sharpe > 0.3 (spread-bounded); DSR > 0.95 with n_trials = 12 (spread-bounded)
 - note: from the underlying-library library: Perpetual funding-rate carry (long spot, short perp); harness suggestion: mandel/data/options.py: add deribit_funding_history and coinbase_cde_products snapshot to collect_options_daily; mandel/experiments/carry.py: funding_carry() | verifier: corrected claim/trial
 
 ### T-364 · crypto-carry-predicts-crashes
@@ -1817,6 +2832,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: trailing percentiles only, synchronous spot, roll days excluded. Overlap handled by block permutation. Costs: 10 bp per switch for the timing rule. Survivorship: none. Multiple testing: 4 variants counted. Regime: pre/post 2022 and pre/post ETF reported.
 - harness: carry_basis_crash_predictor
 - result X-1578602f: not_supported — 321 weeks 2020-05-04..2026-09-14 (31 top-decile, 175 bottom-half): mean 30-day max drawdown 10.6% vs 13.7%, gap -3.2 pp (need >= 10); permutation p 0.9304 (need < 0.05); halves -2.4 / -2.7 pp (need both > 0); 14 non-overlapping episodes (need >= 8); weeks need >= 350; window from 2018-12 covered: no (settle-synchronous spot starts 2019-05, first labelled week 2020-05-04) — failed: depth gap (top decile - bottom half) >= 10 pp; block-permutation p < 0.05; gap positive in both halves (split 2022-01) (not implemented: weeks >= 350 (min_n); claim window from 2018-12 covered by settle-synchronous basis with a 52-week history)
+- result X-5e6643c4: not_supported — house rule 10: no weekday is named, so the criteria are judged on the 1601 labelled observations pooled over the 5 weekday phases (Mon/Tue/Wed/Thu/Fri; each labelled from its own trailing 52 observations; permutation and bootstrap in blocks of 9 weeks = 45 pooled entries, >= 2 x the 30-day horizon; per phase the trial's 8 weeks; episodes are the most any single phase holds, never the union of phases). 321 weeks 2020-05-04..2026-09-14 (146 top-decile, 892 bottom-half observations): mean 30-day max drawdown 10.3% vs 13.9%, gap -3.6 pp (need >= 10); permutation p 0.9644 (need < 0.05); halves -1.6 / -3.8 pp (need both > 0); 18 non-overlapping episodes in the best single phase (need >= 8); weeks need >= 350; window from 2018-12 covered: no (settle-synchronous spot starts 2019-05, first labelled week 2020-05-04); 9-week (45 pooled entries, >= 2 x the 30-day horizon) block-bootstrap 95% CIs of the gap all [-6.1, -1.2] pp, first [-5.1, 2.8] pp, second [-7.0, -1.0] pp; one-sided 95% upper bound of the gap -1.6 pp from the same draws (decisive for the permutation test below min_n when <= 0). Per phase (reported, not judged): gap -4.4 to -3.1 pp (0 of 5 phases >= 10); permutation p 0.9304 to 0.9910 (0 of 5 < 0.05); both halves positive in 0 of 5; episodes 14-18 (5 of 5 >= 8); 0 of 5 phases pass all four; Mon -3.2 pp p 0.930, Tue -3.1 pp p 0.942, Wed -4.4 pp p 0.984, Thu -4.3 pp p 0.991, Fri -3.3 pp p 0.956 — only 321 weeks, below the trial's min_n 350, so the verdict cannot be supported and a failing criterion counts only when it fails decisively (house rule 5). Decisive failures: depth gap (top decile - bottom half) >= 10 pp; block-permutation p < 0.05; gap positive in both halves (split 2022-01). not_supported: failed: depth gap (top decile - bottom half) >= 10 pp (fails decisively below min_n); block-permutation p < 0.05 (fails decisively below min_n); gap positive in both halves (split 2022-01) (fails decisively below min_n) (not implemented: weeks >= 350 (min_n); claim window from 2018-12 covered by settle-synchronous basis with a 52-week history) (criteria at face value: not_supported, failed: depth gap (top decile - bottom half) >= 10 pp; block-permutation p < 0.05; gap positive in both halves (split 2022-01) (not implemented: weeks >= 350 (min_n); claim window from 2018-12 covered by settle-synchronous basis with a 52-week history))
 - note: from the underlying-library library: Crypto carry as a crash predictor (basis signal); harness suggestion: mandel/experiments/carry.py: conditional_tail(signal, returns, horizon) with block permutation | verifier: corrected claim/trial
 
 ### T-368 · fx-carry-g10-retail
@@ -1832,6 +2848,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: OECD monthly averages lagged one month. Costs: FRED noon fixing vs broker fill (+2 bp), financing 1% per leg per year. Survivorship: none (fixed G10 universe; EUR from 1999, legacy DEM not used). Regime: pre/post 2008, ZIRP 2009-2021, 2022 hikes and the 2024 yen unwind reported. Stale-series splice flagged. Crash skew reported. 6 trials deflated.
 - harness: fx_carry_g10
 - result X-a37f0b0b: not_supported — G10 carry (10 incl. USD, top 3 - bottom 3), test 2013-01..2026-09 (165 months), weights equal + VIX > 30 filter chosen on 2002-06..2012-12 (train Sharpe equal 0.33 vs inverse-vol 0.26, with VIX > 30 filter equal 0.38 vs inverse-vol 0.31; test Sharpe of the other weighting with the same filter -0.35; flat in 8 of 165 test months): net Sharpe -0.30 (need > 0.3); stationary-bootstrap 95% interval [-0.66, +0.10] (lower bound need > 0); DSR 0.008 at 6 trials (need > 0.95). Gross Sharpe 0.01, net -1.65%/yr, costs 0.05% trade + 1.67% financing a year, skew -0.26, MDD -27.9%, carry spread 2.39 pp; stale rates spliced by forward fill (flagged): EUR 2026-02..2026-08 (7 mo), GBP 2026-02..2026-08 (7 mo), JPY 2026-08..2026-08 (1 mo); Sharpe through 2026-02 (before the splice) -0.36; one-month gaps filled: USD 2020-04..2020-04 (1 mo) — failed: test-window net Sharpe > 0.3; stationary-bootstrap lower bound > 0; DSR > 0.95 with n_trials = 6
+- result X-c1c7d0cf: not_supported — G10 carry (10 incl. USD, top 3 - bottom 3), test 2013-01..2026-09 (165 months), weights equal + VIX > 30 filter chosen on 2002-06..2012-12 (train Sharpe equal 0.33 vs inverse-vol 0.26, with VIX > 30 filter equal 0.38 vs inverse-vol 0.31; test Sharpe of the other weighting with the same filter -0.35; flat in 8 of 165 test months): net Sharpe -0.30 (need > 0.3); stationary-bootstrap 95% interval [-0.66, +0.10] (lower bound need > 0); DSR 0.008 at 6 trials (need > 0.95). Gross Sharpe 0.01, net -1.65%/yr, costs 0.05% trade + 1.67% financing a year, skew -0.26, MDD -27.9%, carry spread 2.39 pp; stale rates spliced by forward fill (flagged): EUR 2026-02..2026-08 (7 mo), GBP 2026-02..2026-08 (7 mo), JPY 2026-08..2026-08 (1 mo); Sharpe through 2026-02 (before the splice) -0.36; one-month gaps filled: USD 2020-04..2020-04 (1 mo) — failed: test-window net Sharpe > 0.3; stationary-bootstrap lower bound > 0; DSR > 0.95 with n_trials = 6
 - note: from the underlying-library library: G10 FX carry for US retail (OANDA/IBKR); harness suggestion: mandel/experiments/carry.py: cross_sectional_carry(rates, spots, k=3) with bootstrap; FRED fetch list extended | verifier: corrected claim/trial
 
 ### T-379 · vix-futures-roll-yield-carry
@@ -1846,9 +2863,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: test-window Sharpe > 0.5 with lower bound > 0 and max drawdown < 50%; 4 variants counted
 - controls: XIV delisting (survivorship) noted: SVXY changed leverage to -0.5x in Feb 2018 (regime); ETP tracking vs futures; borrow fee for shorting VXX; costs 10 bp; regime dependence central
 - harness: svxy_regime
-- result X-7ca7aeae: error — harness raised NameError
 - result X-de245b0b: not_supported — SVXY in contango only, 2018-: Sharpe 0.16 (lower -0.42), MDD -47% vs always-long Sharpe 0.07, MDD -95% — failed: test Sharpe > 0.5 with lower bound > 0 (not implemented: SVIX arm)
 - result X-42cab9a8: not_supported — SVXY in contango only, 2018-, filled at the next open: Sharpe 0.20 (lower -0.40), MDD -48% vs always-long Sharpe 0.07, MDD -95% — failed: test Sharpe > 0.5 with lower bound > 0 (not implemented: SVIX arm)
+- result X-bcbeed32: not_supported — SVXY in contango only, 2018-, filled at the next open: Sharpe 0.20 (lower -0.40), MDD -48% vs always-long Sharpe 0.07, MDD -95% — failed: test Sharpe > 0.5 with lower bound > 0 (not implemented: SVIX arm)
 - note: from the underlying-library library: VIX futures roll-yield carry via ETPs; harness suggestion: mandel/experiments/volatility.py: term_structure_filter(etp, vix, vix3m); add Cboe VX CSV fetcher to mandel/data/options.py | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-435 (verifier-corrected wording)
 
 ### T-382 · value-hml-etf-tilt
@@ -1864,6 +2881,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: FF portfolios formed in June using prior-fiscal-year book equity (6-month lag by construction); pin the data vintage. Survivorship: none (CRSP-based, includes delistings). Costs: applied to the ETF diagnostic (fees, borrow, spreads). Multiple testing: 5 variants here, counted in the family-wide DSR. Regime: report 1993-2006, 2007-2020 and 2021-2026 separately; the 2007-2020 drawdown is the key stress.
 - harness: fact_value_hml
 - result X-7be8d61a: not_supported — HML 1993-01-04..2026-08-31 [data end 2026-08-31; claim window runs to 2026-09] (n=8473 days): annualised mean +2.36%, 95% studentized block-20 CI -1.73% to +6.61%; family DSR 0.003 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); regimes 1993-2006 +7.18%, 2007-2020 -4.75%, 2021-2026 +8.04%; rolling 10y means -6.89% to +10.25% (54% > 0); diagnostic IWD-IWF net -1.91%/yr, capture ratio 0.69 — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
+- result X-71229ca8: not_supported — HML 1993-01-04..2026-08-31 [data end 2026-08-31; claim window runs to 2026-09] (n=8473 days): annualised mean +2.36%, 95% studentized block-20 CI -1.73% to +6.61%; family DSR 0.003 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); regimes 1993-2006 +7.18%, 2007-2020 -4.75%, 2021-2026 +8.04%; rolling 10y means -6.89% to +10.25% (54% > 0); diagnostic IWD-IWF net -1.91%/yr, capture ratio 0.69 — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
 - note: from the underlying-library library: Value premium (HML) via value/growth ETF pair; harness suggestion: mandel/experiments/underlying.py: add factor_etf_tilt(symbol_long, symbol_short, ff_factor) returning capture ratio, alpha t-stat, bootstrap CI; shared by value/quality/size/profitability/BAB entries. | verifier: corrected claim/trial
 
 ### T-383 · quality-qmj-etf-tilt
@@ -1879,6 +2897,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: betas from t-1; ETF prices tradable. Survivorship: none at ETF level. Costs: 0.15% fee, SPY borrow ~0.3%, 2 bp/month hedge rebalance. Multiple testing: 4 variants into the family-wide DSR. Regime: 2020-2022 growth/rate shock sub-sample reported separately.
 - harness: fact_quality_qual
 - result X-a957b72c: not_supported — QUAL-SPY hedged spread 2013-11..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=154 months, net of 0.30% borrow, 0.15% fee, 2 bp/month): alpha -1.04%/yr, NW t -1.34 (needs >= 2.0), bootstrap 95% CI -2.70% to +0.47%; QMJ loading not available; family DSR 0.000 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); without re-deducting the in-NAV fee alpha t -1.15; QMJ validity needs the AQR QMJ series (not archived) — failed: FF5+UMD alpha NW t >= 2.0; family-wide DSR > 0.95 (not implemented: QMJ loading > 0.5 (validity))
+- result X-6af9f78b: not_supported — QUAL-SPY hedged spread 2013-11..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=154 months, net of 0.30% borrow, 0.15% fee, 2 bp/month): alpha -1.04%/yr, NW t -1.34 (needs >= 2.0), bootstrap 95% CI -2.70% to +0.47%; QMJ loading not available; family DSR 0.000 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); without re-deducting the in-NAV fee alpha t -1.15; QMJ validity needs the AQR QMJ series (not archived) — failed: FF5+UMD alpha NW t >= 2.0; family-wide DSR > 0.95 (not implemented: QMJ loading > 0.5 (validity))
 - note: from the underlying-library library: Quality minus junk via quality ETF; harness suggestion: Reuse factor_etf_tilt; add a factor-regression helper (OLS with Newey-West) on FF5+UMD that every factor-ETF entry calls. | verifier: corrected claim/trial
 
 ### T-384 · low-volatility-tilt
@@ -1893,9 +2912,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Lower 95% bound of Sharpe difference > 0 over the full live window and positive in at least 3 of 4 rolling windows.
 - controls: Look-ahead: none. Survivorship: none at ETF level. Costs: 0.15-0.25% fees, 0.3% borrow on short leg. Multiple testing: 4 variants into the shared DSR. Regime: separate 2022 rate-shock window; test sensitivity to 10-year yield changes (FRED DGS10).
 - harness: low_vol_tilt
-- result X-9bfda3b1: not_supported — USMV Sharpe 0.90 vs SPY 0.93 since 2011-10-20 (diff -0.04, lower -0.26); sub-windows +0.22/+0.27/-0.05/-0.35; SPLV-SPHB -2.53 bps/day — failed: Sharpe diff lower bound > 0; positive in >= 3 of 4 windows
 - result X-cecc68c9: not_supported — USMV Sharpe 0.90 vs SPY 0.93 since 2011-10-20 (diff -0.04, lower -0.26); sub-windows +0.22/+0.27/-0.05/-0.35; SPLV-SPHB -2.53 bps/day — failed: Sharpe diff lower bound > 0; positive in >= 3 of 4 windows; SPLV-SPHB mean > 0
 - result X-bebc64d1: not_supported — USMV excess Sharpe 0.75 vs SPY 0.82 over 2011-11-01..2026-09-30 (3749 days; diff -0.07, lower -0.30); rolling 5-year windows +0.23/+0.29/-0.08/-0.28; SPLV-SPHB -3.23 bps/day — failed: Sharpe diff lower bound > 0; positive in >= 3 of 4 rolling 5-year windows; SPLV-SPHB mean > 0
+- result X-7f523546: not_supported — USMV excess Sharpe 0.75 vs SPY 0.82 over 2011-11-01..2026-09-30 (3749 days; diff -0.07, lower -0.30); rolling 5-year windows +0.23/+0.29/-0.08/-0.28; SPLV-SPHB -3.23 bps/day — failed: Sharpe diff lower bound > 0; positive in >= 3 of 4 rolling 5-year windows; SPLV-SPHB mean > 0
 - note: from the underlying-library library: Low-volatility / minimum-variance tilt; harness suggestion: factor_etf_tilt with a sharpe_diff mode; add FRED DGS10 as a conditioning variable for the regime test. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-448 (verifier-corrected wording)
 
 ### T-385 · size-smb-tilt
@@ -1911,6 +2930,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: none (no parameters). Survivorship: none at ETF/factor level. Costs: fee differential (IJR 0.06%, IWM 0.19%) is in NAV; IWM borrow ~0.3%; 5 bp per rebalance. Multiple testing: 4 variants into the family-wide DSR. Regime: 2000-2006 small-cap boom vs 2014-2026 mega-cap era; June reconstitution confound.
 - harness: fact_size_ijr_iwm
 - result X-d778fa2b: not_supported — IJR-IWM 2000-06-01..2026-09-30 (n=6622 days, 0.3% borrow, 5 bp per monthly reset): annualised mean +0.22%, 95% studentized CI -1.21% to +1.71%; RMW loading +0.18 (NW t +4.68, needs > 1.96); family DSR 0.001 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); June-excluded +0.32%/yr — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
+- result X-ea53d084: not_supported — IJR-IWM 2000-06-01..2026-09-30 (n=6622 days, 0.3% borrow, 5 bp per monthly reset): annualised mean +0.22%, 95% studentized CI -1.21% to +1.71%; RMW loading +0.18 (NW t +4.68, needs > 1.96); family DSR 0.001 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); June-excluded +0.32%/yr — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
 - note: from the underlying-library library: Size premium (small minus big); harness suggestion: factor_etf_tilt; add a two-part verdict (raw vs conditional) in the registry so the parked raw-size claim and the live conditional claim are distinct trials. | verifier: corrected claim/trial
 
 ### T-386 · profitability-rmw-tilt
@@ -1926,6 +2946,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: June formation with prior fiscal-year accounting data; pin vintage. Survivorship: none (CRSP). Costs: COWZ 0.49% fee is material in the diagnostic. Multiple testing: 4 variants. Regime: 2021-2023 energy rally; 2020 junk rally.
 - harness: fact_profitability_rmw
 - result X-895b101f: not_supported — RMW 2013-07-01..2026-08-31 [data end 2026-08-31; claim window runs to 2026-09] (n=3312 days): annualised mean +1.86%, 95% studentized block-20 CI -2.60% to +6.38%; family DSR 0.050 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); regimes 2013-2019 +1.57%, 2020-2026 +2.14%; rolling 5y means -1.89% to +8.26% (98% > 0); diagnostic COWZ hedged FF5+XLE+XLK alpha +0.63%/yr (t +0.35), XLE loading +0.11 — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
+- result X-399f2429: not_supported — RMW 2013-07-01..2026-08-31 [data end 2026-08-31; claim window runs to 2026-09] (n=3312 days): annualised mean +1.86%, 95% studentized block-20 CI -2.60% to +6.38%; family DSR 0.050 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); regimes 2013-2019 +1.57%, 2020-2026 +2.14%; rolling 5y means -1.89% to +8.26% (98% > 0); diagnostic COWZ hedged FF5+XLE+XLK alpha +0.63%/yr (t +0.35), XLE loading +0.11 — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
 - note: from the underlying-library library: Profitability / cash-flow tilt (RMW); harness suggestion: factor_etf_tilt + factor regression helper; add sector-ETF controls (XLE, XLK) as optional regressors. | verifier: corrected claim/trial
 
 ### T-387 · betting-against-beta-etf
@@ -1941,6 +2962,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: betas to t-1. Survivorship: none at ETF level. Costs: broker margin rate (not T-bill), borrow, 2 bp rebalance. Multiple testing: 4 variants; trials correlated with low-volatility-tilt (same ETFs). Regime: 2020 high-beta rebound; 2022 rate hikes.
 - harness: fact_bab_etf
 - result X-4f844e88: not_supported — BAB spread 2011-08-03..2026-09-30 (n=3812 days, 289 resets, financing at bill + 1.0%, 0.5% borrow, 2 bp per reset; 67 flat days held in cash because a reset found a trailing beta <= 0 or missing; held ex-ante beta within +/-0.150): annualised mean +0.71%, 95% studentized CI -7.28% to +8.58%; ex-post beta +0.012 (needs |b| < 0.1); family DSR 0.008 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); diagnostic FF5 alpha -0.92%/yr (t -0.26), corr with AQR BAB since 2014 0.46 — failed: lower 95% bound of the annualised mean net excess return > 0; family-wide DSR > 0.95
+- result X-e127b6c6: not_supported — BAB spread 2011-08-03..2026-09-30 (n=3812 days, 289 resets, financing at bill + 1.0%, 0.5% borrow, 2 bp per reset; 67 flat days held in cash because a reset found a trailing beta <= 0 or missing; held ex-ante beta within +/-0.150): annualised mean +0.71%, 95% studentized CI -7.28% to +8.58%; ex-post beta +0.012 (needs |b| < 0.1); family DSR 0.008 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); diagnostic FF5 alpha -0.92%/yr (t -0.26), corr with AQR BAB since 2014 0.46 — failed: lower 95% bound of the annualised mean net excess return > 0; family-wide DSR > 0.95
 - note: from the underlying-library library: Betting against beta (BAB) with low/high-beta ETFs; harness suggestion: Add beta_neutral_spread() to underlying.py (rolling beta, leverage, financing) and reuse for any pair; ingest AQR BAB Excel through the same fetch layer as Ken French. | verifier: corrected claim/trial
 
 ### T-388 · factor-momentum-rotation
@@ -1956,22 +2978,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: 1-month skip; vol weights to t-1. Survivorship: none. Costs: ~2 switches/yr per factor at 5 bp, factor turnover itself not costed in FF series (note: paper factors are pre-cost). Multiple testing: formation windows and rules counted. Regime: 2009 momentum crash, 2020-2021 value reversal.
 - harness: fact_factor_momentum
 - result X-1ee8d7ce: not_supported — HML/SMB/RMW/CMA/UMD/BAB 1964-07..2026-07 (n=745 months): timed 12-1 Sharpe 1.04 vs static 1.08, difference -0.04 (95% studentized CI -0.24 to +0.17); DSR 0.080 over 5 variants (annualised Sharpe of each timed-minus-static series: ts_12_1 +0.00, ts_1 -0.33, ts_3 -0.16, ts_6 -0.14, xs_12_1 -0.37); PBO 0.29; post-2019 difference 0.06 (reported) — failed: lower 95% bound of the Sharpe difference > 0; DSR > 0.95 with all 5 variants counted
+- result X-15d473d7: not_supported — HML/SMB/RMW/CMA/UMD/BAB 1964-07..2026-07 (n=745 months): timed 12-1 Sharpe 1.04 vs static 1.08, difference -0.04 (95% studentized CI -0.24 to +0.17); DSR 0.080 over 5 variants (annualised Sharpe of each timed-minus-static series: ts_12_1 +0.00, ts_1 -0.33, ts_3 -0.16, ts_6 -0.14, xs_12_1 -0.37); PBO 0.29; post-2019 difference 0.06 (reported) — failed: lower 95% bound of the Sharpe difference > 0; DSR > 0.95 with all 5 variants counted
 - note: from the underlying-library library: Factor momentum rotation across factor ETFs; harness suggestion: Reuse the deflated trend-rule search from T-58 (overfit.py) with factor series as the input; add ETF implementation as the holdout. | verifier: corrected claim/trial
-
-### T-389 · contrarian-factor-timing
-
-**Claim.** Tilting a static equal-risk FF5+UMD portfolio by 60-month factor-return reversal z-scores raises its Sharpe ratio over 1968-2026.
-
-- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.aqr.com/Insights/Research/Journal-Article/Contrarian-Factor-Timing-is-Deceptively-Difficult (fetched), https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html (fetched)
-- statistic: Sharpe difference (timed minus static), monthly, studentized block-bootstrap CI (block 12).
-- null: Sharpe difference <= 0.
-- procedure: Pre-registered windows {36, 60} and sets {all, ex-HML}, plus the value-spread variant: 5 trials. Expanding-window z-scores only; one-quarter embargo between signal and rebalance; deflated Sharpe over 5 trials.
-- data: Ken French monthly FF5 + UMD; 6_Portfolios_2x3 BE/ME section (verified 200). · min n: 600
-- pass: Lower 95% bound > 0 AND DSR > 0.95 over 5 trials; otherwise parked with reason 'contrarian factor timing adds nothing beyond static exposure' (the expected outcome).
-- controls: Look-ahead: expanding windows; BE/ME uses fiscal-year t-1 book known by June t. Survivorship: none. Costs: quarterly tilts at 5 bp. Multiple testing: 5 trials. Regime: 2018-2020 value drawdown is the key stress.
-- harness: fact_contrarian_timing
-- result X-fb91d2c6: not_supported — Mkt-RF/SMB/HML/RMW/CMA/UMD 1968-01..2026-08 (n=704 months): 60-month z tilt Sharpe 1.07 vs static 1.11, difference -0.03 (95% studentized CI -0.12 to +0.04); DSR 0.056 over 5 trials not decided: value-spread trial not computable (6_Portfolios_2x3 BE/ME not archived), so only 4 of the 5 trial Sharpes are in the variance (reported only); annualised Sharpe of each timed-minus-static series z60_all -0.13, z60_exHML -0.13, z36_all -0.05, z36_exHML +0.02 — failed: lower 95% bound of the Sharpe difference > 0 (not implemented: DSR > 0.95 over 5 trials (value-spread trial not computable))
-- note: from the underlying-library library: Contrarian factor timing (value-spread / long-term factor reversal); harness suggestion: Small addition to the factor-momentum harness: z-score tilt vs static baseline, same bootstrap. | verifier: corrected claim/trial
 
 ### T-397 · esg-exclusion-sin-premium
 
@@ -1986,6 +2994,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: none (industry codes are point-in-time in CRSP). Survivorship: FF industry portfolios include delistings; the single-stock basket is survivor-picked today (flag, context only). Costs: 5 bp per rebalance; ESGU borrow ~0.5%. Multiple testing: 4 variants. Regime: 2017-2022 tobacco multiple compression; 2022 defence rally.
 - harness: fact_sin_alpha
 - result X-da0f8875: not_supported — Smoke/Beer/Guns EW 2009-01..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=212 months): FF5 alpha +3.08%/yr, NW t +1.41 (needs >= 2), bootstrap 95% CI -1.77% to +7.45%; CAPM alpha +4.80%/yr (t +1.88); 1965-2008 FF5 alpha -0.88%/yr (t -0.51) — failed: FF5 alpha NW t >= 2
+- result X-72ef05ee: not_supported — Smoke/Beer/Guns EW 2009-01..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=212 months): FF5 alpha +3.08%/yr, NW t +1.41 (needs >= 2), bootstrap 95% CI -1.77% to +7.45%; CAPM alpha +4.80%/yr (t +1.88); 1965-2008 FF5 alpha -0.88%/yr (t -0.51) — failed: FF5 alpha NW t >= 2
 - note: from the underlying-library library: ESG exclusion / sin-stock premium; harness suggestion: Reuse factor regression helper on Ken French industry portfolios; add an industry-portfolio loader to data/fetch.py. | verifier: corrected claim/trial
 
 ### T-421 · highlow-spread-liquidity-shock
@@ -2001,6 +3010,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: estimators use days t-1 and t only; VIX at the same close. Survivorship: not applicable. Costs: SPY 1 bp; BTC 0.5-1% round trip at retail. Multiple testing: 32 cells. Regime: report excluding 2008 and 2020.
 - harness: ohlc_cs_spread_shock
 - result X-ea63a856: not_supported — SPY 2000-01-03..2026-09-14: 356 shock days (CS spread > +2 sd of trailing 60), 131 non-overlapping events (need 60); 20-day forward-return coefficient +0.13 points (95% CI -0.70..+0.88; need >= 1) with p=0.373 vs <= 0 (p=0.980 vs <= 1 point), controlling for the VIX change; excluding 2008/2020 +0.32 points; rule DSR 0.344 over 32 cells; out-of-sample Sharpe vs VIX-only rule -0.23 (one-sided 95% lower -0.48) — failed: shock coefficient >= 1 point; p < 0.05 (H0 coefficient <= 0); DSR >= 0.95 over 32 cells; beats the VIX-only rule out of sample
+- result X-8fd312e9: not_supported — SPY 2000-01-03..2026-09-14: 356 shock days (CS spread > +2 sd of trailing 60), 131 non-overlapping events (need 60); 20-day forward-return coefficient +0.13 points (95% CI -0.70..+0.88; need >= 1) with p=0.373 vs <= 0 (p=0.980 vs <= 1 point), controlling for the VIX change; excluding 2008/2020 +0.32 points; rule DSR 0.344 over 32 cells; out-of-sample Sharpe vs VIX-only rule -0.23 (one-sided 95% lower -0.48) — failed: shock coefficient >= 1 point; p < 0.05 (H0 coefficient <= 0); DSR >= 0.95 over 32 cells; beats the VIX-only rule out of sample
 - note: from the underlying-library library: Liquidity-shock timing from daily high-low spread estimates; harness suggestion: Implement corwin_schultz() and amihud() helpers in mandel/experiments/volatility.py (needs highs/lows from the Yahoo rows); timing rule via the ma_rule_returns pattern; compare_strategies against a VIX rule; pbo_cscv on the grid. | verifier: corrected claim/trial
 
 ### T-423 · perp-funding-basis-sentiment
@@ -2016,6 +3026,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: daily mean uses only hours up to 00:00 UTC; entry at the next hourly bar. Survivorship: not applicable. Costs: spot 0.5-1% round trip retail; perp 5 bps taker (not available to US persons). Multiple testing: 24 cells. Regime: bull vs bear; liquidation-cascade days (|return| > 10%).
 - harness: carry_funding_sentiment
 - result X-6eca056b: not_supported — 2469 days (261 top-decile, 112 non-overlapping events): full-sample 7-day return top +0.84% vs all +1.05%, difference -0.21 pp; out-of-sample 2023+ difference +0.10 pp (need <= -2) with p 0.5741 (need < 0.05; 169 top days); in-sample difference -0.78 pp; DSR of contrarian vs buy-and-hold 0.000 (need >= 0.95) — failed: out-of-sample difference <= -2 pp; out-of-sample stationary-bootstrap p < 0.05 (H0: difference >= 0); DSR >= 0.95 of contrarian-minus-buy-and-hold daily returns (n_trials = 24)
+- result X-7d0b962b: not_supported — 2469 days (261 top-decile, 112 non-overlapping events): full-sample 7-day return top +0.84% vs all +1.05%, difference -0.21 pp; out-of-sample 2023+ difference +0.10 pp (need <= -2) with p 0.5741 (need < 0.05; 169 top days); in-sample difference -0.78 pp; DSR of contrarian vs buy-and-hold 0.000 (need >= 0.95) — failed: out-of-sample difference <= -2 pp; out-of-sample stationary-bootstrap p < 0.05 (H0: difference >= 0); DSR >= 0.95 of contrarian-minus-buy-and-hold daily returns (n_trials = 24)
 - note: from the underlying-library library: Crypto perpetual basis and funding as positioning sentiment; harness suggestion: Add deribit_funding_history() beside deribit_dvol_history in mandel/data/options.py (page backward like DVOL); event study and rule P&L via underlying.py helpers; costs through backtest_eval inputs. | verifier: corrected claim/trial
 
 ### T-427 · intraday-half-hour-momentum
@@ -2031,6 +3042,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: r1 known at 10:30; the position opens at the 15:30 bar open; the exit uses the daily official close, not the 15:30 bar's last trade. Survivorship: not applicable. Costs: 2 bps round trip. Multiple testing: 60 cells. Regime: FOMC/CPI and option-expiration days (gamma mechanism).
 - harness: hourly_half_hour_momentum
 - result X-34f40b31: not_supported — SPY 2023-11-15..2026-10-13, n=720 sessions (7 early closes, 1 day(s) without the 09:30 bar, 1 without the 15:30 bar and 1 without an available daily bar excluded); archived window 2023-11-15..2026-10-13, inside the claimed 2023-11..2026-10. Rule sign(prev close->10:30) held 15:30 bar open->official close: mean net -2.09 bps/day (gross -0.09 bps, cost 2 bps round trip on 720 trades), HAC t -2.58, 95% block-bootstrap CI [-3.71, -0.55] bps, raw p 0.993, annualised net Sharpe -1.49; DSR over 60 cells 0.000 -> deflated p 1.000 (needs < 0.05); QQQ mean net -2.42 bps (n=720, HAC t -2.26); IWM mean net -1.04 bps (n=720, HAC t -1.07); diagnostic slope of the last half hour on r1 -0.0040 (HAC t -0.22) — failed: SPY mean net return > 0; deflated p < 0.05 over 60 cells; same sign on QQQ and IWM (mean net return > 0 on both)
+- result X-69c7c6a1: not_supported — SPY 2023-11-15..2026-10-13, n=720 sessions (7 early closes, 1 day(s) without the 09:30 bar, 1 without the 15:30 bar and 1 without an available daily bar excluded); archived window 2023-11-15..2026-10-13, inside the claimed 2023-11..2026-10. Rule sign(prev close->10:30) held 15:30 bar open->official close: mean net -2.09 bps/day (gross -0.09 bps, cost 2 bps round trip on 720 trades), HAC t -2.58, 95% block-bootstrap CI [-3.71, -0.55] bps, raw p 0.993, annualised net Sharpe -1.49; DSR over 60 cells 0.000 -> deflated p 1.000 (needs < 0.05); QQQ mean net -2.42 bps (n=720, HAC t -2.26); IWM mean net -1.04 bps (n=720, HAC t -1.07); diagnostic slope of the last half hour on r1 -0.0040 (HAC t -0.22) — failed: SPY mean net return > 0; deflated p < 0.05 over 60 cells; same sign on QQQ and IWM (mean net return > 0 on both)
 - note: from the underlying-library library: Market intraday momentum: first half-hour predicts last half-hour; harness suggestion: Yahoo interval=1h pilot fetch; regression and rule P&L in mandel/experiments/intraday_equity.py; BTC session variant via coinbase_candles(granularity=3600). | verifier: corrected claim/trial
 
 ### T-428 · closing-auction-reversal
@@ -2046,6 +3058,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: decision information ends at 15:45; the MOC cutoff is honoured; L is measured to the official close, which is the fill price. Survivorship: not applicable. Costs: no spread at the close print; 1 bp at the open. Multiple testing: 32 cells. Regime: month-end, index rebalances, triple witching.
 - harness: hourly_closing_reversal
 - result X-749ca45c: not_supported — SPY 2023-11-15..2026-10-12, n=720 close-to-next-open pairs (7 early closes, 1 day(s) without the 15:30 bar and 1 without an available daily bar excluded; 1 without an archived next open); archived window 2023-11-15..2026-10-12, inside the claimed 2023-11..2026-10. OLS CO(t+1) = a + b L + c R(open->15:30): b = -0.084 (HAC t -0.48, one-sided p 0.3166, Sidak over 32 cells 1.0000, 95% block-bootstrap CI [-0.416, +0.253]) vs b <= -0.2 and deflated p < 0.01; a = +6.22 bps, c = -0.039; univariate b -0.096; reversal leg sized on the 15:45 state not built (1h bars hold no price between 15:30 and the close); LOOK-AHEAD proxy sized on L to the official close: net +1.92 bps/day, annualised Sharpe +0.50, diagnostic only; QQQ slope -0.129 (HAC t -0.72, n=720); IWM slope -0.148 (HAC t -1.01, n=720); GLD slope -0.831 (HAC t -1.64, n=720) — failed: slope <= -0.2; deflated (Sidak, 32 cells) one-sided p < 0.01 (not implemented: reversal-leg net Sharpe > 0.5 sized on the 15:45 state (needs sub-hourly bars))
+- result X-34651bea: not_supported — SPY 2023-11-15..2026-10-12, n=720 close-to-next-open pairs (7 early closes, 1 day(s) without the 15:30 bar and 1 without an available daily bar excluded; 1 without an archived next open); archived window 2023-11-15..2026-10-12, inside the claimed 2023-11..2026-10. OLS CO(t+1) = a + b L + c R(open->15:30): b = -0.084 (HAC t -0.48, one-sided p 0.3166, Sidak over 32 cells 1.0000, 95% block-bootstrap CI [-0.416, +0.253]) vs b <= -0.2 and deflated p < 0.01; a = +6.22 bps, c = -0.039; univariate b -0.096; reversal leg sized on the 15:45 state not built (1h bars hold no price between 15:30 and the close); LOOK-AHEAD proxy sized on L to the official close: net +1.92 bps/day, annualised Sharpe +0.50, diagnostic only; QQQ slope -0.129 (HAC t -0.72, n=720); IWM slope -0.148 (HAC t -1.01, n=720); GLD slope -0.831 (HAC t -1.64, n=720) — failed: slope <= -0.2; deflated (Sidak, 32 cells) one-sided p < 0.01 (not implemented: reversal-leg net Sharpe > 0.5 sized on the 15:45 state (needs sub-hourly bars))
 - note: from the underlying-library library: Closing-auction imbalance and close-to-open reversal; harness suggestion: Pilot on Yahoo interval=1h bars in mandel/experiments/intraday_equity.py; full version waits for minute data; register the proxy and feed versions as separate trials. | verifier: corrected claim/trial
 
 ### T-431 · em-fx-carry
@@ -2061,6 +3074,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: rates lagged one month. Costs: EM financing 1-2% admin plus spread. Survivorship: none (fixed list chosen ex ante). Crash skew reported. Regimes: 2013 taper, 2015, 2020, 2024 yen unwind.
 - harness: fx_carry_em
 - result X-5357a646: not_supported — G10 + MXN + ZAR carry (top 3 - bottom 3), test 2013-01..2026-09 (165 months), weights equal, no filter, chosen on 2002-06..2012-12 (train Sharpe equal 0.23 vs inverse-vol 0.17, with VIX > 30 filter equal 0.21 vs inverse-vol 0.19; test Sharpe of the other weighting with the same filter 0.12): net Sharpe 0.15 (need > 0.3); stationary-bootstrap 95% interval [-0.30, +0.64] (lower bound need > 0); DSR 0.155 at 10 trials (need > 0.95). Gross Sharpe 0.44, net +1.11%/yr, costs 0.03% trade + 2.24% financing a year, skew -0.90, MDD -23.6%, carry spread 5.27 pp; stale rates spliced by forward fill (flagged): EUR 2026-02..2026-08 (7 mo), GBP 2026-02..2026-08 (7 mo), JPY 2026-08..2026-08 (1 mo); Sharpe through 2026-02 (before the splice) 0.10; one-month gaps filled: USD 2020-04..2020-04 (1 mo) — failed: test-window net Sharpe > 0.3; stationary-bootstrap lower bound > 0; DSR > 0.95 with n_trials = 10
+- result X-8d557597: not_supported — G10 + MXN + ZAR carry (top 3 - bottom 3), test 2013-01..2026-09 (165 months), weights equal, no filter, chosen on 2002-06..2012-12 (train Sharpe equal 0.23 vs inverse-vol 0.17, with VIX > 30 filter equal 0.21 vs inverse-vol 0.19; test Sharpe of the other weighting with the same filter 0.12): net Sharpe 0.15 (need > 0.3); stationary-bootstrap 95% interval [-0.30, +0.64] (lower bound need > 0); DSR 0.155 at 10 trials (need > 0.95). Gross Sharpe 0.44, net +1.11%/yr, costs 0.03% trade + 2.24% financing a year, skew -0.90, MDD -23.6%, carry spread 5.27 pp; stale rates spliced by forward fill (flagged): EUR 2026-02..2026-08 (7 mo), GBP 2026-02..2026-08 (7 mo), JPY 2026-08..2026-08 (1 mo); Sharpe through 2026-02 (before the splice) 0.10; one-month gaps filled: USD 2020-04..2020-04 (1 mo) — failed: test-window net Sharpe > 0.3; stationary-bootstrap lower bound > 0; DSR > 0.95 with n_trials = 10
 - note: from the underlying-library library: Emerging-market FX carry (high-yielders vs funders); harness suggestion: Reuse cross_sectional_carry() with an extended universe. Add DEXMXUS, DEXSFUS, DEXKOUS and the EM IR3TIB01 series to the FRED list. | added by the verifier pass
 
 ### T-435 · vix-futures-roll-yield-carry
@@ -2077,6 +3091,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: svxy_v2
 - result X-9515b742: not_supported — SVXY contango filter vs always, 2018-: Sharpe diff +0.09 (one-sided 95% lower -0.58), DSR 0.24 — failed: Sharpe diff > 0 with one-sided p < 0.05; DSR > 0.95
 - result X-20fc541b: not_supported — SVXY contango filter (position from close t+1, cash at T-bill) vs always, test 2018-01-01..2026-09-30 (2198 days; claim window 3768 days vs min_n 2500): excess Sharpe -0.17 vs 0.01, diff -0.18 (one-sided 95% lower -0.67), DSR 0.19 — failed: Sharpe diff > 0 with one-sided p < 0.05; DSR > 0.95
+- result X-7ca21f29: not_supported — SVXY contango filter (position from close t+1, cash at T-bill) vs always, test 2018-01-01..2026-09-30 (2198 days; claim window 3768 days vs min_n 2500): excess Sharpe -0.17 vs 0.01, diff -0.18 (one-sided 95% lower -0.67), DSR 0.19 — failed: Sharpe diff > 0 with one-sided p < 0.05; DSR > 0.95
 - note: from the underlying-library library: VIX futures roll-yield carry via ETPs; harness suggestion: mandel/experiments/volatility.py: term_structure_filter(etp, vix, vix3m, threshold) with a paired bootstrap. Add a Cboe VX CSV fetcher to mandel/data/options.py. | verifier-corrected restatement of T-379, whose verdict tested the earlier wording and stands
 
 ### T-437 · gold-seasonality
@@ -2093,6 +3108,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gold_autumn_v2
 - result X-0424429c: not_supported — GLD 2011- Sep-Nov minus other months -8.00 bps/day (p=0.988), halves -10.55/-5.27 — failed: difference > 5 bps/day; p < 0.05; both halves positive
 - result X-0dae2bc6: not_supported — GLD 2011- Sep-Nov minus other months -8.00 bps/day (p=0.988), halves -10.55/-5.27 — failed: difference > 5 bps/day; p < 0.05; both halves positive
+- result X-7c1f451d: not_supported — GLD 2011- Sep-Nov minus other months -8.00 bps/day (p=0.988), halves -10.55/-5.27 — failed: difference > 5 bps/day; p < 0.05; both halves positive
 - note: from the underlying-library library: Gold seasonality: autumn effect and the published reversal; harness suggestion: events.py: month_set_effect(days, closes, months={9,10,11}, start='2011-01-01') sharing code with half_year_effect; month_of_year_grid; futures_roll_mask(days, closes) for GC=F. | verifier-corrected restatement of T-356, whose verdict tested the earlier wording and stands
 
 ### T-438 · opex-week-triple-witching
@@ -2109,6 +3125,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: opex_week_v2
 - result X-b691f14a: not_supported — SPY opex week +24.4 vs other weeks +23.2 bps (excess +1.2, p=0.487, halves +18.1/-15.8) — failed: excess > 20 bps; p < 0.05; both halves positive
 - result X-9487020c: not_supported — SPY opex week +21.7 vs other weeks +22.9 bps (excess -1.2, p=0.530, halves +19.8/-22.1) — failed: excess > 20 bps; p < 0.05; both halves positive
+- result X-fffb41da: not_supported — SPY opex week +21.7 vs other weeks +22.9 bps (excess -1.2, p=0.530, halves +19.8/-22.1) — failed: excess > 20 bps; p < 0.05; both halves positive
 - note: from the underlying-library library: Options-expiration week and triple witching; harness suggestion: events.py: third_fridays(days, holidays) and last_fridays(days); week_type_effect(days, closes, week_flag_fn) producing weekly returns and the bootstrap; the witching day reuses event_day_effect. | verifier-corrected restatement of T-353, whose verdict tested the earlier wording and stands
 
 ### T-439 · quarter-end-window-dressing
@@ -2125,6 +3142,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: quarter_end_reversal
 - result X-66ce388f: not_supported — IWM quarter-end minus next-day -17.1 bps over 106 quarters (p=0.824), halves -55.6/+18.5; placebo month ends -26.7 bps (p=0.956) — failed: mean > 20 bps; bootstrap p < 0.05; both halves positive
 - result X-a1030409: not_supported — IWM quarter-end minus next-day -21.1 bps net of 4 bps costs over 106 quarters (p=0.876), halves -59.6/+14.5; placebo month ends -26.7 bps (two-sided p=0.088) — failed: mean > 20 bps net of costs; bootstrap p < 0.05; both halves positive; placebo not significant (two-sided p > 0.1)
+- result X-d1f375f9: not_supported — IWM quarter-end minus next-day -21.1 bps net of 4 bps costs over 106 quarters (p=0.876), halves -59.6/+14.5; placebo month ends -26.7 bps (two-sided p=0.088) — failed: mean > 20 bps net of costs; bootstrap p < 0.05; both halves positive; placebo not significant (two-sided p > 0.1)
 - note: from the underlying-library library: Quarter-end window dressing and 'leaning for the tape'; harness suggestion: events.py: quarter_end_pairs(days) -> list of (last_idx, first_idx); paired_day_effect(closes, pairs, placebo_pairs, n_boot=5000); run on IWM, ^RUT, SPY. | verifier-corrected restatement of T-346, whose verdict tested the earlier wording and stands
 
 ### T-440 · santa-claus-rally
@@ -2141,6 +3159,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: santa_v2
 - result X-df833342: not_supported — post-publication (1973-) Santa excess +0.86 pp over 53 years (placement p=0.010), halves +1.36/+0.37 — failed: excess > 1 pp
 - result X-3a7fb152: not_supported — post-publication (1973-) Santa excess +0.86 pp over 53 years (placement p=0.010), halves +1.36/+0.37 — failed: excess > 1 pp
+- result X-7d81c623: not_supported — post-publication (1973-) Santa excess +0.86 pp over 53 years (placement p=0.010), halves +1.36/+0.37 — failed: excess > 1 pp
 - note: from the underlying-library library: Santa Claus rally and turn-of-year indicators; harness suggestion: events.py: fixed_window_vs_random(days, closes, window_fn, length=7, n_boot=10000, start_year=1973); barometer_sign_test(days, closes, rule). | verifier-corrected restatement of T-350, whose verdict tested the earlier wording and stands | post-publication window: +0.86 pp (p 0.010), significant but under the 1 pp bar; the 1928- reading (+1.38 pp, T-350) is dominated by the pre-publication years. | 2026-10-15: after the harness audit added the claim's SPY >= 1 pp gate, T-350 was re-run and is now not_supported (SPY +0.49 pp over 33 years); T-350 and this restatement now agree.
 
 ### T-441 · sell-in-may-halloween
@@ -2157,6 +3176,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: sell_in_may_v2
 - result X-be07895f: not_supported — Nov-Apr minus May-Oct +40 bps/month over 98 years (p=0.051), post-2002 +43 — failed: difference > 50 bps/month; p < 0.05
 - result X-5c815255: not_supported — Nov-Apr minus May-Oct +40 bps/month over 98 years (p=0.051), 2002-11..2026-09 +26 (144 winter / 143 summer months) — failed: difference > 50 bps/month; p < 0.05
+- result X-9a79b1c6: not_supported — Nov-Apr minus May-Oct +40 bps/month over 98 years (p=0.051), 2002-11..2026-09 +26 (144 winter / 143 summer months) — failed: difference > 50 bps/month; p < 0.05
 - note: from the underlying-library library: Sell in May / Halloween indicator; harness suggestion: events.py: half_year_effect(days, closes, start_month=11, end_month=4, cash=dtb3) -> monthly means, block-bootstrap p, switching Sharpe; month_of_year_grid(days, closes) with Bonferroni over 12. | verifier-corrected restatement of T-352, whose verdict tested the earlier wording and stands
 
 ### T-443 · turn-of-month-replication
@@ -2173,6 +3193,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: tom_replication_v2
 - result X-5733d8cb: not_supported — turn-of-month replicates on 2/5 assets (need 3): QQQ +5.9 bps net, p=0.061; IWM +7.8 bps net, p=0.016; TLT +0.1 bps net, p=0.424; GLD -0.5 bps net, p=0.518; BTC-USD +13.7 bps net, p=0.038; joint p for 2 passes 0.029 — failed: at least 3 of 5 assets pass
 - result X-8c333d01: not_supported — turn-of-month replicates on 2/5 assets (need 3): QQQ +5.9 bps net, p=0.061; IWM +7.8 bps net, p=0.016; TLT +0.1 bps net, p=0.424; GLD -0.5 bps net, p=0.518; BTC-USD +13.5 bps net, p=0.041; joint p for 2 passes 0.025 (shared 21-day calendar blocks on demeaned series, 1000 draws) — failed: at least 3 of 5 assets pass
+- result X-71af3c3c: not_supported — turn-of-month replicates on 2/5 assets (need 3): QQQ +5.9 bps net, p=0.061; IWM +7.8 bps net, p=0.016; TLT +0.1 bps net, p=0.424; GLD -0.5 bps net, p=0.518; BTC-USD +13.5 bps net, p=0.041; joint p for 2 passes 0.025 (shared 21-day calendar blocks on demeaned series, 1000 draws) — failed: at least 3 of 5 assets pass
 - note: from the underlying-library library: Turn-of-the-month premium: cross-asset replication; harness suggestion: mandel/experiments/underlying.py: turn_of_month already exists. Add tom_replication(series: dict[str, (days, closes)], n_boot=2000) with a shared block-index bootstrap across assets for the count null; window and payday parameters for variants. | verifier-corrected restatement of T-344, whose verdict tested the earlier wording and stands
 
 ### T-444 · january-small-cap-effect
@@ -2189,22 +3210,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: january_small_cap
 - result X-65c1b193: not_supported — Russell minus S&P over the turn of the year +0.87 pp over 39 years (p=0.025, placebo p=0.034), halves +1.91/-0.13; IWM-SPY +0.09 pp — failed: ^RUT-^GSPC mean > 1 pp; both halves positive
 - result X-741364e1: not_supported — Russell minus S&P over the turn of the year +0.87 pp over 39 years (p=0.025, placebo p=0.013), halves +1.91/-0.13; IWM-SPY +0.09 pp over 26 years — failed: ^RUT-^GSPC mean > 1 pp; both halves positive; IWM-SPY mean >= 1 pp (2000-)
+- result X-ae3da327: not_supported — Russell minus S&P over the turn of the year +0.87 pp over 39 years (p=0.025, placebo p=0.013), halves +1.91/-0.13; IWM-SPY +0.09 pp over 26 years — failed: ^RUT-^GSPC mean > 1 pp; both halves positive; IWM-SPY mean >= 1 pp (2000-)
 - note: from the underlying-library library: Turn-of-year small-cap premium (January effect); harness suggestion: events.py: spread_series() plus fixed_window_vs_random() from the Santa harness with a different window_fn. | verifier-corrected restatement of T-351, whose verdict tested the earlier wording and stands
-
-### T-445 · accruals-anomaly
-
-**Claim.** The low-minus-high accruals quintile spread (Ken French, value-weighted) has a positive mean monthly return over 1996-07 to 2026-09 (after Sloan's publication).
-
-- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://ideas.repec.org/a/inm/ormnsc/v57y2011i5p797-816.html (fetched), https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Portfolios_Formed_on_AC_CSV.zip (200)
-- statistic: Mean monthly spread with block-bootstrap CI (block 12); FF5 alpha.
-- null: Mean spread <= 0.
-- procedure: Download Portfolios_Formed_on_AC (verified 200); compute spread; split 1963-1996 vs 1996-2026; no parameters.
-- data: Ken French accruals portfolios and FF5. · min n: 300
-- pass: Lower 95% bound > 0 over >= 300 post-publication months AND FF5 alpha t >= 2; otherwise parked as 'arbitraged away'.
-- controls: Look-ahead: June formation with lagged accounting data. Survivorship: none (CRSP/Compustat with delistings). Costs: annual rebalance ~5-10 bp per side, not in paper returns. Multiple testing: 4 variants. Regime: 2000-2002 and 2008.
-- harness: fact_accruals
-- result X-3a88110f: not_supported — Accruals Lo20-Hi20 1996-07..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=362 months): mean +0.17%/month, 95% studentized block-12 CI -0.10 to +0.42; FF5 alpha +0.17%/month (NW t +1.21, needs >= 2); before 1996-07 mean +0.38%/month — failed: lower 95% bound of the mean monthly spread > 0; FF5 alpha NW t >= 2
-- note: from the underlying-library library: Accruals anomaly (Sloan) post-publication; harness suggestion: data/kenfrench.py sort-portfolio loader; one spread_test() for all characteristic-sorted Ken French files (AC, NI, OP, INV, VAR). | added by the verifier pass
 
 ### T-446 · stock-momentum-umd
 
@@ -2219,6 +3226,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: skip month in formation. Survivorship: none (CRSP). Costs: UMD turnover is high (~100%+/yr per leg); paper factor pre-cost; note. Multiple testing: 4 variants; overlaps factor-momentum entry and the trend family. Regime: 2009 and 2020-2021 crashes.
 - harness: fact_momentum_umd
 - result X-a05566d2: not_supported — UMD 1993-01-04..2026-08-31 [data end 2026-08-31; claim window runs to 2026-09] (n=8473 days): annualised mean +5.45%, 95% studentized block-20 CI -0.74% to +11.09%; family DSR 0.033 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); regimes 1993-2008 +11.33%, 2009-2026 +0.12%; rolling 10y means -4.79% to +14.63% (86% > 0) — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
+- result X-9d5cebb4: not_supported — UMD 1993-01-04..2026-08-31 [data end 2026-08-31; claim window runs to 2026-09] (n=8473 days): annualised mean +5.45%, 95% studentized block-20 CI -0.74% to +11.09%; family DSR 0.033 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); regimes 1993-2008 +11.33%, 2009-2026 +0.12%; rolling 10y means -4.79% to +14.63% (86% > 0) — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
 - note: from the underlying-library library: Cross-sectional stock momentum (UMD) post-publication; harness suggestion: factor_etf_tilt on UMD/MTUM; flag cross-family duplicate with trend library. | added by the verifier pass
 
 ### T-447 · investment-asset-growth-cma
@@ -2234,6 +3242,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: June formation. Survivorship: none. Costs: paper factor pre-cost; note. Multiple testing: 4 variants. Regime: 2008, 2020 junk rally.
 - harness: fact_investment_cma
 - result X-38e281c1: not_supported — CMA 2008-07-01..2026-08-31 [data end 2026-08-31; claim window runs to 2026-09] (n=4570 days): annualised mean +0.39%, 95% studentized block-20 CI -3.02% to +3.68%; family DSR 0.004 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); regimes 2008-2019 +0.49%, 2020-2026 +0.21%; rolling 5y means -4.18% to +4.98% (60% > 0) — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
+- result X-eb7c9788: not_supported — CMA 2008-07-01..2026-08-31 [data end 2026-08-31; claim window runs to 2026-09] (n=4570 days): annualised mean +0.39%, 95% studentized block-20 CI -3.02% to +3.68%; family DSR 0.004 (needs > 0.95; 34 trials, trial-Sharpe var 3.96e-04 from 14 computable variants); regimes 2008-2019 +0.49%, 2020-2026 +0.21%; rolling 5y means -4.18% to +4.98% (60% > 0) — failed: lower 95% bound of the annualised mean > 0; family-wide DSR > 0.95
 - note: from the underlying-library library: Investment / asset-growth factor (CMA); harness suggestion: factor_etf_tilt bootstrap mode on FF5 columns. | added by the verifier pass
 
 ### T-448 · low-volatility-tilt
@@ -2250,6 +3259,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: low_vol_v2
 - result X-c5c2c5d0: not_supported — USMV Sharpe 0.90 vs SPY 0.93 over 3765 days (lower -0.26) — failed: Sharpe diff lower bound > 0 (not implemented: family-wide DSR)
 - result X-1c1042af: not_supported — USMV excess Sharpe 0.75 vs SPY 0.82 over 3749 days 2011-11-01..2026-09-30 (lower -0.30) — failed: Sharpe diff lower bound > 0 (not implemented: family-wide DSR)
+- result X-a3970f24: not_supported — USMV excess Sharpe 0.75 vs SPY 0.82 over 3749 days 2011-11-01..2026-09-30 (lower -0.30) — failed: Sharpe diff lower bound > 0 (not implemented: family-wide DSR)
 - note: from the underlying-library library: Low-volatility / minimum-variance tilt; harness suggestion: factor_etf_tilt with a sharpe_diff mode (Ledoit-Wolf studentized bootstrap); FRED DGS10 as a conditioning variable. | verifier-corrected restatement of T-384, whose verdict tested the earlier wording and stands
 
 ### T-449 · net-share-issuance
@@ -2265,23 +3275,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: June formation. Survivorship: none at portfolio level. Costs: annual rebalance. Multiple testing: 4 variants; correlated with buyback-announcement-drift. Regime: 2021 SPAC/issuance boom; 2023 buyback excise tax.
 - harness: fact_net_issuance
 - result X-b0f715c4: not_supported — Net issuance (<0)-Hi20 2008-05..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=220 months): mean +0.30%/month, 95% studentized block-12 CI -0.18 to +0.86; FF5 alpha +0.23%/month (NW t +1.35, needs >= 2); before 2008-05 mean +0.55%/month; diagnostic PKW-SPY -0.01%/month 2007-01..2026-09 — failed: lower 95% bound of the mean monthly spread > 0; FF5 alpha NW t >= 2
+- result X-f02e08fa: not_supported — Net issuance (<0)-Hi20 2008-05..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=220 months): mean +0.30%/month, 95% studentized block-12 CI -0.18 to +0.86; FF5 alpha +0.23%/month (NW t +1.35, needs >= 2); before 2008-05 mean +0.55%/month; diagnostic PKW-SPY -0.01%/month 2007-01..2026-09 — failed: lower 95% bound of the mean monthly spread > 0; FF5 alpha NW t >= 2
 - note: from the underlying-library library: Net share issuance; harness suggestion: spread_test() on Ken French NI file; PKW via factor_etf_tilt. | added by the verifier pass
-
-### T-469 · crypto-short-term-reversal
-
-**Claim.** For Coinbase BTC-USD from 2015-08 to 2026-09, the mean next-day return after a daily return below the trailing-250-day 10th percentile exceeds the unconditional mean next-day return by more than 0.6% (one retail maker round trip).
-
-- kind: underlying-strategy · origin: underlying-library:mean-reversion-statarb, https://doi.org/10.1016/j.irfa.2021.101908, https://wp.ffu.vse.cz/artkey/wps-202301-0003_impact-of-size-and-volume-on-cryptocurrency-momentum-and-reversal.php
-- statistic: conditional minus unconditional mean next-day return; net Sharpe of the long-only rule as secondary
-- null: no conditional difference (signal series circularly block-shifted against returns, as in T-61, plus stationary block bootstrap, block 10 days)
-- procedure: Use trailing 250-day thresholds only (walk-forward by construction). Run 2,000 block-shift and bootstrap resamples. Use DSR across all variants run, counting T-62/T-58 BTC daily trials in n_trials. Split 2015-2020 and 2021-2026. Repeat on Yahoo BTC-USD (2014-09) as a data-source check.
-- data: Coinbase BTC-USD daily candles since 2015-07 and ETH-USD since 2016-05 (public, verified); Yahoo BTC-USD (2014-09) and ETH-USD (2017-11) · min n: 250
-- pass: bootstrap 95% lower bound of (conditional - unconditional) > 0.6% AND both halves > 0.6% AND DSR > 0.95; otherwise park as 'no tradable daily reversal in BTC'
-- controls: Look-ahead: thresholds use t-250..t-1. Executing at the same 00:00 UTC print that defines r_t is optimistic, so entry at the 01:00 UTC hourly candle is also reported. Costs: 0.6% maker round trip (1.2% taker sensitivity). Survivorship: none for BTC/ETH; the cross-section is blocked rather than run on survivors. Multiple testing: DSR across variants plus prior Mandel BTC daily trials. Regime: halves, with the 2017 and 2021 bubbles flagged.
-- harness: btc_reversal_v2
-- result X-9d32ac28: not_supported — 422 signals: next-day excess +11.3 bps (95% CI -23.6 to +47.1; needs > 60), halves +13.9/+8.7 — failed: lower bound > 0.6%; both halves > 0.6% (not implemented: DSR > 0.95)
-- result X-baf34d0a: not_supported — 422 signals: next-day excess +11.3 bps (95% CI -23.6 to +47.2; needs > 60), halves +13.9/+8.7 — failed: lower bound > 0.6%; both halves > 0.6% (not implemented: DSR > 0.95)
-- note: from the underlying-library library: Crypto short-term reversal (time-series BTC/ETH; cross-section of coins); harness suggestion: ts_reversal_quantile: conditional-next-return test with trailing quantile thresholds and block-shift null (generalizes underlying.ratio_reversion's null), reusable for SPY/QQQ/GLD | verifier-corrected restatement of T-320, whose verdict tested the earlier wording and stands
 
 ### T-475 · xs-momentum-etf-rotation
 
@@ -2297,6 +3292,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: sector_rotation_v2
 - result X-890ef6fe: not_supported — sector top-3 alpha +17.3 bps/month over 322 months (95% CI -5.9 to +41.0; random-pick 95th pct +19.5), PBO 0.29, leave-one-out min -1.4 — failed: alpha > 0 with CI excluding 0; above permutation 95th pct; leave-one-out positive (not implemented: DSR > 0.95)
 - result X-8c4a47ea: not_supported — sector top-3 alpha +17.3 bps/month over 322 months (95% CI -5.9 to +41.0; cost-matched random-pick 95th pct +23.2), proxy PBO (12 variants, diagnostic) 0.29, leave-one-sector-out min -1.4, leave-one-decade-out 2000s +4.5/2010s +33.1/2020s +11.7 — failed: alpha > 0 with CI excluding 0; above permutation 95th pct; leave-one-out positive (not implemented: PBO < 0.5 over the declared 96-trial grid; DSR > 0.95 over the declared 96-trial grid)
+- result X-4a101e3d: not_supported — sector top-3 alpha +17.3 bps/month over 322 months (95% CI -5.9 to +41.0; cost-matched random-pick 95th pct +23.2), proxy PBO (12 variants, diagnostic) 0.29, leave-one-sector-out min -1.4, leave-one-decade-out 2000s +4.5/2010s +33.1/2020s +11.7 — failed: alpha > 0 with CI excluding 0; above permutation 95th pct; leave-one-out positive (not implemented: PBO < 0.5 over the declared 96-trial grid; DSR > 0.95 over the declared 96-trial grid)
 - note: from the underlying-library library: Cross-sectional sector ETF momentum (Select Sector SPDR rotation); harness suggestion: underlying.py: xs_momentum(adj_monthly_df, lookback, skip, top_k, long_short, abs_filter) -> weights and returns; harness xs_etf_momentum with rank-permutation null; pbo_cscv from overfit.py. | verifier-corrected restatement of T-306, whose verdict tested the earlier wording and stands
 
 ### T-478 · currency-momentum-g10
@@ -2312,6 +3308,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: month-end noon NY rates published next business day; survivorship: none (fixed currency set, EUR replaces legacy DEM from 1999); costs: 5 bps per side spot, 10-20 bps ETF spreads; multiple testing: 16 trials; regime: 2008 and 2022 dollar spikes reported
 - harness: fx_momentum_g10
 - result X-44d40cbe: not_supported — currency momentum 1999-01..2026-09 (333 months, 9-currency universe; 41 early months with 6-8 currencies while CHF/JPY rates are missing; DKK not archived): mean net -19.0 bps/month, 95% CI [-38.5, +1.0] (need > 0 and CI excluding 0); DSR 0.000 at 16 trials (need > 0.95); permutation 95th pct +1.2 bps, observed at pctile 25.7 (need above the 95th). Gross -5.4 bps, costs 13.6 bps/month, net Sharpe -0.34; full 9-currency sub-sample from 2002-06 (292 months) -12.1 bps [-32.9, +9.2]; same-fixing (no skip) -21.35 bps; stale rates spliced by forward fill (flagged): EUR 2026-02..2026-08 (7 mo), GBP 2026-02..2026-08 (7 mo), JPY 2026-08..2026-08 (1 mo); one-month gaps filled: USD 2020-04..2020-04 (1 mo); ETF cost check not run (FXE/FXY/FXB/FXF/FXC/FXA not archived; reported item, not a pass criterion) — failed: mean net monthly excess return > 0 with block-bootstrap 95% CI excluding 0; DSR > 0.95 with 16 trials; mean above the permutation 95th percentile
+- result X-8712a9b5: not_supported — currency momentum 1999-01..2026-09 (333 months, 9-currency universe; 41 early months with 6-8 currencies while CHF/JPY rates are missing; DKK not archived): mean net -19.0 bps/month, 95% CI [-38.5, +1.0] (need > 0 and CI excluding 0); DSR 0.000 at 16 trials (need > 0.95); permutation 95th pct +1.2 bps, observed at pctile 25.7 (need above the 95th). Gross -5.4 bps, costs 13.6 bps/month, net Sharpe -0.34; full 9-currency sub-sample from 2002-06 (292 months) -12.1 bps [-32.9, +9.2]; same-fixing (no skip) -21.35 bps; stale rates spliced by forward fill (flagged): EUR 2026-02..2026-08 (7 mo), GBP 2026-02..2026-08 (7 mo), JPY 2026-08..2026-08 (1 mo); one-month gaps filled: USD 2020-04..2020-04 (1 mo); ETF cost check not run (FXE/FXY/FXB/FXF/FXC/FXA not archived; reported item, not a pass criterion) — failed: mean net monthly excess return > 0 with block-bootstrap 95% CI excluding 0; DSR > 0.95 with 16 trials; mean above the permutation 95th percentile
 - note: from the underlying-library library: Currency momentum on G10 spot rates (FRED H.10) traded through currency ETFs; harness suggestion: mandel/data/fred.py batch fetch of the H.10 and IR3TIB series; xs_momentum reused on the currency panel; harness currency_momentum. | added by the verifier pass
 
 ### T-480 · dual-momentum-gem
@@ -2328,6 +3325,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: gem_v2
 - result X-d9d8fb12: not_supported — GEM Sharpe 0.80 vs 60/40 0.87 (diff -0.07, lower -0.48), MDD -21% vs -32%, PBO 0.39 over 265 months — failed: Sharpe diff > 0 with 95% CI excluding 0 (not implemented: DSR > 0.95)
 - result X-3b44aadc: not_supported — GEM excess Sharpe 0.59 vs 60/40 0.64 (diff -0.05, lower -0.44), MDD -24% vs -33%, proxy PBO (10 lookbacks, diagnostic) 0.61 over 264 months (fills at the next day's close, 6 bps per switch) — failed: Sharpe diff > 0 with 95% CI excluding 0 (not implemented: PBO < 0.5 over the declared 60-trial matrix (16 partitions); DSR > 0.95 (n_trials = 60))
+- result X-9bb47f39: not_supported — GEM excess Sharpe 0.59 vs 60/40 0.64 (diff -0.05, lower -0.44), MDD -24% vs -33%, proxy PBO (10 lookbacks, diagnostic) 0.61 over 264 months (fills at the next day's close, 6 bps per switch) — failed: Sharpe diff > 0 with 95% CI excluding 0 (not implemented: PBO < 0.5 over the declared 60-trial matrix (16 partitions); DSR > 0.95 (n_trials = 60))
 - note: from the underlying-library library: Dual momentum (Antonacci GEM): SPY vs foreign equity with T-bill filter and bond fallback; harness suggestion: underlying.py: dual_momentum(adj_monthly: dict, lookback, fallback, filter_on) -> monthly weights; harness gem_vs_6040 with pbo_cscv from overfit.py. | verifier-corrected restatement of T-305, whose verdict tested the earlier wording and stands
 
 ### T-485 · crypto-trend-sma-50-200
@@ -2344,6 +3342,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: golden_cross_v2
 - result X-b265f43a: not_supported — BTC: Sharpe diff -0.03 (95% CI -0.39 to +0.35), DSR 1.00; ETH: Sharpe diff -0.07 (95% CI -0.60 to +0.47), DSR 0.94 — failed: BTC Sharpe diff > 0 with CI excluding 0; ETH diff > 0
 - result X-888b07c2: not_supported — SMA through close t, return from close t+1; BTC from 2015-04-06: Sharpe diff -0.04 (95% CI -0.39 to +0.34), DSR 1.00 (n_trials 72, variance of 4 run variants); ETH from 2018-05-29: Sharpe diff -0.00 (95% CI -0.55 to +0.52), DSR 0.89 (n_trials 72, variance of 4 run variants) — failed: BTC Sharpe diff > 0 with CI excluding 0; ETH diff > 0
+- result X-aa5c430d: not_supported — SMA through close t, return from close t+1; BTC from 2015-04-06: Sharpe diff -0.04 (95% CI -0.39 to +0.34), DSR 1.00 (n_trials 72, variance of 4 run variants); ETH from 2018-05-29: Sharpe diff -0.00 (95% CI -0.55 to +0.52), DSR 0.89 (n_trials 72, variance of 4 run variants) — failed: BTC Sharpe diff > 0 with CI excluding 0; ETH diff > 0
 - note: from the underlying-library library: Crypto trend: 50/200-day SMA golden cross on BTC and ETH; harness suggestion: Reuse underlying.ma_rule_returns and rule_search (T-58 harness) with an sma_cross(fast, slow) addition and a paired Sharpe-difference bootstrap; add a coinbase_candles() fetcher for the cross-check. | verifier-corrected restatement of T-302, whose verdict tested the earlier wording and stands
 
 ### T-486 · btc-eth-short-horizon-tsmom
@@ -2360,6 +3359,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: crypto_weekly_v2
 - result X-9db7487c: not_supported — weekly TSMOM minus historical-mean strategy -29.5 bps/week over 604 weeks (95% CI -80.4 to +20.7), DSR 0.03, 2019- -40.5 — failed: mean d > 0 with CI excluding 0; DSR > 0.95; 2019- mean d > 0
 - result X-fd121342: not_supported — weekly TSMOM minus historical-mean strategy -46.3 bps/week over 604 weeks (164 BTC-only; 40 bps per side; 95% CI -96.0 to +2.7), DSR 0.00 (n_trials 16), 2019- -44.9 — failed: mean d > 0 with CI excluding 0; DSR > 0.95; 2019- mean d > 0
+- result X-9ef06506: not_supported — weekly TSMOM minus historical-mean strategy, pooled over all 7 week-ending weekdays (1-week holds entered daily): -50.0 bps/week over 604 weeks (4228 daily entries; 164 BTC-only weeks; 40 bps per side; 95% CI -92.0 to -7.5, blocks of 56 entries), DSR 0.00 (n_trials 16, 604 weeks), 2019- -61.8; per week end mean -67.4 to -29.0 bps, 0/7 week ends pass every criterion — failed: mean d > 0 with CI excluding 0; DSR > 0.95; 2019- mean d > 0
 - note: from the underlying-library library: Short-horizon time-series momentum in BTC and ETH (1-4 week); harness suggestion: Weekly resample plus tsmom_returns from underlying.py; harness btc_weekly_tsmom sharing the crypto trend infrastructure. | verifier-corrected restatement of T-315, whose verdict tested the earlier wording and stands
 
 ### T-487 · trend-metals-gold-silver
@@ -2376,6 +3376,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: metals_v2
 - result X-9538d6f6: not_supported — metals TSMOM minus historical-mean strategy +1.7 bps/month over 234 months (95% CI -42.0 to +45.0), DSR 0.43, futures -15.7 — failed: mean d > 0 with CI excluding 0; DSR > 0.95; futures same sign
 - result X-f829a5fe: not_supported — metals TSMOM minus historical-mean strategy -4.9 bps/month over 233 months from 2007-06 (95% CI -42.6 to +31.0), DSR 0.19 (n_trials 24), futures -7.0 over the same 233 months — failed: mean d > 0 with CI excluding 0; DSR > 0.95
+- result X-84ccd3ac: not_supported — metals TSMOM minus historical-mean strategy -4.9 bps/month over 233 months from 2007-06 (95% CI -42.6 to +31.0), DSR 0.19 (n_trials 24), futures -7.0 over the same 233 months — failed: mean d > 0 with CI excluding 0; DSR > 0.95
 - note: from the underlying-library library: Trend following on gold and silver ETFs; harness suggestion: Reuse the TSMOM harness with an inverse_vol_combiner and a roll-day mask for =F symbols. | verifier-corrected restatement of T-312, whose verdict tested the earlier wording and stands
 
 ### T-502 · pin-risk-expiration-pinning
@@ -2392,6 +3393,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: opex_pinning
 - result X-89d6979d: not_supported — SPY close's distance to the nearest $1 on 255 monthly opex days 0.255 vs 0.249 on other days (ratio 1.03, need <= 0.90; p=0.755); lower in 9/22 years
 - result X-45d0a06f: not_supported — SPY close's distance to the nearest $1 on 214 monthly expiration days 0.250 vs 0.246 on 2886 days with no SPY expiration, 2005 to Nov 2022 (ratio 1.016, need < 0.90; P(boot ratio >= 0.90) = 0.998; difference p 0.646); lower in 7/18 years (4 at least 10% lower); regimes (reported, the last outside the verdict): 2005-2015 (control Mon-Thu) 1.015, 2016-Nov 2022 (control Tue/Thu) 1.036, Nov 2022 on (daily expiries; control non-monthly days) 1.126; verdict: failed: ratio of means < 0.90; bootstrap p < 0.05 against ratio >= 0.90; opex mean lower in a majority of years
+- result X-05439d13: not_supported — SPY close's distance to the nearest $1 on 214 monthly expiration days 0.250 vs 0.246 on 2886 days with no SPY expiration, 2005 to Nov 2022 (ratio 1.016, need < 0.90; P(boot ratio >= 0.90) = 0.998; difference p 0.646); lower in 7/18 years (4 at least 10% lower); regimes (reported, the last outside the verdict): 2005-2015 (control Mon-Thu) 1.015, 2016-Nov 2022 (control Tue/Thu) 1.036, Nov 2022 on (daily expiries; control non-monthly days) 1.126; verdict: failed: ratio of means < 0.90; bootstrap p < 0.05 against ratio >= 0.90; opex mean lower in a majority of years
 - note: from the options-library library: Expiration pin risk management and pinning trade; harness suggestion: mandel/experiments/pinning.py on SPY closes; later join captured OI for OI-weighted pins. | verifier-corrected restatement of T-192, whose verdict tested the earlier wording and stands
 
 ### T-505 · put-call-parity-synthetic-forward
@@ -2406,9 +3408,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Day-one share < 2% with a one-sided 95% bootstrap bound < 2%; still < 2% on >= 16 of the first 20 captured days.
 - controls: Placebo: shift put quotes by one strike and confirm the statistic flags them; repeat on XSP (should match SPX); repeat on SPY with the American band instead of equality; exclude quotes whose last update is older than the chain timestamp.
 - harness: parity_v2
-- result X-b2f95ecc: not_supported — day one 2026-10-14: 2.2% of 590 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 3.2%; needs < 2%)
 - result X-ddcd0c9a: not_supported — day one 2026-10-14: 2.2% of 590 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 3.2%; needs < 2%); later days: 2026-10-15 0.5% (the claim makes day one decisive)
 - result X-486a58ea: not_supported — day one 2026-10-14: 2.2% of 590 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 3.2%; needs < 2%); later days: 2026-10-15 0.5% (the claim makes day one decisive)
+- result X-82ee011c: not_supported — day one 2026-10-14: 2.2% of 590 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 3.2%; needs < 2%); later days: 2026-10-15 0.5% (the claim makes day one decisive)
 - note: from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r) -> per-(K,T) table with strike-dispersion column; inverse_parity(deribit_book) using F_impl = K/(1 - (C_btc - P_btc)); 2-leg template [call+, put-] in the payoff engine must draw a straight line. | verifier-corrected restatement of T-181, whose verdict tested the earlier wording and stands
 
 ### T-506 · short-box-spread-borrow
@@ -2423,10 +3425,117 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Median < 50 bp on day one and on >= 80% of captured days.
 - controls: Strike-invariance; SPX vs XSP agreement; mid vs executable gap reported.
 - harness: box_borrow_v2
-- result X-da417e54: not_supported — day one 2026-10-14: executable short-box borrowing rate is bill +171 bp over 29815 boxes (needs < +50 bp)
 - result X-546d5c3b: not_supported — day one 2026-10-14: executable short-box borrowing rate is bill +171 bp over 29815 boxes (needs < +50 bp); later days: 2026-10-15 +202 bp
 - result X-44e5c0f0: not_supported — day one 2026-10-14: executable short-box borrowing rate is bill +145 bp, median over 12 expiries (29815 boxes; pooled box median +152 bp) (needs < +50 bp); later days: 2026-10-15 +179 bp
+- result X-c5e71477: not_supported — day one 2026-10-14: executable short-box borrowing rate is bill +145 bp, median over 12 expiries (29815 boxes; pooled box median +152 bp) (needs < +50 bp); later days: 2026-10-15 +179 bp
 - note: from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; borrow-curve output. | verifier-corrected restatement of T-187, whose verdict tested the earlier wording and stands
+
+### T-507 · synthetic-call-put-stock-option
+
+**Claim.** For SPY expiries before 2026-12-18 with 30-64 DTE and strikes within +/- 5% of spot, buying SPY at the ask plus the put at the ask costs less than buying the call at the ask plus holding K e^{-r_bill T} in bills in at least 60% of strikes, because option prices embed a financing rate above the bill rate.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Synthetic_position, https://en.wikipedia.org/wiki/Protective_put
+- statistic: Share of strikes with (S_ask + P_ask) < (C_ask + K e^{-r_bill T}).
+- null: Share < 60%.
+- procedure: Day one: SPY chain and underlying quote; no dividend inside T; compute both costs per strike; repeat daily.
+- data: CBOE delayed SPY chain, FRED DGS3MO. · min n: 50
+- pass: Share >= 60% on day one and on >= 80% of captured days.
+- controls: Replace r_bill with the SPX box rate (the share should fall to ~50%); mid-price version; GLD/IBIT dividend-free replications.
+- harness: b6b_chain_synthetic_call
+- result X-7d886959: not_supported — SPY protective put vs call + bills (S_ask = spot + $0.005, ASSUMED), 30-64 DTE before 2026-12-18, strikes within +/- 5%: 2026-10-13: close/DGS3MO 2026-10-09 (ref) 57.0% of 293, sync/DGS3MO 2026-10-09 (ref) 52.0% of 294 -> fail (DTB3 beside it, not deciding: close/DTB3 2026-10-09 60.4% of 293, sync/DTB3 2026-10-09 54.8% of 294); 2026-10-14: close/DGS3MO 2026-10-13 (ref) 0.3% of 298, sync/DGS3MO 2026-10-13 (ref) 48.0% of 298 -> fail (DTB3 beside it, not deciding: close/DTB3 2026-10-13 0.3% of 298, sync/DTB3 2026-10-13 51.0% of 298); controls: 2026-10-13 (close/DGS3MO 2026-10-09 (ref)): mid-price share 54.9%, with the SPXW box rate in place of the bill 53.9%, median cost gap +0.153; GLD replication (no dividend) 44/114; IBIT replication (no dividend) 7/28; 2026-10-14 (close/DGS3MO 2026-10-13 (ref)): mid-price share 0.3%, with the SPXW box rate in place of the bill 0.3%, median cost gap -0.609; GLD replication (no dividend) 25/103; IBIT replication (no dividend) 30/30 — failed: day one (2026-10-13 quotes): share of strikes with S_ask + P_ask < C_ask + K e^(-r_bill T) (r_bill = FRED DGS3MO) >= 60.0% (close/DGS3MO 2026-10-09 (ref) 57.00% of 293, one-sided 95% upper 61.9%, sync/DGS3MO 2026-10-09 (ref) 52.04% of 294, one-sided 95% upper 57.0%; DTB3 beside it, not deciding: close/DTB3 2026-10-09 60.41% of 293, sync/DTB3 2026-10-09 54.76% of 294); on >= 80% of captured days (0 pass, 2 fail, 0 undecided of 2; needs >= 5 days) (not implemented: stock at the ask: underlying bid/ask at the option close not archived (S_ask ASSUMED = spot + $0.005))
+- note: from the options-library library: Synthetic options (synthetic call / synthetic put from stock + option); harness suggestion: Templates [underlying+, put+] vs [call+] plus a bond leg; payoff engine must show identical kinked shapes offset by K - S0 - P + C. | added by the verifier pass
+
+### T-511 · weekend-theta-capture
+
+**Claim.** Since SPY's inception (1993-01-29), the variance of SPY Friday-close-to-Monday-close log returns is less than 1.5 times the mean variance of Monday-Thursday single-night close-to-next-close returns, so a Friday option priced on three calendar days of variance overcharges for the weekend.
+
+- kind: options-strategy · origin: options-library:Time / term-structure, https://api.crossref.org/works/10.1111/jofi.12603, https://api.crossref.org/works/10.1016/0304-405x(86)90004-8
+- statistic: Variance ratio R = Var(Fri close -> Mon close) / Var(single-night weekday close -> next close)
+- null: R >= 1.5
+- procedure: From SPY daily closes, label each return by its calendar gap (1 day = weekday night, 3 days = normal weekend; exclude holiday gaps). Compute R overall and in walk-forward halves. Block bootstrap by week; robustness with the top 1% |returns| winsorised.
+- data: SPY daily closes since inception (data-only). The option-price side (Friday vs Monday marks) needs chain captures from 2026-10-14. · min n: 1500
+- pass: Upper bound of the 95% CI of R < 1.5 in both halves
+- controls: Holiday weekends separately. Winsorised vs raw. The realised-variance leg is testable now; whether listed option prices actually charge calendar-day variance is a separate check on the daily captures (Friday-close vs Monday-open ATM straddle marks), with paid history needed for a backtest. Jones and Shemesh's evidence is on option returns, not on realised variance.
+- harness: b6_surf_weekend_variance
+- result X-f680a617: not_supported — SPY (dividend-adjusted) Fri->Mon variance / mean Mon..Thu single-night variance: R 1.272 (95% CI +1.010 to +1.532) over 1535 normal weekends and 6644 weekday nights (1993-01-29..2026-10-13, holiday gaps excluded); halves 1.378 (95% CI +0.984 to +1.793) and 1.132 (95% CI +0.832 to +1.444) vs 1.5 (blocks of 4 weeks; with 1-week blocks the full-sample 95% CI +1.048 to +1.566). Robustness: top 1% |returns| winsorised R 1.030; raw closes R 1.265; holiday gaps (4-5 days, n=223) variance ratio 1.146. Calendar-day pricing charges 3x; whether listed options do is the separate capture-driven check (Friday-close vs Monday ATM straddle marks), not tested here — failed: full sample (the claim): upper end of the 95% CI of R < 1.5; first half 1993w5..2009w49: upper end of the 95% CI of R < 1.5
+- note: from the options-library library: Weekend theta capture (Friday-to-Monday short premium); harness suggestion: spy_weekend_variance(spy_rows) in experiments/options_market.py, mirroring btc_weekend_variance; then a capture-driven check of the Friday-close-to-Monday ATM straddle mark change vs realised. | added by the verifier pass
+
+### T-522 · election-event-straddle
+
+**Claim.** On US federal election days since 1994, SPY's absolute 2-day return (close before election day to close after) divided by the VIX-implied 2-day move (VIX/sqrt(126)) is larger than the same ratio on matched non-election 2-day windows.
+
+- kind: options-strategy · origin: options-library:event-driven, https://www.nber.org/papers/w19812, https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv
+- statistic: Mean ratio difference (election minus matched windows); exact sign test across 16 elections; MODEL-PRICED straddle P&L with VIX-as-IV.
+- null: Election ratio <= matched-window ratio.
+- procedure: Elections 1994-2024 (16 dates, every 2 years); SPY closes, VIX; matched windows = same weekday pairs 4 weeks before/after.
+- data: SPY daily closes, VIX, election dates; Polymarket/Kalshi odds for 2024+ only. · min n: 16
+- pass: Sign test p < 0.05 (>= 13 of 16) and mean difference > 0 (underpowered: report as indicative).
+- controls: Presidential vs midterm split; VIX regime; exclude 2008 (crisis).
+- harness: b6b_misc_election_spy_move
+- result X-e726de11: not_supported — T-522 elections 1994-11-08..2024-11-05 (federal election day = the Tuesday after the first Monday of November, fixed by law, so known in advance), n = 16 of 16. Ratio = |SPY close-after / close-before - 1| / (VIX at the close before / 100 / sqrt(126)), SPY raw closes; matched windows = the 2-session windows around the Tuesdays 4 weeks before and after (close before the Tuesday to close after it; their mean). 47 of 48 windows (election and matched) run Monday to Wednesday; the 2018 after-window runs Monday 2018-12-03 to Thursday 2018-12-06 because 2018-12-05 was not a session (a market closure); still 2 sessions, so VIX/sqrt(126) applies (dropping the irregular window: 9 of 16 positive, two-sided p 0.8036, mean difference +0.045). Election ratio minus matched ratio positive in 9 of 16 (exact sign test two-sided p 0.8036, one-sided 0.4018; pass needs >= 13 of 16); mean difference +0.046 (iid bootstrap 95% CI [-0.222, +0.336]); underpowered by design: indicative only. MODEL-PRICED 2-day ATM SPY straddle at VIX (T = 2/252, DTB3 known at entry, raw-close settlement, dividend forward if an ex-date falls in the window): mean P&L on election windows +0.050% of S, election minus matched +0.021%; IV x0.9 +0.027%, IV x1.1 +0.016%. Controls (reported): presidential 6/8 positive, mean +0.225; midterm 3/8 positive, mean -0.133; VIX above 20.9 5/8 positive, mean +0.107; VIX at or below 20.9 4/8 positive, mean -0.014; excluding 2008 9/15 positive, mean +0.120; Polymarket (2024 only, one election, so no odds covariate can be estimated): last daily price before the 2024-11-04 close 'Will Donald Trump win the 2024 US Presidential Election?' 0.56, 'Will Kamala Harris win the 2024 US Presidential Election?' 0.43; Kalshi: 0 election markets in the archived settled-markets sample — failed: exact sign test p < 0.05 with >= 13 of 16 elections positive (9 of 16, two-sided p 0.8036)
+- note: from the options-library library: Election / political-event straddle (index vol spanning a scheduled vote); harness suggestion: Reuse the VIX-as-IV event pricer with a 2-day horizon; add Polymarket odds as a covariate when n grows. | added by the verifier pass
+
+### T-527 · call-spread-overwrite
+
+**Claim.** In a model-priced simulation on SPX from 1990 to 2026 (Black-Scholes at VIX, not market prices; this flat-IV pricer overprices OTM calls relative to the skewed market, so it is biased against the wing), a monthly short-ATM / long-5%-OTM call-spread overwrite has a higher Sharpe ratio than the plain ATM covered call priced the same way.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/covered-call-buy-write, https://www.optionseducation.org/strategies/all-strategies/bear-call-spread-credit-call-spread
+- statistic: Sharpe(call-spread overwrite) - Sharpe(ATM covered call), both model-priced on identical paths
+- null: Difference <= 0
+- procedure: Model-priced on SPX daily with VIX-as-IV and DTB3, monthly 3rd-Friday rolls, 5 bps per leg slippage; calibration gate vs actual BXM (TE < 2%/yr); paired block bootstrap; walk-forward halves
+- data: SPX daily, VIX 1990-, DTB3, SPY dividends, BXM for calibration · min n: 400
+- pass: Calibration gate passed AND 95% CI of the Sharpe difference > 0 in both halves
+- controls: SKEW-adjusted wing pricing as a sensitivity; a chain-priced re-test once ~24 monthly cohorts of SPY chain capture exist
+- harness: b6b_bw_call_spread_overwrite
+- result X-2e704524: not_supported — MODEL-PRICED (Black-Scholes at VIX/100 on ^GSPC with SPY's trailing dividend yield, flat IV, which overprices the 5%-OTM wing relative to the skewed market): 440 monthly expiry-to-expiry cycles 1990-01-19..2026-09-18 (rule 10(a): the standard monthly expiry, third Friday or the prior session; 27-36 calendar days); the held index accrues dividends every session at the q known at the prior close, as BXM and PUT accrue SPX dividends daily (not in SPY's quarterly ex-date lumps); 49 cycles price with, and accrue, the ASSUMED q = 3.0% (before SPY's first full year). Both arms hold the index (total return) and sell the call at the first 5-point strike at or above the index (BXM rule); the spread arm also buys the call at the first strike at or above 1.05 x the index; premiums netted from the base; 5 bps of the index per option leg. Mean premium ATM 2.12%, wing 0.63% of the index. Excess-return Sharpe spread 0.449 vs covered call 0.903: full sample -0.454 (CI -0.594 to -0.253); first half -0.548 (CI -0.727 to -0.342), second half -0.391 (CI -0.604 to -0.068) (studentized paired block bootstrap, 12-cycle blocks). Sensitivities (not criteria): iv_x0.90 -0.293 (CI -0.403 to -0.130), iv_x0.81 -0.157 (CI -0.251 to -0.019), no_slippage -0.413 (CI -0.542 to -0.226), skew_wing -0.322 (CI -0.443 to -0.153) (SKEW-line wing, kappa 0.01782 from options-chain-SPX-2026-10-14). The trial's chain-priced re-test needs about 24 monthly cohorts of captured SPY chains (2 capture days archived). Gate (the claim's pricer at IV x1.00, closes, no costs): BXM TE 2.35%/yr over 291 cycles (bias +5.00%/yr, corr 0.982; largest monthly gaps 2008-11-21 +4.6%, 2008-12-19 +3.5%, 2020-06-19 +2.9%) — failed: calibration gate: the BS-at-VIX pricer tracks BXM (2002-) monthly roll-to-roll returns within 2%/yr (TE BXM 2.35%); first half: 95% CI of the Sharpe difference > 0 (lower -0.727); second half: 95% CI of the Sharpe difference > 0 (lower -0.604)
+- note: from the options-library library: Call-spread overwrite (covered call with upside re-entry); harness suggestion: Add as a two-call overlay in the model-priced overlay harness. Re-test with captured chains once ~24 monthly cohorts exist (from 2026-10-14) to remove the flat-IV bias. | added by the verifier pass
+
+### T-528 · vix-call-tail-hedge-overlay
+
+**Claim.** Over 2006-03 to 2026-10, the Cboe VXTH index has a smaller maximum drawdown than the PPUT3M 10%-OTM quarterly put index's companion period, measured on the common 2006-03 onward sample against SPX total return: maxDD(VXTH) is at least 10 points shallower than maxDD(SPY TR).
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_VIX_Tail_Hedge_Index_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/VXTH_History.csv
+- statistic: maxDD(SPY TR) - maxDD(VXTH) on the common sample, daily
+- null: Difference < 10 percentage points
+- procedure: Cboe CDN VXTH_History.csv (2006-03-31 onward); SPY TR from the Yahoo chart adjclose; compute daily maximum drawdowns; bootstrap the drawdown difference with stationary block resampling of daily returns (block 63 days)
+- data: VXTH 5,163 rows; SPY closes plus dividends · min n: 2500
+- pass: Bootstrap 90% CI of the drawdown difference > 10 points
+- controls: PPUT3M (2004-) and PPUT over the same window as put-based tail hedges; CAGR cost reported alongside
+- harness: b6b_hedge_vxth_drawdown
+- result X-c362849a: not_supported — daily common sample 2006-03-31..2026-10-13 (5161 paired returns): maxDD SPY TR 55.2% vs VXTH 43.3%: gap +11.9 pts, 90% CI -6.5 to +23.8 pts (stationary bootstrap, mean block 63 days); PPUT3M maxDD 39.9%: PPUT3M - VXTH -3.4 pts (90% CI -14.3 to +7.1); CAGR cost: VXTH +9.93%, PPUT3M +8.83%, PPUT +8.36%, SPY +11.12%; controls: PPUT maxDD 42.0% (gap vs SPY +13.2); live (post-launch) days only, 2011-07-29..: maxDD VXTH 29.8%, PPUT3M 20.4%, PPUT 22.1%, SPY 33.7%; VXTH launched 2011-07-29: its rows before then are Cboe's back-test, 5.3 of the window's 20.5 years (26%); PPUT3M launched 2021-08-02: its rows before then are Cboe's back-test, 15.3 of the window's 20.5 years (75%); VXTH's deepest drawdown bottoms on 2009-03-09 (back-tested) — failed: 90% CI of maxDD(SPY TR) - maxDD(VXTH) > 10 points (lower -6.48; 0/3 bootstrap variants (seeds) pass); maxDD(VXTH) smaller than maxDD(PPUT3M) (claim's first clause; 90% CI of the difference > 0, lower -14.29; 0/3 bootstrap variants (seeds) pass)
+- note: from the options-library library: VIX-call tail-hedge overlay on an equity holding (Cboe VXTH); harness suggestion: Add VXTH and PPUT3M to the benchmark list. Recomputed today: VXTH 2006- CAGR 9.93% / vol 17.2% / maxDD -43.3% / worst month -10.7%. The hedge's 2008 drawdown is large, so the claim may fail; that is the point of testing it. | added by the verifier pass
+
+### T-529 · zero_dte_vix1d_premium
+
+**Claim.** The VIX1D close implies a next-day S&P 500 variance, (VIX1D/100)^2/365 (the conservative calendar-day convention), that exceeds the next trading day's squared ^GSPC close-to-close log return on average.
+
+- kind: options-strategy · origin: options-library:relative-value-surface, https://www.cboe.com/us/indices/dashboard/vix1d/, https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX1D_History.csv
+- statistic: Mean of (VIX1D_t/100)^2/365 - r_{t+1}^2; repeat with /252 as the liberal convention.
+- null: Mean <= 0 under the /365 convention.
+- procedure: Daily VIX1D (history from 2022-05-13) and ^GSPC closes; daily non-overlapping one-day windows (~1,100); studentized block bootstrap (5-day blocks); walk-forward halves; report event days separately.
+- data: CBOE VIX1D (archive), ^GSPC/SPY closes. Index-implied variance, no option prices; the straddle P&L itself is model-priced. · min n: 500
+- pass: Mean > 0 with the 95% CI excluding zero under the /365 convention, positive in both halves.
+- controls: Same test with VIX/sqrt(21)-scaled daily variance (shows whether the 1-day premium differs from the 30-day one); event-day exclusion.
+- harness: b6_var_vix1d_premium
+- result X-f1fa28ba: not_supported — model-free: (VIX1D/100)^2/365 vs next-day ^GSPC squared log return, 1107 days 2022-05-13..2026-10-12 (rule 10 does not apply: one-day windows have a single grid phase): mean -0.2241 %^2 per day (CI -0.4693 to -0.1012), halves -0.2196/-0.2285; /252 convention +0.1557; implied 0.8470 vs realised 1.0711; VIX-scaled 1-day premium +0.3711 on the same 1107 days; next day an event (CPI/FOMC/NFP) on 137 days: mean -0.6920; ex-events -0.1580 (CI -0.3428 to -0.0646) — failed: mean > 0 with 95% CI excluding 0 (/365); mean > 0 in both halves
+- note: from the options-library library: 1-day (0DTE) variance premium: short SPX daily straddle vs VIX1D; harness suggestion: New harness_vix1d in the harness_vrp_spx style, using archive cboe-VIX1D-history and daily-history--GSPC. | added by the verifier pass
+
+### T-530 · calendar_vol_spread
+
+**Claim.** Conditional on VIX3M/VIX > 1.10 at entry, the 1-to-3-month SPX forward variance F^2 = (93*VIX3M^2 - 30*VIX^2)/63 exceeds the SPY variance realised over trading days 22-63 after entry on average, so the far leg of a reverse calendar is sold above its subsequent realised variance.
+
+- kind: options-strategy · origin: options-library:relative-value-surface, https://www.cboe.com/tradable_products/vix/term_structure/, https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX3M_History.csv
+- statistic: Mean of F^2 - RV(22..63), both annualised, over entries with VIX3M/VIX > 1.10.
+- null: Conditional mean <= 0.
+- procedure: Daily VIX and VIX3M from 2009-09-18 (the free VIX3M file starts there, not 2007) and SPY closes. Non-overlapping 63d cycles (~68 in total, fewer conditional), plus all daily starts with a 63-day-block studentized bootstrap. Walk-forward over declared thresholds 1.05/1.10/1.15, deflated.
+- data: CBOE VIX and VIX3M (archive), SPY closes. Index-implied variance, not option prices; the calendar's own P&L needs chain history. · min n: 40
+- pass: Conditional mean > 0 with the 95% CI excluding zero, positive in both halves of 2009-2026.
+- controls: Unconditional forward premium (harness_forward_variance); shuffled-ratio placebo; sensitivity run excluding 2020.
+- harness: conditional_forward_v2
+- result X-eb6f8b95: supported — 63 contango entries: forward variance minus realised (days 22-63) +0.0220 (p=0.0005), halves +0.0185/+0.0254
+- result X-d4ada054: supported — 63 contango entries: forward variance minus realised (days 22-63) +0.0220 (p=0.0005), halves +0.0185/+0.0254
+- result X-e049bc5e: not_supported — 63 non-overlapping contango cycles; rule 10 (no entry calendar named): POOLED over all 2693 contango days (every start of the 63d grid, overlapping, 126-entry blocks): forward variance minus realised (days 22-63) +0.0143 (p=0.0465), halves +0.0189/+0.0098; each of the 63 grid starts alone: mean +0.0038 to +0.0243, 30 of 63 pass
+- note: from the options-library library: Calendar vol spread (ATM time spread, long or reverse); harness suggestion: harness_forward_variance (T-148, uses 93/30/63) and harness_term_vs_spot (T-231, uses the cruder (3*VIX3M^2 - VIX^2)/2) already compute this gap; add the VIX3M/VIX gate and unify both on the 93/30/63 formula. The calendar P&L comes from build_position with two expiries once captures exist. | verifier-corrected restatement of T-231, whose verdict tested the earlier wording and stands | 2026-10-15 re-run: lost support under rule 10: pooled over all 2693 contango days the forward-minus-realised variance is +0.0143 with both halves positive, but one-sided p 0.0465 (the 95% CI includes zero); only 30 of the 63 single grid phases pass, so the earlier 'supported' came from one grid phase.
 
 ### T-533 · vega_neutral_gamma_long
 
@@ -2442,6 +3551,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vix9d_v2
 - result X-f152f25f: not_supported — 180 signals: next-9-calendar-day RV^2 - VIX9D^2 mean -0.0121 (realised larger in 19%), p=0.977
 - result X-8e2bdb37: not_supported — 180 signals: next-9-calendar-day RV^2 - VIX9D^2 mean -0.0121 (realised larger in 19%), p=0.977
+- result X-f12ce750: not_supported — 180 non-overlapping signal windows; rule 10 (no entry calendar named): POOLED over all 736 signal days (every start of the 9-calendar-day grid, overlapping, 18-entry blocks): next-9-calendar-day RV^2 - VIX9D^2 mean -0.0084 (realised larger in 18%), p=0.702; each of the 9 grid starts alone: mean -0.0215 to +0.0064, 0 of 9 pass
 - note: from the options-library library: Vega-neutral gamma-positive straddle swap (long near / short far straddle); harness suggestion: harness_vix9d (T-232) already runs this but uses 9 trading-day windows; switch to 9 calendar days. Add a harness_gamma_swap daily-rehedge simulator (bs.delta) on SPY closes for the model-priced secondary. | verifier-corrected restatement of T-232, whose verdict tested the earlier wording and stands
 
 ### T-536 · vvix_vol_of_vol
@@ -2458,9 +3568,25 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vvix_v2
 - result X-8010d5c8: not_supported — 243 non-overlapping months: VVIX minus realised spot-VIX vol -22.4 pts (lower 99% -29.8, needs > 10); VVIX prices VIX futures, which move less than spot
 - result X-1b1179af: not_supported — 243 non-overlapping months: VVIX minus realised spot-VIX vol -22.4 pts (lower 99% -29.8, needs > 10); VVIX prices VIX futures, which move less than spot
+- result X-ff99c6bc: not_supported — 243 non-overlapping months; rule 10 (no calendar named): POOLED over all 21 grid starts = 5103 overlapping 21-day windows: VVIX minus realised spot-VIX vol -21.3 pts, studentized block bootstrap (42-day blocks) one-sided p=1.0000 for mean > 10 (lower 99% bound > 10 needs p < 0.005); each of the 21 grid starts alone: lower 99% bound -30.3 to -27.8, 0 of 21 pass; VVIX prices VIX futures, which move less than spot
 - note: from the options-library library: Vol-of-vol trade: short VIX strangle vs VVIX; harness suggestion: harness_vvix (T-243) implements the data part; add the strangle pricer so a pass is no longer reported as inconclusive. | verifier-corrected restatement of T-243, whose verdict tested the earlier wording and stands
 
-## Inconclusive (15)
+### T-539 · ladder
+
+**Claim.** A 45-DTE SPY long put ladder (long 40-delta put, short 25-delta and 15-delta puts), entered at mid on captured chains and held to expiry, has positive mean P&L per unit naked-leg margin.
+
+- kind: options-strategy · origin: options-library:volatility, https://en.wikipedia.org/wiki/Ladder_(option_combination)
+- statistic: mean P&L/margin with studentized block-bootstrap CI
+- null: mean P&L = 0
+- procedure: Delta-selected strikes; mid and bid/ask; settle at expiry
+- data: options-chain-SPY-<date>, daily-history-SPY · min n: 250
+- pass: lower CI > 0 at bid/ask with a stress month in the sample
+- controls: Rule fixed; verdict capped at inconclusive without a stress episode.
+- harness: b6b_dolt_put_ladder
+- result X-e6e164dc: not_supported — T-539 SPY long put ladder (long 1 40-delta put, short 1 25-delta and 1 15-delta put) (expiry nearest 45 DTE within +/-7 days, strikes by vendor delta within 0.075; DoltHub end-of-day SPY quotes 2019-02-08..2026-10-14 (1232 quote days from 1291 snapshots; 59 duplicate snapshots of a quote day dropped, 2 stale-moved kept on their quote day); settled at intrinsic on SPY's raw close on the expiry date, early exercise ignored as the claim holds to expiry; naked-leg margin = Reg-T/CBOE naked put on one uncovered short put: premium + max(20% x S - OTM amount, 10% x K), OTM = max(S - K, 0), premium at the fill, the uncovered leg being the 15-delta put (the 25-delta put is covered by the long 40-delta put)): 565 entry days (54 distinct 52-day holds), 2019-02-08..2026-08-31; mid fills (the claim): mean +0.012 (pooled over 565 entry days in 396 weeks; block 15 weeks (2x hold) CI -0.009 to +0.030; block 30 weeks (4x hold) CI -0.012 to +0.030) -> lower 95% CI > 0: no (week-weighted, reported: mean +0.012, CI -0.017 to +0.030); bid/ask fills (the pass): mean +0.011 (pooled over 565 entry days in 396 weeks; block 15 weeks (2x hold) CI -0.012 to +0.029; block 30 weeks (4x hold) CI -0.015 to +0.028) -> lower 95% CI > 0: no (week-weighted, reported: mean +0.010, CI -0.020 to +0.029); every entry uses its entry-close quotes as the live proxy (the archive stamps every dolt-chain-SPY row available at 22:00Z on its snapshot date, after the 16:15 ET fill); snapshot-date sensitivity (drops the 24 entries whose snapshot was taken on a weekend, holiday or moved day; no kept entry is point in time either): mid mean +0.012 (CI -0.009 to +0.030); exec mean +0.011 (CI -0.012 to +0.029); bid/ask per start (rule 10: 4 non-overlapping chains from the entry days of the first hold, 4 distinct, 47-48 trades each, block 2 trades): mean -0.021 to -0.019, lower bound -0.223 to -0.212, 0/4 pass; mid per start (rule 10: 4 non-overlapping chains from the entry days of the first hold, 4 distinct, 47-48 trades each, block 2 trades): mean -0.019 to -0.018, lower bound -0.221 to -0.210, 0/4 pass; stress: VIX >= 40 months with an open trade 2020-02, 2020-03, 2020-04, 2020-06, 2020-10, 2025-04; months with SPY >= 10% below its 63-session high (reported) 2020-02, 2020-03, 2020-04, 2020-05, 2022-02, 2022-03, 2022-04, 2022-05, 2022-06, 2022-07, 2022-09, 2022-10, 2022-11, 2023-10, 2025-03, 2025-04; 46 trades open across a stress session, mean bid/ask ratio -0.091, without them +0.020; worst trade (bid/ask) -1.521 entered 2020-01-29, expiry 2020-03-20; credit at mid on 40.0% of entries (mean -0.38); mean naked-leg margin 68.73 = 12.89% of S; ratio of means at bid/ask +0.012; with $0.65/contract per leg at bid/ask: mean +0.010; DTE tolerance sensitivity at bid/ask: +/-4 DTE: n 367, mean +0.016 (CI -0.001 to +0.034); +/-14 DTE: n 961, mean +0.005 (CI -0.039 to +0.025); skipped quote days: no expiry within 45 +/- 7 DTE 623; unresolved (expiry after the last archived close) 26; no usable 40-, 25- or 15-delta put 18 — failed: mid fills (the claim): lower 95% CI > 0 for the mean, robust over blocks of 2/4x the hold; bid/ask fills (the pass): lower 95% CI > 0 for the mean, robust over blocks of 2/4x the hold
+- note: from the options-library library: Ladder / Christmas Tree (long or short, call or put); harness suggestion: Harness 'ladder_skew' sharing the delta selector with 'front_ratio_skew'. | added by the verifier pass
+
+## Inconclusive (35)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -2476,6 +3602,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: market_calibration
 - result X-2a13dc3b: supported — market price beats the coin at every horizon (min skill 0.70)
 - result X-d516666f: inconclusive — skill > 0 at every horizon scored on n >= 300, but the claim needs every horizon with n >= 300: 90d n 260
+- result X-cf9d5ba7: inconclusive — skill > 0 at every horizon scored on n >= 300, but the claim needs every horizon with n >= 300: 90d n 260
 
 ### T-38 · retail-attention-predicts-abs-return
 
@@ -2489,9 +3616,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: rho > 0 with p < 0.05 over >= 30 capture days
 - controls: point-in-time join on available_at <= decision time; no look-ahead; mentions standardised within ticker
 - harness: social_attention
-- result X-95f1d3d2: inconclusive — 1/30 collection days, 2 usable ticker-days
 - result X-cd4319f5: inconclusive — 2/30 collection days, 79 usable ticker-days
 - result X-a01508eb: inconclusive — 1/30 capture days with a point-in-time joined row, 0 usable ticker-days (87 rows captured after close(day) dropped)
+- result X-a5ab6bc8: inconclusive — 1/30 capture days with a point-in-time joined row, 0 usable ticker-days (87 rows captured after close(day) dropped)
 - note: runs daily; inconclusive until 30 capture days
 
 ### T-54 · covered-call-beats-buy-and-hold
@@ -2506,9 +3633,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Sharpe higher and p < 0.05
 - controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it.
 - harness: covered_call_overlay
-- result X-c3d19508: supported — model-priced (VIX as flat IV, upper bound for call selling): Sharpe 1.17 vs buy-and-hold 0.62, CAGR 16.4% vs 8.9%, MDD -42% vs -56%, Sharpe-diff p=0.000, 403 cycles
 - result X-2f57d496: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: Sharpe 1.17 vs B&H 0.62, CAGR 16.4% vs 8.9%; at IV x0.81: Sharpe 0.87, CAGR 11.1%, MDD -46% vs -56% (403 cycles)
 - result X-de4b55fd: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: Sharpe 1.11 vs B&H 0.57, CAGR 18.5% vs 10.8%; at IV x0.81: Sharpe 0.81, CAGR 13.2%, MDD -44% vs -55% (403 cycles)
+- result X-482068a0: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: Sharpe 0.96 vs B&H 0.55, CAGR 16.7% vs 10.9%; at IV x0.81: Sharpe 0.65, CAGR 11.1%, MDD -38% vs -48% (403 cycles)
 - blocked on: a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing
 - note: Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days).
 
@@ -2524,9 +3651,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Sharpe higher and p < 0.05
 - controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it.
 - harness: csp_overlay
-- result X-babe2142: supported — model-priced: Sharpe 1.27 vs buy-and-hold 0.62, CAGR 12.9% vs 8.9%, MDD -32% vs -56%, Sharpe-diff p=0.005
 - result X-0b25a5ae: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: Sharpe 1.27 vs B&H 0.62, CAGR 12.9% vs 8.9%; at IV x0.81: Sharpe 0.76, CAGR 7.3%, MDD -38% vs -56%
 - result X-d5823f74: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: Sharpe 1.02 vs B&H 0.57, CAGR 12.9% vs 10.8%; at IV x0.81: Sharpe 0.51, CAGR 7.3%, MDD -38% vs -55%
+- result X-af9fc59f: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: Sharpe 0.90 vs B&H 0.55, CAGR 12.6% vs 10.9%; at IV x0.81: Sharpe 0.46, CAGR 7.1%, MDD -35% vs -48%
 - blocked on: a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing
 - note: Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days).
 
@@ -2542,9 +3669,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: MDD(collar) < 2/3 MDD(SPY) and Sharpe >= Sharpe(SPY) - 0.10
 - controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. A flat VIX under-prices the put, so the collar's cost is understated.
 - harness: collar_overlay
-- result X-70018c19: supported — model-priced: MDD -26% vs -56% (needs < -38%), Sharpe 1.15 vs 0.62, CAGR 10.3% vs 8.9%
 - result X-24cba6b2: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: MDD -26% vs -56%, Sharpe 1.15 vs 0.62; at IV x0.81: MDD -21%, Sharpe 1.19, CAGR 9.3% vs 8.9%
 - result X-b0a5f811: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: MDD -24% vs -55%, Sharpe 1.06 vs 0.57; at IV x0.81: MDD -19%, Sharpe 1.09, CAGR 11.3% vs 10.8%
+- result X-ad19895d: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: MDD -19% vs -48%, Sharpe 1.05 vs 0.55; at IV x0.81: MDD -15%, Sharpe 1.05, CAGR 10.5% vs 10.9%
 - blocked on: a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing
 - note: Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days).
 
@@ -2560,9 +3687,9 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: mean > 0, p < 0.05, both halves > 0
 - controls: MODEL-PRICED: Black-Scholes with VIX as a flat IV and the 3-month bill; a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results are an upper bound. Tests the strategy's logic, not market option prices; the daily chain capture (from 2026-10-14) will replace it. ATM pricing at VIX is close to fair (VIX is roughly the ATM-ish 30-day IV), so this one is the least biased of the overlays.
 - harness: short_straddle_model
-- result X-13ef8afe: supported — model-priced: mean +1.10% of notional per month, Sharpe 1.33, MDD -23%, block-bootstrap p=0.0005, halves +1.14%/+1.06%
 - result X-c9662a62: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: mean +1.10%/month (p=0.0005); at IV x0.81: mean +0.24%/month (p=0.0745), Sharpe 0.29, MDD -37%
 - result X-1acb0719: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: mean +1.10%/month (p=0.0005); at IV x0.81: mean +0.24%/month (p=0.0745), Sharpe 0.29, MDD -37%
+- result X-5fa1ce02: inconclusive — MODEL-PRICED, not a verdict: flat-VIX pricing overstated today's 30-delta call by 79% and ATM by ~20%. At VIX: mean +0.90%/month (p=0.0005); at IV x0.81: mean +0.06%/month (p=0.3628), Sharpe 0.07, MDD -46%
 - blocked on: a history of the ATM-IV/VIX ratio and 30-delta premia from the daily options-surface capture (~250 days) to replace flat-VIX pricing
 - note: Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days).
 
@@ -2578,10 +3705,207 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: mean > 0, p < 0.05
 - controls: market-priced (actual mids), point in time by construction; needs the expiry to pass, so the first verdict is ~2 months after 2026-10-14
 - harness: implied_move
-- result X-fe2505e4: inconclusive — 0/30 captures with an expired ~30d expiry (chain capture started 2026-10-14)
 - result X-c288209a: inconclusive — 0/30 captures with an expired ~30d expiry (chain capture started 2026-10-14)
 - result X-0a8698e7: inconclusive — 0/30 independent ~30d expiry cycles (0 resolved capture days, 0 symbol-captures; overlapping captures share one realised path; chain capture started 2026-10-14)
+- result X-f66810c9: inconclusive — 0/30 independent ~30d expiry cycles (0 resolved capture days, 0 symbol-captures; overlapping captures share one realised path; chain capture started 2026-10-14)
 - note: the market-priced replacement for the model-priced short-straddle overlay (T-57)
+
+### T-101 · short-straddle
+
+**Claim.** For 30-DTE ATM SPY short straddles priced at the model price BS(0.90*VIX/100), mean P&L per unit premium is higher when entered with VIX minus trailing 21-day realised vol in its top tercile than in its bottom tercile, out of sample (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-straddle, https://public.econ.duke.edu/~boller/Published_Papers/rfs_09.pdf
+- statistic: difference in mean P&L/premium (top tercile minus bottom tercile of VIX - RV21 at entry); studentized block-bootstrap CI; deflated Sharpe with n_trials = number of conditioning rules tried
+- null: no tercile difference
+- procedure: overlay_backtest(strategy='short_straddle') with iv_scale in {0.81, 0.90, 1.00}; RV21 from SPY log returns; tercile cut-points set on the training window of walk_forward_splits and applied out of sample
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 390
+- pass: OOS top-minus-bottom difference CI excludes 0 at s = 0.90, with the same sign at s = 0.81 and s = 1.00
+- controls: Tercile thresholds fixed in-sample. Report skewness, kurtosis, PSR, max drawdown and the unconditional mean (T-57 found +0.24%/month, p 0.07, at s = 0.81). Repeat with a 5%-of-premium round-trip haircut. 2008 and 2020 stay in the sample.
+- harness: b6_var_short_straddle_tercile
+- result X-5be89eeb: inconclusive — MODEL-PRICED short 30-DTE ATM SPY straddle at s x VIX on the dividend forward, settled on raw closes; rule 10 (no entry calendar in the claim): POOLED over all 21 grid offsets, 7179 overlapping out-of-sample daily entries = 342 OOS cycles of 402 (5 walk-forward test windows; cut-points on the training window's VIX - RV21 from SPY log returns, SPY entries only, the first 60 cycles (1260 entries) train the first cut-points; min_n counts out-of-sample cycles, the sample the pass statistic is computed on): s=0.81: top +10.4% vs bottom -1.6% of premium, diff +12.0 pts (CI +2.8 to +22.7; entries top/bottom 2587/2480); s=0.90: top +19.3% vs bottom +8.5% of premium, diff +10.8 pts (CI +2.6 to +20.7; entries top/bottom 2587/2480); s=1.00: top +27.4% vs bottom +17.7% of premium, diff +9.7 pts (CI +2.3 to +18.4; entries top/bottom 2587/2480); s=0.90 declared interval: studentized block 126 days, mean of 10 replicates x 5000 draws, lower bound +2.65 pts (Monte Carlo s.e. 0.05); alternatives' lower bounds (5 replicates each): percentile interval +2.02, block 42 days +1.80, block 63 days +2.13, block 252 days +2.25; per grid offset (21 non-overlapping grids, 340-342 OOS cycles, block 6 cycles, 1000 draws): s=0.90 diff -10.2 to +22.0 pts, lower bound -25.7 to +8.7, 8/21 offsets pass; SENSITIVITY, not in the verdict or n (first training window = the 778 pre-SPY daily entries 1990-01-02..1993-01-28 with RV21 from ^GSPC price returns, a series the claim does not name; SPY starts 1993-01-29; every SPY entry is then out of sample): 402 OOS cycles (8439 entries), s=0.90 diff +8.2 pts (CI -0.09 to +16.97, percentile CI -0.21 to +16.62); 5%-of-premium round-trip haircut: top +14.3% vs bottom +3.5% (difference unchanged); unconditional mean at s=0.90 +14.8% of premium (pooled, CI +9.1 to +19.3), skew -2.88, kurtosis 28.8; across the 21 grids PSR 0.99-1.00, max drawdown 17.3-42.1% of spot, DSR(top tercile, 3 trials) 0.69-1.00; the tercile spread is model-priced (IV level only scales premium; the traded version needs SPY chain history (2 capture days archived)) — implemented criteria pass; not implemented: n >= trial min_n (342 of 390 out-of-sample SPY cycles (distinct 21-day holds of the pooled entries); the 48 missing cycles need SPY history before 1993-01-29 (the first archived SPY day) or about 4.0 more years of SPY cycles)
+- note: from the options-library library: Short Straddle; harness suggestion: harness 'short_straddle_vrp' sharing options.py pricing; conditioning rule set declared up front and passed to deflated_sharpe_ratio(n_trials=len(rules)) | verifier: corrected claim/trial
+
+### T-102 · long-strangle
+
+**Claim.** A 30-DTE SPY long strangle at +/-5% strikes, bought at the smile-scaled VIX model price and held to expiry, has negative mean P&L per unit premium over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-strangle-long-combination, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf
+- statistic: mean P&L/premium, non-overlapping 21-day cycles, studentized block-bootstrap CI; secondary: realised frequency of S_{t+21} inside [K_p, K_c] vs the model's risk-neutral probability
+- null: mean P&L = 0
+- procedure: Price each leg with mandel/options/bs.price at sigma = VIX_t x r(moneyness). Pay at intrinsic on S_{t+21}. Repeat at flat VIX (reported as the overpriced bound) and with the put ratio scaled by SKEW_t/SKEW_2026-10-14.
+- data: daily-history-SPY, cboe-VIX-history, cboe-SKEW-history, fred-DTB3, options-surface-2026-10-14 (smile ratios) · min n: 390
+- pass: upper CI < 0 under the smile-scaled model AND under the SKEW-scaled sensitivity
+- controls: Width pre-registered at 5% (3% and 8% reported, deflated with n_trials = 3). The smile ratios come from one day: verdict capped at 'proxy' until 60 capture days refit them. Width varies with vol level; also report a delta-rule version.
+- harness: structure_t_102
+- result X-56e4027b: inconclusive — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -42.4% (95% CI -67.5 to -8.7) — implemented criteria pass; not implemented: SKEW-scaled put sensitivity
+- result X-e2acd1d2: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; studentized block-bootstrap CIs): smile mean -42.4% (95% CI -64.4 to +19.0) — failed: smile: upper CI < 0 (not implemented: SKEW-scaled put sensitivity)
+- result X-0c1fb82f: inconclusive — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape; 403 cycles, trial min_n 390; no entry calendar named: all 21 starts of the 21-day grid pooled (daily entries), per-start range reported; studentized block-bootstrap CIs, block 42 days): smile mean -45.7% (95% CI -59.8 to -13.9) [pooled over 21 starts; per-start means -59.1% to -31.9%, 13 of 21 starts pass] — implemented criteria pass; not implemented: SKEW-scaled put sensitivity
+- note: from the options-library library: Long Strangle; harness suggestion: harness 'strangle_vrp' in options.py; parameter width in {3,5,8}% declared up front and fed to deflated_sharpe_ratio(n_trials=3) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows | 2026-10-15 re-run: now inconclusive (was not_supported): pooled over all 21 starts the smile-scaled mean is -45.7% (CI -59.8 to -13.9), passing, but the trial's SKEW-scaled sensitivity is not implemented, which caps the verdict (rule 2).
+
+### T-136 · stock-repair
+
+**Claim.** After a 10%+ SPY drawdown from its 252-day high, a 3-month zero-cost stock repair (stock + long 1 ATM call + short 2 calls at K2 = (prior high + spot)/2, priced at VIX IV; model-priced) has a higher mean 3-month P&L than holding SPY alone, over 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/stock-repair, https://www.optionseducation.org/strategies/all-strategies/covered-ratio-spread
+- statistic: mean of (repair P&L - hold P&L)/S per episode, which equals the embedded 1x2 call ratio spread's P&L; studentized bootstrap over non-overlapping episodes
+- null: mean difference <= 0
+- procedure: detect the first day of each >= 10% drawdown from the trailing 252-day high (re-arm after 63 days); B = prior high; K1 = S, K2 = (B+S)/2 at VIX IV (VIX3M where available, since the tenor is about 63 days); mark both at the 63-day SPY close
+- data: SPY, VIX, VIX3M, DTB3; QQQ as a second sample · min n: 30
+- pass: lower CI of the mean difference > 0
+- controls: Correction: the original 'recovers breakeven more often' claim was tautological, because the repaired breakeven K2 < B makes it true by construction; replaced with the mean-P&L comparison. Expect only about 25-40 SPY episodes, so report power; QQQ episodes overlap in time and are not independent. Flat IV misprices skew (stated).
+- harness: b6_dir_stock_repair
+- result X-d77c443f: inconclusive — MODEL-PRICED, no transaction costs (none stated in the claim) (calls at VIX3M IV from 2009-09-18, VIX before, flat; dividend forward; raw closes; net premium carried in bills): 25 SPY drawdown episodes (first day the drawdown from the trailing 252-day high newly crosses -10% after having been above it, 63-session lockout; rule 10(c): an event study on data-defined days, no cycle grid), 1997-04-11 to 2025-03-13; K2 = (B + S)/2 median +5.97% above spot; median net premium -0.74% of S (negative = credit; the fixed K2 rule is only roughly zero-cost); mean (repair - hold) / S = 1x2 ratio P&L +1.00% (studentized block-2 bootstrap 95% CI -1.53% to +2.69%); 25 drawdown episodes is 5 short of min_n 30, and the CI failure is not decisive (upper bound above 0), so the sample cannot decide the claim; power: sd +4.51%, minimum detectable mean at 80% power +2.52%; robustness (not the pass rule): the 63-session level-trigger re-arm, which re-fires while the drawdown is still at or below -10%, gives 40 episodes, of which 15 are re-fires inside 3 continuing drawdown spells, mean +0.73% (95% CI -0.93% to +2.50%), verdict under that reading not_supported; QQQ (VXN IV from its first print, VIX before) (second sample, same first-crossing rule, overlaps SPY in time, not in the pass rule): 33 episodes, mean +0.40% (95% CI -1.35% to +1.62%); IV-scale sensitivity (not in the pass rule; a traded test needs chain history): s=0.81 +0.13%, s=0.90 +0.53% — implemented criteria pass; not implemented: mean (repair - hold) / S lower CI > 0; n >= trial min_n (25 of 30 drawdown episodes)
+- note: from the options-library library: Stock Repair (Covered Ratio Spread); harness suggestion: drawdown_event_study(strategy='stock_repair', trigger=-0.10, horizon=63d) | verifier: corrected claim/trial
+
+### T-162 · covered-call-delta-targeted
+
+**Claim.** On the common sample 2002-03 to 2026-10, the Cboe BXMD (30-delta) buy-write has a higher monthly Sharpe ratio (excess over 3m T-bill) than the ATM BXM buy-write.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/BXMD_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/BXMD_History.csv
+- statistic: Sharpe(BXMD) - Sharpe(BXM) on month-end excess returns
+- null: Sharpe(BXMD) - Sharpe(BXM) <= 0
+- procedure: Download BXMD_History.csv, BXM_History.csv and BXY_History.csv; align on 2002-03-22 onward; take month-end excess returns over DTB3; studentized block bootstrap (12-month blocks) of the Sharpe difference (or Ledoit-Wolf test); repeat on walk-forward halves; regress the BXMD-BXM spread on the SPX monthly return to show the convexity difference.
+- data: Cboe CDN daily histories (BXMD 1986-06 onward, BXY 1988-06 onward, BXM 2002-03 onward), FRED DTB3 · min n: 280
+- pass: Bootstrap 95% CI of the Sharpe difference > 0 in the full sample, with the same sign in both halves
+- controls: Beta-matched SPY-TR/T-bill blend; BXMC is NOT an ATM series (it is the conditional buy-write: full unit if VIX >= 20, else half), so use it only as a separately labelled third arm
+- harness: b6b_bw_bxmd_vs_bxm
+- result X-173afa14: inconclusive — BACK-TESTED INDEX VALUES: 161 of 294 months use BXMD values back-tested by Cboe before its 2015-08-03 launch; 1 of 294 months use BXM values back-tested by Cboe before its 2002-04-30 launch. ASSUMPTION: the claim describes the published index histories, so back-tested months are used; they were not known at the time they describe (published at launch) and Cboe chose each index design after seeing that history. BXMD vs BXM month-end excess returns over the 3-month bill (DTB3 discount yield -> continuous, accrued daily at the prior print), 294 months 2002-04..2026-09 on the common calendar (rule 10(a): the claim names month-end sampling; the indices roll on the third Friday). Annualised Sharpe BXMD 0.567 vs BXM 0.454: difference +0.113 (CI +0.007 to +0.221) by the studentized CBB (Bartlett-HAC): paired circular block bootstrap, 12-month blocks, each resample studentized by the Ledoit-Wolf delta-method gradient with a fixed Bartlett(12) long-run variance (mean of 5 seeds x 2000 resamples, Monte Carlo s.e. of the lower end 0.0014; percentile CI +0.010 to +0.215; one-sided p 0.019). Ledoit-Wolf (2008) test (boot.time.inference: prewhitened Parzen HAC s.e. on the sample, Goetze-Kuensch block s.e. in circular-block resamples, b = 12; a criterion: the trial names it as the alternative to the studentized block bootstrap, so the full-sample criterion must pass under both (rule 11)): +0.113 (symmetric CI -0.015 to +0.241, two-sided bootstrap p 0.078, mean of 5 seeds; its prewhitened Parzen HAC test alone: s.e. 0.0565, p 0.046, CI +0.002 to +0.223). Parts (judged on point estimates): first half 2002-04..2014-06 +0.115 (CI +0.019 to +0.218); second half 2014-07..2026-09 +0.109 (CI -0.145 to +0.380). Post-launch months only (from 2015-08-03, 133 months, below min_n 280): +0.134 (CI -0.120 to +0.397); Ledoit-Wolf (2008) test +0.134 (symmetric CI -0.134 to +0.402, two-sided bootstrap p 0.273; its prewhitened Parzen HAC test alone: s.e. 0.0941, p 0.154, CI -0.050 to +0.319). Block-length sensitivity (studentized CBB (Bartlett-HAC)): 6 months CI +0.019 to +0.213, 24 months CI +0.011 to +0.229, 36 months CI +0.028 to +0.216. Roll-date sampling sensitivity (294 roll-to-roll periods): +0.097 (CI +0.009 to +0.187). Fragility of the lower end (sensitivities, not criteria): log excess returns CI -0.001 to +0.218; 3-month-block percentile CI -0.007 to +0.213; leave-one-year-out lowest lower ends 2008 -0.023, 2020 -0.011, 2003 -0.006, 2012 -0.002 (5 years whose removal puts it at or below 0: 2008, 2020, 2003, 2012, 2019). Arms: BXY - BXM +0.097 (CI +0.009 to +0.190); BXMC - BXM +0.096 (CI +0.016 to +0.185) (BXMC is the VIX-conditional buy-write, a separate arm). BXMD-BXM monthly spread on the SPX price return: slope 0.182, quadratic 0.54 (the 30-delta write keeps more upside). beta-matched SPY-TR/bill blends (294 common months; a blend has SPY's excess Sharpe 0.602): BXMD beta 0.81, alpha -0.03%/yr (t -0.05), BXM beta 0.63, alpha -0.78%/yr (t -0.77) — implemented criteria pass; not implemented: full-sample 95% CI of Sharpe(BXMD) - Sharpe(BXM) > 0 under both constructions the trial names (rule 11): studentized CBB (Bartlett-HAC) (lower +0.007); Ledoit-Wolf (2008) test (symmetric) (lower -0.015) [the named constructions disagree: undecided under rule 11]
+- note: from the options-library library: OTM / delta-targeted covered call (30-delta, BXMD; 2% OTM, BXY); harness suggestion: Today's figures: BXMD 1986- CAGR 10.67% vol 12.8%, BXY 10.40%/11.9%, BXMC (ATM, 1990-) 9.73%/11.0%, SPX price 8.9%/15.2%. Use SPY adjusted closes for a TR benchmark. | verifier: corrected claim/trial | 2026-10-15 re-run: inconclusive under rule 11: the BXMD-BXM Sharpe gap (+0.113 annualised) passes the studentized HAC block bootstrap (CI +0.007 to +0.221) but not the Ledoit-Wolf (2008) test the trial names as the alternative (two-sided p 0.078); 161 of 294 BXMD months are Cboe back-test values from before its 2015-08-03 launch.
+
+### T-164 · partial-overwrite-etf-mechanics
+
+**Claim.** Over 2002-03 to 2026-10, the Cboe BXMH half buy-write has a higher monthly Sharpe ratio (excess over 3m T-bill) than the full ATM BXM buy-write.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_Half_Buywrite_Indices_Methodology.pdf, https://www.globalxetfs.com/funds/qyld/
+- statistic: Sharpe(BXMH) - Sharpe(BXM) on month-end excess returns; secondary: Sharpe of synthetic blends w*BXM + (1-w)*SPY TR for w in {0.25, 0.5, 0.75, 1}
+- null: Sharpe(BXMH) <= Sharpe(BXM)
+- procedure: Cboe CDN BXMH_History.csv (1990-) and BXM_History.csv (2002-); align on 2002-03-22 onward; take excess returns over DTB3; studentized block bootstrap of the Sharpe difference; walk-forward halves
+- data: Cboe CDN BXMH, BXM, BXMC; SPY closes plus dividends via the Yahoo chart endpoint; FRED DTB3 · min n: 280
+- pass: Bootstrap 95% CI of the Sharpe difference > 0, with the same sign in both halves
+- controls: Beta-matched comparison; 0.35-0.60% fee drag applied when interpreting ETF replication; BXMC as the VIX-conditional w arm
+- harness: b6b_bw_bxmh_vs_bxm
+- result X-df13fe5c: inconclusive — BACK-TESTED INDEX VALUES: 222 of 294 months use BXMH values back-tested by Cboe before its 2020-09-08 launch; 1 of 294 months use BXM values back-tested by Cboe before its 2002-04-30 launch. ASSUMPTION: the claim describes the published index histories, so back-tested months are used; they were not known at the time they describe (published at launch) and Cboe chose each index design after seeing that history. BXMH vs BXM month-end excess returns over the 3-month bill (DTB3 discount yield -> continuous, accrued daily at the prior print), 294 months 2002-04..2026-09 on the common calendar (rule 10(a): the claim names month-end sampling; the indices roll on the third Friday). Annualised Sharpe BXMH 0.566 vs BXM 0.454: difference +0.111 (CI +0.000 to +0.242) by the studentized CBB (Bartlett-HAC): paired circular block bootstrap, 12-month blocks, each resample studentized by the Ledoit-Wolf delta-method gradient with a fixed Bartlett(12) long-run variance (mean of 25 seeds x 2000 resamples, Monte Carlo s.e. of the lower end 0.0007; percentile CI -0.002 to +0.229; one-sided p 0.026). Ledoit-Wolf (2008) test (boot.time.inference: prewhitened Parzen HAC s.e. on the sample, Goetze-Kuensch block s.e. in circular-block resamples, b = 12; reported, not a criterion: the trial names only a studentized block bootstrap): +0.111 (symmetric CI -0.033 to +0.255, two-sided bootstrap p 0.118, mean of 5 seeds; its prewhitened Parzen HAC test alone: s.e. 0.0628, p 0.076, CI -0.012 to +0.234). Parts (judged on point estimates): first half 2002-04..2014-06 +0.040 (CI -0.091 to +0.200); second half 2014-07..2026-09 +0.180 (CI -0.039 to +0.426). Post-launch months only (from 2020-09-08, 72 months, below min_n 280): +0.059 (CI -0.110 to +0.239); Ledoit-Wolf (2008) test +0.059 (symmetric CI -0.342 to +0.461, two-sided bootstrap p 0.727; its prewhitened Parzen HAC test alone: s.e. 0.1496, p 0.692, CI -0.234 to +0.353). Block-length sensitivity (studentized CBB (Bartlett-HAC)): 6 months CI -0.001 to +0.235, 24 months CI +0.003 to +0.249, 36 months CI -0.005 to +0.254. Roll-date sampling sensitivity (294 roll-to-roll periods): +0.089 (CI -0.009 to +0.194). Secondary: synthetic monthly-rebalanced blends w BXM + (1-w) SPY TR, excess Sharpe w=0.25 0.585, w=0.50 0.557, w=0.75 0.515, w=1.00 0.454; BXMC (VIX-conditional w) - BXM +0.096 (CI +0.016 to +0.185). beta-matched SPY-TR/bill blends (294 common months; a blend has SPY's excess Sharpe 0.602): BXMH beta 0.82, alpha -0.29%/yr (t -0.58), BXM beta 0.63, alpha -0.78%/yr (t -0.77) (ETF fee drag of 0.35-0.60%/yr applies only to replication and is not charged to the indices) — implemented criteria pass; not implemented: full-sample 95% CI of Sharpe(BXMH) - Sharpe(BXM) > 0 (studentized CBB (Bartlett-HAC)) (lower +0.000) [within 2 Monte Carlo s.e. (0.0007) of 0: unresolved]
+- note: from the options-library library: Partial overwrite / overwriting-ETF mechanics (JEPI, QYLD, XYLD, BXMH); harness suggestion: Today's figures: BXMH 1990- CAGR 10.07% vol 12.1% vs BXMC 9.73% vol 11.0%. Add BXMH/BXMC to the Cboe index list. | verifier: corrected claim/trial
+
+### T-173 · covered-ratio-spread-1x2
+
+**Claim.** For SPY, the mean monthly P&L of the 1x2 overlay (short 2x 5%-OTM calls, long 1x 10%-OTM call, 30 DTE, held to expiry) minus a single 5%-OTM covered call overlay is higher when the prior 5%-to-10% OTM call IV slope is in its top quartile than when it is in its bottom quartile.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/covered-ratio-spread, https://www.optionseducation.org/strategies/all-strategies-en
+- statistic: Difference in mean overlay-P&L spread (1x2 minus single OTM call) between the top and bottom quartiles of the entry-day call-skew slope
+- null: Top-quartile mean <= bottom-quartile mean
+- procedure: Daily SPY chain capture: on each capture day record 5%/10% OTM ~30-DTE call mids and IVs; settle each overlapping cohort at expiry with SPY closes; stratify by entry skew slope; block bootstrap by expiry cohort
+- data: Daily chain capture (from 2026-10-14) + SPY closes · min n: 24
+- pass: 95% CI of the top-minus-bottom quartile difference > 0
+- controls: The same test on GLD and IBIT, where the skew sign differs
+- harness: b6b_dolt_ratio_overlay_skew
+- result X-70e4d9b6: inconclusive — T-173 SPY overlay spread (1x2 overlay short 2 5%-OTM calls + long 1 10%-OTM call, minus the single 5%-OTM covered call: the stock legs cancel, leaving short 1 5%-OTM call, long 1 10%-OTM call) on the standard monthly expiry at 30 +/- 7 DTE, every capture day an entry (the trial's overlapping cohorts), mid fills at the entry-day quotes, P&L per unit of the entry spot, settled on SPY's raw close on the expiry date, early exercise ignored; signal = the prior vendor call IV slope (IV at 1.10 S minus IV at 1.05 S, linear in K/S, per unit moneyness); strikes two ways (rule 1: the claim's moneyness, and the listed strikes must agree): EXACT = each leg the strike-weighted mixture of the two usable strikes bracketing 1.05 S or 1.10 S (at most 6% of S apart; the average strike is exactly the target), NEAREST = the usable listed strike nearest the target within 2% of S; information sets (rule 12: the slope and the strike targets S come from one capture): ENTRY CLOSE = the entry-day capture as the live proxy (its rows are stamped available at 22:00Z, after the 16:15 ET fill), PREVIOUS CAPTURE = the last capture known before the entry close (slope on the cohort's expiry when that capture lists it, else on its listing nearest 30 DTE within 14 days; strike targets 1.05 and 1.10 x that capture's close), filled at the entry-day quotes; DoltHub end-of-day SPY quotes 2019-02-08..2026-10-14 (1232 quote days from 1291 snapshots; 59 duplicate snapshots of a quote day dropped, 2 stale-moved kept on their quote day): 209 entries in 85 monthly cohorts on the entry-close nearest-strike reading (2019-03-15..2026-09-18; 1-5 entries per cohort); rule 12: 0 of 209 entries have chain rows stamped available before the fill, so the entry-close reading is a live proxy; the previous capture is 1-7 calendar days before the entry (median 2; the previous NYSE session on 127 of 209 entries); rule 1: the nearest listed strikes sit at K5/S min 1.0374, quartiles 1.0404/1.0552/1.0594, max 1.0623 and K10/S min 1.0922, quartiles 1.0988/1.1001/1.1014, max 1.1068 at the entry close (64 short and 0 long legs more than 1% of S off target); at the previous capture's targets the short leg sits at K5/S_entry min 1.0187, quartiles 1.0403/1.0561/1.0603, max 1.1014; the exact construction averages the bracketing strikes to exactly 1.05 S and 1.10 S; slope quartiles (entry close) Q1 +0.052, Q3 +0.499 (vol per unit moneyness; median +0.355); readings, mid: [entry close (live proxy), exact 5%/10% OTM] top quartile +0.07 vs bottom -0.52% of S (n 51 / 51 entries), difference +0.59% of S (block 2 cohorts CI +0.03 to +2.49; block 4 cohorts CI -0.07 to +2.40); [entry close (live proxy), nearest listed strike] top quartile +0.07 vs bottom -0.57% of S (n 53 / 53 entries), difference +0.63% of S (block 2 cohorts CI +0.11 to +1.97; block 4 cohorts CI +0.01 to +1.99); [previous capture, exact 5%/10% OTM] top quartile +0.08 vs bottom -0.51% of S (n 50 / 50 entries), difference +0.59% of S (block 2 cohorts CI +0.02 to +2.60; block 4 cohorts CI -0.06 to +2.49); [previous capture, nearest listed strike] top quartile +0.07 vs bottom -0.46% of S (n 53 / 53 entries), difference +0.54% of S (block 2 cohorts CI -0.02 to +2.34; block 4 cohorts CI -0.08 to +2.32); reported, not judged: nearest strikes kept only within 1% of S of both targets (68 cohorts) top quartile +0.04 vs bottom -0.54% of S (n 37 / 37 entries), difference +0.57% of S (block 2 cohorts CI -0.08 to +2.02; block 4 cohorts CI -0.15 to +1.98); previous-capture reading on the entries whose previous NYSE session was captured: [exact 5%/10% OTM] 41 cohorts, top quartile +0.08 vs bottom -0.86% of S (n 32 / 32 entries), difference +0.94% of S (block 2 cohorts CI +0.22 to +4.49; block 4 cohorts CI +0.32 to +3.57); [nearest listed strike] 42 cohorts, top quartile +0.08 vs bottom -0.84% of S (n 32 / 32 entries), difference +0.92% of S (block 2 cohorts CI +0.20 to +4.82; block 4 cohorts CI +0.27 to +4.00); unconditional mean spread (entry close, nearest) -0.137% of S; fragility (reported, entry close, nearest): without the most favourable cohort (2025-05-16) difference +0.35% of S (CI -0.13 to +1.43); without the two most favourable (2025-05-16, 2026-04-17) +0.12% (CI -0.15 to +0.58); top/bottom entries by year 2019 5/2, 2020 0/6, 2021 3/1, 2022 0/12, 2023 4/9, 2024 19/2, 2025 18/17, 2026 4/4; reported, not judged (entry close, nearest): executable (sell 5% at the bid, buy 10% at the ask) top quartile +0.06 vs bottom -0.57% of S (n 53 / 53 entries), difference +0.64% of S (block 2 cohorts CI +0.12 to +1.94); in $ top quartile +0.36 vs bottom -3.10 $ (n 53 / 53 entries), difference +3.46 $ (block 2 cohorts CI +0.60 to +13.72); early-exercise sensitivity (a call is exercised at a cum-dividend close when the dividend exceeds its time value, BS put at the entry vendor IV, r = 0) top quartile +0.04 vs bottom -0.59% of S (n 53 / 53 entries), difference +0.63% of S (block 2 cohorts CI +0.11 to +1.91); point-in-time expanding quartiles (after 12 cohorts) top quartile +0.02 vs bottom -0.71% of S (n 55 / 31 entries), difference +0.74% of S (block 2 cohorts CI -0.10 to +6.16); one entry per cohort (nearest 30 DTE) top quartile +0.07 vs bottom -0.18% of S (n 22 / 22 entries), difference +0.25% of S (block 2 cohorts CI -0.21 to +1.30); DTE window +/-4: 85 cohorts, difference +0.45% of S (CI -0.03 to +2.11); +/-14: 87 cohorts, difference +0.65% of S (CI +0.10 to +1.62); snapshot-date sensitivity (drops the 12 entries whose snapshot was taken on a weekend, holiday or moved day; the kept entries are live-proxy entries too) 74 cohorts, top quartile +0.05 vs bottom -0.58% of S (n 50 / 50 entries), difference +0.63% of S (block 2 cohorts CI +0.05 to +2.09); skipped quote days (entry close, nearest): no monthly expiry within 30 +/- 7 DTE 1015; unresolved (expiry after the last archived close) 5; no usable 5%- or 10%-OTM call 3; the GLD and IBIT controls cannot run (DoltHub has neither symbol) — implemented criteria pass; not implemented: 95% CI of the top-minus-bottom quartile difference > 0 (studentized block bootstrap over expiry cohorts, robust over blocks of 2/4 cohorts) under both information sets (rule 12) and both strike constructions (rule 1), passing only when every reading passes ([entry close (live proxy), exact 5%/10% OTM] 78 cohorts / 201 entries, difference +0.59% of S (block 2 CI +0.03 to +2.49; block 4 CI -0.07 to +2.40): marginal (the blocks disagree); [entry close (live proxy), nearest listed strike] 85 cohorts / 209 entries, difference +0.63% of S (block 2 CI +0.11 to +1.97; block 4 CI +0.01 to +1.99): pass; [previous capture, exact 5%/10% OTM] 78 cohorts / 200 entries, difference +0.59% of S (block 2 CI +0.02 to +2.60; block 4 CI -0.06 to +2.49): marginal (the blocks disagree); [previous capture, nearest listed strike] 85 cohorts / 209 entries, difference +0.54% of S (block 2 CI -0.02 to +2.34; block 4 CI -0.08 to +2.32): fail; a reading is marginal: undecided)
+- note: from the options-library library: Covered ratio spread / 1x2 ratio write; harness suggestion: Store 5%/10% OTM call mids and IVs at 30 DTE per capture day for SPY/GLD/IBIT to shorten the wait. | verifier: corrected claim/trial
+
+### T-178 · iron-butterfly-bfly
+
+**Claim.** Over 1986-06 to 2026-10, the Cboe BFLY iron butterfly index has a lower monthly Sharpe ratio (excess over T-bill) than the Cboe CNDR iron condor index.
+
+- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/BFLY_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/BFLY_History.csv
+- statistic: Sharpe(BFLY) - Sharpe(CNDR) on month-end excess returns
+- null: Sharpe(BFLY) >= Sharpe(CNDR)
+- procedure: Cboe CDN BFLY_History.csv and CNDR_History.csv (both 1986-06-20 onward), FRED DTB3; studentized block bootstrap; split pre/post 2008
+- data: Cboe CDN (10,151 rows each), FRED DTB3 · min n: 400
+- pass: Bootstrap 95% CI of the Sharpe difference < 0, with the same sign in both halves
+- controls: Relate monthly P&L to VIX minus subsequent realised vol
+- harness: b6b_hedge_bfly_vs_cndr_sharpe
+- result X-7459c2a7: inconclusive — BFLY vs CNDR monthly excess returns over DTB3, 1986-06..2026-10 (485 months): monthly Sharpe 0.0291 vs 0.0982, difference -0.0691 (annualised -0.239), 95% CI -0.1361 to -0.0001 (studentized block bootstrap, block 6; block 12 CI -0.1313 to -0.0053); pre-2008 (259 months) -0.0611 (CI -0.1662 to +0.0375), from 2008 (226) -0.0641 (CI -0.1646 to +0.0391); equal halves (split 2006-08) -0.0521 / -0.0709 (reported); live (post-launch) months only, 2015-09.. (134): -0.0613 (CI -0.1949 to +0.1039); with the screened spike print(s) kept: -0.0692 (CI -0.1370 to +0.0005; upper across variants -0.0067 to +0.0023, 4/6 bootstrap variants (block length x seed) pass, MARGINAL: the bootstrap variants disagree); BFLY launched 2015-08-03: its rows before then are Cboe's back-test, 29.1 of the window's 40.3 years (72%) (CNDR the same); unflagged one-day spike-and-revert prints dropped like flagged bad prints (each leg >= 2.5% and >= 2x the SPX move, opposite signs): BFLY 1987-10-27 (+6.44% then -3.32% while SPX +2.42% / +0.04%); BFLY 2020-08-31 (+2.65% then -3.09% while SPX -0.22% / +0.75%); BFLY 2020-11-09 (+3.68% then -3.57% while SPX +1.17% / -0.14%); BFLY 2020-12-18 (+2.78% then -2.57% while SPX -0.35% / -0.39%); BFLY 2022-05-31 (+6.81% then -5.89% while SPX -0.63% / -0.75%) — implemented criteria pass; not implemented: 95% CI of Sharpe(BFLY) - Sharpe(CNDR) < 0 (upper -0.0001; upper across variants -0.0073 to +0.0018; 5/6 bootstrap variants (block length x seed) pass, MARGINAL: the bootstrap variants disagree)
+- note: from the options-library library: Iron butterfly benchmark overlay (Cboe BFLY: short ATM straddle, long 5% wings, over T-bills); harness suggestion: Today: BFLY 1986- CAGR 3.66% vol 10.8% maxDD -54.9% beta 0.08; CNDR 5.38% vol 7.0% maxDD -19.8% beta 0.13. | verifier: corrected claim/trial
+
+### T-182 · conversion
+
+**Claim.** For SPY expiries before the next ex-dividend date (2026-12-18) with 30-64 DTE and strikes within +/- 5% of spot, the executable conversion lending rate (stock at ask, put at ask, call at bid, D = 0) is below the FRED 3-month bill rate in at least 95% of (K, T) pairs.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity, https://www.optionseducation.org/strategies/all-strategies-en
+- statistic: Share of (K, T) pairs with r_conv_exec = ln(K / (S_ask + P_ask - C_bid)) / T below r_bill (both continuously compounded).
+- null: Share < 95% (executable conversions beat bills in a material fraction of pairs).
+- procedure: Day one: SPY chain plus underlying quote; restrict to expiries strictly before 2026-12-18 so no dividend enters; compute r_conv_exec per pair; compare to DGS3MO converted to continuous compounding; repeat daily until the ex-date window closes, then roll to the next quarter.
+- data: CBOE delayed SPY chain with underlying bid/ask; FRED DGS3MO. · min n: 100
+- pass: >= 95% of pairs below r_bill on day one and on >= 80% of captured days.
+- controls: Mid-price version should sit near the SPX box rate (bill + ~0-60 bp); drop zero-bid legs; drop pairs where the short call is deep ITM (early-exercise contamination).
+- harness: b6b_chain_conversion
+- result X-ac71dd4f: inconclusive — SPY conversion lending rate ln(K/(S_ask + P_ask - C_bid))/T (S_ask = spot + $0.005, ASSUMED), 30-64 DTE expiries before 2026-12-18, strikes within +/- 5%, vs the trial's 3-month bill FRED DGS3MO (continuous), per spot variant: 2026-10-13: close/DGS3MO 2026-10-09 (ref) 73.0% of 293, sync/DGS3MO 2026-10-09 (ref) 96.9% of 294 -> undecided (DTB3 beside it, not deciding: close/DTB3 2026-10-09 58.0% of 293, sync/DTB3 2026-10-09 86.7% of 294); 2026-10-14: close/DGS3MO 2026-10-13 (ref) 100.0% of 298, sync/DGS3MO 2026-10-13 (ref) 100.0% of 298 -> pass (DTB3 beside it, not deciding: close/DTB3 2026-10-13 100.0% of 298, sync/DTB3 2026-10-13 99.0% of 298); controls: 2026-10-13 (close/DGS3MO 2026-10-09 (ref)): median r_conv_exec - bill -15.7 bp, mid +5.8 bp vs SPXW box +8.6 bp over the bill (2026-11-27, 913 boxes); 0 deep-ITM-call pairs dropped, all-pairs share 73.0%; sync spot 778.122 (+1.4 bp vs the close); 2026-10-14 (close/DGS3MO 2026-10-13 (ref)): median r_conv_exec - bill -110.9 bp, mid -79.5 bp vs SPXW box +27.3 bp over the bill (2026-11-27, 949 boxes); 0 deep-ITM-call pairs dropped, all-pairs share 100.0%; sync spot 769.049 (-7.2 bp vs the close) — implemented criteria pass; not implemented: day one (2026-10-13 quotes): share of (K, T) pairs with r_conv_exec below the bill (FRED DGS3MO) >= 95.0% (close/DGS3MO 2026-10-09 (ref) 73.04% of 293, one-sided 95% upper 77.3%, sync/DGS3MO 2026-10-09 (ref) 96.94% of 294, one-sided 95% upper 98.4%; DTB3 beside it, not deciding: close/DTB3 2026-10-09 58.02% of 293, sync/DTB3 2026-10-09 86.73% of 294) [MARGINAL: the spot variants disagree]; on >= 80% of captured days (1 pass, 0 fail, 1 undecided of 2; needs >= 5 days); stock at the ask: underlying bid/ask at the option close not archived (S_ask ASSUMED = spot + $0.005)
+- note: from the options-library library: Conversion; harness suggestion: Reuse parity.py implied rate per name; add payoff template [underlying+, put+, call-] and assert flat payoff in payoff engine test. | verifier: corrected claim/trial
+
+### T-191 · early-exercise-itm-put-interest
+
+**Claim.** Among SPY puts with K/S >= 1.10, the share whose mid is within one tick plus half the bid-ask of intrinsic value (K - S) is at least 30 percentage points higher for strikes meeting K (1 - e^{-rT}) > C_mid + PV(D) than for strikes failing it.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity, https://www.cboe.com/tradable_products/sp_500/spx_options/specifications/
+- statistic: Difference in at-intrinsic share between criterion-met and criterion-failed groups.
+- null: Difference <= 30 pp (quotes do not reflect the early-exercise rule).
+- procedure: Day one: SPY chain; for each deep ITM put compute the criterion using the same-strike call mid, DGS3MO and SPY dividends inside T; classify at-intrinsic quotes; bootstrap the difference across strikes; replicate on QQQ/IWM and daily.
+- data: CBOE delayed SPY chain, FRED DGS3MO, SPY distributions (few public numbers, manual; not in the listed feeds). · min n: 100
+- pass: Difference > 30 pp with the 95% CI excluding 30 pp on day one; stable over 20 captured days.
+- controls: SPX (European) deep ITM puts should trade at or below discounted intrinsic, never pinned at undiscounted intrinsic; exclude zero-bid quotes.
+- harness: b6b_chain_itm_put_exercise
+- result X-f64267bb: inconclusive — SPY puts with K/S >= 1.10 (bid > 0), at intrinsic when |P_mid - (K - S)| <= $0.01 + half-spread, grouped by K(1 - e^-rT) > C_mid + PV(D) with r the trial's FRED DGS3MO (continuous): 2026-10-13: 1232 puts; criterion met 1214 (at intrinsic 99.1%), failed 18 (at intrinsic 0.0%); difference (close/DGS3MO 2026-10-09 (ref)) +99.1 pp, 95% CI across strikes +98.6 to +99.6 pp (expiry-cluster CI +98.3 to +99.8 pp over 32 expiries); by variant close/DGS3MO 2026-10-09 (ref) +99.1 pp, sync/DGS3MO 2026-10-09 (ref) +99.1 pp; DTB3 beside it, not deciding: close/DTB3 2026-10-09 +99.3 pp, sync/DTB3 2026-10-09 +99.3 pp; excluding zero-bid calls +98.8 pp; SPX control (European): 0.2% of 1221 deep ITM puts pinned at undiscounted intrinsic, 59.7% at or below discounted intrinsic -> pass; 2026-10-14: 1303 puts; criterion met 1285 (at intrinsic 98.9%), failed 18 (at intrinsic 0.0%); difference (close/DGS3MO 2026-10-13 (ref)) +98.9 pp, 95% CI across strikes +98.3 to +99.5 pp (expiry-cluster CI +98.2 to +99.6 pp over 33 expiries); by variant close/DGS3MO 2026-10-13 (ref) +98.9 pp, sync/DGS3MO 2026-10-13 (ref) +99.1 pp; DTB3 beside it, not deciding: close/DTB3 2026-10-13 +99.2 pp, sync/DTB3 2026-10-13 +99.5 pp; excluding zero-bid calls +98.6 pp; SPX control (European): 7.4% of 1400 deep ITM puts pinned at undiscounted intrinsic, 1.9% at or below discounted intrinsic -> pass; the QQQ/IWM replication is not run (their ex-dividend schedules are not archived) — implemented criteria pass; not implemented: stable over 20 captured days (2 so far; no failing day)
+- note: from the options-library library: Early exercise of deep ITM American puts for interest; harness suggestion: early_exercise.py put_exercise_criterion; scan function over chains; SPX control built in. | verifier: corrected claim/trial
+
+### T-194 · etf-vs-index-option-parity-spy-spx-xsp
+
+**Claim.** For SPY expiries before its 2026-12-18 ex-date with 30-64 DTE, the SPY parity-implied financing rate ln(F_spy_impl / SPY) / T + 0.0945% (no distribution inside T, so dividends drop out) lies within 25 bp/yr of the SPX box rate at the nearest SPXW expiry in at least 90% of expiries.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.cboe.com/tradable_products/sp_500/mini_spx_options/, https://www.cboe.com/tradable_products/sp_500/spx_options/specifications/
+- statistic: |r_spy_impl - r_box_spx| per matched expiry, in bp/yr.
+- null: Share within 25 bp < 90% (the two venues price financing differently).
+- procedure: Day one: SPY F_impl from ATM +/- 3 mids (American bias small near ATM); SPX box rate from wide strike pairs at the matched SPXW expiry; compare; repeat daily.
+- data: CBOE delayed SPY (13,470 contracts) and SPX (29,918) chains. No dividend or bill input needed. · min n: 10
+- pass: >= 90% of matched expiries within 25 bp on day one and on >= 80% of 20 captured days.
+- controls: XSP box as a second reference; strike-invariance of each forward; exclude AM-settled SPX monthlies.
+- harness: b6_xc_spy_spx_financing
+- result X-471ee9f1: inconclusive — SPY ATM +/- 3 OLS forward vs SPXW wide-box mid rate, SPY expiries 30-64 DTE before 2026-12-18, r_spy = ln(F/SPY)/T + 0.0945% (bp/yr): 2026-10-13 (SPY 778.01): 2026-11-13 445 vs box 430 (+15), 2026-11-20 438 vs box 440 (-1), 2026-11-27 431 vs box 431 (-1), 2026-11-30 412 vs box 419 (-7) -> 4/4 within; spot that reconciles the two rates is -0.01 from the close; 2026-10-14 (SPY 769.60): 2026-11-13 339 vs box 431 (-92), 2026-11-20 353 vs box 433 (-80), 2026-11-27 359 vs box 451 (-92), 2026-11-30 347 vs box 437 (-90) -> 0/4 within; spot that reconciles the two rates is -0.74 from the close. SPY options quote to 16:15 ET but the SPY close prints at 16:00, so a 15-minute move of the spot shifts r_spy by (dS/S)/T (about 10 bp/yr per 1 bp of spot at 37 DTE); the XSP box (second reference) is not captured; rule 10(c): statistics on fixed capture days, no cycle grid, so no grid phase to vary — implemented criteria pass; not implemented: >= 80% of 20 captured days pass (1/2 so far); n >= trial min_n (4 of 10 matched expiries on day one)
+- note: from the options-library library: ETF vs index option parity (SPY vs SPX vs XSP); harness suggestion: parity.py cross_venue(spy_chain, spx_chain, xsp_chain) returning residual table; payoff template with qty 10:1. | verifier: corrected claim/trial
+
+### T-195 · crypto-put-call-parity-deribit
+
+**Claim.** For Deribit BTC options at expiries with a listed dated future, strikes within 10% of F and DTE 7-180, fewer than 1% of hourly (K, T) observations have |F_impl - F_mark| / F_mark (F_impl = K/(1 - (C_mid - P_mid))) larger than the round-trip taker fees of the three legs.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://docs.deribit.com/api-reference/market-data/public-ticker, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
+- statistic: Exceedance rate of |F_impl - F_mark| / F_mark over the fee threshold; also the 99th percentile in bp.
+- null: Exceedance rate >= 1% (exploitable violations are common).
+- procedure: Poll get_book_summary_by_currency (kind=option and future) and ticker hourly for 7 days; keep expiries whose underlying_index is a listed future (not SYN.); compute F_impl from mids and from executable bid/ask; bootstrap the exceedance rate.
+- data: Deribit public API (live, verified reachable 2026-10-14). · min n: 500
+- pass: Exceedance rate < 1% with the 95% upper bound < 1% and no violation persisting > 1 hour.
+- controls: Executable vs mid; drop zero-bid quotes; isolate the 07:00-08:30 UTC settlement window; ETH replication.
+- harness: b6b_drb_parity_violations
+- result X-7163e0a9: inconclusive — T-195 put-call parity vs the listed dated future on 2 Deribit BTC book snapshot(s) (deribit-book-BTC-2026-10-14, deribit-book-BTC-2026-10-15): expiries whose options reference a listed future (23OCT26, 25DEC26, 26MAR27, 27NOV26, 30OCT26; an option underlying_index BTC-<expiry>, a futures row of the snapshot or an archived quarterly in deribit-quarterly-futures-btc, never a SYN. underlying), strikes within 10% of F (the expiry's underlying/future mark), DTE 7-180, two-sided quotes. |F_impl - F|/F at mids (F_impl = K/(1 - (C_mid - P_mid))) vs round-trip taker fees of the three legs (Deribit fee schedule assumed for every year: option taker 0.03% of the underlying (0.0003 coin per contract) capped at 12.5% of the option price; dated futures taker 0.05%; median threshold 21.9 bp): 0 of 88 observations exceed (0.00%; 95% [+0.00%, +4.11%] exact binomial, iid (fewer than 3 capture days)); median deviation 1.8 bp, 99th percentile 5.5 bp; executable bid/ask exceedance 0.00%; outside 07:00-08:30 UTC 0.00%; ETH replication not run. The claim's data (deribit-book-hourly-BTC, hourly polls for 7 days) is not archived: history.deribit.com serves trades, not order books, so no history request can fill it: poll GET https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option and &kind=future every hour on the hour (T-195: 7 days = 168 snapshots; T-196: 14 days = 336), or take the ticker channel of a free Tardis first-of-month day (https://api.tardis.dev/v1/data-feeds/deribit?from=<YYYY-MM-01>, 24 hourly snapshots per day); rows: kind option value = {capture_ts, instrument, expiry, strike, type, bid, ask, mark, mark_iv, oi, volume, underlying, underlying_index, index_price, interest_rate}, kind future value = {capture_ts, instrument, expiry, bid, ask, mark, index_price}, available_at = capture time. These 2 daily captures are partial evidence only. — implemented criteria pass; not implemented: 95% upper bound < 1% (4.11%, exact binomial, iid (fewer than 3 capture days)) [fails, not decisively, below min_n]; no violation persisting > 1 hour (not implementable: no two snapshots an hour apart); n >= trial min_n (88 of 500 hourly (K, T) observations)
+- note: from the options-library library: Crypto put-call parity vs dated future (Deribit inverse options); harness suggestion: mandel/options/deribit_parity.py polling public endpoints (get_instruments, ticker, get_book_summary_by_currency); payoff engine with inverse payoff mode (divide USD payoff by S_T). | verifier: corrected claim/trial
+
+### T-196 · deribit-inverse-box-spread
+
+**Claim.** For the two most liquid Deribit BTC quarterly expiries, the executable long-box USD lending rate after taker fees (strike pairs within +/- 20% of F) exceeds the FRED 3-month bill by at least 100 bp annualised in the median hourly snapshot.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://docs.deribit.com/api-reference/market-data/public-ticker, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
+- statistic: Median over snapshots of r_box_exec - r_bill (bp).
+- null: Median <= 100 bp.
+- procedure: Hourly polls for 14 days; build boxes from executable bid/ask; subtract fees; join DGS3MO; bootstrap (block = 1 day).
+- data: Deribit public API, FRED DGS3MO. · min n: 200
+- pass: Median > 100 bp with the 95% CI excluding 100 bp.
+- controls: Mid vs executable; strike-pair invariance; exclude the settlement hour; ETH replication; report r_box_exec - basis separately.
+- harness: b6b_drb_quarterly_box_rate
+- result X-1830d794: inconclusive — T-196 executable long-box USD lending rate on the two quarterly expiries with the most open interest, all strike pairs within 20% of F with two-sided quotes on all four legs (C1 ask - C2 bid + P2 ask - P1 bid + four taker fees; Deribit fee schedule assumed for every year: option taker 0.03% of the underlying (0.0003 coin per contract) capped at 12.5% of the option price; dated futures taker 0.05%), debit in USD at the index, r = ln((K2 - K1)/debit)/T; per snapshot the median over boxes minus the 3-month bill (DTB3, continuous, rule 7; no DGS3MO in the archive). 2 snapshot(s): 2026-10-14T11:12 25DEC26/26MAR27: 380 boxes, median exec -789 bp (IQR [-1910 bp, -293 bp], best 160 bp), mid 499 bp, basis 522 bp, bill 417 bp; 2026-10-15T07:10 25DEC26/26MAR27: 361 boxes, median exec -843 bp (IQR [-2087 bp, -400 bp], best 113 bp), mid 538 bp, basis 550 bp, bill 417 bp. Median excess -1233 bp. The claim's data (deribit-book-hourly-BTC, hourly polls for 14 days) is not archived: history.deribit.com serves trades, not order books, so no history request can fill it: poll GET https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=BTC&kind=option and &kind=future every hour on the hour (T-195: 7 days = 168 snapshots; T-196: 14 days = 336), or take the ticker channel of a free Tardis first-of-month day (https://api.tardis.dev/v1/data-feeds/deribit?from=<YYYY-MM-01>, 24 hourly snapshots per day); rows: kind option value = {capture_ts, instrument, expiry, strike, type, bid, ask, mark, mark_iv, oi, volume, underlying, underlying_index, index_price, interest_rate}, kind future value = {capture_ts, instrument, expiry, bid, ask, mark, index_price}, available_at = capture time. These daily captures are partial evidence only. — implemented criteria pass; not implemented: median r_box_exec - bill > 100 bp (median -1233 bp) [fails, not decisively, below min_n]; 95% CI excludes 100 bp (not computable from 2 capture day(s)); n >= trial min_n (2 of 200 hourly snapshots)
+- note: from the options-library library: Deribit inverse box spread (USD lending/borrowing in BTC collateral); harness suggestion: deribit_parity.py box_rate(); inverse payoff mode in payoff engine; join with FRED via existing ingest. | verifier: corrected claim/trial
+
+### T-222 · crypto-catalyst-strangle
+
+**Claim.** For hard-dated BTC/ETH catalysts, a 25-delta strangle in the first expiry after the date, bought 21 days before and sold 1 day before, has a positive mean return on debit net of fees.
+
+- kind: options-strategy · origin: options-library:event-driven, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false, https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data
+- statistic: Mean return on debit; mean change in event-expiry IV minus change in DVOL over the window; exact sign test given small n.
+- null: Mean return <= 0.
+- procedure: Capture event-expiry mark IV and DVOL daily from the Deribit public book (from today); for each catalyst compute window statistics; cross-check with Polymarket odds for the event.
+- data: Deribit book captures (mark IV by expiry), DVOL, catalyst calendar, Polymarket event odds. · min n: 20
+- pass: Sign test p < 0.05 and mean > 0 with 95% CI excluding 0 once n >= 20.
+- controls: Non-catalyst 21-day windows; DVOL-only control; ETF-type vs protocol-type split.
+- harness: b6b_drb_catalyst_strangle
+- result X-2e4eac10: inconclusive — T-222 on Deribit trade prints (deribit-option-trades-catalysts, the first expiry after each event listed by the entry): long 25-delta strangle bought at 12:00 UTC 21 days before and sold at 12:00 UTC 1 day before. Point in time: of 21 stored windows only the 9 whose window row (verified known_since and the target listing) was available by the entry qualify; the others carry no verified fixing date before the entry. Of those, 3 are timed from a realised block height (entry, exit and 'first expiry after the event' from the realised time, at the entry only a few-day estimate; the bundle stores no estimate as of the entry), so the primary statistic uses the 6 windows timed from a date known ex ante (rule 4). Strikes: the out-of-the-money call and put nearest 0.25 |delta| (Black-Scholes, r = 0, index and each print's IV) among the latest prints in the 24 h before the decision; each leg filled at the first print at or after the decision that day (Deribit mark_price x index; a leg without one is re-marked at the decision from its own last IV or the expiry's print smile: {'mark at next print': 23, 're-marked own IV': 1}); Deribit fee schedule assumed for every year: option taker 0.03% of the underlying (0.0003 coin per contract) capped at 12.5% of the option price; dated futures taker 0.05%, both sides. Windows: btc-spot-etf-2024:BTC -33.3%; eth-spot-etf-2024:ETH +172.0%; us-election-2020:BTC +30.1%; us-election-2020:ETH -60.5%; us-election-2024:BTC -48.7%; us-election-2024:ETH -68.0%; realised block-height windows (reported, not in the primary statistic): btc-halving-2020:BTC +90.5%; btc-halving-2024:BTC -64.0%; btc-taproot-2021:BTC -75.4%. One observation per catalyst (BTC and ETH windows of one catalyst averaged): n = 4 catalysts, 1 positive, mean return on debit +16.3%, 95% iid bootstrap CI [-47.5%, +120.7%], sign test p 0.938. Reported: event-expiry ATM IV change minus DVOL change +27.59 vol points over 4 windows (DVOL from 2021-03); taker prints (buy-side fill in, sell-side out) +12.1% over 4; gross of fees +19.2% over 4; coin terms -1.4% over 4; decision at 08:00 -29.9% over 3, at 16:00 +17.0% over 4; with the 3 realised block-height windows added (NOT point in time: timed from the realised event) +2.3% over 7; all 21 windows ignoring point in time (NOT a test: uses catalysts not verifiably known at entry) +49.8% over 19; by category etf +69.4% (2), macro -36.8% (4). Non-catalyst 21-day windows and Polymarket odds need trades outside the stored windows: not run — implemented criteria pass; not implemented: exact sign test p < 0.05 (1 of 4 positive, one-sided p 0.938; at best 0.001 at n = 20) [fails, not decisively, below min_n]; mean return on debit > 0 with 95% CI excluding 0 (mean +16.3%, CI [-47.5%, +120.7%]) [fails, not decisively, below min_n]; n >= trial min_n (4 of 20 catalysts)
+- note: from the options-library library: Crypto scheduled-catalyst strangle (ETF decisions, halving, protocol upgrades); harness suggestion: Catalyst calendar table joined to Deribit expiry-level IV captures and Polymarket odds; report IV ramp per event. | verifier: corrected claim/trial
 
 ### T-231 · calendar_vol_spread
 
@@ -2597,6 +3921,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: term_vs_spot_premium
 - result X-44c31e4c: not_supported — forward premium minus spot premium +0.0046 (variance units) over 68 non-overlapping 63d cycles, p=0.351; conditional (VIX3M/VIX>1.10, n=48) forward premium halves +0.0234/+0.0031
 - result X-1edbb78f: inconclusive — forward premium minus spot premium +0.0046 (variance units) over 68 non-overlapping 63d cycles, p=0.351; conditional (VIX3M/VIX>1.10, n=48) forward premium halves +0.0234/+0.0031; verdict: implemented criteria pass; not implemented: forward premium > spot premium, 95% CI excluding 0 (fails, not decisively, below min_n: undecided); short far leg / reverse calendar (vega-weighted) when VIX3M/VIX > 1.10 has positive expectancy (walk-forward threshold, deflated Sharpe on the conditional short-forward-variance series, shuffled-ratio placebo, ex-2008/2020 sensitivity): not implemented; sample reaches trial min_n 70 cycles (68 so far)
+- result X-91ab585f: inconclusive — forward premium minus spot premium +0.0100 (variance units), rule 10 (no entry calendar named): POOLED over all 63 starts of the non-overlapping 63d grid = 4230 overlapping daily entries (68 cycles), studentized block bootstrap (126-day blocks) p=0.002; conditional (VIX3M/VIX>1.10, 2692 entries) forward premium halves +0.0191/+0.0100; each of the 63 grid starts alone: premium -0.0009 to +0.0246, 24 of 63 pass both data criteria; verdict: implemented criteria pass; not implemented: short far leg / reverse calendar (vega-weighted) when VIX3M/VIX > 1.10 has positive expectancy (walk-forward threshold, deflated Sharpe on the conditional short-forward-variance series, shuffled-ratio placebo, ex-2008/2020 sensitivity): not implemented; sample reaches trial min_n 70 cycles (68 so far)
 - note: from the options-library library: Calendar vol spread (ATM time spread, long or reverse); harness suggestion: Extend harness_term_structure with the forward-variance decomposition F^2 = (3*VIX3M^2 - VIX^2)/2 and a 63-day realised window; P&L of the calendar via build_position with two expiries. | superseded by T-530 (verifier-corrected wording)
 
 ### T-238 · vix_contango_short_call_spread
@@ -2613,6 +3938,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vix_forward_contango
 - result X-a0277481: inconclusive — in contango (VIX3M/VIX>1.10), VIX 21 days later is below the forward 147/177 = 83% (95% CI 0.77-0.88); mean F - VIX(t+21) +2.90 pts, p=0.0005; data part passes, call-spread simulation not implemented
 - result X-0b47e7e3: inconclusive — in contango (VIX3M/VIX>1.10), VIX 21 days later is below the forward 147/177 = 83% (95% CI 0.77-0.88); mean F - VIX(t+21) +2.90 pts, p=0.0005; data part passes, call-spread simulation not implemented
+- result X-ac6f49d9: inconclusive — 177 non-overlapping contango cycles (VIX3M/VIX>1.10); rule 10 (no entry calendar named): POOLED over all 2730 contango days (every start of the 21d grid, overlapping, 42-day blocks): VIX 21 days later is below the forward 2241/2730 = 82% (95% CI 0.78-0.86); mean F - VIX(t+21) +2.66 pts, p=0.0005; each of the 21 grid starts alone: frequency 0.78 to 0.88, 21 of 21 pass; data part passes, call-spread simulation not implemented
 - note: from the options-library library: VIX futures roll-down harvest via short VIX call spread; harness suggestion: Extend harness_term_structure with the forward-level proxy F and a VIX-call-spread pricer (bs.price with sigma = VVIX/100, T from the VIX monthly calendar). | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists | superseded by T-534 (verifier-corrected wording)
 
 ### T-256 · dvol-percentile-vega
@@ -2629,7 +3955,68 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: btc_low_dvol_straddle
 - result X-766daf94: not_supported — MODEL-PRICED at flat DVOL: 60-day ATM straddles bought with DVOL below its trailing 20% quantile return +31.0% on premium vs +14.0% on all days (629 of 1605 daily entries; diff 95% CI -12.1 to +46.8, overlapping entries, block = holding period) — failed: difference 95% CI > 0
 - result X-f666096a: inconclusive — MODEL-PRICED at flat DVOL: 60-day ATM straddles bought with DVOL below its trailing 20% quantile return +29.2% on premium over 18 non-overlapping entries (conditional mean > 0) vs +14.1% on all 1606 daily entries (diff +15.1, 95% CI -13.0 to +43.3; 630 low-DVOL days in all) — only 18 non-overlapping conditional entries, below the trial's min_n 25, so the verdict cannot be supported and a failing criterion counts only when it fails decisively (house rule 5): inconclusive, implemented criteria pass; not implemented: difference 95% CI > 0 (fails, not decisively, below min_n: undecided); n >= trial min_n (18 of 25 non-overlapping conditional entries) (criteria: not_supported, failed: difference 95% CI > 0)
+- result X-04e18984: inconclusive — MODEL-PRICED at flat DVOL: 60-day ATM straddles bought with DVOL below its trailing 20% quantile return +29.2% on premium over 18 non-overlapping entries (conditional mean > 0) vs +14.1% on all 1606 daily entries (diff +15.1, 95% CI -13.0 to +43.3; 630 low-DVOL days in all) — only 18 non-overlapping conditional entries, below the trial's min_n 25, so the verdict cannot be supported and a failing criterion counts only when it fails decisively (house rule 5): inconclusive, implemented criteria pass; not implemented: difference 95% CI > 0 (fails, not decisively, below min_n: undecided); n >= trial min_n (18 of 25 non-overlapping conditional entries) (criteria: not_supported, failed: difference 95% CI > 0)
 - note: from the options-library library: DVOL percentile vega timing (long/short vol regimes); harness suggestion: Add percentile filter to the DVOL harness; straddle P&L via Position | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states
+
+### T-257 · btc-collar-risk-reversal
+
+**Claim.** Using daily BTC smiles reconstructed from Deribit trade prints, a 30-day delta-hedged 25-delta risk reversal that sells the richer wing has positive mean P&L on entries where |RR25| > 5 vol points, 2022-2026.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_book_summary_by_instrument?instrument_name=BTC-30OCT26-70000-C
+- statistic: Mean 30-day P&L of the delta-hedged RR, conditional on |RR25| > 5
+- null: Mean <= 0
+- procedure: From history.deribit.com trades (sampled, e.g. 07:00-09:00 UTC each day), fit a per-expiry smile from trade IVs and interpolate 25-delta call and put IV at 30 DTE; enter when the threshold is hit; price legs by BS at their fitted IVs; hedge daily on closes; mark using the next fitted smiles; non-overlapping entries; block bootstrap
+- data: history.deribit.com option trades (iv, mark_price, index_price; free, verified); BTC closes; ongoing daily book capture as quote-based confirmation from 2026-10-14 · min n: 40
+- pass: CI > 0 and hit rate > 55%
+- controls: Random entry days; fees and a 1-vol-point slippage per leg; re-run on quote captures once 120+ days accumulate
+- harness: b6b_drb_rr_skew_harvest
+- result X-8587bd48: inconclusive — missing data bundles ['deribit-option-trades-daily-BTC']: the claim cannot be tested until they are archived (fill: deribit-option-trades-daily-BTC: GET https://history.deribit.com/api/v2/public/get_last_trades_by_currency_and_time?currency=BTC&kind=option&start_timestamp=<day 07:00 UTC ms>&end_timestamp=<day 09:00 UTC ms - 1>&count=1000&include_old=true&sorting=asc, paged forward, for every day 2021-12-01..2026-10-14 (about 1,780 days, on the order of 10^4 pages); rows: kind option-trade value = the raw trade {trade_id, timestamp, instrument_name, price, mark_price, iv, index_price, amount, direction} + {currency, expiry, expiry_code, strike, type}, available_at = trade time) — implemented criteria pass; not implemented: data bundles ['deribit-option-trades-daily-BTC'] archived
+- note: from the options-library library: BTC zero-cost collar / risk reversal on inventory (skew harvest); harness suggestion: Extend deribit_book capture to store 25d RR per expiry; harness on accumulated history | verifier: corrected claim/trial
+
+### T-260 · deribit-box-spread
+
+**Claim.** The BTC option-implied USD rate from boxes bracketing ATM on 30-90 DTE expiries exceeds the 3-month T-bill by more than 200 bp annualised on at least 70% of capture days.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_book_summary_by_instrument?instrument_name=BTC-30OCT26-70000-C
+- statistic: Fraction of capture days with r_implied - DGS3MO > 2% (annualised, mid prices)
+- null: Fraction <= 70%
+- procedure: From daily synchronous book captures, price the box at mid for strikes bracketing ATM; solve for r; compare to FRED; repeat at bid/ask
+- data: Deribit book captures from 2026-10-14; FRED DGS3MO · min n: 60
+- pass: Fraction > 70% at mid (also report the median spread and bid/ask results)
+- controls: Futures-basis implied rate on the same days (also back-testable from futures trade history)
+- harness: b6b_drb_box_rate_capture_days
+- result X-f43acb93: inconclusive — T-260 option-implied USD rate from boxes bracketing the index (2 strikes below and 2 above with two-sided quotes, every bracketing pair) on expiries 30-90 calendar days out, mid prices, r = ln((K2 - K1)/(debit x index))/T, vs the 3-month bill (DTB3 continuous, rule 7; the archive has no DGS3MO): 2 capture day(s) from deribit-book-BTC-2026-10-14, deribit-book-BTC-2026-10-15: 2026-10-14 25DEC26/27NOV26 mid 180 bp (lend exec -6231 bp, borrow exec 7463 bp), bill 417 bp; 2026-10-15 25DEC26/27NOV26 mid 485 bp (lend exec -6372 bp, borrow exec 7192 bp), bill 417 bp. Median spread -84 bp; executable lending spread -6718 bp. Control, futures-basis implied rate (30-90 DTE quarterly, deribit-quarterly-futures-btc): same days 0.00 above 200 bp; first of each month 2019-05..2026-10 proxy 0.57 of 60 days above 200 bp (median +276 bp; not the claim's option box). Not archived: deribit-box-monthly (mandel.data.options_misc.fetch_tardis_box_monthly (Tardis keyless first-of-month ticker feed, minute 00:00-00:01 UTC, 2019-04..2026-10, about 91 capture days; blocked from this shared host by the per-IP transfer budget, run it from a host with its own IP); the daily deribit-book-BTC-<date> captures accumulate from 2026-10-14). — implemented criteria pass; not implemented: fraction of capture days with r_mid - bill > 200 bp > 70% (0 of 2 = 0%; exact 95% [0%, 84%]) [fails, not decisively, below min_n]; n >= trial min_n (2 of 60 capture days)
+- note: from the options-library library: Deribit box spread (synthetic coin lending / implied rate); harness suggestion: Parity/box scanner over stored book snapshots; FRED via fred_series | verifier: corrected claim/trial
+
+### T-262 · btc-calendar-term-structure
+
+**Claim.** Using BTC ATM IVs reconstructed from Deribit trade prints, long ATM call calendars (front 7-30 DTE / back ~90 DTE) entered when the front IV exceeds the back by more than 5 vol points and held 14 days have positive mean P&L, 2022-2026.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
+- statistic: Mean 14-day calendar P&L conditional on inversion > 5 points (hit rate reported)
+- null: Mean <= 0
+- procedure: Daily ATM IV per expiry from fitted trade-print smiles; detect inversion; price legs by BS at their own IVs; re-mark after 14 days with that day's fitted IVs; non-overlapping entries; block bootstrap
+- data: history.deribit.com option trades (free, verified); BTC closes; quote captures from 2026-10-14 as confirmation · min n: 30
+- pass: CI > 0
+- controls: Random entry days; SPY with VIX vs VIX3M as a structural analogue (model-priced); 1 vol point slippage per leg
+- harness: b6b_drb_calendar_inversion
+- result X-ce9af676: inconclusive — missing data bundles ['deribit-option-trades-daily-BTC']: the claim cannot be tested until they are archived (fill: deribit-option-trades-daily-BTC: GET https://history.deribit.com/api/v2/public/get_last_trades_by_currency_and_time?currency=BTC&kind=option&start_timestamp=<day 07:00 UTC ms>&end_timestamp=<day 09:00 UTC ms - 1>&count=1000&include_old=true&sorting=asc, paged forward, for every day 2021-12-01..2026-10-14 (about 1,780 days, on the order of 10^4 pages); rows: kind option-trade value = the raw trade {trade_id, timestamp, instrument_name, price, mark_price, iv, index_price, amount, direction} + {currency, expiry, expiry_code, strike, type}, available_at = trade time) — implemented criteria pass; not implemented: data bundles ['deribit-option-trades-daily-BTC'] archived
+- note: from the options-library library: BTC IV term-structure calendar (DVOL vs long-dated IV); harness suggestion: Store ATM IV per expiry per day from deribit_book; term-slope harness mirrors the existing VIX/VIX3M one | verifier: corrected claim/trial
+
+### T-263 · crypto-event-vol
+
+**Claim.** For FOMC decisions 2022-2026, the BTC ATM straddle-implied move (from Deribit trade prints on the day before, for the first post-decision expiry) exceeds the realised close-to-close |return| over the same window on average.
+
+- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_volatility_index_data?currency=BTC&start_timestamp=1700000000000&end_timestamp=1700300000000&resolution=86400
+- statistic: Mean (implied move - realised |move|) across FOMC decisions; hit rate reported
+- null: Mean <= 0
+- procedure: For each FOMC decision (Fed calendar), take ATM call and put trade prints/marks on the first post-decision expiry during the 24h before; implied move = straddle/index; compare to the realised move to that expiry's 08:00 UTC settlement; bootstrap and sign test
+- data: history.deribit.com option trades (free, verified); BTC closes; FOMC dates from federalreserve.gov (8/year, ~38 decisions 2022-2026) · min n: 16
+- pass: Mean > 0 with 95% CI excluding 0
+- controls: Non-event days with the same DTE as baseline; DVOL change around FOMC (also testable now)
+- harness: b6b_drb_fomc_event_straddle
+- result X-dbb078ec: inconclusive — missing data bundles ['deribit-option-trades-fomc']: the claim cannot be tested until they are archived (fill: deribit-option-trades-fomc: GET https://history.deribit.com/api/v2/public/get_last_trades_by_currency_and_time?currency=BTC&kind=option&start_timestamp=<decision_ms - 86400000>&end_timestamp=<decision_ms - 1>&count=1000&include_old=true&sorting=asc, paged forward, for every scheduled FOMC decision 2022-01-26..2026-09 in fomc-meetings (decision_ms = 14:00 America/New_York on decision_day), keeping the first expiry after the decision listed by then (listing = min creation_timestamp from https://history.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=true and expired=false); rows: kind option-trade value = the raw trade + {decision_day, currency, expiry, expiry_code, strike, type}, available_at = trade time, and kind fomc-window value = {decision_day, decision_time, currency, target_expiry, target_expiry_code, target_listed_at, window_start, window_end, complete} (mandel.data.options_misc.trades_in_window / catalyst_windows do this with before_days=1)). Control (archived now): BTC DVOL change over the decision day -1.07 vol points, 95% CI [-2.13, -0.16], over 38 decisions 2022-2026 (25 falls) — implemented criteria pass; not implemented: data bundles ['deribit-option-trades-fomc'] archived
+- note: from the options-library library: Crypto event straddle / pre-event IV crush; harness suggestion: Event-date table + straddle capture; interim DVOL pre/post FOMC t-test from existing DVOL history | verifier: corrected claim/trial
 
 ### T-266 · eth-btc-vol-pair
 
@@ -2643,25 +4030,10 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: CI > 0; report the unconditional mean (usually negative, since DVOL carries a VRP) for comparison
 - controls: High-percentile mirror trade; random dates
 - harness: eth_btc_dvol_ratio
-- result X-7cf64c6f: error — harness raised ValueError
 - result X-39ddc726: supported — ETH/BTC DVOL extremes: 21 signals, mean +0.072 log units (95% CI +0.015 to +0.125), win rate 0.71 — all criteria pass
 - result X-15ae0752: inconclusive — ETH/BTC DVOL extremes: 21 non-overlapping signals, mean +0.082 ratio points (95% CI +0.020 to +0.139), win rate 0.71; unconditional mean over all 1636 post-warm-up days +0.136 — only 21 non-overlapping signals, below the trial's min_n 25, so the verdict cannot be supported and a failing criterion counts only when it fails decisively (house rule 5): inconclusive, implemented criteria pass; not implemented: n >= trial min_n (21 of 25 non-overlapping signals) (criteria: supported, all criteria pass)
+- result X-808aaa9a: inconclusive — ETH/BTC DVOL extremes: 21 non-overlapping signals, mean +0.082 ratio points (95% CI +0.020 to +0.139), win rate 0.71; unconditional mean over all 1636 post-warm-up days +0.136 — only 21 non-overlapping signals, below the trial's min_n 25, so the verdict cannot be supported and a failing criterion counts only when it fails decisively (house rule 5): inconclusive, implemented criteria pass; not implemented: n >= trial min_n (21 of 25 non-overlapping signals) (criteria: supported, all criteria pass)
 - note: from the options-library library: ETH vs BTC relative volatility (vol pair / dispersion); harness suggestion: deribit_dvol_history('ETH') alongside BTC; ratio harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py
-
-### T-324 · etf-nav-premium-reversion
-
-**Claim.** For SPY/IVV from 2010-01 to 2026-09, the twin rule (enter at |z| > 2 of the 60-day log price-ratio z-score, exit at z = 0 or 5 days) earns a positive mean net return per trade after 2 bps per leg per trade (8 bps per round trip of both legs).
-
-- kind: underlying-strategy · origin: underlying-library:mean-reversion-statarb, https://doi.org/10.3905/jod.2006.635418, https://doi.org/10.2139/ssrn.1572907
-- statistic: mean net return per trade with bootstrap interval; AR(1) half-life of x_t and share of signals whose excursion exceeds costs as diagnostics
-- null: zero mean net return per trade
-- procedure: Compute x_t from Yahoo adjusted closes (total-return basis neutralizes SPY's quarterly UIT dividend timing). Simulate the rule with trailing statistics only. Bootstrap over trades, clustered by month. Repeat on the other twins and report as variants in DSR.
-- data: Yahoo daily adjusted closes: SPY (1993), IVV (2000), VOO (2010), QQQM (2020-10), GLD (2004), IAU (2005), IBIT/FBTC (2024-01) · min n: 1000
-- pass: 95% lower bound of mean net return per trade > 0 AND DSR > 0.95 across the 5 twin variants; otherwise park as 'reversion real but below retail cost'
-- controls: Look-ahead: trailing windows; execute at the next close after the signal. Dividends: total-return series, because SPY (UIT) holds dividends in cash and pays quarterly with a lag, creating a slow drift absorbed by the trailing mean. Closing-auction prints for both legs. Costs: 2 bps per leg per trade. Survivorship: none (all twins listed). Multiple testing: 5 twins. Regime: March 2020 reported separately.
-- harness: ohlc_spy_ivv_twin
-- result X-baa72a98: inconclusive — SPY/IVV 2010-01-04..2026-09-30 (4211 days): 175 trades at |z|>2, mean gross +0.17 bps, net -7.83 bps after 8 bps RT (month-clustered 95% CI -9.14..-6.58); DSR 0.000 across 5 twins (variance of trial Sharpes zero-skill floor: VOO, IAU, QQQM, FBTC not archived); AR(1) phi 0.940, half-life 11.3 days; 27% of signals with excursion > cost; March 2020 2 trades; min_n counted in trades (the statistic is per trade): 175 trades, the window allows about 2105 at most; on the trades available the CI lies entirely below 0 and these criteria would fail: 95% lower bound of mean net return per trade > 0; DSR > 0.95 across 5 twin variants — data cannot support the claim: 175 trades, below the trial's min_n 1000
-- note: from the underlying-library library: ETF premium/discount to NAV reversion (and identical-exposure twins); harness suggestion: twin_spread_halflife: ratio AR(1), excursion-vs-cost counter, rule simulator; later nav_premium_reversion when NAV lands | verifier: corrected claim/trial
 
 ### T-329 · crypto-futures-basis-carry
 
@@ -2676,22 +4048,38 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Synchronicity: Yahoo BTC-USD's 00:00 UTC close is 2-3 hours away from CME settlement, and that hourly BTC move (~0.5-1%) exceeds a month of basis, so only settlement-aligned hourly spot is valid. T-362 uses BTC-USD daily closes and has the same flaw (flagged). Roll contamination: BTC=F is a continuous front-month series, expired per-contract history is not on Yahoo (BTCZ23.CME returns null), so roll windows are excluded rather than reconstructed. Costs: 20 bps round trip plus margin financing at DTB3+1.5%. Regime: 2021 boom, 2022, post-ETF. Multiple testing: 5 variants.
 - harness: carry_cme_basis_spike
 - result X-2543136c: inconclusive — 30 trades 2019-06-18..2026-08-18 (synchronous spot from 2019-05-01; z > 2 vs the valid settles in the trailing 60 trading days, at least 20, the 5 days before expiry excluded; enter next settle, hold 5 trading days in the same contract, 20 bp round trip; 17 exits inside the roll window): mean net +0.178%, one-sided 95% lower bound +0.070% (need > 0); pre-2024 mean +0.229% (n=22), post +0.039% (n=8) (need both > 0); DSR 0.982 (need > 0.95); window from 2018-01 covered: no, no settle-synchronous spot before 2019-05-01 — implemented criteria pass; not implemented: trades >= 40 (min_n); claim window from 2018-01 covered by settle-synchronous spot
+- result X-e60ced50: inconclusive — 30 trades 2019-06-18..2026-08-18 (synchronous spot from 2019-05-01; z > 2 vs the valid settles in the trailing 60 trading days, at least 20, the 5 days before expiry excluded; enter next settle, hold 5 trading days in the same contract, 20 bp round trip; 17 exits inside the roll window): mean net +0.178%, one-sided 95% lower bound +0.070% (need > 0); pre-2024 mean +0.229% (n=22), post +0.039% (n=8) (need both > 0); DSR 0.982 (need > 0.95); window from 2018-01 covered: no, no settle-synchronous spot before 2019-05-01; month-clustered one-sided 95% upper bound of the mean +0.301% (21 months; same draws as the lower bound, decisive below min_n when <= 0); month-clustered 95% CIs pre-2024 [+0.070, +0.433]% (15 months), post-2024 [-0.074, +0.160]% (6 months) — only 30 trades, below the trial's min_n 40, so the verdict cannot be supported and a failing criterion counts only when it fails decisively (house rule 5). Decisive failures: none. inconclusive: implemented criteria pass; not implemented: trades >= 40 (min_n); claim window from 2018-01 covered by settle-synchronous spot
 - note: from the underlying-library library: Crypto futures basis / cash-and-carry (CME BTC futures and Deribit); harness suggestion: basis_carry_harness: basis calculator with roll detection, hurdle rule, hold-to-expiry accounting; daily Deribit snapshot writer for the forward sample | verifier: corrected claim/trial
 
-### T-361 · post-fomc-monetary-momentum
+### T-500 · butterfly-convexity-arbitrage
 
-**Claim.** Over 1994-2026, SPY's cumulative return over the 15 trading days starting at the close of t+2 after a scheduled FOMC statement is higher after expansionary surprises (DGS2 down more than 5 bps on day t) than after contractionary ones (up more than 5 bps) by at least 1 percentage point, with both halves positive.
+**Claim.** On the CBOE delayed SPX and SPY chains, fewer than 0.5% of equally spaced call or put butterflies (adjacent listed strikes within +/- 20% of spot, all expiries) can be bought for a net credit at executable prices (ask on wings, bid on the body).
 
-- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://www.nber.org/papers/w24748, https://www.federalreserve.gov/monetarypolicy/fomchistorical2019.htm
-- statistic: Mean 15-day SPY return after expansionary minus after contractionary meetings (pp).
-- null: Zero gap. Permutation of surprise labels across meetings (10,000); bootstrap over meetings.
-- procedure: Classify each scheduled meeting by the DGS2 change; entry at the t+2 close respects H.15 publication. Halves 1994-2009 / 2010-2026; ZLB meetings 2009-2015 (compressed DGS2 moves) reported separately. 6 variants Holm.
-- data: daily-history-SPY (stored); fred-DGS2 (stored; fredgraph.csv keyless, verified to 2026-10-09); FOMC dates (Fed site); ^FVX via Yahoo; Polymarket Fed markets (stored); Kalshi KXFEDDECISION via /historical. · min n: 120
-- pass: Gap > 1 pp with permutation p < 0.05 and both halves positive; the long-only expansionary arm's Sharpe beats buy-and-hold over matched windows.
-- controls: Look-ahead: entry after DGS2 is published (t+2); the ^FVX variant uses same-day closes. Survivorship: n/a. Costs: up to 16 legs/yr at 1-2 bps. Multiple testing: 6 variants. Regime: halves and ZLB split.
-- harness: fomc_monetary_momentum
-- result X-bf82b216: inconclusive — only 85 expansionary+contractionary meetings (min_n 120); SPY 15 trading days from the t+2 close: after 50 expansionary (DGS2 < -5 bps) +0.42% vs 35 contractionary -0.30% of 261 classified meetings: net gap +0.64 pp (95% CI -1.34 to +2.74), permutation p=0.2097; 1994-2009 +0.67 pp, 2010-2026 +0.70 pp; ZLB 2009-2015 +3.94 pp; long-only arm Sharpe 0.05 vs buy-and-hold 0.52 (1994-01-03..2026-10-09, excess over T-bills) — inconclusive: only 85 of 261 classified meetings enter the gap (min_n 120); criteria on this sample, not used for the verdict: failed: net gap > 1 pp; permutation p < 0.05; long-only expansionary arm Sharpe > buy-and-hold Sharpe
-- note: from the underlying-library library: Post-FOMC directional drift (monetary momentum); harness suggestion: data/fetch.py: fred_series('DGS2') (the FRED route exists); events.py: post_event_directional_drift(days, closes, event_days, signal_by_event, horizon=15, threshold_bps=5) with label permutation and block bootstrap. | verifier: corrected claim/trial
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Butterfly_(options), https://arxiv.org/abs/1204.0646
+- statistic: Share of butterflies with B_exec < 0.
+- null: Share >= 0.5%.
+- procedure: Day one: enumerate butterflies from adjacent equally spaced strikes; compute B_exec and B_mid; count; bootstrap across expiries; repeat daily.
+- data: CBOE delayed SPX and SPY chains (available). · min n: 1000
+- pass: Share < 0.5% with the 95% upper bound < 0.5% on day one and on >= 80% of captured days.
+- controls: Mid-price share should be small but non-zero; drop legs with zero bid; separate wing strikes (> 10% OTM) from the core.
+- harness: b6b_chain_butterfly_arb
+- result X-6568b066: inconclusive — Executable credit butterflies (ask wings, bid body), adjacent equally spaced listed strikes within +/- 20% of the quote-day close, all expiries, every leg bid > 0 and not crossed: 2026-10-13: SPX 0/19276 credit butterflies (0.000%, 95% upper 0.016%; mid-price negative 20.3%; core 0/14016, wings 0/5260; 382 dropped for a zero-bid or crossed leg); SPY 0/7404 credit butterflies (0.000%, 95% upper 0.040%; mid-price negative 21.0%; core 0/5077, wings 0/2327; 570 dropped for a zero-bid or crossed leg); 2026-10-14: SPX 0/18706 credit butterflies (0.000%, 95% upper 0.016%; mid-price negative 18.0%; core 0/13578, wings 0/5128; 1830 dropped for a zero-bid or crossed leg); SPY 0/7474 credit butterflies (0.000%, 95% upper 0.040%; mid-price negative 18.7%; core 0/5187, wings 0/2287; 478 dropped for a zero-bid or crossed leg) — implemented criteria pass; not implemented: on >= 80% of captured days (2 of 2; needs >= 5 days)
+- note: from the options-library library: Butterfly convexity arbitrage (negative-priced butterfly); harness suggestion: mandel/options/static_arb.py: butterfly_scan(chain) with executable and mid prices; payoff engine template [call+ K1, call-2 K2, call+ K3]. | added by the verifier pass
+
+### T-501 · calendar-time-value-arbitrage
+
+**Claim.** On the CBOE delayed SPY chain (American), fewer than 0.1% of same-strike call or put pairs at adjacent expiries can be bought as a calendar for a net credit at executable prices (far ask < near bid).
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Calendar_spread, https://arxiv.org/abs/1204.0646
+- statistic: Share of same-strike adjacent-expiry pairs with far_ask < near_bid.
+- null: Share >= 0.1%.
+- procedure: Day one: enumerate pairs; count executable credits; for SPX, compute total-variance violations at fixed forward-moneyness as a companion statistic; repeat daily.
+- data: CBOE delayed SPY and SPX chains (available). · min n: 5000
+- pass: Share < 0.1% on day one and on >= 80% of captured days.
+- controls: Exclude zero-bid near legs; separate deep ITM calls straddling ex-div (early-exercise value); Deribit total-variance scan as a crypto replication.
+- harness: b6b_chain_calendar_arb
+- result X-a6b081cf: inconclusive — SPY (American) calendars bought for a credit, same strike, adjacent listed expiries: 2026-10-13: executable 0.0% of 7856 -> pass; 2026-10-14: executable 0.0% of 8029 -> pass; 2026-10-13: mid-price inversions 5.41%; deep ITM calls straddling the ex-date (separated) 0/345; dropped 468 zero-bid near and 277 offerless far legs; SPX total-variance companion 35/11749 (0.30%) points with far total variance below near at the same forward-moneyness; 2026-10-14: mid-price inversions 4.36%; deep ITM calls straddling the ex-date (separated) 0/321; dropped 313 zero-bid near and 279 offerless far legs; SPX total-variance companion 65/11539 (0.56%) points with far total variance below near at the same forward-moneyness; the Deribit total-variance replication is not run (only per-expiry ATM marks are archived) — implemented criteria pass; not implemented: on >= 80% of captured days (2 pass, 0 fail, 0 undecided of 2; needs >= 5 days)
+- note: from the options-library library: Calendar (time-value) arbitrage; harness suggestion: static_arb.py calendar_scan(chain) plus total_variance_check(surface). | added by the verifier pass
 
 ### T-503 · long-box-spread-lend
 
@@ -2705,12 +4093,57 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Day-one median spread inside [15, 80] bp with the 95% bootstrap CI inside [0, 120] bp; persistence over 20 captured days.
 - controls: Strike-invariance of r_box (if r_box varies by more than spreads across pairs, quote noise dominates); SPX AM vs SPXW PM roots; XSP replication; convert DGS3MO from bond-equivalent to continuous.
 - harness: box_mid_v2
-- result X-afab5dd0: inconclusive — day one 2026-10-14: 15583 boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median +63 bp (95% CI +63 to +63); needs [15, 80] with CI in [0, 120]; persistence needs 20 capture days (2 so far); the CI resamples boxes that share strikes, so it understates uncertainty
 - result X-23bc344d: inconclusive — day one 2026-10-14: 15583 boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median +63 bp (95% CI +63 to +63); needs [15, 80] with CI in [0, 120]; later days: 2026-10-15 +65 bp (in range); persistence needs 20 capture days (2 so far); the CI resamples boxes that share strikes, so it understates uncertainty
 - result X-0e895672: inconclusive — day one 2026-10-14: 248432 boxes (SPX and SPXW, 60-120 DTE, all strike pairs), mid box rate minus bill median +39 bp (95% CI +39 to +39); needs [15, 80] with CI in [0, 120] (robustness, $25 grid and width >= 5% of spot: +44 bp over 15583 boxes); later days: 2026-10-15 +44 bp (in range); persistence needs 20 capture days (2 so far); the CI resamples boxes that share strikes, so it understates uncertainty; verdict: implemented criteria pass; not implemented: persistence: in range on every one of the first 20 captured days (2 so far)
+- result X-62f6665b: inconclusive — day one 2026-10-14: 248432 boxes (SPX and SPXW, 60-120 DTE, all strike pairs), mid box rate minus bill median +39 bp (95% CI +39 to +39); needs [15, 80] with CI in [0, 120] (robustness, $25 grid and width >= 5% of spot: +44 bp over 15583 boxes); later days: 2026-10-15 +44 bp (in range); persistence needs 20 capture days (2 so far); the CI resamples boxes that share strikes, so it understates uncertainty; verdict: implemented criteria pass; not implemented: persistence: in range on every one of the first 20 captured days (2 so far)
 - note: from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2, side) and daily box_curve; payoff-engine test asserts a flat K2 - K1. | verifier-corrected restatement of T-186, whose verdict tested the earlier wording and stands | the bootstrap CI over boxes is too narrow (boxes share strikes and are not independent); the persistence criterion over 20 capture days is the real test
 
-## Untested (169)
+### T-508 · vertical-spread-bound-arbitrage
+
+**Claim.** Across the CBOE delayed SPY, SPX, QQQ, GLD and IBIT chains, fewer than 0.1% of adjacent-strike call or put verticals violate monotonicity or the width bound at executable prices on the capture day.
+
+- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Vertical_spread, https://en.wikipedia.org/wiki/Bull_spread
+- statistic: Share of adjacent-strike verticals with executable violation (debit < 0 or bid > width bound).
+- null: Share >= 0.1%.
+- procedure: Day one: enumerate adjacent pairs per expiry; compute executable debits/credits; count violations; repeat daily.
+- data: CBOE delayed chains (available), FRED DGS3MO for discounting. · min n: 5000
+- pass: Share < 0.1% on day one and on >= 80% of captured days.
+- controls: Mid-price violation rate as a quote-quality diagnostic; exclude zero-bid legs; IBIT/GLD reported separately (wider spreads).
+- harness: b6b_chain_vertical_bounds
+- result X-133cc150: inconclusive — Adjacent-strike verticals at executable prices (debit < 0, or credit above the width bound: undiscounted for American SPY/QQQ/GLD/IBIT, discounted for European SPX at the trial's FRED DGS3MO), both legs bid > 0 and not crossed: 2026-10-13 (DGS3MO 2026-10-09 (ref)): SPY 0/12176 (0.000%; monotonicity 0, width 0; mid-price violations 5.28%; 924 dropped); SPX 0/28043 (0.000%; monotonicity 0, width 0; mid-price violations 6.35%; 1265 dropped); QQQ 0/10324 (0.000%; monotonicity 0, width 0; mid-price violations 6.22%; 698 dropped); GLD 0/7064 (0.000%; monotonicity 0, width 0; mid-price violations 12.22%; 760 dropped); IBIT 0/2728 (0.000%; monotonicity 0, width 0; mid-price violations 9.46%; 392 dropped); DTB3 beside it, not deciding: DTB3 2026-10-09/pooled 0.000%, DTB3 2026-10-09/SPX 0.000%; 2026-10-14 (DGS3MO 2026-10-13 (ref)): SPY 0/12341 (0.000%; monotonicity 0, width 0; mid-price violations 4.98%; 759 dropped); SPX 0/27274 (0.000%; monotonicity 0, width 0; mid-price violations 5.98%; 3072 dropped); QQQ 0/10323 (0.000%; monotonicity 0, width 0; mid-price violations 10.52%; 391 dropped); GLD 0/7051 (0.000%; monotonicity 0, width 0; mid-price violations 15.23%; 555 dropped); IBIT 0/2810 (0.000%; monotonicity 0, width 0; mid-price violations 9.89%; 244 dropped); DTB3 beside it, not deciding: DTB3 2026-10-13/pooled 0.000%, DTB3 2026-10-13/SPX 0.000% — implemented criteria pass; not implemented: on >= 80% of captured days (2 of 2; needs >= 5 days)
+- note: from the options-library library: Vertical-spread bound and strike-monotonicity arbitrage; harness suggestion: static_arb.py vertical_scan(chain); also used as a quote-sanity gate in the daily options-fetch job. | added by the verifier pass
+
+### T-518 · crude-oil-opec-eia-event-straddle
+
+**Claim.** On OPEC+ ministerial meeting days since 2009-09, a 1-day ATM USO straddle model-priced with OVX-as-IV (sigma = OVX at the T-1 close, T = 1/252) and bought at the T-1 close has a higher mean P&L than on non-event days.
+
+- kind: options-strategy · origin: options-library:event-driven, https://www.cboe.com/us/indices/dashboard/ovx/, https://www.optionseducation.org/strategies/all-strategies/long-straddle
+- statistic: Difference in mean MODEL-PRICED long-straddle P&L (event minus non-event), bootstrap CI.
+- null: Event-day mean P&L <= non-event mean P&L.
+- procedure: OVX CSV (free, since 2009-09) and USO closes (free, not wired); OPEC+ meeting dates hardcoded from OPEC press releases; EIA Wednesdays as a second event set.
+- data: Cboe OVX history, USO daily closes, OPEC+ meeting calendar, EIA release calendar. · min n: 40
+- pass: Difference > 0 with 95% CI excluding 0.
+- controls: USO roll-date exclusion; 2020-03/04 exclusion; non-event Wednesdays for EIA.
+- harness: b6b_misc_opec_uso_straddle
+- result X-da58485b: inconclusive — T-518 MODEL-PRICED: 1-day ATM USO straddle bought at the T-1 close at Black-Scholes with sigma = OVX(T-1)/100, T = 1/252, r = DTB3 (rule 7, print before T-1), K = S(T-1), settled at T's raw (split-adjusted) close, P&L in % of S(T-1); USO ex-dividend dates in the data: 0 (escrowed forward when one falls on T); sessions 2009-09-21..2025-12-31 (OVX starts 2009-09-18; the Kanzig vintage covers OPEC dates to its month-end). OPEC dates: opec-announcements (Kanzig 2021) is a list of OPEC announcement dates, NOT the OPEC+ ministerial-meeting calendar the claim names: it includes non-meeting statements and a called-off meeting, and it misses at least the Sunday 2023-04-02 OPEC+ voluntary cut, so the event set only approximates the claim's calendar and non-event days can include unrecorded OPEC+ announcements. Documented corrections (mandel/data/options_misc.py), applied before every test: session 2021-07-06 out of both pools (2021-07-05: OPEC+ meeting called off); session 2023-04-03 out of the non-event pool (2023-04-02: Sunday OPEC+ voluntary cut, missing from the 2025M12 vintage); session 2024-03-04 out of both pools (2024-03-03: Sunday statement extending the voluntary cuts, not a meeting); session 2025-03-03 out of both pools (2025-03-03: statement to proceed with the April increase, not a meeting); 67 event sessions remain in the window (weekend dates on the next Monday, holidays on the next session). POINT IN TIME: an event row is available at the END of its announcement day unless a verified known_since says the date was announced earlier; 0 of 67 event sessions have a flag available by the T-1 close (16:00 New York), so the event flag is not known in advance and the claim's T-1-close entry is not implementable point in time (the claim fixes the entry at the T-1 close, so there is no day-after reading to fall back on); both criteria are undecided. Ex-post diagnostics (LOOK-AHEAD: event dates known only after the fact; reported, never criteria): event - non-event +0.611% [+0.129%, +1.152%] (event +0.287%, n 67; other -0.324%, n 4025) (21-session blocks; 63-session blocks CI [+0.174%, +1.159%]); the uncorrected announcement list (every listed date an event, every other session a non-event) +0.613% [+0.142%, +1.127%] (event +0.290%, n 70; other -0.323%, n 4026); excluding 2020-03/04 +0.611% [+0.136%, +1.122%]; excluding the APPROXIMATE USO roll sessions +0.836% [+0.317%, +1.408%]; IV-scale sensitivity IV x0.9 +0.643% [+0.164%, +1.175%], IV x1.1 +0.579% [+0.085%, +1.129%]; mean |move| / premium: events 1.17, other days 0.82; EIA Wednesdays (second event set; Tuesday-close entry, holiday-week shifts not modelled) minus other non-OPEC days +0.180% [+0.080%, +0.285%]. n = 0 point-in-time events (min_n 40) — implemented criteria pass; not implemented: OPEC event dates known at the T-1 close (verified advance notice); event-minus-non-event mean P&L > 0 with the 95% CI excluding 0 (no point-in-time events); n >= trial min_n (0 of 40 point-in-time events)
+- note: from the options-library library: Crude-oil scheduled-event straddle (OPEC+ meetings / EIA inventory); harness suggestion: Add (USO, OVX) to the (underlying, vol index) event harness. | added by the verifier pass
+
+### T-538 · dispersion-trade
+
+**Claim.** Over 2006-2026, 1-month implied correlation (COR1M) exceeds the subsequently realised average pairwise correlation of the index constituents on average, so a vega-neutral short-index/long-constituent straddle book has positive mean P&L.
+
+- kind: options-strategy · origin: options-library:volatility, https://en.wikipedia.org/wiki/Dispersion_trading, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_Implied_Correlation_Indices_Methodology.pdf
+- statistic: mean of (COR1M_t - realised average correlation over t+1..t+21) with studentized block-bootstrap CI; realised correlation from constituent daily returns via sigma_idx^2 = sum w_i^2 s_i^2 + sum_{i!=j} w_i w_j s_i s_j rho
+- null: mean = 0
+- procedure: Monthly non-overlapping; COR1M from the archive; realised correlation from constituent or sector-ETF closes
+- data: cboe-COR1M-history (archive, 2006 on), daily closes of the top-50 constituents or the 11 sector SPDRs (NOT yet captured) · min n: 240
+- pass: lower CI > 0
+- controls: Sector ETFs give an upward-biased realised correlation (diversified within sector), which is conservative; COR1M uses the top-50 constituents.
+- harness: b6_surf_implied_correlation
+- result X-66a6cce7: inconclusive — COR1M averages 37.1 vs realised equal-weight average pairwise correlation of the 9 sector SPDRs (XLB/XLE/XLF/XLI/XLK/XLP/XLU/XLV/XLY) 55.7. POOLED over all 21 grid offsets (5206 daily starts 2006-01-03..2026-09-14 = 248 distinct 21-session holds; studentized circular block bootstrap, block 126 sessions): mean gap -18.6 pts (95% CI -20.8 to -16.1), halves -19.0/-18.2. Per grid offset (21 non-overlapping grids, n 247 to 248 windows, block 6): mean gap -19.4 to -17.5 pts, lower bound -21.7 to -19.8 pts, 0/21 offsets with the lower bound > 0. Proxy verdict: NOT an acceptable stand-in under the claim's wording ('the index constituents'): sector baskets diversify away idiosyncratic risk, so their pairwise correlation is far above single-stock correlation (the gap above is dominated by that bias, not by the correlation premium); XLC/XLRE and cap weights are also missing, so the verdict is capped at inconclusive — implemented criteria pass; not implemented: proxy (9 sector SPDRs) POOLED lower 95% CI bound > 0 (a sector proxy bounds the claim from one side only: sector correlations exceed constituent ones, so a proxy shortfall is not a failure); realised average correlation of the index constituents (COR1M's top-50 S&P 500 names, cap-weighted): constituent closes and weights are not archived; vega-neutral short-index / long-constituent straddle book has positive mean P&L: needs index and single-stock chain history
+- note: from the options-library library: Dispersion Trade (short index vol, long constituent vol); harness suggestion: Harness 'implied_vs_realised_correlation' in mandel/experiments/volatility.py with bundles ['cboe-COR1M-history','daily-history-XL*']. | added by the verifier pass
+
+## Untested (91)
 
 ### T-12 · volume-improves-calibration
 
@@ -2751,851 +4184,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: missing-data alignment; markets of the same event are mechanically correlated (exclude same-event pairs)
 - note: harness not yet written: low_rank_structure
 
-### T-101 · short-straddle
-
-**Claim.** For 30-DTE ATM SPY short straddles priced at the model price BS(0.90*VIX/100), mean P&L per unit premium is higher when entered with VIX minus trailing 21-day realised vol in its top tercile than in its bottom tercile, out of sample (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-straddle, https://public.econ.duke.edu/~boller/Published_Papers/rfs_09.pdf
-- statistic: difference in mean P&L/premium (top tercile minus bottom tercile of VIX - RV21 at entry); studentized block-bootstrap CI; deflated Sharpe with n_trials = number of conditioning rules tried
-- null: no tercile difference
-- procedure: overlay_backtest(strategy='short_straddle') with iv_scale in {0.81, 0.90, 1.00}; RV21 from SPY log returns; tercile cut-points set on the training window of walk_forward_splits and applied out of sample
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 390
-- pass: OOS top-minus-bottom difference CI excludes 0 at s = 0.90, with the same sign at s = 0.81 and s = 1.00
-- controls: Tercile thresholds fixed in-sample. Report skewness, kurtosis, PSR, max drawdown and the unconditional mean (T-57 found +0.24%/month, p 0.07, at s = 0.81). Repeat with a 5%-of-premium round-trip haircut. 2008 and 2020 stay in the sample.
-- note: from the options-library library: Short Straddle; harness suggestion: harness 'short_straddle_vrp' sharing options.py pricing; conditioning rule set declared up front and passed to deflated_sharpe_ratio(n_trials=len(rules)) | verifier: corrected claim/trial
-
-### T-103 · short-strangle
-
-**Claim.** A 30-DTE SPY short strangle at +/-5% strikes, priced with the smile-scaled VIX model, has a higher Sharpe ratio than the ATM short straddle priced on the same model and the same entry dates, 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-strangle, https://public.econ.duke.edu/~boller/Published_Papers/rfs_09.pdf
-- statistic: paired Sharpe difference (strangle - straddle) of per-cycle returns on notional; studentized block bootstrap via compare_strategies
-- null: no Sharpe difference
-- procedure: Same entry dates as the short-straddle harness; price both structures with the smile-scaled model and pay at intrinsic.
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 (smile ratios) · min n: 390
-- pass: paired Sharpe difference p < 0.05 with strangle > straddle; same sign under the flat-VIX and SKEW-scaled sensitivities
-- controls: Width fixed at 5% before looking. The same 5%-of-premium cost haircut applies to both. Report PSR, max drawdown and skew. Proxy cap until 60 capture days refit the smile ratios.
-- note: from the options-library library: Short Strangle; harness suggestion: harness 'short_strangle_vs_straddle' using compare_strategies from mandel/validation/backtest_eval.py on per-trade P&L series | verifier: corrected claim/trial
-
-### T-113 · jade-lizard
-
-**Claim.** A 1-month SPY jade lizard (short 30-delta put, short 30-delta call, long call 1% of S above it, priced at VIX IV; model-priced; months with credit < width skipped) has a positive mean P&L per unit of naked-put margin over 1993-2026.
-
-- kind: options-strategy · origin: options-library:volatility, https://www.tastylive.com/concepts-strategies/jade-lizard, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf
-- statistic: mean P&L / (0.2 x S) with block bootstrap CI; number of skipped months reported
-- null: mean <= 0
-- procedure: monthly cycles; solve the 30-delta strikes at VIX IV; enter only when Cr >= w; payoff from the SPY close
-- data: SPY, VIX, DTB3 · min n: 250
-- pass: lower CI > 0 and positive in both walk-forward halves
-- controls: Overlaps the neutral/income family; DSR counts it once across families. Flat pricing understates the put credit and overstates the call credit relative to real skew; recheck with chain mids at 60 days.
-- note: from the options-library library: Jade Lizard; harness suggestion: harness 'jade_lizard_condition' in options.py reading chain capture; shares strike-by-delta selector with bwb harness | verifier: corrected claim/trial
-
-### T-123 · gamma-scalping-long-straddle
-
-**Claim.** A 30-DTE ATM SPY straddle bought at BS(0.90*VIX) and delta-hedged daily at that entry vol has negative mean P&L per unit vega over 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://emanuelderman.com/wp-content/uploads/1999/02/gs-volatility_swaps.pdf, https://public.econ.duke.edu/~boller/Published_Papers/rfs_09.pdf
-- statistic: mean hedged P&L/vega over non-overlapping cycles, studentized block-bootstrap CI; run at s in {0.81, 0.90, 1.00}; secondary: correlation of P&L with (RV_21 - (s*VIX)^2)
-- null: mean hedged P&L = 0
-- procedure: Each cycle: price the straddle at s*VIX_t; each day compute BS delta (bs.greeks) at the entry vol, hedge at the SPY close, charge 1 bp per share traded; sum to expiry
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 390
-- pass: upper CI < 0 at s = 0.90; report the s at which the sign flips
-- controls: Daily (not intraday) hedging; cost declared; VIX is SPX; q = 0 with unadjusted closes; report the variance-term share of P&L vs hedging error; BTZ 1990-2007 as an external anchor (monthly %^2 units).
-- note: from the options-library library: Gamma Scalping a Long Straddle (delta-neutral); harness suggestion: harness 'gamma_scalp_vrp' in options.py: functions bs_delta, hedge_path(prices, vix_entry, r, cost_bps) returning per-trade P&L; verdict via block_bootstrap_pvalue and a reported VRP series; a sibling 'dvol_vrp' harness runs the same on BTC with DVOL as IV (bundles deribit-dvol-daily, btc-daily-closes) | verifier: corrected claim/trial
-
-### T-128 · short-naked-put
-
-**Claim.** Selling a 1-month ATM SPY put at VIX IV (model-priced), fully collateralised in 3-month bills with the PUT-index construction, has a higher Sharpe ratio than SPY buy-and-hold over 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/naked-put-uncovered-put-short-put, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_SP_500_PutWrite_Indices_Methodology.pdf
-- statistic: annualised Sharpe difference (putwrite minus SPY) with studentized block bootstrap p-value; also the max drawdown ratio
-- null: Sharpe(putwrite) <= Sharpe(SPY)
-- procedure: third-Friday roll; strike = nearest strike at or below spot; premium = BS put at VIX IV; collateral earns DTB3; settle at the SPY close (proxy for the SOQ); walk-forward halves; repeat at iv_scale 0.9
-- data: SPY, VIX, DTB3; benchmark check against the actual Cboe PUT index daily history (cdn.cboe.com PUT_History.csv: 4,983 rows from 1991-03-04 to 2026-10-13, with gaps) · min n: 300
-- pass: p < 0.05 at both iv_scale 1.0 and 0.9, holding in both walk-forward halves
-- controls: Correction: VIX is usually above ATM IV, so pricing the ATM put at VIX overstates the premium and the result is optimistic, not conservative; the 0.9 x VIX run and the comparison with the real PUT index guard this. Sharpe flatters negatively skewed returns, so report skew, kurtosis and PSR. SPY is price-only unless total return is reconstructed; state the dividend convention.
-- note: from the options-library library: Short (Naked / Cash-Secured) Put; harness suggestion: putwrite_vs_spy() reproducing the Cboe PUT methodology with VIX pricing; later swap in captured SPY chain mids | verifier: corrected claim/trial
-
-### T-133 · ratio-front-spread-1x2
-
-**Claim.** A 1-month zero-cost 1x2 SPY call ratio spread (long 1 ATM call, short 2 calls at the strike where 2C(K2) = C(K1), all priced at VIX IV; model-priced) has a positive mean monthly P&L per unit spot, yet loses more than 3x its median gain in more than 3% of months, over 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/short-ratio-put-spread
-- statistic: mean P&L per unit spot with block bootstrap CI; frequency of months with a loss > 3x the median gain, with binomial CI
-- null: mean <= 0, or tail frequency <= 3%
-- procedure: monthly cycles; solve K2 for zero cost at that month's VIX; long 1 call at S, short 2 at K2; payoff from the SPY close
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: lower CI of the mean > 0 AND tail-frequency lower CI > 3% (both pre-registered)
-- controls: Flat IV overprices the OTM shorts relative to the real smile, so the real zero-cost K2 sits closer to ATM (more negative gamma); report by VIX tercile; recheck with chain mids at 60 days.
-- note: from the options-library library: Ratio Vertical Front Spread (1x2 Call or Put Ratio Spread); harness suggestion: vix_priced_option_returns(strategy='ratio_call_1x2', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial
-
-### T-135 · ladder-christmas-tree
-
-**Claim.** A 1-month 1-3-2 SPY call Christmas tree (A = ATM, w = 2.5%, priced at VIX IV; model-priced) finishes inside its profit zone [K1 + D, K4 - D/2] more often than the zone's Black-Scholes risk-neutral probability at entry over 1993-2026 (VRP narrows the realised distribution and positive drift moves mass into the zone just above spot).
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-christmas-tree-spread-calls
-- statistic: realised zone hit rate minus the mean risk-neutral zone probability at entry, with block bootstrap CI
-- null: hit rate <= risk-neutral probability
-- procedure: monthly cycles; price the 4 strikes at VIX IV; compute the zone; count months in which the SPY close lands in the zone; RN probability from the same lognormal (N(d2) differences)
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: lower CI of (hit - RN) > 0
-- controls: Correction: the original direction (hit rate below RN because drift carries SPY past the zone) does not hold up. Monthly drift is about 1% and the zone spans about +1% to +7%, so drift and VRP both push mass into the zone; the claim was reversed. The zone is defined from model prices only; report ATM and ITM anchors.
-- note: from the options-library library: Ladder / Christmas Tree (1-3-2 and 1-1-1); harness suggestion: vix_priced_option_returns(strategy='call_tree_132', dte=30, width=0.025) with zone_hit_rate statistic | verifier: corrected claim/trial
-
-### T-136 · stock-repair
-
-**Claim.** After a 10%+ SPY drawdown from its 252-day high, a 3-month zero-cost stock repair (stock + long 1 ATM call + short 2 calls at K2 = (prior high + spot)/2, priced at VIX IV; model-priced) has a higher mean 3-month P&L than holding SPY alone, over 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/stock-repair, https://www.optionseducation.org/strategies/all-strategies/covered-ratio-spread
-- statistic: mean of (repair P&L - hold P&L)/S per episode, which equals the embedded 1x2 call ratio spread's P&L; studentized bootstrap over non-overlapping episodes
-- null: mean difference <= 0
-- procedure: detect the first day of each >= 10% drawdown from the trailing 252-day high (re-arm after 63 days); B = prior high; K1 = S, K2 = (B+S)/2 at VIX IV (VIX3M where available, since the tenor is about 63 days); mark both at the 63-day SPY close
-- data: SPY, VIX, VIX3M, DTB3; QQQ as a second sample · min n: 30
-- pass: lower CI of the mean difference > 0
-- controls: Correction: the original 'recovers breakeven more often' claim was tautological, because the repaired breakeven K2 < B makes it true by construction; replaced with the mean-P&L comparison. Expect only about 25-40 SPY episodes, so report power; QQQ episodes overlap in time and are not independent. Flat IV misprices skew (stated).
-- note: from the options-library library: Stock Repair (Covered Ratio Spread); harness suggestion: drawdown_event_study(strategy='stock_repair', trigger=-0.10, horizon=63d) | verifier: corrected claim/trial
-
-### T-138 · risk-reversal-directional
-
-**Claim.** Months in which the CBOE SKEW index at entry is in its top quintile (steep put skew) are followed by a higher mean 1-month P&L on a bullish SPY risk reversal (long 5%-OTM call, short 5%-OTM put, legs priced at VIX IV; model-priced) than months in the bottom quintile, 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://en.wikipedia.org/wiki/Risk_reversal, https://insights.deribit.com/exchange-updates/dvol-deribit-implied-volatility-index/
-- statistic: difference in mean monthly P&L per unit spot, top minus bottom SKEW quintile, studentized block bootstrap
-- null: difference <= 0
-- procedure: monthly cycles from SPY inception (1993); quintiles of SKEW computed on the full history and also on an expanding window; legs priced at VIX IV; payoff from the SPY close
-- data: SPY, VIX, CBOE SKEW daily, DTB3 · min n: 300
-- pass: lower CI of the difference > 0 in both the full-sample and expanding-window quintile definitions
-- controls: Flat pricing means the entry premium does not vary with skew, so this isolates the conditional return of the underlying wings (a SKEW timing test). A real skew-premium test needs chain capture (60+ days, follow-up). Under flat pricing the structure is a small debit, not a credit; state this. SPY starts in 1993, so the sample is 1993-2026, not 1990.
-- note: from the options-library library: Risk Reversal (Directional, OTM Combo); harness suggestion: conditional_option_returns(strategy='risk_reversal_25d', condition='SKEW quintile'); follow-up skew_premium_harvest once chains have 60 days | verifier: corrected claim/trial
-
-### T-139 · leaps-stock-replacement
-
-**Claim.** A SPY 1-year 20%-ITM call priced at VIX3M IV (VIX before 2007; model-priced), rolled annually with the rest of the capital in 3-month bills, earns a lower annualised return than SPY over 1993-2026 but with a smaller maximum drawdown.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-call, https://www.law.cornell.edu/uscode/text/26/1256
-- statistic: annualised return difference (LEAPS + bills minus SPY) with block bootstrap CI; ratio of max drawdowns
-- null: return difference >= 0, or drawdown ratio >= 1
-- procedure: annual cycles plus 12 monthly-staggered cohorts; K = 0.8*S; BS at VIX3M/100 (VIX before 2007-12), r = DTB3, q = constant assumption; hold to expiry; (S - C) earns DTB3; compare against SPY under the same dividend convention as q
-- data: SPY, VIX, VIX3M, DTB3 · min n: 30
-- pass: return difference upper CI < 0 AND drawdown ratio < 1 (both pre-registered); report that n of independent annual cycles is about 33
-- controls: Correction: by put-call parity, call + (S - C) in bills = SPY + a 1-year 20%-OTM put financed at the bill rate (with dividends via q), so the original claim (higher return, drawdown >= 1.5x SPY) contradicted the structure, since loss per cycle is capped at C. The return difference equals the embedded put's P&L. IV proxy mismatch: 1-year IV is usually above VIX3M, so the put cost is understated (stated).
-- note: from the options-library library: LEAPS Call as Stock Replacement; harness suggestion: vix_priced_option_returns(strategy='leaps_itm20', dte=365, iv_source='VIX3M', cohorts='monthly') | verifier: corrected claim/trial
-
-### T-140 · deep-itm-call-stock-substitute
-
-**Claim.** A monthly-rolled SPY 10%-ITM call priced at VIX IV (model-priced), held with the rest of the capital (S - C) in 3-month bills, has a daily-return correlation above 0.98 with SPY and an annualised shortfall versus SPY below 1 percentage point over 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-call, https://www.cboe.com/tradable_products/sp_500/spx_options/specifications/
-- statistic: correlation of daily portfolio returns (call re-marked by BS at that day's VIX, plus bills) with SPY; annualised shortfall vs SPY under the same dividend convention as q; block bootstrap CIs
-- null: correlation <= 0.98 or shortfall >= 1 pp
-- procedure: monthly roll at K = 0.9*S at VIX IV; mark daily; compute portfolio returns and shortfall relative to SPY
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: correlation lower CI > 0.98 AND shortfall upper CI < 1 pp
-- controls: Correction: the original drag bound (DTB3*K/S + 1pp) compared an unfunded option with SPY. With the bills included, parity makes the shortfall equal the P&L of the embedded 10%-OTM 1-month put (premium minus payoff), which is the quantity tested. Bid-ask on deep-ITM strikes is not in the history; add it once chain capture reaches 20 days.
-- note: from the options-library library: Deep ITM Call as Short-Dated Stock Substitute; harness suggestion: vix_priced_option_returns(strategy='deep_itm_call', dte=30, strike='ITM10', daily_marks=True) | verifier: corrected claim/trial
-
-### T-143 · long-calendar-spread
-
-**Claim.** A 30/60-DTE ATM SPY call calendar held to the front expiry, model-priced (front IV = VIX, back IV = VIX/VIX3M total-variance interpolation to 60 days), has a higher mean P&L per unit of debit on entries made when VIX/VIX3M >= 1.0 than on entries made when VIX/VIX3M <= 0.9.
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-calls, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-puts
-- statistic: Difference in mean P&L/debit to the front expiry between entries with VIX/VIX3M >= 1.0 and entries with VIX/VIX3M <= 0.9
-- null: No regime difference: the VIX/VIX3M regime label is circularly block-shifted against the P&L series
-- procedure: Run from 2007-12-04, the first VIX3M date (verified in FRED VXVCLS). On each trading day, price 30- and 60-DTE ATM calls with Black-Scholes (front IV = VIX; back IV from the total-variance interpolation w(60) = w(30) + (w(93) - w(30))*(60-30)/(93-30), where w = IV^2*T). Hold 21 trading days, then revalue the far leg at the IV interpolated that day and the SPY close. Use a studentized block bootstrap (block 21) on the daily series, a plain bootstrap on non-overlapping monthly entries, deflation for the thresholds tested, and walk-forward halves.
-- data: SPY daily closes, CBOE VIX and VIX3M daily history, FRED 3-month bill rate (all free and in the data list) · min n: 30
-- pass: Regime difference > 0 with p < 0.05 after deflating for thresholds (0.9/0.95/1.0), with the same sign in both walk-forward halves. A sensitivity rerun at today's measured SPY 30/60-DTE ATM IV spread from the chain capture.
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV because it includes the skew, so using VIX as ATM IV overstates premium levels. This trial is model-priced, not market-priced, and runs on a flat smile. The verdict stays 'model-only' until at least 120 daily chain captures confirm the real front-vs-back ATM IV spread. Costs and pin risk at T1 are modelled by closing both legs at mid minus half the spread. Backwardation entries cluster in 2008, 2011, 2020 and 2022, so report the result with each of those episodes left out.
-- note: from the options-library library: Long calendar (horizontal) spread; harness suggestion: Add a two-expiry mode to the payoff engine: Position.value_at(t=T1) that settles legs with T<=T1 at intrinsic and reprices legs with T>T1 via bs.price at a supplied IV; then calendar_model_backtest(price_rows, vix_rows, vix3m_rows, front_dte, back_dte, strike_rule) in experiments/volatility.py reusing _block_shift_null and _halves_agree. | verifier: corrected claim/trial
-
-### T-144 · short-calendar-spread
-
-**Claim.** A 30/60-DTE ATM SPY short call calendar, entered only on days when VIX3M/VIX >= 1.15 (steep contango) and closed at the front expiry, has positive mean P&L, model-priced (front IV = VIX, back IV = VIX/VIX3M total-variance interpolation).
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/short-calendar-spread-calls, https://www.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/abs/risk-premia-and-the-vix-term-structure/56572D1F060448571BD8F597C732D9C3
-- statistic: Mean P&L per conditional entry as a fraction of the far leg's premium
-- null: Zero conditional mean (studentized block bootstrap); for the placebo, the regime label is block-shifted
-- procedure: Daily entries since 2007-12-04 on days meeting the gate. Price with Black-Scholes from VIX/VIX3M. Revalue the far short at T1 (21 trading days) with the IV interpolated that day. Studentized block bootstrap (block 21), walk-forward halves, and deflation for the 1.10/1.15/1.20 thresholds.
-- data: SPY closes, CBOE VIX, VIX3M, FRED 3-month bill · min n: 60
-- pass: Conditional mean > 0 with the 95% CI excluding 0 in both halves after deflation, surviving removal of the five largest VIX-spike months
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced, and runs on a flat smile. A VIX-level tercile control checks that the result is not just a low-VIX effect. Unconditional entry is reported alongside. Cost is half the bid-ask on four fills, from today's SPY chain spreads.
-- note: from the options-library library: Short (reverse) calendar spread; harness suggestion: Reuse calendar_model_backtest with legs reversed and an entry mask from the VIX3M/VIX ratio; report conditional/unconditional means side by side with the existing term_structure_reversion output. | verifier: corrected claim/trial
-
-### T-145 · long-diagonal-spread
-
-**Claim.** On SPY, a 0.70-delta/90-DTE long call vs 0.30-delta/30-DTE short call diagonal, with the short rolled monthly and the long replaced at 30 DTE, has a higher annualised Sharpe ratio than the 30-DTE vertical call spread on the same strikes rolled monthly, model-priced (VIX as the 30-DTE IV, VIX/VIX3M total-variance interpolation for 90 DTE).
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/concepts-strategies/diagonal-spread, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-calls
-- statistic: Difference in annualised Sharpe between the diagonal and the vertical
-- null: Zero difference; monthly P&L pairs permuted between the two strategies
-- procedure: Monthly entries since 2007-12. Black-Scholes pricing with daily mark-to-model. Paired bootstrap on monthly P&L, walk-forward halves, deflated Sharpe for the pair.
-- data: SPY closes, VIX, VIX3M, FRED 3-month bill · min n: 150
-- pass: Sharpe difference > 0 with the bootstrap 95% CI excluding 0 in both halves, and PBO < 0.5
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. A flat smile overstates SPY OTM call premia, so rerun with a SKEW-index tilt. Report how often each entry met tastylive's setup rules. Costs come from today's SPY chain spreads.
-- note: from the options-library library: Long diagonal spread (bullish call / bearish put); harness suggestion: Extend the two-expiry payoff mode with a roll schedule (list of (dte, action) tuples) so diagonals, PMCC and collars share one simulator; output Sharpe/PBO through the existing overfit module. | verifier: corrected claim/trial
-
-### T-146 · double-calendar
-
-**Claim.** Entered on the same days and held to the front expiry, a +/-5% 30/60-DTE double calendar on SPY has a lower standard deviation of P&L as a percentage of debit than the ATM single calendar of the same expiries, model-priced (VIX/VIX3M).
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/double-diagonal-spread, https://www.tastylive.com/concepts-strategies/calendar-spread
-- statistic: Ratio of standard deviations of P&L/debit (double / single), paired by entry date
-- null: Ratio = 1 (variance-ratio test via paired bootstrap of non-overlapping monthly entries)
-- procedure: Daily entries since 2007-12-04 with Black-Scholes pricing from VIX/VIX3M (OTM legs at the same flat IV; a SKEW-based tilt as a sensitivity), revalued at T1. Non-overlapping monthly subsample for CIs; walk-forward halves.
-- data: SPY closes, VIX, VIX3M, SKEW, FRED 3-month bill · min n: 150
-- pass: Std ratio < 0.9 with the 95% CI excluding 1 in both halves
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. A flat smile understates the put wing. Commissions for 8 fills vs 4. Pin risk modelled by closing at mid minus half the spread at T1. The OTM debit is smaller, so also report std of P&L per unit of max loss.
-- note: from the options-library library: Double calendar spread; harness suggestion: Same two-expiry simulator as the single calendar with a strike list; add SKEW-index tilt as an optional smile adjustment (put IV = VIX + k*(SKEW-100)). | verifier: corrected claim/trial
-
-### T-147 · double-diagonal
-
-**Claim.** On SPY, a double diagonal (near 0.16-delta strangle at 30 DTE, far 0.10-delta wings at 60 DTE) has a higher mean P&L per unit of max loss than the 30-DTE iron condor on the same strikes when entered with VIX below its trailing 1-year median, model-priced.
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/double-diagonal-spread, https://www.tastylive.com/concepts-strategies/diagonal-spread
-- statistic: Mean P&L / max loss for the double diagonal minus that of the iron condor, on low-VIX entry days
-- null: Zero difference; paired monthly P&L permuted between the two structures
-- procedure: Monthly entries since 2007-12 on days with VIX below its trailing 252-day median. Black-Scholes pricing from VIX/VIX3M, with a SKEW tilt as a sensitivity. Revalue at T1; paired bootstrap; walk-forward halves.
-- data: SPY closes, VIX, VIX3M, SKEW, FRED 3-month bill · min n: 80
-- pass: Difference > 0 with the 95% CI excluding 0 in both halves, holding with and without the SKEW tilt
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. Costs on eight fills vs four. Max-loss normalisation uses the realised far-wing value at T1.
-- note: from the options-library library: Double diagonal spread; harness suggestion: Two-expiry simulator with four legs; add an iron-condor control leg set in the same run and report the paired difference. | verifier: corrected claim/trial
-
-### T-149 · ratio-calendar
-
-**Claim.** Re-sized to vega-neutral at each weekly entry and held 5 trading days, the SPY 30/90-DTE ATM ratio call calendar has weekly P&L whose absolute Spearman correlation with the weekly change in VIX is below 0.3, model-priced (VIX/VIX3M term interpolation).
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/concepts-strategies/calendar-spread, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/short-calendar-spread-calls
-- statistic: Spearman correlation of 5-day P&L with delta-VIX over the same 5 days
-- null: |rho| >= 0.3 (block bootstrap of the correlation)
-- procedure: Weekly entries since 2007-12. Black-Scholes pricing with front IV = VIX and back IV from the VIX/VIX3M total-variance interpolation; n set from model vegas at entry. Revalue after 5 trading days with the new interpolated IVs and SPY close. Block bootstrap (block 4 weeks); walk-forward halves. The 1:1 calendar is the comparison.
-- data: SPY closes, VIX, VIX3M, FRED 3-month bill · min n: 300
-- pass: Upper bound of the 95% CI of |rho| < 0.3 in both halves
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. Gamma losses co-move with VIX spikes, so also report the correlation of the delta-hedged P&L. Separate top-decile VIX-spike weeks. Costs on 2.7 fills.
-- note: from the options-library library: Ratio (vega-weighted) calendar spread; harness suggestion: Add fractional qty support to the two-expiry simulator (already numeric in Leg) and a sizing hook that sets qty from model vegas at entry. | verifier: corrected claim/trial
-
-### T-150 · poor-mans-covered-call
-
-**Claim.** On SPY, a PMCC (0.80-delta 12-month LEAPS replaced at 90 DTE, plus a monthly 0.30-delta short call) does not have a higher annualised Sharpe ratio, measured on capital deployed, than the stock-based covered call with the same short-call rule, model-priced (LEAPS IV = VIX3M, short IV = VIX).
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.optionsplaybook.com/blogs/poor-mans-covered-call-how-to-run-a-covered-call-strategy-for-less-capital, https://www.tastylive.com/concepts-strategies/diagonal-spread
-- statistic: Difference in annualised Sharpe (PMCC minus covered call), monthly returns on capital deployed
-- null: Sharpe(PMCC) > Sharpe(CC): the claim is falsified if the paired-bootstrap 95% CI of the difference lies entirely above 0
-- procedure: Monthly rebalance since 2007-12, Black-Scholes pricing and daily mark-to-model, roll rules as in the claim. Paired block bootstrap of the Sharpe difference (run.py _sharpe_diff_p); walk-forward halves. Sensitivity at today's SPY 12-month ATM IV vs VIX3M from the chain capture.
-- data: SPY closes and dividends, VIX, VIX3M, FRED 3-month bill · min n: 150
-- pass: The claim survives if the CI of the Sharpe difference includes 0 or lies below it in both halves; return on capital and drawdown are also reported
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, and VIX3M (93-day) is a coarse proxy for 365-day IV (sensitivity +/-3 vol points), so this trial is model-priced, not market-priced. The covered call receives dividends and the PMCC does not. Costs on monthly rolls.
-- note: from the options-library library: Poor man's covered call (PMCC / LEAPS diagonal); harness suggestion: Roll-schedule simulator shared with diagonals; add a 'capital deployed' denominator option (debit vs stock price) to overlay_verdict so ROC and absolute return are both reported. | verifier: corrected claim/trial
-
-### T-151 · leaps-collar
-
-**Claim.** A LEAPS collar on SPY (12-month -0.25-delta put rolled at 90 DTE, monthly 0.30-delta calls) has a higher annualised Sharpe ratio than the same-delta standard collar with both put and call at 30 DTE rolled monthly, model-priced.
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/collar, https://www.optionsplaybook.com/blogs/poor-mans-covered-call-how-to-run-a-covered-call-strategy-for-less-capital
-- statistic: Difference in annualised Sharpe (LEAPS collar minus standard collar); max drawdown and the credit-coverage ratio reported alongside
-- null: Zero Sharpe difference; paired monthly returns permuted between the two strategies
-- procedure: Monthly rebalance since 2007-12 with Black-Scholes pricing (put IV = VIX3M proxy, call IV = VIX) and daily mark-to-model. Paired block bootstrap; walk-forward halves. Sensitivity at today's SPY 12-month 25-delta put IV from the chain.
-- data: SPY closes and dividends, VIX, VIX3M, FRED 3-month bill · min n: 150
-- pass: Sharpe difference > 0 with the 95% CI excluding 0 in both halves
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, and VIX3M is a coarse proxy for 365-day IV (sensitivity +/-3 vol points), so this trial is model-priced, not market-priced. A flat smile underprices the OTM put: rerun with a SKEW-index tilt. Dividends are credited to the stock leg in both strategies.
-- note: from the options-library library: LEAPS collar (long-dated put, serial short calls); harness suggestion: Roll-schedule simulator with an underlying leg; reuse overlay_backtest's drawdown function (dd) and overlay_verdict for the benchmark comparison. | verifier: corrected claim/trial
-
-### T-152 · calendarised-butterfly
-
-**Claim.** In the top-decile months of VIX increase since 2007-12, a calendarised ATM SPY butterfly (+/-3% wings at 60 DTE, 2x ATM body at 30 DTE) loses less per unit of debit by the front expiry than the 30-DTE butterfly on the same strikes, model-priced.
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-butterfly-spread-calls, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-calls
-- statistic: Mean paired difference in P&L/debit (time fly minus plain fly) within top-decile delta-VIX holding periods
-- null: Zero difference in the spike decile (paired bootstrap)
-- procedure: Monthly entries since 2007-12. Black-Scholes pricing from VIX/VIX3M. Revalue both structures at T1 and sort by delta-VIX over the hold. Paired bootstrap; walk-forward halves.
-- data: SPY closes, VIX, VIX3M, FRED 3-month bill · min n: 15
-- pass: Spike-decile difference > 0 with the 95% CI excluding 0
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced (flat smile). Costs on 6 vs 4 contracts. Pin risk modelled at mid minus half the spread. The overall mean P&L is reported but is not the claim.
-- note: from the options-library library: Calendarised (time) butterfly; harness suggestion: Two-expiry simulator with K-slot strikes; add the plain butterfly as the control leg set and report by delta-VIX decile. | verifier: corrected claim/trial
-
-### T-153 · jelly-roll
-
-**Claim.** On every SPY chain capture from 2026-10-14 on, the mid-price 30/60-DTE jelly roll at strikes within +/-5% of spot deviates from bill-implied carry, K(exp(-r*T1) - exp(-r*T2)) - PV(div), by less than half the sum of the four legs' bid-ask spreads for at least 95% of strikes.
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.law.cornell.edu/uscode/text/26/1256, https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/long-calendar-spread-calls
-- statistic: Per capture: the share of strikes with |roll_mid - fair| <= 0.5 * sum of the four legs' spreads; median absolute deviation in cents
-- null: Share < 0.95 (a binomial test per capture)
-- procedure: For each capture, compute the roll at every strike in the band from chain mids, r from FRED, and PV(div) from SPY's quarterly dividend schedule. Repeat on SPX (European; uses each expiry's parity-implied forward) to isolate the early-exercise premium. Accumulate captures; a single capture can falsify.
-- data: CBOE SPY and SPX chain captures from 2026-10-14 (mid, bid, ask per leg), FRED 3-month bill, SPY dividend schedule · min n: 200
-- pass: Share >= 0.95 on every capture (one failing day falsifies); confirmation at 60 captures
-- controls: Exclude zero-bid legs and spreads > 5% of mid. Delayed snapshots may not be synchronous across legs. Ex-dividend-spanning expiries are reported separately (that was a second claim and is now a diagnostic). Compare the SPX result with T-181 parity_check.
-- note: from the options-library library: Jelly roll (synthetic time spread / financing trade); harness suggestion: jelly_roll_check(chain_rows, rate, dividends) producing per-capture deviation statistics; store in the options-surface file so it accumulates daily. | verifier: corrected claim/trial
-
-### T-154 · zebra
-
-**Claim.** A monthly 30-DTE SPY call ZEBRA (long 2 delta-0.70 calls, short 1 ATM call, priced at VIX IV; model-priced) has a lower mean monthly P&L than a delta-matched SPY position (entry delta x 1 share) over 1993-2026.
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/concepts-strategies/zebra
-- statistic: mean of (ZEBRA P&L - delta_0 x SPY P&L)/S with block bootstrap CI
-- null: mean difference >= 0
-- procedure: monthly cycles; solve the 0.70-delta strike at VIX IV; payoff from the SPY close; the cash difference earns DTB3
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: upper CI < 0
-- controls: The net extrinsic paid (about 0.25% of S per month under flat pricing) is the cost tested against the convexity gained. Flat IV misprices the ITM call wing; rerun on chain mids at 60 days.
-- note: from the options-library library: ZEBRA (zero extrinsic back ratio); harness suggestion: Add a 'zero-extrinsic solver' to strategies.py (choose K1 so 2*extrinsic(K1) = extrinsic(K2)) and run through the roll-schedule simulator; compare to leaps-stock-replacement in the same report. | verifier: corrected claim/trial
-
-### T-155 · roll-out-up-down
-
-**Claim.** For a 0.16-delta 45-DTE SPY short put that is tested (delta beyond -0.30) at 21 DTE, rolling it out at the same strike to the next monthly does not produce a higher mean P&L per day than closing it and opening a fresh 0.16-delta 45-DTE put, model-priced (VIX as IV).
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/news-insights/how-to-roll-options-position, https://www.optionsplaybook.com/blogs/poor-mans-covered-call-how-to-run-a-covered-call-strategy-for-less-capital
-- statistic: Mean P&L per day held, roll path minus close-and-reset path, paired by entry
-- null: Roll path P&L/day > reset path. The claim is falsified if the paired-bootstrap 95% CI of the difference lies entirely above 0.
-- procedure: Daily entries since 1993-01-29 (SPY inception; VIX exists from 1990, but SPY prices do not). Black-Scholes pricing from VIX. At 21 DTE apply the 'tested' trigger; simulate both paths to the next cycle's 21-DTE exit. Paired block bootstrap; walk-forward halves.
-- data: SPY closes, VIX, FRED 3-month bill · min n: 200
-- pass: The claim survives if the CI of (roll - reset) includes 0 or lies below it in both halves; the variance ratio is reported
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV and has no skew, so this trial is model-priced, not market-priced; rerun with a SKEW tilt. Both paths pay the same number of fills. Margin-time cost charged at the bill rate.
-- note: from the options-library library: Rolling a short option (out / up / down); harness suggestion: Roll-schedule simulator with conditional actions (on delta/DTE triggers); expose roll vs reset as two action lists over the same price path. | verifier: corrected claim/trial
-
-### T-156 · theta-harvest-45dte
-
-**Claim.** For model-priced 45-DTE 1SD SPY short strangles, exiting at 21 DTE yields a higher mean P&L per day in the trade than holding to expiration.
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/concepts-strategies/managing-winners, https://www.tastylive.com/news-insights/How-Capital-Allocation-Impacts-Volatility
-- statistic: Mean P&L per day in the trade, 21-DTE exit minus hold-to-expiry, paired by entry; the 50% rule and the standard deviations are reported alongside
-- null: No difference between exit rules (exit labels permuted within entry)
-- procedure: Daily entries since 1993-01-29 (SPY inception), with VIX as IV for the Black-Scholes premium and daily mark-to-model to trigger exits. Non-overlapping monthly entries for the CIs; paired bootstrap; walk-forward halves; deflate for the three rules.
-- data: SPY daily closes, VIX daily history, FRED 3-month bill · min n: 300
-- pass: (21-DTE - hold) P&L/day > 0 with the CI excluding 0 in both halves after deflation
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV (it overstates 0.16-delta call premium and understates put skew), so this trial is model-priced, not market-priced; SKEW-tilt sensitivity. Commissions $0.65/contract; margin-time cost. Compare with the existing harness_short_straddle outputs.
-- note: from the options-library library: Time-decay harvesting (45 DTE short premium, managed at 50% or 21 DTE); harness suggestion: Extend overlay_backtest with exit rules (profit_target, dte_exit) and report P&L/day; the BTC version runs on DVOL/realised-vol from Deribit with the same code path. | verifier: corrected claim/trial
-
-### T-157 · theta-ladder
-
-**Claim.** A 4-rung weekly ladder of quarter-size 0.16-delta SPY short puts, each managed at 50% or 21 DTE, has a maximum drawdown at least 15% smaller than a single full-size 45-DTE monthly entry managed the same way, model-priced (VIX as IV).
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.tastylive.com/news-insights/How-Capital-Allocation-Impacts-Volatility, https://www.tastylive.com/concepts-strategies/managing-winners
-- statistic: Ratio of max drawdowns (ladder / single entry); mean monthly P&L per unit of margin and the standard deviation are reported alongside
-- null: Drawdown ratio >= 0.85 (compared across block-bootstrap resampled paths)
-- procedure: Daily simulation since 1993-01-29 (SPY inception) with VIX-as-IV pricing. The single-entry book enters monthly at 45 DTE; the ladder enters weekly at a quarter size; identical exit rules. Studentized block bootstrap; walk-forward halves.
-- data: SPY closes, VIX, FRED 3-month bill · min n: 300
-- pass: Drawdown ratio < 0.85 with the bootstrap CI upper bound < 1 in both halves
-- controls: VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. Four times the fills are charged. Strikes are set on different days, so the average moneyness differs; report delta-matched results. Same total margin.
-- note: from the options-library library: Theta ladder (staggered-expiry short premium); harness suggestion: Roll-schedule simulator run with an entry cadence parameter (weekly vs monthly) and a size parameter; drawdown via overlay_backtest's dd helper. | verifier: corrected claim/trial
-
-### T-159 · vix-term-structure-regime-filter
-
-**Claim.** Within each VIX-level tercile, the 21-day SPY variance risk premium (VIX^2 minus the subsequent 21-trading-day realised variance) is higher on days when VIX/VIX3M < 0.95 than on days when VIX/VIX3M > 1.05.
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://www.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/abs/risk-premia-and-the-vix-term-structure/56572D1F060448571BD8F597C732D9C3, https://www.macroption.com/vix3m/
-- statistic: Contango-minus-backwardation difference in mean VRP (variance units, and vol points), within each VIX tercile; model-priced strangle P&L reported as a secondary
-- null: No regime difference, with the regime label circularly block-shifted against the VRP series (as in term_structure_reversion)
-- procedure: Daily since 2007-12-04. Compute the ratio and the forward 21-day VRP; stratify by VIX tercile. Studentized block bootstrap (block 21); walk-forward halves; deflate for the thresholds 0.90/0.95/1.00/1.05.
-- data: CBOE VIX and VIX3M history, SPY closes (data-only for the VRP; FRED 3-month bill for the strangle secondary) · min n: 60
-- pass: Difference > 0 with p < 0.05 after deflation, in both halves and in at least 2 of 3 VIX terciles (the high tercile holds most backwardation days)
-- controls: VIX level (terciles). Regime autocorrelation (block null). Report with and without 2008 and 2020. The strangle secondary is model-priced (VIX overstates ATM IV; flat smile).
-- note: from the options-library library: VIX term-structure regime filter (VIX3M/VIX gate for premium selling); harness suggestion: term_structure_conditional_pnl(vix_rows, vix3m_rows, price_rows, strategy) in experiments/volatility.py reusing overlay_backtest for the strangle path and variance_risk_premium for the VRP; register alongside vix-term-structure-reversion. | verifier: corrected claim/trial
-
-### T-161 · covered-call-atm-buywrite
-
-**Claim.** Over 2002-03 to 2026-10, monthly excess returns of the Cboe BXM index over the 3-month T-bill have a positive Jensen alpha against SPY total-return excess returns (beta ~0.63), i.e. ATM overwriting adds return beyond its reduced equity exposure.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/covered-call-buy-write, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_BuyWrite_Indices_Methodology.pdf
-- statistic: Intercept (annualised alpha) of an OLS regression of BXM monthly excess return on SPY total-return monthly excess return
-- null: alpha <= 0 (overwriting is just de-risking; no variance premium captured)
-- procedure: Pull BXM_History.csv (Cboe CDN; it redirects to cdn-api.cboe.com and starts 2002-03-22). Build SPY total return from the Yahoo chart endpoint with events=div / adjclose (the archived daily-history-SPY rows hold only the unadjusted close). Take FRED DTB3, sample month-ends, run OLS with HAC standard errors, stationary block bootstrap (12-month blocks) of alpha, and split into walk-forward halves.
-- data: BXM 2002-03-22 onward (6,177 daily rows); SPY closes plus dividends 1993 onward; FRED DTB3 · min n: 280
-- pass: Bootstrap 95% CI of annualised alpha > 0 in the full sample, with a positive point estimate in both halves
-- controls: Israelov & Nielsen decomposition: compare with a beta-matched SPY-TR/T-bill blend; price-only SPX as a sensitivity (it biases against SPX by ~2%/yr of dividends)
-- note: from the options-library library: Covered call / buy-write (ATM, BXM-style); harness suggestion: Add BXM, BXMD, BXY, BXMW, BXMH, BXMC, BXN, BXR to CBOE_INDICES in mandel/data/options.py (same CSV format, single column). Sanity numbers computed today: BXM 2002-2026 CAGR 6.23% vol 10.6% maxDD -40% beta 0.63 vs SPX price-only CAGR 8.11% vol 14.8%. | verifier: corrected claim/trial
-
-### T-162 · covered-call-delta-targeted
-
-**Claim.** On the common sample 2002-03 to 2026-10, the Cboe BXMD (30-delta) buy-write has a higher monthly Sharpe ratio (excess over 3m T-bill) than the ATM BXM buy-write.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/BXMD_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/BXMD_History.csv
-- statistic: Sharpe(BXMD) - Sharpe(BXM) on month-end excess returns
-- null: Sharpe(BXMD) - Sharpe(BXM) <= 0
-- procedure: Download BXMD_History.csv, BXM_History.csv and BXY_History.csv; align on 2002-03-22 onward; take month-end excess returns over DTB3; studentized block bootstrap (12-month blocks) of the Sharpe difference (or Ledoit-Wolf test); repeat on walk-forward halves; regress the BXMD-BXM spread on the SPX monthly return to show the convexity difference.
-- data: Cboe CDN daily histories (BXMD 1986-06 onward, BXY 1988-06 onward, BXM 2002-03 onward), FRED DTB3 · min n: 280
-- pass: Bootstrap 95% CI of the Sharpe difference > 0 in the full sample, with the same sign in both halves
-- controls: Beta-matched SPY-TR/T-bill blend; BXMC is NOT an ATM series (it is the conditional buy-write: full unit if VIX >= 20, else half), so use it only as a separately labelled third arm
-- note: from the options-library library: OTM / delta-targeted covered call (30-delta, BXMD; 2% OTM, BXY); harness suggestion: Today's figures: BXMD 1986- CAGR 10.67% vol 12.8%, BXY 10.40%/11.9%, BXMC (ATM, 1990-) 9.73%/11.0%, SPX price 8.9%/15.2%. Use SPY adjusted closes for a TR benchmark. | verifier: corrected claim/trial
-
-### T-163 · covered-call-weekly-ladder
-
-**Claim.** Over 2012-06 to 2026-10, the Cboe BXMW multi-week buy-write has a higher monthly Sharpe ratio (excess over 3m T-bill) than the monthly BXM buy-write.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/BXMW_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/BXMW_History.csv
-- statistic: Sharpe(BXMW) - Sharpe(BXM) on month-end excess returns from 2012-06-29
-- null: Difference <= 0
-- procedure: Cboe CDN BXMW_History.csv vs BXM_History.csv; month-end excess returns over DTB3; studentized block bootstrap of the Sharpe difference; split pre/post 2020
-- data: BXMW 2012-06-29 onward (3,589 rows), BXM, FRED DTB3 · min n: 160
-- pass: 95% CI of the Sharpe difference excludes 0 from below, with the same sign in both halves
-- controls: Beta-matched SPY-TR blend; cost sensitivity: subtract 4x roll costs at 0.05% of notional per roll
-- note: from the options-library library: Multi-week / laddered covered call (BXMW, weekly overwriting); harness suggestion: Computed today: BXMW 2012- CAGR 7.72% vol 8.25% maxDD -30.6%; BXM same era needs re-alignment to 2012 start. | verifier: corrected claim/trial
-
-### T-164 · partial-overwrite-etf-mechanics
-
-**Claim.** Over 2002-03 to 2026-10, the Cboe BXMH half buy-write has a higher monthly Sharpe ratio (excess over 3m T-bill) than the full ATM BXM buy-write.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_Half_Buywrite_Indices_Methodology.pdf, https://www.globalxetfs.com/funds/qyld/
-- statistic: Sharpe(BXMH) - Sharpe(BXM) on month-end excess returns; secondary: Sharpe of synthetic blends w*BXM + (1-w)*SPY TR for w in {0.25, 0.5, 0.75, 1}
-- null: Sharpe(BXMH) <= Sharpe(BXM)
-- procedure: Cboe CDN BXMH_History.csv (1990-) and BXM_History.csv (2002-); align on 2002-03-22 onward; take excess returns over DTB3; studentized block bootstrap of the Sharpe difference; walk-forward halves
-- data: Cboe CDN BXMH, BXM, BXMC; SPY closes plus dividends via the Yahoo chart endpoint; FRED DTB3 · min n: 280
-- pass: Bootstrap 95% CI of the Sharpe difference > 0, with the same sign in both halves
-- controls: Beta-matched comparison; 0.35-0.60% fee drag applied when interpreting ETF replication; BXMC as the VIX-conditional w arm
-- note: from the options-library library: Partial overwrite / overwriting-ETF mechanics (JEPI, QYLD, XYLD, BXMH); harness suggestion: Today's figures: BXMH 1990- CAGR 10.07% vol 12.1% vs BXMC 9.73% vol 11.0%. Add BXMH/BXMC to the Cboe index list. | verifier: corrected claim/trial
-
-### T-166 · collar
-
-**Claim.** Over 2008-08 to 2026-10, the Cboe CLL 95-110 collar index has a lower CAGR than a beta-matched (OLS beta ~0.63) SPY-total-return/T-bill blend.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/collar-protective-collar, https://cdn.cboe.com/api/global/us_indices/governance/CLL_Methodology.pdf
-- statistic: CAGR(CLL) - CAGR(blend), where blend = beta*SPY TR + (1-beta)*T-bill, rebalanced monthly
-- null: CAGR(CLL) >= CAGR(blend)
-- procedure: Cboe CDN CLL_History.csv (2008-08-26 onward; the methodology base date is 1986 but the free CSV starts 2008; it has gaps up to 11 days, so use month-ends); SPY TR from the Yahoo chart adjclose; DTB3; estimate beta on the first half and apply it out of sample to the second; block bootstrap
-- data: CLL 4,520 rows, SPY closes plus dividends, FRED DTB3 · min n: 200
-- pass: Bootstrap 95% CI of the CAGR difference entirely below 0
-- controls: CLL1M and CLL3M (2004-) as alternative collars; PPUT (put only) to isolate the call leg; CLLZ (1986-) as the long-history collar
-- note: from the options-library library: Collar (protective collar, Cboe CLL 95-110); harness suggestion: Today: CLL 2008- CAGR 6.96% vol 12.3% maxDD -26.3% beta 0.51 vs SPX price CAGR 10.5% maxDD ~-34% (2020) / -57% (2009 not in sample start). | verifier: corrected claim/trial
-
-### T-168 · put-spread-collar
-
-**Claim.** Over 1993-02 to 2026-10, the Cboe CLLZ zero-cost put-spread collar index has no higher monthly Sharpe ratio (excess over 3m T-bill) than SPY total return.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/daily_prices/CLLZ_History.csv, https://www.cboe.com/us/indices/indicesproducts/
-- statistic: Sharpe(CLLZ) - Sharpe(SPY TR) on month-end excess returns
-- null: Sharpe(CLLZ) > Sharpe(SPY TR) (the put-spread collar improves risk-adjusted return)
-- procedure: Cboe CDN CLLZ_History.csv (1986-06 onward); SPY TR from Yahoo chart adjclose (1993 onward); DTB3; studentized block bootstrap of the Sharpe difference; walk-forward halves; also report the mean return difference in months with SPX < -5% to show the bounded protection
-- data: CLLZ 10,151 rows; SPY closes plus dividends; FRED DTB3 · min n: 380
-- pass: Bootstrap 95% CI upper bound of the Sharpe difference <= 0.05 and point estimate <= 0 (rejecting the null requires the CI to lie below a small positive margin)
-- controls: CLL and PPUT as full-floor comparators; price-only SPX as a sensitivity
-- note: from the options-library library: Put-spread collar (Cboe CLLZ zero-cost put-spread collar); harness suggestion: Today: CLLZ 1986- CAGR 8.14% vol 11.6% maxDD -47.2% worst month -17.1% vs SPX price CAGR 8.94% vol 15.2%; the -47% drawdown is the fingerprint of the short tail. | verifier: corrected claim/trial
-
-### T-169 · protective-put
-
-**Claim.** Over 1993-02 to 2026-10, the Cboe PPUT index has a CAGR more than 1%/yr below a beta-matched (OLS beta ~0.73) SPY-total-return/T-bill blend.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/protective-put-married-put, https://cdn.cboe.com/api/global/us_indices/governance/PPUT_Methodology.pdf
-- statistic: CAGR(PPUT) - CAGR(blend), blend = beta*SPY TR + (1-beta)*T-bill rebalanced monthly
-- null: CAGR(PPUT) - CAGR(blend) >= -1%/yr
-- procedure: Cboe CDN PPUT_History.csv (1986-06 onward), SPY TR (Yahoo chart adjclose, 1993-), DTB3; estimate beta out of sample (first half), apply to the second; monthly block bootstrap; VRP cross-check: VIX vs forward 21-day SPX realised vol since 1990
-- data: PPUT 10,145 rows, SPY closes plus dividends, DTB3, VIX 1990- · min n: 380
-- pass: Bootstrap 95% CI of the CAGR difference entirely below -1%/yr
-- controls: Exclude 2008 and 2020 one at a time; PPUT3M (2004-) as the tail variant
-- note: from the options-library library: Protective put / married put (Cboe PPUT 5% OTM); harness suggestion: Today: PPUT 1986- CAGR 8.02% vol 12.3% maxDD -42% worst month -10.6% (vs SPX -19.6% ex 1987 crash months): protection shows up in the worst month but costs ~1%/yr vs SPX price-only CAGR 8.91%. | verifier: corrected claim/trial
-
-### T-170 · cash-secured-put
-
-**Claim.** Over 2007-01 to 2026-10, the Cboe PUT (ATM put-write) index has a higher monthly Sharpe ratio (excess over 3m T-bill) than the BXM (ATM buy-write) index.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/cash-secured-put, https://www.optionseducation.org/strategies/all-strategies/naked-put-uncovered-put-short-put
-- statistic: Sharpe(PUT) - Sharpe(BXM) on month-end excess returns, 2007-01 onward
-- null: Sharpe(PUT) <= Sharpe(BXM) (parity: no difference)
-- procedure: Cboe CDN PUT_History.csv. It has only 1-2 rows per year before 2007-01-03, with gaps up to 1,159 days, so start in 2007. Align with BXM_History.csv; excess returns over DTB3; studentized block bootstrap; walk-forward halves
-- data: PUT (daily from 2007-01-03), BXM, FRED DTB3; PUTY 1986- and WPUT/PUTD 2006- as secondary arms · min n: 220
-- pass: Bootstrap 95% CI of the Sharpe difference > 0 in the full sample, with the same sign in both halves
-- controls: PUTY vs BXY (both 2% OTM, 1988-) as a longer parity check
-- note: from the options-library library: Cash-secured put / put-write (Cboe PUT, WPUT, PUTD); harness suggestion: Note: PUT_History.csv appears sparse in early years (4,984 rows for 35 years) - validate day counts before monthly sampling; computed WPUT 2006- CAGR 4.84% vol 9.6% maxDD -28.6%, PUTD 9.67%/12.0%. | verifier: corrected claim/trial
-
-### T-171 · the-wheel
-
-**Claim.** In a model-priced simulation (Black-Scholes with VIX as the implied vol, not market prices) on SPX from 1990 to 2026, a wheel whose call strike is constrained to be >= the cost basis has a lower Sharpe ratio than the same wheel writing an unconstrained 30-delta call.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/cash-secured-put, https://www.optionseducation.org/strategies/all-strategies/covered-call-buy-write
-- statistic: Sharpe(basis-constrained wheel) - Sharpe(unconstrained 30-delta wheel), model-priced
-- null: Difference >= 0 (the basis rule helps or is neutral)
-- procedure: Model-priced backtest on SPX daily since 1990 (IV = VIX, with an OTM adjustment from SKEW as a sensitivity), 30-45 DTE cycles, 10 bps slippage. Gate: the same pricer must first reproduce BXM (2002-) and PUT (2007-) monthly returns with tracking error < 2%/yr, or results do not count. Block bootstrap of the paired Sharpe difference.
-- data: SPX daily 1975-, VIX 1990-, SKEW 1990-, BXM/PUT histories for calibration, FRED DTB3 · min n: 400
-- pass: Calibration gate passed AND the 95% CI of the Sharpe difference < 0
-- controls: Constant-IV pricer to show sensitivity; ATM-both-phases wheel vs the actual PUT index as an external check
-- note: from the options-library library: The wheel (cash-secured put -> assignment -> covered call -> called away); harness suggestion: Reuse the model-priced overlay harness; calibrate it to BXM/PUT first (now downloadable) and report the calibration error as a gate. | verifier: corrected claim/trial
-
-### T-172 · covered-strangle
-
-**Claim.** Over 1988-06 to 2026-10, the Cboe CMBO covered combo index has a higher monthly Sharpe ratio (excess over 3m T-bill) than the BXY 2% OTM buy-write, i.e. adding the ATM short put on T-bill collateral improves risk-adjusted return.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/covered-strangle-covered-combination, https://cdn.cboe.com/api/global/us_indices/governance/CMBO_Methodology.pdf
-- statistic: Sharpe(CMBO) - Sharpe(BXY) on month-end excess returns
-- null: Sharpe(CMBO) <= Sharpe(BXY)
-- procedure: Cboe CDN CMBO_History.csv (1986-06) and BXY_History.csv (1988-06); align; excess over DTB3; studentized block bootstrap; walk-forward halves; report worst-5% months as a secondary description
-- data: Cboe CDN histories, FRED DTB3 · min n: 400
-- pass: Bootstrap 95% CI of the Sharpe difference > 0, with the same sign in both halves
-- controls: Beta-matched SPY-TR blend (CMBO beta ~0.66); PUTY 2% OTM put-write as the put-only arm
-- note: from the options-library library: Covered strangle / covered combination (Cboe CMBO); harness suggestion: Today: CMBO 1986- CAGR 9.37% vol 11.0% maxDD -42.7% worst month -17.3% beta 0.66. | verifier: corrected claim/trial
-
-### T-174 · covered-put
-
-**Claim.** In a model-priced simulation (Black-Scholes at VIX, not market prices) of short SPX + short monthly ATM SPX puts with T-bill interest on proceeds, the CAGR is negative in at least 90% of rolling 120-month windows from 1990 to 2026.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/all-strategies-en, https://www.optionseducation.org/strategies/all-strategies-en
-- statistic: Fraction of rolling 120-month windows with negative CAGR (model-priced)
-- null: Fraction < 0.9
-- procedure: Model-priced with VIX-as-IV on SPX daily, monthly rolls, T-bill interest on short proceeds, dividends owed on the short; pricer must first pass the BXM/PUT calibration gate
-- data: SPX price 1975-, SPY dividends (Yahoo chart events=div), VIX 1990-, FRED DTB3 · min n: 300
-- pass: Fraction of negative windows >= 0.9
-- controls: Short SPX alone to isolate the put income
-- note: from the options-library library: Covered put (short stock + short put); harness suggestion: Low priority: include for completeness of the payoff library; the claim is mostly a sanity check of the engine's sign conventions. | verifier: corrected claim/trial
-
-### T-178 · iron-butterfly-bfly
-
-**Claim.** Over 1986-06 to 2026-10, the Cboe BFLY iron butterfly index has a lower monthly Sharpe ratio (excess over T-bill) than the Cboe CNDR iron condor index.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/BFLY_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/BFLY_History.csv
-- statistic: Sharpe(BFLY) - Sharpe(CNDR) on month-end excess returns
-- null: Sharpe(BFLY) >= Sharpe(CNDR)
-- procedure: Cboe CDN BFLY_History.csv and CNDR_History.csv (both 1986-06-20 onward), FRED DTB3; studentized block bootstrap; split pre/post 2008
-- data: Cboe CDN (10,151 rows each), FRED DTB3 · min n: 400
-- pass: Bootstrap 95% CI of the Sharpe difference < 0, with the same sign in both halves
-- controls: Relate monthly P&L to VIX minus subsequent realised vol
-- note: from the options-library library: Iron butterfly benchmark overlay (Cboe BFLY: short ATM straddle, long 5% wings, over T-bills); harness suggestion: Today: BFLY 1986- CAGR 3.66% vol 10.8% maxDD -54.9% beta 0.08; CNDR 5.38% vol 7.0% maxDD -19.8% beta 0.13. | verifier: corrected claim/trial
-
-### T-179 · iron-condor-cndr
-
-**Claim.** From 1990 to 2026, CNDR's monthly excess return over the 1-month T-bill rises with the roll-day gap between VIX and trailing 21-day SPX realised volatility (positive regression slope).
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/CNDR_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/CNDR_History.csv
-- statistic: OLS slope of monthly CNDR excess return (roll to roll) on (VIX at roll - trailing 21-day SPX realised vol)
-- null: Slope <= 0
-- procedure: Cboe CDN CNDR_History.csv sampled at 3rd-Friday roll dates; VIX history; SPX realised vol from Cboe SPX daily; FRED DTB3; HAC standard errors; block bootstrap; walk-forward halves
-- data: CNDR 1986- (use 1990- for VIX), SPX daily, VIX, DTB3 · min n: 400
-- pass: Bootstrap 95% CI of the slope > 0, with the same sign in both halves
-- controls: Beta to SPX near zero (0.13 today); add SPX month return as a regressor to separate the variance premium from direction
-- note: from the options-library library: Iron condor benchmark overlay (Cboe CNDR: short 20-delta strangle, long 5-delta wings, over T-bills); harness suggestion: CNDR is the cleanest free realised series for the SPX variance premium harness; add it as a validation target for the model-priced condor. | verifier: corrected claim/trial
-
-### T-180 · cboe-benchmark-replication
-
-**Claim.** A Black-Scholes overlay simulation on SPX (model-priced, with VIX as the implied vol and FRED DTB3 as the rate) reproduces the monthly returns of BXM (2002-2026) and PUT (2007-2026) with R^2 > 0.95 and annualised tracking error below 2%.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_BuyWrite_Indices_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/BXMD_History.csv
-- statistic: R^2 and annualised tracking error between simulated and actual monthly returns for BXM and PUT (secondary: BXMD, CNDR)
-- null: R^2 <= 0.95 or TE >= 2%/yr for either BXM or PUT
-- procedure: Simulate each index's strike/roll rule on SPX daily with VIX (SKEW-based OTM adjustment for BXMD/CNDR as a documented sensitivity), compare with downloaded histories, and report by sub-period. Use SPX price plus SPY dividends (Yahoo chart events=div) for the total-return leg.
-- data: SPX daily, VIX, SKEW, DTB3, SPY dividends, Cboe benchmark CSVs · min n: 220
-- pass: R^2 > 0.95 and TE < 2%/yr for both BXM and PUT; document the shortfall for BXMD/CNDR (skew)
-- controls: Price-only vs total-return SPX; VWAP vs close fill assumption
-- note: from the options-library library: Buy-write benchmark family map (BXM/BXMD/BXY/BXMW/BXMH/BXN/BXR/PUT/CLL/CLLZ/CMBO/PPUT/BFLY/CNDR) as replication targets; harness suggestion: This is the first thing to run: extend cboe_index_history to the list above (the CDN 307-redirects to cdn-api.cboe.com; httpx follow_redirects is already on), then calibrate the model-priced overlay harness against it. | verifier: corrected claim/trial
-
-### T-182 · conversion
-
-**Claim.** For SPY expiries before the next ex-dividend date (2026-12-18) with 30-64 DTE and strikes within +/- 5% of spot, the executable conversion lending rate (stock at ask, put at ask, call at bid, D = 0) is below the FRED 3-month bill rate in at least 95% of (K, T) pairs.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity, https://www.optionseducation.org/strategies/all-strategies-en
-- statistic: Share of (K, T) pairs with r_conv_exec = ln(K / (S_ask + P_ask - C_bid)) / T below r_bill (both continuously compounded).
-- null: Share < 95% (executable conversions beat bills in a material fraction of pairs).
-- procedure: Day one: SPY chain plus underlying quote; restrict to expiries strictly before 2026-12-18 so no dividend enters; compute r_conv_exec per pair; compare to DGS3MO converted to continuous compounding; repeat daily until the ex-date window closes, then roll to the next quarter.
-- data: CBOE delayed SPY chain with underlying bid/ask; FRED DGS3MO. · min n: 100
-- pass: >= 95% of pairs below r_bill on day one and on >= 80% of captured days.
-- controls: Mid-price version should sit near the SPX box rate (bill + ~0-60 bp); drop zero-bid legs; drop pairs where the short call is deep ITM (early-exercise contamination).
-- note: from the options-library library: Conversion; harness suggestion: Reuse parity.py implied rate per name; add payoff template [underlying+, put+, call-] and assert flat payoff in payoff engine test. | verifier: corrected claim/trial
-
-### T-184 · synthetic-long-stock
-
-**Claim.** For SPY expiries with 180-365 DTE, the executable financing rate of an ATM synthetic long (call at ask, put at bid, dividends from SPY's trailing four distributions) is below the 3-month bill + 50 bp in at least 80% of expiries, i.e. at least 100 bp cheaper than a benchmark retail margin rate of bill + 150 bp.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.optionseducation.org/strategies/all-strategies-en, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity
-- statistic: r_impl_exec - r_bill per expiry, r_impl_exec solving C_ask - P_bid = S - PV(D) - K e^{-r T}.
-- null: r_impl_exec - r_bill >= 50 bp in more than 20% of expiries.
-- procedure: Day one on SPY (QQQ/IWM/GLD/IBIT as replications): ATM strike per expiry with 180-365 DTE; PV(D) from trailing distributions on the known quarterly ex-dates; compute r_impl_exec and r_impl_mid; compare to DGS3MO; repeat daily.
-- data: CBOE delayed SPY chain, FRED DGS3MO, SPY trailing four quarterly distributions (4 public numbers entered by hand; not in the listed feeds). GLD/IBIT replications need no dividends. · min n: 20
-- pass: >= 80% of expiries with r_impl_exec - r_bill < 50 bp on day one and on >= 80% of captured days.
-- controls: Sensitivity to +/-10% dividend forecast; mid-based rate; exclude expiries with a zero-bid leg; GLD/IBIT dividend-free replication.
-- note: from the options-library library: Synthetic long stock (combo); harness suggestion: Template [call+, put-]; payoff engine must reproduce a straight line; parity.py reports r_impl_askbid alongside r_impl_mid. | verifier: corrected claim/trial
-
-### T-185 · synthetic-short-stock
-
-**Claim.** For SPY expiries before 2026-12-18 with 30-64 DTE (no dividend inside T), the executable implicit borrow cost of an ATM synthetic short, r_bill - r_impl with r_impl solving C_bid - P_ask = S - K e^{-r T}, is below 50 bp/yr in at least 80% of (K, T) pairs within +/- 2% of spot.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.optionseducation.org/strategies/all-strategies-en, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity
-- statistic: Share of near-ATM pairs with r_bill - r_impl_exec < 50 bp.
-- null: Share < 80% (synthetic shorts in SPY cost more than 50 bp/yr over general collateral).
-- procedure: Day one: SPY chain, expiries strictly before the ex-date, strikes within +/- 2%; compute r_impl_exec from put ask / call bid; compare to DGS3MO; repeat daily; replicate on GLD and IBIT with no dividend (their expense ratios reduce the forward via the underlying market and are reported separately).
-- data: CBOE delayed SPY/GLD/IBIT chains, FRED DGS3MO. · min n: 20
-- pass: Share >= 80% on day one and on >= 80% of captured days.
-- controls: Mid-price version; stale-quote filter; exclude zero-bid legs; compare with the SPX box rate to separate the bill-vs-option-financing basis from borrow.
-- note: from the options-library library: Synthetic short stock (combo); harness suggestion: Template [put+, call-]; parity.py implicit_borrow column. | verifier: corrected claim/trial
-
-### T-191 · early-exercise-itm-put-interest
-
-**Claim.** Among SPY puts with K/S >= 1.10, the share whose mid is within one tick plus half the bid-ask of intrinsic value (K - S) is at least 30 percentage points higher for strikes meeting K (1 - e^{-rT}) > C_mid + PV(D) than for strikes failing it.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity, https://www.cboe.com/tradable_products/sp_500/spx_options/specifications/
-- statistic: Difference in at-intrinsic share between criterion-met and criterion-failed groups.
-- null: Difference <= 30 pp (quotes do not reflect the early-exercise rule).
-- procedure: Day one: SPY chain; for each deep ITM put compute the criterion using the same-strike call mid, DGS3MO and SPY dividends inside T; classify at-intrinsic quotes; bootstrap the difference across strikes; replicate on QQQ/IWM and daily.
-- data: CBOE delayed SPY chain, FRED DGS3MO, SPY distributions (few public numbers, manual; not in the listed feeds). · min n: 100
-- pass: Difference > 30 pp with the 95% CI excluding 30 pp on day one; stable over 20 captured days.
-- controls: SPX (European) deep ITM puts should trade at or below discounted intrinsic, never pinned at undiscounted intrinsic; exclude zero-bid quotes.
-- note: from the options-library library: Early exercise of deep ITM American puts for interest; harness suggestion: early_exercise.py put_exercise_criterion; scan function over chains; SPX control built in. | verifier: corrected claim/trial
-
-### T-194 · etf-vs-index-option-parity-spy-spx-xsp
-
-**Claim.** For SPY expiries before its 2026-12-18 ex-date with 30-64 DTE, the SPY parity-implied financing rate ln(F_spy_impl / SPY) / T + 0.0945% (no distribution inside T, so dividends drop out) lies within 25 bp/yr of the SPX box rate at the nearest SPXW expiry in at least 90% of expiries.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.cboe.com/tradable_products/sp_500/mini_spx_options/, https://www.cboe.com/tradable_products/sp_500/spx_options/specifications/
-- statistic: |r_spy_impl - r_box_spx| per matched expiry, in bp/yr.
-- null: Share within 25 bp < 90% (the two venues price financing differently).
-- procedure: Day one: SPY F_impl from ATM +/- 3 mids (American bias small near ATM); SPX box rate from wide strike pairs at the matched SPXW expiry; compare; repeat daily.
-- data: CBOE delayed SPY (13,470 contracts) and SPX (29,918) chains. No dividend or bill input needed. · min n: 10
-- pass: >= 90% of matched expiries within 25 bp on day one and on >= 80% of 20 captured days.
-- controls: XSP box as a second reference; strike-invariance of each forward; exclude AM-settled SPX monthlies.
-- note: from the options-library library: ETF vs index option parity (SPY vs SPX vs XSP); harness suggestion: parity.py cross_venue(spy_chain, spx_chain, xsp_chain) returning residual table; payoff template with qty 10:1. | verifier: corrected claim/trial
-
-### T-195 · crypto-put-call-parity-deribit
-
-**Claim.** For Deribit BTC options at expiries with a listed dated future, strikes within 10% of F and DTE 7-180, fewer than 1% of hourly (K, T) observations have |F_impl - F_mark| / F_mark (F_impl = K/(1 - (C_mid - P_mid))) larger than the round-trip taker fees of the three legs.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://docs.deribit.com/api-reference/market-data/public-ticker, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
-- statistic: Exceedance rate of |F_impl - F_mark| / F_mark over the fee threshold; also the 99th percentile in bp.
-- null: Exceedance rate >= 1% (exploitable violations are common).
-- procedure: Poll get_book_summary_by_currency (kind=option and future) and ticker hourly for 7 days; keep expiries whose underlying_index is a listed future (not SYN.); compute F_impl from mids and from executable bid/ask; bootstrap the exceedance rate.
-- data: Deribit public API (live, verified reachable 2026-10-14). · min n: 500
-- pass: Exceedance rate < 1% with the 95% upper bound < 1% and no violation persisting > 1 hour.
-- controls: Executable vs mid; drop zero-bid quotes; isolate the 07:00-08:30 UTC settlement window; ETH replication.
-- note: from the options-library library: Crypto put-call parity vs dated future (Deribit inverse options); harness suggestion: mandel/options/deribit_parity.py polling public endpoints (get_instruments, ticker, get_book_summary_by_currency); payoff engine with inverse payoff mode (divide USD payoff by S_T). | verifier: corrected claim/trial
-
-### T-196 · deribit-inverse-box-spread
-
-**Claim.** For the two most liquid Deribit BTC quarterly expiries, the executable long-box USD lending rate after taker fees (strike pairs within +/- 20% of F) exceeds the FRED 3-month bill by at least 100 bp annualised in the median hourly snapshot.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://docs.deribit.com/api-reference/market-data/public-ticker, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
-- statistic: Median over snapshots of r_box_exec - r_bill (bp).
-- null: Median <= 100 bp.
-- procedure: Hourly polls for 14 days; build boxes from executable bid/ask; subtract fees; join DGS3MO; bootstrap (block = 1 day).
-- data: Deribit public API, FRED DGS3MO. · min n: 200
-- pass: Median > 100 bp with the 95% CI excluding 100 bp.
-- controls: Mid vs executable; strike-pair invariance; exclude the settlement hour; ETH replication; report r_box_exec - basis separately.
-- note: from the options-library library: Deribit inverse box spread (USD lending/borrowing in BTC collateral); harness suggestion: deribit_parity.py box_rate(); inverse payoff mode in payoff engine; join with FRED via existing ingest. | verifier: corrected claim/trial
-
-### T-197 · cash-and-carry-options
-
-**Claim.** Across the daily history of expired and live Deribit BTC quarterly futures, the median annualised basis of the second-nearest quarterly over the index exceeds the same-day FRED 3-month bill by at least 100 bp.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false, https://docs.deribit.com/api-reference/market-data/public-ticker
-- statistic: Median over days of [ln(F_q2 / S) x 365/DTE - r_bill]; block-bootstrap CI.
-- null: Median <= 100 bp.
-- procedure: Pull daily closes for every quarterly via get_tradingview_chart_data (works for expired instruments, e.g. BTC-27DEC24, verified); spot proxy = BTC daily close (or BTC-PERPETUAL close at the same tick); compute annualised basis of the second quarterly; join DGS3MO; studentized block bootstrap (block 20 days); walk-forward by year.
-- data: Deribit public API (chart data for expired dated futures), BTC daily closes, FRED DGS3MO. · min n: 500
-- pass: Median > 100 bp with the 95% CI excluding 100 bp and the sign holding in a majority of calendar years.
-- controls: Timestamp alignment of futures and spot closes; exclude the final 7 days before each expiry; ETH replication; report 2022 separately (basis compression).
-- note: from the options-library library: Cash-and-carry with options (spot vs synthetic short / dated future); harness suggestion: mandel/options/deribit_basis.py (futures curve snapshot) feeding both this and the box entry; payoff template [underlying+, put+, call-]. | verifier: corrected claim/trial
-
-### T-199 · gld-options-implied-gold-carry
-
-**Claim.** At 90-365 DTE, the GLD option-implied financing rate from ATM +/- 3 mid prices lies within 50 bp of (FRED 3-month bill - 0.40%) in at least 90% of strike/expiry pairs on the capture day.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity, https://www.optionseducation.org/strategies/all-strategies-en
-- statistic: Share of pairs with |r_impl - (r_bill - 0.40%)| <= 50 bp.
-- null: Share < 90% (a material lease/borrow premium is priced).
-- procedure: Day one: GLD and SLV chains; ATM +/- 3 strikes at expiries 90-365 DTE; r_impl from mids; compare with DGS3MO - fee; repeat daily; report SLV separately.
-- data: CBOE delayed GLD/SLV chains, FRED DGS3MO. No dividends. · min n: 30
-- pass: Share >= 90% on day one and on >= 80% of captured days.
-- controls: Executable vs mid; strike-invariance; compare the residual against the SPX box-bill spread (option-market financing basis) to avoid attributing it to lease rates.
-- note: from the options-library library: GLD options-implied gold carry (ETF parity for metals); harness suggestion: parity.py with q = expense ratio as continuous 'dividend'; report per-symbol implied carry. | verifier: corrected claim/trial
-
-### T-223 · deribit-expiry-max-pain-pin
-
-**Claim.** An 8-hour ATM BTC short straddle model-priced with DVOL-as-IV (T = 8/(24*365)), sold at 00:00 UTC and settled on the 08:00 UTC price, has a higher mean P&L on Deribit monthly-expiry Fridays than on other Fridays.
-
-- kind: options-strategy · origin: options-library:event-driven, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false, https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data
-- statistic: Difference in mean MODEL-PRICED P&L (monthly-expiry Fridays minus other Fridays), bootstrap CI; mean |00-08 UTC return| by group (permutation test).
-- null: Monthly-expiry mean P&L <= other-Friday mean P&L.
-- procedure: BTC-PERPETUAL hourly candles from public/get_tradingview_chart_data (available back to 2019; a proxy for the settlement index), DVOL 1D for pricing (from 2021-04); monthly expiry calendar (last Friday). Max-pain convergence (|S_08 - K_maxpain| vs |S_00 - K_maxpain|) needs OI captures.
-- data: Deribit public hourly perp candles, DVOL history, expiry calendar. · min n: 60
-- pass: Difference > 0 with 95% CI excluding 0.
-- controls: Weekly vs monthly split; exclude expiries coinciding with FOMC/CPI; ETH separately.
-- note: from the options-library library: Deribit expiry max-pain pin (sell the 08:00 UTC settlement straddle); harness suggestion: Deribit hourly index fetcher + expiry calendar; max-pain calculator from book summary OI. | verifier: corrected claim/trial
-
-### T-227 · risk_reversal_skew
-
-**Claim.** Since 1991, the frequency of 21-trading-day S&P 500 log returns below -2 VIX-implied sigma is not higher, by 1 percentage point or more, in windows starting with CBOE SKEW above its trailing 252-day 80th percentile than in windows starting with SKEW below its 20th percentile (the extra put premium a high-SKEW risk reversal sells is not paid back by more realised left-tail events).
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf, https://www.optionseducation.org/strategies/all-strategies/short-straddle
-- statistic: Difference (high-SKEW minus low-SKEW) in the frequency of r_{t,t+21} < -2*(VIX_t/100)*sqrt(21/252) on ^GSPC; secondary: difference in realised 21d skewness of daily returns.
-- null: freq_high - freq_low >= 0.01 (SKEW carries real information about future left tails).
-- procedure: Daily SKEW and VIX since 1990-01; ^GSPC closes (archive daily-history--GSPC, because SPY only starts in 1993-01); trailing 252-day SKEW percentile, so the first usable window is in 1991. Use overlapping daily-start 21d windows with a 21-day-block studentized bootstrap, because non-overlapping windows leave only ~85 per quintile and a handful of tail events. Reject the null if the bootstrap 95% upper bound of the difference is < 0.01. Deflate for the two cut pairs tried (80/20 and 90/10).
-- data: CBOE SKEW and VIX daily history and ^GSPC daily closes, all in the archive. Index data only, no option prices. · min n: 300
-- pass: 95% upper bound of (freq_high - freq_low) < 0.01, and the realised-skewness difference is not significantly negative (p > 0.1) in both halves 1991-2008 and 2009-2026.
-- controls: Shuffled-SKEW placebo; VIX-tercile stratification (SKEW must not proxy for the VIX level); sensitivity run excluding Oct-2008 and Mar-2020; repeat with the 21-day SKEW change instead of its level.
-- note: from the options-library library: Risk reversal (25-delta skew trade); harness suggestion: Extend harness_skew_tail: bucket by SKEW percentile, compare CBOE-table implied 2-sigma probability vs realised frequency; log skew-vega P&L once surface_summary 25d put/call IVs have 60+ captures. | verifier: corrected claim/trial
-
-### T-228 · put_skew_ratio_sale
-
-**Claim.** The CBOE SKEW-implied risk-neutral probability of a 30-day S&P 500 log return below -2 sigma, P = 0.0228 + 0.0270*(SKEW-100)/10 (the white paper's Gram-Charlier mapping: 2.3% at SKEW 100, 14.45% at 145), exceeds the realised frequency of 21-trading-day returns below -2*(VIX/100)*sqrt(21/252) by more than 2 percentage points on average.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf, https://www.cboe.com/tradable_products/vix/vix_historical_data/
-- statistic: Mean over windows of P_SKEW(t) - 1{r_{t,t+21} < -2*(VIX_t/100)*sqrt(21/252)}.
-- null: Mean gap <= 0.02.
-- procedure: Non-overlapping 21d windows since 1990 (^GSPC closes before SPY's 1993 start); studentized block bootstrap; require the gap to be positive in each of three sub-periods. Report the SKEW > 135 conditional gap only as a secondary, with PBO across thresholds 125/130/135/140.
-- data: CBOE SKEW and VIX history and ^GSPC/SPY closes (archive). Index-only: this tests the tail premium the strategy sells, not the 1x2's P&L, which needs 10d/25d IVs from chain capture. · min n: 300
-- pass: Lower 95% bound of the mean gap > 0.02, and the gap is positive in at least 2 of 3 sub-periods.
-- controls: Constant-normal benchmark (P = 2.28%) to show SKEW adds information; shuffled-SKEW placebo. SKEW readings above 145 (154.7 on 2026-10-13) are outside the white-paper table and use the formula's extrapolation; report them separately.
-- note: from the options-library library: Put-skew richness sale (1x2 put ratio spread, delta-hedged); harness suggestion: Add a 'skew_implied_tail' statistic to harness_skew_tail using the CBOE white-paper mapping (100 -> 2.3%, 145 -> 14.45%, interpolate); P&L of the 1x2 needs surface_summary 10d/25d IVs, which accumulate from today. | verifier: corrected claim/trial
-
-### T-229 · skew_cheap_put_spread
-
-**Claim.** Model-priced: a 30-DTE 25d/10d SPX put spread bought only in months when CBOE SKEW is below its trailing 252-day 20th percentile has a higher mean ratio of expiry payoff to entry debit than the same spread bought every month.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf
-- statistic: mean(payoff/debit | SKEW < p20) - mean(payoff/debit | all months). The debit is model-priced with BS: ATM IV = VIX/100 times the ATM-to-VIX ratio measured on the captured SPX chain; strike IVs come from a linear-in-log-moneyness smile with slope kappa*(SKEW-100), kappa calibrated once on the 2026-10-14 SPX surface. Payoff from ^GSPC at expiry.
-- null: Difference <= 0.
-- procedure: Monthly 30-DTE entries since 1991, held to expiry (21 trading days, non-overlapping); walk-forward trailing percentile; studentized block bootstrap of the difference; deflated Sharpe of the conditional series. Rerun with kappa x0.5 and x2, because the smile model drives the debit.
-- data: CBOE SKEW and VIX, ^GSPC/SPY closes (model-priced, not market prices); today's SPX surface for kappa. Switch to captured 25d/10d IVs once surface_summary stores 10d and 36+ monthly captures exist. · min n: 300
-- pass: Difference > 0 with the 95% CI excluding zero, at least 60 low-SKEW entries, and the sign unchanged at kappa x0.5 and x2.
-- controls: Random-timing placebo with the same entry count; VIX-tercile stratification; a VIX < 15 gate as an alternative rule counted in the deflation.
-- note: from the options-library library: SKEW-conditioned tail hedge (put spread when skew is cheap); harness suggestion: Reuse the monthly model-priced cycle of harness_vrp_spx with a SKEW gate; swap in real 10d/25d IVs from surface_summary when available. | verifier: corrected claim/trial
-
-### T-233 · vrp_short_straddle_hedged
-
-**Claim.** Model-priced: a daily delta-hedged short 30-DTE SPY ATM straddle priced at ATM IV = 0.81 x VIX (the ATM-to-VIX ratio used by harness_short_straddle, to be recalibrated on the captured SPY surface) earns a positive mean P&L per monthly cycle after a 0.5 vol-point round-trip cost.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.optionseducation.org/strategies/all-strategies/short-straddle, https://en.wikipedia.org/wiki/Variance_swap
-- statistic: Mean cycle P&L / straddle premium for the BS-priced, daily-rehedged short straddle.
-- null: Mean <= 0.
-- procedure: Monthly non-overlapping cycles from 1993-02 (SPY) with VIX-scaled IV and FRED DTB3 rates; hedge at daily closes; studentized block bootstrap; walk-forward thirds; deflated Sharpe over the IV scales {1.0, 0.9, 0.81} and hedge frequencies tried.
-- data: CBOE VIX, SPY closes and FRED DTB3. Model-priced: the captured ATM IV/VIX ratio replaces the 0.81 scale as chain history accrues. · min n: 300
-- pass: Mean > 0 with the 95% CI excluding zero at IV scale 0.81 and at the scale measured on the capture; deflated Sharpe p < 0.05; positive in all three thirds.
-- controls: Unhedged short straddle; buy-and-hold SPY (harness_controls); shuffled-VIX placebo.
-- note: from the options-library library: VRP harvest: delta-hedged short ATM straddle; harness suggestion: harness_vrp_spx and harness_short_straddle already compute this; add the daily-rehedge path and costs; cross-asset twins harness_vrp_nasdaq/russell/gold/oil/bonds/btc/eth. | verifier: corrected claim/trial
-
-### T-234 · variance_strip_replication
-
-**Claim.** VIX^2 exceeds the subsequently realised 21-trading-day S&P 500 variance in more than 75% of non-overlapping months since 1990.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://en.wikipedia.org/wiki/Variance_swap, https://www.cboe.com/tradable_products/vix/vix_historical_data/
-- statistic: Win rate of 1{(VIX_t/100)^2 > RV_{t,t+21}}; secondary: mean ln(RV/VIX^2) and the dollar P&L of a short variance swap with vega notional 1.
-- null: Win rate <= 0.75.
-- procedure: Monthly non-overlapping cycles since 1990-01, with VIX as the strike and ^GSPC closes for RV (SPY from 1993 as a check; price returns, no dividends); exact binomial CI plus a block bootstrap; walk-forward thirds. Measure the strip-vs-VIX^2 truncation error on the captured SPX chain.
-- data: CBOE VIX (archive), ^GSPC/SPY closes. Model-free: VIX is the strip's fair strike. Today's SPX chain (29,918 contracts) for the discretisation check. · min n: 300
-- pass: Lower 95% bound of the win rate > 0.75 and positive in all three thirds; truncation error < 5% of the strike on the captured chain (reported, not part of the pass).
-- controls: ATM-straddle-only VRP (should be smaller: the smile adds premium); shuffled-returns placebo; dividend-adjusted SPY as a check on the ^GSPC price-return RV.
-- note: from the options-library library: Variance swap replication by 1/K^2 strip (log contract); harness suggestion: Wrap harness_vrp_spx's implied-minus-realised statistic in the log form and add a 'strip_from_chain' function in mandel/options that sums 2/(T*K^2)*mid over the current CBOE chain to compare with VIX^2. | verifier: corrected claim/trial
-
-### T-235 · iv_rv_spread_conditional
-
-**Claim.** Scaling a short 21-day S&P 500 variance position struck at VIX^2 by max(z, 0), where z is the entry z-score of VIX minus a walk-forward HAR realised-vol forecast, gives a higher Sharpe ratio than the constant-notional short over the same months.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.cboe.com/tradable_products/vix/vix_historical_data/, https://www.optionseducation.org/strategies/all-strategies/short-straddle
-- statistic: Sharpe(scaled) - Sharpe(constant) of the monthly P&L N_t*((VIX_t/100)^2 - RV_{t,t+21}).
-- null: Sharpe difference <= 0 (the spread carries no timing information).
-- procedure: HAR(1,5,22) fitted walk-forward (expanding window, refit monthly); monthly cycles since 1991 using ^GSPC closes; studentized bootstrap of the Sharpe difference; PBO across the declared scaling rules (on/off at z > 0.5, z > 1, linear max(z,0)).
-- data: CBOE VIX and ^GSPC/SPY closes. Model-free variance P&L: the straddle implementation is model-priced and reported separately. Twins: DVOL + BTC, GVZ + GLD (archive). · min n: 300
-- pass: Sharpe difference > 0 at p < 0.05 and PBO < 0.3.
-- controls: VIX-level-only scaling (shows the realised forecast adds information beyond the VIX level); random-z placebo; top-tercile share of P&L reported descriptively.
-- note: from the options-library library: Conditional VRP: trade only when implied-minus-realised spread is wide; harness suggestion: Add a 'gate' argument to harness_vrp_spx / harness_vrp_btc accepting a spread z-score and report deflated Sharpe vs the ungated run. | verifier: corrected claim/trial
-
-### T-237 · cross_index_vol_spread
-
-**Claim.** After the 60-day z-score of VXN - VIX passes +/-2, the statistic s*[(VXN - VIX) - (RV_QQQ - RV_SPY)] over the next 21 trading days, with s = +1 for z > +2 and -1 for z < -2, is positive on average: the realised spread falls short of an extreme-wide implied spread and exceeds an extreme-narrow one.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.cboe.com/tradable_products/vix/vix_historical_data/, https://www.optionseducation.org/strategies/all-strategies/short-straddle
-- statistic: Mean of s*[(VXN_t - VIX_t) - (RV_QQQ - RV_SPY)_{t,t+21}] over event entries; secondary: model-priced vega-neutral straddle-pair P&L.
-- null: Mean <= 0 (the implied spread is an unbiased forecast of the realised spread).
-- procedure: Daily VXN from 2009-09-14 (the free file starts there, not 2001), VIX, SPY and QQQ closes; event entries with non-overlapping 21d holds; studentized block bootstrap; walk-forward z-window (40/60/120 declared, deflated).
-- data: CBOE VIX, VXN and RVX (archive); SPY, QQQ and IWM closes (archive). Index-implied vols, model-free for the statistic. · min n: 30
-- pass: Mean > 0 with the 95% CI excluding zero, win rate > 0.6, same sign in both halves.
-- controls: Unconditional spread (no signal); random-entry placebo with a matched count; RVX-VIX replication with IWM.
-- note: from the options-library library: Cross-index vol spread (QQQ vs SPY, IWM vs SPY straddle pairs); harness suggestion: Pair harness_vrp_nasdaq and harness_vrp_spx outputs: new harness_vol_spread computing the implied-minus-realised spread differential conditioned on the VXN-VIX z-score. | verifier: corrected claim/trial
-
-### T-239 · vix_call_hedge
-
-**Claim.** Model-priced: over 2009-09 to 2026, a rolling 1-month 25-delta VIX call overlay with a fixed premium budget of 1% of portfolio value per year reduces SPY's maximum drawdown by more than 25% relative to unhedged SPY.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.cboe.com/tradable_products/vix/vix_options/specifications/, https://www.cboe.com/tradable_products/vix/vix_historical_data/
-- statistic: 1 - MDD(hedged)/MDD(unhedged); secondary: Sharpe difference and hedge P&L per cycle.
-- null: Drawdown reduction <= 25%.
-- procedure: Monthly cycles from 2009-09 (VIX3M start). The call is priced with Black-76 on F_adj = sqrt((93*VIX3M^2 - 30*VIX^2)/63)*exp(-(VVIX/100)^2*T/2) with sigma = VVIX/100 (model-priced); payoff on spot VIX at expiry as the SOQ proxy. Block bootstrap of the drawdown ratio by resampling 12-month blocks; budget fixed ex ante.
-- data: CBOE VIX, VIX3M and VVIX (archive), SPY closes. Model-priced: no VIX option or futures history. · min n: 180
-- pass: Lower 95% bound of the drawdown reduction > 25%, with the Sharpe difference reported (not required to be positive).
-- controls: SPX 10-delta put hedge with the same budget (model-priced at VIX x skew scale); cash-drag control at the same budget.
-- note: from the options-library library: VIX call hedge (rolling long OTM VIX calls); harness suggestion: Monthly model-priced overlay in the harness_vrp_spx style with the VVIX-as-IV pricer; report hedged vs unhedged via harness_controls. | verifier: corrected claim/trial
-
-### T-240 · vix_call_spread_ratio
-
-**Claim.** The realised 21-trading-day volatility of daily log changes in spot VIX is below the entry VVIX in more than 70% of non-overlapping months since 2006.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://www.cboe.com/tradable_products/vix/vix_options/specifications/, https://www.cboe.com/tradable_products/vix/vix_historical_data/
-- statistic: Win rate of 1{VVIX_t > 100*sqrt(252)*sd(dlnVIX_{t..t+21})}; secondary: model-priced 1x2 P&L with Black-76 on F_adj and VVIX as IV.
-- null: Win rate <= 0.70.
-- procedure: Daily VVIX from 2006-03-06 (not 2007) and VIX; non-overlapping 21d windows (~245); exact binomial CI plus block bootstrap; walk-forward halves. Spot VIX realises more vol than the futures VVIX refers to, so the test is biased against the claim (conservative).
-- data: CBOE VVIX and VIX (archive); VIX3M for the forward proxy in the secondary. · min n: 200
-- pass: Lower 95% bound of the win rate > 0.70; positive premium in both halves.
-- controls: SPX VRP win rate (VIX^2 vs RV^2) for scale; shuffled-VVIX placebo.
-- note: from the options-library library: VIX call spread and call ratio (defined-cost vol hedge / vol-of-vol sale); harness suggestion: New harness_vvix_vrp using cboe_index_history('VVIX') with realised vol of log VIX; reuse harness_vrp_spx structure. | verifier: corrected claim/trial
-
-### T-249 · forward_variance_term_premium
-
-**Claim.** Since 2009-09, the 1-to-3-month SPX forward variance premium as a fraction of implied, (F^2 - RV(22..63))/F^2 with F^2 = (93*VIX3M^2 - 30*VIX^2)/63, exceeds the spot 30-day premium fraction (VIX^2 - RV(1..21))/VIX^2 on average.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://en.wikipedia.org/wiki/Variance_swap, https://www.cboe.com/tradable_products/vix/term_structure/
-- statistic: Mean paired difference [(F^2 - RV_fwd)/F^2] - [(VIX^2 - RV_spot)/VIX^2] per entry.
-- null: Paired difference <= 0.
-- procedure: Daily VIX and VIX3M from 2009-09-18, SPY closes; non-overlapping 63d cycles (~68) plus all daily starts with a 63-day-block studentized bootstrap; walk-forward halves. Strip discretisation error is measured on the captured SPX chain at the two expiries.
-- data: CBOE VIX and VIX3M (archive), SPY closes, captured SPX chain. Model-free. · min n: 60
-- pass: Paired difference > 0 with the 95% CI excluding zero; forward win rate > 0.7 (reported).
-- controls: Shuffled-VIX3M placebo; sensitivity run excluding 2020; level (not ratio) version as in harness_term_vs_spot.
-- note: from the options-library library: Forward-start variance / term-premium strip (long far strip, short near strip); harness suggestion: Same extension of harness_term_structure as the calendar entry; add the premium-to-implied ratio and a two-expiry strip builder in mandel/options. | verifier: corrected claim/trial
-
-### T-255 · btc-vrp-short-straddle
-
-**Claim.** Model-priced (BS at DVOL, daily rehedge on daily closes): a delta-hedged short 30-day ATM BTC straddle has positive mean P&L per cycle over 2021-04 to 2026-09, with a studentized block-bootstrap 95% CI above zero.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://insights.deribit.com/exchange-updates/dvol-deribit-implied-volatility-index/, https://www.deribit.com/api/v2/public/get_historical_volatility?currency=BTC
-- statistic: Mean hedged P&L per non-overlapping 30-day cycle (normalised by premium); reported alongside the mean of DVOL^2 - RV^2_30d
-- null: Mean hedged P&L <= 0
-- procedure: DVOL daily from get_volatility_index_data (paged from 2021-03-24); realised vol from BTC closes; simulate a daily delta-hedged straddle with BS at sigma = DVOL; studentized block bootstrap; walk-forward halves; deflated Sharpe over threshold variants
-- data: DVOL 2021-03-24..today (~2,030 days, verified paging); BTC closes · min n: 36
-- pass: CI excludes 0 pooled and the sign holds in both halves; Sharpe of hedged P&L > 0.5 after fees
-- controls: SPY/VIX hedged straddle as positive control (model-priced); shuffled-DVOL negative control; 1 bp/day funding; haircut the premium by the DVOL-ATM IV gap (estimated from history.deribit.com trade IVs)
-- note: from the options-library library: BTC variance risk premium harvest (delta-hedged short straddle); harness suggestion: Existing BTC VRP harness (cycle 3) extended with hedged straddle simulation in Position + daily rehedge | verifier: corrected claim/trial
-
-### T-257 · btc-collar-risk-reversal
-
-**Claim.** Using daily BTC smiles reconstructed from Deribit trade prints, a 30-day delta-hedged 25-delta risk reversal that sells the richer wing has positive mean P&L on entries where |RR25| > 5 vol points, 2022-2026.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_book_summary_by_instrument?instrument_name=BTC-30OCT26-70000-C
-- statistic: Mean 30-day P&L of the delta-hedged RR, conditional on |RR25| > 5
-- null: Mean <= 0
-- procedure: From history.deribit.com trades (sampled, e.g. 07:00-09:00 UTC each day), fit a per-expiry smile from trade IVs and interpolate 25-delta call and put IV at 30 DTE; enter when the threshold is hit; price legs by BS at their fitted IVs; hedge daily on closes; mark using the next fitted smiles; non-overlapping entries; block bootstrap
-- data: history.deribit.com option trades (iv, mark_price, index_price; free, verified); BTC closes; ongoing daily book capture as quote-based confirmation from 2026-10-14 · min n: 40
-- pass: CI > 0 and hit rate > 55%
-- controls: Random entry days; fees and a 1-vol-point slippage per leg; re-run on quote captures once 120+ days accumulate
-- note: from the options-library library: BTC zero-cost collar / risk reversal on inventory (skew harvest); harness suggestion: Extend deribit_book capture to store 25d RR per expiry; harness on accumulated history | verifier: corrected claim/trial
-
-### T-261 · inverse-quanto-short-strangle
-
-**Claim.** Model-priced (BS at DVOL, daily rehedge on closes): for a short 15-delta inverse BTC strangle, the variance of 30-day USD P&L when hedged with the coin-corrected delta is at least 20% lower than when hedged with the naive BS delta, 2021-04 to 2026-09.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
-- statistic: Ratio of USD P&L variance (corrected hedge / naive hedge)
-- null: Ratio >= 0.8
-- procedure: Simulate daily-rehedged short strangles on BTC closes with IV = DVOL; book the premium in coin; compute USD P&L under both hedge rules; bootstrap the variance ratio
-- data: BTC closes; DVOL from 2021-03-24 · min n: 36
-- pass: Upper end of the 95% CI of the variance ratio < 0.8
-- controls: The same test on a USDC-linear strangle must give ratio ~1; vary collateral treatment (premium only vs premium + collateral)
-- note: from the options-library library: Inverse-settled short strangle with coin-payoff (quanto) correction; harness suggestion: Add an inverse-payoff flag to payoff.Leg (divide USD payoff by S_T, premium in coin) and the corrected delta to bs.greeks | verifier: corrected claim/trial
-
-### T-262 · btc-calendar-term-structure
-
-**Claim.** Using BTC ATM IVs reconstructed from Deribit trade prints, long ATM call calendars (front 7-30 DTE / back ~90 DTE) entered when the front IV exceeds the back by more than 5 vol points and held 14 days have positive mean P&L, 2022-2026.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
-- statistic: Mean 14-day calendar P&L conditional on inversion > 5 points (hit rate reported)
-- null: Mean <= 0
-- procedure: Daily ATM IV per expiry from fitted trade-print smiles; detect inversion; price legs by BS at their own IVs; re-mark after 14 days with that day's fitted IVs; non-overlapping entries; block bootstrap
-- data: history.deribit.com option trades (free, verified); BTC closes; quote captures from 2026-10-14 as confirmation · min n: 30
-- pass: CI > 0
-- controls: Random entry days; SPY with VIX vs VIX3M as a structural analogue (model-priced); 1 vol point slippage per leg
-- note: from the options-library library: BTC IV term-structure calendar (DVOL vs long-dated IV); harness suggestion: Store ATM IV per expiry per day from deribit_book; term-slope harness mirrors the existing VIX/VIX3M one | verifier: corrected claim/trial
-
-### T-263 · crypto-event-vol
-
-**Claim.** For FOMC decisions 2022-2026, the BTC ATM straddle-implied move (from Deribit trade prints on the day before, for the first post-decision expiry) exceeds the realised close-to-close |return| over the same window on average.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_volatility_index_data?currency=BTC&start_timestamp=1700000000000&end_timestamp=1700300000000&resolution=86400
-- statistic: Mean (implied move - realised |move|) across FOMC decisions; hit rate reported
-- null: Mean <= 0
-- procedure: For each FOMC decision (Fed calendar), take ATM call and put trade prints/marks on the first post-decision expiry during the 24h before; implied move = straddle/index; compare to the realised move to that expiry's 08:00 UTC settlement; bootstrap and sign test
-- data: history.deribit.com option trades (free, verified); BTC closes; FOMC dates from federalreserve.gov (8/year, ~38 decisions 2022-2026) · min n: 16
-- pass: Mean > 0 with 95% CI excluding 0
-- controls: Non-event days with the same DTE as baseline; DVOL change around FOMC (also testable now)
-- note: from the options-library library: Crypto event straddle / pre-event IV crush; harness suggestion: Event-date table + straddle capture; interim DVOL pre/post FOMC t-test from existing DVOL history | verifier: corrected claim/trial
-
 ### T-268 · dvol-futures-basis
 
 **Claim.** Across expired BTCDVOL futures, the futures mark 7 days before expiry exceeds DVOL at settlement on average (positive vol-futures term premium).
@@ -3607,33 +4195,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - data: history.deribit.com DVOL-futures trades (verified free); DVOL history · min n: 12
 - pass: 95% CI > 0 (report the mean, target > 2 vol points)
 - controls: VIX futures roll-down on the same dates as structural comparison; trade-print timing noise checked against index_price in the same records
+- harness: b6b_drb_dvol_futures_basis
 - note: from the options-library library: DVOL futures vs straddle basis (vol-of-vol carry); harness suggestion: Extend deribit_book to USDC futures filtered to DVOL instruments | verifier: corrected claim/trial
-
-### T-269 · cme-btc-options-1256
-
-**Claim.** For a top-bracket US individual (37% ordinary, 20% long-term, NIIT ignored), a CME BTC futures covered call has a higher mean annual after-tax return than an IBIT covered call over 2021-2025. Pre-tax P&L is model-priced at DVOL; the CME futures carry is proxied by the Deribit dated-futures basis; IBIT option P&L is short-term and IBIT share gains are long-term when held > 1 year.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.law.cornell.edu/uscode/text/26/1256
-- statistic: Mean annual after-tax return difference (CME - IBIT)
-- null: Difference <= 0
-- procedure: Take pre-tax monthly P&L from the btc-covered-call simulation; CME version subtracts the futures basis (annualised, from history.deribit.com dated-futures trades vs index_price) and taxes all P&L 60/40 (26.8% blended) marked at year end; IBIT version taxes option P&L at 37% and share P&L at 20% on realisation (subject to qualified-covered-call rules). Note the identity: on equal pre-tax gains the 1256 edge is 0.102 x gain, so 3 pp/yr needs a pre-tax return >= 29.4%, not 20%.
-- data: Simulated P&L from btc-covered-call; Deribit futures trade history (basis proxy); statutory rates · min n: 5
-- pass: Mean difference > 0 across years with bootstrap over years; sensitivity table over basis levels
-- controls: Zero-return year (difference ~ -basis); loss years (1256 three-year carryback)
-- note: from the options-library library: CME Bitcoin options futures-style (1256) covered/short premium; harness suggestion: Post-processing layer on existing covered-call P&L; tax function with 1256 flag | verifier: corrected claim/trial
-
-### T-275 · silver-call-backspread
-
-**Claim.** Model-priced with SLV's trailing 60-day realised vol as a flat IV (no VRP, no skew, so optimistic), 1x2 SLV call backspreads (0.50/0.25 delta, 90 DTE) entered monthly have positive mean P&L over 2006-2026.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.law.cornell.edu/uscode/text/26/1256
-- statistic: Mean P&L per backspread (as % of SLV price); skewness reported
-- null: Mean <= 0
-- procedure: SLV closes; monthly entries priced with BS at trailing 60-day RV; hold to expiry; block bootstrap; repeat with RV + 5 vol points (VRP) and with captured SLV IV/skew once available
-- data: SLV daily closes (Yahoo, from 2006-04); SLV IV from chain capture later · min n: 100
-- pass: Mean CI > 0 under RV pricing and still > 0 at RV + 5 vol points; final verdict on captured IV
-- controls: Same on GLD; shuffled returns (kills tail clustering)
-- note: from the options-library library: Silver call backspread (squeeze convexity); harness suggestion: Payoff engine template with K1/K2 rules; realised-vol proxy pricing flagged as model-priced | verifier: corrected claim/trial
 
 ### T-300 · tsmom-12-1-multi-asset
 
@@ -4766,150 +5329,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: FRED values used with available_at; survivorship: none; costs: 2 bps per side (futures/ETF equivalent); synthetic-return approximation error measured against IEF; multiple testing: 8 trials; regime: three rate regimes reported
 - note: from the underlying-library library: Long-history Treasury trend from FRED yields (synthetic 10-year bond TSMOM since 1962); harness suggestion: underlying.py synthetic_bond_returns(dgs, maturity) shared with cross-asset-tsmom-bond-equity; harness bond_tsmom_long_history reusing the TSMOM harness. | added by the verifier pass
 
-### T-500 · butterfly-convexity-arbitrage
-
-**Claim.** On the CBOE delayed SPX and SPY chains, fewer than 0.5% of equally spaced call or put butterflies (adjacent listed strikes within +/- 20% of spot, all expiries) can be bought for a net credit at executable prices (ask on wings, bid on the body).
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Butterfly_(options), https://arxiv.org/abs/1204.0646
-- statistic: Share of butterflies with B_exec < 0.
-- null: Share >= 0.5%.
-- procedure: Day one: enumerate butterflies from adjacent equally spaced strikes; compute B_exec and B_mid; count; bootstrap across expiries; repeat daily.
-- data: CBOE delayed SPX and SPY chains (available). · min n: 1000
-- pass: Share < 0.5% with the 95% upper bound < 0.5% on day one and on >= 80% of captured days.
-- controls: Mid-price share should be small but non-zero; drop legs with zero bid; separate wing strikes (> 10% OTM) from the core.
-- note: from the options-library library: Butterfly convexity arbitrage (negative-priced butterfly); harness suggestion: mandel/options/static_arb.py: butterfly_scan(chain) with executable and mid prices; payoff engine template [call+ K1, call-2 K2, call+ K3]. | added by the verifier pass
-
-### T-501 · calendar-time-value-arbitrage
-
-**Claim.** On the CBOE delayed SPY chain (American), fewer than 0.1% of same-strike call or put pairs at adjacent expiries can be bought as a calendar for a net credit at executable prices (far ask < near bid).
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Calendar_spread, https://arxiv.org/abs/1204.0646
-- statistic: Share of same-strike adjacent-expiry pairs with far_ask < near_bid.
-- null: Share >= 0.1%.
-- procedure: Day one: enumerate pairs; count executable credits; for SPX, compute total-variance violations at fixed forward-moneyness as a companion statistic; repeat daily.
-- data: CBOE delayed SPY and SPX chains (available). · min n: 5000
-- pass: Share < 0.1% on day one and on >= 80% of captured days.
-- controls: Exclude zero-bid near legs; separate deep ITM calls straddling ex-div (early-exercise value); Deribit total-variance scan as a crypto replication.
-- note: from the options-library library: Calendar (time-value) arbitrage; harness suggestion: static_arb.py calendar_scan(chain) plus total_variance_check(surface). | added by the verifier pass
-
-### T-507 · synthetic-call-put-stock-option
-
-**Claim.** For SPY expiries before 2026-12-18 with 30-64 DTE and strikes within +/- 5% of spot, buying SPY at the ask plus the put at the ask costs less than buying the call at the ask plus holding K e^{-r_bill T} in bills in at least 60% of strikes, because option prices embed a financing rate above the bill rate.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Synthetic_position, https://en.wikipedia.org/wiki/Protective_put
-- statistic: Share of strikes with (S_ask + P_ask) < (C_ask + K e^{-r_bill T}).
-- null: Share < 60%.
-- procedure: Day one: SPY chain and underlying quote; no dividend inside T; compute both costs per strike; repeat daily.
-- data: CBOE delayed SPY chain, FRED DGS3MO. · min n: 50
-- pass: Share >= 60% on day one and on >= 80% of captured days.
-- controls: Replace r_bill with the SPX box rate (the share should fall to ~50%); mid-price version; GLD/IBIT dividend-free replications.
-- note: from the options-library library: Synthetic options (synthetic call / synthetic put from stock + option); harness suggestion: Templates [underlying+, put+] vs [call+] plus a bond leg; payoff engine must show identical kinked shapes offset by K - S0 - P + C. | added by the verifier pass
-
-### T-508 · vertical-spread-bound-arbitrage
-
-**Claim.** Across the CBOE delayed SPY, SPX, QQQ, GLD and IBIT chains, fewer than 0.1% of adjacent-strike call or put verticals violate monotonicity or the width bound at executable prices on the capture day.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Vertical_spread, https://en.wikipedia.org/wiki/Bull_spread
-- statistic: Share of adjacent-strike verticals with executable violation (debit < 0 or bid > width bound).
-- null: Share >= 0.1%.
-- procedure: Day one: enumerate adjacent pairs per expiry; compute executable debits/credits; count violations; repeat daily.
-- data: CBOE delayed chains (available), FRED DGS3MO for discounting. · min n: 5000
-- pass: Share < 0.1% on day one and on >= 80% of captured days.
-- controls: Mid-price violation rate as a quote-quality diagnostic; exclude zero-bid legs; IBIT/GLD reported separately (wider spreads).
-- note: from the options-library library: Vertical-spread bound and strike-monotonicity arbitrage; harness suggestion: static_arb.py vertical_scan(chain); also used as a quote-sanity gate in the daily options-fetch job. | added by the verifier pass
-
-### T-511 · weekend-theta-capture
-
-**Claim.** Since SPY's inception (1993-01-29), the variance of SPY Friday-close-to-Monday-close log returns is less than 1.5 times the mean variance of Monday-Thursday single-night close-to-next-close returns, so a Friday option priced on three calendar days of variance overcharges for the weekend.
-
-- kind: options-strategy · origin: options-library:Time / term-structure, https://api.crossref.org/works/10.1111/jofi.12603, https://api.crossref.org/works/10.1016/0304-405x(86)90004-8
-- statistic: Variance ratio R = Var(Fri close -> Mon close) / Var(single-night weekday close -> next close)
-- null: R >= 1.5
-- procedure: From SPY daily closes, label each return by its calendar gap (1 day = weekday night, 3 days = normal weekend; exclude holiday gaps). Compute R overall and in walk-forward halves. Block bootstrap by week; robustness with the top 1% |returns| winsorised.
-- data: SPY daily closes since inception (data-only). The option-price side (Friday vs Monday marks) needs chain captures from 2026-10-14. · min n: 1500
-- pass: Upper bound of the 95% CI of R < 1.5 in both halves
-- controls: Holiday weekends separately. Winsorised vs raw. The realised-variance leg is testable now; whether listed option prices actually charge calendar-day variance is a separate check on the daily captures (Friday-close vs Monday-open ATM straddle marks), with paid history needed for a backtest. Jones and Shemesh's evidence is on option returns, not on realised variance.
-- note: from the options-library library: Weekend theta capture (Friday-to-Monday short premium); harness suggestion: spy_weekend_variance(spy_rows) in experiments/options_market.py, mirroring btc_weekend_variance; then a capture-driven check of the Friday-close-to-Monday ATM straddle mark change vs realised. | added by the verifier pass
-
-### T-516 · digital-tight-vertical
-
-**Claim.** For SPY 30-day digital puts at K = 0.97S, the risk-neutral probability N(-d2) computed at VIX IV (model-priced) exceeds the realised frequency of SPY closing below K over 1993-2026 (downside digitals are overpriced).
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://en.wikipedia.org/wiki/Binary_option, https://api.elections.kalshi.com/trade-api/v2/series/KXINX
-- statistic: realised frequency minus mean N(-d2), with block bootstrap CI; Brier score of N(-d2) vs climatology
-- null: realised frequency >= mean risk-neutral probability
-- procedure: non-overlapping 21-day cycles; K = 0.97S; N(-d2) at VIX/100, r = DTB3; outcome 1{S_T < K}
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: upper CI of (realised - RN) < 0
-- controls: Flat IV ignores skew, which raises the market's digital-put price further (the slope term -dC/dK includes the skew), so the real overpricing is larger than modelled. Follow-up (blocked): compare SPXW tight-vertical probabilities with Kalshi KXINX mids at synchronised snapshots.
-- note: from the options-library library: Digital (Binary) via Tight Vertical Spread; harness suggestion: digital_calibration(symbol='SPY', moneyness=0.97, dte=21) using proper scoring in mandel/forecasts.py; Kalshi follow-up after 30 synchronised SPXW + KXINX snapshots | added by the verifier pass
-
-### T-522 · election-event-straddle
-
-**Claim.** On US federal election days since 1994, SPY's absolute 2-day return (close before election day to close after) divided by the VIX-implied 2-day move (VIX/sqrt(126)) is larger than the same ratio on matched non-election 2-day windows.
-
-- kind: options-strategy · origin: options-library:event-driven, https://www.nber.org/papers/w19812, https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv
-- statistic: Mean ratio difference (election minus matched windows); exact sign test across 16 elections; MODEL-PRICED straddle P&L with VIX-as-IV.
-- null: Election ratio <= matched-window ratio.
-- procedure: Elections 1994-2024 (16 dates, every 2 years); SPY closes, VIX; matched windows = same weekday pairs 4 weeks before/after.
-- data: SPY daily closes, VIX, election dates; Polymarket/Kalshi odds for 2024+ only. · min n: 16
-- pass: Sign test p < 0.05 (>= 13 of 16) and mean difference > 0 (underpowered: report as indicative).
-- controls: Presidential vs midterm split; VIX regime; exclude 2008 (crisis).
-- note: from the options-library library: Election / political-event straddle (index vol spanning a scheduled vote); harness suggestion: Reuse the VIX-as-IV event pricer with a 2-day horizon; add Polymarket odds as a covariate when n grows. | added by the verifier pass
-
-### T-527 · call-spread-overwrite
-
-**Claim.** In a model-priced simulation on SPX from 1990 to 2026 (Black-Scholes at VIX, not market prices; this flat-IV pricer overprices OTM calls relative to the skewed market, so it is biased against the wing), a monthly short-ATM / long-5%-OTM call-spread overwrite has a higher Sharpe ratio than the plain ATM covered call priced the same way.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/covered-call-buy-write, https://www.optionseducation.org/strategies/all-strategies/bear-call-spread-credit-call-spread
-- statistic: Sharpe(call-spread overwrite) - Sharpe(ATM covered call), both model-priced on identical paths
-- null: Difference <= 0
-- procedure: Model-priced on SPX daily with VIX-as-IV and DTB3, monthly 3rd-Friday rolls, 5 bps per leg slippage; calibration gate vs actual BXM (TE < 2%/yr); paired block bootstrap; walk-forward halves
-- data: SPX daily, VIX 1990-, DTB3, SPY dividends, BXM for calibration · min n: 400
-- pass: Calibration gate passed AND 95% CI of the Sharpe difference > 0 in both halves
-- controls: SKEW-adjusted wing pricing as a sensitivity; a chain-priced re-test once ~24 monthly cohorts of SPY chain capture exist
-- note: from the options-library library: Call-spread overwrite (covered call with upside re-entry); harness suggestion: Add as a two-call overlay in the model-priced overlay harness. Re-test with captured chains once ~24 monthly cohorts exist (from 2026-10-14) to remove the flat-IV bias. | added by the verifier pass
-
-### T-528 · vix-call-tail-hedge-overlay
-
-**Claim.** Over 2006-03 to 2026-10, the Cboe VXTH index has a smaller maximum drawdown than the PPUT3M 10%-OTM quarterly put index's companion period, measured on the common 2006-03 onward sample against SPX total return: maxDD(VXTH) is at least 10 points shallower than maxDD(SPY TR).
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_VIX_Tail_Hedge_Index_Methodology.pdf, https://cdn.cboe.com/api/global/us_indices/daily_prices/VXTH_History.csv
-- statistic: maxDD(SPY TR) - maxDD(VXTH) on the common sample, daily
-- null: Difference < 10 percentage points
-- procedure: Cboe CDN VXTH_History.csv (2006-03-31 onward); SPY TR from the Yahoo chart adjclose; compute daily maximum drawdowns; bootstrap the drawdown difference with stationary block resampling of daily returns (block 63 days)
-- data: VXTH 5,163 rows; SPY closes plus dividends · min n: 2500
-- pass: Bootstrap 90% CI of the drawdown difference > 10 points
-- controls: PPUT3M (2004-) and PPUT over the same window as put-based tail hedges; CAGR cost reported alongside
-- note: from the options-library library: VIX-call tail-hedge overlay on an equity holding (Cboe VXTH); harness suggestion: Add VXTH and PPUT3M to the benchmark list. Recomputed today: VXTH 2006- CAGR 9.93% / vol 17.2% / maxDD -43.3% / worst month -10.7%. The hedge's 2008 drawdown is large, so the claim may fail; that is the point of testing it. | added by the verifier pass
-
-### T-529 · zero_dte_vix1d_premium
-
-**Claim.** The VIX1D close implies a next-day S&P 500 variance, (VIX1D/100)^2/365 (the conservative calendar-day convention), that exceeds the next trading day's squared ^GSPC close-to-close log return on average.
-
-- kind: options-strategy · origin: options-library:relative-value-surface, https://www.cboe.com/us/indices/dashboard/vix1d/, https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX1D_History.csv
-- statistic: Mean of (VIX1D_t/100)^2/365 - r_{t+1}^2; repeat with /252 as the liberal convention.
-- null: Mean <= 0 under the /365 convention.
-- procedure: Daily VIX1D (history from 2022-05-13) and ^GSPC closes; daily non-overlapping one-day windows (~1,100); studentized block bootstrap (5-day blocks); walk-forward halves; report event days separately.
-- data: CBOE VIX1D (archive), ^GSPC/SPY closes. Index-implied variance, no option prices; the straddle P&L itself is model-priced. · min n: 500
-- pass: Mean > 0 with the 95% CI excluding zero under the /365 convention, positive in both halves.
-- controls: Same test with VIX/sqrt(21)-scaled daily variance (shows whether the 1-day premium differs from the 30-day one); event-day exclusion.
-- note: from the options-library library: 1-day (0DTE) variance premium: short SPX daily straddle vs VIX1D; harness suggestion: New harness_vix1d in the harness_vrp_spx style, using archive cboe-VIX1D-history and daily-history--GSPC. | added by the verifier pass
-
-### T-540 · variance-swap-replication
-
-**Claim.** Short 30-day variance struck at (VIX_t/100)^2 and settled on the next 21 trading days' SPY close-to-close realised variance has positive mean P&L in monthly variance units over 1993-2026.
-
-- kind: options-strategy · origin: options-library:volatility, https://emanuelderman.com/wp-content/uploads/1999/02/gs-volatility_swaps.pdf, https://en.wikipedia.org/wiki/Variance_swap
-- statistic: mean of (VIX_t^2 - RV21_{t+}) / 12 in percent-squared per month over non-overlapping cycles; studentized block-bootstrap CI; report skew, kurtosis, worst cycle
-- null: mean = 0
-- procedure: RV21 = (252/21) * sum of squared daily log returns over t+1..t+21; non-overlapping cycles
-- data: cboe-VIX-history, daily-history-SPY · min n: 390
-- pass: lower CI > 0; robust to excluding the single worst cycle is NOT required (the tail is the point), but report it
-- controls: SPX vs SPY basis; close-to-close vs 5-minute RV (BTZ use 5-minute RV, which runs lower); no cap; vrp_spx already supports this in vol units (T-48), so this is the variance-unit and tail-statistics restatement.
-- note: from the options-library library: Variance Swap Replication (long / short variance via 1/K^2 strip); harness suggestion: Extend 'vrp_spx' (mandel/experiments/volatility.variance_risk_premium) with a variance-unit, non-overlapping mode and tail statistics; the same mode for vrp_btc and vrp_gold. | added by the verifier pass
-
-## Blocked (130)
+## Blocked (117)
 
 ### T-05 · cross-venue-arbitrage
 
@@ -5281,20 +5701,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: daily chain capture: 250 entry days including a stress episode
 - note: from the options-library library: Albatross (long / short); harness suggestion: harness 'tail_wing_richness' in options.py; implied vol from the engine's implied_vol() | verifier: corrected claim/trial
 
-### T-119 · call-ratio-backspread
-
-**Claim.** A 60-DTE SPY 1:2 call backspread (short ATM, long 2x 25-delta calls), entered at mid on captured chains and held to expiry, has negative mean P&L per unit max loss: realised upside rarely reaches the upper breakeven.
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-ratio-call-spread
-- statistic: mean P&L/max loss with studentized block-bootstrap CI
-- null: mean P&L = 0
-- procedure: Delta-selected strikes from daily chains; mid and bid/ask fills; settle at expiry
-- data: options-chain-SPY-<date>, daily-history-SPY · min n: 250
-- pass: upper CI < 0 at mid fills
-- controls: Rule fixed; credit/debit frequency reported descriptively; IBIT and GLD runs reported as cross-asset contrasts.
-- blocked on: daily chain capture: 250 entry days resolving ~60 days later
-- note: from the options-library library: Call Ratio Backspread; harness suggestion: harness 'backspread_credit_frequency' in options.py | verifier: corrected claim/trial
-
 ### T-120 · put-ratio-backspread
 
 **Claim.** A 60-DTE SPY 1:2 put backspread (short ATM, long 2x 5%-OTM puts), entered at mid on captured chains and held to expiry, has negative mean P&L per unit max loss (the crash hedge costs money on average).
@@ -5309,20 +5715,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: daily chain capture: 250 entry days including a stress episode
 - note: from the options-library library: Put Ratio Backspread; harness suggestion: same 'backspread_credit_frequency' harness, put side | verifier: corrected claim/trial
 
-### T-121 · front-ratio-spread
-
-**Claim.** A 45-DTE SPY put front-ratio (long 40-delta put, short two 20-delta puts), entered at mid on captured chains and held to expiry, has positive mean P&L per unit of naked-leg margin.
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-ratio-call-spread
-- statistic: mean P&L/margin with studentized block-bootstrap CI
-- null: mean P&L = 0
-- procedure: Delta-selected strikes; mid and bid/ask fills; settle at expiry
-- data: options-chain-SPY-<date>, daily-history-SPY · min n: 250
-- pass: lower CI > 0 at bid/ask with a stress month in the sample
-- controls: Rule fixed; tail absent from short samples, so the verdict is capped at inconclusive.
-- blocked on: daily chain capture: 250 entry days including a stress episode
-- note: from the options-library library: Front Ratio Spread (short ratio call / put spread); harness suggestion: harness 'front_ratio_skew' sharing the delta selector | verifier: corrected claim/trial
-
 ### T-122 · unbalanced-iron-condor
 
 **Claim.** A 45-DTE SPY 2:1 put-weighted unbalanced 16-delta iron condor has higher mean P&L per unit max loss than the balanced 16-delta condor entered on the same captured days and held to expiry.
@@ -5336,20 +5728,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Rules fixed; mid and bid/ask; SKEW index for regime description.
 - blocked on: daily chain capture: 250 entry days including a stress episode
 - note: from the options-library library: Unbalanced (Skewed) Iron Condor; harness suggestion: harness 'condor_credit_split' in options.py | verifier: corrected claim/trial
-
-### T-137 · synthetic-long-short-stock
-
-**Claim.** In captured SPX (European), SPY, GLD and IBIT chains, the mid-price synthetic forward K + C - P deviates from the parity forward by more than the two half-spreads plus 10 bps of spot in fewer than 1% of near-ATM strike-expiry pairs (no exploitable conversion/reversal edge for a retail API account).
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/synthetic-long-stock, https://www.optionseducation.org/strategies/all-strategies/synthetic-short-stock
-- statistic: share of pairs with |K + C_mid - P_mid - F| > half-spread(C) + half-spread(P) + 0.001*S, where F = S*exp((r-q)T) for SPX, and for American SPY/GLD/IBIT the check is against the American no-arbitrage bounds S - PV(div) - K <= C - P <= S - K*exp(-rT)
-- null: share >= 1%
-- procedure: for each daily capture, take the 3 strikes nearest spot for every expiry; r from FRED DTB3; q for SPX/SPY implied from the SPX box/parity regression (dividends are not in the free data list); cluster CIs by capture day
-- data: CBOE delayed chains for _SPX, SPY, GLD, IBIT (daily capture from 2026-10-14); DTB3 · min n: 500
-- pass: share < 1% with a day-clustered 95% CI entirely below 1%
-- controls: Delayed (15-min) quotes can be stale: exclude crossed or zero bids. SPX is the clean European control. The repo's T-181 parity_check (mandel/experiments/options_market.py) already regresses C - P on K: run both.
-- blocked on: daily chain capture, about 5 trading days. One capture already gives about 250 near-ATM pairs (SPY/GLD/IBIT/SPX have dozens of expiries each), so 500 pairs come quickly, but at least 5 separate days are needed for a day-clustered CI. Not 20 days.
-- note: from the options-library library: Synthetic Long / Short Stock (Combo); harness suggestion: parity_deviation_scan(symbols=['SPY','GLD','IBIT']) over the chain archive | verifier: corrected claim/trial
 
 ### T-141 · zero-dte-directional-debit-spread
 
@@ -5421,20 +5799,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: daily chain capture, ~120 trading days
 - note: from the options-library library: Zero-cost collar; harness suggestion: Write surface_summary to also store, per capture, the equal-premium call strike for 5%/10% OTM puts at 30/60/90 DTE for SPX, GLD, IBIT. | verifier: corrected claim/trial
 
-### T-173 · covered-ratio-spread-1x2
-
-**Claim.** For SPY, the mean monthly P&L of the 1x2 overlay (short 2x 5%-OTM calls, long 1x 10%-OTM call, 30 DTE, held to expiry) minus a single 5%-OTM covered call overlay is higher when the prior 5%-to-10% OTM call IV slope is in its top quartile than when it is in its bottom quartile.
-
-- kind: options-strategy · origin: options-library:income-overlay-on-holding, https://www.optionseducation.org/strategies/all-strategies/covered-ratio-spread, https://www.optionseducation.org/strategies/all-strategies-en
-- statistic: Difference in mean overlay-P&L spread (1x2 minus single OTM call) between the top and bottom quartiles of the entry-day call-skew slope
-- null: Top-quartile mean <= bottom-quartile mean
-- procedure: Daily SPY chain capture: on each capture day record 5%/10% OTM ~30-DTE call mids and IVs; settle each overlapping cohort at expiry with SPY closes; stratify by entry skew slope; block bootstrap by expiry cohort
-- data: Daily chain capture (from 2026-10-14) + SPY closes · min n: 24
-- pass: 95% CI of the top-minus-bottom quartile difference > 0
-- controls: The same test on GLD and IBIT, where the skew sign differs
-- blocked on: daily chain capture, ~24 monthly expiry cohorts (~730 days); daily overlapping entries help but remain cohort-correlated
-- note: from the options-library library: Covered ratio spread / 1x2 ratio write; harness suggestion: Store 5%/10% OTM call mids and IVs at 30 DTE per capture day for SPY/GLD/IBIT to shorten the wait. | verifier: corrected claim/trial
-
 ### T-183 · reversal-reverse-conversion
 
 **Claim.** On a single capture day, the 90th percentile of options-implied borrow (r_bill - r_impl from 30-90 DTE ATM parity at mid prices, dividend-adjusted) across the 200 most liquid optionable US single names exceeds 200 bp/yr.
@@ -5448,20 +5812,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: SPY/QQQ/IWM computed the same way should be < 50 bp; exclude names with a zero-bid ATM leg; placebo with mismatched expiries.
 - blocked on: Single-name ex-dividend calendar (free sources exist but are not ingested); without it dividend yield is indistinguishable from implied borrow. The cross-section itself needs only today's chain.
 - note: from the options-library library: Reversal (reverse conversion); harness suggestion: Same parity.py output, reported as implied_borrow column; payoff template [underlying-, call+, put-]. | verifier: corrected claim/trial
-
-### T-188 · box-treasury-convenience-yield
-
-**Claim.** Daily changes in the SPX box-minus-bill spread (60-120 DTE, mid prices) are positively correlated with daily changes in VIX, with correlation above 0.2.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://www.nber.org/papers/w26138, https://en.wikipedia.org/wiki/Box_spread
-- statistic: Pearson correlation of d(r_box - r_bill) with d(VIX), studentized block bootstrap CI.
-- null: Correlation <= 0.
-- procedure: Build a daily SPX box-rate series from captured chains; join DGS3MO and VIX; block bootstrap (5-day blocks) of the correlation; report the mean spread separately.
-- data: Daily SPX chain capture (none before 2026-10-14), FRED DGS3MO, CBOE VIX history. · min n: 120
-- pass: Correlation > 0.2 with the 95% CI excluding 0.
-- controls: Fixed strike-pair rule; exclude < 30 DTE; mid series for the statistic, executable for P&L; check robustness to dropping FOMC days.
-- blocked on: daily SPX chain capture, ~120 trading days, to form a box-rate series (alternative: ingest published van Binsbergen-Diamond-Grotteria box-rate data)
-- note: from the options-library library: Box-vs-Treasury convenience-yield trade; harness suggestion: box.py daily series -> mandel/experiments/box_bill_spread.py joining FRED + VIX; bootstrap via existing block bootstrap. | verifier: corrected claim/trial
 
 ### T-189 · dividend-arbitrage-itm-put
 
@@ -5532,20 +5882,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Quarterly-only matching; executable vs mid; XSP/MES replication.
 - blocked on: CME ES/MES option quote source plus ~60 days of daily capture
 - note: from the options-library library: Index options vs futures options parity (SPX vs ES, XSP vs MES); harness suggestion: parity.py cross_venue() with futures-option pricing (Black-76) once an ES chain source exists. | verifier: corrected claim/trial
-
-### T-202 · covered-call-short-put-equivalence
-
-**Claim.** Over their common daily history in Cboe's published files, the annualised return of the Cboe S&P 500 PutWrite Index (PUT) exceeds that of the BuyWrite Index (BXM) by between 0 and 1.5 percentage points.
-
-- kind: options-strategy · origin: options-library:Arbitrage and synthetic relationships, https://en.wikipedia.org/wiki/Put%E2%80%93call_parity, https://www.optionseducation.org/strategies/all-strategies-en
-- statistic: Annualised return difference PUT - BXM from monthly returns; studentized block-bootstrap CI.
-- null: Difference <= 0 or >= 1.5 pp/yr.
-- procedure: Download PUT and BXM daily histories (free Cboe CSVs); monthly returns; block bootstrap of the difference; walk-forward by decade; report monthly correlation as a diagnostic.
-- data: Cboe PUT and BXM index histories (free download, not yet ingested; PUT dashboard lists daily data since January 2007, with longer back-calculated history); FRED bills to explain the collateral-yield component. · min n: 200
-- pass: 95% CI of the difference inside (0, 1.5) pp/yr.
-- controls: BXMD (OTM calls) for strike dependence; check that 2008 and 2020 drawdowns coincide; T-bill collateral yield subtracted as an explanation test.
-- blocked on: Cboe PUT/BXM index CSV ingest (free, one-off download; no option-chain history needed)
-- note: from the options-library library: Covered call / cash-secured put equivalence (synthetic identity trade); harness suggestion: mandel/ingest cboe_index_history(PUT, BXM); experiments/putwrite_vs_buywrite.py with block bootstrap. | verifier: corrected claim/trial
 
 ### T-203 · event-contract-vs-vertical-replication
 
@@ -5715,34 +6051,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: daily chain capture (~120+ trading days, more if negative-GEX days are rare) for GEX plus a 10:00 ET snapshot.
 - note: from the options-library library: 0DTE SPX long straddle on negative dealer-gamma / event days; harness suggestion: Same GEX estimator and 10:00 ET snapshot as the condor; report conditional on GEX sign and on event flag. | verifier: corrected claim/trial
 
-### T-220 · vix-settlement-soq
-
-**Claim.** A VIX call credit spread (short front-future+2, long +5 higher) expiring at the Wednesday SOQ and sold 3 trading days before settlement when VIX3M/VIX > 1.1 has a positive mean return on max loss net of half-spreads.
-
-- kind: options-strategy · origin: options-library:event-driven, https://www.cboe.com/tradable_products/vix/vix_options/, https://www.cboe.com/tradable_products/vix/vix_options/specifications/
-- statistic: Mean return on max loss with bootstrap CI; preliminary: mean (VRO - VIX close on the prior day) on settlement days vs mean daily VIX change on other Wednesdays.
-- null: Mean return <= 0.
-- procedure: Settlement calendar since 2006 (computable); front-future level from Cboe CFE settlement history; option entry credit from captured VIX chains (from today) or Black-76 with VVIX as vol-of-vol (MODEL-PRICED); settlement from VRO (free Cboe CSV since 2008).
-- data: VIX, VIX3M daily OHLC (listed); VRO and VVIX daily history (free Cboe CSVs, not in the current list); VIX futures settlement history (free CFE files, not wired); VIX option chain captures from 2026-10-14. · min n: 60
-- pass: Mean > 0 with 95% CI excluding 0.
-- controls: Backwardation subsample; non-settlement Wednesdays for the SOQ-deviation check; exclude 2008, 2018-02, 2020-03 as robustness.
-- blocked on: VIX futures settlement history (free CFE files, not wired) plus either VIX chain capture (~12+ monthly settlements) or a VVIX-based model price; VRO history (free) enables the preliminary SOQ test.
-- note: from the options-library library: VIX settlement (Wednesday SOQ) trades; harness suggestion: VIX settlement calendar generator + VIX/VIX3M OHLC event harness; add VIX futures history fetch (Cboe CFE CSVs) for the futures-based version. | verifier: corrected claim/trial
-
-### T-222 · crypto-catalyst-strangle
-
-**Claim.** For hard-dated BTC/ETH catalysts, a 25-delta strangle in the first expiry after the date, bought 21 days before and sold 1 day before, has a positive mean return on debit net of fees.
-
-- kind: options-strategy · origin: options-library:event-driven, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false, https://docs.deribit.com/api-reference/market-data/public-get_volatility_index_data
-- statistic: Mean return on debit; mean change in event-expiry IV minus change in DVOL over the window; exact sign test given small n.
-- null: Mean return <= 0.
-- procedure: Capture event-expiry mark IV and DVOL daily from the Deribit public book (from today); for each catalyst compute window statistics; cross-check with Polymarket odds for the event.
-- data: Deribit book captures (mark IV by expiry), DVOL, catalyst calendar, Polymarket event odds. · min n: 20
-- pass: Sign test p < 0.05 and mean > 0 with 95% CI excluding 0 once n >= 20.
-- controls: Non-catalyst 21-day windows; DVOL-only control; ETF-type vs protocol-type split.
-- blocked on: Deribit expiry-level IV capture across >= 20 hard-dated catalysts (years at current frequency; partial evidence after 3-5).
-- note: from the options-library library: Crypto scheduled-catalyst strangle (ETF decisions, halving, protocol upgrades); harness suggestion: Catalyst calendar table joined to Deribit expiry-level IV captures and Polymarket odds; report IV ramp per event. | verifier: corrected claim/trial
-
 ### T-225 · binary-catalyst-pdufa-strangle
 
 **Claim.** For FDA PDUFA dates on small-cap biotechs, a 25%/45%-OTM asymmetric strangle bought 5 trading days before the date and sold at the first open after a decision (or at the date +1 close if delayed) has a positive mean return on debit, delays included.
@@ -5813,20 +6121,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: chain capture of >= 50 large caps (add to CHAIN_SYMBOLS; 3 names give only ~12 events a year), ~4 quarterly seasons to reach 200 events, plus an earnings-calendar feed.
 - note: from the options-library library: Event vol: implied move vs realised move (earnings / macro straddles); harness suggestion: harness_implied_move exists; add an event-date join and the realised/implied ratio statistic. | verifier: corrected claim/trial
 
-### T-250 · sector_correlation_trade
-
-**Claim.** Implied cross-sector correlation computed from SPY and the nine original SPDR sector ETFs' 30-day ATM IVs exceeds the subsequently realised 21-day correlation of the same ETFs (same formula on realised vols, SPY sector weights) by more than 0.05 on average.
-
-- kind: options-strategy · origin: options-library:volatility-surface-relative-value, https://en.wikipedia.org/wiki/Dispersion_trading, https://www.cboe.com/tradable_products/vix/vix_historical_data/
-- statistic: Mean of rho_implied(t) - rho_realised(t..t+21).
-- null: Mean <= 0.05.
-- procedure: Daily chain captures of SPY and the 9 sectors give implied correlation per day; realised correlation from the archived sector closes; non-overlapping 21d cycles; studentized block bootstrap; walk-forward after 2 years.
-- data: Daily CBOE chain capture of SPY plus XLB/XLE/XLF/XLI/XLK/XLP/XLU/XLV/XLY (sector chains are NOT yet in CHAIN_SYMBOLS); sector closes are archived (XLRE and XLC are missing and have short histories). · min n: 36
-- pass: Lower 95% bound of the mean > 0.05 over at least 36 cycles; positive in > 65% of non-crisis months (reported).
-- controls: COR1M as an external implied-correlation check; VIX-tercile stratification; crisis months (VIX > 30) reported separately.
-- blocked on: daily chain capture of the 9 sector ETFs (add to CHAIN_SYMBOLS): ~60 days for a first read, ~36 monthly cycles (~3 years) for the test. The realised side can be computed now from the archived sector closes.
-- note: from the options-library library: Correlation trade via index vs sector/sub-basket straddles (QQQ vs XLK, SPY vs sector ETFs); harness suggestion: Same harness_dispersion as the index-vs-components entry with the sector list; implied correlation from surface_summary ATM IVs. | verifier: corrected claim/trial
-
 ### T-251 · skew_term_structure
 
 **Claim.** Conditional on SPY's 30-day 25-delta put-minus-call IV skew exceeding its 90-day skew at entry, the delta-hedged short-near/long-far skew position held for 21 trading days has a positive mean P&L.
@@ -5868,20 +6162,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Mid vs touch prices; exclude expiries < 1 day
 - blocked on: daily synchronous Deribit book + futures capture, 60 days
 - note: from the options-library library: Conversion / reversal basis arbitrage on Deribit inverse options; harness suggestion: Extend deribit_book to include futures mark; parity scan job | verifier: corrected claim/trial
-
-### T-260 · deribit-box-spread
-
-**Claim.** The BTC option-implied USD rate from boxes bracketing ATM on 30-90 DTE expiries exceeds the 3-month T-bill by more than 200 bp annualised on at least 70% of capture days.
-
-- kind: options-strategy · origin: options-library:crypto-metals-options, https://www.deribit.com/api/v2/public/get_book_summary_by_instrument?instrument_name=BTC-30OCT26-70000-C
-- statistic: Fraction of capture days with r_implied - DGS3MO > 2% (annualised, mid prices)
-- null: Fraction <= 70%
-- procedure: From daily synchronous book captures, price the box at mid for strikes bracketing ATM; solve for r; compare to FRED; repeat at bid/ask
-- data: Deribit book captures from 2026-10-14; FRED DGS3MO · min n: 60
-- pass: Fraction > 70% at mid (also report the median spread and bid/ask results)
-- controls: Futures-basis implied rate on the same days (also back-testable from futures trade history)
-- blocked on: daily synchronous Deribit book capture, 60 days (futures-basis proxy testable now)
-- note: from the options-library library: Deribit box spread (synthetic coin lending / implied rate); harness suggestion: Parity/box scanner over stored book snapshots; FRED via fred_series | verifier: corrected claim/trial
 
 ### T-265 · btc-cross-venue-vol
 
@@ -6485,20 +6765,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: daily/Thursday Deribit book capture with OI, ~26 weekly expiries (~6 months)
 - note: from the options-library library: Deribit expiry pin / max-pain iron butterfly; harness suggestion: Add OI to deribit_book captures; max-pain calculator; pin harness | added by the verifier pass
 
-### T-518 · crude-oil-opec-eia-event-straddle
-
-**Claim.** On OPEC+ ministerial meeting days since 2009-09, a 1-day ATM USO straddle model-priced with OVX-as-IV (sigma = OVX at the T-1 close, T = 1/252) and bought at the T-1 close has a higher mean P&L than on non-event days.
-
-- kind: options-strategy · origin: options-library:event-driven, https://www.cboe.com/us/indices/dashboard/ovx/, https://www.optionseducation.org/strategies/all-strategies/long-straddle
-- statistic: Difference in mean MODEL-PRICED long-straddle P&L (event minus non-event), bootstrap CI.
-- null: Event-day mean P&L <= non-event mean P&L.
-- procedure: OVX CSV (free, since 2009-09) and USO closes (free, not wired); OPEC+ meeting dates hardcoded from OPEC press releases; EIA Wednesdays as a second event set.
-- data: Cboe OVX history, USO daily closes, OPEC+ meeting calendar, EIA release calendar. · min n: 40
-- pass: Difference > 0 with 95% CI excluding 0.
-- controls: USO roll-date exclusion; 2020-03/04 exclusion; non-event Wednesdays for EIA.
-- blocked on: USO closes and OVX history fetchers (both free, not in the current data list) and an OPEC+ meeting calendar.
-- note: from the options-library library: Crude-oil scheduled-event straddle (OPEC+ meetings / EIA inventory); harness suggestion: Add (USO, OVX) to the (underlying, vol index) event harness. | added by the verifier pass
-
 ### T-519 · earnings-covered-call-overwrite
 
 **Claim.** For US large-cap holders, selling a 1x-implied-move call in the first post-earnings expiry at the T-1 close and covering at the T+1 open raises the mean T-1-to-T+1-open return of the stock position, net of half-spreads.
@@ -6639,34 +6905,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: daily chain capture: 250 entry days including a stress episode
 - note: from the options-library library: Delta-Hedged Risk Reversal (skew trade); harness suggestion: Harness 'rr_skew_premium' combining the delta selector with the 'gamma_scalp_vrp' hedging loop. | added by the verifier pass
 
-### T-538 · dispersion-trade
-
-**Claim.** Over 2006-2026, 1-month implied correlation (COR1M) exceeds the subsequently realised average pairwise correlation of the index constituents on average, so a vega-neutral short-index/long-constituent straddle book has positive mean P&L.
-
-- kind: options-strategy · origin: options-library:volatility, https://en.wikipedia.org/wiki/Dispersion_trading, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_Implied_Correlation_Indices_Methodology.pdf
-- statistic: mean of (COR1M_t - realised average correlation over t+1..t+21) with studentized block-bootstrap CI; realised correlation from constituent daily returns via sigma_idx^2 = sum w_i^2 s_i^2 + sum_{i!=j} w_i w_j s_i s_j rho
-- null: mean = 0
-- procedure: Monthly non-overlapping; COR1M from the archive; realised correlation from constituent or sector-ETF closes
-- data: cboe-COR1M-history (archive, 2006 on), daily closes of the top-50 constituents or the 11 sector SPDRs (NOT yet captured) · min n: 240
-- pass: lower CI > 0
-- controls: Sector ETFs give an upward-biased realised correlation (diversified within sector), which is conservative; COR1M uses the top-50 constituents.
-- blocked on: constituent or sector-ETF daily closes are not in the free data set yet (the daily-history fetcher already handles ETFs, so adding XLK..XLU bundles unblocks the proxy); a market-priced test also needs single-stock chain captures
-- note: from the options-library library: Dispersion Trade (short index vol, long constituent vol); harness suggestion: Harness 'implied_vs_realised_correlation' in mandel/experiments/volatility.py with bundles ['cboe-COR1M-history','daily-history-XL*']. | added by the verifier pass
-
-### T-539 · ladder
-
-**Claim.** A 45-DTE SPY long put ladder (long 40-delta put, short 25-delta and 15-delta puts), entered at mid on captured chains and held to expiry, has positive mean P&L per unit naked-leg margin.
-
-- kind: options-strategy · origin: options-library:volatility, https://en.wikipedia.org/wiki/Ladder_(option_combination)
-- statistic: mean P&L/margin with studentized block-bootstrap CI
-- null: mean P&L = 0
-- procedure: Delta-selected strikes; mid and bid/ask; settle at expiry
-- data: options-chain-SPY-<date>, daily-history-SPY · min n: 250
-- pass: lower CI > 0 at bid/ask with a stress month in the sample
-- controls: Rule fixed; verdict capped at inconclusive without a stress episode.
-- blocked on: daily chain capture: 250 entry days including a stress episode
-- note: from the options-library library: Ladder / Christmas Tree (long or short, call or put); harness suggestion: Harness 'ladder_skew' sharing the delta selector with 'front_ratio_skew'. | added by the verifier pass
-
 ### T-541 · vix-call-spread
 
 **Claim.** 30-60 DTE VIX 25-delta/10-delta call spreads bought at captured mids and held to settlement have negative mean P&L per unit debit.
@@ -6709,7 +6947,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: 30 forward event days after 2026-10-15 (0 of 30 on 2026-10-15; about 20 a year)
 - note: pre-registered forward test of an in-sample observation; the in-sample result is evidence for registering it, not for supporting it
 
-## Parked (8)
+## Parked (12)
 
 ### T-03 · edge-sign-consistent-across-scales
 
@@ -6826,3 +7064,72 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: fear_greed_contrarian
 - result X-1ad5ebb0: not_supported — 7d BTC-USD log return after fear<=25: +0.0001 vs all (block-shift p=0.518, halves +0.0070/-0.0086); after greed>=75: +0.0229 (p=0.957)
 - parked (was not_supported): not useful this iteration: no contrarian effect of extreme crypto fear or greed on 7-day BTC returns over 3166 aligned days (block-shift p 0.52 and 0.96; the two halves disagree in sign). Unpark only for a pre-registered variant (e.g. 30-day horizon or index changes).
+
+### T-324 · etf-nav-premium-reversion
+
+**Claim.** For SPY/IVV from 2010-01 to 2026-09, the twin rule (enter at |z| > 2 of the 60-day log price-ratio z-score, exit at z = 0 or 5 days) earns a positive mean net return per trade after 2 bps per leg per trade (8 bps per round trip of both legs).
+
+- kind: underlying-strategy · origin: underlying-library:mean-reversion-statarb, https://doi.org/10.3905/jod.2006.635418, https://doi.org/10.2139/ssrn.1572907
+- statistic: mean net return per trade with bootstrap interval; AR(1) half-life of x_t and share of signals whose excursion exceeds costs as diagnostics
+- null: zero mean net return per trade
+- procedure: Compute x_t from Yahoo adjusted closes (total-return basis neutralizes SPY's quarterly UIT dividend timing). Simulate the rule with trailing statistics only. Bootstrap over trades, clustered by month. Repeat on the other twins and report as variants in DSR.
+- data: Yahoo daily adjusted closes: SPY (1993), IVV (2000), VOO (2010), QQQM (2020-10), GLD (2004), IAU (2005), IBIT/FBTC (2024-01) · min n: 1000
+- pass: 95% lower bound of mean net return per trade > 0 AND DSR > 0.95 across the 5 twin variants; otherwise park as 'reversion real but below retail cost'
+- controls: Look-ahead: trailing windows; execute at the next close after the signal. Dividends: total-return series, because SPY (UIT) holds dividends in cash and pays quarterly with a lag, creating a slow drift absorbed by the trailing mean. Closing-auction prints for both legs. Costs: 2 bps per leg per trade. Survivorship: none (all twins listed). Multiple testing: 5 twins. Regime: March 2020 reported separately.
+- harness: ohlc_spy_ivv_twin
+- result X-baa72a98: inconclusive — SPY/IVV 2010-01-04..2026-09-30 (4211 days): 175 trades at |z|>2, mean gross +0.17 bps, net -7.83 bps after 8 bps RT (month-clustered 95% CI -9.14..-6.58); DSR 0.000 across 5 twins (variance of trial Sharpes zero-skill floor: VOO, IAU, QQQM, FBTC not archived); AR(1) phi 0.940, half-life 11.3 days; 27% of signals with excursion > cost; March 2020 2 trades; min_n counted in trades (the statistic is per trade): 175 trades, the window allows about 2105 at most; on the trades available the CI lies entirely below 0 and these criteria would fail: 95% lower bound of mean net return per trade > 0; DSR > 0.95 across 5 twin variants — data cannot support the claim: 175 trades, below the trial's min_n 1000
+- result X-49cd0e78: not_supported — SPY/IVV 2010-01-04..2026-09-30 (4211 days): 175 trades at |z|>2, mean gross +0.17 bps, net -7.83 bps after 8 bps RT (month-clustered 95% CI -9.14..-6.58); DSR 0.000 across 5 twins (variance of trial Sharpes zero-skill floor: VOO, IAU, QQQM, FBTC not archived); AR(1) phi 0.940, half-life 11.3 days; 27% of signals with excursion > cost; March 2020 2 trades; min_n counted in trades (the statistic is per trade): 175 trades, the window allows about 2105 at most; on the trades available the CI lies entirely below 0 and these criteria would fail: 95% lower bound of mean net return per trade > 0; DSR > 0.95 across 5 twin variants — house rule 5: only 175 trades, below the trial's min_n 1000, so the verdict cannot be supported and a failing criterion counts only when it fails decisively, its 95% interval wholly on the wrong side of the claimed bound: not_supported, failed: 95% lower bound of mean net return per trade > 0 (fails decisively below min_n: upper end of the month-clustered 95% CI -6.58 bps <= +0.00 bps); DSR > 0.95 across 5 twin variants (fails decisively below min_n: PSR against a zero Sharpe 0.000 <= 0.05) (not implemented: n >= trial min_n (175 of 1000 trades)) [criteria at face value: not_supported, failed: 95% lower bound of mean net return per trade > 0; DSR > 0.95 across 5 twin variants]
+- parked (was not_supported): reversion real but below retail cost (the trial's own park rule): SPY/IVV ratio AR(1) half-life 11.3 days, but mean gross +0.17 bp per trade against 8 bp round trip; net -7.83 bp (CI -9.14..-6.58), 175 trades 2010-2026
+- note: from the underlying-library library: ETF premium/discount to NAV reversion (and identical-exposure twins); harness suggestion: twin_spread_halflife: ratio AR(1), excursion-vs-cost counter, rule simulator; later nav_premium_reversion when NAV lands | verifier: corrected claim/trial
+
+### T-389 · contrarian-factor-timing
+
+**Claim.** Tilting a static equal-risk FF5+UMD portfolio by 60-month factor-return reversal z-scores raises its Sharpe ratio over 1968-2026.
+
+- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.aqr.com/Insights/Research/Journal-Article/Contrarian-Factor-Timing-is-Deceptively-Difficult (fetched), https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html (fetched)
+- statistic: Sharpe difference (timed minus static), monthly, studentized block-bootstrap CI (block 12).
+- null: Sharpe difference <= 0.
+- procedure: Pre-registered windows {36, 60} and sets {all, ex-HML}, plus the value-spread variant: 5 trials. Expanding-window z-scores only; one-quarter embargo between signal and rebalance; deflated Sharpe over 5 trials.
+- data: Ken French monthly FF5 + UMD; 6_Portfolios_2x3 BE/ME section (verified 200). · min n: 600
+- pass: Lower 95% bound > 0 AND DSR > 0.95 over 5 trials; otherwise parked with reason 'contrarian factor timing adds nothing beyond static exposure' (the expected outcome).
+- controls: Look-ahead: expanding windows; BE/ME uses fiscal-year t-1 book known by June t. Survivorship: none. Costs: quarterly tilts at 5 bp. Multiple testing: 5 trials. Regime: 2018-2020 value drawdown is the key stress.
+- harness: fact_contrarian_timing
+- result X-fb91d2c6: not_supported — Mkt-RF/SMB/HML/RMW/CMA/UMD 1968-01..2026-08 (n=704 months): 60-month z tilt Sharpe 1.07 vs static 1.11, difference -0.03 (95% studentized CI -0.12 to +0.04); DSR 0.056 over 5 trials not decided: value-spread trial not computable (6_Portfolios_2x3 BE/ME not archived), so only 4 of the 5 trial Sharpes are in the variance (reported only); annualised Sharpe of each timed-minus-static series z60_all -0.13, z60_exHML -0.13, z36_all -0.05, z36_exHML +0.02 — failed: lower 95% bound of the Sharpe difference > 0 (not implemented: DSR > 0.95 over 5 trials (value-spread trial not computable))
+- result X-085a4b7a: not_supported — Mkt-RF/SMB/HML/RMW/CMA/UMD 1968-01..2026-08 (n=704 months; quarterly rebalance pooled over its 3 phases, one third of capital each, house rule 10): 60-month z tilt Sharpe 1.08 vs static 1.11, pooled difference -0.03 (95% studentized block-12 CI -0.11 to +0.04); per phase difference -0.03 to -0.03, lower bounds -0.12 to -0.11, 0 of 3 phases pass the lower bound (Jan/Apr/Jul/Oct -0.03 [-0.12, +0.04]; Feb/May/Aug/Nov -0.03 [-0.11, +0.04]; Mar/Jun/Sep/Dec -0.03 [-0.11, +0.04]); pooled DSR 0.102 over 5 trials (per phase 0.056 to 0.153) not decided: value-spread trial not computable (6_Portfolios_2x3 BE/ME not archived), so only 4 of the 5 trial Sharpes are in the variance (reported only); annualised Sharpe of each pooled timed-minus-static series z60_all -0.11, z60_exHML -0.11, z36_all -0.07, z36_exHML -0.01 — failed: lower 95% bound of the Sharpe difference > 0 (not implemented: DSR > 0.95 over 5 trials (value-spread trial not computable))
+- parked (was not_supported): contrarian factor timing adds nothing beyond static exposure (the trial's own park rule, the expected outcome): 60-month z tilt minus static Sharpe -0.03 (CI -0.11..+0.04) pooled over the 3 quarterly phases, 704 months 1968-2026
+- note: from the underlying-library library: Contrarian factor timing (value-spread / long-term factor reversal); harness suggestion: Small addition to the factor-momentum harness: z-score tilt vs static baseline, same bootstrap. | verifier: corrected claim/trial
+
+### T-445 · accruals-anomaly
+
+**Claim.** The low-minus-high accruals quintile spread (Ken French, value-weighted) has a positive mean monthly return over 1996-07 to 2026-09 (after Sloan's publication).
+
+- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://ideas.repec.org/a/inm/ormnsc/v57y2011i5p797-816.html (fetched), https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Portfolios_Formed_on_AC_CSV.zip (200)
+- statistic: Mean monthly spread with block-bootstrap CI (block 12); FF5 alpha.
+- null: Mean spread <= 0.
+- procedure: Download Portfolios_Formed_on_AC (verified 200); compute spread; split 1963-1996 vs 1996-2026; no parameters.
+- data: Ken French accruals portfolios and FF5. · min n: 300
+- pass: Lower 95% bound > 0 over >= 300 post-publication months AND FF5 alpha t >= 2; otherwise parked as 'arbitraged away'.
+- controls: Look-ahead: June formation with lagged accounting data. Survivorship: none (CRSP/Compustat with delistings). Costs: annual rebalance ~5-10 bp per side, not in paper returns. Multiple testing: 4 variants. Regime: 2000-2002 and 2008.
+- harness: fact_accruals
+- result X-3a88110f: not_supported — Accruals Lo20-Hi20 1996-07..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=362 months): mean +0.17%/month, 95% studentized block-12 CI -0.10 to +0.42; FF5 alpha +0.17%/month (NW t +1.21, needs >= 2); before 1996-07 mean +0.38%/month — failed: lower 95% bound of the mean monthly spread > 0; FF5 alpha NW t >= 2
+- result X-64054c65: not_supported — Accruals Lo20-Hi20 1996-07..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=362 months): mean +0.17%/month, 95% studentized block-12 CI -0.10 to +0.42; FF5 alpha +0.17%/month (NW t +1.21, needs >= 2); before 1996-07 mean +0.38%/month — failed: lower 95% bound of the mean monthly spread > 0; FF5 alpha NW t >= 2
+- parked (was not_supported): arbitraged away (the trial's own park rule): post-publication accruals Lo20-Hi20 +0.17%/month (CI -0.10..+0.42), FF5 alpha t 1.21, 362 months 1996-07..2026-08, against +0.38%/month before 1996-07
+- note: from the underlying-library library: Accruals anomaly (Sloan) post-publication; harness suggestion: data/kenfrench.py sort-portfolio loader; one spread_test() for all characteristic-sorted Ken French files (AC, NI, OP, INV, VAR). | added by the verifier pass
+
+### T-469 · crypto-short-term-reversal
+
+**Claim.** For Coinbase BTC-USD from 2015-08 to 2026-09, the mean next-day return after a daily return below the trailing-250-day 10th percentile exceeds the unconditional mean next-day return by more than 0.6% (one retail maker round trip).
+
+- kind: underlying-strategy · origin: underlying-library:mean-reversion-statarb, https://doi.org/10.1016/j.irfa.2021.101908, https://wp.ffu.vse.cz/artkey/wps-202301-0003_impact-of-size-and-volume-on-cryptocurrency-momentum-and-reversal.php
+- statistic: conditional minus unconditional mean next-day return; net Sharpe of the long-only rule as secondary
+- null: no conditional difference (signal series circularly block-shifted against returns, as in T-61, plus stationary block bootstrap, block 10 days)
+- procedure: Use trailing 250-day thresholds only (walk-forward by construction). Run 2,000 block-shift and bootstrap resamples. Use DSR across all variants run, counting T-62/T-58 BTC daily trials in n_trials. Split 2015-2020 and 2021-2026. Repeat on Yahoo BTC-USD (2014-09) as a data-source check.
+- data: Coinbase BTC-USD daily candles since 2015-07 and ETH-USD since 2016-05 (public, verified); Yahoo BTC-USD (2014-09) and ETH-USD (2017-11) · min n: 250
+- pass: bootstrap 95% lower bound of (conditional - unconditional) > 0.6% AND both halves > 0.6% AND DSR > 0.95; otherwise park as 'no tradable daily reversal in BTC'
+- controls: Look-ahead: thresholds use t-250..t-1. Executing at the same 00:00 UTC print that defines r_t is optimistic, so entry at the 01:00 UTC hourly candle is also reported. Costs: 0.6% maker round trip (1.2% taker sensitivity). Survivorship: none for BTC/ETH; the cross-section is blocked rather than run on survivors. Multiple testing: DSR across variants plus prior Mandel BTC daily trials. Regime: halves, with the 2017 and 2021 bubbles flagged.
+- harness: btc_reversal_v2
+- result X-9d32ac28: not_supported — 422 signals: next-day excess +11.3 bps (95% CI -23.6 to +47.1; needs > 60), halves +13.9/+8.7 — failed: lower bound > 0.6%; both halves > 0.6% (not implemented: DSR > 0.95)
+- result X-baf34d0a: not_supported — 422 signals: next-day excess +11.3 bps (95% CI -23.6 to +47.2; needs > 60), halves +13.9/+8.7 — failed: lower bound > 0.6%; both halves > 0.6% (not implemented: DSR > 0.95)
+- result X-7a3d6092: not_supported — 422 signals: next-day excess +11.3 bps (95% CI -23.6 to +47.2; needs > 60), halves +13.9/+8.7 — failed: lower bound > 0.6%; both halves > 0.6% (not implemented: DSR > 0.95)
+- parked (was not_supported): no tradable daily reversal in BTC (the trial's own park rule): conditional minus unconditional next-day excess +11.3 bp (CI -23.6..+47.2) against the 60 bp bar, 422 signals
+- note: from the underlying-library library: Crypto short-term reversal (time-series BTC/ETH; cross-section of coins); harness suggestion: ts_reversal_quantile: conditional-next-return test with trailing quantile thresholds and block-shift null (generalizes underlying.ratio_reversion's null), reusable for SPY/QQQ/GLD | verifier-corrected restatement of T-320, whose verdict tested the earlier wording and stands

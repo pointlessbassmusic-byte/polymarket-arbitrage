@@ -31,7 +31,8 @@
    "blocked_on": "",
    "results": [
     "X-2a13dc3b",
-    "X-d516666f"
+    "X-d516666f",
+    "X-cf9d5ba7"
    ],
    "notes": ""
   },
@@ -61,7 +62,8 @@
    "blocked_on": "",
    "results": [
     "X-59df1d8a",
-    "X-ad24c88b"
+    "X-ad24c88b",
+    "X-665c4ab0"
    ],
    "notes": "sub-claim read from the market_calibration calibration table; automated as harness longshot_bias (7d, <0.10, bootstrap interval). Reading 2026-10-14: the <0.10 bucket (mean price 0.008-0.014) resolves YES at 0.010 (1d), 0.007 (3d), 0.028 (7d), 0.020 (30d), 0.019 (90d): at 7d+ slightly MORE often than priced, the reverse of the classic longshot bias, on 5-8 YES events per horizon. A lead, not a finding."
   },
@@ -123,7 +125,8 @@
    "results": [
     "X-8ca82b68",
     "X-71e7a200",
-    "X-12f8332a"
+    "X-12f8332a",
+    "X-515a635d"
    ],
    "notes": "one snapshot so far; the claim needs repeated snapshots (half-life) before parking"
   },
@@ -179,7 +182,8 @@
    "blocked_on": "",
    "results": [
     "X-2fb589be",
-    "X-85bebeee"
+    "X-85bebeee",
+    "X-13833502"
    ],
    "notes": ""
   },
@@ -210,7 +214,8 @@
    "blocked_on": "",
    "results": [
     "X-485f95d2",
-    "X-2d6b0510"
+    "X-2d6b0510",
+    "X-f1af37b6"
    ],
    "notes": "a bounded price is mean-reverting by construction near the edges; the verdict says structure exists, not that it is tradable"
   },
@@ -301,7 +306,8 @@
    "blocked_on": "",
    "results": [
     "X-cd5674d2",
-    "X-82a019fd"
+    "X-82a019fd",
+    "X-e48361c0"
    ],
    "notes": ""
   },
@@ -330,7 +336,8 @@
    "blocked_on": "",
    "results": [
     "X-aa7f417a",
-    "X-664c674d"
+    "X-664c674d",
+    "X-129843a3"
    ],
    "notes": ""
   },
@@ -385,7 +392,8 @@
    "blocked_on": "",
    "results": [
     "X-b7b7c690",
-    "X-0e02429c"
+    "X-0e02429c",
+    "X-29198603"
    ],
    "notes": "automated as harness horizon_monotone (1-point tolerance). Reading 2026-10-14: skill 0.70 (90d), 0.72 (30d), 0.78 (7d), 0.86 (3d), 0.86 (1d): monotone as claimed; the 1d/3d tie is within noise."
   },
@@ -540,7 +548,8 @@
    "blocked_on": "",
    "results": [
     "X-95aa94c7",
-    "X-983681da"
+    "X-983681da",
+    "X-5cf19b6b"
    ],
    "notes": "harness point_in_time_check runs the Fear & Greed test naive (lag 0) and honest (lag 1) and asks whether the verdict or sign changes; one harness only so far"
   },
@@ -922,7 +931,8 @@
    "blocked_on": "",
    "results": [
     "X-cd5674d2",
-    "X-3ba2e1c3"
+    "X-3ba2e1c3",
+    "X-119ef908"
    ],
    "notes": "the dsr_pbo verdict (overfit) is the same statement from the other side"
   },
@@ -979,7 +989,8 @@
    "results": [
     "X-95f1d3d2",
     "X-cd4319f5",
-    "X-a01508eb"
+    "X-a01508eb",
+    "X-a5ab6bc8"
    ],
    "notes": "runs daily; inconclusive until 30 capture days"
   },
@@ -1235,7 +1246,8 @@
    "blocked_on": "",
    "results": [
     "X-c3f695ac",
-    "X-aa8c7df3"
+    "X-aa8c7df3",
+    "X-08a0d9ca"
    ],
    "notes": ""
   },
@@ -1265,7 +1277,8 @@
    "blocked_on": "",
    "results": [
     "X-c41a0dfb",
-    "X-7972f2f2"
+    "X-7972f2f2",
+    "X-4bd10592"
    ],
    "notes": ""
   },
@@ -1295,7 +1308,8 @@
    "blocked_on": "",
    "results": [
     "X-eb9af641",
-    "X-b2950263"
+    "X-b2950263",
+    "X-8afc2b22"
    ],
    "notes": ""
   },
@@ -1325,7 +1339,8 @@
    "blocked_on": "",
    "results": [
     "X-a052edc2",
-    "X-710ccee8"
+    "X-710ccee8",
+    "X-90274944"
    ],
    "notes": ""
   },
@@ -1355,7 +1370,8 @@
    "blocked_on": "",
    "results": [
     "X-4b59c8db",
-    "X-3a9fe359"
+    "X-3a9fe359",
+    "X-7398722d"
    ],
    "notes": "literature finds SKEW a weak predictor; this is the test, not the belief"
   },
@@ -1385,7 +1401,8 @@
    "blocked_on": "",
    "results": [
     "X-47917835",
-    "X-c287ea93"
+    "X-c287ea93",
+    "X-1e2b6853"
    ],
    "notes": ""
   },
@@ -1416,7 +1433,8 @@
    "results": [
     "X-c3d19508",
     "X-2f57d496",
-    "X-de4b55fd"
+    "X-de4b55fd",
+    "X-482068a0"
    ],
    "notes": "Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days)."
   },
@@ -1447,7 +1465,8 @@
    "results": [
     "X-babe2142",
     "X-0b25a5ae",
-    "X-d5823f74"
+    "X-d5823f74",
+    "X-af9fc59f"
    ],
    "notes": "Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days)."
   },
@@ -1478,7 +1497,8 @@
    "results": [
     "X-70018c19",
     "X-24cba6b2",
-    "X-b0a5f811"
+    "X-b0a5f811",
+    "X-ad19895d"
    ],
    "notes": "Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days)."
   },
@@ -1509,7 +1529,8 @@
    "results": [
     "X-13ef8afe",
     "X-c9662a62",
-    "X-1acb0719"
+    "X-1acb0719",
+    "X-5fa1ce02"
    ],
    "notes": "Harness returns inconclusive by design while model-priced: against the live SPY chain on 2026-10-14 (30 DTE) a flat VIX overstated the 30-delta call premium by 79%, the ATM call by 23%, the ATM put by 17% and the 30-delta put by 8% (VIX 15.27 vs SPY ATM IV 12.3). The statistic is reported at VIX and at IV x0.81 as a sensitivity. Becomes a verdict when the daily surface capture gives a history of the ATM-IV/VIX ratio and of the 30-delta premia (blocked_on: ~250 capture days)."
   },
@@ -1539,7 +1560,8 @@
    "blocked_on": "",
    "results": [
     "X-1974bcf3",
-    "X-094704b4"
+    "X-094704b4",
+    "X-381b3b37"
    ],
    "notes": ""
   },
@@ -1569,7 +1591,8 @@
    "blocked_on": "",
    "results": [
     "X-bc27e9fd",
-    "X-3c158b05"
+    "X-3c158b05",
+    "X-371f3448"
    ],
    "notes": ""
   },
@@ -1599,7 +1622,8 @@
    "blocked_on": "",
    "results": [
     "X-cd38bf54",
-    "X-da0d36f5"
+    "X-da0d36f5",
+    "X-41550db4"
    ],
    "notes": ""
   },
@@ -1628,7 +1652,8 @@
    "blocked_on": "",
    "results": [
     "X-3983c31f",
-    "X-4e86823c"
+    "X-4e86823c",
+    "X-aed6c899"
    ],
    "notes": ""
   },
@@ -1657,7 +1682,8 @@
    "blocked_on": "",
    "results": [
     "X-45ddf2f7",
-    "X-c5c063b9"
+    "X-c5c063b9",
+    "X-8de11ddf"
    ],
    "notes": ""
   },
@@ -1687,7 +1713,8 @@
    "blocked_on": "",
    "results": [
     "X-888bbcd8",
-    "X-2a418ad7"
+    "X-2a418ad7",
+    "X-62ccd582"
    ],
    "notes": ""
   },
@@ -1717,7 +1744,8 @@
    "blocked_on": "",
    "results": [
     "X-b147605f",
-    "X-1593db1c"
+    "X-1593db1c",
+    "X-2a2420a3"
    ],
    "notes": ""
   },
@@ -1747,7 +1775,8 @@
    "blocked_on": "",
    "results": [
     "X-3f3a7dbe",
-    "X-8aa0cd5f"
+    "X-8aa0cd5f",
+    "X-37b377c0"
    ],
    "notes": ""
   },
@@ -1778,7 +1807,8 @@
    "results": [
     "X-fe2505e4",
     "X-c288209a",
-    "X-0a8698e7"
+    "X-0a8698e7",
+    "X-f66810c9"
    ],
    "notes": "the market-priced replacement for the model-priced short-straddle overlay (T-57)"
   },
@@ -1808,7 +1838,8 @@
    "blocked_on": "",
    "results": [
     "X-80732af2",
-    "X-ea153b37"
+    "X-ea153b37",
+    "X-3cffc77d"
    ],
    "notes": ""
   },
@@ -1839,7 +1870,8 @@
    "blocked_on": "",
    "results": [
     "X-ac351508",
-    "X-53693711"
+    "X-53693711",
+    "X-251ff505"
    ],
    "notes": "from the options-library library: Long Straddle; harness suggestion: new module mandel/experiments/options.py with bs_price/bs_greeks and straddle_vrp(spy, vix, tbill); register harness 'straddle_vrp' in HARNESSES in mandel/experiments/run.py with bundles ['spy-daily-closes','cboe-vix-daily','fred-tbill-3m']; verdict via block_bootstrap_pvalue from mandel/validation/backtest_eval.py | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -1866,9 +1898,11 @@
     "b6_var_short_straddle_tercile"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5be89eeb"
+   ],
    "notes": "from the options-library library: Short Straddle; harness suggestion: harness 'short_straddle_vrp' sharing options.py pricing; conditioning rule set declared up front and passed to deflated_sharpe_ratio(n_trials=len(rules)) | verifier: corrected claim/trial"
   },
   {
@@ -1894,13 +1928,14 @@
     "structure_t_102"
    ],
    "testable_now": true,
-   "status": "not_supported",
+   "status": "inconclusive",
    "blocked_on": "",
    "results": [
     "X-56e4027b",
-    "X-e2acd1d2"
+    "X-e2acd1d2",
+    "X-0c1fb82f"
    ],
-   "notes": "from the options-library library: Long Strangle; harness suggestion: harness 'strangle_vrp' in options.py; parameter width in {3,5,8}% declared up front and fed to deflated_sharpe_ratio(n_trials=3) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
+   "notes": "from the options-library library: Long Strangle; harness suggestion: harness 'strangle_vrp' in options.py; parameter width in {3,5,8}% declared up front and fed to deflated_sharpe_ratio(n_trials=3) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows | 2026-10-15 re-run: now inconclusive (was not_supported): pooled over all 21 starts the smile-scaled mean is -45.7% (CI -59.8 to -13.9), passing, but the trial's SKEW-scaled sensitivity is not implemented, which caps the verdict (rule 2)."
   },
   {
    "id": "T-103",
@@ -1925,9 +1960,11 @@
     "b6b_chain_strangle_vs_straddle"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e3bda8ef"
+   ],
    "notes": "from the options-library library: Short Strangle; harness suggestion: harness 'short_strangle_vs_straddle' using compare_strategies from mandel/validation/backtest_eval.py on per-trade P&L series | verifier: corrected claim/trial"
   },
   {
@@ -1956,7 +1993,8 @@
    "blocked_on": "",
    "results": [
     "X-6c62e346",
-    "X-ddb49077"
+    "X-ddb49077",
+    "X-a9ed2826"
    ],
    "notes": "from the options-library library: Long Butterfly (call or put); harness suggestion: harness 'butterfly_density' in options.py; same bundles; can reuse a generic multi_leg_payoff(legs, S_T) helper | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -1987,7 +2025,8 @@
    "blocked_on": "",
    "results": [
     "X-71227f64",
-    "X-065c7e94"
+    "X-065c7e94",
+    "X-3e86c188"
    ],
    "notes": "from the options-library library: Short Butterfly (call or put); harness suggestion: same 'butterfly_density' harness emits both signs | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2017,7 +2056,8 @@
    "blocked_on": "",
    "results": [
     "X-7a424f37",
-    "X-c1573e0b"
+    "X-c1573e0b",
+    "X-4ea6e979"
    ],
    "notes": "from the options-library library: Iron Butterfly (short, credit); harness suggestion: harness 'iron_fly_vs_straddle' with compare_strategies | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2047,7 +2087,8 @@
    "blocked_on": "",
    "results": [
     "X-ebe24649",
-    "X-a20c1cdc"
+    "X-a20c1cdc",
+    "X-88a5c09c"
    ],
    "notes": "from the options-library library: Reverse Iron Butterfly (long, debit); harness suggestion: same 'iron_fly_vs_straddle' harness, sign flipped, with decile conditioning | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2104,7 +2145,8 @@
    "blocked_on": "",
    "results": [
     "X-a5fdc39b",
-    "X-85f781ce"
+    "X-85f781ce",
+    "X-10f43eb1"
    ],
    "notes": "from the options-library library: Iron Condor (short, credit); harness suggestion: harness 'iron_condor_breach' in options.py; implied breach probability from norm_cdf already in backtest_eval.py | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2134,7 +2176,8 @@
    "blocked_on": "",
    "results": [
     "X-2b560d7e",
-    "X-cf21e5db"
+    "X-cf21e5db",
+    "X-4098b207"
    ],
    "notes": "from the options-library library: Reverse Iron Condor (long, debit); harness suggestion: same 'iron_condor_breach' harness, sign flipped | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2212,10 +2255,12 @@
     "b6_dir_jade_lizard"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Jade Lizard; harness suggestion: harness 'jade_lizard_condition' in options.py reading chain capture; shares strike-by-delta selector with bwb harness | verifier: corrected claim/trial"
+   "results": [
+    "X-f5e50a1d"
+   ],
+   "notes": "from the options-library library: Jade Lizard; harness suggestion: harness 'jade_lizard_condition' in options.py reading chain capture; shares strike-by-delta selector with bwb harness | verifier: corrected claim/trial | 2026-10-15 re-run: MODEL-PRICED at VIX IV; the edge is the short-premium VRP and shrinks with the IV scale (+0.71% at s = 0.81). The trial's control 'recheck on chain mids at 60 days' is pending: 2 chain days are archived."
   },
   {
    "id": "T-114",
@@ -2244,7 +2289,8 @@
    "blocked_on": "",
    "results": [
     "X-84bd401c",
-    "X-0c32d400"
+    "X-0c32d400",
+    "X-870b8064"
    ],
    "notes": "from the options-library library: Big Lizard; harness suggestion: harness 'big_lizard_condition' sharing straddle engine | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2275,7 +2321,8 @@
    "blocked_on": "",
    "results": [
     "X-b486bff8",
-    "X-b9aaaeb9"
+    "X-b9aaaeb9",
+    "X-89b22193"
    ],
    "notes": "from the options-library library: Strip; harness suggestion: include in 'straddle_vrp' harness as a ratio parameter (calls, puts) in {(1,1),(1,2),(2,1)} | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2305,7 +2352,8 @@
    "blocked_on": "",
    "results": [
     "X-61fd43e1",
-    "X-a346d37e"
+    "X-a346d37e",
+    "X-026a0107"
    ],
    "notes": "from the options-library library: Strap; harness suggestion: same ratio parameter in 'straddle_vrp' | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2383,8 +2431,10 @@
     "b6b_dolt_backspread"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "not_supported",
+   "results": [
+    "X-0b00e203"
+   ],
    "notes": "from the options-library library: Call Ratio Backspread; harness suggestion: harness 'backspread_credit_frequency' in options.py | verifier: corrected claim/trial",
    "unblocked_from": "daily chain capture: 250 entry days resolving ~60 days later"
   },
@@ -2436,8 +2486,10 @@
     "b6b_dolt_put_front_ratio"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "not_supported",
+   "results": [
+    "X-cd21ab67"
+   ],
    "notes": "from the options-library library: Front Ratio Spread (short ratio call / put spread); harness suggestion: harness 'front_ratio_skew' sharing the delta selector | verifier: corrected claim/trial",
    "unblocked_from": "daily chain capture: 250 entry days including a stress episode"
   },
@@ -2490,9 +2542,11 @@
     "b6_var_gamma_scalp_long_straddle"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-78f814bf"
+   ],
    "notes": "from the options-library library: Gamma Scalping a Long Straddle (delta-neutral); harness suggestion: harness 'gamma_scalp_vrp' in options.py: functions bs_delta, hedge_path(prices, vix_entry, r, cost_bps) returning per-trade P&L; verdict via block_bootstrap_pvalue and a reported VRP series; a sibling 'dvol_vrp' harness runs the same on BTC with DVOL as IV (bundles deribit-dvol-daily, btc-daily-closes) | verifier: corrected claim/trial"
   },
   {
@@ -2522,7 +2576,8 @@
    "blocked_on": "",
    "results": [
     "X-03436e65",
-    "X-804b88ef"
+    "X-804b88ef",
+    "X-d6c4f63c"
    ],
    "notes": "from the options-library library: Short Vol with Wings (tail-protected short straddle/strangle); harness suggestion: harness 'winged_short_vol' built on compare_strategies with wing-price multiplier sensitivity; later re-run on chain capture when available | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2553,7 +2608,8 @@
    "blocked_on": "",
    "results": [
     "X-1d7ea485",
-    "X-aeb3c086"
+    "X-aeb3c086",
+    "X-e67714f3"
    ],
    "notes": "from the options-library library: Long Call; harness suggestion: vix_priced_option_returns(strategy='long_call', dte=30, strike='ATM') in mandel/experiments/options.py; reuse block_bootstrap_pvalue and deflated_sharpe_ratio | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2584,7 +2640,8 @@
    "blocked_on": "",
    "results": [
     "X-ef87c11c",
-    "X-7e14bd33"
+    "X-7e14bd33",
+    "X-c8a55583"
    ],
    "notes": "from the options-library library: Long Put; harness suggestion: vix_priced_option_returns(strategy='long_put', dte=30) paired with long_call output | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2615,7 +2672,8 @@
    "blocked_on": "",
    "results": [
     "X-7cde2127",
-    "X-1157681c"
+    "X-1157681c",
+    "X-01dbc2cb"
    ],
    "notes": "from the options-library library: Short (Naked) Call; harness suggestion: vix_priced_option_returns(strategy='short_call', dte=30, strike='OTM5') compared to short_put | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2642,9 +2700,11 @@
     "b6b_bw_putwrite_vs_spy"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3d662f03"
+   ],
    "notes": "from the options-library library: Short (Naked / Cash-Secured) Put; harness suggestion: putwrite_vs_spy() reproducing the Cboe PUT methodology with VIX pricing; later swap in captured SPY chain mids | verifier: corrected claim/trial"
   },
   {
@@ -2674,7 +2734,8 @@
    "blocked_on": "",
    "results": [
     "X-856f5dfa",
-    "X-86dc6336"
+    "X-86dc6336",
+    "X-949a4dfe"
    ],
    "notes": "from the options-library library: Bull Call Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bull_call_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2705,7 +2766,8 @@
    "blocked_on": "",
    "results": [
     "X-c50f79b2",
-    "X-87b98a57"
+    "X-87b98a57",
+    "X-3d192b64"
    ],
    "notes": "from the options-library library: Bear Put Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bear_put_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2736,7 +2798,8 @@
    "blocked_on": "",
    "results": [
     "X-072c25c9",
-    "X-2b7c636c"
+    "X-2b7c636c",
+    "X-442a2325"
    ],
    "notes": "from the options-library library: Bull Put Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bull_put_spread', dte=30, strikes=('OTM5','OTM10')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2766,7 +2829,8 @@
    "blocked_on": "",
    "results": [
     "X-591cc927",
-    "X-bdb9f113"
+    "X-bdb9f113",
+    "X-354acc99"
    ],
    "notes": "from the options-library library: Bear Call Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bear_call_spread', dte=30, strikes=('OTM3','OTM6')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2792,9 +2856,11 @@
     "b6_dir_ratio_1x2"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-78d24028"
+   ],
    "notes": "from the options-library library: Ratio Vertical Front Spread (1x2 Call or Put Ratio Spread); harness suggestion: vix_priced_option_returns(strategy='ratio_call_1x2', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial"
   },
   {
@@ -2823,7 +2889,8 @@
    "blocked_on": "",
    "results": [
     "X-19107292",
-    "X-30692d85"
+    "X-30692d85",
+    "X-2cd9ae76"
    ],
    "notes": "from the options-library library: Backspread (1x2 Long Ratio: Call or Put); harness suggestion: vix_priced_option_returns(strategy='put_backspread_1x2', dte=30, condition='vix<15') | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -2849,9 +2916,11 @@
     "b6_dir_christmas_tree"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5cce8455"
+   ],
    "notes": "from the options-library library: Ladder / Christmas Tree (1-3-2 and 1-1-1); harness suggestion: vix_priced_option_returns(strategy='call_tree_132', dte=30, width=0.025) with zone_hit_rate statistic | verifier: corrected claim/trial"
   },
   {
@@ -2877,9 +2946,11 @@
     "b6_dir_stock_repair"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-d77c443f"
+   ],
    "notes": "from the options-library library: Stock Repair (Covered Ratio Spread); harness suggestion: drawdown_event_study(strategy='stock_repair', trigger=-0.10, horizon=63d) | verifier: corrected claim/trial"
   },
   {
@@ -2905,8 +2976,10 @@
     "b6_xc_parity_deviation_scan"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "not_supported",
+   "results": [
+    "X-16ddfa68"
+   ],
    "notes": "from the options-library library: Synthetic Long / Short Stock (Combo); harness suggestion: parity_deviation_scan(symbols=['SPY','GLD','IBIT']) over the chain archive | verifier: corrected claim/trial",
    "unblocked_from": "daily chain capture, about 5 trading days. One capture already gives about 250 near-ATM pairs (SPY/GLD/IBIT/SPX have dozens of expiries each), so 500 pairs come quickly, but at least 5 separate days are needed for a day-clustered CI. Not 20 days."
   },
@@ -2933,9 +3006,11 @@
     "b6_dir_risk_reversal_skew"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-93c696cc"
+   ],
    "notes": "from the options-library library: Risk Reversal (Directional, OTM Combo); harness suggestion: conditional_option_returns(strategy='risk_reversal_25d', condition='SKEW quintile'); follow-up skew_premium_harvest once chains have 60 days | verifier: corrected claim/trial"
   },
   {
@@ -2961,9 +3036,11 @@
     "b6_dir_leaps_replacement"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-57623c6d"
+   ],
    "notes": "from the options-library library: LEAPS Call as Stock Replacement; harness suggestion: vix_priced_option_returns(strategy='leaps_itm20', dte=365, iv_source='VIX3M', cohorts='monthly') | verifier: corrected claim/trial"
   },
   {
@@ -2989,9 +3066,11 @@
     "b6_dir_deep_itm_call"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-cbfc46bf"
+   ],
    "notes": "from the options-library library: Deep ITM Call as Short-Dated Stock Substitute; harness suggestion: vix_priced_option_returns(strategy='deep_itm_call', dte=30, strike='ITM10', daily_marks=True) | verifier: corrected claim/trial"
   },
   {
@@ -3069,9 +3148,11 @@
     "b6_term_long_calendar"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-10a49f0d"
+   ],
    "notes": "from the options-library library: Long calendar (horizontal) spread; harness suggestion: Add a two-expiry mode to the payoff engine: Position.value_at(t=T1) that settles legs with T<=T1 at intrinsic and reprices legs with T>T1 via bs.price at a supplied IV; then calendar_model_backtest(price_rows, vix_rows, vix3m_rows, front_dte, back_dte, strike_rule) in experiments/volatility.py reusing _block_shift_null and _halves_agree. | verifier: corrected claim/trial"
   },
   {
@@ -3097,9 +3178,11 @@
     "b6_term_short_calendar"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-87edcdcc"
+   ],
    "notes": "from the options-library library: Short (reverse) calendar spread; harness suggestion: Reuse calendar_model_backtest with legs reversed and an entry mask from the VIX3M/VIX ratio; report conditional/unconditional means side by side with the existing term_structure_reversion output. | verifier: corrected claim/trial"
   },
   {
@@ -3125,9 +3208,11 @@
     "b6_term_long_diagonal"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-58e4c1d3"
+   ],
    "notes": "from the options-library library: Long diagonal spread (bullish call / bearish put); harness suggestion: Extend the two-expiry payoff mode with a roll schedule (list of (dte, action) tuples) so diagonals, PMCC and collars share one simulator; output Sharpe/PBO through the existing overfit module. | verifier: corrected claim/trial"
   },
   {
@@ -3153,9 +3238,11 @@
     "b6_term_double_calendar"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3c150160"
+   ],
    "notes": "from the options-library library: Double calendar spread; harness suggestion: Same two-expiry simulator as the single calendar with a strike list; add SKEW-index tilt as an optional smile adjustment (put IV = VIX + k*(SKEW-100)). | verifier: corrected claim/trial"
   },
   {
@@ -3181,9 +3268,11 @@
     "b6_term_double_diagonal"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-63ef8ec5"
+   ],
    "notes": "from the options-library library: Double diagonal spread; harness suggestion: Two-expiry simulator with four legs; add an iron-condor control leg set in the same run and report the paired difference. | verifier: corrected claim/trial"
   },
   {
@@ -3240,9 +3329,11 @@
     "b6_term_ratio_calendar"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-396ecf5b"
+   ],
    "notes": "from the options-library library: Ratio (vega-weighted) calendar spread; harness suggestion: Add fractional qty support to the two-expiry simulator (already numeric in Leg) and a sizing hook that sets qty from model vegas at entry. | verifier: corrected claim/trial"
   },
   {
@@ -3268,9 +3359,11 @@
     "b6_term_pmcc"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0716df12"
+   ],
    "notes": "from the options-library library: Poor man's covered call (PMCC / LEAPS diagonal); harness suggestion: Roll-schedule simulator shared with diagonals; add a 'capital deployed' denominator option (debit vs stock price) to overlay_verdict so ROC and absolute return are both reported. | verifier: corrected claim/trial"
   },
   {
@@ -3296,9 +3389,11 @@
     "b6_term_leaps_collar"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-24b761f5"
+   ],
    "notes": "from the options-library library: LEAPS collar (long-dated put, serial short calls); harness suggestion: Roll-schedule simulator with an underlying leg; reuse overlay_backtest's drawdown function (dd) and overlay_verdict for the benchmark comparison. | verifier: corrected claim/trial"
   },
   {
@@ -3324,10 +3419,12 @@
     "b6_term_calendarised_fly"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Calendarised (time) butterfly; harness suggestion: Two-expiry simulator with K-slot strikes; add the plain butterfly as the control leg set and report by delta-VIX decile. | verifier: corrected claim/trial"
+   "results": [
+    "X-8c2b7bf1"
+   ],
+   "notes": "from the options-library library: Calendarised (time) butterfly; harness suggestion: Two-expiry simulator with K-slot strikes; add the plain butterfly as the control leg set and report by delta-VIX decile. | verifier: corrected claim/trial | 2026-10-15 re-run: supported on the pooled all-start estimate (+59.2%, CI +39.7 to +77.6); 18 of 21 single grid phases pass; the walk-forward halves (+73.9%, +47.0%) are each below min_n 15 months (report only)."
   },
   {
    "id": "T-153",
@@ -3352,9 +3449,11 @@
     "b6b_chain_jelly_roll"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-fc398775"
+   ],
    "notes": "from the options-library library: Jelly roll (synthetic time spread / financing trade); harness suggestion: jelly_roll_check(chain_rows, rate, dividends) producing per-capture deviation statistics; store in the options-surface file so it accumulates daily. | verifier: corrected claim/trial"
   },
   {
@@ -3379,9 +3478,11 @@
     "b6_dir_zebra"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-54e06747"
+   ],
    "notes": "from the options-library library: ZEBRA (zero extrinsic back ratio); harness suggestion: Add a 'zero-extrinsic solver' to strategies.py (choose K1 so 2*extrinsic(K1) = extrinsic(K2)) and run through the roll-schedule simulator; compare to leaps-stock-replacement in the same report. | verifier: corrected claim/trial"
   },
   {
@@ -3407,9 +3508,11 @@
     "b6_term_roll_tested_put"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3e10c60c"
+   ],
    "notes": "from the options-library library: Rolling a short option (out / up / down); harness suggestion: Roll-schedule simulator with conditional actions (on delta/DTE triggers); expose roll vs reset as two action lists over the same price path. | verifier: corrected claim/trial"
   },
   {
@@ -3435,9 +3538,11 @@
     "b6_var_theta_harvest_45dte"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-daad6f05"
+   ],
    "notes": "from the options-library library: Time-decay harvesting (45 DTE short premium, managed at 50% or 21 DTE); harness suggestion: Extend overlay_backtest with exit rules (profit_target, dte_exit) and report P&L/day; the BTC version runs on DVOL/realised-vol from Deribit with the same code path. | verifier: corrected claim/trial"
   },
   {
@@ -3463,9 +3568,11 @@
     "b6_var_theta_ladder"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-dad7f2ce"
+   ],
    "notes": "from the options-library library: Theta ladder (staggered-expiry short premium); harness suggestion: Roll-schedule simulator run with an entry cadence parameter (weekly vs monthly) and a size parameter; drawdown via overlay_backtest's dd helper. | verifier: corrected claim/trial"
   },
   {
@@ -3517,9 +3624,11 @@
     "b6_surf_vrp_term_regime"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-bd91ae4f"
+   ],
    "notes": "from the options-library library: VIX term-structure regime filter (VIX3M/VIX gate for premium selling); harness suggestion: term_structure_conditional_pnl(vix_rows, vix3m_rows, price_rows, strategy) in experiments/volatility.py reusing overlay_backtest for the strangle path and variance_risk_premium for the VRP; register alongside vix-term-structure-reversion. | verifier: corrected claim/trial"
   },
   {
@@ -3547,7 +3656,8 @@
    "testable_now": false,
    "status": "not_supported",
    "results": [
-    "X-c5827bb7"
+    "X-c5827bb7",
+    "X-133c5bea"
    ],
    "notes": "from the options-library library: VIX futures / VIX options calendar (term-structure roll trade); harness suggestion: Add a cboe_vx_settlements ingest (per-contract daily settlement CSVs) and a continuous-contract builder; then vx_calendar_backtest with the regime gate; register as a theory blocked on ingest. | verifier: corrected claim/trial",
    "unblocked_from": "VX per-contract settlement history is free but not in Mandel's reachable data list until ingested (cboe_vx_settlements ingest plus a continuous-contract builder). Coverage verified from 2013 only."
@@ -3575,9 +3685,11 @@
     "b6b_bw_bxm_alpha"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f5ad4c58"
+   ],
    "notes": "from the options-library library: Covered call / buy-write (ATM, BXM-style); harness suggestion: Add BXM, BXMD, BXY, BXMW, BXMH, BXMC, BXN, BXR to CBOE_INDICES in mandel/data/options.py (same CSV format, single column). Sanity numbers computed today: BXM 2002-2026 CAGR 6.23% vol 10.6% maxDD -40% beta 0.63 vs SPX price-only CAGR 8.11% vol 14.8%. | verifier: corrected claim/trial"
   },
   {
@@ -3603,10 +3715,12 @@
     "b6b_bw_bxmd_vs_bxm"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: OTM / delta-targeted covered call (30-delta, BXMD; 2% OTM, BXY); harness suggestion: Today's figures: BXMD 1986- CAGR 10.67% vol 12.8%, BXY 10.40%/11.9%, BXMC (ATM, 1990-) 9.73%/11.0%, SPX price 8.9%/15.2%. Use SPY adjusted closes for a TR benchmark. | verifier: corrected claim/trial"
+   "results": [
+    "X-173afa14"
+   ],
+   "notes": "from the options-library library: OTM / delta-targeted covered call (30-delta, BXMD; 2% OTM, BXY); harness suggestion: Today's figures: BXMD 1986- CAGR 10.67% vol 12.8%, BXY 10.40%/11.9%, BXMC (ATM, 1990-) 9.73%/11.0%, SPX price 8.9%/15.2%. Use SPY adjusted closes for a TR benchmark. | verifier: corrected claim/trial | 2026-10-15 re-run: inconclusive under rule 11: the BXMD-BXM Sharpe gap (+0.113 annualised) passes the studentized HAC block bootstrap (CI +0.007 to +0.221) but not the Ledoit-Wolf (2008) test the trial names as the alternative (two-sided p 0.078); 161 of 294 BXMD months are Cboe back-test values from before its 2015-08-03 launch."
   },
   {
    "id": "T-163",
@@ -3631,9 +3745,11 @@
     "b6b_bw_bxmw_vs_bxm"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1f452751"
+   ],
    "notes": "from the options-library library: Multi-week / laddered covered call (BXMW, weekly overwriting); harness suggestion: Computed today: BXMW 2012- CAGR 7.72% vol 8.25% maxDD -30.6%; BXM same era needs re-alignment to 2012 start. | verifier: corrected claim/trial"
   },
   {
@@ -3659,9 +3775,11 @@
     "b6b_bw_bxmh_vs_bxm"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-df13fe5c"
+   ],
    "notes": "from the options-library library: Partial overwrite / overwriting-ETF mechanics (JEPI, QYLD, XYLD, BXMH); harness suggestion: Today's figures: BXMH 1990- CAGR 10.07% vol 12.1% vs BXMC 9.73% vol 11.0%. Add BXMH/BXMC to the Cboe index list. | verifier: corrected claim/trial"
   },
   {
@@ -3713,9 +3831,11 @@
     "b6b_hedge_collar_cll_vs_blend"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7d7b4e5d"
+   ],
    "notes": "from the options-library library: Collar (protective collar, Cboe CLL 95-110); harness suggestion: Today: CLL 2008- CAGR 6.96% vol 12.3% maxDD -26.3% beta 0.51 vs SPX price CAGR 10.5% maxDD ~-34% (2020) / -57% (2009 not in sample start). | verifier: corrected claim/trial"
   },
   {
@@ -3767,10 +3887,12 @@
     "b6b_hedge_cllz_sharpe"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Put-spread collar (Cboe CLLZ zero-cost put-spread collar); harness suggestion: Today: CLLZ 1986- CAGR 8.14% vol 11.6% maxDD -47.2% worst month -17.1% vs SPX price CAGR 8.94% vol 15.2%; the -47% drawdown is the fingerprint of the short tail. | verifier: corrected claim/trial"
+   "results": [
+    "X-47e71844"
+   ],
+   "notes": "from the options-library library: Put-spread collar (Cboe CLLZ zero-cost put-spread collar); harness suggestion: Today: CLLZ 1986- CAGR 8.14% vol 11.6% maxDD -47.2% worst month -17.1% vs SPX price CAGR 8.94% vol 15.2%; the -47% drawdown is the fingerprint of the short tail. | verifier: corrected claim/trial | 2026-10-15 re-run: supported as worded (CLLZ has no higher Sharpe than SPY: -0.036 per month, CI -0.064 to -0.013). 67% of the window is Cboe's back-test before CLLZ's 2015-08-03 launch; post-launch months alone give -0.027 (CI -0.089 to +0.024), which also meets the pass (upper <= 0.05, point <= 0)."
   },
   {
    "id": "T-169",
@@ -3795,9 +3917,11 @@
     "b6b_hedge_pput_vs_blend"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-80fa69b3"
+   ],
    "notes": "from the options-library library: Protective put / married put (Cboe PPUT 5% OTM); harness suggestion: Today: PPUT 1986- CAGR 8.02% vol 12.3% maxDD -42% worst month -10.6% (vs SPX -19.6% ex 1987 crash months): protection shows up in the worst month but costs ~1%/yr vs SPX price-only CAGR 8.91%. | verifier: corrected claim/trial"
   },
   {
@@ -3823,10 +3947,12 @@
     "b6b_bw_put_vs_bxm"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Cash-secured put / put-write (Cboe PUT, WPUT, PUTD); harness suggestion: Note: PUT_History.csv appears sparse in early years (4,984 rows for 35 years) - validate day counts before monthly sampling; computed WPUT 2006- CAGR 4.84% vol 9.6% maxDD -28.6%, PUTD 9.67%/12.0%. | verifier: corrected claim/trial"
+   "results": [
+    "X-66d68491"
+   ],
+   "notes": "from the options-library library: Cash-secured put / put-write (Cboe PUT, WPUT, PUTD); harness suggestion: Note: PUT_History.csv appears sparse in early years (4,984 rows for 35 years) - validate day counts before monthly sampling; computed WPUT 2006- CAGR 4.84% vol 9.6% maxDD -28.6%, PUTD 9.67%/12.0%. | verifier: corrected claim/trial | 2026-10-15 re-run: scope: supported for PUT vs BXM on the published histories 2007-02..2026-09 (PUT has no 2006-12 month-end, October 2026 is incomplete; partial-month sensitivity leaves the verdict unchanged; 5 months are pre-launch back-test values). The edge does not generalise to the other put-write arms: PUTY-BXM +0.005 (CI -0.117 to +0.138), WPUT-BXM -0.121."
   },
   {
    "id": "T-171",
@@ -3851,9 +3977,11 @@
     "b6b_bw_wheel_basis"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-9c038379"
+   ],
    "notes": "from the options-library library: The wheel (cash-secured put -> assignment -> covered call -> called away); harness suggestion: Reuse the model-priced overlay harness; calibrate it to BXM/PUT first (now downloadable) and report the calibration error as a gate. | verifier: corrected claim/trial"
   },
   {
@@ -3879,9 +4007,11 @@
     "b6b_bw_cmbo_vs_bxy"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b1cbc563"
+   ],
    "notes": "from the options-library library: Covered strangle / covered combination (Cboe CMBO); harness suggestion: Today: CMBO 1986- CAGR 9.37% vol 11.0% maxDD -42.7% worst month -17.3% beta 0.66. | verifier: corrected claim/trial"
   },
   {
@@ -3907,8 +4037,10 @@
     "b6b_dolt_ratio_overlay_skew"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "inconclusive",
+   "results": [
+    "X-70e4d9b6"
+   ],
    "notes": "from the options-library library: Covered ratio spread / 1x2 ratio write; harness suggestion: Store 5%/10% OTM call mids and IVs at 30 DTE per capture day for SPY/GLD/IBIT to shorten the wait. | verifier: corrected claim/trial",
    "unblocked_from": "daily chain capture, ~24 monthly expiry cohorts (~730 days); daily overlapping entries help but remain cohort-correlated"
   },
@@ -3935,9 +4067,11 @@
     "b6b_bw_covered_put"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3e616bfc"
+   ],
    "notes": "from the options-library library: Covered put (short stock + short put); harness suggestion: Low priority: include for completeness of the payoff library; the claim is mostly a sanity check of the engine's sign conventions. | verifier: corrected claim/trial"
   },
   {
@@ -3967,7 +4101,8 @@
    "blocked_on": "",
    "results": [
     "X-f7120cfc",
-    "X-eca8ed72"
+    "X-eca8ed72",
+    "X-e0a01a1d"
    ],
    "notes": "from the options-library library: Covered call on IBIT / BTC ETF; harness suggestion: Already close to the BTC-VRP harness; add the conditional-on-percentile split and report expected premium capture per 30-delta covered call via Black-Scholes at DVOL. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -3998,7 +4133,8 @@
    "blocked_on": "",
    "results": [
     "X-7bb88d2c",
-    "X-821aad1c"
+    "X-821aad1c",
+    "X-a33115e9"
    ],
    "notes": "from the options-library library: Deribit covered call on BTC/ETH inventory (inverse options); harness suggestion: Mandel's deribit_book + DVOL fetchers already exist; add public/get_delivery_prices (free, 2,638 daily records) so expiries settle at the official TWAP rather than a close. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states; spot closes stand in for Deribit delivery prices (30-minute TWAP)"
   },
@@ -4029,7 +4165,8 @@
    "blocked_on": "",
    "results": [
     "X-b7862591",
-    "X-dc722fd2"
+    "X-dc722fd2",
+    "X-d15e8aec"
    ],
    "notes": "from the options-library library: Covered call on gold/silver (GLD/SLV equity route; GC/SI futures-options route); harness suggestion: GVZ history is already fetched; add GLD/SLV daily closes (free) and reuse the VRP harness; GC futures closes are not free - use GLD as the proxy. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -4056,9 +4193,11 @@
     "b6b_hedge_bfly_vs_cndr_sharpe"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7459c2a7"
+   ],
    "notes": "from the options-library library: Iron butterfly benchmark overlay (Cboe BFLY: short ATM straddle, long 5% wings, over T-bills); harness suggestion: Today: BFLY 1986- CAGR 3.66% vol 10.8% maxDD -54.9% beta 0.08; CNDR 5.38% vol 7.0% maxDD -19.8% beta 0.13. | verifier: corrected claim/trial"
   },
   {
@@ -4084,9 +4223,11 @@
     "b6b_hedge_cndr_vrp_gap"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-30b8aabf"
+   ],
    "notes": "from the options-library library: Iron condor benchmark overlay (Cboe CNDR: short 20-delta strangle, long 5-delta wings, over T-bills); harness suggestion: CNDR is the cleanest free realised series for the SPX variance premium harness; add it as a validation target for the model-priced condor. | verifier: corrected claim/trial"
   },
   {
@@ -4112,9 +4253,11 @@
     "b6b_hedge_bs_replication"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-63ffe887"
+   ],
    "notes": "from the options-library library: Buy-write benchmark family map (BXM/BXMD/BXY/BXMW/BXMH/BXN/BXR/PUT/CLL/CLLZ/CMBO/PPUT/BFLY/CNDR) as replication targets; harness suggestion: This is the first thing to run: extend cboe_index_history to the list above (the CDN 307-redirects to cdn-api.cboe.com; httpx follow_redirects is already on), then calibrate the model-priced overlay harness against it. | verifier: corrected claim/trial"
   },
   {
@@ -4146,7 +4289,8 @@
     "X-b7521792",
     "X-adaf1657",
     "X-ddf2141f",
-    "X-1dfce7cb"
+    "X-1dfce7cb",
+    "X-d6f09cab"
    ],
    "notes": "from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r, divs) -> per-(K,T) table; wire into payoff engine as a 2-leg template; daily job appends to data/options/parity/. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-505 (verifier-corrected wording)"
   },
@@ -4173,9 +4317,11 @@
     "b6b_chain_conversion"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-ac71dd4f"
+   ],
    "notes": "from the options-library library: Conversion; harness suggestion: Reuse parity.py implied rate per name; add payoff template [underlying+, put+, call-] and assert flat payoff in payoff engine test. | verifier: corrected claim/trial"
   },
   {
@@ -4227,9 +4373,11 @@
     "b6b_chain_synthetic_long"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0cbfdd19"
+   ],
    "notes": "from the options-library library: Synthetic long stock (combo); harness suggestion: Template [call+, put-]; payoff engine must reproduce a straight line; parity.py reports r_impl_askbid alongside r_impl_mid. | verifier: corrected claim/trial"
   },
   {
@@ -4255,9 +4403,11 @@
     "b6b_chain_synthetic_short"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e4010567"
+   ],
    "notes": "from the options-library library: Synthetic short stock (combo); harness suggestion: Template [put+, call-]; parity.py implicit_borrow column. | verifier: corrected claim/trial"
   },
   {
@@ -4288,7 +4438,8 @@
    "results": [
     "X-a110b91c",
     "X-b8a1631b",
-    "X-0faed075"
+    "X-0faed075",
+    "X-1108a3bf"
    ],
    "notes": "from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2) and daily box_curve; payoff engine test asserts flat K2-K1. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-503 (verifier-corrected wording)"
   },
@@ -4320,7 +4471,8 @@
    "results": [
     "X-8a3bbd3c",
     "X-fb00bd60",
-    "X-e9a80339"
+    "X-e9a80339",
+    "X-b114ed57"
    ],
    "notes": "from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; report borrow curve. | market-priced from the daily raw CBOE chains (local disk on the capturing machine); one day can falsify, confirmation needs 20 capture days | superseded by T-506 (verifier-corrected wording)"
   },
@@ -4347,8 +4499,10 @@
     "b6b_misc_box_bill_vix_corr"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "not_supported",
+   "results": [
+    "X-221aebb6"
+   ],
    "notes": "from the options-library library: Box-vs-Treasury convenience-yield trade; harness suggestion: box.py daily series -> mandel/experiments/box_bill_spread.py joining FRED + VIX; bootstrap via existing block bootstrap. | verifier: corrected claim/trial",
    "unblocked_from": "daily SPX chain capture, ~120 trading days, to form a box-rate series (alternative: ingest published van Binsbergen-Diamond-Grotteria box-rate data)"
   },
@@ -4427,9 +4581,11 @@
     "b6b_chain_itm_put_exercise"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f64267bb"
+   ],
    "notes": "from the options-library library: Early exercise of deep ITM American puts for interest; harness suggestion: early_exercise.py put_exercise_criterion; scan function over chains; SPX control built in. | verifier: corrected claim/trial"
   },
   {
@@ -4512,9 +4668,11 @@
     "b6_xc_spy_spx_financing"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-471ee9f1"
+   ],
    "notes": "from the options-library library: ETF vs index option parity (SPY vs SPX vs XSP); harness suggestion: parity.py cross_venue(spy_chain, spx_chain, xsp_chain) returning residual table; payoff template with qty 10:1. | verifier: corrected claim/trial"
   },
   {
@@ -4540,9 +4698,11 @@
     "b6b_drb_parity_violations"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7163e0a9"
+   ],
    "notes": "from the options-library library: Crypto put-call parity vs dated future (Deribit inverse options); harness suggestion: mandel/options/deribit_parity.py polling public endpoints (get_instruments, ticker, get_book_summary_by_currency); payoff engine with inverse payoff mode (divide USD payoff by S_T). | verifier: corrected claim/trial"
   },
   {
@@ -4568,9 +4728,11 @@
     "b6b_drb_quarterly_box_rate"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1830d794"
+   ],
    "notes": "from the options-library library: Deribit inverse box spread (USD lending/borrowing in BTC collateral); harness suggestion: deribit_parity.py box_rate(); inverse payoff mode in payoff engine; join with FRED via existing ingest. | verifier: corrected claim/trial"
   },
   {
@@ -4596,9 +4758,11 @@
     "b6b_drb_quarterly_basis"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-047acafb"
+   ],
    "notes": "from the options-library library: Cash-and-carry with options (spot vs synthetic short / dated future); harness suggestion: mandel/options/deribit_basis.py (futures curve snapshot) feeding both this and the box entry; payoff template [underlying+, put+, call-]. | verifier: corrected claim/trial"
   },
   {
@@ -4627,7 +4791,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-e906b9f3"
+    "X-e906b9f3",
+    "X-1618349b"
    ],
    "notes": "from the options-library library: Perpetual funding vs dated-future/option-synthetic carry; harness suggestion: mandel/ingest deribit funding history -> mandel/experiments/perp_funding_carry.py with block bootstrap. | verifier: corrected claim/trial"
   },
@@ -4654,9 +4819,11 @@
     "b6_xc_gld_implied_carry"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-6f856e67"
+   ],
    "notes": "from the options-library library: GLD options-implied gold carry (ETF parity for metals); harness suggestion: parity.py with q = expense ratio as continuous 'dividend'; report per-symbol implied carry. | verifier: corrected claim/trial"
   },
   {
@@ -4734,8 +4901,10 @@
     "b6b_bw_put_bxm_return_gap"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "not_supported",
+   "results": [
+    "X-b6a74212"
+   ],
    "notes": "from the options-library library: Covered call / cash-secured put equivalence (synthetic identity trade); harness suggestion: mandel/ingest cboe_index_history(PUT, BXM); experiments/putwrite_vs_buywrite.py with block bootstrap. | verifier: corrected claim/trial",
    "unblocked_from": "Cboe PUT/BXM index CSV ingest (free, one-off download; no option-chain history needed)"
   },
@@ -4893,7 +5062,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-65240d9f"
+    "X-65240d9f",
+    "X-d8906f1e"
    ],
    "notes": "from the options-library library: Implied-move vs realised-move signal (conditional straddle, sign chosen by IM/HM); harness suggestion: Build an 'event-move table' harness (event_type, date, IM, HM, realised) as the shared dataset for the whole family; VIX-as-IV SPX FOMC version first. | verifier: corrected claim/trial"
   },
@@ -5050,7 +5220,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-38efc61c"
+    "X-38efc61c",
+    "X-22fc17ae"
    ],
    "notes": "from the options-library library: SPX macro-event straddle (FOMC / CPI / NFP): event vol vs realised; harness suggestion: VIX-as-IV straddle pricer over an event-date list; run the identical code for CPI and NFP dates once BLS release calendars are loaded (also free). | verifier: corrected claim/trial"
   },
@@ -5079,7 +5250,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-a98432dc"
+    "X-a98432dc",
+    "X-d05909d2"
    ],
    "notes": "from the options-library library: Pre-FOMC announcement drift call spread; harness suggestion: Event-window return harness with (T-1 close -> T open) and (T-1 close -> T close) variants; flag that intraday 13:55 is the true target. | verifier: corrected claim/trial"
   },
@@ -5110,7 +5282,8 @@
    "blocked_on": "",
    "results": [
     "X-ace3719a",
-    "X-93130d94"
+    "X-93130d94",
+    "X-dccb283a"
    ],
    "notes": "from the options-library library: Monthly opex gamma pin (short ATM straddle / iron butterfly on heavy-OI strikes); harness suggestion: Add a GEX estimator (sum over strikes of OI*gamma*spot^2*0.01 with sign convention calls +, puts -) once chain captures accumulate; join to the opex clustering test. | verifier: corrected claim/trial | Scope (2026-10-15): supported for the MODEL-PRICED straddle (sigma = Thursday VIX, T = 1/252), priced on the dividend forward on ex-dividend Fridays. The 132 quarterly opex Fridays are SPY ex-dividend days; at r = q = 0 with the dividend ignored the difference is +6.57 bps with a CI of -0.76..+13.77, so the as-priced reading matters. With every ex-dividend Friday dropped the result holds (+10.15 bps, CI +2.05..+18.11). A traded-price test needs 1-day implied vol on opex Thursdays (chain captures). CPI-day exclusion control pending (task: CPI-calendar controls). | 2026-10-15: CPI-day exclusion control done (macro-release-cpi archived): opex Fridays with FOMC/CPI excluded +8.01 bps (CI +0.61..+15.26); Thursday CPI also dropped +6.37 bps (CI -1.51..+14.14), a sensitivity that touches 0."
   },
@@ -5192,7 +5365,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-00792bd7"
+    "X-00792bd7",
+    "X-c131b554"
    ],
    "notes": "from the options-library library: Triple witching / quarterly rebalance close (long gamma into the close); harness suggestion: Event-day realised-move comparison harness (event dates vs matched weekday controls) with VIX-as-IV straddle pricer. | verifier: corrected claim/trial"
   },
@@ -5219,9 +5393,11 @@
     "b6b_hedge_vix_soq_credit_spread"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
-   "notes": "from the options-library library: VIX settlement (Wednesday SOQ) trades; harness suggestion: VIX settlement calendar generator + VIX/VIX3M OHLC event harness; add VIX futures history fetch (Cboe CFE CSVs) for the futures-based version. | verifier: corrected claim/trial",
+   "status": "not_supported",
+   "results": [
+    "X-1c908327"
+   ],
+   "notes": "from the options-library library: VIX settlement (Wednesday SOQ) trades; harness suggestion: VIX settlement calendar generator + VIX/VIX3M OHLC event harness; add VIX futures history fetch (Cboe CFE CSVs) for the futures-based version. | verifier: corrected claim/trial | 2026-10-15 re-run: rule 12 decided it: the VIX3M/VIX gate and the strike choice read at one information set, at the previous close and at the entry close as the live proxy; both readings fail (means +0.87% and +0.59% of max loss, CIs include 0) and chain-calibrated pricing is negative in both.",
    "unblocked_from": "VIX futures settlement history (free CFE files, not wired) plus either VIX chain capture (~12+ monthly settlements) or a VVIX-based model price; VRO history (free) enables the preliminary SOQ test."
   },
   {
@@ -5251,7 +5427,8 @@
    "blocked_on": "",
    "results": [
     "X-bd896fa6",
-    "X-d2e0bbe4"
+    "X-d2e0bbe4",
+    "X-8cd5ab77"
    ],
    "notes": "from the options-library library: Crypto macro-event straddle on Deribit (FOMC / CPI) - DVOL vs realised; harness suggestion: Reuse the BTC VRP harness (DVOL vs realised) with an event-date mask; add inverse-option payoff mode to the payoff engine (payoff/S_T). | verifier: corrected claim/trial | 2026-10-15: the reported pooled FOMC+CPI variant gives -51.7 bps (95% CI -95.8 to -9.9) over 109 event days and CPI-only -58.0 bps (CI -119.7 to -1.4); not a pass criterion here (FOMC alone fails), so it is pre-registered as the forward test T-543."
   },
@@ -5278,8 +5455,10 @@
     "b6b_drb_catalyst_strangle"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "inconclusive",
+   "results": [
+    "X-2e4eac10"
+   ],
    "notes": "from the options-library library: Crypto scheduled-catalyst strangle (ETF decisions, halving, protocol upgrades); harness suggestion: Catalyst calendar table joined to Deribit expiry-level IV captures and Polymarket odds; report IV ramp per event. | verifier: corrected claim/trial",
    "unblocked_from": "Deribit expiry-level IV capture across >= 20 hard-dated catalysts (years at current frequency; partial evidence after 3-5)."
   },
@@ -5306,9 +5485,11 @@
     "b6b_drb_expiry_friday_straddle"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3c1a0a3e"
+   ],
    "notes": "from the options-library library: Deribit expiry max-pain pin (sell the 08:00 UTC settlement straddle); harness suggestion: Deribit hourly index fetcher + expiry calendar; max-pain calculator from book summary OI. | verifier: corrected claim/trial"
   },
   {
@@ -5336,7 +5517,8 @@
    "testable_now": false,
    "status": "supported",
    "results": [
-    "X-6e050abd"
+    "X-6e050abd",
+    "X-2965eac1"
    ],
    "notes": "from the options-library library: Metals macro-event straddle (FOMC / CPI / NFP) on GC or GLD; harness suggestion: Generalise the VIX-as-IV straddle harness to (underlying, vol index) pairs: (SPY,VIX), (GLD,GVZ), (BTC,DVOL), (QQQ,VXN). | verifier: corrected claim/trial | Scope (2026-10-15): supported for the claim as worded, a MODEL-PRICED straddle at sigma = GVZ(T-1). GVZ is 30-day implied vol; on event days the true 1-day implied vol carries the event premium, so a traded short straddle collects more than this model and the gap would shrink. A traded test needs event-day 1-day GLD implied vol.",
    "unblocked_from": "GLD daily closes and GVZ history fetchers (both free) plus CPI calendar; runnable as soon as they are loaded."
@@ -5415,9 +5597,11 @@
     "b6_surf_skew_tail_frequency"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e2bef5fd"
+   ],
    "notes": "from the options-library library: Risk reversal (25-delta skew trade); harness suggestion: Extend harness_skew_tail: bucket by SKEW percentile, compare CBOE-table implied 2-sigma probability vs realised frequency; log skew-vega P&L once surface_summary 25d put/call IVs have 60+ captures. | verifier: corrected claim/trial"
   },
   {
@@ -5443,10 +5627,12 @@
     "b6_surf_skew_implied_tail_gap"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Put-skew richness sale (1x2 put ratio spread, delta-hedged); harness suggestion: Add a 'skew_implied_tail' statistic to harness_skew_tail using the CBOE white-paper mapping (100 -> 2.3%, 145 -> 14.45%, interpolate); P&L of the 1x2 needs surface_summary 10d/25d IVs, which accumulate from today. | verifier: corrected claim/trial"
+   "results": [
+    "X-1c42240d"
+   ],
+   "notes": "from the options-library library: Put-skew richness sale (1x2 put ratio spread, delta-hedged); harness suggestion: Add a 'skew_implied_tail' statistic to harness_skew_tail using the CBOE white-paper mapping (100 -> 2.3%, 145 -> 14.45%, interpolate); P&L of the 1x2 needs surface_summary 10d/25d IVs, which accumulate from today. | verifier: corrected claim/trial | 2026-10-15 re-run: supported as worded, but the excess over the 2 pp margin comes from the SKEW-to-probability mapping: a constant-normal benchmark gives +1.23 pp (below the margin), and SKEW carries no information about realised tails (frequency 0.79% with SKEW > 135 vs 1.10% otherwise, shift placebo p 0.61). SKEW's implied tail probability overstates realised tails; it is not a tail predictor."
   },
   {
    "id": "T-229",
@@ -5470,9 +5656,11 @@
     "b6_surf_skew_cheap_put_spread"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-445e5d1a"
+   ],
    "notes": "from the options-library library: SKEW-conditioned tail hedge (put spread when skew is cheap); harness suggestion: Reuse the monthly model-priced cycle of harness_vrp_spx with a SKEW gate; swap in real 10d/25d IVs from surface_summary when available. | verifier: corrected claim/trial"
   },
   {
@@ -5528,7 +5716,8 @@
    "blocked_on": "",
    "results": [
     "X-44c31e4c",
-    "X-1edbb78f"
+    "X-1edbb78f",
+    "X-91ab585f"
    ],
    "notes": "from the options-library library: Calendar vol spread (ATM time spread, long or reverse); harness suggestion: Extend harness_term_structure with the forward-variance decomposition F^2 = (3*VIX3M^2 - VIX^2)/2 and a 63-day realised window; P&L of the calendar via build_position with two expiries. | superseded by T-530 (verifier-corrected wording)"
   },
@@ -5559,7 +5748,8 @@
    "blocked_on": "",
    "results": [
     "X-d311688d",
-    "X-bda12d5b"
+    "X-bda12d5b",
+    "X-2e3ff097"
    ],
    "notes": "from the options-library library: Vega-neutral gamma-positive straddle swap (reverse calendar straddle); harness suggestion: New harness_gamma_swap built on harness_term_structure's index loader plus a daily-rehedge simulator (bs.delta) over SPY closes. | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists | superseded by T-533 (verifier-corrected wording)"
   },
@@ -5586,9 +5776,11 @@
     "b6_var_vrp_short_straddle_hedged"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b734534f"
+   ],
    "notes": "from the options-library library: VRP harvest: delta-hedged short ATM straddle; harness suggestion: harness_vrp_spx and harness_short_straddle already compute this; add the daily-rehedge path and costs; cross-asset twins harness_vrp_nasdaq/russell/gold/oil/bonds/btc/eth. | verifier: corrected claim/trial"
   },
   {
@@ -5614,9 +5806,11 @@
     "b6_var_variance_strip_win_rate"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a774b108"
+   ],
    "notes": "from the options-library library: Variance swap replication by 1/K^2 strip (log contract); harness suggestion: Wrap harness_vrp_spx's implied-minus-realised statistic in the log form and add a 'strip_from_chain' function in mandel/options that sums 2/(T*K^2)*mid over the current CBOE chain to compare with VIX^2. | verifier: corrected claim/trial"
   },
   {
@@ -5642,9 +5836,11 @@
     "b6_var_iv_rv_spread_scaled"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a54d5155"
+   ],
    "notes": "from the options-library library: Conditional VRP: trade only when implied-minus-realised spread is wide; harness suggestion: Add a 'gate' argument to harness_vrp_spx / harness_vrp_btc accepting a spread z-score and report deflated Sharpe vs the ungated run. | verifier: corrected claim/trial"
   },
   {
@@ -5696,9 +5892,11 @@
     "b6_surf_cross_index_vol_spread"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f61b21fd"
+   ],
    "notes": "from the options-library library: Cross-index vol spread (QQQ vs SPY, IWM vs SPY straddle pairs); harness suggestion: Pair harness_vrp_nasdaq and harness_vrp_spx outputs: new harness_vol_spread computing the implied-minus-realised spread differential conditioned on the VXN-VIX z-score. | verifier: corrected claim/trial"
   },
   {
@@ -5728,7 +5926,8 @@
    "blocked_on": "",
    "results": [
     "X-a0277481",
-    "X-0b47e7e3"
+    "X-0b47e7e3",
+    "X-ac6f49d9"
    ],
    "notes": "from the options-library library: VIX futures roll-down harvest via short VIX call spread; harness suggestion: Extend harness_term_structure with the forward-level proxy F and a VIX-call-spread pricer (bs.price with sigma = VVIX/100, T from the VIX monthly calendar). | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists | superseded by T-534 (verifier-corrected wording)"
   },
@@ -5755,9 +5954,11 @@
     "b6_surf_vix_call_hedge"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f49a2a7a"
+   ],
    "notes": "from the options-library library: VIX call hedge (rolling long OTM VIX calls); harness suggestion: Monthly model-priced overlay in the harness_vrp_spx style with the VVIX-as-IV pricer; report hedged vs unhedged via harness_controls. | verifier: corrected claim/trial"
   },
   {
@@ -5783,9 +5984,11 @@
     "b6_surf_vvix_vs_realised"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7f1908d5"
+   ],
    "notes": "from the options-library library: VIX call spread and call ratio (defined-cost vol hedge / vol-of-vol sale); harness suggestion: New harness_vvix_vrp using cboe_index_history('VVIX') with realised vol of log VIX; reuse harness_vrp_spx structure. | verifier: corrected claim/trial"
   },
   {
@@ -5816,7 +6019,8 @@
    "results": [
     "X-a1f4f715",
     "X-b9399c71",
-    "X-d52e3c83"
+    "X-d52e3c83",
+    "X-ba679106"
    ],
    "notes": "from the options-library library: VIX spike mean-reversion via long VIX put / put spread; harness suggestion: Add a 'backwardation event' study to harness_term_structure; event count will be small (~25-40 since 2007), report exact CIs. | WORDING CONFLICT: the claim sentence says VIX lands below the forward in fewer than 50% of spikes; the pass rule asks for more than 50% with the CI above 0.5. The verdict follows the pass rule. On 2026-10-14 data (19/23 below forward, CI 0.61-0.95) the pass rule is met and the claim sentence is refuted. Small n (23 non-overlapping events); in-sample. | superseded by T-535 (verifier-corrected wording)"
   },
@@ -5845,7 +6049,8 @@
    "testable_now": false,
    "status": "not_supported",
    "results": [
-    "X-a09c37e5"
+    "X-a09c37e5",
+    "X-32710c11"
    ],
    "notes": "from the options-library library: VXX / UVXY decay harvest with options (put spreads, call spreads, diagonals); harness suggestion: Add VXX/UVXY/SVXY to CHAIN_SYMBOLS and to the daily closes fetch; then a harness_vxx_decay in the harness_term_structure style. | verifier: corrected claim/trial",
    "unblocked_from": "VXX/UVXY daily close history (add to the closes fetch) and adding VXX/UVXY/SVXY to CHAIN_SYMBOLS, ~60 days of capture for real IVs. An SVXY-based proxy of the same contango claim is testable now from the archived SVXY closes."
@@ -5878,7 +6083,8 @@
    "results": [
     "X-ba2577e8",
     "X-b139bb3f",
-    "X-041e6dcb"
+    "X-041e6dcb",
+    "X-a88fb7ff"
    ],
    "notes": "from the options-library library: Vol-of-vol trade: VIX straddle / strangle vs VVIX; harness suggestion: Same harness_vvix_vrp as the VIX call ratio entry; add the quartile split and a strangle pricer. | harness implements the data part only: it can falsify the claim, and a passing data part returns inconclusive until the strategy simulation exists | the claim compares VVIX with spot-VIX realised vol; VVIX prices VIX futures, which are less volatile than spot, so a fair test of the vol-of-vol premium needs VIX futures history (CFE, not yet captured) | superseded by T-536 (verifier-corrected wording)"
   },
@@ -5909,7 +6115,8 @@
    "blocked_on": "",
    "results": [
     "X-e4186ff5",
-    "X-26ff7ed2"
+    "X-26ff7ed2",
+    "X-ab1091dd"
    ],
    "notes": "from the options-library library: Gold volatility premium (GVZ) via GLD straddles / GC strangles; harness suggestion: harness_vrp_gold exists; add the ratio-to-SPX comparison and a 15-delta strangle pricer; add SLV ATM IV from surface_summary for the silver twin. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -5940,7 +6147,8 @@
    "blocked_on": "",
    "results": [
     "X-e6c23238",
-    "X-dfbd6504"
+    "X-dfbd6504",
+    "X-af4983e0"
    ],
    "notes": "from the options-library library: Oil and bond volatility premium (OVX via USO, VXTLT via TLT); harness suggestion: harness_vrp_oil and harness_vrp_bonds exist; add a portfolio aggregator over the harness outputs with the correlation matrix. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -5971,7 +6179,8 @@
    "blocked_on": "",
    "results": [
     "X-b01e58de",
-    "X-73d614a4"
+    "X-73d614a4",
+    "X-a25e88fc"
    ],
    "notes": "from the options-library library: BTC/ETH volatility premium (DVOL vs realised) via Deribit inverse straddles; harness suggestion: harness_vrp_btc and harness_vrp_eth exist; add the worst-decile share, a funding sensitivity parameter and an inverse-payoff conversion in the payoff engine (payoff in BTC = payoff_usd / S_T). | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -6002,7 +6211,8 @@
    "blocked_on": "",
    "results": [
     "X-00e1fb1e",
-    "X-35dc52fb"
+    "X-35dc52fb",
+    "X-ebe8314f"
    ],
    "notes": "from the options-library library: Cross-asset implied vol ratio trades (GVZ/VIX, DVOL/VIX, OVX/VIX); harness suggestion: Combine harness_vrp_gold and harness_vrp_spx outputs into a ratio harness; the DVOL/VIX version joins harness_vrp_btc. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -6055,9 +6265,11 @@
     "b6_surf_forward_variance_premium"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-6ae5939f"
+   ],
    "notes": "from the options-library library: Forward-start variance / term-premium strip (long far strip, short near strip); harness suggestion: Same extension of harness_term_structure as the calendar entry; add the premium-to-implied ratio and a two-expiry strip builder in mandel/options. | verifier: corrected claim/trial"
   },
   {
@@ -6083,8 +6295,10 @@
     "b6b_volh_sector_corr_premium"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "not_supported",
+   "results": [
+    "X-931dd4dd"
+   ],
    "notes": "from the options-library library: Correlation trade via index vs sector/sub-basket straddles (QQQ vs XLK, SPY vs sector ETFs); harness suggestion: Same harness_dispersion as the index-vs-components entry with the sector list; implied correlation from surface_summary ATM IVs. | verifier: corrected claim/trial",
    "unblocked_from": "daily chain capture of the 9 sector ETFs (add to CHAIN_SYMBOLS): ~60 days for a first read, ~36 monthly cycles (~3 years) for the test. The realised side can be computed now from the archived sector closes."
   },
@@ -6167,7 +6381,8 @@
    "blocked_on": "",
    "results": [
     "X-130e1ef5",
-    "X-a681b36c"
+    "X-a681b36c",
+    "X-f857e5ff"
    ],
    "notes": "from the options-library library: BTC covered call on coin inventory; harness suggestion: mandel.data.options.deribit_dvol_history + BTC closes -> bs.price with sigma=DVOL; payoff via Position; bootstrap from validation | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6199,7 +6414,8 @@
    "results": [
     "X-a9d5ba07",
     "X-af2e1a54",
-    "X-e15fd8af"
+    "X-e15fd8af",
+    "X-d1356138"
    ],
    "notes": "from the options-library library: Coin-secured / cash-secured put to accumulate BTC or metal; harness suggestion: Same loop as btc-covered-call with kind='put'; reuse VRP harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6226,10 +6442,12 @@
     "b6_xc_btc_hedged_straddle"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: BTC variance risk premium harvest (delta-hedged short straddle); harness suggestion: Existing BTC VRP harness (cycle 3) extended with hedged straddle simulation in Position + daily rehedge | verifier: corrected claim/trial"
+   "results": [
+    "X-b56d12eb"
+   ],
+   "notes": "from the options-library library: BTC variance risk premium harvest (delta-hedged short straddle); harness suggestion: Existing BTC VRP harness (cycle 3) extended with hedged straddle simulation in Position + daily rehedge | verifier: corrected claim/trial | 2026-10-15 re-run: MODEL-PRICED at DVOL. At the measured 30-day ATM/DVOL scale 0.945 (2 book captures, October 2026) the mean is +9.5% of premium (CI +5.2 to +13.5), after-fee Sharpe 0.71; the refuter's per-cycle haircut from history.deribit.com trade IVs (0.814-0.98 over 2021-2026) gave net +8.1%, Sharpe 0.97, still passing. The trial's own per-cycle haircut runs once deribit-option-trades-daily-BTC is archived."
   },
   {
    "id": "T-256",
@@ -6257,7 +6475,8 @@
    "blocked_on": "",
    "results": [
     "X-766daf94",
-    "X-f666096a"
+    "X-f666096a",
+    "X-04e18984"
    ],
    "notes": "from the options-library library: DVOL percentile vega timing (long/short vol regimes); harness suggestion: Add percentile filter to the DVOL harness; straddle P&L via Position | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6283,9 +6502,11 @@
     "b6b_drb_rr_skew_harvest"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-8587bd48"
+   ],
    "notes": "from the options-library library: BTC zero-cost collar / risk reversal on inventory (skew harvest); harness suggestion: Extend deribit_book capture to store 25d RR per expiry; harness on accumulated history | verifier: corrected claim/trial"
   },
   {
@@ -6313,7 +6534,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-f07adf1e"
+    "X-f07adf1e",
+    "X-42639223"
    ],
    "notes": "from the options-library library: Perpetual funding carry hedged with options; harness suggestion: Add deribit_funding_history to mandel.data.options; monthly aggregation; hedge from DVOL | verifier: corrected claim/trial"
   },
@@ -6365,8 +6587,10 @@
     "b6b_drb_box_rate_capture_days"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "inconclusive",
+   "results": [
+    "X-f43acb93"
+   ],
    "notes": "from the options-library library: Deribit box spread (synthetic coin lending / implied rate); harness suggestion: Parity/box scanner over stored book snapshots; FRED via fred_series | verifier: corrected claim/trial",
    "unblocked_from": "daily synchronous Deribit book capture, 60 days (futures-basis proxy testable now)"
   },
@@ -6392,9 +6616,11 @@
     "b6_xc_inverse_strangle_hedge"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-51c9d9c3"
+   ],
    "notes": "from the options-library library: Inverse-settled short strangle with coin-payoff (quanto) correction; harness suggestion: Add an inverse-payoff flag to payoff.Leg (divide USD payoff by S_T, premium in coin) and the corrected delta to bs.greeks | verifier: corrected claim/trial"
   },
   {
@@ -6419,9 +6645,11 @@
     "b6b_drb_calendar_inversion"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-ce9af676"
+   ],
    "notes": "from the options-library library: BTC IV term-structure calendar (DVOL vs long-dated IV); harness suggestion: Store ATM IV per expiry per day from deribit_book; term-slope harness mirrors the existing VIX/VIX3M one | verifier: corrected claim/trial"
   },
   {
@@ -6446,9 +6674,11 @@
     "b6b_drb_fomc_event_straddle"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-dbb078ec"
+   ],
    "notes": "from the options-library library: Crypto event straddle / pre-event IV crush; harness suggestion: Event-date table + straddle capture; interim DVOL pre/post FOMC t-test from existing DVOL history | verifier: corrected claim/trial"
   },
   {
@@ -6477,7 +6707,8 @@
    "blocked_on": "",
    "results": [
     "X-1d68b098",
-    "X-6122d1b6"
+    "X-6122d1b6",
+    "X-6f714008"
    ],
    "notes": "from the options-library library: Weekend theta harvest (24/7 pricing vs weekend realised vol); harness suggestion: Pure closes-based test; later confirm pricing side with Deribit daily-expiry captures | superseded by T-515 (verifier-corrected wording)"
   },
@@ -6534,7 +6765,8 @@
    "results": [
     "X-7cf64c6f",
     "X-39ddc726",
-    "X-15ae0752"
+    "X-15ae0752",
+    "X-808aaa9a"
    ],
    "notes": "from the options-library library: ETH vs BTC relative volatility (vol pair / dispersion); harness suggestion: deribit_dvol_history('ETH') alongside BTC; ratio harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -6564,7 +6796,8 @@
    "blocked_on": "",
    "results": [
     "X-a4d32b86",
-    "X-1767f28c"
+    "X-1767f28c",
+    "X-bf1ceaec"
    ],
    "notes": "from the options-library library: Protective put / tail hedge on BTC inventory sized by DVOL; harness suggestion: Payoff engine rolling template; reuse covered-call loop | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6617,9 +6850,11 @@
     "b6b_drb_cme_ibit_tax"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-c595e83c"
+   ],
    "notes": "from the options-library library: CME Bitcoin options futures-style (1256) covered/short premium; harness suggestion: Post-processing layer on existing covered-call P&L; tax function with 1256 flag | verifier: corrected claim/trial"
   },
   {
@@ -6649,7 +6884,8 @@
    "blocked_on": "",
    "results": [
     "X-e5665ac0",
-    "X-6fc32c1c"
+    "X-6fc32c1c",
+    "X-8410b34f"
    ],
    "notes": "from the options-library library: Gold covered call (GLD / GC-OG) using GVZ as the IV reference; harness suggestion: cboe_index_history('GVZ') exists in mandel.data.options (CBOE_INDICES); add GLD to the closes feed; reuse VRP harness with GVZ | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6679,7 +6915,8 @@
    "blocked_on": "",
    "results": [
     "X-c5b6056b",
-    "X-4c9ff56d"
+    "X-4c9ff56d",
+    "X-b8cf2713"
    ],
    "notes": "from the options-library library: Gold variance risk premium (delta-hedged short strangle on GLD/GC); harness suggestion: Clone the SPY/VIX VRP harness with GVZ/GLD inputs | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -6709,7 +6946,8 @@
    "blocked_on": "",
    "results": [
     "X-4d1156f7",
-    "X-877d8dc2"
+    "X-877d8dc2",
+    "X-f41b9769"
    ],
    "notes": "from the options-library library: GVZ low-percentile long gold vol (crisis convexity); harness suggestion: Percentile harness shared with dvol-percentile-vega | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6739,7 +6977,8 @@
    "blocked_on": "",
    "results": [
     "X-dfd2c227",
-    "X-f24ee748"
+    "X-f24ee748",
+    "X-35bd4a37"
    ],
    "notes": "from the options-library library: Gold event vol (FOMC/CPI straddle on GLD); harness suggestion: Event-date table in mandel/knowledge; paired-difference harness over cboe_index_history('GVZ') | verifier: corrected claim/trial"
   },
@@ -6770,7 +7009,8 @@
    "blocked_on": "",
    "results": [
     "X-5beb6789",
-    "X-731b4b2d"
+    "X-731b4b2d",
+    "X-61fead11"
    ],
    "notes": "from the options-library library: Gold-silver ratio options trade; harness suggestion: Underlying-ratio harness now; option overlay once SLV surface_summary history exists | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
@@ -6796,9 +7036,11 @@
     "b6b_misc_slv_call_backspread"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-9856d560"
+   ],
    "notes": "from the options-library library: Silver call backspread (squeeze convexity); harness suggestion: Payoff engine template with K1/K2 rules; realised-vol proxy pricing flagged as model-priced | verifier: corrected claim/trial"
   },
   {
@@ -6905,7 +7147,8 @@
    "results": [
     "X-70072aa5",
     "X-460817bd",
-    "X-99ef77b8"
+    "X-99ef77b8",
+    "X-8846da32"
    ],
    "notes": "from the options-library library: Metals put-write for accumulation (GLD/SLV cash-secured; GC/SI SPAN); harness suggestion: Shares loop with gold-covered-call; kind='put' | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
@@ -6989,7 +7232,8 @@
    "results": [
     "X-3f905d4b",
     "X-2988e0ba",
-    "X-31c71edc"
+    "X-31c71edc",
+    "X-f23b1407"
    ],
    "notes": "from the underlying-library library: Crypto trend: 50/200 SMA and 12-week momentum on BTC and ETH; harness suggestion: trend.py sma_cross(prices, fast, slow) and donchian(prices, n); harness crypto_trend_vs_bh over BTC/ETH bundles; add Coinbase candle fetcher (api.exchange.coinbase.com/products/BTC-USD/candles, verified) as a second source to check Yahoo closes. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-485 (verifier-corrected wording)"
   },
@@ -7019,7 +7263,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-45363c88"
+    "X-45363c88",
+    "X-e8e687fa"
    ],
    "notes": "from the underlying-library library: Funding-rate-aware crypto trend (crowding filter on BTC/ETH trend signals); harness suggestion: New fetcher mandel/data/deribit.py: funding_history(instrument, start, end) paging by 14 days into bundle deribit-funding-<instrument> with available_at = timestamp; harness funding_filter_vs_trend in trend.py sharing the sma rule; report activation count as a hard inconclusive gate. | verifier: corrected claim/trial"
   },
@@ -7049,7 +7294,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-d019c368"
+    "X-d019c368",
+    "X-c050a2c0"
    ],
    "notes": "from the underlying-library library: Donchian channel breakout and all-time-high entry with ATR trailing stop; harness suggestion: trend.py donchian_atr(ohlc, n, atr_mult) returning trade list and daily returns; harness breakout_expectancy with the matched-hold random-entry control; extend the Yahoo bundle schema to keep open/high/low (currently close and volume). | verifier: corrected claim/trial"
   },
@@ -7081,7 +7327,8 @@
    "results": [
     "X-681555d4",
     "X-289f61db",
-    "X-267f9afa"
+    "X-267f9afa",
+    "X-b076e943"
    ],
    "notes": "from the underlying-library library: Dual momentum (Antonacci GEM): relative + absolute momentum between US and foreign equity with a bond fallback; harness suggestion: trend.py dual_momentum(prices_dict, lookback, fallback) -> monthly weights; harness gem_vs_6040 with pbo_cscv across the lookback grid. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-480 (verifier-corrected wording)"
   },
@@ -7113,7 +7360,8 @@
    "results": [
     "X-61ec30e0",
     "X-0667ba9d",
-    "X-e8562d46"
+    "X-e8562d46",
+    "X-76080490"
    ],
    "notes": "from the underlying-library library: Cross-sectional ETF momentum (sector and asset-class rotation); harness suggestion: trend.py xs_momentum(prices_df, lookback, skip, top_k, long_short) -> weights; harness xs_etf_momentum with within-month rank permutation null; reuse pbo_cscv. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-475 (verifier-corrected wording)"
   },
@@ -7274,7 +7522,8 @@
    "results": [
     "X-394ef7eb",
     "X-59b357ad",
-    "X-22d2e29d"
+    "X-22d2e29d",
+    "X-ea21c42c"
    ],
    "notes": "from the underlying-library library: Trend following on precious metals (gold and silver ETFs and chained futures); harness suggestion: collect_history for GLD, SLV, IAU, GC=F, SI=F, PPLT, PALL; trend.py functions from the TSMOM entry with an inverse-vol combiner; harness metals_trend with a roll-day mask for =F symbols. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-487 (verifier-corrected wording)"
   },
@@ -7358,7 +7607,8 @@
    "results": [
     "X-9cf9dbda",
     "X-33eb058b",
-    "X-b83f8cf1"
+    "X-b83f8cf1",
+    "X-2f386b0a"
    ],
    "notes": "from the underlying-library library: Short-horizon time-series momentum in BTC and ETH (1-4 week); harness suggestion: trend.py sign_lookback on weekly resample; harness btc_weekly_tsmom; reuse crypto_trend_vs_bh infrastructure. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-486 (verifier-corrected wording)"
   },
@@ -7494,7 +7744,8 @@
    "results": [
     "X-0d11fe29",
     "X-5add37e1",
-    "X-a95bab1b"
+    "X-a95bab1b",
+    "X-251e752a"
    ],
    "notes": "from the underlying-library library: Crypto short-term reversal (time-series BTC/ETH and cross-section of coins); harness suggestion: ts_reversal_quantile: generic conditional-next-return test with trailing quantile thresholds, reusable for SPY/QQQ | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-469 (verifier-corrected wording)"
   },
@@ -7599,12 +7850,15 @@
     "ohlc_spy_ivv_twin"
    ],
    "testable_now": true,
-   "status": "inconclusive",
+   "status": "parked",
    "blocked_on": "",
    "results": [
-    "X-baa72a98"
+    "X-baa72a98",
+    "X-49cd0e78"
    ],
-   "notes": "from the underlying-library library: ETF premium/discount to NAV reversion (and identical-exposure twins); harness suggestion: twin_spread_halflife: ratio AR(1), excursion-vs-cost counter, rule simulator; later nav_premium_reversion when NAV lands | verifier: corrected claim/trial"
+   "notes": "from the underlying-library library: ETF premium/discount to NAV reversion (and identical-exposure twins); harness suggestion: twin_spread_halflife: ratio AR(1), excursion-vs-cost counter, rule simulator; later nav_premium_reversion when NAV lands | verifier: corrected claim/trial",
+   "status_before_park": "not_supported",
+   "parked_reason": "reversion real but below retail cost (the trial's own park rule): SPY/IVV ratio AR(1) half-life 11.3 days, but mean gross +0.17 bp per trade against 8 bp round trip; net -7.83 bp (CI -9.14..-6.58), 175 trades 2010-2026"
   },
   {
    "id": "T-325",
@@ -7736,7 +7990,8 @@
    "status": "inconclusive",
    "blocked_on": "",
    "results": [
-    "X-2543136c"
+    "X-2543136c",
+    "X-e60ced50"
    ],
    "notes": "from the underlying-library library: Crypto futures basis / cash-and-carry (CME BTC futures and Deribit); harness suggestion: basis_carry_harness: basis calculator with roll detection, hurdle rule, hold-to-expiry accounting; daily Deribit snapshot writer for the forward sample | verifier: corrected claim/trial"
   },
@@ -7818,7 +8073,8 @@
    "status": "supported",
    "blocked_on": "",
    "results": [
-    "X-660e7d9f"
+    "X-660e7d9f",
+    "X-87c1a610"
    ],
    "notes": "from the underlying-library library: Index ETF daily technical reversal (RSI(2), Bollinger, IBS, down-day streak); harness suggestion: daily_rule_grid: declared indicator set, conditional-mean test, split-sample sign check, dsr_pbo_harness feed (parallels the Polymarket T-10 harness) | verifier: corrected claim/trial | Scope (2026-10-15): min_n 2000 is counted in trading days (6,725 in the window); the signal fires on 1,310 days. The pass statistic trades at the close that defines IBS (optimistic for MOC); next-open-to-close +7.5 bps and next-close entry +6.9 bps are reported as execution diagnostics, both above the 2 bps bar but not tested against it."
   },
@@ -7848,7 +8104,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-e6d84c5e"
+    "X-e6d84c5e",
+    "X-c4995dc5"
    ],
    "notes": "from the underlying-library library: Overnight vs intraday return reversal; harness suggestion: overnight_intraday_decomp: OHLC decomposition, correlation test, gap-fade simulator, IBIT control | verifier: corrected claim/trial"
   },
@@ -8060,7 +8317,8 @@
    "blocked_on": "",
    "results": [
     "X-3b985170",
-    "X-15befc42"
+    "X-15befc42",
+    "X-f071b157"
    ],
    "notes": "from the underlying-library library: Pre-FOMC announcement drift; harness suggestion: events.py: fomc_dates() fetcher (parse statement URLs by year, cache to mandel/data as 'fomc-dates'), then event_day_effect(days, closes, event_days, offset=-1, n_boot=2000) generalizing turn_of_month's paired block bootstrap; add subsample argument. | verifier: corrected claim/trial"
   },
@@ -8090,7 +8348,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-93025618"
+    "X-93025618",
+    "X-f302407b"
    ],
    "notes": "from the underlying-library library: FOMC-cycle even-week effect; harness suggestion: events.py: fomc_cycle_week(days, statement_days) -> week index per day; even_week_effect(days, closes, statement_days, cost_bps=1.5) with the cycle-shift placebo; verdict format as weekday_effect. | verifier: corrected claim/trial"
   },
@@ -8119,7 +8378,8 @@
    "testable_now": false,
    "status": "not_supported",
    "results": [
-    "X-05b99f6b"
+    "X-05b99f6b",
+    "X-1eeb3e18"
    ],
    "notes": "from the underlying-library library: Scheduled macro announcement-day premium (CPI, jobs, FOMC, GDP, ISM); harness suggestion: data/fetch.py: fred_release_dates(release_id) cached as 'fred-release-dates-<id>'; events.py: event_day_effect(days, closes, event_days, offset=0) shared with pre-FOMC; per-type loop with Bonferroni as in weekday_effect. | verifier: corrected claim/trial",
    "unblocked_from": "CPI and Employment Situation release dates for 1993-2026. The FRED release-dates API needs a free API key that Mandel does not hold (verified error), and the BLS schedule archive returns 403 from this host. A free FRED key (minutes to obtain) or running the BLS scrape from the user's server unblocks it. The FOMC-only component is already testable in the pre-FOMC entry."
@@ -8152,7 +8412,8 @@
    "results": [
     "X-4d5f471c",
     "X-9a309bb4",
-    "X-38a6588c"
+    "X-38a6588c",
+    "X-689377f2"
    ],
    "notes": "from the underlying-library library: Turn-of-the-month premium: cross-asset and sub-window replication; harness suggestion: Extend run.py: loop turn_of_month(days, closes) over the five symbols after fetch_yahoo_history for QQQ/IWM/TLT/GLD (social.py yahoo_history is the fetcher); add window and payday variants as parameters (before, after, mid=(14,16)). | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-443 (verifier-corrected wording)"
   },
@@ -8266,7 +8527,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-5ba41761"
+    "X-5ba41761",
+    "X-66b0c4ee"
    ],
    "notes": "from the underlying-library library: Overnight vs intraday return split (the night effect); harness suggestion: social.py yahoo_history: keep open/high/low; experiments/volatility.price_ohlc(rows) returning aligned arrays; events.py: overnight_intraday(days, opens, closes, cost_bps=1.0) with paired block bootstrap and net Sharpe. | verifier: corrected claim/trial"
   },
@@ -8324,7 +8586,8 @@
    "results": [
     "X-77358286",
     "X-22d944f4",
-    "X-2450086d"
+    "X-2450086d",
+    "X-83672e35"
    ],
    "notes": "from the underlying-library library: Santa Claus rally and turn-of-year indicators; harness suggestion: events.py: fixed_window_vs_random(days, closes, window_fn, length=7, n_boot=2000) where window_fn returns the Santa window per year; barometer_sign_test(days, closes, rule) for the indicator variants. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-440 (verifier-corrected wording)"
   },
@@ -8388,7 +8651,8 @@
    "results": [
     "X-eef67ea9",
     "X-f434df42",
-    "X-e7437d51"
+    "X-e7437d51",
+    "X-e374104e"
    ],
    "notes": "from the underlying-library library: Sell in May / Halloween indicator and month-of-year seasonality; harness suggestion: events.py: half_year_effect(days, closes, start_month=11, end_month=4) returning monthly means, block-bootstrap p, Sharpe of switching vs buy-and-hold; month_of_year_grid(days, closes) with Bonferroni, mirroring weekday_effect. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-441 (verifier-corrected wording)"
   },
@@ -8420,7 +8684,8 @@
    "results": [
     "X-4ecac469",
     "X-c1129583",
-    "X-d802443d"
+    "X-d802443d",
+    "X-e5573ba3"
    ],
    "notes": "from the underlying-library library: Options-expiration week and triple witching; harness suggestion: events.py: third_fridays(days) and last_fridays(days); week_type_effect(days, closes, week_flag_fn) producing weekly returns and the paired bootstrap; witching_day_effect reuses event_day_effect. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-438 (verifier-corrected wording)"
   },
@@ -8452,7 +8717,8 @@
    "results": [
     "X-c698c81e",
     "X-f79ca263",
-    "X-9b84676e"
+    "X-9b84676e",
+    "X-0366a70a"
    ],
    "notes": "from the underlying-library library: Crypto calendar effects: weekday, month-turn, derivatives expiry and trading-hours; harness suggestion: Reuse weekday_effect and turn_of_month on BTC/ETH; add last_fridays-based event_day_effect two-sided; hours arm waits on data/fetch.py coinbase_candles(product, granularity=3600) with paging. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-436 (verifier-corrected wording)"
   },
@@ -8510,7 +8776,8 @@
    "results": [
     "X-415ea23a",
     "X-4396480e",
-    "X-08b2d59b"
+    "X-08b2d59b",
+    "X-140f43ba"
    ],
    "notes": "from the underlying-library library: Gold seasonality: autumn effect, Indian wedding season and Lunar New Year; harness suggestion: events.py: month_set_effect(days, closes, months={9,10,11}) sharing code with half_year_effect; month_of_year_grid(days, closes) with Bonferroni; run over GLD, GC=F, SLV, GDX. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-437 (verifier-corrected wording)"
   },
@@ -8641,10 +8908,11 @@
     "fomc_monetary_momentum"
    ],
    "testable_now": true,
-   "status": "inconclusive",
+   "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-bf82b216"
+    "X-bf82b216",
+    "X-a809c4fb"
    ],
    "notes": "from the underlying-library library: Post-FOMC directional drift (monetary momentum); harness suggestion: data/fetch.py: fred_series('DGS2') (the FRED route exists); events.py: post_event_directional_drift(days, closes, event_days, signal_by_event, horizon=15, threshold_bps=5) with label permutation and block bootstrap. | verifier: corrected claim/trial"
   },
@@ -8674,7 +8942,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-952748a4"
+    "X-952748a4",
+    "X-926afbde"
    ],
    "notes": "from the underlying-library library: Crypto cash-and-carry via CME/Coinbase dated futures; harness suggestion: mandel/experiments/carry.py: basis_carry(spot, fut, rf, cost_bps) reusing ratio_reversion bootstrap; add Yahoo BTC=F/ETH=F/MBT=F to the daily-history bundles | verifier: corrected claim/trial"
   },
@@ -8704,7 +8973,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-4644d81f"
+    "X-4644d81f",
+    "X-236388dc"
    ],
    "notes": "from the underlying-library library: Perpetual funding-rate carry (long spot, short perp); harness suggestion: mandel/data/options.py: add deribit_funding_history and coinbase_cde_products snapshot to collect_options_daily; mandel/experiments/carry.py: funding_carry() | verifier: corrected claim/trial"
   },
@@ -8734,7 +9004,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-1578602f"
+    "X-1578602f",
+    "X-5e6643c4"
    ],
    "notes": "from the underlying-library library: Crypto carry as a crash predictor (basis signal); harness suggestion: mandel/experiments/carry.py: conditional_tail(signal, returns, horizon) with block permutation | verifier: corrected claim/trial"
   },
@@ -8842,7 +9113,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-a37f0b0b"
+    "X-a37f0b0b",
+    "X-c1c7d0cf"
    ],
    "notes": "from the underlying-library library: G10 FX carry for US retail (OANDA/IBKR); harness suggestion: mandel/experiments/carry.py: cross_sectional_carry(rates, spots, k=3) with bootstrap; FRED fetch list extended | verifier: corrected claim/trial"
   },
@@ -9134,7 +9406,8 @@
    "results": [
     "X-7ca7aeae",
     "X-de245b0b",
-    "X-42cab9a8"
+    "X-42cab9a8",
+    "X-bcbeed32"
    ],
    "notes": "from the underlying-library library: VIX futures roll-yield carry via ETPs; harness suggestion: mandel/experiments/volatility.py: term_structure_filter(etp, vix, vix3m); add Cboe VX CSV fetcher to mandel/data/options.py | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-435 (verifier-corrected wording)"
   },
@@ -9216,7 +9489,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-7be8d61a"
+    "X-7be8d61a",
+    "X-71229ca8"
    ],
    "notes": "from the underlying-library library: Value premium (HML) via value/growth ETF pair; harness suggestion: mandel/experiments/underlying.py: add factor_etf_tilt(symbol_long, symbol_short, ff_factor) returning capture ratio, alpha t-stat, bootstrap CI; shared by value/quality/size/profitability/BAB entries. | verifier: corrected claim/trial"
   },
@@ -9246,7 +9520,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-a957b72c"
+    "X-a957b72c",
+    "X-6af9f78b"
    ],
    "notes": "from the underlying-library library: Quality minus junk via quality ETF; harness suggestion: Reuse factor_etf_tilt; add a factor-regression helper (OLS with Newey-West) on FF5+UMD that every factor-ETF entry calls. | verifier: corrected claim/trial"
   },
@@ -9278,7 +9553,8 @@
    "results": [
     "X-9bfda3b1",
     "X-cecc68c9",
-    "X-bebc64d1"
+    "X-bebc64d1",
+    "X-7f523546"
    ],
    "notes": "from the underlying-library library: Low-volatility / minimum-variance tilt; harness suggestion: factor_etf_tilt with a sharpe_diff mode; add FRED DGS10 as a conditioning variable for the regime test. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-448 (verifier-corrected wording)"
   },
@@ -9308,7 +9584,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-d778fa2b"
+    "X-d778fa2b",
+    "X-ea53d084"
    ],
    "notes": "from the underlying-library library: Size premium (small minus big); harness suggestion: factor_etf_tilt; add a two-part verdict (raw vs conditional) in the registry so the parked raw-size claim and the live conditional claim are distinct trials. | verifier: corrected claim/trial"
   },
@@ -9338,7 +9615,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-895b101f"
+    "X-895b101f",
+    "X-399f2429"
    ],
    "notes": "from the underlying-library library: Profitability / cash-flow tilt (RMW); harness suggestion: factor_etf_tilt + factor regression helper; add sector-ETF controls (XLE, XLK) as optional regressors. | verifier: corrected claim/trial"
   },
@@ -9368,7 +9646,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-4f844e88"
+    "X-4f844e88",
+    "X-e127b6c6"
    ],
    "notes": "from the underlying-library library: Betting against beta (BAB) with low/high-beta ETFs; harness suggestion: Add beta_neutral_spread() to underlying.py (rolling beta, leverage, financing) and reuse for any pair; ingest AQR BAB Excel through the same fetch layer as Ken French. | verifier: corrected claim/trial"
   },
@@ -9398,7 +9677,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-1ee8d7ce"
+    "X-1ee8d7ce",
+    "X-15d473d7"
    ],
    "notes": "from the underlying-library library: Factor momentum rotation across factor ETFs; harness suggestion: Reuse the deflated trend-rule search from T-58 (overfit.py) with factor series as the input; add ETF implementation as the holdout. | verifier: corrected claim/trial"
   },
@@ -9425,12 +9705,15 @@
     "fact_contrarian_timing"
    ],
    "testable_now": true,
-   "status": "not_supported",
+   "status": "parked",
    "blocked_on": "",
    "results": [
-    "X-fb91d2c6"
+    "X-fb91d2c6",
+    "X-085a4b7a"
    ],
-   "notes": "from the underlying-library library: Contrarian factor timing (value-spread / long-term factor reversal); harness suggestion: Small addition to the factor-momentum harness: z-score tilt vs static baseline, same bootstrap. | verifier: corrected claim/trial"
+   "notes": "from the underlying-library library: Contrarian factor timing (value-spread / long-term factor reversal); harness suggestion: Small addition to the factor-momentum harness: z-score tilt vs static baseline, same bootstrap. | verifier: corrected claim/trial",
+   "status_before_park": "not_supported",
+   "parked_reason": "contrarian factor timing adds nothing beyond static exposure (the trial's own park rule, the expected outcome): 60-month z tilt minus static Sharpe -0.03 (CI -0.11..+0.04) pooled over the 3 quarterly phases, 704 months 1968-2026"
   },
   {
    "id": "T-390",
@@ -9640,7 +9923,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-da0f8875"
+    "X-da0f8875",
+    "X-72ef05ee"
    ],
    "notes": "from the underlying-library library: ESG exclusion / sin-stock premium; harness suggestion: Reuse factor regression helper on Ken French industry portfolios; add an industry-portfolio loader to data/fetch.py. | verifier: corrected claim/trial"
   },
@@ -10267,7 +10551,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-ea63a856"
+    "X-ea63a856",
+    "X-8fd312e9"
    ],
    "notes": "from the underlying-library library: Liquidity-shock timing from daily high-low spread estimates; harness suggestion: Implement corwin_schultz() and amihud() helpers in mandel/experiments/volatility.py (needs highs/lows from the Yahoo rows); timing rule via the ma_rule_returns pattern; compare_strategies against a VIX rule; pbo_cscv on the grid. | verifier: corrected claim/trial"
   },
@@ -10323,7 +10608,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-6eca056b"
+    "X-6eca056b",
+    "X-7d0b962b"
    ],
    "notes": "from the underlying-library library: Crypto perpetual basis and funding as positioning sentiment; harness suggestion: Add deribit_funding_history() beside deribit_dvol_history in mandel/data/options.py (page backward like DVOL); event study and rule P&L via underlying.py helpers; costs through backtest_eval inputs. | verifier: corrected claim/trial"
   },
@@ -10430,7 +10716,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-34f40b31"
+    "X-34f40b31",
+    "X-69c7c6a1"
    ],
    "notes": "from the underlying-library library: Market intraday momentum: first half-hour predicts last half-hour; harness suggestion: Yahoo interval=1h pilot fetch; regression and rule P&L in mandel/experiments/intraday_equity.py; BTC session variant via coinbase_candles(granularity=3600). | verifier: corrected claim/trial"
   },
@@ -10459,7 +10746,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-749ca45c"
+    "X-749ca45c",
+    "X-34651bea"
    ],
    "notes": "from the underlying-library library: Closing-auction imbalance and close-to-open reversal; harness suggestion: Pilot on Yahoo interval=1h bars in mandel/experiments/intraday_equity.py; full version waits for minute data; register the proxy and feed versions as separate trials. | verifier: corrected claim/trial"
   },
@@ -10541,7 +10829,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-5357a646"
+    "X-5357a646",
+    "X-8d557597"
    ],
    "notes": "from the underlying-library library: Emerging-market FX carry (high-yielders vs funders); harness suggestion: Reuse cross_sectional_carry() with an extended universe. Add DEXMXUS, DEXSFUS, DEXKOUS and the EM IR3TIB01 series to the FRED list. | added by the verifier pass"
   },
@@ -10650,7 +10939,8 @@
    "blocked_on": "",
    "results": [
     "X-9515b742",
-    "X-20fc541b"
+    "X-20fc541b",
+    "X-7ca21f29"
    ],
    "notes": "from the underlying-library library: VIX futures roll-yield carry via ETPs; harness suggestion: mandel/experiments/volatility.py: term_structure_filter(etp, vix, vix3m, threshold) with a paired bootstrap. Add a Cboe VX CSV fetcher to mandel/data/options.py. | verifier-corrected restatement of T-379, whose verdict tested the earlier wording and stands",
    "supersedes": "T-379"
@@ -10681,7 +10971,8 @@
    "blocked_on": "",
    "results": [
     "X-6198668a",
-    "X-e5c606da"
+    "X-e5c606da",
+    "X-51420fd9"
    ],
    "notes": "from the underlying-library library: Crypto calendar effects: Monday, month-turn, expiry, holidays; harness suggestion: weekday_contrast(days, closes, 'Mon', 'rest', calendar=7) beside weekday_effect; turn_of_month on 7-day calendars; last_fridays-based event_day_effect two-sided; data/fetch.py coinbase_candles(product, 3600) with paging for the hours arm. | verifier-corrected restatement of T-354, whose verdict tested the earlier wording and stands | READ WITH CARE: the verifier's restatement dropped the Bonferroni correction over seven weekdays that T-354 carried. Uncorrected p = 0.012 passes; corrected it would be about 0.08. Mandel has also tested BTC weekend vs weekday (T-62, not supported) and the BTC weekday family, so the honest multiplicity is at least seven. A Monday-only strategy net of a 0.4% round trip has Sharpe 0.18 vs buy-and-hold 0.99 (T-354): the effect is not tradable at retail cost.",
    "supersedes": "T-354"
@@ -10713,7 +11004,8 @@
    "blocked_on": "",
    "results": [
     "X-0424429c",
-    "X-0dae2bc6"
+    "X-0dae2bc6",
+    "X-7c1f451d"
    ],
    "notes": "from the underlying-library library: Gold seasonality: autumn effect and the published reversal; harness suggestion: events.py: month_set_effect(days, closes, months={9,10,11}, start='2011-01-01') sharing code with half_year_effect; month_of_year_grid; futures_roll_mask(days, closes) for GC=F. | verifier-corrected restatement of T-356, whose verdict tested the earlier wording and stands",
    "supersedes": "T-356"
@@ -10745,7 +11037,8 @@
    "blocked_on": "",
    "results": [
     "X-b691f14a",
-    "X-9487020c"
+    "X-9487020c",
+    "X-fffb41da"
    ],
    "notes": "from the underlying-library library: Options-expiration week and triple witching; harness suggestion: events.py: third_fridays(days, holidays) and last_fridays(days); week_type_effect(days, closes, week_flag_fn) producing weekly returns and the bootstrap; the witching day reuses event_day_effect. | verifier-corrected restatement of T-353, whose verdict tested the earlier wording and stands",
    "supersedes": "T-353"
@@ -10777,7 +11070,8 @@
    "blocked_on": "",
    "results": [
     "X-66ce388f",
-    "X-a1030409"
+    "X-a1030409",
+    "X-d1f375f9"
    ],
    "notes": "from the underlying-library library: Quarter-end window dressing and 'leaning for the tape'; harness suggestion: events.py: quarter_end_pairs(days) -> list of (last_idx, first_idx); paired_day_effect(closes, pairs, placebo_pairs, n_boot=5000); run on IWM, ^RUT, SPY. | verifier-corrected restatement of T-346, whose verdict tested the earlier wording and stands",
    "supersedes": "T-346"
@@ -10809,7 +11103,8 @@
    "blocked_on": "",
    "results": [
     "X-df833342",
-    "X-3a7fb152"
+    "X-3a7fb152",
+    "X-7d81c623"
    ],
    "notes": "from the underlying-library library: Santa Claus rally and turn-of-year indicators; harness suggestion: events.py: fixed_window_vs_random(days, closes, window_fn, length=7, n_boot=10000, start_year=1973); barometer_sign_test(days, closes, rule). | verifier-corrected restatement of T-350, whose verdict tested the earlier wording and stands | post-publication window: +0.86 pp (p 0.010), significant but under the 1 pp bar; the 1928- reading (+1.38 pp, T-350) is dominated by the pre-publication years. | 2026-10-15: after the harness audit added the claim's SPY >= 1 pp gate, T-350 was re-run and is now not_supported (SPY +0.49 pp over 33 years); T-350 and this restatement now agree.",
    "supersedes": "T-350"
@@ -10841,7 +11136,8 @@
    "blocked_on": "",
    "results": [
     "X-be07895f",
-    "X-5c815255"
+    "X-5c815255",
+    "X-9a79b1c6"
    ],
    "notes": "from the underlying-library library: Sell in May / Halloween indicator; harness suggestion: events.py: half_year_effect(days, closes, start_month=11, end_month=4, cash=dtb3) -> monthly means, block-bootstrap p, switching Sharpe; month_of_year_grid(days, closes) with Bonferroni over 12. | verifier-corrected restatement of T-352, whose verdict tested the earlier wording and stands",
    "supersedes": "T-352"
@@ -10899,7 +11195,8 @@
    "blocked_on": "",
    "results": [
     "X-5733d8cb",
-    "X-8c333d01"
+    "X-8c333d01",
+    "X-71af3c3c"
    ],
    "notes": "from the underlying-library library: Turn-of-the-month premium: cross-asset replication; harness suggestion: mandel/experiments/underlying.py: turn_of_month already exists. Add tom_replication(series: dict[str, (days, closes)], n_boot=2000) with a shared block-index bootstrap across assets for the count null; window and payday parameters for variants. | verifier-corrected restatement of T-344, whose verdict tested the earlier wording and stands",
    "supersedes": "T-344"
@@ -10931,7 +11228,8 @@
    "blocked_on": "",
    "results": [
     "X-65c1b193",
-    "X-741364e1"
+    "X-741364e1",
+    "X-ae3da327"
    ],
    "notes": "from the underlying-library library: Turn-of-year small-cap premium (January effect); harness suggestion: events.py: spread_series() plus fixed_window_vs_random() from the Santa harness with a different window_fn. | verifier-corrected restatement of T-351, whose verdict tested the earlier wording and stands",
    "supersedes": "T-351"
@@ -10959,12 +11257,15 @@
     "fact_accruals"
    ],
    "testable_now": true,
-   "status": "not_supported",
+   "status": "parked",
    "blocked_on": "",
    "results": [
-    "X-3a88110f"
+    "X-3a88110f",
+    "X-64054c65"
    ],
-   "notes": "from the underlying-library library: Accruals anomaly (Sloan) post-publication; harness suggestion: data/kenfrench.py sort-portfolio loader; one spread_test() for all characteristic-sorted Ken French files (AC, NI, OP, INV, VAR). | added by the verifier pass"
+   "notes": "from the underlying-library library: Accruals anomaly (Sloan) post-publication; harness suggestion: data/kenfrench.py sort-portfolio loader; one spread_test() for all characteristic-sorted Ken French files (AC, NI, OP, INV, VAR). | added by the verifier pass",
+   "status_before_park": "not_supported",
+   "parked_reason": "arbitraged away (the trial's own park rule): post-publication accruals Lo20-Hi20 +0.17%/month (CI -0.10..+0.42), FF5 alpha t 1.21, 362 months 1996-07..2026-08, against +0.38%/month before 1996-07"
   },
   {
    "id": "T-446",
@@ -10992,7 +11293,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-a05566d2"
+    "X-a05566d2",
+    "X-9d5cebb4"
    ],
    "notes": "from the underlying-library library: Cross-sectional stock momentum (UMD) post-publication; harness suggestion: factor_etf_tilt on UMD/MTUM; flag cross-family duplicate with trend library. | added by the verifier pass"
   },
@@ -11022,7 +11324,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-38e281c1"
+    "X-38e281c1",
+    "X-eb7c9788"
    ],
    "notes": "from the underlying-library library: Investment / asset-growth factor (CMA); harness suggestion: factor_etf_tilt bootstrap mode on FF5 columns. | added by the verifier pass"
   },
@@ -11053,7 +11356,8 @@
    "blocked_on": "",
    "results": [
     "X-c5c2c5d0",
-    "X-1c1042af"
+    "X-1c1042af",
+    "X-a3970f24"
    ],
    "notes": "from the underlying-library library: Low-volatility / minimum-variance tilt; harness suggestion: factor_etf_tilt with a sharpe_diff mode (Ledoit-Wolf studentized bootstrap); FRED DGS10 as a conditioning variable. | verifier-corrected restatement of T-384, whose verdict tested the earlier wording and stands",
    "supersedes": "T-384"
@@ -11084,7 +11388,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-b0f715c4"
+    "X-b0f715c4",
+    "X-f02e08fa"
    ],
    "notes": "from the underlying-library library: Net share issuance; harness suggestion: spread_test() on Ken French NI file; PKW via factor_etf_tilt. | added by the verifier pass"
   },
@@ -11600,14 +11905,17 @@
     "btc_reversal_v2"
    ],
    "testable_now": true,
-   "status": "not_supported",
+   "status": "parked",
    "blocked_on": "",
    "results": [
     "X-9d32ac28",
-    "X-baf34d0a"
+    "X-baf34d0a",
+    "X-7a3d6092"
    ],
    "notes": "from the underlying-library library: Crypto short-term reversal (time-series BTC/ETH; cross-section of coins); harness suggestion: ts_reversal_quantile: conditional-next-return test with trailing quantile thresholds and block-shift null (generalizes underlying.ratio_reversion's null), reusable for SPY/QQQ/GLD | verifier-corrected restatement of T-320, whose verdict tested the earlier wording and stands",
-   "supersedes": "T-320"
+   "supersedes": "T-320",
+   "status_before_park": "not_supported",
+   "parked_reason": "no tradable daily reversal in BTC (the trial's own park rule): conditional minus unconditional next-day excess +11.3 bp (CI -23.6..+47.2) against the 60 bp bar, 422 signals"
   },
   {
    "id": "T-470",
@@ -11766,7 +12074,8 @@
    "blocked_on": "",
    "results": [
     "X-890ef6fe",
-    "X-8c4a47ea"
+    "X-8c4a47ea",
+    "X-4a101e3d"
    ],
    "notes": "from the underlying-library library: Cross-sectional sector ETF momentum (Select Sector SPDR rotation); harness suggestion: underlying.py: xs_momentum(adj_monthly_df, lookback, skip, top_k, long_short, abs_filter) -> weights and returns; harness xs_etf_momentum with rank-permutation null; pbo_cscv from overfit.py. | verifier-corrected restatement of T-306, whose verdict tested the earlier wording and stands",
    "supersedes": "T-306"
@@ -11848,7 +12157,8 @@
    "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-44d40cbe"
+    "X-44d40cbe",
+    "X-8712a9b5"
    ],
    "notes": "from the underlying-library library: Currency momentum on G10 spot rates (FRED H.10) traded through currency ETFs; harness suggestion: mandel/data/fred.py batch fetch of the H.10 and IR3TIB series; xs_momentum reused on the currency panel; harness currency_momentum. | added by the verifier pass"
   },
@@ -11905,7 +12215,8 @@
    "blocked_on": "",
    "results": [
     "X-d9d8fb12",
-    "X-3b44aadc"
+    "X-3b44aadc",
+    "X-9bb47f39"
    ],
    "notes": "from the underlying-library library: Dual momentum (Antonacci GEM): SPY vs foreign equity with T-bill filter and bond fallback; harness suggestion: underlying.py: dual_momentum(adj_monthly: dict, lookback, fallback, filter_on) -> monthly weights; harness gem_vs_6040 with pbo_cscv from overfit.py. | verifier-corrected restatement of T-305, whose verdict tested the earlier wording and stands",
    "supersedes": "T-305"
@@ -12040,7 +12351,8 @@
    "blocked_on": "",
    "results": [
     "X-b265f43a",
-    "X-888b07c2"
+    "X-888b07c2",
+    "X-aa5c430d"
    ],
    "notes": "from the underlying-library library: Crypto trend: 50/200-day SMA golden cross on BTC and ETH; harness suggestion: Reuse underlying.ma_rule_returns and rule_search (T-58 harness) with an sma_cross(fast, slow) addition and a paired Sharpe-difference bootstrap; add a coinbase_candles() fetcher for the cross-check. | verifier-corrected restatement of T-302, whose verdict tested the earlier wording and stands",
    "supersedes": "T-302"
@@ -12072,7 +12384,8 @@
    "blocked_on": "",
    "results": [
     "X-9db7487c",
-    "X-fd121342"
+    "X-fd121342",
+    "X-9ef06506"
    ],
    "notes": "from the underlying-library library: Short-horizon time-series momentum in BTC and ETH (1-4 week); harness suggestion: Weekly resample plus tsmom_returns from underlying.py; harness btc_weekly_tsmom sharing the crypto trend infrastructure. | verifier-corrected restatement of T-315, whose verdict tested the earlier wording and stands",
    "supersedes": "T-315"
@@ -12104,7 +12417,8 @@
    "blocked_on": "",
    "results": [
     "X-9538d6f6",
-    "X-f829a5fe"
+    "X-f829a5fe",
+    "X-84ccd3ac"
    ],
    "notes": "from the underlying-library library: Trend following on gold and silver ETFs; harness suggestion: Reuse the TSMOM harness with an inverse_vol_combiner and a roll-day mask for =F symbols. | verifier-corrected restatement of T-312, whose verdict tested the earlier wording and stands",
    "supersedes": "T-312"
@@ -12132,9 +12446,11 @@
     "b6b_chain_butterfly_arb"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-6568b066"
+   ],
    "notes": "from the options-library library: Butterfly convexity arbitrage (negative-priced butterfly); harness suggestion: mandel/options/static_arb.py: butterfly_scan(chain) with executable and mid prices; payoff engine template [call+ K1, call-2 K2, call+ K3]. | added by the verifier pass"
   },
   {
@@ -12160,9 +12476,11 @@
     "b6b_chain_calendar_arb"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a6b081cf"
+   ],
    "notes": "from the options-library library: Calendar (time-value) arbitrage; harness suggestion: static_arb.py calendar_scan(chain) plus total_variance_check(surface). | added by the verifier pass"
   },
   {
@@ -12192,7 +12510,8 @@
    "blocked_on": "",
    "results": [
     "X-89d6979d",
-    "X-45d0a06f"
+    "X-45d0a06f",
+    "X-05439d13"
    ],
    "notes": "from the options-library library: Expiration pin risk management and pinning trade; harness suggestion: mandel/experiments/pinning.py on SPY closes; later join captured OI for OI-weighted pins. | verifier-corrected restatement of T-192, whose verdict tested the earlier wording and stands",
    "supersedes": "T-192"
@@ -12227,7 +12546,8 @@
     "X-56531a00",
     "X-afab5dd0",
     "X-23bc344d",
-    "X-0e895672"
+    "X-0e895672",
+    "X-62f6665b"
    ],
    "notes": "from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2, side) and daily box_curve; payoff-engine test asserts a flat K2 - K1. | verifier-corrected restatement of T-186, whose verdict tested the earlier wording and stands | the bootstrap CI over boxes is too narrow (boxes share strikes and are not independent); the persistence criterion over 20 capture days is the real test",
    "supersedes": "T-186"
@@ -12287,7 +12607,8 @@
     "X-a1e718fa",
     "X-b2f95ecc",
     "X-ddcd0c9a",
-    "X-486a58ea"
+    "X-486a58ea",
+    "X-82ee011c"
    ],
    "notes": "from the options-library library: Put-call parity scan / synthetic forward; harness suggestion: mandel/options/parity.py: implied_forward(chain, r) -> per-(K,T) table with strike-dispersion column; inverse_parity(deribit_book) using F_impl = K/(1 - (C_btc - P_btc)); 2-leg template [call+, put-] in the payoff engine must draw a straight line. | verifier-corrected restatement of T-181, whose verdict tested the earlier wording and stands",
    "supersedes": "T-181"
@@ -12321,7 +12642,8 @@
     "X-5463bfbf",
     "X-da417e54",
     "X-546d5c3b",
-    "X-44e5c0f0"
+    "X-44e5c0f0",
+    "X-c5e71477"
    ],
    "notes": "from the options-library library: Short box spread (SPX box borrowing); harness suggestion: box.py with side='short' using executable prices; borrow-curve output. | verifier-corrected restatement of T-187, whose verdict tested the earlier wording and stands",
    "supersedes": "T-187"
@@ -12349,9 +12671,11 @@
     "b6b_chain_synthetic_call"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7d886959"
+   ],
    "notes": "from the options-library library: Synthetic options (synthetic call / synthetic put from stock + option); harness suggestion: Templates [underlying+, put+] vs [call+] plus a bond leg; payoff engine must show identical kinked shapes offset by K - S0 - P + C. | added by the verifier pass"
   },
   {
@@ -12377,9 +12701,11 @@
     "b6b_chain_vertical_bounds"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-133cc150"
+   ],
    "notes": "from the options-library library: Vertical-spread bound and strike-monotonicity arbitrage; harness suggestion: static_arb.py vertical_scan(chain); also used as a quote-sanity gate in the daily options-fetch job. | added by the verifier pass"
   },
   {
@@ -12435,7 +12761,8 @@
    "blocked_on": "",
    "results": [
     "X-8f04150f",
-    "X-a3e70303"
+    "X-a3e70303",
+    "X-3afb94b3"
    ],
    "notes": "from the options-library library: Straddle calendar (time spread of straddles / forward-vol trade); harness suggestion: Already harnessed as T-148, forward_variance_premium in experiments/options_market.py (not volatility.py). The archived verdict is supported: +6.21 vol points, positive on 87% of 4,229 days since 2009-09-18, halves +6.42/+5.99, sign test 59/68. Next: a model-priced delta-hedged reverse straddle-calendar P&L through the two-expiry simulator, to check that the premium survives four-leg costs. | verifier-corrected restatement of T-148, whose verdict tested the earlier wording and stands",
    "supersedes": "T-148"
@@ -12463,9 +12790,11 @@
     "b6_surf_weekend_variance"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f680a617"
+   ],
    "notes": "from the options-library library: Weekend theta capture (Friday-to-Monday short premium); harness suggestion: spy_weekend_variance(spy_rows) in experiments/options_market.py, mirroring btc_weekend_variance; then a capture-driven check of the Friday-close-to-Monday ATM straddle mark change vs realised. | added by the verifier pass"
   },
   {
@@ -12495,7 +12824,8 @@
    "blocked_on": "",
    "results": [
     "X-40ab469d",
-    "X-a9bf4b49"
+    "X-a9bf4b49",
+    "X-3313ccaf"
    ],
    "notes": "from the options-library library: Crude oil variance risk premium (OVX on USO) short strangle; harness suggestion: Clone the GVZ VRP harness with OVX/USO inputs; cboe_index_history('OVX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py"
   },
@@ -12552,7 +12882,8 @@
    "blocked_on": "",
    "results": [
     "X-46f63ac4",
-    "X-3c8945e5"
+    "X-3c8945e5",
+    "X-b20b70c0"
    ],
    "notes": "from the options-library library: Gold vs equity implied-vol spread (GVZ/VIX relative value); harness suggestion: Ratio z-score harness over cboe_index_history('GVZ') and ('VIX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py"
   },
@@ -12584,7 +12915,8 @@
    "results": [
     "X-696b70b5",
     "X-a15a3182",
-    "X-177cecd0"
+    "X-177cecd0",
+    "X-633005f6"
    ],
    "notes": "from the options-library library: Weekend theta harvest (24/7 pricing vs weekend realised vol); harness suggestion: Extend underlying.weekend_effect to variance ratios; later confirm the pricing side with weekend-daily trade IVs | verifier-corrected restatement of T-264, whose verdict tested the earlier wording and stands",
    "supersedes": "T-264"
@@ -12612,9 +12944,11 @@
     "b6_dir_digital_put"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b2c26a56"
+   ],
    "notes": "from the options-library library: Digital (Binary) via Tight Vertical Spread; harness suggestion: digital_calibration(symbol='SPY', moneyness=0.97, dte=21) using proper scoring in mandel/forecasts.py; Kalshi follow-up after 30 synchronised SPXW + KXINX snapshots | added by the verifier pass"
   },
   {
@@ -12644,7 +12978,8 @@
    "blocked_on": "",
    "results": [
     "X-19a801eb",
-    "X-b780aa15"
+    "X-b780aa15",
+    "X-07b81d33"
    ],
    "notes": "from the options-library library: Seagull (Put-Financed Call Spread); harness suggestion: overlay_backtest(strategy='seagull', k_put='zero_cost') in mandel/experiments/volatility.py | added by the verifier pass | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
@@ -12671,8 +13006,10 @@
     "b6b_misc_opec_uso_straddle"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "inconclusive",
+   "results": [
+    "X-da58485b"
+   ],
    "notes": "from the options-library library: Crude-oil scheduled-event straddle (OPEC+ meetings / EIA inventory); harness suggestion: Add (USO, OVX) to the (underlying, vol index) event harness. | added by the verifier pass",
    "unblocked_from": "USO closes and OVX history fetchers (both free, not in the current data list) and an OPEC+ meeting calendar."
   },
@@ -12777,9 +13114,11 @@
     "b6b_misc_election_spy_move"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e726de11"
+   ],
    "notes": "from the options-library library: Election / political-event straddle (index vol spanning a scheduled vote); harness suggestion: Reuse the VIX-as-IV event pricer with a 2-day horizon; add Polymarket odds as a covariate when n grows. | added by the verifier pass"
   },
   {
@@ -12909,9 +13248,11 @@
     "b6b_bw_call_spread_overwrite"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-2e704524"
+   ],
    "notes": "from the options-library library: Call-spread overwrite (covered call with upside re-entry); harness suggestion: Add as a two-call overlay in the model-priced overlay harness. Re-test with captured chains once ~24 monthly cohorts exist (from 2026-10-14) to remove the flat-IV bias. | added by the verifier pass"
   },
   {
@@ -12937,9 +13278,11 @@
     "b6b_hedge_vxth_drawdown"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-c362849a"
+   ],
    "notes": "from the options-library library: VIX-call tail-hedge overlay on an equity holding (Cboe VXTH); harness suggestion: Add VXTH and PPUT3M to the benchmark list. Recomputed today: VXTH 2006- CAGR 9.93% / vol 17.2% / maxDD -43.3% / worst month -10.7%. The hedge's 2008 drawdown is large, so the claim may fail; that is the point of testing it. | added by the verifier pass"
   },
   {
@@ -12965,9 +13308,11 @@
     "b6_var_vix1d_premium"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f1fa28ba"
+   ],
    "notes": "from the options-library library: 1-day (0DTE) variance premium: short SPX daily straddle vs VIX1D; harness suggestion: New harness_vix1d in the harness_vrp_spx style, using archive cboe-VIX1D-history and daily-history--GSPC. | added by the verifier pass"
   },
   {
@@ -12993,13 +13338,14 @@
     "conditional_forward_v2"
    ],
    "testable_now": true,
-   "status": "supported",
+   "status": "not_supported",
    "blocked_on": "",
    "results": [
     "X-eb6f8b95",
-    "X-d4ada054"
+    "X-d4ada054",
+    "X-e049bc5e"
    ],
-   "notes": "from the options-library library: Calendar vol spread (ATM time spread, long or reverse); harness suggestion: harness_forward_variance (T-148, uses 93/30/63) and harness_term_vs_spot (T-231, uses the cruder (3*VIX3M^2 - VIX^2)/2) already compute this gap; add the VIX3M/VIX gate and unify both on the 93/30/63 formula. The calendar P&L comes from build_position with two expiries once captures exist. | verifier-corrected restatement of T-231, whose verdict tested the earlier wording and stands",
+   "notes": "from the options-library library: Calendar vol spread (ATM time spread, long or reverse); harness suggestion: harness_forward_variance (T-148, uses 93/30/63) and harness_term_vs_spot (T-231, uses the cruder (3*VIX3M^2 - VIX^2)/2) already compute this gap; add the VIX3M/VIX gate and unify both on the 93/30/63 formula. The calendar P&L comes from build_position with two expiries once captures exist. | verifier-corrected restatement of T-231, whose verdict tested the earlier wording and stands | 2026-10-15 re-run: lost support under rule 10: pooled over all 2693 contango days the forward-minus-realised variance is +0.0143 with both halves positive, but one-sided p 0.0465 (the 95% CI includes zero); only 30 of the 63 single grid phases pass, so the earlier 'supported' came from one grid phase.",
    "supersedes": "T-231"
   },
   {
@@ -13081,7 +13427,8 @@
    "blocked_on": "",
    "results": [
     "X-f152f25f",
-    "X-8e2bdb37"
+    "X-8e2bdb37",
+    "X-f12ce750"
    ],
    "notes": "from the options-library library: Vega-neutral gamma-positive straddle swap (long near / short far straddle); harness suggestion: harness_vix9d (T-232) already runs this but uses 9 trading-day windows; switch to 9 calendar days. Add a harness_gamma_swap daily-rehedge simulator (bs.delta) on SPY closes for the model-priced secondary. | verifier-corrected restatement of T-232, whose verdict tested the earlier wording and stands",
    "supersedes": "T-232"
@@ -13113,7 +13460,8 @@
    "blocked_on": "",
    "results": [
     "X-f0f50dc7",
-    "X-fc0a22c8"
+    "X-fc0a22c8",
+    "X-50f4ab3a"
    ],
    "notes": "from the options-library library: VIX futures roll-down harvest via short VIX call spread; harness suggestion: harness_vix_forward_contango (T-238) runs the data part; add F_adj and the Black-76 call-spread pricer (sigma = VVIX/100, T from the VIX monthly calendar). | verifier-corrected restatement of T-238, whose verdict tested the earlier wording and stands",
    "supersedes": "T-238"
@@ -13145,7 +13493,8 @@
    "blocked_on": "",
    "results": [
     "X-d74fdd76",
-    "X-5fa20844"
+    "X-5fa20844",
+    "X-28339e58"
    ],
    "notes": "from the options-library library: VIX spike mean-reversion via long VIX put / put spread; harness suggestion: harness_vix_spike (T-241) runs this; add F_adj and report the exact event count. | verifier-corrected restatement of T-241, whose verdict tested the earlier wording and stands",
    "supersedes": "T-241"
@@ -13177,7 +13526,8 @@
    "blocked_on": "",
    "results": [
     "X-8010d5c8",
-    "X-1b1179af"
+    "X-1b1179af",
+    "X-ff99c6bc"
    ],
    "notes": "from the options-library library: Vol-of-vol trade: short VIX strangle vs VVIX; harness suggestion: harness_vvix (T-243) implements the data part; add the strangle pricer so a pass is no longer reported as inconclusive. | verifier-corrected restatement of T-243, whose verdict tested the earlier wording and stands",
    "supersedes": "T-243"
@@ -13231,8 +13581,10 @@
     "b6_surf_implied_correlation"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "inconclusive",
+   "results": [
+    "X-66a6cce7"
+   ],
    "notes": "from the options-library library: Dispersion Trade (short index vol, long constituent vol); harness suggestion: Harness 'implied_vs_realised_correlation' in mandel/experiments/volatility.py with bundles ['cboe-COR1M-history','daily-history-XL*']. | added by the verifier pass",
    "unblocked_from": "constituent or sector-ETF daily closes are not in the free data set yet (the daily-history fetcher already handles ETFs, so adding XLK..XLU bundles unblocks the proxy); a market-priced test also needs single-stock chain captures"
   },
@@ -13258,8 +13610,10 @@
     "b6b_dolt_put_ladder"
    ],
    "testable_now": false,
-   "status": "untested",
-   "results": [],
+   "status": "not_supported",
+   "results": [
+    "X-e6e164dc"
+   ],
    "notes": "from the options-library library: Ladder / Christmas Tree (long or short, call or put); harness suggestion: Harness 'ladder_skew' sharing the delta selector with 'front_ratio_skew'. | added by the verifier pass",
    "unblocked_from": "daily chain capture: 250 entry days including a stress episode"
   },
@@ -13286,10 +13640,12 @@
     "b6_var_variance_swap_units"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Variance Swap Replication (long / short variance via 1/K^2 strip); harness suggestion: Extend 'vrp_spx' (mandel/experiments/volatility.variance_risk_premium) with a variance-unit, non-overlapping mode and tail statistics; the same mode for vrp_btc and vrp_gold. | added by the verifier pass"
+   "results": [
+    "X-a7f44bf6"
+   ],
+   "notes": "from the options-library library: Variance Swap Replication (long / short variance via 1/K^2 strip); harness suggestion: Extend 'vrp_spx' (mandel/experiments/volatility.variance_risk_premium) with a variance-unit, non-overlapping mode and tail statistics; the same mode for vrp_btc and vrp_gold. | added by the verifier pass | 2026-10-15 re-run: supported pooled over all 21 start offsets (+8.12 %^2/month, CI +1.43 to +11.22); 17 of 21 single grids pass; worst cycle -630.8 entered 2020-02-26 (skew -7.6, kurtosis 93): the tail is the point, as the trial says."
   },
   {
    "id": "T-541",
