@@ -4187,6 +4187,29 @@
    "parked_reason": "",
    "in_git": false,
    "schema": "kind option-trade: value = raw Deribit trade {trade_id, trade_seq, timestamp (ms), instrument_name, price (coin), mark_price, iv, index_price, amount, contracts?, direction, tick_direction, block_trade_id?} + {decision_day, currency, expiry, expiry_code, strike, type}; only the target expiry; available_at = trade time | kind fomc-window: value = {decision_day, decision_time (14:00 America/New_York, ISO UTC), currency, target_expiry, target_expiry_code, target_listed_at, window_start, window_end (= decision_time, exclusive), complete, trades_seen, trades_kept, pages (these four are fetch metadata, not market information), available_basis}; available_at = max(fomc-meetings available_at of the meeting, target_listed_at)"
+  },
+  "deribit-option-trades-daily-BTC": {
+   "name": "deribit-option-trades-daily-BTC",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-option-trades-daily-BTC.jsonl.gz",
+   "created_at": "2026-10-15T19:18:04.740045+00:00",
+   "rows": 2465638,
+   "bytes": 78899604,
+   "sha256": "cebbef19e19a763a1bcf95d23882f1c724bb3c5f6e75bb78cd2afc3e4f351b43",
+   "tags": [
+    "T-257",
+    "T-262",
+    "crypto",
+    "daily",
+    "deribit",
+    "options",
+    "smile",
+    "trades"
+   ],
+   "recipe": "GET https://history.deribit.com/api/v2/public/get_last_trades_by_currency_and_time?currency=BTC&kind=option&start_timestamp=<day 07:00 UTC ms>&end_timestamp=<day 09:00 UTC ms - 1>&count=1000&include_old=true&sorting=asc, paged forward (mandel.data.options_misc.trades_in_window), for every UTC day (the window batch6b_drb.daily_smiles samples), keeping the expiries 1-400 calendar days after the day; raw-trade fields trade_id, timestamp, instrument_name, price, mark_price, iv, index_price, amount, direction; via mandel.data.deribit_history.fetch_deribit_daily_trades, stored in chunks of 180 complete days (resume with skip_stored=True); 0.25s pacing, 4 tries with exponential backoff on 429/5xx. available_at = trade time. Days stored: 2021-12-01..2026-10-14 (1779 days; a day is stored only when its paging completed). Deribit states no data licence (no redistribution right) and the repo is public: local disk only (in_git=False), rebuild from this recipe",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind option-trade: value = {trade_id, timestamp (ms), instrument_name, price (coin), mark_price, iv, index_price, amount, direction} (fields of the raw Deribit trade) + {currency, expiry, expiry_code, strike, type}; trades in [day 07:00, day 09:00) UTC in expiries 1-400 calendar days after the day; available_at = trade time | kind sample-day (fetch metadata, not market information; the harness reads option-trade rows only): value = {day, currency, window_start, window_end, hours, dte_days, trades_seen, trades_kept, pages, complete}, available_at = window end"
   }
  }
 }

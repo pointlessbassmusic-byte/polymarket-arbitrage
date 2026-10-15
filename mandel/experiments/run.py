@@ -1106,16 +1106,16 @@ BATCH_BUNDLES = {
     "b6b_dolt_ratio_overlay_skew": ["daily-history-SPY", "dolt-chain-SPY"],
     "b6b_volh_sector_corr_premium": ["cboe-COR1M-history", "cboe-VIX-history", "daily-history-SPY", "daily-history-XLB", "daily-history-XLE", "daily-history-XLF", "daily-history-XLI", "daily-history-XLK", "daily-history-XLP", "daily-history-XLU", "daily-history-XLV", "daily-history-XLY", "dolt-chain-SPY", "dolt-volhistory"],
     "b6b_drb_box_rate_capture_days": ["deribit-book-BTC-*", "deribit-funding-BTC-PERPETUAL", "deribit-quarterly-futures-btc", "fred-DTB3"],
-    "b6b_drb_calendar_inversion": ["deribit-delivery-prices-btc"],
+    "b6b_drb_calendar_inversion": ["deribit-delivery-prices-btc", "deribit-option-trades-daily-BTC"],
     "b6b_drb_catalyst_strangle": ["deribit-dvol-BTC-history", "deribit-dvol-ETH-history", "deribit-option-trades-catalysts"],
     "b6b_drb_cme_ibit_tax": ["deribit-delivery-prices-btc", "deribit-dvol-BTC-history", "deribit-funding-BTC-PERPETUAL", "deribit-quarterly-futures-btc", "fred-DTB3"],
     "b6b_drb_dvol_futures_basis": ["deribit-dvol-futures-trades"],
     "b6b_drb_expiry_friday_straddle": ["deribit-delivery-prices-btc", "deribit-dvol-BTC-history", "deribit-dvol-ETH-history", "deribit-funding-BTC-PERPETUAL", "fomc-meetings", "fred-DTB3", "hourly-BTC-USD", "hourly-ETH-USD", "macro-release-cpi"],
-    "b6b_drb_fomc_event_straddle": ["deribit-delivery-prices-btc", "deribit-dvol-BTC-history", "fomc-meetings"],
+    "b6b_drb_fomc_event_straddle": ["deribit-delivery-prices-btc", "deribit-dvol-BTC-history", "deribit-option-trades-fomc", "fomc-meetings"],
     "b6b_drb_parity_violations": ["deribit-book-BTC-*", "deribit-funding-BTC-PERPETUAL", "deribit-quarterly-futures-btc"],
     "b6b_drb_quarterly_basis": ["daily-history-BTC-USD", "deribit-funding-BTC-PERPETUAL", "deribit-quarterly-futures-btc", "fred-DTB3"],
     "b6b_drb_quarterly_box_rate": ["deribit-book-BTC-*", "deribit-funding-BTC-PERPETUAL", "fred-DTB3"],
-    "b6b_drb_rr_skew_harvest": ["deribit-delivery-prices-btc"],
+    "b6b_drb_rr_skew_harvest": ["deribit-delivery-prices-btc", "deribit-option-trades-daily-BTC"],
 }
 
 
