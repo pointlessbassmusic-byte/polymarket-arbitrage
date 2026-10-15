@@ -11,6 +11,7 @@ which live on the capturing machine's disk; elsewhere they report the missing bu
 
 from __future__ import annotations
 
+import bisect
 import math
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
@@ -18,6 +19,7 @@ from typing import Iterable, Optional
 
 import numpy as np
 
+from mandel.experiments.underlying2 import _verdict
 from mandel.experiments.volatility import index_closes, price_closes
 from mandel.validation.backtest_eval import block_bootstrap_pvalue
 
@@ -63,6 +65,35 @@ def _rv_annual(r: np.ndarray, start: int, end: int, ppy: int = 252) -> float:
     return float(np.sum(seg ** 2) * ppy / len(seg))
 
 
+# ------------------------------------------------------------------ FRED rates --
+
+def _bill_obs(series: dict, day: str) -> tuple[str, float]:
+    """Latest FRED observation dated strictly BEFORE the capture day. A FRED row for day D is published about 20:00 UTC on D, while the
+    chain captures (07:00-11:30 UTC) carry the previous session's quotes, so a same-day row would be look-ahead and would make a re-run
+    differ from the recorded day-one statistic."""
+    prior = [d for d in series if d < day]
+    if not prior:
+        raise ValueError(f"no FRED observation dated before capture day {day}")
+    d = max(prior)
+    return d, float(series[d])
+
+
+def _dtb3_cont(pct: float) -> float:
+    """FRED DTB3 is a discount-basis yield on a 91-day bill: price = 1 - d*91/360, continuous rate = -ln(price) / (91/365)."""
+    return -math.log(1 - pct / 100 * 91 / 360) / (91 / 365)
+
+
+def _semiannual_cont(pct: float) -> float:
+    """FRED DGS2 is a bond-equivalent (semiannually compounded) yield: continuous rate = 2 ln(1 + y/2)."""
+    return 2 * math.log(1 + pct / 200)
+
+
+def _bill_used(dtb3: dict, day: str) -> dict:
+    """The 3-month bill a capture day is compared with, recorded in each day's output so a re-run reproduces it."""
+    d, v = _bill_obs(dtb3, day)
+    return {"bill_day": d, "dtb3_discount_pct": v, "bill_cont_bp": _dtb3_cont(v) * 1e4}
+
+
 # ------------------------------------------------------------- forward variance --
 
 def forward_variance_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
@@ -89,6 +120,9 @@ def forward_variance_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
             "reason": f"forward vol (VIX/VIX3M, days 21-63) exceeds realised by {g.mean():+.2f} vol pts on average ({(g > 0).mean()*100:.0f}% of {len(g)} days since {days[0]}); halves {g[:half].mean():+.2f}/{g[half:].mean():+.2f} (p {p1:.3f}/{p2:.3f}); sign test {k}/{len(non)} p={p_sign:.4f}"}
 
 
+T231_MIN_CYCLES = 70        # T-231 trial.min_n, in non-overlapping 63-day cycles
+
+
 def term_vs_spot_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
     """T-231: (F^2 - RV[22..63]) - (VIX^2 - RV[1..21]) > 0 with F^2 = (3*VIX3M^2 - VIX^2)/2; conditional forward premium
     (VIX3M/VIX > 1.10) positive in both halves. Non-overlapping 63-day cycles."""
@@ -106,9 +140,12 @@ def term_vs_spot_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
     h = len(cond) // 2
     halves = [float(cond[:h].mean()) if h else float("nan"), float(cond[h:].mean()) if len(cond) - h else float("nan")]
     ok = d.mean() > 0 and p < 0.025 and all(x > 0 for x in halves)
-    return {"n_cycles": int(len(d)), "mean_term_minus_spot_var": float(d.mean()), "p_value": p, "n_conditional": int(len(cond)),
-            "conditional_forward_premium_halves": halves, "verdict": "supported" if ok else "not_supported",
-            "reason": f"forward premium minus spot premium {d.mean():+.4f} (variance units) over {len(d)} non-overlapping 63d cycles, p={p:.3f}; conditional (VIX3M/VIX>1.10, n={len(cond)}) forward premium halves {halves[0]:+.4f}/{halves[1]:+.4f}"}
+    short = len(d) < T231_MIN_CYCLES                 # trial.min_n: a pass below it is not a confirmation (a failing criterion still fails)
+    return {"n_cycles": int(len(d)), "min_n": T231_MIN_CYCLES, "mean_term_minus_spot_var": float(d.mean()), "p_value": p, "n_conditional": int(len(cond)),
+            "conditional_forward_premium_halves": halves, "verdict": ("inconclusive" if short else "supported") if ok else "not_supported",
+            "reason": f"forward premium minus spot premium {d.mean():+.4f} (variance units) over {len(d)} non-overlapping 63d cycles, p={p:.3f}; conditional (VIX3M/VIX>1.10, n={len(cond)}) forward premium halves {halves[0]:+.4f}/{halves[1]:+.4f}"
+                      + (f"; {len(d)} cycles is below the trial min_n {T231_MIN_CYCLES}, so a pass cannot confirm" if short else "")}
+
 
 
 # ------------------------------------------------------------------- vol of vol --
@@ -189,9 +226,16 @@ def vix_forward_contango(vix_rows, vix3m_rows) -> dict:
             "reason": f"in contango (VIX3M/VIX>1.10), VIX 21 days later is below the forward {k}/{n} = {k/n:.0%} (95% CI {lo:.2f}-{hi:.2f}); mean F - VIX(t+21) {g.mean():+.2f} pts, p={p:.4f}" + ("; data part passes, call-spread simulation not implemented" if data_ok else "")}
 
 
+T241_MIN_EVENTS = 25        # T-241 trial.min_n, in spike events
+
+
 def vix_spike_forward(vix_rows, vix3m_rows) -> dict:
-    """T-241: after VIX > 30 and VIX > VIX3M, P(VIX_{t+21} < F) > 0.5 with 95% CI excluding 0.5 for the strategy to pass;
-    otherwise the finding is 'the forward is fair'. Non-overlapping 21-day event entries."""
+    """T-241, tested as its claim sentence is worded: after VIX > 30 and VIX > VIX3M, VIX_{t+21} is below the forward F in FEWER than 50%
+    of events and the excess reversion beyond F is not significant (the exact 95% CI does not lie above 0.5), while VIX_{t+21} is below spot
+    VIX in MORE than 75% of events; the put-spread P&L part (priced with VVIX) is not implemented, so the verdict is at best inconclusive.
+    The strategy-side reading (P(<F) > 0.5 with the CI above 0.5) refutes this claim; it is T-535's wording (spike_forward_v2).
+    Below trial.min_n (25 events) only a decisive failure (an exact CI on the wrong side of the claimed bound) can decide.
+    Non-overlapping 21-day event entries."""
     vx = index_closes(vix_rows); v3 = index_closes(vix3m_rows)
     days = sorted(d for d in vx if d in v3)
     VX = np.array([vx[d] for d in days]); V3 = np.array([v3[d] for d in days]); F = _vix_forward(VX, V3)
@@ -207,11 +251,22 @@ def vix_spike_forward(vix_rows, vix3m_rows) -> dict:
         return {"n": n, "verdict": "inconclusive", "reason": f"only {n} spike events"}
     kf, ks = int(sum(below_f)), int(sum(below_spot))
     lf, hf = _binom_two_sided_ci(kf, n); ls, hs = _binom_two_sided_ci(ks, n)
-    ok = kf / n > 0.5 and lf > 0.5
-    return {"n_events": n, "p_below_forward": kf / n, "ci_forward": [lf, hf], "p_below_spot": ks / n, "ci_spot": [ls, hs],
-            "verdict": "supported" if ok else "not_supported",
+    full = n >= T241_MIN_EVENTS
+    # (name, passes on the point frequency / test, fails decisively: the exact 95% CI lies on the wrong side of the claimed bound)
+    rows = [("P(VIX_t+21 < F) < 0.5", kf / n < 0.5, lf >= 0.5),
+            ("excess reversion beyond F not significant (exact 95% CI not above 0.5)", not lf > 0.5, lf > 0.5),
+            ("P(VIX_t+21 < spot VIX) > 0.75", ks / n > 0.75, hs <= 0.75)]
+    criteria = [(name, bool(ok) if (full or ok or decisive) else None) for name, ok, decisive in rows]
+    criteria += [("put spread struck at F vs at spot: positive expectancy only when struck at spot (VVIX-priced P&L simulation)", None),
+                 (f"sample reaches trial min_n {T241_MIN_EVENTS} events ({n} so far)", True if full else None)]
+    verdict, why = _verdict(criteria)
+    strategy_passes = kf / n > 0.5 and lf > 0.5
+    return {"n_events": n, "min_n": T241_MIN_EVENTS, "p_below_forward": kf / n, "ci_forward": [lf, hf], "p_below_spot": ks / n, "ci_spot": [ls, hs],
+            "criteria": [[c, ok] for c, ok in criteria], "verdict": verdict,
             "reason": f"{n} spike events (VIX>30, backwardation): VIX 21 days later below the forward in {kf}/{n} ({lf:.2f}-{hf:.2f}), below spot in {ks}/{n} ({ls:.2f}-{hs:.2f})"
-                      + ("; the pass rule (strategy passes) is met, which REFUTES the claim sentence that the curve already prices the decline" if ok else "; finding: the forward is fair after spikes")}
+                      + ("; the curve UNDER-prices the reversion (the strategy-side pass rule is met), which refutes the claim sentence that the curve already prices the decline (that reading is T-535)"
+                         if strategy_passes else "; finding: the forward is fair after spikes")
+                      + f"; verdict: {why}"}
 
 
 # ------------------------------------------------------------- chains: boxes, parity --
@@ -227,9 +282,9 @@ def _chain_by_expiry(rows: Iterable[dict]) -> dict:
 
 
 def _bill_curve(dtb3: dict, dgs2: dict, day: str):
-    """Continuous rate at maturity T (years), linear between the 3-month bill and the 2-year note; flat outside."""
-    d3 = max((d for d in dtb3 if d <= day), default=None); d2 = max((d for d in dgs2 if d <= day), default=None)
-    y3 = math.log(1 + dtb3[d3] / 100); y2 = math.log(1 + dgs2[d2] / 100)
+    """Continuous rate at maturity T (years), linear between the 3-month bill (DTB3, discount basis) and the 2-year note (DGS2,
+    semiannual bond-equivalent); flat outside. Both from the latest rows dated before the capture day."""
+    y3 = _dtb3_cont(_bill_obs(dtb3, day)[1]); y2 = _semiannual_cont(_bill_obs(dgs2, day)[1])
     def at(T):
         if T <= 0.25:
             return y3
@@ -271,33 +326,40 @@ def box_rates(chain_rows, spot: float, capture_day: str, dtb3_rows, dgs2_rows, d
     return out
 
 
+T186_MIN_DAYS = 20          # T-186 pass: "maintained over 20 captured days" (= trial.min_n)
+T187_MIN_DAYS = 10          # T-187 trial.min_n; its pass names no 20-day requirement
+
+
 def box_lending(captures: list[tuple[str, float, list]], dtb3_rows, dgs2_rows) -> dict:
-    """T-186: per capture day, median (r_lend - r_bill) over 90-365 DTE boxes in [15, 80] bp with >= 80% of boxes positive;
-    maintained on >= 80% of >= 20 captured days. One day can falsify, not confirm."""
+    """T-186: per capture day, median (r_lend - r_bill) over 90-365 DTE boxes in [15, 80] bp with >= 80% of boxes positive.
+    Day one is a criterion of its own (a failed day one is not_supported); then maintained on >= 80% of >= 20 captured days."""
     dtb3, dgs2 = list(dtb3_rows), list(dgs2_rows)
+    d3, d2 = index_closes(dtb3), index_closes(dgs2)
     days = []
     for day, spot, rows in captures:
         bx = [b for b in box_rates(rows, spot, day, dtb3, dgs2, (90, 365)) if b["r_lend"] is not None]
         if not bx:
             continue
         sp = np.array([(b["r_lend"] - b["bill"]) * 1e4 for b in bx]); mid = np.array([(b["r_mid"] - b["bill"]) * 1e4 for b in bx if b["r_mid"] is not None])
+        dgs2_day, dgs2_pct = _bill_obs(d2, day)
         days.append({"day": day, "n_boxes": len(bx), "median_spread_bp": float(np.median(sp)), "share_positive": float((sp > 0).mean()),
                      "median_mid_spread_bp": float(np.median(mid)) if len(mid) else None,
-                     "pass": bool(15 <= np.median(sp) <= 80 and (sp > 0).mean() >= 0.8)})
+                     "pass": bool(15 <= np.median(sp) <= 80 and (sp > 0).mean() >= 0.8),
+                     "bill": {**_bill_used(d3, day), "dgs2_day": dgs2_day, "dgs2_pct": dgs2_pct, "dgs2_cont_bp": _semiannual_cont(dgs2_pct) * 1e4}})
     if not days:
         return {"n_days": 0, "verdict": "inconclusive", "reason": "no SPX chain captures with 90-365 DTE boxes on this machine"}
-    share = sum(d["pass"] for d in days) / len(days)
-    if len(days) < 20:
-        verdict = "not_supported" if share < 0.8 and len(days) >= 1 and not any(d["pass"] for d in days) else "inconclusive"
-    else:
-        verdict = "supported" if share >= 0.8 else "not_supported"
+    d0 = days[0]; share = sum(d["pass"] for d in days) / len(days)
+    verdict, why = _verdict([(f"day one ({d0['day']}): median executable spread in [15, 80] bp with >= 80% of boxes positive", d0["pass"]),
+                             (f"maintained on >= 80% of >= {T186_MIN_DAYS} captured days ({len(days)} so far)",
+                              None if len(days) < T186_MIN_DAYS else share >= 0.8)])
     last = days[-1]
     return {"n_days": len(days), "days": days, "share_days_passing": share, "verdict": verdict,
-            "reason": f"{len(days)} capture day(s); latest {last['day']}: {last['n_boxes']} boxes, executable lending spread over bills median {last['median_spread_bp']:+.0f} bp (mid {last['median_mid_spread_bp']:+.0f} bp), {last['share_positive']*100:.0f}% positive; claim needs [15, 80] bp and 80% positive on 80% of 20+ days"}
+            "reason": f"{len(days)} capture day(s); day one {d0['day']}: executable spread median {d0['median_spread_bp']:+.0f} bp ({'pass' if d0['pass'] else 'fail'}); latest {last['day']}: {last['n_boxes']} boxes, executable lending spread over bills median {last['median_spread_bp']:+.0f} bp (mid {last['median_mid_spread_bp']:+.0f} bp), {last['share_positive']*100:.0f}% positive; claim needs [15, 80] bp and 80% positive on day one and on 80% of 20+ days; verdict: {why}"}
 
 
 def box_borrowing(captures: list[tuple[str, float, list]], dtb3_rows, dgs2_rows) -> dict:
-    """T-187: executable short-box borrowing rate (180-730 DTE) at least 100 bp below (3-month bill + 150 bp) on >= 80% of days."""
+    """T-187: executable short-box borrowing rate (180-730 DTE) at least 100 bp below (3-month bill + 150 bp): median advantage > 100 bp
+    on day one (a failed day one is not_supported) and on >= 80% of captured days, with at least trial.min_n (10) days to confirm."""
     dtb3, dgs2 = list(dtb3_rows), list(dgs2_rows)
     d3 = index_closes(dtb3)
     days = []
@@ -305,27 +367,33 @@ def box_borrowing(captures: list[tuple[str, float, list]], dtb3_rows, dgs2_rows)
         bx = [b for b in box_rates(rows, spot, day, dtb3, dgs2, (180, 730)) if b["r_borrow"] is not None]
         if not bx:
             continue
-        bench = math.log(1 + d3[max(d for d in d3 if d <= day)] / 100) + 0.015
+        bill = _bill_used(d3, day)
+        bench = bill["bill_cont_bp"] / 1e4 + 0.015
         adv = np.array([(bench - b["r_borrow"]) * 1e4 for b in bx])
-        days.append({"day": day, "n_boxes": len(bx), "median_advantage_bp": float(np.median(adv)), "pass": bool(np.median(adv) > 100)})
+        days.append({"day": day, "n_boxes": len(bx), "median_advantage_bp": float(np.median(adv)), "pass": bool(np.median(adv) > 100), "bill": bill})
     if not days:
         return {"n_days": 0, "verdict": "inconclusive", "reason": "no SPX chain captures with 180-730 DTE boxes on this machine"}
-    share = sum(d["pass"] for d in days) / len(days); last = days[-1]
-    verdict = ("supported" if share >= 0.8 else "not_supported") if len(days) >= 20 else ("not_supported" if not any(d["pass"] for d in days) else "inconclusive")
+    d0 = days[0]; share = sum(d["pass"] for d in days) / len(days); last = days[-1]
+    verdict, why = _verdict([(f"day one ({d0['day']}): median advantage over bill + 150 bp > 100 bp", d0["pass"]),
+                             (f"advantage > 100 bp on >= 80% of >= {T187_MIN_DAYS} captured days ({len(days)} so far)",
+                              None if len(days) < T187_MIN_DAYS else share >= 0.8)])
     return {"n_days": len(days), "days": days, "share_days_passing": share, "verdict": verdict,
-            "reason": f"{len(days)} capture day(s); latest {last['day']}: {last['n_boxes']} boxes, borrowing via short box beats bill+150 bp by a median {last['median_advantage_bp']:+.0f} bp (claim: > 100 bp on 80% of 20+ days)"}
+            "reason": f"{len(days)} capture day(s); day one {d0['day']}: median advantage {d0['median_advantage_bp']:+.0f} bp; latest {last['day']}: {last['n_boxes']} boxes, borrowing via short box beats bill+150 bp by a median {last['median_advantage_bp']:+.0f} bp (claim: > 100 bp on day one and on 80% of days, {T187_MIN_DAYS}+ days to confirm); verdict: {why}"}
 
 
 def parity_check(captures: list[tuple[str, str, float, list]], dtb3_rows, n_side: int = 5) -> dict:
-    """T-181: per expiry, regress (C_mid - P_mid) on K over the n_side strikes either side of spot. Violations: |residual| >
-    half the combined call+put spread; claim: < 2% of (K,T) pairs. Implied rate r = -ln(-slope)/T for expiries >= 30 DTE;
-    claim: |median r_impl - r_bill| < 50 bp. Stable over 20 days to confirm; one day can falsify."""
+    """T-181: implied rate r = -ln(-slope)/T from regressing (C_mid - P_mid) on K over the n_side strikes either side of spot, for
+    expiries >= 30 DTE; claim: |median r_impl - r_bill| < 50 bp on day one (each symbol's first capture day; a failure there is
+    not_supported) and on every one of the first 20 captured days ("stable"; any failure among them is not_supported).
+    The claim's violation statistic compares F_impl with F_theo = S e^{rT} - FV(D), which needs a dividend schedule the inputs do not
+    carry: it is not implemented (None), so the verdict is at best inconclusive. ``violation_rate`` is a diagnostic only: residuals
+    from a free-intercept fit, which absorbs any level error of the forward and so measures cross-strike consistency (T-505's question)."""
     d3 = index_closes(dtb3_rows)
     per_day = []
     for day, sym, spot, rows in captures:
         by = _chain_by_expiry(rows)
         cap = datetime.strptime(day, "%Y-%m-%d")
-        bill = math.log(1 + d3[max(d for d in d3 if d <= day)] / 100)
+        bill_rec = _bill_used(d3, day); bill = bill_rec["bill_cont_bp"] / 1e4
         pairs = viol = 0; rates = []
         for exp, legs in by.items():
             dte = (datetime.strptime(exp, "%Y-%m-%d") - cap).days
@@ -344,15 +412,28 @@ def parity_check(captures: list[tuple[str, str, float, list]], dtb3_rows, n_side
                 T = dte / 365.0
                 rates.append(-math.log(-coef[1]) / T)
         if pairs:
-            per_day.append({"day": day, "symbol": sym, "pairs": pairs, "violation_rate": viol / pairs,
-                            "median_rate_gap_bp": float((np.median(rates) - bill) * 1e4) if rates else None, "n_rate_expiries": len(rates)})
+            gap = float((np.median(rates) - bill) * 1e4) if rates else None
+            per_day.append({"day": day, "symbol": sym, "pairs": pairs, "violation_rate": viol / pairs, "violation_rate_basis": "free-intercept regression residual (diagnostic)",
+                            "median_rate_gap_bp": gap, "n_rate_expiries": len(rates), "rate_ok": None if gap is None else bool(abs(gap) < 50), "bill": bill_rec})
     if not per_day:
         return {"n": 0, "verdict": "inconclusive", "reason": "no SPY/SPX chain captures on this machine"}
-    ok_day = [d["violation_rate"] < 0.02 and d["median_rate_gap_bp"] is not None and abs(d["median_rate_gap_bp"]) < 50 for d in per_day]
+
+    def _all(vals):            # False if any False; None if any not evaluable; else True
+        return False if any(v is False for v in vals) else (None if any(v is None for v in vals) else True)
+
+    by_sym = defaultdict(list)
+    for d in sorted(per_day, key=lambda d: d["day"]):
+        by_sym[d["symbol"]].append(d)
+    day_one = _all([v[0]["rate_ok"] for v in by_sym.values()])
+    first20 = [d["rate_ok"] for v in by_sym.values() for d in v[:20]]
+    stable = False if any(x is False for x in first20) else (_all(first20) if all(len(v) >= 20 for v in by_sym.values()) else None)
     n_days = len({d["day"] for d in per_day})
-    verdict = ("supported" if all(ok_day) else "not_supported") if n_days >= 20 else ("not_supported" if not any(ok_day) else "inconclusive")
-    txt = "; ".join(f"{d['symbol']} {d['day']}: {d['violation_rate']*100:.1f}% of {d['pairs']} pairs outside half-spread, implied rate {d['median_rate_gap_bp']:+.0f} bp vs bill" for d in per_day[-4:] if d["median_rate_gap_bp"] is not None)
-    return {"n_days": n_days, "per_day": per_day, "verdict": verdict, "reason": txt + " (claim: < 2% and within 50 bp, stable over 20 days); the implied rate from ten strikes is noise-dominated for SPY's $1 strikes, so the violation rate is the reliable half"}
+    verdict, why = _verdict([("day one: |median r_impl - r_bill| < 50 bp for every symbol (" + ", ".join(f"{s} {v[0]['day']}" for s, v in sorted(by_sym.items())) + ")", day_one),
+                             ("stable over the first 20 captured days: rate gap within 50 bp on every one of them", stable),
+                             ("violation fraction |F_impl - F_theo| > half-spread < 2%, F_theo = S e^{rT} - FV(D) (needs a dividend schedule the inputs do not carry)", None)])
+    txt = "; ".join(f"{d['symbol']} {d['day']}: implied rate {d['median_rate_gap_bp']:+.0f} bp vs bill, {d['violation_rate']*100:.1f}% of {d['pairs']} pairs off a free cross-strike fit by more than the half-spread" for d in per_day[-4:] if d["median_rate_gap_bp"] is not None)
+    return {"n_days": n_days, "per_day": per_day, "verdict": verdict,
+            "reason": txt + " (claim: within 50 bp and < 2% violations against F_theo on day one, stable over 20 days); the free-fit violation rate is a diagnostic, not the claim's F_theo statistic; the implied rate from ten strikes is noise-dominated for SPY's $1 strikes; verdict: " + why}
 
 
 # ---------------------------------------------------------------- pinning, weekend --

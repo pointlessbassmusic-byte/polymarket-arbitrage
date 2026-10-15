@@ -22,6 +22,10 @@ closes.
   that 15-minute look-ahead, is reported as a sensitivity only.
 * Costs: $2 per contract per leg on every leg traded. A roll closes both old legs and opens both new ones, $8; the
   expiring leg is counted even though it cash-settles. A gate entry or exit costs $4.
+* Missing settles are bridged. Legs are marked at their last valid settle, so a held position's move across a hole in
+  one leg is booked on the first day the settle returns. A trade that needs a missing settle is deferred to the next
+  settle, with no extra cost. No interval is dropped. The reason reports the number of gap intervals and the absolute
+  P&L and spread move booked across them. The archive has none.
 * Statistics: daily net P&L over every trading day, with flat days counted as 0. The 95% CI is two-sided (2.5% and
   97.5%) from a studentized circular block bootstrap with block 21, Bartlett long-run variance with bandwidth 21.
   Annualisation uses 252 days.
@@ -213,44 +217,68 @@ def calendar_pnl(curve: dict, gate_ratio: dict, lag: int = 1, threshold: float =
     whose position changes at days[k], an expiring leg included. They are charged to the interval that starts at
     days[k]. With ``gate=False`` the spread is always held.
 
+    Missing settles are bridged, never skipped. Every leg is marked at its last valid settle, so a held leg with no
+    settle on a day books nothing that day, and its move across the gap is booked on the first day its settle
+    returns. A trade whose legs lack a settle at days[k] is deferred: the held legs are kept, no extra cost is charged,
+    and the trade is retried at the next settle. An expired leg that never got a final settle is closed at its last
+    valid settle (a stale close). Every interval is kept in the series.
+
     Returns per-interval arrays (the day an interval ends, the position held, the ungated spread change in dollars,
-    gross, cost, net) plus counts of dropped intervals and trades."""
+    gross, cost, net, a gap flag) plus counts of trades, the intervals that bridged a missing settle (``gaps``),
+    deferred trades, stale closes, and the absolute held P&L and spread move booked across gaps."""
     days = sorted(curve)
     if expiries is None:
         expiries = sorted({e for d in curve for e in curve[d]})
     expiries = sorted(expiries)
     asof = AsOf(gate_ratio, max_stale_days=7)
-    rec = {k: [] for k in ("day", "start", "w", "spread_chg", "gross", "cost", "net", "spread", "ratio", "m1", "m2")}
-    dropped, prev_pos, n_rolls, n_switch = [], {}, 0, 0
+    rec = {k: [] for k in ("day", "start", "w", "spread_chg", "gross", "cost", "net", "spread", "ratio", "m1", "m2", "gap")}
+    gaps, held, last = [], {}, {}
+    n_rolls = n_switch = n_deferred = n_stale = 0
+    for d in days[:lag + 1]:
+        last.update(curve[d])                            # last valid settle per contract, as of the close of d0
     for k in range(lag, len(days) - 1):
         d0, d1 = days[k], days[k + 1]
-        j = bisect_right(expiries, d0)
-        if j + 1 >= len(expiries):
-            dropped.append((d1, "no M2 listed")); continue
-        e1, e2 = expiries[j], expiries[j + 1]
         c0, c1 = curve[d0], curve[d1]
-        if d1 > e1 or e1 not in c0 or e2 not in c0 or e1 not in c1 or e2 not in c1:
-            # an interval with missing settles: the book is carried flat through it (no P&L, no trade booked)
-            dropped.append((d1, "missing settle")); continue
+        j = bisect_right(expiries, d0)
+        pair = (expiries[j], expiries[j + 1]) if j + 1 < len(expiries) else None
         r = asof.at(days[k - lag])
-        if gate:
-            w = 1 if (r is not None and r < threshold) else 0
+        w = (1 if (r is not None and r < threshold) else 0) if gate else 1
+        pos = {pair[0]: -w, pair[1]: w} if (w and pair) else {}
+        legs = [c for c in set(pos) | set(held) if pos.get(c, 0) != held.get(c, 0)]
+        deferred = not all(c in c0 or c <= d0 for c in legs)
+        stale = 0
+        if deferred:
+            n_deferred += 1; cost = 0.0                  # a leg to trade has no settle at d0: keep the held legs
         else:
-            w = 1
-        pos = {e1: -w, e2: w} if w else {}
-        traded = sum(abs(pos.get(c, 0) - prev_pos.get(c, 0)) for c in set(pos) | set(prev_pos))
-        if prev_pos and pos and set(prev_pos) != set(pos):
-            n_rolls += 1
-        elif bool(prev_pos) != bool(pos):
-            n_switch += 1
-        prev_pos = pos
-        chg = mult * ((c1[e2] - c0[e2]) - (c1[e1] - c0[e1]))
-        cost = cost_per_contract * traded
-        rec["day"].append(d1); rec["start"].append(d0); rec["w"].append(w); rec["spread_chg"].append(chg)
-        rec["gross"].append(w * chg); rec["cost"].append(cost); rec["net"].append(w * chg - cost)
-        rec["spread"].append(c0[e2] - c0[e1]); rec["ratio"].append(r); rec["m1"].append(e1); rec["m2"].append(e2)
+            if held and pos and set(held) != set(pos):
+                n_rolls += 1
+            elif bool(held) != bool(pos):
+                n_switch += 1
+            stale = sum(1 for c in legs if c not in c0)  # expired, no final settle: closed at its last valid settle
+            n_stale += stale
+            cost = cost_per_contract * sum(abs(pos.get(c, 0) - held.get(c, 0)) for c in legs)
+            held = pos
+        watch = set(held) | set(pair or ())
+        m0 = {c: last.get(c) for c in watch}
+        last.update(c1)
+        gross = mult * sum(q * (last[c] - m0[c]) for c, q in held.items())
+        if pair and m0[pair[0]] is not None and m0[pair[1]] is not None:
+            chg = mult * ((last[pair[1]] - m0[pair[1]]) - (last[pair[0]] - m0[pair[0]]))
+            spread = m0[pair[1]] - m0[pair[0]]
+        else:
+            chg, spread = 0.0, float("nan")
+        gap = pair is None or deferred or stale > 0 or any(c not in c0 or c not in c1 for c in watch)
+        if gap:
+            gaps.append((d1, "no M2 listed" if pair is None else "missing settle"))
+        rec["day"].append(d1); rec["start"].append(d0); rec["w"].append(1 if held else 0); rec["spread_chg"].append(chg)
+        rec["gross"].append(gross); rec["cost"].append(cost); rec["net"].append(gross - cost); rec["gap"].append(gap)
+        rec["spread"].append(spread); rec["ratio"].append(r)
+        rec["m1"].append(pair[0] if pair else None); rec["m2"].append(pair[1] if pair else None)
     out = {k: (np.array(v, dtype=float) if k in ("w", "spread_chg", "gross", "cost", "net", "spread") else v) for k, v in rec.items()}
-    out.update(dropped=dropped, n_rolls=n_rolls, n_switches=n_switch)
+    g = np.array(rec["gap"], dtype=bool)
+    out.update(gaps=gaps, n_rolls=n_rolls, n_switches=n_switch, n_deferred=n_deferred, n_stale_closes=n_stale,
+               gap_abs_gross=float(np.abs(out["gross"][g]).sum()) if g.any() else 0.0,
+               gap_abs_spread_chg=float(np.abs(out["spread_chg"][g]).sum()) if g.any() else 0.0)
     return out
 
 
@@ -295,7 +323,7 @@ def vx_calendar(curve: dict, vix: dict, vix3m: dict, cost_per_contract: float = 
     gross_mean = float(res["gross"].mean())
     plc_pct = float((plc >= gross_mean).mean()) if len(plc) else None
     spread_days = res["start"]
-    sl = [(s, vix3m[d] - vix[d]) for s, d in zip(res["spread"], spread_days) if d in vix and d in vix3m]
+    sl = [(s, vix3m[d] - vix[d]) for s, d in zip(res["spread"], spread_days) if d in vix and d in vix3m and math.isfinite(s)]
     sa, sb = np.array([a for a, _ in sl]), np.array([b for _, b in sl])
     basis_corr = float(np.corrcoef(sa, sb)[0, 1]) if len(sl) > 10 and sa.std() > 0 and sb.std() > 0 else None
     held = res["w"] > 0
@@ -316,7 +344,9 @@ def vx_calendar(curve: dict, vix: dict, vix3m: dict, cost_per_contract: float = 
 
     reason = (f"VX M1-M2 calendar (short M1 / long M2, $1,000/pt) on CBOE daily settlements {days[0]}..{days[-1]}, "
               f"n={n} daily intervals (2013 rows with Settle = 0 dropped, so the first settlement is {min(curve)}; "
-              f"{len(res['dropped'])} intervals with a missing settle skipped); held on {held.mean():.0%} of days under the "
+              f"{len(res['gaps'])} intervals bridged a missing settle, booking {_usd(res['gap_abs_gross'], 0)} absolute held "
+              f"P&L and {_usd(res['gap_abs_spread_chg'], 0)} absolute spread move across gaps, {res['n_deferred']} trades "
+              f"deferred, {res['n_stale_closes']} stale closes); held on {held.mean():.0%} of days under the "
               f"point-in-time gate (VIX/VIX3M < 1 at the previous close); costs $2/contract/leg on every leg traded "
               f"({res['n_rolls']} rolls at $8, {res['n_switches']} gate entries/exits at $4, total {_usd(float(res['cost'].sum()), 0)}). "
               f"Mean net {_usd(full['mean'])}/day, 95% CI {ci(full)} (n >= {min_n}: {n >= min_n}); "
@@ -341,7 +371,9 @@ def vx_calendar(curve: dict, vix: dict, vix3m: dict, cost_per_contract: float = 
             "placebo": {"n_shifts": int(len(plc)), "share_ge_actual": plc_pct,
                         "mean": float(plc.mean()) if len(plc) else None, "actual_gross": gross_mean},
             "basis_corr_spread_vs_vix3m_minus_vix": basis_corr, "worst_days": worst,
-            "dropped_intervals": len(res["dropped"]),
+            "gap_intervals": len(res["gaps"]), "gap_abs_gross_usd": res["gap_abs_gross"],
+            "gap_abs_spread_chg_usd": res["gap_abs_spread_chg"], "n_deferred_trades": res["n_deferred"],
+            "n_stale_closes": res["n_stale_closes"],
             "conventions": "M1/M2 = first two expiries after the day; Wednesday (expiry-day) rolls; gate at previous close; "
                            "$2 x contracts traded",
             "criteria": crit, "verdict": v, "reason": reason}

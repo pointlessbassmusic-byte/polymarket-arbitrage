@@ -11,6 +11,7 @@ stays in the registry.
 from __future__ import annotations
 
 import bisect
+import inspect
 import json
 import time
 from pathlib import Path
@@ -321,31 +322,45 @@ def harness_longshot(archive: Archive, horizon: int = 7, hi_p: float = 0.10, n_b
                                           f"{stat['yes_events']} YES events of {sel.size} markets in {n_events} events" + (f"; below min_n {min_n}" if verdict == "inconclusive" else ""))
 
 
-def harness_horizon_monotone(archive: Archive, horizons=(1, 3, 7, 30, 90)) -> tuple[dict, int, str, str]:
-    """T-13: Brier skill vs coin is non-increasing as the horizon lengthens (the market learns as time passes).
-    Each adjacent pair must satisfy skill(shorter) >= skill(longer) - 0.01 (a 1-point tolerance for noise)."""
+def harness_horizon_monotone(archive: Archive, horizons=(1, 3, 7, 30, 90), required=(1, 7, 30, 90), min_n: int = 300) -> tuple[dict, int, str, str]:
+    """T-13: skill(1d) > skill(7d) > skill(30d) > skill(90d), strictly, no tolerance (the registered pass). 3d is reported only.
+    Any strict-order violation among the scored required horizons falsifies the chain; otherwise every required horizon must be
+    scored on >= min_n markets (the trial's min_n, per horizon), else inconclusive. n is the binding per-horizon minimum."""
     rep = market_calibration(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"), horizons_days=horizons)
-    skills = {h: rep["horizons"][h]["skill_vs_coin"] for h in horizons if h in rep["horizons"] and rep["horizons"][h].get("n", 0) >= 30}
-    hs = sorted(skills)
-    n = min((rep["horizons"][h]["n"] for h in hs), default=0)
-    if len(hs) < 3:
-        return {"skills": skills}, n, "inconclusive", "fewer than 3 horizons with 30+ observations"
-    ok = all(skills[hs[i]] >= skills[hs[i + 1]] - 0.01 for i in range(len(hs) - 1))
-    return {"skills": {str(h): skills[h] for h in hs}, "monotone": ok}, n, "supported" if ok else "not_supported", \
-        "skill by horizon " + ", ".join(f"{h}d {skills[h]:.3f}" for h in hs) + (" (non-increasing)" if ok else " (not monotone)")
+    H = rep["horizons"]
+    skills = {h: H[h]["skill_vs_coin"] for h in horizons if "brier" in H.get(h, {}) and H[h].get("skill_vs_coin") is not None}
+    ns = {h: int(H.get(h, {}).get("n", 0)) for h in horizons}
+    n = min(ns[h] for h in required)
+    avail = [h for h in required if h in skills]
+    violations = [(a, b) for i, a in enumerate(avail) for b in avail[i + 1:] if not skills[a] > skills[b]]
+    missing = [h for h in required if h not in skills]
+    thin = [h for h in required if h in skills and ns[h] < min_n]
+    stat = {"skills": {str(h): skills[h] for h in horizons if h in skills}, "n_by_horizon": {str(h): ns[h] for h in horizons},
+            "required": list(required), "monotone": not violations and not missing}
+    txt = "skill by horizon " + ", ".join(f"{h}d {skills[h]:.3f}" for h in horizons if h in skills) + " (3d reported only)"
+    if violations:
+        return stat, n, "not_supported", txt + "; strict order fails: " + ", ".join(f"skill({a}d) <= skill({b}d)" for a, b in violations)
+    if missing or thin:
+        return stat, n, "inconclusive", txt + f"; the chain needs every one of {', '.join(f'{h}d' for h in required)} with n >= {min_n}: " + \
+            ", ".join([f"{h}d unscored (n {ns[h]})" for h in missing] + [f"{h}d n {ns[h]}" for h in thin])
+    return stat, n, "supported", txt + " (strictly decreasing 1d > 7d > 30d > 90d)"
 
 
 def harness_point_in_time(archive: Archive) -> tuple[dict, int, str, str]:
     """T-19: does honouring available_at change a verdict? Runs the Fear & Greed harness with the naive join
-    (lag 0) and the honest one (lag 1) and compares verdicts and the sign of the fear-side effect."""
+    (lag 0) and the honest one (lag 1). Pass: the verdicts differ. The sign of the fear-side effect is reported only."""
     fng = list(archive.load("crypto-fear-greed-history")); px = list(archive.load("daily-history-BTC-USD"))
     naive = fear_greed_forward_returns(fng, px, lag_days=0, n_boot=500)
     honest = fear_greed_forward_returns(fng, px, lag_days=1, n_boot=500)
-    changed = naive["verdict"] != honest["verdict"] or (np.sign(naive.get("d_fear", 0)) != np.sign(honest.get("d_fear", 0)))
+    changed = naive["verdict"] != honest["verdict"]
+    dn, dh = naive.get("d_fear", float("nan")), honest.get("d_fear", float("nan"))
+    sign_flip = bool(dn is not None and dh is not None and np.isfinite(dn) and np.isfinite(dh) and np.sign(dn) != np.sign(dh))
     stat = {"naive": {k: naive.get(k) for k in ("verdict", "d_fear", "d_greed", "p_fear", "p_greed")},
-            "honest": {k: honest.get(k) for k in ("verdict", "d_fear", "d_greed", "p_fear", "p_greed")}, "changed": bool(changed)}
+            "honest": {k: honest.get(k) for k in ("verdict", "d_fear", "d_greed", "p_fear", "p_greed")}, "changed": bool(changed),
+            "d_fear_sign_flip_reported_only": sign_flip}
     return stat, int(honest.get("n", 0)), "supported" if changed else "not_supported", \
-        f"naive {naive['verdict']} (d_fear {naive.get('d_fear', float('nan')):+.4f}) vs point-in-time {honest['verdict']} (d_fear {honest.get('d_fear', float('nan')):+.4f}): {'verdict or sign changed' if changed else 'no change on this harness'}"
+        f"naive {naive['verdict']} (d_fear {naive.get('d_fear', float('nan')):+.4f}) vs point-in-time {honest['verdict']} (d_fear {honest.get('d_fear', float('nan')):+.4f}): " \
+        f"{'verdict changed' if changed else 'no verdict change on this harness'}" + ("; d_fear sign flips (reported only)" if sign_flip else "")
 
 
 def _vrp(archive: Archive, index_bundle: str, price_bundle: str, symbol: str, window: int, ppy: int) -> tuple[dict, int, str, str]:
@@ -481,13 +496,17 @@ def _closes(archive: Archive, sym: str):
 
 
 def harness_trend_rules(archive: Archive):
-    """T-58: a declared grid of six long/flat trend rules beats buy-and-hold on a majority of eight assets after deflation."""
-    series = {}
+    """T-58: a declared grid of six long/flat trend rules beats buy-and-hold on a majority of eight assets after deflation.
+    The denominator is always the eight named assets: an asset that cannot be loaded makes the run a missing-data result, never a
+    smaller majority."""
+    series, absent = {}, []
     for sym in TREND_ASSETS:
         try:
             _, c = _closes(archive, sym); series[sym] = c
-        except Exception:
-            continue
+        except (KeyError, FileNotFoundError):
+            absent.append(f"daily-history-{sym}")
+    if absent:
+        raise MissingData(absent)
     rep = trend_rules_multi(series, TREND_RULES, cost_bps=5.0, ppy=TREND_ASSETS)
     n = min(o["n_periods"] for o in rep["per_asset"].values()) if rep["per_asset"] else 0
     return rep, n, rep["verdict"], rep["reason"]
@@ -518,17 +537,26 @@ def harness_crypto_weekend(archive: Archive):
 
 
 def _chain_captures(archive: Archive, sym: str) -> list[tuple[str, float, list]]:
-    """(day, spot, rows) for every raw chain capture of sym present on this machine; spot from that day's surface bundle."""
-    out = []
+    """(day, spot, rows) for every raw chain capture of sym listed in the INDEX; spot from that day's surface bundle. The raw chains are
+    kept off git (in_git=False), so a checkout can list captures it does not hold: any listed capture (or its surface) that is not on
+    this machine raises MissingData instead of being skipped, so 'day one' never shifts silently."""
+    out, unreadable = [], []
     for name in _bundles_matching(archive, f"options-chain-{sym}-*"):
         day = name.rsplit("-", 3)[-3:]; day = "-".join(day)
         try:
             rows = list(archive.load(name))
-        except Exception:
-            continue
-        spot = next((r["value"]["underlying"] for r in archive.load(f"options-surface-{day}") if r["value"]["symbol"] == sym), None) if _bundles_matching(archive, f"options-surface-{day}") else None
+        except FileNotFoundError:
+            unreadable.append(name); continue
+        spot = None
+        if _bundles_matching(archive, f"options-surface-{day}"):
+            try:
+                spot = next((r["value"]["underlying"] for r in archive.load(f"options-surface-{day}") if r["value"]["symbol"] == sym), None)
+            except FileNotFoundError:
+                unreadable.append(f"options-surface-{day}"); continue
         if rows and spot:
             out.append((day, float(spot), rows))
+    if unreadable:
+        raise MissingData(unreadable)
     return out
 
 
@@ -588,53 +616,145 @@ def _bill(archive):
 def _u2(fn):
     def h(archive):
         rep = fn(archive)
-        n = next((int(rep[k]) for k in ("n_years", "n_months", "n_weeks", "n_quarters", "n_signals", "n_test_days", "n_opex_weeks", "n_days") if rep.get(k)), 0)
+        n = int(rep["n"]) if rep.get("n") is not None else \
+            next((int(rep[k]) for k in ("n_years", "n_months", "n_weeks", "n_quarters", "n_signals", "n_test_days", "n_opex_weeks", "n_days") if rep.get(k)), 0)
         return rep, n, rep["verdict"], rep["reason"]
     h.__doc__ = fn.__doc__
     return h
 
 
+def _with_n(rep: dict, n: int) -> dict:
+    """Attach the number of daily observations the verdict rests on, unless the function already reports its own 'n'."""
+    rep.setdefault("n", int(n))
+    return rep
+
+
+def _n_returns(*series, burn: int = 0, since: Optional[str] = None) -> int:
+    """Smallest count of daily returns across (days, closes) series, after a burn-in of `burn` returns, ending on or after `since`."""
+    return min((sum(1 for d in days[1:][burn:] if since is None or d >= since) for days, _ in series), default=0)
+
+
+def _excess_index(series: tuple, bill: tuple) -> tuple[list, np.ndarray]:
+    """(days, index) of the series in excess of T-bills: E_i = E_{i-1} * (P_i / P_{i-1} - rf_i), rf_i = the latest DTB3 print on or
+    before day i-1 (percent) / 100 / 252, i.e. the bill rate known when the day's holding period starts. Days before the first bill
+    print are dropped. Feeding this index to a Sharpe or switch rule makes every return an excess return, and a flat (cash) day earns
+    the bill: sig * (r - rf) is the excess return of sig * r + (1 - sig) * rf."""
+    days, c = series; bdays, bvals = bill
+    i0 = next((i for i, d in enumerate(days) if bisect.bisect_right(bdays, d) > 0), None)
+    if i0 is None:
+        raise MissingData(["fred-DTB3 (no bill print before the series)"])
+    out = [float(c[i0])]
+    for i in range(i0 + 1, len(days)):
+        rf = bvals[bisect.bisect_right(bdays, days[i - 1]) - 1] / 100 / 252
+        out.append(out[-1] * (c[i] / c[i - 1] - rf))
+    return list(days[i0:]), np.array(out)
+
+
+TOM_ASSETS, TOM_COST_BPS = ("QQQ", "IWM", "TLT", "GLD", "BTC-USD"), {"QQQ": 2, "IWM": 2, "TLT": 2, "GLD": 3, "BTC-USD": 40}
+
+
+def _u2_tom(a, fn_name: str):
+    s = {sym: _ls(a, sym) for sym in TOM_ASSETS}
+    return _with_n(getattr(u2, fn_name)(s, TOM_COST_BPS), _n_returns(*s.values()))
+
+
+def _accepts_bills(fn) -> bool:
+    try:
+        return "bill_days" in inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _u2_low_vol_v2(a):
+    """T-448's statistic is on daily excess returns over T-bills. If underlying2.low_vol_v2 takes the bill series it subtracts the bill
+    itself; otherwise both legs are passed as excess-return indexes (never both, so the bill is never subtracted twice)."""
+    b = _bill(a)
+    if _accepts_bills(u2.low_vol_v2):
+        return u2.low_vol_v2(_ls(a, "USMV"), _ls(a, "SPY"), bill_days=b[0], bill_vals=b[1])
+    rep = u2.low_vol_v2(_excess_index(_ls(a, "USMV"), b), _excess_index(_ls(a, "SPY"), b))
+    rep["returns"] = "excess over fred-DTB3 (prior-day print / 100 / 252)"; rep["reason"] = "excess over T-bills: " + rep["reason"]
+    return rep
+
+
+def _u2_svxy_v2(a):
+    """T-435 holds SGOV (bills) when out of SVXY. If underlying2.svxy_v2 takes the bill series it credits cash days itself; otherwise the
+    SVXY leg is an excess-return index, so off days earn the bill and the Sharpe difference is on excess returns."""
+    b = _bill(a); vix, vix3m = index_closes(a.load("cboe-VIX-history")), index_closes(a.load("cboe-VIX3M-history"))
+    if _accepts_bills(u2.svxy_v2):
+        return u2.svxy_v2(_ls(a, "SVXY"), vix, vix3m, bill_days=b[0], bill_vals=b[1])
+    rep = u2.svxy_v2(_excess_index(_ls(a, "SVXY"), b), vix, vix3m)
+    rep["returns"] = "excess over fred-DTB3 (prior-day print / 100 / 252); cash days earn the bill"; rep["reason"] = "excess over T-bills, cash earns the bill: " + rep["reason"]
+    return rep
+
+
+def _u2_gold_autumn_v2(a):
+    g = _ls(a, "GLD")
+    return _with_n(u2.gold_autumn_v2(g), max(sum(1 for d in g[0] if d >= "2010-12-31") - 1, 0))
+
+
+def _u2_low_vol_tilt(a):
+    usmv, spy = _ls(a, "USMV"), _ls(a, "SPY")
+    return _with_n(u2.low_vol_tilt(usmv, spy, _ls(a, "SPLV"), _ls(a, "SPHB")), max(len(set(usmv[0]) & set(spy[0])) - 1, 0))
+
+
+def _u2_golden_cross(a, v2: bool):
+    btc, eth = _ls(a, "BTC-USD"), _ls(a, "ETH-USD")
+    if v2:   # golden_cross_v2 tests BTC returns from 2015-04 after a 300-day burn-in
+        return _with_n(u2.golden_cross_v2(btc, eth), _n_returns(btc, burn=300, since="2015-04-01"))
+    return _with_n(u2.golden_cross(btc, eth), _n_returns(btc, eth, burn=300))
+
+
 U2_HARNESSES = {
-    "tom_replication": _u2(lambda a: u2.tom_replication({s: _ls(a, s) for s in ("QQQ", "IWM", "TLT", "GLD", "BTC-USD")}, {"QQQ": 2, "IWM": 2, "TLT": 2, "GLD": 3, "BTC-USD": 40})),
+    "tom_replication": _u2(lambda a: _u2_tom(a, "tom_replication")),
     "quarter_end_reversal": _u2(lambda a: u2.quarter_end_reversal(*_ls(a, "IWM"))),
     "santa_rally": _u2(lambda a: u2.santa_rally(_ls(a, "^GSPC"), _ls(a, "SPY"))),
     "january_small_cap": _u2(lambda a: u2.january_small_cap(_ls(a, "IWM"), _ls(a, "SPY"), _ls(a, "^RUT"), _ls(a, "^GSPC"))),
     "sell_in_may": _u2(lambda a: u2.sell_in_may(_ls(a, "^GSPC"), _ls(a, "SPY"))),
     "opex_week": _u2(lambda a: u2.opex_week(*_ls(a, "SPY"))),
-    "btc_monday": _u2(lambda a: u2.btc_monday(*_ls(a, "BTC-USD"))),
-    "gold_autumn": _u2(lambda a: u2.gold_autumn(_ls(a, "GLD"), _ls(a, "GC=F"))),
-    "golden_cross_crypto": _u2(lambda a: u2.golden_cross(_ls(a, "BTC-USD"), _ls(a, "ETH-USD"))),
+    "btc_monday": _u2(lambda a: (lambda s: _with_n(u2.btc_monday(*s), _n_returns(s)))(_ls(a, "BTC-USD"))),
+    "gold_autumn": _u2(lambda a: (lambda g: _with_n(u2.gold_autumn(g, _ls(a, "GC=F")), _n_returns(g)))(_ls(a, "GLD"))),
+    "golden_cross_crypto": _u2(lambda a: _u2_golden_cross(a, v2=False)),
     "metals_tsmom": _u2(lambda a: u2.metals_tsmom(_ls(a, "GLD"), _ls(a, "SLV"), _ls(a, "GC=F"), _ls(a, "SI=F"))),
     "crypto_weekly_tsmom": _u2(lambda a: u2.crypto_weekly_tsmom(_ls(a, "BTC-USD"), _ls(a, "ETH-USD"))),
     "btc_reversal": _u2(lambda a: u2.btc_reversal(*_ls(a, "BTC-USD"))),
     "gem_dual_momentum": _u2(lambda a: u2.gem(_ls(a, "SPY"), _ls(a, "EFA"), _ls(a, "AGG"), *_bill(a))),
     "sector_rotation": _u2(lambda a: u2.sector_rotation({s: _ls(a, s) for s in u2.SECTORS}, _ls(a, "SPY"), *_bill(a))),
     "svxy_regime": _u2(lambda a: u2.svxy_regime(_ls(a, "SVXY"), index_closes(a.load("cboe-VIX-history")), index_closes(a.load("cboe-VIX3M-history")))),
-    "low_vol_tilt": _u2(lambda a: u2.low_vol_tilt(_ls(a, "USMV"), _ls(a, "SPY"), _ls(a, "SPLV"), _ls(a, "SPHB"))),
+    "low_vol_tilt": _u2(_u2_low_vol_tilt),
     "santa_v2": _u2(lambda a: u2.santa_v2(_ls(a, "^GSPC"))),
     "sell_in_may_v2": _u2(lambda a: u2.sell_in_may_v2(_ls(a, "^GSPC"))),
     "btc_monday_v2": _u2(lambda a: u2.btc_monday_v2(*_ls(a, "BTC-USD"))),
-    "gold_autumn_v2": _u2(lambda a: u2.gold_autumn_v2(_ls(a, "GLD"))),
+    "gold_autumn_v2": _u2(_u2_gold_autumn_v2),
     "opex_week_v2": _u2(lambda a: u2.opex_week_v2(*_ls(a, "SPY"))),
-    "tom_replication_v2": _u2(lambda a: u2.tom_replication_v2({s: _ls(a, s) for s in ("QQQ", "IWM", "TLT", "GLD", "BTC-USD")}, {"QQQ": 2, "IWM": 2, "TLT": 2, "GLD": 3, "BTC-USD": 40})),
-    "low_vol_v2": _u2(lambda a: u2.low_vol_v2(_ls(a, "USMV"), _ls(a, "SPY"))),
+    "tom_replication_v2": _u2(lambda a: _u2_tom(a, "tom_replication_v2")),
+    "low_vol_v2": _u2(_u2_low_vol_v2),
     "btc_reversal_v2": _u2(lambda a: u2.btc_reversal_v2(*_ls(a, "BTC-USD"))),
     "sector_rotation_v2": _u2(lambda a: u2.sector_rotation_v2({s: _ls(a, s) for s in u2.SECTORS}, _ls(a, "SPY"), *_bill(a))),
     "gem_v2": _u2(lambda a: u2.gem_v2(_ls(a, "SPY"), _ls(a, "EFA"), _ls(a, "AGG"), *_bill(a))),
-    "golden_cross_v2": _u2(lambda a: u2.golden_cross_v2(_ls(a, "BTC-USD"), _ls(a, "ETH-USD"))),
+    "golden_cross_v2": _u2(lambda a: _u2_golden_cross(a, v2=True)),
     "crypto_weekly_v2": _u2(lambda a: u2.crypto_weekly_v2(_ls(a, "BTC-USD"), _ls(a, "ETH-USD"))),
     "metals_v2": _u2(lambda a: u2.metals_v2(_ls(a, "GLD"), _ls(a, "SLV"), _ls(a, "GC=F"), _ls(a, "SI=F"), *_bill(a))),
-    "svxy_v2": _u2(lambda a: u2.svxy_v2(_ls(a, "SVXY"), index_closes(a.load("cboe-VIX-history")), index_closes(a.load("cboe-VIX3M-history")))),
+    "svxy_v2": _u2(_u2_svxy_v2),
 }
-U2_BUNDLES = {"tom_replication": ["daily-history-QQQ", "daily-history-BTC-USD"], "quarter_end_reversal": ["daily-history-IWM"], "santa_rally": ["daily-history--GSPC"],
-              "january_small_cap": ["daily-history--RUT", "daily-history--GSPC"], "sell_in_may": ["daily-history--GSPC"], "opex_week": ["daily-history-SPY"], "btc_monday": ["daily-history-BTC-USD"],
-              "gold_autumn": ["daily-history-GLD", "daily-history-GC-F"], "golden_cross_crypto": ["daily-history-BTC-USD", "daily-history-ETH-USD"], "metals_tsmom": ["daily-history-GLD", "daily-history-SI-F"],
-              "crypto_weekly_tsmom": ["daily-history-BTC-USD", "daily-history-ETH-USD"], "btc_reversal": ["daily-history-BTC-USD"], "gem_dual_momentum": ["daily-history-EFA", "daily-history-AGG", "fred-DTB3"],
-              "sector_rotation": ["daily-history-XLK", "fred-DTB3"], "svxy_regime": ["daily-history-SVXY", "cboe-VIX3M-history"], "low_vol_tilt": ["daily-history-USMV", "daily-history-SPHB"],
-              "santa_v2": ["daily-history--GSPC"], "sell_in_may_v2": ["daily-history--GSPC"], "btc_monday_v2": ["daily-history-BTC-USD"], "gold_autumn_v2": ["daily-history-GLD"],
-              "opex_week_v2": ["daily-history-SPY"], "tom_replication_v2": ["daily-history-QQQ"], "low_vol_v2": ["daily-history-USMV"], "btc_reversal_v2": ["daily-history-BTC-USD"],
-              "sector_rotation_v2": ["daily-history-XLK", "fred-DTB3"], "gem_v2": ["daily-history-EFA", "fred-DTB3"], "golden_cross_v2": ["daily-history-BTC-USD"],
-              "crypto_weekly_v2": ["daily-history-ETH-USD"], "metals_v2": ["daily-history-SLV", "daily-history-SI-F"], "svxy_v2": ["daily-history-SVXY"]}
+
+
+def _dh(*syms: str) -> list[str]:
+    """Bundle names of daily-history symbols, sanitised exactly as u2.load_series names them (^GSPC -> daily-history--GSPC)."""
+    return ["daily-history-" + "".join(c if c.isalnum() or c in "-_." else "-" for c in s) for s in syms]
+
+
+# Every bundle each U2 harness actually loads (asserted against a load trace in tests/test_mandel_audit_rw.py).
+U2_BUNDLES = {"tom_replication": _dh(*TOM_ASSETS), "quarter_end_reversal": _dh("IWM"), "santa_rally": _dh("^GSPC", "SPY"),
+              "january_small_cap": _dh("IWM", "SPY", "^RUT", "^GSPC"), "sell_in_may": _dh("^GSPC", "SPY"), "opex_week": _dh("SPY"), "btc_monday": _dh("BTC-USD"),
+              "gold_autumn": _dh("GLD", "GC=F"), "golden_cross_crypto": _dh("BTC-USD", "ETH-USD"), "metals_tsmom": _dh("GLD", "SLV", "GC=F", "SI=F"),
+              "crypto_weekly_tsmom": _dh("BTC-USD", "ETH-USD"), "btc_reversal": _dh("BTC-USD"), "gem_dual_momentum": _dh("SPY", "EFA", "AGG") + ["fred-DTB3"],
+              "sector_rotation": _dh(*u2.SECTORS, "SPY") + ["fred-DTB3"], "svxy_regime": _dh("SVXY") + ["cboe-VIX-history", "cboe-VIX3M-history"],
+              "low_vol_tilt": _dh("USMV", "SPY", "SPLV", "SPHB"),
+              "santa_v2": _dh("^GSPC"), "sell_in_may_v2": _dh("^GSPC"), "btc_monday_v2": _dh("BTC-USD"), "gold_autumn_v2": _dh("GLD"),
+              "opex_week_v2": _dh("SPY"), "tom_replication_v2": _dh(*TOM_ASSETS), "low_vol_v2": _dh("USMV", "SPY") + ["fred-DTB3"], "btc_reversal_v2": _dh("BTC-USD"),
+              "sector_rotation_v2": _dh(*u2.SECTORS, "SPY") + ["fred-DTB3"], "gem_v2": _dh("SPY", "EFA", "AGG") + ["fred-DTB3"], "golden_cross_v2": _dh("BTC-USD", "ETH-USD"),
+              "crypto_weekly_v2": _dh("BTC-USD", "ETH-USD"), "metals_v2": _dh("GLD", "SLV", "GC=F", "SI=F") + ["fred-DTB3"],
+              "svxy_v2": _dh("SVXY") + ["cboe-VIX-history", "cboe-VIX3M-history", "fred-DTB3"]}
 
 
 def _om(fn, nkey):
@@ -725,11 +845,53 @@ XA_MAP = {"T-175": "dvol_gap_5pts", "T-177": "gvz_gap_2pts", "T-244": "gvz_var_p
           "T-245": "multi_asset_short_var", "T-247": "gvz_vix_extremes", "T-266": "eth_btc_dvol_ratio", "T-274": "gold_silver_ratio_extreme", "T-514": "gvz_vix_zscore_slope",
           "T-253": "btc_covered_call", "T-254": "btc_short_put", "T-256": "btc_low_dvol_straddle", "T-267": "btc_protective_put", "T-176": "btc_inverse_covered_call",
           "T-270": "gld_covered_call", "T-279": "gld_put_write", "T-272": "gld_low_gvz_straddle"}
+_BTC_OPT = _dh("BTC-USD") + ["deribit-dvol-BTC-history", "fred-DTB3"]
+_GLD_OPT = _dh("GLD") + ["cboe-GVZ-history", "fred-DTB3"]
+# Every bundle each XA harness actually loads (asserted against a load trace in tests/test_mandel_audit_rw.py).
+XA_BUNDLES = {
+    "dvol_gap_5pts": _dh("BTC-USD") + ["deribit-dvol-BTC-history"], "gvz_gap_2pts": _dh("GLD") + ["cboe-GVZ-history"],
+    "gvz_var_premium_thirds": _dh("GLD") + ["cboe-GVZ-history"], "dvol_var_premium": _dh("BTC-USD") + ["deribit-dvol-BTC-history"],
+    "gvz_var_premium_halves": _dh("GLD") + ["cboe-GVZ-history"], "ovx_var_premium": _dh("USO") + ["cboe-OVX-history"],
+    "multi_asset_short_var": _dh("SPY", "GLD", "USO", "TLT") + ["cboe-VIX-history", "cboe-GVZ-history", "cboe-OVX-history", "cboe-VXTLT-history"],
+    "gvz_vix_extremes": _dh("GLD", "SPY") + ["cboe-GVZ-history", "cboe-VIX-history"],
+    "eth_btc_dvol_ratio": _dh("ETH-USD", "BTC-USD") + ["deribit-dvol-ETH-history", "deribit-dvol-BTC-history"],
+    "gold_silver_ratio_extreme": _dh("GLD", "SLV"), "gvz_vix_zscore_slope": ["cboe-GVZ-history", "cboe-VIX-history"],
+    "btc_covered_call": _BTC_OPT, "btc_short_put": _BTC_OPT, "btc_low_dvol_straddle": _BTC_OPT, "btc_protective_put": _BTC_OPT, "btc_inverse_covered_call": _BTC_OPT,
+    "gld_covered_call": _GLD_OPT, "gld_put_write": _GLD_OPT, "gld_low_gvz_straddle": _GLD_OPT,
+}
+# The registered null of the theory each XA harness tests (XA_MAP), recorded with every result.
+XA_NULLS = {
+    "dvol_gap_5pts": "mean(DVOL - forward 30-day realised BTC vol) <= 5 vol points (block-bootstrap CI)",
+    "gvz_gap_2pts": "mean(GVZ - forward 21-day realised GLD vol) < 2 vol points (block-bootstrap CI)",
+    "gvz_var_premium_thirds": "mean(GVZ^2 - forward realised GLD variance) <= 0 (block-bootstrap CI)",
+    "dvol_var_premium": "mean(DVOL^2 - forward realised BTC variance) <= 0 (block-bootstrap CI)",
+    "gvz_var_premium_halves": "mean GVZ^2 - realised GLD variance <= 0 (block-bootstrap CI)",
+    "ovx_var_premium": "mean OVX^2 - realised USO variance <= 0 (block-bootstrap CI)",
+    "multi_asset_short_var": "Sharpe(equal-vega SPX/GLD/USO/TLT short variance) - Sharpe(SPX alone) <= 0 (block bootstrap)",
+    "gvz_vix_extremes": "mean of s*[ln(RV_GLD/RV_SPY) - ln(GVZ/VIX)] after band exits <= 0 (block-bootstrap CI)",
+    "eth_btc_dvol_ratio": "mean of [ln(RV_ETH/RV_BTC) - ln(DVOL_ETH/DVOL_BTC)] after low-ratio signals <= 0 (block-bootstrap CI)",
+    "gold_silver_ratio_extreme": "mean 180-day forward log change of GLD/SLV after a 5-year 90th-percentile exceedance >= 0 (bootstrap)",
+    "gvz_vix_zscore_slope": "OLS slope of the 20-day forward change in log(GVZ/VIX) on its z-score >= 0 (bootstrap, per half)",
+    "btc_covered_call": "Sharpe(covered call) - Sharpe(hold) <= 0; model-priced at flat DVOL", "btc_short_put": "mean short-put P&L <= 0; model-priced at flat DVOL",
+    "btc_low_dvol_straddle": "mean straddle return (low DVOL) - mean (all days) <= 0; model-priced", "btc_protective_put": "Calmar(hedged) - Calmar(hold) <= 0; model-priced",
+    "btc_inverse_covered_call": "mean BTC-denominated covered-call P&L <= 0; model-priced", "gld_covered_call": "Sharpe(covered call) - Sharpe(hold) <= 0; model-priced at flat GVZ",
+    "gld_put_write": "mean short-put P&L <= 0; model-priced at flat GVZ", "gld_low_gvz_straddle": "mean straddle return (low GVZ) - mean (all days) <= 0; model-priced",
+}
 
 
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
+    """INDEX entries matching the pattern. Listing is not availability: bundles kept off git have INDEX entries on every checkout."""
     names = sorted(e.name for e in archive.entries())
     return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
+
+
+def _present(archive: Archive, pattern: str) -> list[str]:
+    """INDEX entries matching the pattern whose file is on this machine."""
+    return [n for n in _bundles_matching(archive, pattern) if archive._abs(archive.get(n).path).exists()]
+
+
+def _missing_bundles(archive: Archive, needed: list[str]) -> list[str]:
+    return [b for b in needed if not _present(archive, b)]
 
 
 def _load_many(archive: Archive, pattern: str):
@@ -759,6 +921,7 @@ HARNESSES: dict[str, Callable] = {
     "markov_baseline": harness_markov,
     "msm_volatility": harness_msm,
     "dsr_pbo_harness": harness_overfit,
+    "holdout_sharpe": harness_holdout_sharpe,
     "controls": harness_controls,
     "social_attention": harness_social_attention,
     "fear_greed_contrarian": harness_fear_greed,
@@ -786,7 +949,7 @@ BUNDLES_NEEDED = {
     "bundle_arb_scan": ["polymarket-books-snapshot"],
     "multifractal_scaling": ["polymarket-price-history-daily"], "hurst_ci": ["polymarket-price-history-daily"],
     "markov_baseline": ["polymarket-price-history-daily"], "msm_volatility": ["polymarket-price-history-daily"],
-    "dsr_pbo_harness": ["polymarket-price-history-daily"], "controls": ["polymarket-price-history-daily", "polymarket-closed-markets"],
+    "dsr_pbo_harness": ["polymarket-price-history-daily"], "holdout_sharpe": ["polymarket-price-history-daily"], "controls": ["polymarket-price-history-daily", "polymarket-closed-markets"],
     "social_attention": ["social-derived-*", "social-prices-*"],
     "fear_greed_contrarian": ["crypto-fear-greed-history", "daily-history-BTC-USD"],
     "longshot_bias": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -799,7 +962,7 @@ BUNDLES_NEEDED = {
     "collar_overlay": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"], "short_straddle_model": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3"],
     "vrp_oil": ["cboe-OVX-history", "daily-history-USO"], "vrp_bonds": ["cboe-VXTLT-history", "daily-history-TLT"], "vrp_russell": ["cboe-RVX-history", "daily-history-IWM"],
     "vrp_eth": ["deribit-dvol-ETH-history", "daily-history-ETH-USD"], "implied_move": ["options-surface-*", "daily-history-SPY"],
-    "trend_rules": ["daily-history-SPY", "daily-history-BTC-USD"], "turn_of_month": ["daily-history-SPY"], "weekday_effect": ["daily-history-SPY"],
+    "trend_rules": _dh(*TREND_ASSETS), "turn_of_month": ["daily-history-SPY"], "weekday_effect": ["daily-history-SPY"],
     "gold_silver_ratio": ["daily-history-GLD", "daily-history-SLV"], "crypto_weekend": ["daily-history-BTC-USD"],
     "forward_variance_premium": ["cboe-VIX-history", "cboe-VIX3M-history", "daily-history-SPY"], "term_vs_spot_premium": ["cboe-VIX-history", "cboe-VIX3M-history", "daily-history-SPY"],
     "vvix_premium": ["cboe-VVIX-history", "cboe-VIX-history"], "vix9d_conditional": ["cboe-VIX9D-history", "daily-history-SPY"],
@@ -808,7 +971,7 @@ BUNDLES_NEEDED = {
     "parity_forward": ["options-chain-SPY-*", "fred-DTB3"], "opex_pinning": ["daily-history-SPY"], "btc_weekend_variance": ["daily-history-BTC-USD"],
     **U2_BUNDLES,
     **OM2_BUNDLES,
-    **{k: ["daily-history-GLD", "cboe-GVZ-history", "deribit-dvol-BTC-history", "fred-DTB3"] for k in XA_HARNESSES},
+    **XA_BUNDLES,
     **{f"structure_{c.replace('-', '_').lower()}": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3", "spy-smile-*"] for c in ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]},
 }
 
@@ -821,39 +984,86 @@ def save_registry(reg: dict, path: Path = REGISTRY) -> None:
     atomic_write_text(path, json.dumps(reg, indent=1, ensure_ascii=False))
 
 
+# A theory whose registry `experiments` still names a harness that does not test its wording is scored by the harness that does.
+# T-36's pass rule is the holdout Sharpe of the in-sample best rule, which dsr_pbo_harness (T-10's DSR/PBO rule) never computes.
+# A no-op once registry.json maps T-36 to holdout_sharpe.
+HARNESS_REMAP = {("T-36", "dsr_pbo_harness"): "holdout_sharpe"}
+UPDATABLE = ("untested", "inconclusive", "supported", "not_supported")
+
+
+def _experiments_of(t: dict) -> list[str]:
+    return [HARNESS_REMAP.get((t["id"], h), h) for h in t.get("experiments", [])]
+
+
+def _scored_theories(reg: Optional[dict]) -> dict[str, list[str]]:
+    """harness -> ids of the theories its verdict scores. A superseded theory is not scored by a harness that is also mapped to its
+    successor: that harness tests the restated wording, and the earlier wording's verdict stands. A superseded theory with a harness
+    of its own (testing its own wording) is still scored by it."""
+    if not reg:
+        return {}
+    exps = {t["id"]: _experiments_of(t) for t in reg["theories"]}
+    successors: dict[str, list[str]] = {}
+    for t in reg["theories"]:
+        if t.get("supersedes"):
+            successors.setdefault(t["supersedes"], []).append(t["id"])
+    out: dict[str, list[str]] = {}
+    for t in reg["theories"]:
+        shared = {h for s in successors.get(t["id"], []) for h in exps.get(s, [])}
+        for h in exps[t["id"]]:
+            if h not in shared:
+                out.setdefault(h, []).append(t["id"])
+    return out
+
+
+def _execute(name: str, fn: Callable, archive: Archive, ledger: Ledger) -> tuple[dict, int, str, str, bool]:
+    """Run one harness: (stat, n, verdict, reason, no_data). no_data marks a result that must not move theory status: an input listed
+    in the INDEX but not on this machine, or a harness reporting it has nothing on this machine to test."""
+    try:
+        stat, n, verdict, reason = fn(archive, ledger) if name == "controls" else fn(archive)
+    except (MissingData, FileNotFoundError) as e:
+        return {"missing": getattr(e, "names", [str(e)[:300]])}, 0, "inconclusive", f"missing data: {e}"[:500], True
+    except Exception as e:  # a crashing harness is a recorded error, not a silent skip
+        return {"error": repr(e)[:300]}, 0, "error", f"harness raised {type(e).__name__}", False
+    return stat, n, verdict, reason, verdict == "inconclusive" and "on this machine" in str(reason)
+
+
+def _apply_result(reg: Optional[dict], ids: list[str], res_id: str, verdict: str, no_data: bool) -> None:
+    """Move the status of the scored theories to the verdict. A no-data result moves nothing (as for a missing bundle). An error never
+    overwrites a verdict computed earlier; an untested theory becomes inconclusive."""
+    if not reg or no_data:
+        return
+    ids = set(ids)
+    for t in reg["theories"]:
+        if t["id"] in ids and t.get("status") in UPDATABLE:
+            if verdict != "error":
+                t["status"] = verdict
+            elif t["status"] == "untested":
+                t["status"] = "inconclusive"
+            t.setdefault("results", []).append(res_id)
+
+
 def run_all(only: Optional[list[str]] = None, ledger: Optional[Ledger] = None, archive: Optional[Archive] = None,
             log: Optional[ExperimentLog] = None, registry_path: Path = REGISTRY) -> list[dict]:
     ledger = ledger if ledger is not None else Ledger()
     archive = archive if archive is not None else Archive(ledger=ledger)
     log = log if log is not None else ExperimentLog(ledger=ledger)
     reg = load_registry(registry_path)
-    theories_by_h: dict[str, list[str]] = {}
-    if reg:
-        for t in reg["theories"]:
-            for h in t.get("experiments", []):
-                theories_by_h.setdefault(h, []).append(t["id"])
+    theories_by_h = _scored_theories(reg)
     out = []
     for name, fn in HARNESSES.items():
         if only and name not in only:
             continue
         t0 = time.time()
         needed = BUNDLES_NEEDED[name]
-        missing = [b for b in needed if not _bundles_matching(archive, b)]
+        missing = _missing_bundles(archive, needed)       # on disk, not merely listed in the INDEX
         if missing:
-            res = log.record(name, theories_by_h.get(name, []), {}, "n/a", 0, "inconclusive", f"missing data bundles {missing}", data_bundles=needed)
+            res = log.record(name, theories_by_h.get(name, []), {}, _null_for(name), 0, "inconclusive", f"missing data bundles {missing}", data_bundles=needed)
             out.append(res.as_dict()); continue
-        try:
-            stat, n, verdict, reason = fn(archive, ledger) if name == "controls" else fn(archive)
-        except Exception as e:  # a crashing harness is a recorded error, not a silent skip
-            stat, n, verdict, reason = {"error": repr(e)[:300]}, 0, "error", f"harness raised {type(e).__name__}"
+        stat, n, verdict, reason, no_data = _execute(name, fn, archive, ledger)
         res = log.record(name, theories_by_h.get(name, []), stat, _null_for(name), n, verdict, reason, data_bundles=needed,
                          cost={"wall_seconds": round(time.time() - t0, 1)})
         out.append(res.as_dict())
-        if reg:
-            for t in reg["theories"]:
-                if name in t.get("experiments", []) and t.get("status") in ("untested", "inconclusive", "supported", "not_supported"):
-                    t["status"] = verdict if verdict != "error" else "inconclusive"
-                    t.setdefault("results", []).append(res.id)
+        _apply_result(reg, theories_by_h.get(name, []), res.id, verdict, no_data)
     if reg:
         save_registry(reg, registry_path)
     return out
@@ -863,18 +1073,19 @@ def _null_for(name: str) -> str:
     return {
         "market_calibration": "coin (p=0.5) Brier 0.25; skill vs coin must be > 0 at every horizon",
         "multiscale_edge": "mean(outcome - price) = 0 at every horizon (bootstrap 95% interval)",
-        "bundle_arb_scan": "no after-fee mispricing in the snapshot",
-        "multifractal_scaling": "shuffled increments (same marginal, no clustering): concavity q95",
-        "hurst_ci": "shuffled increments: H interval around 0.5",
+        "bundle_arb_scan": "no after-fee long-bundle (YES ask + NO ask) mispricing in the snapshot; short side reported only",
+        "multifractal_scaling": "shuffled increments (same marginal, no clustering): concavity q95 over 200 shuffles per series",
+        "hurst_ci": "shuffled increments: H interval around 0.5 (200 shuffles per series); claim needs majority H < 0.5 and > 25% below the null",
         "markov_baseline": "base-rate predictor of the next move",
         "msm_volatility": "20-day rolling variance, out-of-sample Gaussian log score",
         "dsr_pbo_harness": "zero-skill best-of-N: DSR < 0.95 and PBO > 0.5 expected",
+        "holdout_sharpe": "holdout Sharpe of the in-sample best rule = 0 (pass: <= 0)",
         "controls": "coin 0.25, oracle 0, market < coin on the same questions",
         "social_attention": "mentions permuted within ticker: Spearman rho with next-day |return| ~ 0",
         "fear_greed_contrarian": "Fear & Greed series circularly shifted against returns: conditional mean difference ~ 0",
-        "longshot_bias": "calibrated bucket: mean(outcome - price) = 0 (bootstrap 95% interval)",
+        "longshot_bias": "calibrated bucket: mean(outcome - price) = 0 (event-clustered bootstrap 95% interval)",
         "horizon_monotone": "skill flat across horizons",
-        "point_in_time_check": "naive and point-in-time runs give the same verdict and sign",
+        "point_in_time_check": "naive and point-in-time runs give the same verdict (d_fear sign reported only)",
         "vrp_spx": "implied variance = realised variance (studentized block bootstrap of the daily difference)",
         "vrp_btc": "implied variance = realised variance (block bootstrap)", "vrp_gold": "implied = realised (block bootstrap)", "vrp_nasdaq": "implied = realised (block bootstrap)",
         "skew_tail": "SKEW circularly shifted against returns: equal crash probability in top and bottom quintiles",
@@ -895,4 +1106,5 @@ def _null_for(name: str) -> str:
         "spx_box_lending": "box lending spread over bills <= 0", "spx_box_borrowing": "short-box rate >= bill + 50 bp",
         "parity_forward": "parity deviations within the half-spread; implied rate = bill", "opex_pinning": "distance to nearest $1 uniform on opex and other days",
         "btc_weekend_variance": "weekend variance >= 3x weekday variance",
+        **XA_NULLS,
     }.get(name, "see the harness docstring in mandel/experiments/underlying2.py (null stated per criterion)" if name in U2_HARNESSES else "n/a")

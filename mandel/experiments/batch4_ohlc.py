@@ -17,6 +17,8 @@ Data conventions
   recovered exactly as D_t = C_{t-1} (1 - f_{t-1}/f_t) with f = adjclose/close. Ratio moves under 1e-4 are float32
   rounding (about 1e-6) and are ignored. On SPY this finds 4 ex-dates a year, on quarterly third Fridays.
 * Where a claim works on dividend-adjusted OHLC (T-304), open/high/low are multiplied by f of the same day.
+* Overnight gaps (T-333, T-348) add the ex-date dividend back, (open_t + D_t)/close_{t-1} - 1, so the cash
+  dividend that lands overnight is not read as a gap down.
 
 Statistics
 ----------
@@ -24,10 +26,12 @@ Statistics
   conservative reading of a one-sided bound. Circular block bootstrap unless the trial names another scheme
   (T-332: stationary bootstrap with mean block 20; T-304: cluster bootstrap by asset x entry year; T-324: cluster
   bootstrap by entry month).
-* p-values test the null the trial states. Where the claim also names a magnitude ("at least 3 bps", "at least 1
-  point") the point estimate must clear it and the p-value against the magnitude itself is reported as a
-  diagnostic. Bootstrap p-values are studentized (``block_bootstrap_pvalue``) for means and centred percentile
-  for regression coefficients and clustered means.
+* p-values test the null the trial states, except T-348: its claim is a gap of "at least 3 bps per trading day"
+  and its pass is "Gap > 3 bps/day with p < 0.05", so the p criterion is against H0: gap <= 3 bps (the equal-means
+  p is reported). For T-421 ("at least 1 point") the point estimate must clear the magnitude, the p criterion is
+  against 0 and the p against the magnitude is reported. Bootstrap p-values are studentized
+  (``block_bootstrap_pvalue``) for means and centred percentile for regression coefficients and clustered means.
+* min_n is counted in the unit of the statistic: trades for per-trade statistics (T-304, T-324, T-333).
 * DSR is ``deflated_sharpe_ratio`` with the trial count the claim states; the variance of trial Sharpes is that of
   the variants the archive supports (when there are at least two), floored at the zero-skill variance 1/(T-1).
 * Annualisation: 252 trading days for US-listed instruments, 365 for crypto.
@@ -35,7 +39,10 @@ Statistics
   cannot be implemented (None) -> at best inconclusive. A sample below the trial's min_n -> inconclusive.
 
 Model pricing (T-216) is Black-Scholes with sigma = VIX/100, T = 1/252, r = 0 and labelled MODEL-PRICED: a flat
-30-day index cannot see any expiry-specific premium that traded weekly options carry.
+30-day index cannot see any expiry-specific premium that traded weekly options carry. The straddle settles on the
+raw closes, |SPY_Fri - SPY_Thu|, as the procedure states; on an ex-dividend Friday the known cash dividend (declared
+before the ex-date) is priced into the forward, S_thu - D. The r = q = 0 price without the dividend is reported as
+the as-worded sensitivity.
 """
 
 from __future__ import annotations
@@ -290,9 +297,10 @@ def overnight_intraday(days: Sequence[str], opens, closes, divs=None, adj=None, 
                        split: str = "2010-01-01", min_gap: float = 0.0003, block: int = 10, n_boot: int = 2000, min_n: int = 3000,
                        cost_rt: float = 0.0001, seed: int = 0) -> dict:
     """T-348: r_night = open_t/close_{t-1} - 1 + D_t/close_{t-1}; r_day = close_t/open_t - 1. Pass: mean(r_night -
-    r_day) > 3 bps/day, studentized block-10 bootstrap p < 0.05 against equal means, gap positive in both halves.
-    Secondary (not in the pass): Sharpe of the overnight series net of a 1 bp round trip (2 bp sensitivity) vs
-    buy-and-hold."""
+    r_day) > 3 bps/day, studentized block-10 bootstrap p < 0.05 against the magnitude the claim names (H0: gap <= 3
+    bps, since the claim is 'at least 3 bps per trading day'), gap positive in both halves. The p against the trial's
+    equal-means null and the one-sided 95% lower bound of the gap are reported. Secondary (not in the pass): Sharpe of
+    the overnight series net of a 1 bp round trip (2 bp sensitivity) vs buy-and-hold."""
     O = np.asarray(opens, dtype=float); C = np.asarray(closes, dtype=float)
     D = np.zeros(len(C)) if divs is None else np.asarray(divs, dtype=float)
     ds = np.array(days[1:])
@@ -314,23 +322,27 @@ def overnight_intraday(days: Sequence[str], opens, closes, divs=None, adj=None, 
     lo, hi = _mean_ci(d, block, n_boot, seed)
     p_eq = float(block_bootstrap_pvalue(d, np.zeros(n), n_boot=n_boot, block_len=block, seed=seed))
     p_thr = float(block_bootstrap_pvalue(d, np.full(n, min_gap), n_boot=n_boot, block_len=block, seed=seed))
+    rng = np.random.default_rng(seed)
+    lo1 = float(np.quantile([d[_circ_idx(n, block, rng)].mean() for _ in range(n_boot)], 0.05))
     early = ds < split
     halves = [float(d[early].mean()) if early.any() else float("nan"), float(d[~early].mean()) if (~early).any() else float("nan")]
     halves_n = [int(early.sum()), int((~early).sum())]
     sr_night1, sr_night2 = _sr(night - cost_rt, EQ_PPY), _sr(night - 2 * cost_rt, EQ_PPY)
     sr_day, sr_bh = _sr(dayr, EQ_PPY), _sr(bh, EQ_PPY)
     crit = [(f"gap > {min_gap * 1e4:.0f} bps/day", gap > min_gap),
-            ("p < 0.05 vs equal means (studentized block-10 bootstrap)", p_eq < 0.05),
+            (f"p < 0.05 vs gap <= {min_gap * 1e4:.0f} bps (studentized block-{block} bootstrap)", p_thr < 0.05),
             ("gap positive in both halves", all(math.isfinite(h) and h > 0 for h in halves))]
     v, why = _decide(crit, n, min_n, "trading days")
     rep.update(mean_night_bps=float(night.mean() * 1e4), mean_day_bps=float(dayr.mean() * 1e4), gap_bps=gap * 1e4,
-               gap_ci_bps=[lo * 1e4, hi * 1e4], p_equal_means=p_eq, p_gap_le_threshold=p_thr, halves_gap_bps=[h * 1e4 for h in halves],
+               gap_ci_bps=[lo * 1e4, hi * 1e4], gap_lower95_one_sided_bps=lo1 * 1e4, p_criterion="H0: gap <= threshold",
+               p_equal_means=p_eq, p_gap_le_threshold=p_thr, halves_gap_bps=[h * 1e4 for h in halves],
                halves_n=halves_n, split=split, sharpe_overnight_net_1bp=sr_night1, sharpe_overnight_net_2bp=sr_night2,
                sharpe_intraday=sr_day, sharpe_buy_hold=sr_bh, verdict=v,
                reason=(f"SPY {rep['first']}..{rep['last']} ({n} days, {rep['n_ex_dividend_days']} ex-dividend nights with D/C added back): "
                        f"overnight {night.mean() * 1e4:+.2f} vs intraday {dayr.mean() * 1e4:+.2f} bps/day, gap {gap * 1e4:+.2f} bps "
-                       f"(95% CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}; threshold 3 bps), p={p_eq:.4f} vs equal means "
-                       f"(p={p_thr:.3f} vs gap <= 3 bps, diagnostic); halves <{split} {halves[0] * 1e4:+.2f} / >={split} {halves[1] * 1e4:+.2f} bps; "
+                       f"(95% CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}; one-sided 95% lower bound {lo1 * 1e4:+.2f}; claim: at least "
+                       f"{min_gap * 1e4:.0f} bps), p={p_thr:.3f} vs gap <= {min_gap * 1e4:.0f} bps (the pass criterion; p={p_eq:.4f} vs equal "
+                       f"means, the trial's stated null, shows only that the gap is positive); halves <{split} {halves[0] * 1e4:+.2f} / >={split} {halves[1] * 1e4:+.2f} bps; "
                        f"secondary Sharpe overnight net 1 bp {sr_night1:.2f} (2 bp {sr_night2:.2f}) vs buy-hold {sr_bh:.2f}; "
                        f"open==close on {flat_open * 100:.1f}% of days (flagged) — {why}"))
     return rep
@@ -338,11 +350,13 @@ def overnight_intraday(days: Sequence[str], opens, closes, divs=None, adj=None, 
 
 # ============================================================================== T-333 overnight gap fade ==
 
-def gap_fade_series(opens, closes, thr: float = 0.005, cost_rt: float = 0.0002):
-    """(o, i, side, daily net) aligned to days[1:]: o = gap, i = open-to-close, side = +1 after o < -thr (buy the open),
+def gap_fade_series(opens, closes, thr: float = 0.005, cost_rt: float = 0.0002, divs=None):
+    """(o, i, side, daily net) aligned to days[1:]: o = gap (open_t + D_t)/close_{t-1} - 1 with the ex-date cash
+    dividend D added back (raw gap without ``divs``), i = open-to-close, side = +1 after o < -thr (buy the open),
     -1 after o > +thr (short the open), daily net = side*i - cost on trade days and 0 otherwise."""
     O = np.asarray(opens, dtype=float); C = np.asarray(closes, dtype=float)
-    o = O[1:] / C[:-1] - 1; i = C[1:] / O[1:] - 1
+    D = np.zeros(len(C)) if divs is None else np.asarray(divs, dtype=float)
+    o = (O[1:] + D[1:]) / C[:-1] - 1; i = C[1:] / O[1:] - 1
     side = np.where(o < -thr, 1.0, np.where(o > thr, -1.0, 0.0))
     daily = np.where(side != 0, side * i - cost_rt, 0.0)
     return o, i, side, daily
@@ -350,14 +364,24 @@ def gap_fade_series(opens, closes, thr: float = 0.005, cost_rt: float = 0.0002):
 
 def gap_fade(days: Sequence[str], opens, closes, start: Optional[str] = "2000-01-01", end: Optional[str] = "2026-09-30", thr: float = 0.005,
              cost_rt: float = 0.0002, split: str = "2013-01-01", block: int = 20, n_boot: int = 2000, seed: int = 0, min_n: int = 500,
-             variant_sharpes: Optional[Sequence[float]] = None, n_trials: int = 6) -> dict:
+             variant_sharpes: Optional[Sequence[float]] = None, n_trials: int = 6, divs=None) -> dict:
     """T-333: fade overnight gaps beyond +-0.5% from the open to the close. Pass: 95% lower bound of the mean net
     return per trade > 0 (block-20 bootstrap over trades in time order, 2,000 resamples) AND the same sign in the two
     halves AND DSR > 0.95 over the ``n_trials`` variants (daily series, zero on non-trade days). The DSR is None
-    (not implemented) when no variant Sharpes are supplied."""
+    (not implemented) when no variant Sharpes are supplied. With ``divs`` the gap adds the ex-date dividend back and
+    the raw-gap version is reported as a sensitivity."""
     ds = np.array(days[1:])
-    o, i, side, daily = gap_fade_series(opens, closes, thr, cost_rt)
+    o, i, side, daily = gap_fade_series(opens, closes, thr, cost_rt, divs)
     m = _range_mask(ds, start, end)
+    raw = None
+    if divs is not None:
+        _, _, side_r, daily_r = gap_fade_series(opens, closes, thr, cost_rt)
+        side_r, daily_r = side_r[m], daily_r[m]
+        exd = (np.asarray(divs, dtype=float)[1:] > 0)[m]
+        raw = {"n_trades": int(np.sum(side_r != 0)), "n_ex_dividend_days": int(exd.sum()),
+               "n_trades_on_ex_dividend_days": int(np.sum((side[m] != 0) & exd)),
+               "n_raw_trades_on_ex_dividend_days": int(np.sum((side_r != 0) & exd)),
+               "n_side_changed": int(np.sum(side_r != side[m]))}
     ds, o, i, side, daily = ds[m], o[m], i[m], side[m], daily[m]
     tr = side != 0
     net = daily[tr]; tdays = ds[tr]
@@ -385,13 +409,23 @@ def gap_fade(days: Sequence[str], opens, closes, start: Optional[str] = "2000-01
         dec[d0 + "0s"] = {"n": int(mm.sum()), "mean_net_bps": float(net[mm].mean() * 1e4)}
     by_side = {"long_after_gap_down_bps": float(net[side[tr] > 0].mean() * 1e4) if np.any(side[tr] > 0) else None,
                "short_after_gap_up_bps": float(net[side[tr] < 0].mean() * 1e4) if np.any(side[tr] < 0) else None}
+    raw_txt = ""
+    if raw is not None:
+        rnet = daily_r[side_r != 0]
+        if rnet.size >= 2:
+            rlo, rhi = _mean_ci(rnet, block, n_boot, seed)
+            raw.update(mean_net_bps=float(rnet.mean() * 1e4), ci_bps=[rlo * 1e4, rhi * 1e4])
+            raw_txt = (f"; gap net of the ex-date dividend ({raw['n_ex_dividend_days']} ex-dividend days, {raw['n_trades_on_ex_dividend_days']} "
+                       f"traded; raw-gap sensitivity: {raw['n_trades']} trades, {raw['n_raw_trades_on_ex_dividend_days']} on ex-dividend days, "
+                       f"mean {rnet.mean() * 1e4:+.2f} bps, CI {rlo * 1e4:+.2f}..{rhi * 1e4:+.2f}; {raw['n_side_changed']} days change side)")
     crit = [("95% lower bound of mean net per trade > 0", lo > 0), (f"same sign in <{split} and >={split}", bool(same_sign)),
             (f"DSR > 0.95 over {n_trials} variants", None if dsr is None else dsr > DSR_PASS)]
     v, why = _decide(crit, n, min_n, "gap trades")
     rep.update(mean_net_bps=mean * 1e4, ci_bps=[lo * 1e4, hi * 1e4], halves_bps=[h * 1e4 for h in halves], dsr=dsr, n_trials=n_trials,
-               corr_o_i=corr, corr_ci=corr_ci, by_decade=dec, by_side=by_side, threshold=thr, cost_rt=cost_rt, verdict=v,
+               corr_o_i=corr, corr_ci=corr_ci, by_decade=dec, by_side=by_side, threshold=thr, cost_rt=cost_rt,
+               dividend_neutral_gap=divs is not None, raw_gap_sensitivity=raw, verdict=v,
                reason=(f"{n} gap trades |o|>{thr * 100:.2f}% {rep['first']}..{rep['last']} ({rep['n_long']} long, {rep['n_short']} short): "
-                       f"mean net {mean * 1e4:+.2f} bps after {cost_rt * 1e4:.0f} bps RT (95% CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}); "
+                       f"mean net {mean * 1e4:+.2f} bps after {cost_rt * 1e4:.0f} bps RT (95% CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}){raw_txt}; "
                        f"halves <{split} {halves[0] * 1e4:+.2f} / >={split} {halves[1] * 1e4:+.2f} bps; "
                        f"DSR {'n/a' if dsr is None else f'{dsr:.3f}'} over {n_trials} variants; diagnostic corr(o,i) {corr:+.3f} "
                        f"(95% CI {corr_ci[0]:+.3f}..{corr_ci[1]:+.3f}) — {why}"))
@@ -477,7 +511,7 @@ def ibs_reversal(days: Sequence[str], highs, lows, closes, adj, opens=None, star
     n = len(idx)
     rep = {"n": n, "first": sdays[0] if n else None, "last": sdays[-1] if n else None, "n_signal": int(f.sum())}
     if n < min_n:
-        v, why = _decide([], n, min_n, "signal days")
+        v, why = _decide([], n, min_n, "trading days")
         rep.update(verdict=v, reason=f"IBS reversal: {n} days, {int(f.sum())} signals — {why}")
         return rep
     if f.sum() < 2 or (~f).sum() < 2:
@@ -512,7 +546,7 @@ def ibs_reversal(days: Sequence[str], highs, lows, closes, adj, opens=None, star
     crit = [(f"95% lower bound of the difference > {min_gap * 1e4:.0f} bps", lo > min_gap),
             (f"same sign in <{split} and >={split}", bool(same_sign)),
             (f"DSR > 0.95 over {n_trials} trials", None if dsr is None else dsr > DSR_PASS)]
-    v, why = _decide(crit, n, min_n, "signal days")
+    v, why = _decide(crit, n, min_n, "trading days")  # the statistic compares the signal days with all days, so n counts trading days
     rep.update(mean_after_signal_bps=float(r_w[f].mean() * 1e4), mean_unconditional_bps=float(r_w.mean() * 1e4), diff_bps=diff * 1e4,
                ci_bps=[lo * 1e4, hi * 1e4], p_block_shift=p_shift, halves_bps=[h * 1e4 for h in halves], dsr=dsr, n_trials=n_trials,
                rule_sharpe_net=_sr(daily, EQ_PPY), execution=diag, verdict=v,
@@ -808,23 +842,23 @@ def twin_reversion(days: Sequence[str], a, b, start: str = "2010-01-01", end: st
     """T-324 on aligned adjusted closes of twins A and B: x = ln(A/B), z over the trailing 60 days (including t). Net
     return per trade = side x (A leg return - B leg return) - 8 bps (2 bps per leg per transaction, equal dollars).
     Pass: 95% lower bound of the mean net return per trade > 0 (bootstrap clustered by entry month) AND DSR > 0.95
-    of the trade-return series across ``n_trials`` twin variants. min_n counts daily observations of x in the window."""
+    of the trade-return series across ``n_trials`` twin variants. min_n counts trades, the unit of the per-trade
+    statistic (as for T-304 and T-333); below it the verdict is inconclusive and the statistics are still reported."""
     A = np.asarray(a, dtype=float); B = np.asarray(b, dtype=float); ds = np.array(days)
     x = np.log(A / B)
     z = _trailing_z(x, window, include_current=True)
     inw = _range_mask(ds, start, end) & np.isfinite(z)
     n_days = int(inw.sum())
-    rep = {"n": n_days, "first": ds[inw][0] if n_days else None, "last": ds[inw][-1] if n_days else None}
-    if n_days < min_n:
-        v, why = _decide([], n_days, min_n, "daily observations of the spread")
-        rep.update(verdict=v, reason=f"twin spread: {n_days} days — {why}")
-        return rep
     w = np.where(inw)[0]
-    trades = twin_trades(z, int(w[0]), int(w[-1]), entry_z, max_hold)
-    if len(trades) < 2:
-        crit = [("at least 2 trades for a bootstrap interval", False)]
-        v, why = _decide(crit, n_days, min_n, "daily observations of the spread")
-        rep.update(n_trades=len(trades), verdict=v, reason=f"twin spread: only {len(trades)} trades on {n_days} days — {why}")
+    trades = twin_trades(z, int(w[0]), int(w[-1]), entry_z, max_hold) if n_days else []
+    n_tr = len(trades)
+    rep = {"n": n_tr, "n_trades": n_tr, "n_days": n_days, "first": ds[inw][0] if n_days else None, "last": ds[inw][-1] if n_days else None,
+           "max_feasible_trades": n_days // 2}
+    if n_tr < 2:
+        v, why = _decide([], n_tr, min_n, "trades")
+        if v != "inconclusive":
+            v, why = "inconclusive", f"data cannot support the claim: {n_tr} trades, too few for a bootstrap interval"
+        rep.update(verdict=v, reason=f"twin spread: {n_tr} trades on {n_days} days — {why}")
         return rep
     e_i = np.array([t[0] for t in trades]); x_i = np.array([t[1] for t in trades]); side = np.array([t[2] for t in trades])
     gross = side * ((A[x_i] / A[e_i] - 1) - (B[x_i] / B[e_i] - 1))
@@ -845,8 +879,15 @@ def twin_reversion(days: Sequence[str], a, b, start: str = "2010-01-01", end: st
     exc = np.abs(x[e_i - 1] - mu60[e_i - 1])
     mar20 = months == "2020-03"
     crit = [("95% lower bound of mean net return per trade > 0", lo > 0), (f"DSR > 0.95 across {n_trials} twin variants", dsr > DSR_PASS)]
-    v, why = _decide(crit, n_days, min_n, "daily observations of the spread")
-    rep.update(n_trades=len(trades), mean_gross_bps=float(gross.mean() * 1e4), mean_net_bps=mean * 1e4, ci_bps=[lo * 1e4, hi * 1e4],
+    v, why = _decide(crit, n_tr, min_n, "trades")
+    below = ""
+    if n_tr < min_n:
+        failing = [nm for nm, ok in crit if not ok]
+        below = (f"; min_n counted in trades (the statistic is per trade): {n_tr} trades, the window allows about {n_days // 2} at most; "
+                 + (f"on the trades available the CI lies {'entirely below 0' if hi < 0 else 'across 0' if lo <= 0 else 'above 0'} and "
+                    f"these criteria would fail: {'; '.join(failing)}" if failing else "on the trades available every criterion would pass"))
+    rep.update(mean_gross_bps=float(gross.mean() * 1e4), mean_net_bps=mean * 1e4, ci_bps=[lo * 1e4, hi * 1e4],
+               criteria_on_available_trades={nm: bool(ok) for nm, ok in crit},
                dsr=dsr, n_trials=n_trials, n_month_clusters=K, ar1_phi=phi, half_life_days=half_life,
                share_signals_excursion_gt_cost=float(np.mean(exc > cost_rt)), mean_hold_days=float(np.mean(x_i - e_i)),
                march_2020={"n": int(mar20.sum()), "mean_net_bps": float(net[mar20].mean() * 1e4) if mar20.any() else None},
@@ -856,8 +897,7 @@ def twin_reversion(days: Sequence[str], a, b, start: str = "2010-01-01", end: st
                        f"{lo * 1e4:+.2f}..{hi * 1e4:+.2f}); DSR {dsr:.3f} across {n_trials} twins (variance of trial Sharpes "
                        f"{'from variants' if trial_sharpes and len(trial_sharpes) >= 2 else 'zero-skill floor: VOO, IAU, QQQM, FBTC not archived'}); "
                        f"AR(1) phi {phi:.3f}, half-life {'n/a' if half_life is None else f'{half_life:.1f}'} days; "
-                       f"{np.mean(exc > cost_rt) * 100:.0f}% of signals with excursion > cost; March 2020 {int(mar20.sum())} trades; "
-                       f"min_n read as daily observations of x — {why}"))
+                       f"{np.mean(exc > cost_rt) * 100:.0f}% of signals with excursion > cost; March 2020 {int(mar20.sum())} trades{below} — {why}"))
     return rep
 
 
@@ -869,26 +909,28 @@ def third_friday(y: int, m: int) -> date:
     return d + timedelta(days=14)
 
 
-def thu_fri_straddles(days: Sequence[str], closes, vix: dict, divs=None, settle_with_dividend: bool = True, T: float = 1.0 / EQ_PPY):
-    """One row per Friday whose previous trading day is the calendar Thursday and has a VIX close: (friday, pnl, raw
-    pnl, premium) in fraction of spot for a short ATM straddle sold at Thursday's close (K = S_thu, sigma = VIX/100,
-    r = 0) and settled at Friday's close. With ``settle_with_dividend`` an ex-dividend Friday settles at C_fri + D
-    (the strike is at the 1-day forward; SPY declares the amount before the ex-date, so this is known at the sale),
-    otherwise at the raw close."""
+def thu_fri_straddles(days: Sequence[str], closes, vix: dict, divs=None, T: float = 1.0 / EQ_PPY):
+    """One row per Friday whose previous trading day is the calendar Thursday and has a VIX close: (friday, pnl,
+    as-worded pnl, premium) in fraction of spot for a short ATM straddle sold at Thursday's close (K = S_thu,
+    sigma = VIX/100, r = 0) and settled on the raw closes, |S_fri - S_thu|, as the procedure states. ``pnl`` prices
+    the straddle on the forward S_thu - D, with D the cash dividend going ex on that Friday (SPY declares it before
+    the ex-date, so it is known at the sale); ``premium`` is that price. The as-worded pnl prices at r = q = 0 with no
+    dividend (the two agree on Fridays without a dividend)."""
     C = np.asarray(closes, dtype=float); D = np.zeros(len(C)) if divs is None else np.asarray(divs, dtype=float)
-    fri, K, sig, sett, raw = [], [], [], [], []
+    fri, K, sig, dv, raw = [], [], [], [], []
     for i in range(1, len(days)):
         df, dt = date.fromisoformat(days[i]), date.fromisoformat(days[i - 1])
         if df.weekday() != 4 or (df - dt).days != 1 or days[i - 1] not in vix:
             continue
-        fri.append(days[i]); K.append(C[i - 1]); sig.append(vix[days[i - 1]] / 100.0)
-        sett.append(C[i] + (D[i] if settle_with_dividend else 0.0)); raw.append(C[i])
+        fri.append(days[i]); K.append(C[i - 1]); sig.append(vix[days[i - 1]] / 100.0); dv.append(D[i]); raw.append(C[i])
     if not fri:
         return [], np.array([]), np.array([]), np.array([])
-    K, sig, sett, raw = (np.array(x, dtype=float) for x in (K, sig, sett, raw))
-    prem = bs.price(K, K, T, 0.0, sig, "call") + bs.price(K, K, T, 0.0, sig, "put")
-    pnl = (prem - np.abs(sett - K)) / K
-    pnl_raw = (prem - np.abs(raw - K)) / K
+    K, sig, dv, raw = (np.array(x, dtype=float) for x in (K, sig, dv, raw))
+    F = K - dv
+    prem = bs.price(F, K, T, 0.0, sig, "call") + bs.price(F, K, T, 0.0, sig, "put")
+    prem0 = bs.price(K, K, T, 0.0, sig, "call") + bs.price(K, K, T, 0.0, sig, "put")
+    pnl = (prem - np.abs(raw - K)) / K
+    pnl_raw = (prem0 - np.abs(raw - K)) / K
     return fri, pnl, pnl_raw, prem / K
 
 
@@ -897,9 +939,11 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
                   split: str = "2010-01-01") -> dict:
     """T-216 (MODEL-PRICED): mean short-straddle P&L on monthly third-Friday expirations minus other Fridays. Pass:
     difference > 0 with the two-sided 95% block-bootstrap CI (block of ``block`` Fridays) excluding 0, over >= 300
-    opex Fridays. Secondary: distance of the Friday close to the nearest $1 strike, opex vs other (permutation test).
-    Controls: FOMC-day exclusion, quarterly vs other opex, pre/post-2010, raw-close settlement."""
-    fri, pnl, pnl_raw, prem = thu_fri_straddles(days, closes, vix, divs, True)
+    opex Fridays. Settlement on the raw closes |SPY_Fri - SPY_Thu|; the known ex-date dividend is priced into the
+    forward. Secondary: distance of the Friday close to the nearest $1 strike, opex vs other (permutation test).
+    Controls: FOMC-day exclusion, quarterly vs other opex, pre/post-2010. Sensitivities: the as-worded r = q = 0 price
+    that ignores the dividend, and all ex-dividend Fridays dropped."""
+    fri, pnl, pnl_raw, prem = thu_fri_straddles(days, closes, vix, divs)
     fr = np.array(fri)
     m = _range_mask(fr, start, end) if len(fr) else np.zeros(0, dtype=bool)
     fr, pnl, pnl_raw, prem = fr[m], pnl[m], pnl_raw[m], prem[m]
@@ -917,6 +961,9 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
     dmap = {} if divs is None else {d: float(x) for d, x in zip(days, np.asarray(divs, dtype=float))}
     exd = np.array([dmap.get(d, 0.0) > 0 for d in fr], dtype=bool)
     g_nodiv = group_diff(pnl[~exd], ox[~exd], block, n_boot, seed) if exd.any() else g
+    nd_ok = g_nodiv["diff"] is not None
+    nd_txt = (f"{g_nodiv['diff'] * 1e4:+.2f}, CI {g_nodiv['ci'][0] * 1e4:+.2f}..{g_nodiv['ci'][1] * 1e4:+.2f}" if nd_ok
+              else f"n/a ({g_nodiv['n_flag']} opex Fridays left)")
     quarterly = np.array([int(d[5:7]) in (3, 6, 9, 12) for d in fr])
     ctrl = {"quarterly_opex_minus_other_bps": float((pnl[ox & quarterly].mean() - pnl[~ox].mean()) * 1e4) if np.any(ox & quarterly) else None,
             "monthly_only_opex_minus_other_bps": float((pnl[ox & ~quarterly].mean() - pnl[~ox].mean()) * 1e4) if np.any(ox & ~quarterly) else None}
@@ -944,18 +991,26 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
     lo, hi = g["ci"]
     crit = [("difference > 0", g["diff"] > 0), ("95% CI excludes 0", lo > 0)]
     v, why = _decide(crit, n, min_n, "opex Fridays")
+    v_raw, _ = _decide([("difference > 0", g_raw["diff"] > 0), ("95% CI excludes 0", g_raw["ci"][0] > 0)], n, min_n, "opex Fridays")
+    n_exd_opex = int((exd & ox).sum())
     rep.update(mean_opex_bps=g["mean_flag"] * 1e4, mean_other_bps=g["mean_other"] * 1e4, diff_bps=g["diff"] * 1e4,
                ci_bps=[lo * 1e4, hi * 1e4], p=g["p"], mean_premium_bps=float(prem.mean() * 1e4),
-               raw_close_settlement={"diff_bps": g_raw["diff"] * 1e4, "ci_bps": [g_raw["ci"][0] * 1e4, g_raw["ci"][1] * 1e4]},
-               ex_dividend_fridays_excluded={"n_excluded": int(exd.sum()), "n_opex": g_nodiv["n_flag"], "diff_bps": g_nodiv["diff"] * 1e4,
-                                             "ci_bps": [g_nodiv["ci"][0] * 1e4, g_nodiv["ci"][1] * 1e4]},
+               settlement="raw closes |SPY_Fri - SPY_Thu|", pricing="BS on the forward S_thu - D (known ex-date dividend), r = 0",
+               as_worded_r0_no_dividend={"diff_bps": g_raw["diff"] * 1e4, "ci_bps": [g_raw["ci"][0] * 1e4, g_raw["ci"][1] * 1e4],
+                                         "p": g_raw["p"], "verdict": v_raw},
+               verdict_depends_on_dividend_treatment=bool(v_raw != v), n_ex_dividend_opex=n_exd_opex,
+               ex_dividend_fridays_excluded={"n_excluded": int(exd.sum()), "n_opex": g_nodiv["n_flag"],
+                                             "diff_bps": g_nodiv["diff"] * 1e4 if nd_ok else None,
+                                             "ci_bps": [g_nodiv["ci"][0] * 1e4, g_nodiv["ci"][1] * 1e4] if nd_ok else [None, None]},
                controls=ctrl, strike_pin=pin, verdict=v,
                reason=(f"MODEL-PRICED (BS, sigma = Thursday VIX, T=1/252): {n} opex vs {int((~ox).sum())} other Fridays "
                        f"{rep['first']}..{rep['last']}; short-straddle P&L {g['mean_flag'] * 1e4:+.2f} vs {g['mean_other'] * 1e4:+.2f} bps of spot, "
                        f"difference {g['diff'] * 1e4:+.2f} bps (95% block-{block} CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}, p={g['p']:.3f}); "
-                       f"settled at the ex-dividend-neutral close (raw close: {g_raw['diff'] * 1e4:+.2f}, CI {g_raw['ci'][0] * 1e4:+.2f}.."
-                       f"{g_raw['ci'][1] * 1e4:+.2f}; with all {int(exd.sum())} ex-dividend Fridays dropped: {g_nodiv['diff'] * 1e4:+.2f}, CI "
-                       f"{g_nodiv['ci'][0] * 1e4:+.2f}..{g_nodiv['ci'][1] * 1e4:+.2f}); $1-strike distance opex {pin.get('opex_mean_distance', float('nan')):.3f} vs "
+                       f"settled on raw closes |SPY_Fri - SPY_Thu| with the known dividend priced into the forward S_thu - D on the "
+                       f"{int(exd.sum())} ex-dividend Fridays ({n_exd_opex} of them opex); as-worded sensitivity at r = q = 0 ignoring the dividend: "
+                       f"{g_raw['diff'] * 1e4:+.2f}, CI {g_raw['ci'][0] * 1e4:+.2f}..{g_raw['ci'][1] * 1e4:+.2f} ({v_raw.replace('_', ' ')}"
+                       f"{', so the verdict depends on how the dividend is treated' if v_raw != v else ''}); with all ex-dividend Fridays dropped: "
+                       f"{nd_txt}; $1-strike distance opex {pin.get('opex_mean_distance', float('nan')):.3f} vs "
                        f"{pin.get('other_mean_distance', float('nan')):.3f} (perm p={pin.get('p_opex_closer', float('nan')):.3f}) — {why}"))
     return rep
 
@@ -1031,8 +1086,8 @@ def ohlc_ibs_reversal(archive):
 
 
 def ohlc_gap_fade(archive):
-    """T-333: SPY gap fade (|gap| > 0.5%, open to close, 2 bps RT), 2000-01..2026-09; DSR over SPY/QQQ x 3 thresholds;
-    IBIT control reported."""
+    """T-333: SPY gap fade (|gap| > 0.5%, open to close, 2 bps RT), 2000-01..2026-09, gaps net of the ex-date dividend
+    (raw gaps reported); DSR over SPY/QQQ x 3 thresholds; IBIT control reported."""
     miss = _missing(archive, ["daily-history-SPY"])
     if miss:
         return miss
@@ -1042,9 +1097,10 @@ def ohlc_gap_fade(archive):
         if not _has(archive, _bundle(sym)):
             continue
         bb = _bars(archive, sym); ds = np.array(bb.days[1:]); w = (ds >= "2000-01-01") & (ds <= "2026-09-30")
+        dv = ex_dividends(bb.close, bb.adj)
         for thr in (0.0025, 0.005, 0.01):
-            sharpes.append(sharpe_ratio(gap_fade_series(bb.open, bb.close, thr, 0.0002)[3][w]))
-    rep = gap_fade(b.days, b.open, b.close, variant_sharpes=sharpes)
+            sharpes.append(sharpe_ratio(gap_fade_series(bb.open, bb.close, thr, 0.0002, dv)[3][w]))
+    rep = gap_fade(b.days, b.open, b.close, variant_sharpes=sharpes, divs=ex_dividends(b.close, b.adj))
     rep["variants"] = "SPY, QQQ x |gap| > 0.25%, 0.5%, 1.0%"
     if _has(archive, "daily-history-IBIT"):
         ib = _bars(archive, "IBIT")

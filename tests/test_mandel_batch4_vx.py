@@ -118,11 +118,59 @@ def test_calendar_gate_is_point_in_time():
     assert lag0["day"][0] == d[1] and lag0["w"].tolist() == [1, 1, 0, 1, 1]
 
 
-def test_calendar_missing_settle_interval_is_skipped():
+def test_calendar_missing_settle_is_bridged_not_skipped():
     d, curve, ex = _toy_curve()
     del curve[d[4]][ex[2]]
     res = vx.calendar_pnl(curve, _flat_index(d, 0.9), lag=1, expiries=ex)
-    assert len(res["dropped"]) == 2 and d[4] not in res["day"] and d[5] not in res["day"]
+    # both intervals touching the hole are kept; E3 is marked at its last valid settle (14.4 on d3) through d4
+    assert res["day"] == [d[2], d[3], d[4], d[5]] and res["gaps"] == [(d[4], "missing settle"), (d[5], "missing settle")]
+    assert res["gross"].tolist() == pytest.approx([-500.0, -300.0, 200.0, 400.0])
+    assert res["gross"].sum() == pytest.approx(-200.0)                       # = the complete-data total
+    assert res["cost"].sum() == pytest.approx(12.0) and res["n_deferred"] == 0
+
+
+def _gap_toy():
+    """The reviewer's case: M1 flat at 20, M2 steps 21 -> 26 on 2020-01-09, gate always on (VIX/VIX3M = 0.9)."""
+    days = _bdays("2020-01-06", 7)
+    e1, e2 = "2020-02-19", "2020-03-18"
+    m2 = [21.0, 21.0, 21.0, 26.0, 26.0, 26.0, 26.0]
+    return days, {d: {e1: 20.0, e2: b} for d, b in zip(days, m2)}, e1, e2
+
+
+def test_calendar_gap_in_held_leg_keeps_the_move_regression():
+    # regression: a one-day hole in M2 used to drop two intervals, and the held spread's +$5,000 vanished (net -$4, n=3)
+    days, curve, e1, e2 = _gap_toy()
+    full = vx.calendar_pnl(curve, _flat_index(days, 0.9), lag=1)
+    del curve["2020-01-09"][e2]
+    gap = vx.calendar_pnl(curve, _flat_index(days, 0.9), lag=1)
+    assert full["net"].sum() == pytest.approx(4996.0) and len(full["net"]) == 5 and full["gaps"] == []
+    assert gap["net"].sum() == pytest.approx(4996.0) and len(gap["net"]) == 5
+    assert gap["cost"].sum() == pytest.approx(4.0)                          # no phantom exit / re-entry
+    assert [g[0] for g in gap["gaps"]] == ["2020-01-09", "2020-01-10"]
+    assert gap["net"].tolist() == pytest.approx([-4.0, 0.0, 5000.0, 0.0, 0.0])  # booked when the settle returns
+    assert gap["gap_abs_gross"] == pytest.approx(5000.0) and gap["gap_abs_spread_chg"] == pytest.approx(5000.0)
+
+
+def test_calendar_trade_needing_a_missing_settle_is_deferred():
+    days, curve, e1, e2 = _gap_toy()
+    ratio = _flat_index(days, 1.05)
+    ratio[days[1]] = ratio[days[2]] = 0.9               # gate on at the 01-07 and 01-08 closes: enter at the 01-08 settle
+    del curve[days[2]][e2]                              # ... but M2 has no settle on 01-08
+    res = vx.calendar_pnl(curve, ratio, lag=1)
+    # entry deferred to the 01-09 settle (M2 at 26 after the jump): no P&L from the jump, one $4 entry; the gate is
+    # off from the 01-09 close, so the spread is closed at the 01-10 settle ($4)
+    assert res["n_deferred"] == 1 and res["w"].tolist() == [0, 0, 1, 0, 0]
+    assert res["gross"].sum() == pytest.approx(0.0) and res["cost"].tolist() == pytest.approx([0, 0, 4, 4, 0])
+
+
+def test_calendar_expired_leg_without_final_settle_is_closed_stale():
+    d, curve, ex = _toy_curve()
+    del curve[d[2]][ex[0]]                              # E1's final settlement is missing
+    res = vx.calendar_pnl(curve, _flat_index(d, 0.9), lag=1, expiries=ex)
+    # E1 is marked at 11.0 (d1) and closed there; the roll still happens at the d2 close
+    assert res["n_stale_closes"] == 1 and res["n_rolls"] == 1 and res["n_deferred"] == 0
+    assert res["gross"].tolist() == pytest.approx([500.0, -300.0, 400.0, 200.0])
+    assert res["cost"].tolist() == pytest.approx([4.0, 8.0, 0.0, 0.0])
 
 
 def test_vx_calendar_planted_contango_supported():

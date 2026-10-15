@@ -20,12 +20,12 @@ the only intraday spot in the archive: coinbase-hourly-BTC-USD is not archived. 
 "Synchronous" spot for a CME settle is this index at 15:00 America/Chicago (20:00 UTC under CDT, 21:00 under CST).
 The archive confirms the alignment: near expiry the BTC=F close sits within a median 0.066% of that hour's index,
 against 0.29-0.42% one or two hours either side. The CME CF BRR, which sets the final settlement, is computed from
-trades between 15:00 and 16:00 London. Its proxy here is the mean of the index at 15:00 and 16:00 London. Across 88
-expiries that mean is within 0.20% of the final settlement on average (sd 0.26%), while the 16:00 point alone is
-0.35% away (sd 0.47%). Before 2019-05 there is no synchronous spot. Claims whose decision window starts earlier carry
-a not-implemented coverage criterion: at best inconclusive, and still not_supported if a tested criterion fails. Yahoo
-BTC-USD daily closes (00:00 UTC) are used only where a claim asks for daily closes (T-303's trend rule, T-364's
-drawdowns).
+trades between 15:00 and 16:00 London. T-362's trial names its BRR proxy, the hourly close at 16:00 London, and that
+point is the exit price. Across 88 expiries it is 0.35% from the final settlement on average (sd 0.47%), while the mean
+of the index at 15:00 and 16:00 London is 0.20% away (sd 0.26%); that mean is reported as a control only. Before
+2019-05 there is no synchronous spot. Claims whose decision window starts earlier carry a not-implemented coverage
+criterion: at best inconclusive, and still not_supported if a tested criterion fails. Yahoo BTC-USD daily closes
+(00:00 UTC) are used only where a claim asks for daily closes (T-303's trend rule, T-364's drawdowns).
 
 CME BTC=F (roll handling). Yahoo's continuous front month. Bars are stamped 00:00 New York and the close is the
 15:00 CT settle. The archive shows that Yahoo stays on the expiring contract through its last trading day, whose close
@@ -33,9 +33,10 @@ is the final settlement (an off-tick print equal to the BRR; 101 of the 106 expi
 next contract on the following trading day. So the front contract on day d is the first CME expiry on or after d. That
 expiry is the last Friday of the month, moved to the prior business day for Good Friday, Christmas and New Year. Days to
 expiry come from that calendar, not from Yahoo. The expiry-day print is never used as a settle-time basis. Each claim's
-roll window is dropped: T-329 drops the 5 trading days before expiry and T-364 drops observations within 3 calendar
-days of expiry. T-362 decides on the first session after the previous expiry, far from any roll. Half-day sessions
-(bars stamped 08:00/09:00 ET) are dropped because their settle time differs. Per-contract history is not on Yahoo, so roll windows are excluded rather than reconstructed.
+roll window is dropped: T-329 drops the 5 trading days before expiry from its z-score observations and its signal and
+entry days (an exit may fall there when the contract is unchanged, so no trade spans a roll), and T-364 drops
+observations within 3 calendar days of expiry. T-362 decides on the first session after the previous expiry, far
+from any roll. Half-day sessions (bars stamped 08:00/09:00 ET) are dropped because their settle time differs. Per-contract history is not on Yahoo, so roll windows are excluded rather than reconstructed.
 
 Deribit quarterlies. ``deribit-quarterly-futures-btc`` daily bars open at 08:00 UTC (``ts_ms``) and close 24 hours
 later; the archive confirms this. The close is compared with the index at that same 08:00 UTC hour. The bar that opens
@@ -605,36 +606,55 @@ def trend_funding_filter(days: Sequence[str], closes, fts, i8, start: str = "202
 def cme_daily_basis(days: Sequence[str], F, S, std_bar, expiries: Sequence[date], roll_trading_days: Optional[int] = None,
                     roll_calendar_days: Optional[int] = None) -> dict:
     """Annualised basis b = (F/S - 1) x 365/dte per BTC=F bar, with dte in calendar days to the front expiry from the
-    CME calendar. ok = standard session, finite F and S, not the expiry day, and outside the roll window (trading days
-    to expiry > roll_trading_days and/or calendar days to expiry > roll_calendar_days)."""
+    CME calendar. valid = standard session, finite F and S, not the expiry day. ok = valid and outside the roll window
+    (trading days to expiry > roll_trading_days and/or calendar days to expiry > roll_calendar_days)."""
     F = np.asarray(F, dtype=float); S = np.asarray(S, dtype=float); std = np.asarray(std_bar, dtype=bool); n = len(days)
     exp = [front_expiry(d, expiries) for d in days]
     dte = np.array([(e - _d(d)).days for d, e in zip(days, exp)], dtype=float)
     ntd = np.array([bisect.bisect_left(days, e.isoformat()) - i for i, e in enumerate(exp)], dtype=float)
-    ok = std & np.isfinite(F) & np.isfinite(S) & (dte > 0)
+    valid = std & np.isfinite(F) & np.isfinite(S) & (dte > 0)
+    ok = valid.copy()
     if roll_trading_days is not None:
         ok &= ntd > roll_trading_days
     if roll_calendar_days is not None:
         ok &= dte > roll_calendar_days
     with np.errstate(divide="ignore", invalid="ignore"):
         b = np.where(ok, (F / S - 1.0) * 365.0 / np.maximum(dte, 1.0), np.nan)
-    return {"expiry": exp, "dte": dte, "ntd": ntd, "ok": ok, "basis": b}
+    return {"expiry": exp, "dte": dte, "ntd": ntd, "valid": valid, "ok": ok, "basis": b}
 
 
 # ===================================================================================================================
 # T-329: 5-day long-spot / short-futures trade after a +2 sd annualised CME basis spike
 # ===================================================================================================================
 
-def _basis_trades(days, F, S, ok, exp, sig: np.ndarray, hold: int, cost_rt: float):
+def trailing_z(b, ok, window: int, min_obs: int) -> np.ndarray:
+    """z of b at each ok bar against the ok observations dated within the previous ``window`` bars (trading days),
+    excluding the bar itself; nan when fewer than ``min_obs`` such observations exist or their sd is 0."""
+    b = np.asarray(b, dtype=float); okidx = np.flatnonzero(ok); z = np.full(len(b), np.nan)
+    for k, i in enumerate(okidx):
+        w = b[okidx[np.searchsorted(okidx, i - window):k]]
+        if len(w) >= max(2, min_obs):
+            sd = w.std(ddof=1)
+            if sd > 0:
+                z[i] = (b[i] - w.mean()) / sd
+    return z
+
+
+def _basis_trades(days, F, S, ok, exp, sig: np.ndarray, hold: int, cost_rt: float, exit_ok=None):
+    """Non-overlapping trades: signal and entry bars must be ``ok`` (outside the roll window); the exit bar only needs
+    ``exit_ok`` (standard session, synchronous prices, before expiry day), with the same contract at signal, entry and
+    exit, so no trade spans a roll."""
+    exit_ok = ok if exit_ok is None else exit_ok
     n = len(days); trades = []; last_exit = -1
     for i in np.flatnonzero(sig):
         if i < last_exit:
             continue
         e, x = i + 1, i + 1 + hold
-        if x >= n or not (ok[e] and ok[x]) or not (exp[i] == exp[e] == exp[x]):
+        if x >= n or not (ok[e] and exit_ok[x]) or not (exp[i] == exp[e] == exp[x]):
             continue
         net = ((F[e] - S[e]) - (F[x] - S[x])) / S[e] - cost_rt
         trades.append({"signal": days[i], "entry": days[e], "exit": days[x], "net": float(net),
+                       "exit_in_roll_window": bool(not ok[x]),
                        "basis_change": float(((F[x] - S[x]) - (F[e] - S[e])) / S[e]),
                        "decay_implied_change": float((F[e] - S[e]) / S[e] * ((_d(exp[e]) - _d(days[x])).days /
                                                                              max(1, (_d(exp[e]) - _d(days[e])).days) - 1.0)),
@@ -647,26 +667,24 @@ def cme_basis_spike(days: Sequence[str], F, S, std_bar, expiries: Sequence[date]
                     start: str = "2018-01-01", end: str = "2026-09-30", z_window: int = 60, z_thr: float = 2.0,
                     hold: int = 5, cost_rt: float = 0.002, roll_trading_days: int = 5, n_boot: int = 5000, seed: int = 0,
                     n_trials: int = 5, split: str = "2024-01-01", min_n: int = 40, shift_block: int = 20,
-                    financing_spread: float = 0.015) -> dict:
-    """T-329. Signal on settle day i: the annualised basis is more than z_thr sd above the mean of the previous z_window
-    valid observations. Entry at the next settle (i+1), exit 5 trading days later. Net per unit spot = (B_entry -
-    B_exit)/S_entry - 20 bp, with B = F - S in dollars. Trades never overlap and never span a roll; observations in the
-    5 trading days before expiry are dropped. Pass: one-sided 95% lower bound of the mean net return (month-clustered
-    bootstrap) > 0, positive means before and after 2024-01, DSR > 0.95 over 5 variants, and the claim window from
-    ``start`` covered by synchronous spot."""
+                    financing_spread: float = 0.015, z_min_obs: int = 20) -> dict:
+    """T-329. Signal on settle day i: the annualised basis is more than z_thr sd above the mean of the valid
+    observations dated within the trailing z_window trading days (BTC=F sessions; at least z_min_obs of them).
+    Entry at the next settle (i+1), exit 5 trading days later. Net per unit spot = (B_entry - B_exit)/S_entry - 20 bp,
+    with B = F - S in dollars. Observations in the 5 trading days before expiry are dropped from the z-score and cannot
+    be a signal or entry day. The exit may fall in that window if it is a standard synchronous bar of the same contract
+    before expiry day, so trades never span a roll. Trades never overlap. Pass: one-sided 95% lower bound of the mean
+    net return (month-clustered bootstrap) > 0, positive means before and after 2024-01, DSR > 0.95 over 5 variants,
+    and the claim window from ``start`` covered by synchronous spot."""
     F = np.asarray(F, dtype=float); S = np.asarray(S, dtype=float); ds = list(days); n = len(ds)
     tab = cme_daily_basis(ds, F, S, std_bar, expiries, roll_trading_days=roll_trading_days)
-    ok, b, exp = tab["ok"], tab["basis"], tab["expiry"]
+    ok, valid, b, exp = tab["ok"], tab["valid"], tab["basis"], tab["expiry"]
     okidx = np.flatnonzero(ok)
-    z = np.full(n, np.nan)
-    for k in range(z_window, len(okidx)):
-        w = b[okidx[k - z_window:k]]; sd = w.std(ddof=1)
-        if sd > 0:
-            z[okidx[k]] = (b[okidx[k]] - w.mean()) / sd
+    z = trailing_z(b, ok, z_window, z_min_obs)
     dsa = np.array(ds)
     inwin = (dsa >= start) & (dsa <= end)
     sig = np.isfinite(z) & (z > z_thr) & inwin
-    trades = _basis_trades(ds, F, S, ok, exp, sig, hold, cost_rt)
+    trades = _basis_trades(ds, F, S, ok, exp, sig, hold, cost_rt, valid)
     nt = len(trades)
     first_sync = ds[okidx[0]] if len(okidx) else None
     covered = first_sync is not None and first_sync <= (_d(start) + timedelta(days=31)).isoformat()
@@ -682,7 +700,7 @@ def cme_basis_spike(days: Sequence[str], F, S, std_bar, expiries: Sequence[date]
     shifted = []
     for k in range(1, n // shift_block):
         sg = np.roll(np.isfinite(z) & (z > z_thr), k * shift_block) & inwin
-        tr = _basis_trades(ds, F, S, ok, exp, sg, hold, cost_rt)
+        tr = _basis_trades(ds, F, S, ok, exp, sg, hold, cost_rt, valid)
         if tr:
             shifted.append(np.mean([t["net"] for t in tr]))
     p_shift = (1 + sum(m >= net.mean() for m in shifted)) / (1 + len(shifted)) if shifted else None
@@ -696,8 +714,10 @@ def cme_basis_spike(days: Sequence[str], F, S, std_bar, expiries: Sequence[date]
             (f"claim window from {start[:7]} covered by settle-synchronous spot", True if covered else None)]
     v, why = _verdict(crit)
     reason = (f"{nt} trades {trades[0]['entry']}..{trades[-1]['entry']} (synchronous spot from {first_sync}; z > {z_thr:g} "
-              f"over the trailing {z_window} settles, enter next settle, hold {hold} trading days, {cost_rt * 1e4:.0f} bp "
-              f"round trip): mean net {_pp(net.mean(), 3)}%, one-sided 95% lower bound {_pp(boot['lb95'], 3)}% (need > 0); "
+              f"vs the valid settles in the trailing {z_window} trading days, at least {z_min_obs}, the {roll_trading_days} "
+              f"days before expiry excluded; enter next settle, hold {hold} trading days in the same contract, "
+              f"{cost_rt * 1e4:.0f} bp round trip; {sum(t['exit_in_roll_window'] for t in trades)} exits inside the "
+              f"roll window): mean net {_pp(net.mean(), 3)}%, one-sided 95% lower bound {_pp(boot['lb95'], 3)}% (need > 0); "
               f"pre-2024 mean {_pp(pre.mean() if len(pre) else None, 3)}% (n={len(pre)}), post {_pp(post.mean() if len(post) else None, 3)}% "
               f"(n={len(post)}) (need both > 0); DSR {_f(dsr, 3)} (need > 0.95); window from {start[:7]} covered: "
               f"{'yes' if covered else 'no, no settle-synchronous spot before ' + str(first_sync)} — {why}")
@@ -717,9 +737,9 @@ def cme_contract_table(days: Sequence[str], F, std_bar, spot_at: Callable[[int],
                        dtb3: Optional[dict] = None, first: str = "2018-01", last: str = "2026-09") -> list[dict]:
     """One row per contract month: decision on the first standard session after the previous expiry; F0 = BTC=F
     settle, S0 = spot at the 15:00 CT settle; F_final = the expiry-day BTC=F print (the final settlement); S_exit =
-    the BRR-window proxy, the mean of spot at 15:00 and 16:00 London on expiry day (falls back to 16:00 alone);
-    S_exit_16 = spot at 16:00 London (the trial's literal proxy); rf = DTB3 (bond-equivalent) known before the
-    decision."""
+    spot at 16:00 London on expiry day (the trial's BRR proxy); S_exit_15_16_mean = the mean of spot at 15:00 and
+    16:00 London (the BRR calculation window; control only, falls back to 16:00 alone); rf = DTB3 (bond-equivalent)
+    known before the decision."""
     F = np.asarray(F, dtype=float); std = np.asarray(std_bar, dtype=bool); rates = Rates(dtb3); out = []
     pos = {d: i for i, d in enumerate(days)}
     for (y, m) in _months(first, last):
@@ -734,22 +754,25 @@ def cme_contract_table(days: Sequence[str], F, std_bar, spot_at: Callable[[int],
         s16 = float(spot_at(brr_ts(e))); s15 = float(spot_at(brr_ts(e) - HOUR))
         out.append({"contract": f"{y:04d}-{m:02d}", "expiry": e.isoformat(), "decision": dday, "F0": float(F[j]),
                     "S0": float(spot_at(cme_settle_ts(dday))), "F_final": float(F[k]) if k is not None else float("nan"),
-                    "S_exit": 0.5 * (s15 + s16) if math.isfinite(s15) else s16, "S_exit_16": s16, "rf": rates.before(dday)})
+                    "S_exit": s16, "S_exit_15_16_mean": 0.5 * (s15 + s16) if math.isfinite(s15) else s16,
+                    "rf": rates.before(dday)})
     return out
 
 
 def cme_cash_and_carry(contracts: Sequence[dict], h: float = 0.03, test: tuple = ("2022-01", "2026-09"),
                        fit: tuple = ("2018-01", "2021-12"), margin: float = 0.40, cost_rt: float = 0.002, block: int = 3,
                        n_boot: int = 5000, seed: int = 0, n_trials: int = 10, min_n: int = 50,
-                       grid: Sequence[float] = (0.0, 0.03, 0.05, 0.10)) -> dict:
+                       grid: Sequence[float] = (0.0, 0.03, 0.05, 0.10), claim: tuple = ("2018-01", "2026-09")) -> dict:
     """T-362. Enter when b = (F0/S0 - 1) x 365/d > rf + h, with d = calendar days from decision to expiry. Buy spot,
     short the same BTC of futures, hold to final settlement. Capital = S0 + 40% x F0, with the margin earning T-bills.
-    The P&L is (F0 - S0) - (F_final - S_exit) - 20 bp x S0. The F_final - S_exit term is the settlement slippage of
-    the BRR-window proxy (``S_exit``) and is 0 when the expiry print is missing. A control re-runs the test with the
-    trial's literal proxy, the 16:00 London point (``S_exit_16``). Excess over DTB3 on all capital = P&L - S0 x rf x d/365
-    (margin interest cancels). Annualised: excess / capital x 365/d. Months not entered count as 0. Pass (test
-    window): one-sided 95% studentized block-bootstrap (block 3) lower bound of the mean > 0, and DSR > 0.95 with
-    n_trials = 10."""
+    The P&L is (F0 - S0) - (F_final - S_exit) - 20 bp x S0. The F_final - S_exit term is the settlement slippage
+    against the trial's BRR proxy, spot at 16:00 London (``S_exit``), and is 0 when the expiry print is missing. A
+    control re-runs the test with the mean of spot at 15:00 and 16:00 London (``S_exit_15_16_mean``); it is reported
+    and never enters the verdict. Excess over DTB3 on all capital = P&L - S0 x rf x d/365 (margin interest cancels).
+    Annualised: excess / capital x 365/d. Months not entered count as 0. Pass (test window): one-sided 95% studentized
+    block-bootstrap (block 3) lower bound of the mean > 0, and DSR > 0.95 with n_trials = 10. The claim covers every
+    contract month in ``claim``: months without synchronous prices leave a not-implemented coverage criterion (at
+    best inconclusive)."""
 
     def run(hh: float, rows: Sequence[dict], exit_key: str = "S_exit"):
         ann, per, entered = [], [], []
@@ -778,14 +801,16 @@ def cme_cash_and_carry(contracts: Sequence[dict], h: float = 0.03, test: tuple =
     ci = student_mean_ci(ann, block, n_boot, seed)
     dsr = _dsr(per, n_trials)
     slips = [(c["F_final"] - c["S_exit"]) / c["S0"] for c in tst if math.isfinite(c["F_final"]) and math.isfinite(c["S_exit"])]
-    lit = None
-    if any("S_exit_16" in c for c in tst):
-        la, lp, _ = run(h, tst, "S_exit_16"); lci = student_mean_ci(la, block, n_boot, seed)
-        lsl = [(c["F_final"] - c["S_exit_16"]) / c["S0"] for c in tst
-               if math.isfinite(c["F_final"]) and math.isfinite(c.get("S_exit_16", float("nan")))]
-        lit = {"mean_ann_excess": float(la.mean()), "lb95": lci["lb95"], "dsr": _dsr(lp, n_trials),
-               "mean_slippage": float(np.mean(lsl)) if lsl else None,
-               "note": "control: spot sold at the 16:00 London index, the trial's literal BRR proxy"}
+    win = None
+    if any("S_exit_15_16_mean" in c for c in tst):
+        wa, wp, _ = run(h, tst, "S_exit_15_16_mean"); wci = student_mean_ci(wa, block, n_boot, seed)
+        wsl = [(c["F_final"] - c["S_exit_15_16_mean"]) / c["S0"] for c in tst
+               if math.isfinite(c["F_final"]) and math.isfinite(c.get("S_exit_15_16_mean", float("nan")))]
+        win = {"mean_ann_excess": float(wa.mean()), "lb95": wci["lb95"], "dsr": _dsr(wp, n_trials),
+               "mean_slippage": float(np.mean(wsl)) if wsl else None,
+               "note": "control only: spot sold at the mean of the 15:00 and 16:00 London index (BRR calculation window)"}
+    have = {c["contract"] for c in cov}
+    uncovered = [f"{y:04d}-{m:02d}" for (y, m) in _months(*claim) if f"{y:04d}-{m:02d}" not in have]
     fit_rep = None
     if fitc:
         fa, _, fe = run(h, fitc)
@@ -799,19 +824,22 @@ def cme_cash_and_carry(contracts: Sequence[dict], h: float = 0.03, test: tuple =
             reg[nm] = {"n": int(msk.sum()), "mean_ann_excess": float(ann[msk].mean())}
     crit = [(f"test-window contract-months >= {min_n}", True if n >= min_n else None),
             ("one-sided 95% studentized block-bootstrap lower bound of mean annualised excess > 0", ci["lb95"] is not None and ci["lb95"] > 0),
-            (f"DSR > 0.95 (n_trials = {n_trials})", dsr is not None and dsr > 0.95)]
+            (f"DSR > 0.95 (n_trials = {n_trials})", dsr is not None and dsr > 0.95),
+            (f"claim window from {claim[0]} covered by settle-synchronous spot", None if uncovered else True)]
     v, why = _verdict(crit)
     reason = (f"{n} test contract-months {tst[0]['contract']}..{tst[-1]['contract']} (h = DTB3 + {h * 100:g}%, entered "
-              f"{int(ent.sum())}): mean annualised excess over DTB3 on capital {_pp(ann.mean())}%, one-sided 95% lower bound "
-              f"{_pp(ci['lb95'])}% (need > 0); DSR {_f(dsr, 3)} (need > 0.95); mean settlement slippage "
-              f"{_pp(np.mean(slips) if slips else None, 3)}% of spot vs the BRR-window proxy (mean index 15:00/16:00 London); "
-              f"with the trial's literal 16:00-London exit instead: mean {_pp(lit['mean_ann_excess'] if lit else None)}%, lower "
-              f"bound {_pp(lit['lb95'] if lit else None)}%, DSR {_f(lit['dsr'] if lit else None, 3)}; fit window covered from "
-              f"{fit_rep['first'] if fit_rep else 'n/a'} (no synchronous spot before 2019-05) with mean "
+              f"{int(ent.sum())}; exit at the 16:00 London index, the trial's BRR proxy): mean annualised excess over DTB3 "
+              f"on capital {_pp(ann.mean())}%, one-sided 95% lower bound {_pp(ci['lb95'])}% (need > 0); DSR {_f(dsr, 3)} "
+              f"(need > 0.95); mean settlement slippage {_pp(np.mean(slips) if slips else None, 3)}% of spot; control with "
+              f"the mean 15:00/16:00 London index as exit (not in the verdict): mean {_pp(win['mean_ann_excess'] if win else None)}%, "
+              f"lower bound {_pp(win['lb95'] if win else None)}%, DSR {_f(win['dsr'] if win else None, 3)}; claim window "
+              f"{claim[0]}..{claim[1]} covered: "
+              f"{'yes' if not uncovered else f'no, {len(uncovered)} contract-months ({uncovered[0]}..{uncovered[-1]}) have no settle-synchronous spot'}; "
+              f"fit window covered from {fit_rep['first'] if fit_rep else 'n/a'} with mean "
               f"{_pp(fit_rep['mean_ann_excess'] if fit_rep else None)}% over {fit_rep['n'] if fit_rep else 0} contracts — {why}")
     return {"n": n, "mean_ann_excess": float(ann.mean()), "ci": ci, "dsr": dsr, "entered": int(ent.sum()),
-            "fit": fit_rep, "regimes": reg, "mean_slippage": float(np.mean(slips)) if slips else None, "literal_16_london_exit_control": lit,
-            "uncovered_contracts": [c["contract"] for c in contracts if c not in cov],
+            "fit": fit_rep, "regimes": reg, "mean_slippage": float(np.mean(slips)) if slips else None,
+            "brr_window_mean_exit_control": win, "uncovered_contracts": uncovered,
             "contracts": [{**c, "ann_excess": float(a)} for c, a in zip(tst, ann)], "criteria": crit, "verdict": v,
             "reason": reason}
 

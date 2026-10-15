@@ -248,8 +248,9 @@ def test_monetary_momentum_min_n_counts_only_expansionary_and_contractionary():
     days, c, dgs2, ev = _mm_setup(0.002, seed=14, labels=[-1, 0, 1, 0, 0])      # 2 of every 5 meetings are surprises
     rep = fm.monetary_momentum(days, c, dgs2, ev, n_perm=2000, n_boot=300)
     n_used = rep["n_expansionary"] + rep["n_contractionary"]
-    assert rep["n_classified"] >= 120 and n_used < 120 and rep["n"] == n_used
+    assert n_used + rep["n_neutral"] >= 120 and n_used < 120
     assert rep["verdict"] == "inconclusive", rep["reason"]
+    assert rep["n"] == n_used and rep["n_classified"] == n_used + rep["n_neutral"]
     assert rep["reason"].startswith(f"only {n_used} expansionary+contractionary meetings (min_n 120)")
     assert rep["criteria_verdict_if_min_n_ignored"] == "supported" and all(rep["criteria"].values())   # criteria still reported
     assert rep["reason"].rsplit(" — ", 1)[1].startswith("inconclusive")

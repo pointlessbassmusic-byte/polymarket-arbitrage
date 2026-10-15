@@ -85,7 +85,7 @@ def test_overnight_intraday_planted_gap_supported():
     night, day = _night_day(len(days) - 1, 0.0008)
     O, C = _path(night, day)
     rep = ob.overnight_intraday(days, O, C)
-    assert rep["gap_bps"] > 3 and rep["p_equal_means"] < 0.05 and all(h > 0 for h in rep["halves_gap_bps"])
+    assert rep["gap_bps"] > 3 and rep["p_gap_le_threshold"] < 0.05 and all(h > 0 for h in rep["halves_gap_bps"])
     assert rep["verdict"] == "supported", rep["reason"]
     assert rep["reason"].endswith("all criteria pass")
 
@@ -96,6 +96,23 @@ def test_overnight_intraday_null_not_supported():
     O, C = _path(night, day)
     rep = ob.overnight_intraday(days, O, C)
     assert rep["verdict"] == "not_supported", rep["reason"]
+
+
+def test_overnight_intraday_p_is_against_the_3bp_magnitude():
+    """Regression (T-348): a gap just above 3 bps that is significant only against equal means fails the claim
+    'at least 3 bps per trading day'; the p criterion is H0: gap <= 3 bps."""
+    days = _days("1993-02-01", "2026-09-30")
+    night, day = _night_day(len(days) - 1, 0.0, seed=9)
+    early = np.array(days[1:]) < "2010-01-01"
+    for g in (early, ~early):                                        # exact gap of 3.3 bps in each half
+        night[g] += 0.00033 - night[g].mean(); day[g] -= day[g].mean()
+    O, C = _path(night, day)
+    rep = ob.overnight_intraday(days, O, C)
+    assert rep["gap_bps"] == pytest.approx(3.3, abs=1e-6) and all(h > 0 for h in rep["halves_gap_bps"])
+    assert rep["p_equal_means"] < 0.05                                # positive gap is significant ...
+    assert rep["p_gap_le_threshold"] >= 0.05 and rep["gap_lower95_one_sided_bps"] < 3   # ... but not one of at least 3 bps
+    assert rep["verdict"] == "not_supported", rep["reason"]
+    assert "failed: p < 0.05 vs gap <= 3 bps" in rep["reason"]
 
 
 def test_overnight_intraday_adds_dividends_back():
@@ -157,6 +174,33 @@ def test_gap_fade_sides():
     assert list(side) == [1.0, -1.0, 1.0]
     assert daily[0] == pytest.approx(99.5 / 99 - 1 - 0.0002)
     assert daily[1] == pytest.approx(-(101 / 101.5 - 1) - 0.0002)
+
+
+def test_gap_fade_series_adds_ex_dividend_back():
+    """Regression (T-333): the cash dividend that lands overnight is not a gap. Day 1: real gap +0.2% with D = 0.8
+    (raw gap -0.6%, a false long). Day 2: real gap +0.9% with D = 0.5 (raw gap about +0.4%, a missed short)."""
+    C = np.array([100.0, 100.0, 100.0])
+    D = np.array([0.0, 0.8, 0.5])
+    O = np.array([100.0, 100.0 * 1.002 - 0.8, 100.0 * 1.009 - 0.5])
+    o_raw, _, side_raw, _ = ob.gap_fade_series(O, C, 0.005, 0.0002)
+    o, i, side, daily = ob.gap_fade_series(O, C, 0.005, 0.0002, divs=D)
+    assert list(side_raw) == [1.0, 0.0] and list(side) == [0.0, -1.0]
+    assert o == pytest.approx([0.002, 0.009])
+    assert i == pytest.approx(C[1:] / O[1:] - 1)                     # intraday leg is unchanged
+
+
+def test_gap_fade_reports_raw_gap_sensitivity():
+    days, O, C = _gap_path(-0.4, seed=10)
+    D = np.zeros(len(days)); D[60::63] = 0.006 * C[59::63][: len(D[60::63])]   # quarterly ex-dates, 60 bps
+    O = O - D                                                       # the dividend lands in the open
+    sh = [0.05] * 6
+    rep = ob.gap_fade(days, O, C, variant_sharpes=sh, divs=D)
+    raw = rep["raw_gap_sensitivity"]
+    assert rep["dividend_neutral_gap"] and raw["n_ex_dividend_days"] > 90
+    assert raw["n_side_changed"] > 0 and raw["n_raw_trades_on_ex_dividend_days"] > raw["n_trades_on_ex_dividend_days"]
+    assert "raw-gap sensitivity" in rep["reason"] and raw["ci_bps"][0] is not None
+    plain = ob.gap_fade(days, O, C, variant_sharpes=sh)
+    assert plain["raw_gap_sensitivity"] is None and plain["n"] == raw["n_trades"]
 
 
 # ------------------------------------------------------------------------------------------- T-332 IBS reversal --
@@ -320,15 +364,29 @@ def _twins(phi, seed=0):
 
 def test_twin_planted_reversion_supported():
     days, a, b = _twins(0.5)
-    rep = ob.twin_reversion(days, a, b)
+    rep = ob.twin_reversion(days, a, b, min_n=100)
+    assert rep["n"] == rep["n_trades"] >= 100
     assert rep["ci_bps"][0] > 0 and rep["dsr"] > 0.95 and rep["half_life_days"] < 2
     assert rep["verdict"] == "supported", rep["reason"]
 
 
 def test_twin_random_walk_not_supported():
     days, a, b = _twins(1.0, seed=7)
-    rep = ob.twin_reversion(days, a, b)
+    rep = ob.twin_reversion(days, a, b, min_n=100)
+    assert rep["n_trades"] >= 100
     assert rep["verdict"] == "not_supported", rep["reason"]
+
+
+def test_twin_min_n_counts_trades():
+    """Regression (T-324): the statistic is per trade, so min_n 1000 counts trades, not daily observations of x.
+    Fewer trades -> inconclusive, with the interval still reported in the reason."""
+    days, a, b = _twins(1.0, seed=7)
+    rep = ob.twin_reversion(days, a, b)
+    assert rep["n"] == rep["n_trades"] < 1000 < rep["n_days"]
+    assert rep["verdict"] == "inconclusive", rep["reason"]
+    assert rep["reason"].endswith(f"{rep['n_trades']} trades, below the trial's min_n 1000")
+    assert f"{rep['ci_bps'][0]:+.2f}..{rep['ci_bps'][1]:+.2f}" in rep["reason"]
+    assert rep["criteria_on_available_trades"]["95% lower bound of mean net return per trade > 0"] is False
 
 
 # ------------------------------------------------------------------------------------ T-216 opex MODEL-PRICED --
@@ -340,8 +398,21 @@ def test_third_friday_and_premium():
     fri, pnl, raw, prem = ob.thu_fri_straddles(days, [100.0, 100.0], {"2024-03-14": 16.0})
     assert fri == ["2024-03-15"] and pnl[0] == pytest.approx(prem[0])
     assert prem[0] == pytest.approx(0.16 / np.sqrt(252) * np.sqrt(2 / np.pi), rel=0.01)
-    fri, pnl, raw, prem = ob.thu_fri_straddles(days, [100.0, 99.0], {"2024-03-14": 16.0}, divs=[0.0, 0.6])
-    assert pnl[0] == pytest.approx(prem[0] - 0.004) and raw[0] == pytest.approx(prem[0] - 0.01)
+
+
+def test_thu_fri_straddle_settles_raw_and_prices_the_dividend():
+    """Regression (T-216): settlement is the raw |SPY_Fri - SPY_Thu|; the dividend known before the ex-date moves the
+    model forward to S_thu - D instead of moving the settlement. The as-worded r = q = 0 price ignores it."""
+    days, vix = ["2024-03-14", "2024-03-15"], {"2024-03-14": 16.0}
+    T = 1 / 252
+    fri, pnl, raw, prem = ob.thu_fri_straddles(days, [100.0, 99.4], vix, divs=[0.0, 0.6])  # the close falls by D only
+    p_fwd = (ob.bs.price(99.4, 100.0, T, 0.0, 0.16, "call") + ob.bs.price(99.4, 100.0, T, 0.0, 0.16, "put")) / 100
+    p_atm = (ob.bs.price(100.0, 100.0, T, 0.0, 0.16, "call") + ob.bs.price(100.0, 100.0, T, 0.0, 0.16, "put")) / 100
+    assert prem[0] == pytest.approx(p_fwd) and p_fwd > p_atm
+    assert pnl[0] == pytest.approx(p_fwd - 0.006)                    # settled on |99.4 - 100|, not on C + D
+    assert raw[0] == pytest.approx(p_atm - 0.006)
+    _, pnl0, raw0, prem0 = ob.thu_fri_straddles(days, [100.0, 99.4], vix)  # no dividend: both prices agree
+    assert pnl0[0] == pytest.approx(raw0[0]) == pytest.approx(p_atm - 0.006) and prem0[0] == pytest.approx(p_atm)
 
 
 def _opex_closes(opex_sd, seed=0):
@@ -364,6 +435,27 @@ def test_opex_null_not_supported():
     days, C, vix = _opex_closes(0.01, seed=8)
     rep = ob.opex_straddle(days, C, vix, n_boot=1000, n_perm=200)
     assert rep["verdict"] == "not_supported", rep["reason"]
+
+
+def test_opex_reports_as_worded_dividend_sensitivity():
+    """Regression (T-216): with a 1% cash dividend going ex on every opex Friday, the forward-priced model keeps the
+    planted pin, the as-worded r = q = 0 price charges the drop to the seller, and the reason says the verdict
+    depends on the dividend treatment."""
+    rng = np.random.default_rng(11)
+    days = _days("1993-02-01", "2026-09-30")
+    tf = {ob.third_friday(int(d[:4]), int(d[5:7])).isoformat() for d in days}
+    C, D = np.empty(len(days)), np.zeros(len(days))
+    C[0] = 100.0
+    for t in range(1, len(days)):
+        opex = days[t] in tf
+        D[t] = 0.01 * C[t - 1] if opex else 0.0
+        C[t] = C[t - 1] * (1 + rng.normal(0, 0.006 if opex else 0.01)) - D[t]
+    rep = ob.opex_straddle(days, C, {d: 16.0 for d in days}, divs=D, n_boot=1000, n_perm=200)
+    assert rep["settlement"].startswith("raw closes") and rep["n_ex_dividend_opex"] == rep["n"]
+    assert rep["verdict"] == "supported", rep["reason"]
+    aw = rep["as_worded_r0_no_dividend"]
+    assert aw["diff_bps"] < rep["diff_bps"] and aw["verdict"] == "not_supported"
+    assert rep["verdict_depends_on_dividend_treatment"] and "depends on how the dividend is treated" in rep["reason"]
 
 
 # --------------------------------------------------------------------------------------- harness contract --

@@ -208,6 +208,36 @@ def test_bab_spread_test_invalid_when_beta_not_neutral():
     assert "|ex-post beta to the market| < 0.1" in rep["reason"].split(" — ")[1]
 
 
+def test_bab_spread_flattens_unhedgeable_book_instead_of_carrying_stale_positions():
+    # regression (reviewer, T-387): the low-beta leg's beta falls to 0.08 (hedgeable: the 2x gross cap keeps the book
+    # beta-neutral), then to -0.3 (not hedgeable), and the market is flat for 70 days (beta missing). The old 0.1 floor
+    # skipped those resets and carried drifted positions with a held ex-ante beta up to 0.90; the book must instead
+    # stay inside the +/-0.15 band on every live day and sit flat in cash when a reset cannot hedge it.
+    n = 4000
+    rng = np.random.default_rng(18)
+    days = _bdays(n, "2011-05-02")
+    rm = rng.normal(0.0004, 0.01, n)
+    rm[3200:3270] = 0.0
+    b = np.full(n, 0.6)
+    b[1500:2300] = 0.08
+    b[2300:3000] = -0.3
+    rl = b * rm + 0.0003 + rng.normal(0, 0.002, n)
+    rh = 1.4 * rm - 0.0003 + rng.normal(0, 0.006, n)
+    rep = bf.bab_spread_test(days, rl, rh, rm, np.full(n, 0.02), start=days[0], end=days[-1], family_sharpes=SMALL_FAMILY, n_boot=200)
+    assert rep["max_abs_exante_beta_held"] <= 0.15 + 1e-9
+    assert abs(rep["ex_post_beta"]) < 0.1
+    idx = np.array([days.index(d) for d in rep["_days"]])
+    flat = rep["_flat"]
+    assert rep["n_flat_days"] == int(flat.sum()) > 500 and f"{rep['n_flat_days']} flat days" in rep["reason"]
+    assert flat[(idx >= 2400) & (idx < 3000)].all()               # negative beta: flat, not stale
+    assert not flat[(idx >= 1600) & (idx < 2300)].any()           # small positive beta: hedged under the gross cap
+    nanb = ~np.isfinite(bf.trailing_beta(rl, rm, 60, 2)[idx])
+    assert nanb.sum() > 5 and flat[nanb].all()                    # beta missing: flattened at once
+    episodes = int(flat[0]) + int(np.sum(flat[1:] & ~flat[:-1]))
+    pf = rep["_pnl"][flat]
+    assert np.all((pf == 0.0) | (pf == -0.0002)) and int(np.sum(pf == -0.0002)) == episodes   # only the flattening trade costs
+
+
 def _regime_factors(seed, T=760, K=6):
     rng = np.random.default_rng(seed)
     F = np.empty((T, K))
@@ -244,11 +274,31 @@ def test_contrarian_timing_test_planted_and_null():
     rng = np.random.default_rng(22)
     t = np.arange(T)
     F = 0.004 + 0.02 * np.sin(2 * np.pi * t[:, None] / 80 + rng.uniform(0, 2 * np.pi, 6)[None, :]) + rng.normal(0, 0.015, (T, 6))
-    rep = bf.contrarian_timing_test(ms, F, names, n_boot=1000)
+    start = ms.index("1968-01")
+    vs = bf.contrarian_portfolios(F, ms, 48, np.ones(6), start)[1]       # stand-in for the 5th (value-spread) trial
+    rep = bf.contrarian_timing_test(ms, F, names, n_boot=1000, value_spread_timed=vs)
     assert rep["verdict"] == "supported" and rep["ci"][0] > 0 and rep["dsr"] > 0.95
-    assert rep["window_used"].startswith("1968-01")
+    assert rep["window_used"].startswith("1968-01") and len(rep["trial_diff_sharpes_ann"]) == 5
     null = bf.contrarian_timing_test(ms, rng.normal(0.004, 0.02, (T, 6)), names, n_boot=1000)
     assert null["verdict"] == "not_supported"
+
+
+def test_contrarian_timing_dsr_unimplemented_without_value_spread_trial():
+    # regression (reviewer, T-389): the archive has no 6_Portfolios_2x3 BE/ME, so the 5th DSR trial is uncomputed;
+    # the DSR criterion must then be None and a passing CI can reach only 'inconclusive', never 'supported'
+    T = 760
+    ms = _months(1963, 7, T)
+    names = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "UMD"]
+    rng = np.random.default_rng(22)
+    t = np.arange(T)
+    F = 0.004 + 0.02 * np.sin(2 * np.pi * t[:, None] / 80 + rng.uniform(0, 2 * np.pi, 6)[None, :]) + rng.normal(0, 0.015, (T, 6))
+    rep = bf.contrarian_timing_test(ms, F, names, n_boot=1000)
+    assert rep["ci"][0] > 0 and rep["dsr"] > 0.95                         # both would pass ...
+    assert rep["verdict"] == "inconclusive" and rep["dsr_decided"] is False  # ... but the DSR is not decided
+    assert rep["reason"].endswith("not implemented: DSR > 0.95 over 5 trials (value-spread trial not computable)")
+    assert "value-spread trial not computable" in rep["reason"].split(" — ")[0]
+    with pytest.raises(ValueError):
+        bf.contrarian_timing_test(ms, F, names, n_boot=50, value_spread_timed=np.zeros(10))
 
 
 def test_monthly_engines_use_no_future_data():

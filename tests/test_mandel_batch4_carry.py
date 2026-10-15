@@ -168,7 +168,7 @@ def test_t303_too_few_activations_is_inconclusive_not_supported():
 
 # ------------------------------------------------------------------------------------- T-329 CME basis spikes --
 
-def _cme_setup(planted, seed=0):
+def _cme_setup(planted, seed=0, spike_ntd=15):
     rng = np.random.default_rng(seed)
     days = _days("2018-01-02", "2026-09-30", weekdays_only=True); n = len(days)
     S = 10000 * np.exp(np.cumsum(0.02 * rng.standard_normal(n)))
@@ -178,7 +178,7 @@ def _cme_setup(planted, seed=0):
     if planted:
         ntd = np.array([days.index(cy.front_expiry(d, ex).isoformat()) - i if cy.front_expiry(d, ex).isoformat() in days else 99
                         for i, d in enumerate(days)])
-        for i in np.flatnonzero(ntd == 15):
+        for i in np.flatnonzero(ntd == spike_ntd):
             b[i:i + 2] = 0.60                                    # spike on the signal and entry day, gone by exit
     F = S * (1 + b * dte / 365)
     return days, F, S, np.ones(n, dtype=bool), ex
@@ -189,6 +189,7 @@ def test_t329_planted_reverting_spikes_supported():
     rep = cy.cme_basis_spike(days, F, S, std, ex, n_boot=NB)
     assert rep["n"] >= 40 and rep["mean_net"] > 0.01
     assert rep["verdict"] == "supported", rep["reason"]
+    assert "trailing 60 trading days" in rep["reason"]
 
 
 def test_t329_null_noise_basis_not_supported():
@@ -204,6 +205,43 @@ def test_t329_missing_early_window_caps_at_inconclusive():
     assert rep["verdict"] == "inconclusive" and "covered" in rep["reason"]
 
 
+def test_t329_exit_inside_roll_window_of_same_contract_is_kept():
+    # regression: spikes 8 sessions before expiry put the 5-day exit 2 sessions before expiry, inside the roll window
+    # but in the same contract; those trades used to be discarded (0 trades)
+    days, F, S, std, ex = _cme_setup(True, spike_ntd=8)
+    rep = cy.cme_basis_spike(days, F, S, std, ex, n_boot=NB)
+    assert rep["n"] >= 40 and all(t["exit_in_roll_window"] for t in rep["trades"])
+    assert all(cy.front_expiry(t["entry"], ex) == cy.front_expiry(t["exit"], ex) for t in rep["trades"])
+    assert rep["verdict"] == "supported", rep["reason"]
+
+
+def test_t329_basis_trades_exit_rules():
+    days = _days("2021-03-15", "2021-04-09", weekdays_only=True); n = len(days)
+    F = np.full(n, 101.0); S = np.full(n, 100.0); ok = np.ones(n, dtype=bool); sig = np.zeros(n, dtype=bool)
+    exp = [cy.front_expiry(d, cy.cme_expiries(2021, 2021)) for d in days]
+    sig[days.index("2021-03-17")] = True                         # exit 2021-03-25, the day before expiry
+    valid = np.ones(n, dtype=bool); roll = np.ones(n, dtype=bool); roll[days.index("2021-03-25")] = False
+    assert len(cy._basis_trades(days, F, S, roll, exp, sig, 5, 0.002, valid)) == 1     # exit in the roll window kept
+    valid[days.index("2021-03-25")] = False
+    assert cy._basis_trades(days, F, S, roll, exp, sig, 5, 0.002, valid) == []         # invalid exit bar dropped
+    sig[:] = False; sig[days.index("2021-03-19")] = True                               # exit 2021-03-29: next contract
+    assert cy._basis_trades(days, F, S, ok, exp, sig, 5, 0.002, np.ones(n, dtype=bool)) == []
+
+
+def test_t329_trailing_z_uses_trailing_60_trading_days():
+    # regression: the window is the valid observations dated within the last 60 sessions, not the last 60 valid ones
+    rng = np.random.default_rng(0); n = 300
+    b = np.zeros(n); ok = np.zeros(n, dtype=bool)
+    ok[:150] = True; b[:150] = 10 + rng.standard_normal(150)    # old regime, densely observed
+    ok[150::3] = True; b[150:] = rng.standard_normal(150)        # new regime, every third session valid
+    z = cy.trailing_z(b, ok, 60, 20)
+    i = 297; w = b[[j for j in range(i - 60, i) if ok[j]]]
+    assert ok[i] and len(w) == 20
+    assert z[i] == pytest.approx((b[i] - w.mean()) / w.std(ddof=1))
+    assert abs(z[i]) < 5                                          # the last 60 observations would reach the old regime
+    assert np.isnan(cy.trailing_z(b, ok, 60, 21)[i])              # fewer than the minimum count -> no z
+
+
 def test_cme_daily_basis_drops_roll_window_and_expiry_day():
     days = _days("2021-03-15", "2021-04-09", weekdays_only=True)
     n = len(days); S = np.full(n, 100.0); F = np.full(n, 101.0)
@@ -215,14 +253,16 @@ def test_cme_daily_basis_drops_roll_window_and_expiry_day():
     assert tab["basis"][i] == pytest.approx(0.01 * 365 / 32)      # (F/S - 1) x 365 / days to 2021-04-30
 
 
-def test_cme_contract_table_decision_and_brr_window_exit():
+def test_cme_contract_table_decision_and_16_london_exit():
+    # regression (T-362): the exit is the trial's BRR proxy, the 16:00 London index; the 15:00/16:00 mean is a control
     days = _days("2021-02-22", "2021-05-05", weekdays_only=True)
     n = len(days); F = np.full(n, 101.0); std = np.ones(n, dtype=bool)
     spot = lambda t: 100.0 + (t % 7200) / 3600.0                  # alternates 100 / 101 by hour parity
     tab = cy.cme_contract_table(days, F, std, spot, cy.cme_expiries(2021, 2021), first="2021-04", last="2021-04")
     c = tab[0]
     assert c["decision"] == "2021-03-29" and c["expiry"] == "2021-04-30"
-    assert c["S_exit"] == pytest.approx(100.5) and c["S_exit_16"] in (100.0, 101.0)
+    assert c["S_exit"] == spot(cy.brr_ts("2021-04-30")) == 101.0   # 16:00 BST = 15:00 UTC
+    assert c["S_exit_15_16_mean"] == pytest.approx(100.5)
 
 
 # ----------------------------------------------------------------------------------- T-362 cash-and-carry --
@@ -249,6 +289,35 @@ def test_t362_null_slippage_eats_carry_not_supported():
     rep = cy.cme_cash_and_carry(_contracts(0.055, slip_mean=0.004, slip_sd=0.01, seed=4), n_boot=NB)
     assert rep["mean_ann_excess"] < 0
     assert rep["verdict"] == "not_supported", rep["reason"]
+
+
+def test_t362_verdict_uses_16_london_exit_not_the_window_mean():
+    # regression: the 16:00 London index sits 3% below the final settlement and the 15:00 point 3% above, so the
+    # 15:00/16:00 mean matches it; the claim must be judged on the trial's 16:00 proxy
+    rng = np.random.default_rng(7)
+    days = _days("2018-01-01", "2026-09-30", weekdays_only=True); n = len(days)
+    ex = cy.cme_expiries(2017, 2027); S = 10000.0
+    dte = np.array([(cy.front_expiry(d, ex) - date.fromisoformat(d)).days for d in days], dtype=float)
+    F = S * (1 + (0.15 + 0.02 * rng.standard_normal(n)) * dte / 365)       # expiry day: F = S (final settlement)
+    brr = {cy.brr_ts(e) for e in ex}
+    spot = lambda t: S * 0.97 if t in brr else S * 1.03 if t + 3600 in brr else S
+    tab = cy.cme_contract_table(days, F, np.ones(n, dtype=bool), spot, ex)
+    rep = cy.cme_cash_and_carry(tab, n_boot=NB)
+    assert rep["n"] == 57 and rep["mean_slippage"] == pytest.approx(0.03)
+    assert rep["verdict"] == "not_supported", rep["reason"]
+    ctl = rep["brr_window_mean_exit_control"]
+    assert ctl["mean_slippage"] == pytest.approx(0.0) and ctl["lb95"] > 0 and ctl["dsr"] > 0.95   # control alone would pass
+    assert "not in the verdict" in rep["reason"]
+
+
+def test_t362_uncovered_claim_months_cap_at_inconclusive():
+    # regression: no synchronous spot for 2018-01..2019-05 -> the claim window is not covered, at best inconclusive
+    cs = _contracts(0.15, slip_sd=0.001)
+    cs = [{**c, "S0": float("nan")} if c["contract"] <= "2019-05" else c for c in cs]
+    rep = cy.cme_cash_and_carry(cs, n_boot=NB)
+    assert rep["uncovered_contracts"][0] == "2018-01" and len(rep["uncovered_contracts"]) == 17
+    assert rep["verdict"] == "inconclusive" and "17 contract-months (2018-01..2019-05)" in rep["reason"], rep["reason"]
+    assert cy.cme_cash_and_carry(_contracts(0.15, slip_sd=0.001), n_boot=NB)["uncovered_contracts"] == []
 
 
 def test_t362_never_entering_is_not_supported():

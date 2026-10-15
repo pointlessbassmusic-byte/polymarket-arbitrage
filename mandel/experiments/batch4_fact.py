@@ -256,17 +256,20 @@ def trailing_beta(y, x, window: int = 60, gap: int = 2) -> np.ndarray:
 
 
 def ls_book(days, rl, rs, wl, ws, rf=None, borrow: float = 0.0, fee: float = 0.0, fin_spread: float = 0.0,
-            cost: float = 0.0, trigger: Optional[Callable[[int, float, float], bool]] = None, ppy: int = 252) -> tuple[np.ndarray, int]:
+            cost: float = 0.0, trigger: Optional[Callable[[int, float, float], bool]] = None, ppy: int = 252,
+            return_pos: bool = False):
     """Daily P&L per unit capital of a long-short book: long ``wl[i]`` notional of rl, short ``ws[i]`` of rs.
 
     The book is (re)set to the target notionals on the first trading day of each month (at the prior close), when it is
     not yet live, or when ``trigger(i, L, S)`` says so; between resets the legs drift with prices. The net cash from
     the reset (ws - wl) earns rf[i] minus fin_spread/ppy (floored at 0) when positive and pays rf[i] plus
     fin_spread/ppy when negative (rf is a daily decimal rate). The short leg pays borrow/ppy a day, the long leg
-    fee/ppy a day (only for fees a claim lists beyond NAV), and each reset costs ``cost``. NaN before the book is
-    live. Returns (pnl, number of resets)."""
+    fee/ppy a day (only for fees a claim lists beyond NAV), and each reset that trades costs ``cost`` (a flat book
+    reset to flat targets does not trade). NaN before the book is live. Returns (pnl, number of trading resets), plus
+    the notionals (L, S) held over each day when ``return_pos``."""
     n = len(rl)
     out = np.full(n, np.nan)
+    Lh, Sh = np.full(n, np.nan), np.full(n, np.nan)
     L = S = cash = 0.0
     live = False
     n_reb = 0
@@ -275,19 +278,22 @@ def ls_book(days, rl, rs, wl, ws, rf=None, borrow: float = 0.0, fee: float = 0.0
         want = new_month or not live or (trigger is not None and trigger(i, L, S))
         c = 0.0
         if want and np.isfinite(wl[i]) and np.isfinite(ws[i]):
+            traded = L != 0.0 or S != 0.0 or wl[i] != 0.0 or ws[i] != 0.0
             L, S = float(wl[i]), float(ws[i])
             cash = S - L
             live = True
-            c = cost
-            n_reb += 1
+            if traded:
+                c = cost
+                n_reb += 1
         if not live:
             continue
+        Lh[i], Sh[i] = L, S
         r_f = float(rf[i]) if rf is not None and np.isfinite(rf[i]) else 0.0
         rate = r_f + fin_spread / ppy if cash < 0 else max(r_f - fin_spread / ppy, 0.0)
         out[i] = L * rl[i] - S * rs[i] + cash * rate - S * borrow / ppy - L * fee / ppy - c
         L *= 1.0 + rl[i]
         S *= 1.0 + rs[i]
-    return out, n_reb
+    return (out, n_reb, Lh, Sh) if return_pos else (out, n_reb)
 
 
 def _window(days, start: str, end: str) -> np.ndarray:
@@ -464,26 +470,45 @@ def bab_spread_test(days, r_low, r_high, r_mkt, rate, start: str = "2011-06-01",
     ``window``-day betas to t-1, gross capped at 2x), reset monthly and when the book's ex-ante beta drifts beyond
     +/-``drift``; net cash financed at ``rate`` + fin_spread (earned at rate - fin_spread, floored at 0); short borrow
     ``borrow``. Pass: lower 95% bound of the annualised mean > 0 over >= min_n days AND |full-sample beta to the
-    market| < 0.1 AND family-wide DSR > 0.95. ``rate`` is the annual decimal rate known before each day."""
+    market| < 0.1 AND family-wide DSR > 0.95. ``rate`` is the annual decimal rate known before each day.
+
+    Any pair of positive betas can be hedged (when a beta is small the gross cap scales both legs, keeping the book's
+    ex-ante beta at 0). A reset (scheduled or drift) that finds a beta <= 0 or missing cannot hedge the book, so it
+    goes flat (P&L 0 while flat) rather than carrying the previous positions; a held book whose beta cannot be
+    measured is flattened at once. Flat days stay in the sample."""
     r_low, r_high, r_mkt, rate = (np.asarray(v, dtype=float) for v in (r_low, r_high, r_mkt, rate))
     bL = trailing_beta(r_low, r_mkt, window, 2)
     bH = trailing_beta(r_high, r_mkt, window, 2)
     inwin = _window(days, start, end)
-    ok = inwin & np.isfinite(bL) & np.isfinite(bH) & (bL > 0.1) & (bH > 0.1)
+    fin = np.isfinite(bL) & np.isfinite(bH)
+    hedge = inwin & fin & (bL > 0) & (bH > 0)
+    k0 = int(np.argmax(inwin & fin)) if (inwin & fin).any() else len(days)
+    ready = inwin & (np.arange(len(days)) >= k0)          # the rule can be evaluated from the first in-window day with both betas
     with np.errstate(divide="ignore", invalid="ignore"):
-        wl = np.where(ok, 1.0 / bL, np.nan)
-        ws = np.where(ok, 1.0 / bH, np.nan)
+        wl = np.where(hedge, 1.0 / bL, np.nan)
+        ws = np.where(hedge, 1.0 / bH, np.nan)
     scale = np.minimum(1.0, gross_cap / (wl + ws))
     wl, ws = wl * scale, ws * scale
+    unhedgeable = ready & ~hedge
+    wl[unhedgeable] = 0.0
+    ws[unhedgeable] = 0.0
 
     def trig(i, L, S):
-        return bool(ok[i] and abs(L * bL[i] - S * bH[i]) > drift)
+        if not fin[i]:
+            return L != 0.0 or S != 0.0                   # neutrality cannot be checked: flatten
+        return bool(abs(L * bL[i] - S * bH[i]) > drift)
 
-    pnl, nreb = ls_book(days, r_low, r_high, wl, ws, rf=rate / 252.0, borrow=borrow, fin_spread=fin_spread, cost=cost, trigger=trig)
+    pnl, nreb, Lh, Sh = ls_book(days, r_low, r_high, wl, ws, rf=rate / 252.0, borrow=borrow, fin_spread=fin_spread, cost=cost,
+                                trigger=trig, return_pos=True)
     live = inwin & np.isfinite(pnl)
     x = pnl[live]
     d = [dd for dd, k in zip(days, live) if k]
     n = int(x.size)
+    flat = (Lh[live] == 0.0) & (Sh[live] == 0.0)
+    n_flat = int(flat.sum())
+    with np.errstate(invalid="ignore"):
+        exante = (Lh * bL - Sh * bH)[live]
+    max_exante = float(np.nanmax(np.abs(exante))) if np.isfinite(exante).any() else float("nan")
     mean, lo, hi = stud_mean_ci(x, 20, n_boot) if n >= 8 else (float("nan"),) * 3
     beta = float(ols_nw(x, r_mkt[live], 0)["coef"][1]) if n > 30 else float("nan")
     fd = family_dsr(x, family_sharpes) if (family_sharpes is not None and n > 1) else None
@@ -493,12 +518,14 @@ def bab_spread_test(days, r_low, r_high, r_mkt, rate, start: str = "2011-06-01",
     v, why = _decide(crit, n, min_n, "daily observations")
     roll = _rolling(x, 252 * 3) if n else None
     reason = (f"BAB spread {d[0] if d else ''}..{d[-1] if d else ''} (n={n} days, {nreb} resets, financing at bill + {fin_spread:.1%}, "
-              f"{borrow:.1%} borrow, {cost * 1e4:.0f} bp per reset): annualised mean {mean * 252:+.2%}, 95% studentized CI "
+              f"{borrow:.1%} borrow, {cost * 1e4:.0f} bp per reset; {n_flat} flat days held in cash because a reset found a trailing "
+              f"beta <= 0 or missing; held ex-ante beta within +/-{max_exante:.3f}): annualised mean {mean * 252:+.2%}, 95% studentized CI "
               f"{lo * 252:+.2%} to {hi * 252:+.2%}; ex-post beta {beta:+.3f} (needs |b| < 0.1); {_fmt_dsr(fd)} — {why}")
     return {"n": n, "n_days": n, "window_requested": f"{start[:7]}..{end[:7]}", "window_used": f"{d[0]}..{d[-1]}" if d else "empty",
             "mean_ann": mean * 252, "ci_ann": [lo * 252, hi * 252], "ex_post_beta": beta, "n_resets": nreb,
+            "n_flat_days": n_flat, "max_abs_exante_beta_held": max_exante,
             "mean_long_notional": float(np.nanmean(wl[live])) if n else None, "mean_short_notional": float(np.nanmean(ws[live])) if n else None,
-            "rolling3y": roll, "family": fd, "verdict": v, "reason": reason, "_pnl": x, "_days": d}
+            "rolling3y": roll, "family": fd, "verdict": v, "reason": reason, "_pnl": x, "_days": d, "_flat": flat}
 
 
 # --------------------------------------------------------------- monthly factor portfolios --
@@ -630,12 +657,13 @@ def contrarian_portfolios(F: np.ndarray, months: Sequence[str], W: int, tilt_mas
 
 
 def contrarian_timing_test(months: Sequence[str], F: np.ndarray, names: Sequence[str], start_month: str = "1968-01", min_n: int = 600,
-                           n_boot: int = 5000, seed: int = 0, value_spread_available: bool = False) -> dict:
+                           n_boot: int = 5000, seed: int = 0, value_spread_timed: Optional[np.ndarray] = None) -> dict:
     """T-389: static equal-risk portfolio tilted by 60-month reversal z-scores (expanding window, one-quarter embargo,
     quarterly) minus the static portfolio: lower 95% bound of the annualised Sharpe difference > 0 (studentized
     block-12 bootstrap) AND DSR > 0.95 over the 5 pre-registered trials ({36, 60} x {all, ex-HML} + value spread).
-    The value-spread trial needs the BE/ME block of 6_Portfolios_2x3; without it the DSR counts 5 trials with the
-    trial-Sharpe variance estimated from the 4 computable ones."""
+    The value-spread trial needs the BE/ME block of 6_Portfolios_2x3; ``value_spread_timed`` is that trial's monthly
+    timed return series aligned with months[start:]. Without it the DSR criterion is not implemented (None, so the
+    verdict is at best inconclusive); the DSR over 5 trials with the variance of the 4 computable trials is reported."""
     F = np.asarray(F, dtype=float)
     months = list(months)
     start = next(i for i, m in enumerate(months) if m >= start_month)
@@ -651,21 +679,31 @@ def contrarian_timing_test(months: Sequence[str], F: np.ndarray, names: Sequence
             trials[f"z{W}_{setn}"] = t
     ms = months[start:]
     n = len(static)
+    have_vs = value_spread_timed is not None
+    if have_vs:
+        vst = np.asarray(value_spread_timed, dtype=float)
+        if vst.shape != static.shape:
+            raise ValueError(f"value_spread_timed must have {n} monthly returns aligned with {ms[0]}..{ms[-1]}")
+        trials["value_spread"] = vst
     diffs = {k: v - static for k, v in trials.items()}
     obs, lo, hi = sharpe_diff_ci(trials["z60_all"], static, 12, 12, n_boot, seed)
     tsr = [float(sharpe_ratio(diffs[k])) for k in trials]
     var_tsr = float(np.var(tsr, ddof=1))
     dsr = float(deflated_sharpe_ratio(diffs["z60_all"], n_trials=5, var_trials_sr=var_tsr if var_tsr > 0 else None))
-    crit = [("lower 95% bound of the Sharpe difference > 0", bool(lo > 0)), (f"DSR > {DSR_PASS} over 5 trials", bool(dsr > DSR_PASS))]
+    dsr_name = f"DSR > {DSR_PASS} over 5 trials" + ("" if have_vs else " (value-spread trial not computable)")
+    crit = [("lower 95% bound of the Sharpe difference > 0", bool(lo > 0)), (dsr_name, bool(dsr > DSR_PASS) if have_vs else None)]
     v, why = _decide(crit, n, min_n, "monthly observations")
     s_t, s_s = float(sharpe_ratio(trials["z60_all"], 12)), float(sharpe_ratio(static, 12))
-    vs = "" if value_spread_available else " (value-spread trial not computable: 6_Portfolios_2x3 BE/ME not archived; its Sharpe is not in the variance)"
+    dsr_s = (f"DSR {dsr:.3f} over 5 trials (needs > {DSR_PASS})" if have_vs else
+             f"DSR {dsr:.3f} over 5 trials not decided: value-spread trial not computable (6_Portfolios_2x3 BE/ME not archived), so only "
+             f"4 of the 5 trial Sharpes are in the variance (reported only)")
     reason = (f"{'/'.join(names)} {ms[0]}..{ms[-1]} (n={n} months): 60-month z tilt Sharpe {s_t:.2f} vs static {s_s:.2f}, difference "
-              f"{obs:+.2f} (95% studentized CI {lo:+.2f} to {hi:+.2f}); DSR {dsr:.3f} over 5 trials{vs}; annualised Sharpe of each timed-minus-static series "
+              f"{obs:+.2f} (95% studentized CI {lo:+.2f} to {hi:+.2f}); {dsr_s}; annualised Sharpe of each timed-minus-static series "
               f"{', '.join(f'{k} {s * math.sqrt(12):+.2f}' for k, s in zip(trials, tsr))} — {why}")
     return {"n": n, "n_months": n, "window_used": f"{ms[0]}..{ms[-1]}", "factors": list(names), "sharpe_timed": s_t, "sharpe_static": s_s,
-            "sharpe_diff": obs, "ci": [lo, hi], "dsr": dsr, "trial_diff_sharpes_ann": {k: s * math.sqrt(12) for k, s in zip(trials, tsr)},
-            "value_spread_trial": "computed" if value_spread_available else "not computable (BE/ME of 6_Portfolios_2x3 not archived)",
+            "sharpe_diff": obs, "ci": [lo, hi], "dsr": dsr, "dsr_decided": have_vs,
+            "trial_diff_sharpes_ann": {k: s * math.sqrt(12) for k, s in zip(trials, tsr)},
+            "value_spread_trial": "computed" if have_vs else "not computable (BE/ME of 6_Portfolios_2x3 not archived)",
             "verdict": v, "reason": reason}
 
 
@@ -1059,7 +1097,8 @@ def fact_bab_etf(archive) -> dict:
     book's ex-ante beta drifts beyond +/-0.15; gross <= 2x), net cash at the 3-month bill (DTB3 on a bond-equivalent
     basis, standing in for DGS3MO) + 1.0%, 0.5% borrow, 2 bp per reset; 2011-06 to 2026-09: lower 95% studentized
     block-20 bound of the annualised mean > 0 over >= 3500 days AND |ex-post beta to SPY| < 0.1 AND family-wide DSR
-    > 0.95. Diagnostics: monthly FF5 alpha, correlation with AQR BAB since 2014."""
+    > 0.95. A reset that finds a trailing beta <= 0 (or missing) holds the book flat in cash until a reset can hedge it.
+    Diagnostics: monthly FF5 alpha, correlation with AQR BAB since 2014."""
     days, rl, rh, rm, rate = _bab_inputs(archive)
     fam = family_sharpes(archive)
     rep = bab_spread_test(days, rl, rh, rm, rate, family_sharpes=list(fam.values()))
@@ -1109,7 +1148,9 @@ def fact_contrarian_timing(archive) -> dict:
     """T-389: static equal-risk FF5+UMD portfolio (Mkt-RF, SMB, HML, RMW, CMA, UMD; inverse 36-month vol to t-1; 10%
     target vol; quarterly) tilted by expanding-window z-scores of trailing 60-month factor returns (one-quarter
     embargo; overweight z < -1, underweight z > +1, tilt capped at +/-50%; 5 bp per unit traded), 1968-2026. Pass:
-    lower 95% bound of the Sharpe difference > 0 AND DSR > 0.95 over 5 trials (value-spread trial not computable)."""
+    lower 95% bound of the Sharpe difference > 0 AND DSR > 0.95 over 5 trials. The value-spread trial (5th of 5) needs
+    the BE/ME block of 6_Portfolios_2x3, which is not archived, so the DSR criterion is not implemented and the verdict
+    is at best inconclusive."""
     fm_months, fm = ff_monthly(archive)
     names = FF5 + ["UMD"]
     rep = contrarian_timing_test(fm_months, _ff_matrix(fm, names), names)
