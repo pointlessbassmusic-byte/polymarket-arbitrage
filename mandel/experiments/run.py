@@ -556,6 +556,26 @@ OM2_BUNDLES = {"box_mid_v2": ["options-chain-SPX-*", "fred-DTB3"], "box_borrow_v
                "contango_forward_v2": ["cboe-VVIX-history", "cboe-VIX3M-history"], "spike_forward_v2": ["cboe-VVIX-history", "cboe-VIX3M-history"], "vvix_v2": ["cboe-VVIX-history"]}
 
 
+_SC = {}
+
+
+def _structure_ctx(archive):
+    """One shared context per run (closes, VIX, bills, captured smile)."""
+    from mandel.experiments.structure_claims import Ctx
+    key = id(archive)
+    if key not in _SC:
+        days, closes = u2.load_series(archive, "SPY", adjusted=False)
+        _SC.clear(); _SC[key] = Ctx(days, closes, index_closes(archive.load("cboe-VIX-history")), index_closes(archive.load("fred-DTB3")), list(_load_many(archive, "spy-smile-*")))
+    return _SC[key]
+
+
+def _structure_harness(cid):
+    def h(archive):
+        from mandel.experiments.structure_claims import evaluate
+        rep = evaluate(cid, _structure_ctx(archive)); return rep, rep["n_cycles"], rep["verdict"], rep["reason"]
+    return h
+
+
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     names = sorted(e.name for e in archive.entries())
     return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
@@ -606,6 +626,7 @@ HARNESSES: dict[str, Callable] = {
     "opex_pinning": harness_pinning, "btc_weekend_variance": harness_btc_weekend_var,
     **U2_HARNESSES,
     **OM2_HARNESSES,
+    **{f"structure_{c.replace('-', '_').lower()}": _structure_harness(c) for c in ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]},
 }
 BUNDLES_NEEDED = {
     "market_calibration": ["polymarket-price-history-daily", "polymarket-closed-markets"],
@@ -635,6 +656,7 @@ BUNDLES_NEEDED = {
     "parity_forward": ["options-chain-SPY-*", "fred-DTB3"], "opex_pinning": ["daily-history-SPY"], "btc_weekend_variance": ["daily-history-BTC-USD"],
     **U2_BUNDLES,
     **OM2_BUNDLES,
+    **{f"structure_{c.replace('-', '_').lower()}": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3", "spy-smile-*"] for c in ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]},
 }
 
 

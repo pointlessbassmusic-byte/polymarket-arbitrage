@@ -417,6 +417,9 @@ def cmd_options_fetch(args) -> int:
     from mandel.data.options import collect_options_daily, collect_options_history
     from mandel.data.store import ObservationStore
     store = ObservationStore(Archive(ledger=Ledger()))
+    if args.smile:
+        from mandel.data.options import build_smiles
+        _print(build_smiles(store)); return 0
     _print(collect_options_history(store) if args.history else collect_options_daily(store, capture_day=args.day))
     return 0
 
@@ -548,6 +551,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--history", action="store_true", help="instead: one-off deep history (full Fear & Greed series, full daily closes for BTC-USD, ETH-USD, SPY, QQQ)")
     p = add("options-fetch", cmd_options_fetch, "Capture CBOE option chains (raw on disk, surface committed) and Deribit books; --history pulls VIX-family, FRED and DVOL histories.")
     p.add_argument("--day"); p.add_argument("--history", action="store_true")
+    p.add_argument("--smile", action="store_true", help="refresh VIX and write spy-smile-<quote_date> bundles for raw SPY chains on this machine")
     p = add("book-snapshot", cmd_book_snapshot, "Capture one dated snapshot of Polymarket YES/NO books (polymarket-books-<day>).")
     p.add_argument("--books", type=int, default=300)
     p = add("archive", cmd_archive, "List cold-storage bundles (data, results, knowledge) and their rebuild recipes.")

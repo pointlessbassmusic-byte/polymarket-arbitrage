@@ -13,6 +13,10 @@ Sources (all without keys, verified 2026-10-14):
   * Deribit public API: DVOL (BTC/ETH implied-vol index) daily history, realised volatility, and the whole option
     book summary with mark IV. Deribit does not onboard US persons; this is data, not a venue.
 
+A capture taken before the US open (the daily job runs at 06:40 UTC) carries the previous session's closing
+quotes: the underlying's ``last_trade_time`` is the quote date, and surface rows record it as ``quote_date``.
+Join a capture to index closes (VIX etc.) on the quote date, not the capture date.
+
 Raw chains are large (SPY ~13k contracts, SPX ~30k), so the daily raw bundle stays out of git and a small
 ``options-surface-<day>`` summary (per symbol and expiry: ATM IV, 25-delta put/call IV, skew, open interest,
 put/call ratios) is committed. ``available_at`` for a chain is the capture time; for an index close it is the
@@ -158,7 +162,7 @@ def surface_summary(symbol: str, chain: dict, capture_day: str) -> list[dict]:
         v_c = sum(o.get("vol") or 0 for o in rows if o["type"] == "call"); v_p = sum(o.get("vol") or 0 for o in rows if o["type"] == "put")
         atm_iv = (atm_c["iv"] + atm_p["iv"]) / 2
         straddle = (mid(atm_c) or 0) + (mid(atm_p) or 0)
-        out.append({"symbol": symbol.lstrip("_"), "expiry": exp, "dte": dte, "underlying": S, "atm_strike": atm_c["strike"], "atm_iv": atm_iv,
+        out.append({"symbol": symbol.lstrip("_"), "expiry": exp, "dte": dte, "underlying": S, "quote_date": (chain["meta"].get("last_trade_time") or "")[:10] or None, "atm_strike": atm_c["strike"], "atm_iv": atm_iv,
                     "iv_call25d": c25["iv"] if c25 else None, "iv_put25d": p25["iv"] if p25 else None,
                     "skew25": (p25["iv"] - c25["iv"]) if (c25 and p25) else None,
                     "straddle_mid": straddle, "implied_move_pct": (straddle / S * 100) if S else None,
@@ -291,4 +295,71 @@ def collect_options_daily(store: ObservationStore, capture_day: Optional[str] = 
             e = store.write_bundle(f"deribit-surface-{cur}-{day}", dsurf, recipe="per-expiry ATM mark IV from the day's Deribit book", tags=["options", "crypto", "surface", day],
                                    schema="value = {currency, expiry, underlying, atm_strike, atm_mark_iv, oi_total, n_contracts}")
             out["deribit"][f"{cur}-surface"] = e.rows
+    return out
+
+
+# ------------------------------------------------------------------ smile ratio --
+
+SMILE_GRID = [round(0.70 + 0.01 * i, 2) for i in range(61)]          # moneyness K/S from 0.70 to 1.30
+
+
+def smile_ratio(chain_rows: list[dict], spot: float, index_level: float, quote_date: str, target_dtes=(30, 45)) -> list[dict]:
+    """IV(K)/index for out-of-the-money options (puts below spot, calls above) at the expiry nearest each target DTE,
+    linearly interpolated onto SMILE_GRID (no extrapolation: grid points outside the quoted range are omitted)."""
+    import numpy as _np
+    by_exp: dict[str, list] = defaultdict(list)
+    for o in chain_rows:
+        by_exp[o["expiry"]].append(o)
+    qd = datetime.strptime(quote_date, "%Y-%m-%d")
+    out = []
+    for target in target_dtes:
+        exp = min(by_exp, key=lambda e: abs((datetime.strptime(e, "%Y-%m-%d") - qd).days - target))
+        dte = (datetime.strptime(exp, "%Y-%m-%d") - qd).days
+        pts = sorted((o["strike"] / spot, o["iv"] / (index_level / 100)) for o in by_exp[exp]
+                     if (o.get("iv") or 0) > 0 and ((o["type"] == "put" and o["strike"] <= spot) or (o["type"] == "call" and o["strike"] > spot)))
+        if len(pts) < 10:
+            continue
+        m = _np.array([p[0] for p in pts]); r = _np.array([p[1] for p in pts])
+        grid = [g for g in SMILE_GRID if m.min() <= g <= m.max()]
+        out.append({"quote_date": quote_date, "expiry": exp, "dte": dte, "target_dte": target, "index_level": index_level,
+                    "ratio": {f"{g:.2f}": float(_np.interp(g, m, r)) for g in grid}})
+    return out
+
+
+def build_smiles(store: ObservationStore, symbol: str = "SPY", index: str = "VIX") -> dict:
+    """For every raw chain capture of `symbol` on this machine without a smile bundle, compute IV/index on the quote date and
+    write `<symbol>-smile-<quote_date>` (committed, small). Refreshes the index history first so the quote date's close exists."""
+    a = store.archive
+    with _client() as c:
+        rows = cboe_index_history(index, c, Throttle(0.5))
+    if rows:
+        store.write_bundle(f"cboe-{index}-history", (Observation("cboe", "index", index, observed_at=r["day"] + "T21:15:00+00:00", available_at=r["day"] + "T21:30:00+00:00", value=r) for r in rows),
+                           recipe=f"https://cdn.cboe.com/api/global/us_indices/daily_prices/{index}_History.csv", tags=["volatility", "cboe", "history"], schema="value = {day, open?, high?, low?, close}")
+    level = {r["day"]: r["close"] for r in rows}
+    have = {e.name for e in a.entries()}
+    out = {}
+    for e in a.entries(tag="chain"):
+        if not e.name.startswith(f"options-chain-{symbol}-"):
+            continue
+        try:
+            chain = [r["value"] for r in a.load(e.name)]
+        except Exception:
+            continue
+        cap_day = e.name.rsplit("-", 3)[-3:]; cap_day = "-".join(cap_day)
+        surf = f"options-surface-{cap_day}"
+        if surf not in have:
+            continue
+        srow = next((r["value"] for r in a.load(surf) if r["value"]["symbol"] == symbol), None)
+        if not srow:
+            continue
+        qd = srow.get("quote_date") or max((d for d in level if d < cap_day), default=None)
+        name = f"{symbol.lower()}-smile-{qd}"
+        if not qd or qd not in level or name in have:
+            out[cap_day] = "skipped" if name in have else f"no {index} close for quote date {qd}"
+            continue
+        sm = smile_ratio(chain, srow["underlying"], level[qd], qd)
+        ent = store.write_bundle(name, (Observation("cboe", "smile", f"{symbol}:{x['target_dte']}", observed_at=qd + "T20:00:00+00:00", available_at=qd + "T21:30:00+00:00", value=x) for x in sm),
+                                 recipe=f"mandel.data.options.smile_ratio over options-chain-{symbol}-{cap_day} with {index} close on {qd}", tags=["options", "smile", qd],
+                                 schema="value = {quote_date, expiry, dte, target_dte, index_level, ratio{moneyness: IV/index}}")
+        out[cap_day] = {"bundle": name, "rows": ent.rows}
     return out

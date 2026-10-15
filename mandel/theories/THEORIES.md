@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `c4e9fa8a47945152`). 476 theories. supported 24, not_supported 53, inconclusive 8, untested 250, blocked 133, parked 8.
+Rendered from `registry.json` (hash `c1613adbe553cb33`). 476 theories. supported 31, not_supported 66, inconclusive 9, untested 229, blocked 133, parked 8.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (24)
+## Supported (31)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -205,6 +205,96 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: vrp_bonds
 - result X-b147605f: supported — implied 15.5 vs realised 14.4 vol pts over 5697 days (2004-01-02..2026-09-11); VRP positive on 72% of days, block-bootstrap p=0.0220, halves +0.0019/+0.0044
 
+### T-114 · big-lizard
+
+**Claim.** A 30-DTE SPY big lizard (short ATM straddle, long +2% call), sold at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit downside max loss over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.tastylive.com/concepts-strategies/jade-lizard, https://www.optionseducation.org/strategies/all-strategies/short-straddle
+- statistic: mean P&L/max loss with block-bootstrap CI; condition frequency (C_r >= 0.02 S) by VIX bucket; paired difference vs the short straddle
+- null: mean P&L = 0
+- procedure: Price the straddle at s*VIX (s grid) and the +2% call at VIX x r(1.02); settle at S_{t+21}.
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
+- pass: lower CI > 0 under the smile-scaled model and at s = 0.90
+- controls: Width fixed at 2%; proxy cap; costs haircut.
+- harness: structure_t_114
+- result X-84bd401c: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean +0.4% (95% CI +0.2 to +0.6); s=0.90 mean +0.5% (95% CI +0.2 to +0.7) — all criteria pass
+- note: from the options-library library: Big Lizard; harness suggestion: harness 'big_lizard_condition' sharing straddle engine | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-115 · strip
+
+**Claim.** A 30-DTE ATM SPY strip priced at BS(s*VIX) has lower mean P&L per unit premium than the ATM straddle on the same dates, over 1993-2026, for every s in {0.81, 0.90, 1.00} (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://en.wikipedia.org/wiki/Straddle, https://www.optionseducation.org/strategies/all-strategies/long-straddle
+- statistic: paired mean difference (strip - straddle) of P&L/premium; studentized block-bootstrap CI
+- null: no difference
+- procedure: Shared ATM engine with a (calls, puts) ratio parameter
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 390
+- pass: upper CI of the difference < 0 at all three s
+- controls: Same dates; equity drift is the main driver, so also report a drift-removed version.
+- harness: structure_t_115
+- result X-b486bff8: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): strip-straddle s=0.81 mean -6.7% (95% CI -10.4 to -2.9); strip-straddle s=0.9 mean -6.1% (95% CI -9.4 to -2.7); strip-straddle s=1.0 mean -5.6% (95% CI -8.6 to -2.5) — all criteria pass
+- note: from the options-library library: Strip; harness suggestion: include in 'straddle_vrp' harness as a ratio parameter (calls, puts) in {(1,1),(1,2),(2,1)} | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-116 · strap
+
+**Claim.** A 30-DTE ATM SPY strap priced at BS(s*VIX) has higher mean P&L per unit premium than the strip on the same dates over 1993-2026, for every s in {0.81, 0.90, 1.00} (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://en.wikipedia.org/wiki/Straddle
+- statistic: paired mean difference (strap - strip) of P&L/premium; block-bootstrap CI
+- null: no difference
+- procedure: Shared ratio engine (2,1) vs (1,2)
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 390
+- pass: lower CI of the difference > 0 at all three s
+- controls: Drift is the obvious driver; report a drift-removed version.
+- harness: structure_t_116
+- result X-61fd43e1: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): strap-strip s=0.81 mean +13.3% (95% CI +5.7 to +20.6); strap-strip s=0.9 mean +12.1% (95% CI +5.3 to +18.7); strap-strip s=1.0 mean +11.0% (95% CI +4.9 to +17.0) — all criteria pass
+- note: from the options-library library: Strap; harness suggestion: same ratio parameter in 'straddle_vrp' | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-126 · long-put
+
+**Claim.** A 1-month ATM SPY put priced at VIX IV (model-priced, flat smile, so call and put carry the same IV) has a lower mean monthly return on premium than the matching ATM call over 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-put, https://scholarsarchive.byu.edu/facpub/9281
+- statistic: mean of paired monthly differences (put return minus call return) with block bootstrap CI; also each mean separately
+- null: put mean return >= call mean return
+- procedure: same engine as long-call: price the ATM put and ATM call at VIX IV each cycle, payoff from the SPY close, paired differences, at iv_scale 1.0 and 0.9
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: upper CI of (put - call) < 0 at both iv_scales
+- controls: Because both legs carry the same flat IV, this tests only drift plus the VIX-vs-realised gap. It does not test put-skew richness, which needs the captured chain (60+ days). VIX > ATM IV overprices both legs equally in vol terms. Paired design removes common vol shocks.
+- harness: structure_t_126
+- result X-ef87c11c: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): put-call s=1.0 mean -33.2% (95% CI -51.1 to -14.7); put-call s=0.9 mean -36.5% (95% CI -56.3 to -15.9) — all criteria pass
+- note: from the options-library library: Long Put; harness suggestion: vix_priced_option_returns(strategy='long_put', dte=30) paired with long_call output | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-130 · bear-put-spread
+
+**Claim.** A 1-month ATM/-5% SPY bear put spread priced at VIX IV (model-priced) has a negative mean return per dollar of debit, and a lower mean than the matching ATM/+5% bull call spread, over 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bear-put-spread, https://cdn.cboe.com/resources/options/Trading_Strategies.pdf
+- statistic: mean return on debit with block bootstrap CI; paired difference vs the bull call spread
+- null: mean >= 0, or mean(bear put) >= mean(bull call)
+- procedure: same monthly engine; puts at K2 = spot and K1 = 0.95 x spot priced at VIX IV; payoff from the SPY close
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: upper CI < 0 and paired-difference upper CI < 0
+- controls: Flat VIX overprices the ATM long put (VIX > ATM IV) and underprices the short 5%-OTM put (skew), so both biases inflate the modelled D and push toward a too-negative result, favouring a pass. Rerun at 0.9 x VIX and with chain mids at 60 days. Report with and without 2008 and 2020.
+- harness: structure_t_130
+- result X-c50f79b2: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): bear put spread mean -40.3% (95% CI -50.5 to -29.7); bear put - bull call mean -53.5% (95% CI -72.1 to -34.6) — all criteria pass
+- note: from the options-library library: Bear Put Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bear_put_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-131 · bull-put-credit-spread
+
+**Claim.** A 1-month 5%/10%-OTM SPY bull put spread priced at VIX IV (model-priced), rolled monthly, has a positive mean P&L per unit of max loss and a win rate above 85%, while its worst single month exceeds 10x the median credit, over 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bull-put-spread-credit-put-spread, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_SP_500_PutWrite_Indices_Methodology.pdf
+- statistic: mean P&L / max loss with block bootstrap CI; win rate with binomial CI; ratio of the worst monthly loss to the median credit
+- null: mean <= 0 (no premium left after the tails)
+- procedure: monthly cycles; K2 = 0.95S, K1 = 0.90S puts priced at VIX IV; payoff from the SPY close; collateral earns DTB3
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: lower CI of the mean > 0 AND win rate > 0.85 AND worst/median > 10 (all three pre-registered)
+- controls: Correction: flat IV underprices both OTM puts, and the farther 10%-OTM long leg carries more skew, so the real credit may be smaller than modelled; the bias direction is indeterminate, not conservative. Use PSR with skew/kurtosis, walk-forward halves, and recheck with chain mids at 60 days.
+- harness: structure_t_131
+- result X-072c25c9: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): bull put spread mean +5.6% (95% CI +3.6 to +7.5); win rate 0.92, worst/median credit 30.1 — all criteria pass
+- note: from the options-library library: Bull Put Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bull_put_spread', dte=30, strikes=('OTM5','OTM10')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
 ### T-148 · straddle-calendar
 
 **Claim.** The 30-to-93-day forward variance implied by VIX and VIX3M, FV = (93*VIX3M^2 - 30*VIX^2)/63, exceeds the realised SPY variance over the subsequent trading days 21..63 on average (a forward variance risk premium), so the reverse straddle calendar (short far / long near, delta-hedged) has positive expectancy and the long straddle calendar negative.
@@ -315,6 +405,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-a15a3182: supported — BTC weekend/weekday squared-return ratio 0.47 (95% CI 0.38-0.57, needs entirely < 0.9); below 1 in 100% of years (needs 70%)
 - note: from the options-library library: Weekend theta harvest (24/7 pricing vs weekend realised vol); harness suggestion: Extend underlying.weekend_effect to variance ratios; later confirm the pricing side with weekend-daily trade IVs | verifier-corrected restatement of T-264, whose verdict tested the earlier wording and stands
 
+### T-517 · seagull
+
+**Claim.** A 1-month zero-cost SPY seagull (long ATM call, short 5%-OTM call, short put struck to make net premium zero; all at VIX IV, model-priced) has a positive mean monthly P&L per unit spot over 1993-2026, holding in both walk-forward halves.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bull-call-spread-debit-call-spread, https://www.optionseducation.org/strategies/all-strategies/naked-put-uncovered-put-short-put
+- statistic: mean P&L per unit spot with block bootstrap CI, per half
+- null: mean <= 0
+- procedure: monthly cycles; solve K1 for zero cost at VIX IV; payoff from the SPY close
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: lower CI > 0 in the full sample and the mean > 0 in both halves
+- controls: Under flat pricing the zero-cost put sits near ATM, whereas with real skew it sits 3-6% OTM, so the model trade is far more put-heavy than the traded one: a chain-based rerun at 60 days is required before any trading conclusion. Run at iv_scale 0.9.
+- harness: structure_t_517
+- result X-19a801eb: supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): seagull mean +0.9% (95% CI +0.6 to +1.2); halves +0.68%/+1.14% — all criteria pass
+- note: from the options-library library: Seagull (Put-Financed Call Spread); harness suggestion: overlay_backtest(strategy='seagull', k_put='zero_cost') in mandel/experiments/volatility.py | added by the verifier pass | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
 ### T-530 · calendar_vol_spread
 
 **Claim.** Conditional on VIX3M/VIX > 1.10 at entry, the 1-to-3-month SPX forward variance F^2 = (93*VIX3M^2 - 30*VIX^2)/63 exceeds the SPY variance realised over trading days 22-63 after entry on average, so the far leg of a reverse calendar is sold above its subsequent realised variance.
@@ -360,7 +465,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-d74fdd76: supported — 23 spike events since 2009-09-18: VIX 21 days later below F_adj in 19/23 (0.61-0.95), below unadjusted F in 83%, below spot in 83%
 - note: from the options-library library: VIX spike mean-reversion via long VIX put / put spread; harness suggestion: harness_vix_spike (T-241) runs this; add F_adj and report the exact event count. | verifier-corrected restatement of T-241, whose verdict tested the earlier wording and stands
 
-## Not Supported (53)
+## Not Supported (66)
 
 ### T-02 · longshot-bias
 
@@ -520,6 +625,201 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: DVOL-ETH history from 2021-03
 - harness: vrp_eth
 - result X-80732af2: not_supported — implied 77.4 vs realised 74.4 vol pts over 2000 days (2021-03-24..2026-09-13); VRP positive on 64% of days, block-bootstrap p=0.2019, halves +0.1137/-0.0218
+
+### T-100 · long-straddle
+
+**Claim.** A 30-DTE ATM SPY straddle, bought at the model price BS(s*VIX/100) and held to expiry, has negative mean P&L per unit premium over 1993-2026 for every ATM scale s in {0.81, 0.90, 1.00}. MODEL-PRICED proxy.
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-straddle, https://cdn.cboe.com/api/global/us_indices/governance/Volatility_Index_Methodology_Cboe_Volatility_Index.pdf
+- statistic: mean P&L / premium over non-overlapping 21-trading-day cycles; studentized block-bootstrap 95% CI (block 6 cycles); run separately for each s
+- null: mean P&L = 0 (straddle fairly priced at s*VIX)
+- procedure: For each cycle start t: S_t from daily-history-SPY, r from fred-DTB3, sigma = s*VIX_t/100, T = 21/252, K = S_t. Price call + put by BS (mandel/options/bs.price), pay |S_{t+21} - K|, P&L = payoff - premium. The existing overlay_backtest(strategy='long_straddle', iv_scale=s) in mandel/experiments/volatility.py already computes this.
+- data: daily-history-SPY (1993-01-29 on), cboe-VIX-history (1990 on), fred-DTB3 · min n: 390
+- pass: upper CI < 0 for all three s; if the sign holds only at s = 1.00, report 'pricing-artefact, not supported'
+- controls: s grid pre-registered; s = 0.81 comes from one capture day and is refit as options-surface captures accumulate. VIX is SPX, not SPY. SPY closes are unadjusted (price return) and q = 0 in pricing, a small bias. No transaction costs (adding them strengthens a negative result). Prior evidence: the mirror short-straddle harness (T-57, short_straddle_model) gave +1.10%/month at s = 1.0 but +0.24%/month at s = 0.81 (p 0.07), so this claim is expected to FAIL at s = 0.81.
+- harness: structure_t_100
+- result X-ac351508: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): s=0.81 mean -5.9% (95% CI -13.2 to +1.7); s=0.9 mean -15.3% (95% CI -21.9 to -8.4); s=1.0 mean -23.7% (95% CI -29.7 to -17.6) — failed: s=0.81: upper CI < 0
+- note: from the options-library library: Long Straddle; harness suggestion: new module mandel/experiments/options.py with bs_price/bs_greeks and straddle_vrp(spy, vix, tbill); register harness 'straddle_vrp' in HARNESSES in mandel/experiments/run.py with bundles ['spy-daily-closes','cboe-vix-daily','fred-tbill-3m']; verdict via block_bootstrap_pvalue from mandel/validation/backtest_eval.py | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-104 · long-butterfly
+
+**Claim.** A 30-DTE SPY ATM call butterfly with +/-5% wings, bought at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit debit over 1993-2026: realised 30-day returns land near the money more often than the model's risk-neutral density implies (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-call-butterfly
+- statistic: mean P&L/debit with studentized block-bootstrap CI; secondary: realised frequency of |S_{t+21}/S_t - 1| < 2.5% vs the model-implied probability
+- null: mean P&L = 0
+- procedure: Price three legs with the smile-scaled model (and the ATM-scale grid s in {0.81, 0.90, 1.00} with flat wings as a sensitivity); terminal payoff from daily-history-SPY.
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 (smile ratios) · min n: 390
+- pass: lower CI > 0 under the smile-scaled model and at s = 0.90
+- controls: Wing width fixed at 5%. Flat VIX is reported only as the optimistic-for-buyer bound. Proxy cap until 60 capture days refit the smile.
+- harness: structure_t_104
+- result X-6c62e346: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -8.9% (95% CI -15.6 to -1.9); s=0.90 mean +12.1% (95% CI +3.9 to +20.5) — failed: smile: lower CI > 0
+- note: from the options-library library: Long Butterfly (call or put); harness suggestion: harness 'butterfly_density' in options.py; same bundles; can reuse a generic multi_leg_payoff(legs, S_T) helper | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-105 · short-butterfly
+
+**Claim.** Mirror of long-butterfly: the 30-DTE +/-5% SPY short call butterfly at the smile-scaled VIX model price has negative mean P&L per unit max loss over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-call-butterfly, https://en.wikipedia.org/wiki/Options_strategy
+- statistic: mean P&L/max loss with block-bootstrap CI (sign-flipped long-butterfly series)
+- null: mean P&L = 0
+- procedure: as long-butterfly, sign flipped
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
+- pass: upper CI < 0
+- controls: One harness, two verdicts; the controls are the same as long-butterfly.
+- harness: structure_t_105
+- result X-71227f64: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean +5.7% (95% CI -0.5 to +11.7) — failed: smile: upper CI < 0
+- note: from the options-library library: Short Butterfly (call or put); harness suggestion: same 'butterfly_density' harness emits both signs | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-106 · iron-butterfly
+
+**Claim.** A 30-DTE SPY iron butterfly with +/-5% wings, sold at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit max loss over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-iron-butterfly
+- statistic: mean P&L/max loss with studentized block-bootstrap CI; secondary: max drawdown and Sharpe vs the naked short straddle (paired, compare_strategies)
+- null: mean P&L = 0
+- procedure: Price four legs with the smile-scaled model; terminal payoff; paired with the short-straddle series on the same dates.
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
+- pass: lower CI > 0 under the smile-scaled model and at ATM scale s = 0.90
+- controls: Wing width fixed. Flat VIX is reported as the optimistic bound. The same cost haircut applies. Proxy cap until the smile is refit.
+- harness: structure_t_106
+- result X-7a424f37: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -9.3% (95% CI -15.9 to -2.3); s=0.90 mean +11.5% (95% CI +3.4 to +19.9) — failed: smile: lower CI > 0
+- note: from the options-library library: Iron Butterfly (short, credit); harness suggestion: harness 'iron_fly_vs_straddle' with compare_strategies | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-107 · reverse-iron-butterfly
+
+**Claim.** A 30-DTE SPY reverse iron butterfly with +/-5% wings, bought at the smile-scaled VIX model price, has negative mean P&L per unit debit over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-iron-butterfly
+- statistic: mean P&L/debit with block-bootstrap CI; lowest-VIX-decile mean reported as a secondary
+- null: mean P&L = 0
+- procedure: sign-flipped iron-fly engine; decile cut on an expanding window
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
+- pass: upper CI < 0 under the smile-scaled model and at s = 0.90
+- controls: Flat VIX reported as the pessimistic-for-buyer bound; proxy cap.
+- harness: structure_t_107
+- result X-ebe24649: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean +6.2% (95% CI -0.1 to +12.1); s=0.90 mean -8.8% (95% CI -14.2 to -3.7) — failed: smile: upper CI < 0
+- note: from the options-library library: Reverse Iron Butterfly (long, debit); harness suggestion: same 'iron_fly_vs_straddle' harness, sign flipped, with decile conditioning | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-109 · iron-condor
+
+**Claim.** A 45-DTE SPY iron condor with short strikes at +/-5% and wings at +/-8%, sold at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit max loss over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-condor, https://www.cboe.com/tradable_products/vix/
+- statistic: mean P&L/max loss over non-overlapping 31-trading-day cycles, studentized block-bootstrap CI; secondary: realised breach frequency vs the model-implied breach probability
+- null: mean P&L = 0
+- procedure: Price four legs with the smile-scaled model at T = 45/365; settle at S_{t+31}. Sensitivity: term-adjust VIX toward VIX3M (VIX3M history starts 2009-09-18 in the archive, so this covers 2009-2026 only).
+- data: daily-history-SPY, cboe-VIX-history, cboe-VIX3M-history, fred-DTB3, options-surface-2026-10-14 · min n: 260
+- pass: lower CI > 0 under the smile-scaled model; flat-VIX result reported as the optimistic bound
+- controls: Widths fixed. The 30-day VIX vs 45-day tenor mismatch is flagged. Proxy cap until 60 capture days refit the smile (the 2026-10-14 calibration is a low-vol, high-SKEW day).
+- harness: structure_t_109
+- result X-a5fdc39b: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -3.3% (95% CI -8.4 to +1.7) — failed: smile: lower CI > 0
+- note: from the options-library library: Iron Condor (short, credit); harness suggestion: harness 'iron_condor_breach' in options.py; implied breach probability from norm_cdf already in backtest_eval.py | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-110 · reverse-iron-condor
+
+**Claim.** Mirror of iron-condor: the 45-DTE SPY reverse iron condor (+/-5% inner, +/-8% outer), bought at the smile-scaled VIX model price, has negative mean P&L per unit debit over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-iron-condor
+- statistic: mean P&L/debit with block-bootstrap CI
+- null: mean P&L = 0
+- procedure: sign-flipped iron condor engine
+- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 260
+- pass: upper CI < 0 under the smile-scaled model
+- controls: Same as iron condor.
+- harness: structure_t_110
+- result X-2b560d7e: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -0.3% (95% CI -26.1 to +26.0) — failed: smile: upper CI < 0
+- note: from the options-library library: Reverse Iron Condor (long, debit); harness suggestion: same 'iron_condor_breach' harness, sign flipped | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-124 · short-vol-with-wings
+
+**Claim.** A 30-DTE SPY short ATM straddle with +/-10% wings, sold at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit max loss over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-iron-butterfly, https://www.optionseducation.org/strategies/all-strategies/short-condor
+- statistic: mean P&L/max loss with studentized block-bootstrap CI; secondary: paired Sharpe and max drawdown vs the naked short straddle (compare_strategies)
+- null: mean P&L = 0
+- procedure: Short straddle at s*VIX (s grid), wings at VIX x r(0.90) and VIX x r(1.10) (r(1.10) extrapolated, flagged); settle at S_{t+21}; wing-price multipliers 1.5 and 2.0 as SKEW-range sensitivities
+- data: daily-history-SPY, cboe-VIX-history, cboe-SKEW-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
+- pass: lower CI > 0 under the smile-scaled model AND under the 1.5x wing multiplier
+- controls: Flat VIX reported as the upper bound; proxy cap until the smile is refit; costs haircut.
+- harness: structure_t_124
+- result X-03436e65: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -4.4% (95% CI -8.7 to -0.5); wings x1.5 mean -8.9% (95% CI -13.2 to -4.8) — failed: smile: lower CI > 0; wings x1.5: lower CI > 0
+- note: from the options-library library: Short Vol with Wings (tail-protected short straddle/strangle); harness suggestion: harness 'winged_short_vol' built on compare_strategies with wing-price multiplier sensitivity; later re-run on chain capture when available | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-125 · long-call
+
+**Claim.** A 1-month ATM SPY call priced by Black-Scholes at VIX IV (model-priced, flat smile) and held to expiry has a negative mean monthly return on premium over 1993-2026, and this still holds when IV is scaled down to 0.9 x VIX.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-call, https://scholarsarchive.byu.edu/facpub/9281
+- statistic: mean monthly return on premium, (payoff - C)/C, with studentized block bootstrap 95% CI, at iv_scale 1.0 and 0.9
+- null: mean return >= 0 at either iv_scale
+- procedure: non-overlapping 21-trading-day cycles; K = spot; price BS call with sigma = iv_scale*VIX/100, r = FRED DTB3, q = constant assumption (SPY dividends are not in the free data list; run q = 0 and q = 1.8%); payoff from the SPY close at cycle end; about 400 returns
+- data: SPY daily closes, CBOE VIX daily, FRED DTB3 · min n: 300
+- pass: upper CI bound < 0 at both iv_scale 1.0 and 0.9
+- controls: VIX exceeds 30-day ATM IV on average (it integrates the OTM put wing), so pricing ATM at VIX overprices the call and biases the result toward a pass; the 0.9 x VIX run is the guard. Compare with chain mids once capture reaches 60 days. DSR with n_trials = number of family strategies tested.
+- harness: structure_t_125
+- result X-1d7ea485: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): s=1.0 mean -7.7% (95% CI -16.9 to +1.3); s=0.9 mean +2.3% (95% CI -7.9 to +12.3) — failed: s=1.0: upper CI < 0; s=0.9: upper CI < 0
+- note: from the options-library library: Long Call; harness suggestion: vix_priced_option_returns(strategy='long_call', dte=30, strike='ATM') in mandel/experiments/options.py; reuse block_bootstrap_pvalue and deflated_sharpe_ratio | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-127 · short-naked-call
+
+**Claim.** Selling a 1-month 5%-OTM SPY call at VIX IV (model-priced), rolled monthly, has a positive mean P&L but a lower Sharpe ratio than the matching 5%-OTM short put over 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/naked-call-uncovered-call-short-call, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
+- statistic: Sharpe of monthly P&L per unit spot for the short call vs the short put; difference with block bootstrap
+- null: Sharpe(short call) >= Sharpe(short put)
+- procedure: price both legs at VIX IV each cycle, payoff from the SPY close, P&L normalised by spot
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: bootstrap p < 0.05 for Sharpe(call) < Sharpe(put), and the call mean's lower CI > 0
+- controls: Flat IV overprices the OTM call relative to the real smile (optimistic for the call) and underprices the 5%-OTM put (conservative for the put), so the bias favours the null: a pass is robust. Recheck with chain mids after 60 days.
+- harness: structure_t_127
+- result X-7cde2127: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): Sharpe put minus call -0.59 (one-sided 95% lower -1.33); short call mean +0.4% (95% CI +0.3 to +0.5) — failed: Sharpe(put) > Sharpe(call), one-sided p < 0.05
+- note: from the options-library library: Short (Naked) Call; harness suggestion: vix_priced_option_returns(strategy='short_call', dte=30, strike='OTM5') compared to short_put | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-129 · bull-call-spread
+
+**Claim.** A 1-month ATM/+5% SPY bull call spread priced at VIX IV (model-priced) has a negative mean return per dollar of debit over 1993-2026, but less negative than the plain ATM long call.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bull-call-spread-debit-call-spread, https://cdn.cboe.com/resources/options/Trading_Strategies.pdf
+- statistic: mean return on debit for the spread and for the long call, each with block bootstrap CI, plus the paired difference
+- null: spread mean >= 0, or spread mean <= call mean
+- procedure: monthly cycles; price both strikes at VIX IV (and 0.9 x VIX); payoff from the SPY close; compute (payoff - D)/D
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: spread upper CI < 0 and paired (spread - call) lower CI > 0
+- controls: Correction: flat VIX overprices both C(K1) (VIX > ATM IV) and C(K2) (OTM call IV < ATM IV), so the sign of the bias on D is indeterminate and must be measured against chain mids at 60 days. Report the iv_scale sensitivity.
+- harness: structure_t_129
+- result X-856f5dfa: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): bull call spread mean +13.2% (95% CI +2.2 to +23.7); spread - long call mean +20.9% (95% CI +17.5 to +24.7) — failed: bull call spread: upper CI < 0
+- note: from the options-library library: Bull Call Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bull_call_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-132 · bear-call-credit-spread
+
+**Claim.** A 1-month 3%/6%-OTM SPY bear call spread priced at VIX IV (model-priced) has a mean P&L per unit of max loss that is not positive over 1993-2026 (equity drift exceeds the flat-IV call premium).
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bear-call-spread-credit-call-spread
+- statistic: mean P&L / max loss with block bootstrap CI
+- null: mean > 0
+- procedure: monthly cycles; K1 = 1.03S, K2 = 1.06S at VIX IV; payoff from the SPY close
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: upper CI <= 0
+- controls: Correction: flat IV overprices both OTM calls relative to the real smile; the sign of the bias on the net credit is indeterminate (depends on the smile slope between K1 and K2), so do not assume the real result is more negative. Compare with the bull put spread in the same months and with chain mids at 60 days.
+- harness: structure_t_132
+- result X-591cc927: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): bear call spread mean +3.9% (95% CI +0.7 to +7.1) — failed: upper CI <= 0
+- note: from the options-library library: Bear Call Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bear_call_spread', dte=30, strikes=('OTM3','OTM6')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
+### T-134 · backspread-1x2
+
+**Claim.** A 1-month 1x2 SPY put backspread (short 1 ATM put, long 2 delta -0.25 puts, priced at VIX IV; model-priced) has a negative mean P&L overall but a positive mean P&L in months entered with VIX below 15, over 1993-2026.
+
+- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-ratio-put-spread
+- statistic: mean P&L per unit spot, overall and conditional on VIX < 15 at entry, with block bootstrap CIs
+- null: conditional mean <= 0
+- procedure: monthly cycles; solve the delta -0.25 strike at VIX IV; payoff from the SPY close; split by entry VIX
+- data: SPY, VIX, DTB3 · min n: 300
+- pass: overall upper CI < 0 AND conditional (VIX < 15) lower CI > 0
+- controls: The threshold of 15 is fixed before looking; report the number of low-VIX months (about 1/3 of the sample). Flat IV underprices the 25-delta puts relative to skew, which flatters the long wings: state this. With fixed 5% wings the position is short gamma at VIX < 15, which is why the strike rule is delta-based.
+- harness: structure_t_134
+- result X-19107292: not_supported — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): all months mean +0.1% (95% CI -0.1 to +0.3); VIX<15 (n=140) mean -0.0% (95% CI -0.1 to +0.1) — failed: all months: upper CI < 0; VIX<15 (n=140): lower CI > 0
+- note: from the options-library library: Backspread (1x2 Long Ratio: Call or Put); harness suggestion: vix_priced_option_returns(strategy='put_backspread_1x2', dte=30, condition='vix<15') | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
 
 ### T-181 · put-call-parity-synthetic-forward
 
@@ -1177,7 +1477,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-8010d5c8: not_supported — 243 non-overlapping months: VVIX minus realised spot-VIX vol -22.4 pts (lower 99% -29.8, needs > 10); VVIX prices VIX futures, which move less than spot
 - note: from the options-library library: Vol-of-vol trade: short VIX strangle vs VVIX; harness suggestion: harness_vvix (T-243) implements the data part; add the strangle pricer so a pass is no longer reported as inconclusive. | verifier-corrected restatement of T-243, whose verdict tested the earlier wording and stands
 
-## Inconclusive (8)
+## Inconclusive (9)
 
 ### T-38 · retail-attention-predicts-abs-return
 
@@ -1278,6 +1578,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-c288209a: inconclusive — 0/30 captures with an expired ~30d expiry (chain capture started 2026-10-14)
 - note: the market-priced replacement for the model-priced short-straddle overlay (T-57)
 
+### T-102 · long-strangle
+
+**Claim.** A 30-DTE SPY long strangle at +/-5% strikes, bought at the smile-scaled VIX model price and held to expiry, has negative mean P&L per unit premium over 1993-2026 (MODEL-PRICED proxy).
+
+- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-strangle-long-combination, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf
+- statistic: mean P&L/premium, non-overlapping 21-day cycles, studentized block-bootstrap CI; secondary: realised frequency of S_{t+21} inside [K_p, K_c] vs the model's risk-neutral probability
+- null: mean P&L = 0
+- procedure: Price each leg with mandel/options/bs.price at sigma = VIX_t x r(moneyness). Pay at intrinsic on S_{t+21}. Repeat at flat VIX (reported as the overpriced bound) and with the put ratio scaled by SKEW_t/SKEW_2026-10-14.
+- data: daily-history-SPY, cboe-VIX-history, cboe-SKEW-history, fred-DTB3, options-surface-2026-10-14 (smile ratios) · min n: 390
+- pass: upper CI < 0 under the smile-scaled model AND under the SKEW-scaled sensitivity
+- controls: Width pre-registered at 5% (3% and 8% reported, deflated with n_trials = 3). The smile ratios come from one day: verdict capped at 'proxy' until 60 capture days refit them. Width varies with vol level; also report a delta-rule version.
+- harness: structure_t_102
+- result X-56e4027b: inconclusive — MODEL-PRICED proxy (smile from 2 quote days, held fixed in shape): smile mean -42.4% (95% CI -67.5 to -8.7) — implemented criteria pass; not implemented: SKEW-scaled put sensitivity
+- note: from the options-library library: Long Strangle; harness suggestion: harness 'strangle_vrp' in options.py; parameter width in {3,5,8}% declared up front and fed to deflated_sharpe_ratio(n_trials=3) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows
+
 ### T-238 · vix_contango_short_call_spread
 
 **Claim.** When VIX3M exceeds VIX by more than 10% (contango), spot VIX 21 trading days later is below the VIX3M-VIX-implied 1-month forward level F = sqrt((3*VIX3M^2 - VIX^2)/2) in more than 65% of months, so a VIX call spread struck at F has positive expectancy.
@@ -1310,7 +1625,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-23bc344d: inconclusive — day one 2026-10-14: 15583 boxes (SPX and SPXW, 60-120 DTE), mid box rate minus bill median +63 bp (95% CI +63 to +63); needs [15, 80] with CI in [0, 120]; later days: 2026-10-15 +65 bp (in range); persistence needs 20 capture days (2 so far); the CI resamples boxes that share strikes, so it understates uncertainty
 - note: from the options-library library: Long box spread (SPX box lending); harness suggestion: mandel/options/box.py: box_rate(chain, expiry, K1, K2, side) and daily box_curve; payoff-engine test asserts a flat K2 - K1. | verifier-corrected restatement of T-186, whose verdict tested the earlier wording and stands | the bootstrap CI over boxes is too narrow (boxes share strikes and are not independent); the persistence criterion over 20 capture days is the real test
 
-## Untested (250)
+## Untested (229)
 
 ### T-12 · volume-improves-calibration
 
@@ -1351,19 +1666,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: missing-data alignment; markets of the same event are mechanically correlated (exclude same-event pairs)
 - note: harness not yet written: low_rank_structure
 
-### T-100 · long-straddle
-
-**Claim.** A 30-DTE ATM SPY straddle, bought at the model price BS(s*VIX/100) and held to expiry, has negative mean P&L per unit premium over 1993-2026 for every ATM scale s in {0.81, 0.90, 1.00}. MODEL-PRICED proxy.
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-straddle, https://cdn.cboe.com/api/global/us_indices/governance/Volatility_Index_Methodology_Cboe_Volatility_Index.pdf
-- statistic: mean P&L / premium over non-overlapping 21-trading-day cycles; studentized block-bootstrap 95% CI (block 6 cycles); run separately for each s
-- null: mean P&L = 0 (straddle fairly priced at s*VIX)
-- procedure: For each cycle start t: S_t from daily-history-SPY, r from fred-DTB3, sigma = s*VIX_t/100, T = 21/252, K = S_t. Price call + put by BS (mandel/options/bs.price), pay |S_{t+21} - K|, P&L = payoff - premium. The existing overlay_backtest(strategy='long_straddle', iv_scale=s) in mandel/experiments/volatility.py already computes this.
-- data: daily-history-SPY (1993-01-29 on), cboe-VIX-history (1990 on), fred-DTB3 · min n: 390
-- pass: upper CI < 0 for all three s; if the sign holds only at s = 1.00, report 'pricing-artefact, not supported'
-- controls: s grid pre-registered; s = 0.81 comes from one capture day and is refit as options-surface captures accumulate. VIX is SPX, not SPY. SPY closes are unadjusted (price return) and q = 0 in pricing, a small bias. No transaction costs (adding them strengthens a negative result). Prior evidence: the mirror short-straddle harness (T-57, short_straddle_model) gave +1.10%/month at s = 1.0 but +0.24%/month at s = 0.81 (p 0.07), so this claim is expected to FAIL at s = 0.81.
-- note: from the options-library library: Long Straddle; harness suggestion: new module mandel/experiments/options.py with bs_price/bs_greeks and straddle_vrp(spy, vix, tbill); register harness 'straddle_vrp' in HARNESSES in mandel/experiments/run.py with bundles ['spy-daily-closes','cboe-vix-daily','fred-tbill-3m']; verdict via block_bootstrap_pvalue from mandel/validation/backtest_eval.py | verifier: corrected claim/trial
-
 ### T-101 · short-straddle
 
 **Claim.** For 30-DTE ATM SPY short straddles priced at the model price BS(0.90*VIX/100), mean P&L per unit premium is higher when entered with VIX minus trailing 21-day realised vol in its top tercile than in its bottom tercile, out of sample (MODEL-PRICED proxy).
@@ -1376,19 +1678,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: OOS top-minus-bottom difference CI excludes 0 at s = 0.90, with the same sign at s = 0.81 and s = 1.00
 - controls: Tercile thresholds fixed in-sample. Report skewness, kurtosis, PSR, max drawdown and the unconditional mean (T-57 found +0.24%/month, p 0.07, at s = 0.81). Repeat with a 5%-of-premium round-trip haircut. 2008 and 2020 stay in the sample.
 - note: from the options-library library: Short Straddle; harness suggestion: harness 'short_straddle_vrp' sharing options.py pricing; conditioning rule set declared up front and passed to deflated_sharpe_ratio(n_trials=len(rules)) | verifier: corrected claim/trial
-
-### T-102 · long-strangle
-
-**Claim.** A 30-DTE SPY long strangle at +/-5% strikes, bought at the smile-scaled VIX model price and held to expiry, has negative mean P&L per unit premium over 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-strangle-long-combination, https://cdn.cboe.com/resources/indices/documents/SKEWwhitepaperjan2011.pdf
-- statistic: mean P&L/premium, non-overlapping 21-day cycles, studentized block-bootstrap CI; secondary: realised frequency of S_{t+21} inside [K_p, K_c] vs the model's risk-neutral probability
-- null: mean P&L = 0
-- procedure: Price each leg with mandel/options/bs.price at sigma = VIX_t x r(moneyness). Pay at intrinsic on S_{t+21}. Repeat at flat VIX (reported as the overpriced bound) and with the put ratio scaled by SKEW_t/SKEW_2026-10-14.
-- data: daily-history-SPY, cboe-VIX-history, cboe-SKEW-history, fred-DTB3, options-surface-2026-10-14 (smile ratios) · min n: 390
-- pass: upper CI < 0 under the smile-scaled model AND under the SKEW-scaled sensitivity
-- controls: Width pre-registered at 5% (3% and 8% reported, deflated with n_trials = 3). The smile ratios come from one day: verdict capped at 'proxy' until 60 capture days refit them. Width varies with vol level; also report a delta-rule version.
-- note: from the options-library library: Long Strangle; harness suggestion: harness 'strangle_vrp' in options.py; parameter width in {3,5,8}% declared up front and fed to deflated_sharpe_ratio(n_trials=3) | verifier: corrected claim/trial
 
 ### T-103 · short-strangle
 
@@ -1403,84 +1692,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Width fixed at 5% before looking. The same 5%-of-premium cost haircut applies to both. Report PSR, max drawdown and skew. Proxy cap until 60 capture days refit the smile ratios.
 - note: from the options-library library: Short Strangle; harness suggestion: harness 'short_strangle_vs_straddle' using compare_strategies from mandel/validation/backtest_eval.py on per-trade P&L series | verifier: corrected claim/trial
 
-### T-104 · long-butterfly
-
-**Claim.** A 30-DTE SPY ATM call butterfly with +/-5% wings, bought at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit debit over 1993-2026: realised 30-day returns land near the money more often than the model's risk-neutral density implies (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-call-butterfly
-- statistic: mean P&L/debit with studentized block-bootstrap CI; secondary: realised frequency of |S_{t+21}/S_t - 1| < 2.5% vs the model-implied probability
-- null: mean P&L = 0
-- procedure: Price three legs with the smile-scaled model (and the ATM-scale grid s in {0.81, 0.90, 1.00} with flat wings as a sensitivity); terminal payoff from daily-history-SPY.
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 (smile ratios) · min n: 390
-- pass: lower CI > 0 under the smile-scaled model and at s = 0.90
-- controls: Wing width fixed at 5%. Flat VIX is reported only as the optimistic-for-buyer bound. Proxy cap until 60 capture days refit the smile.
-- note: from the options-library library: Long Butterfly (call or put); harness suggestion: harness 'butterfly_density' in options.py; same bundles; can reuse a generic multi_leg_payoff(legs, S_T) helper | verifier: corrected claim/trial
-
-### T-105 · short-butterfly
-
-**Claim.** Mirror of long-butterfly: the 30-DTE +/-5% SPY short call butterfly at the smile-scaled VIX model price has negative mean P&L per unit max loss over 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-call-butterfly, https://en.wikipedia.org/wiki/Options_strategy
-- statistic: mean P&L/max loss with block-bootstrap CI (sign-flipped long-butterfly series)
-- null: mean P&L = 0
-- procedure: as long-butterfly, sign flipped
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
-- pass: upper CI < 0
-- controls: One harness, two verdicts; the controls are the same as long-butterfly.
-- note: from the options-library library: Short Butterfly (call or put); harness suggestion: same 'butterfly_density' harness emits both signs | verifier: corrected claim/trial
-
-### T-106 · iron-butterfly
-
-**Claim.** A 30-DTE SPY iron butterfly with +/-5% wings, sold at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit max loss over 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-iron-butterfly
-- statistic: mean P&L/max loss with studentized block-bootstrap CI; secondary: max drawdown and Sharpe vs the naked short straddle (paired, compare_strategies)
-- null: mean P&L = 0
-- procedure: Price four legs with the smile-scaled model; terminal payoff; paired with the short-straddle series on the same dates.
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
-- pass: lower CI > 0 under the smile-scaled model and at ATM scale s = 0.90
-- controls: Wing width fixed. Flat VIX is reported as the optimistic bound. The same cost haircut applies. Proxy cap until the smile is refit.
-- note: from the options-library library: Iron Butterfly (short, credit); harness suggestion: harness 'iron_fly_vs_straddle' with compare_strategies | verifier: corrected claim/trial
-
-### T-107 · reverse-iron-butterfly
-
-**Claim.** A 30-DTE SPY reverse iron butterfly with +/-5% wings, bought at the smile-scaled VIX model price, has negative mean P&L per unit debit over 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-iron-butterfly
-- statistic: mean P&L/debit with block-bootstrap CI; lowest-VIX-decile mean reported as a secondary
-- null: mean P&L = 0
-- procedure: sign-flipped iron-fly engine; decile cut on an expanding window
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
-- pass: upper CI < 0 under the smile-scaled model and at s = 0.90
-- controls: Flat VIX reported as the pessimistic-for-buyer bound; proxy cap.
-- note: from the options-library library: Reverse Iron Butterfly (long, debit); harness suggestion: same 'iron_fly_vs_straddle' harness, sign flipped, with decile conditioning | verifier: corrected claim/trial
-
-### T-109 · iron-condor
-
-**Claim.** A 45-DTE SPY iron condor with short strikes at +/-5% and wings at +/-8%, sold at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit max loss over 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-condor, https://www.cboe.com/tradable_products/vix/
-- statistic: mean P&L/max loss over non-overlapping 31-trading-day cycles, studentized block-bootstrap CI; secondary: realised breach frequency vs the model-implied breach probability
-- null: mean P&L = 0
-- procedure: Price four legs with the smile-scaled model at T = 45/365; settle at S_{t+31}. Sensitivity: term-adjust VIX toward VIX3M (VIX3M history starts 2009-09-18 in the archive, so this covers 2009-2026 only).
-- data: daily-history-SPY, cboe-VIX-history, cboe-VIX3M-history, fred-DTB3, options-surface-2026-10-14 · min n: 260
-- pass: lower CI > 0 under the smile-scaled model; flat-VIX result reported as the optimistic bound
-- controls: Widths fixed. The 30-day VIX vs 45-day tenor mismatch is flagged. Proxy cap until 60 capture days refit the smile (the 2026-10-14 calibration is a low-vol, high-SKEW day).
-- note: from the options-library library: Iron Condor (short, credit); harness suggestion: harness 'iron_condor_breach' in options.py; implied breach probability from norm_cdf already in backtest_eval.py | verifier: corrected claim/trial
-
-### T-110 · reverse-iron-condor
-
-**Claim.** Mirror of iron-condor: the 45-DTE SPY reverse iron condor (+/-5% inner, +/-8% outer), bought at the smile-scaled VIX model price, has negative mean P&L per unit debit over 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/long-iron-condor
-- statistic: mean P&L/debit with block-bootstrap CI
-- null: mean P&L = 0
-- procedure: sign-flipped iron condor engine
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 260
-- pass: upper CI < 0 under the smile-scaled model
-- controls: Same as iron condor.
-- note: from the options-library library: Reverse Iron Condor (long, debit); harness suggestion: same 'iron_condor_breach' harness, sign flipped | verifier: corrected claim/trial
-
 ### T-113 · jade-lizard
 
 **Claim.** A 1-month SPY jade lizard (short 30-delta put, short 30-delta call, long call 1% of S above it, priced at VIX IV; model-priced; months with credit < width skipped) has a positive mean P&L per unit of naked-put margin over 1993-2026.
@@ -1493,45 +1704,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: lower CI > 0 and positive in both walk-forward halves
 - controls: Overlaps the neutral/income family; DSR counts it once across families. Flat pricing understates the put credit and overstates the call credit relative to real skew; recheck with chain mids at 60 days.
 - note: from the options-library library: Jade Lizard; harness suggestion: harness 'jade_lizard_condition' in options.py reading chain capture; shares strike-by-delta selector with bwb harness | verifier: corrected claim/trial
-
-### T-114 · big-lizard
-
-**Claim.** A 30-DTE SPY big lizard (short ATM straddle, long +2% call), sold at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit downside max loss over 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.tastylive.com/concepts-strategies/jade-lizard, https://www.optionseducation.org/strategies/all-strategies/short-straddle
-- statistic: mean P&L/max loss with block-bootstrap CI; condition frequency (C_r >= 0.02 S) by VIX bucket; paired difference vs the short straddle
-- null: mean P&L = 0
-- procedure: Price the straddle at s*VIX (s grid) and the +2% call at VIX x r(1.02); settle at S_{t+21}.
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
-- pass: lower CI > 0 under the smile-scaled model and at s = 0.90
-- controls: Width fixed at 2%; proxy cap; costs haircut.
-- note: from the options-library library: Big Lizard; harness suggestion: harness 'big_lizard_condition' sharing straddle engine | verifier: corrected claim/trial
-
-### T-115 · strip
-
-**Claim.** A 30-DTE ATM SPY strip priced at BS(s*VIX) has lower mean P&L per unit premium than the ATM straddle on the same dates, over 1993-2026, for every s in {0.81, 0.90, 1.00} (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://en.wikipedia.org/wiki/Straddle, https://www.optionseducation.org/strategies/all-strategies/long-straddle
-- statistic: paired mean difference (strip - straddle) of P&L/premium; studentized block-bootstrap CI
-- null: no difference
-- procedure: Shared ATM engine with a (calls, puts) ratio parameter
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 390
-- pass: upper CI of the difference < 0 at all three s
-- controls: Same dates; equity drift is the main driver, so also report a drift-removed version.
-- note: from the options-library library: Strip; harness suggestion: include in 'straddle_vrp' harness as a ratio parameter (calls, puts) in {(1,1),(1,2),(2,1)} | verifier: corrected claim/trial
-
-### T-116 · strap
-
-**Claim.** A 30-DTE ATM SPY strap priced at BS(s*VIX) has higher mean P&L per unit premium than the strip on the same dates over 1993-2026, for every s in {0.81, 0.90, 1.00} (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://en.wikipedia.org/wiki/Straddle
-- statistic: paired mean difference (strap - strip) of P&L/premium; block-bootstrap CI
-- null: no difference
-- procedure: Shared ratio engine (2,1) vs (1,2)
-- data: daily-history-SPY, cboe-VIX-history, fred-DTB3 · min n: 390
-- pass: lower CI of the difference > 0 at all three s
-- controls: Drift is the obvious driver; report a drift-removed version.
-- note: from the options-library library: Strap; harness suggestion: same ratio parameter in 'straddle_vrp' | verifier: corrected claim/trial
 
 ### T-123 · gamma-scalping-long-straddle
 
@@ -1546,58 +1718,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Daily (not intraday) hedging; cost declared; VIX is SPX; q = 0 with unadjusted closes; report the variance-term share of P&L vs hedging error; BTZ 1990-2007 as an external anchor (monthly %^2 units).
 - note: from the options-library library: Gamma Scalping a Long Straddle (delta-neutral); harness suggestion: harness 'gamma_scalp_vrp' in options.py: functions bs_delta, hedge_path(prices, vix_entry, r, cost_bps) returning per-trade P&L; verdict via block_bootstrap_pvalue and a reported VRP series; a sibling 'dvol_vrp' harness runs the same on BTC with DVOL as IV (bundles deribit-dvol-daily, btc-daily-closes) | verifier: corrected claim/trial
 
-### T-124 · short-vol-with-wings
-
-**Claim.** A 30-DTE SPY short ATM straddle with +/-10% wings, sold at the smile-scaled VIX model price and held to expiry, has positive mean P&L per unit max loss over 1993-2026 (MODEL-PRICED proxy).
-
-- kind: options-strategy · origin: options-library:volatility, https://www.optionseducation.org/strategies/all-strategies/short-iron-butterfly, https://www.optionseducation.org/strategies/all-strategies/short-condor
-- statistic: mean P&L/max loss with studentized block-bootstrap CI; secondary: paired Sharpe and max drawdown vs the naked short straddle (compare_strategies)
-- null: mean P&L = 0
-- procedure: Short straddle at s*VIX (s grid), wings at VIX x r(0.90) and VIX x r(1.10) (r(1.10) extrapolated, flagged); settle at S_{t+21}; wing-price multipliers 1.5 and 2.0 as SKEW-range sensitivities
-- data: daily-history-SPY, cboe-VIX-history, cboe-SKEW-history, fred-DTB3, options-surface-2026-10-14 · min n: 390
-- pass: lower CI > 0 under the smile-scaled model AND under the 1.5x wing multiplier
-- controls: Flat VIX reported as the upper bound; proxy cap until the smile is refit; costs haircut.
-- note: from the options-library library: Short Vol with Wings (tail-protected short straddle/strangle); harness suggestion: harness 'winged_short_vol' built on compare_strategies with wing-price multiplier sensitivity; later re-run on chain capture when available | verifier: corrected claim/trial
-
-### T-125 · long-call
-
-**Claim.** A 1-month ATM SPY call priced by Black-Scholes at VIX IV (model-priced, flat smile) and held to expiry has a negative mean monthly return on premium over 1993-2026, and this still holds when IV is scaled down to 0.9 x VIX.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-call, https://scholarsarchive.byu.edu/facpub/9281
-- statistic: mean monthly return on premium, (payoff - C)/C, with studentized block bootstrap 95% CI, at iv_scale 1.0 and 0.9
-- null: mean return >= 0 at either iv_scale
-- procedure: non-overlapping 21-trading-day cycles; K = spot; price BS call with sigma = iv_scale*VIX/100, r = FRED DTB3, q = constant assumption (SPY dividends are not in the free data list; run q = 0 and q = 1.8%); payoff from the SPY close at cycle end; about 400 returns
-- data: SPY daily closes, CBOE VIX daily, FRED DTB3 · min n: 300
-- pass: upper CI bound < 0 at both iv_scale 1.0 and 0.9
-- controls: VIX exceeds 30-day ATM IV on average (it integrates the OTM put wing), so pricing ATM at VIX overprices the call and biases the result toward a pass; the 0.9 x VIX run is the guard. Compare with chain mids once capture reaches 60 days. DSR with n_trials = number of family strategies tested.
-- note: from the options-library library: Long Call; harness suggestion: vix_priced_option_returns(strategy='long_call', dte=30, strike='ATM') in mandel/experiments/options.py; reuse block_bootstrap_pvalue and deflated_sharpe_ratio | verifier: corrected claim/trial
-
-### T-126 · long-put
-
-**Claim.** A 1-month ATM SPY put priced at VIX IV (model-priced, flat smile, so call and put carry the same IV) has a lower mean monthly return on premium than the matching ATM call over 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-put, https://scholarsarchive.byu.edu/facpub/9281
-- statistic: mean of paired monthly differences (put return minus call return) with block bootstrap CI; also each mean separately
-- null: put mean return >= call mean return
-- procedure: same engine as long-call: price the ATM put and ATM call at VIX IV each cycle, payoff from the SPY close, paired differences, at iv_scale 1.0 and 0.9
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: upper CI of (put - call) < 0 at both iv_scales
-- controls: Because both legs carry the same flat IV, this tests only drift plus the VIX-vs-realised gap. It does not test put-skew richness, which needs the captured chain (60+ days). VIX > ATM IV overprices both legs equally in vol terms. Paired design removes common vol shocks.
-- note: from the options-library library: Long Put; harness suggestion: vix_priced_option_returns(strategy='long_put', dte=30) paired with long_call output | verifier: corrected claim/trial
-
-### T-127 · short-naked-call
-
-**Claim.** Selling a 1-month 5%-OTM SPY call at VIX IV (model-priced), rolled monthly, has a positive mean P&L but a lower Sharpe ratio than the matching 5%-OTM short put over 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/naked-call-uncovered-call-short-call, https://www.deribit.com/api/v2/public/get_instruments?currency=BTC&kind=option&expired=false
-- statistic: Sharpe of monthly P&L per unit spot for the short call vs the short put; difference with block bootstrap
-- null: Sharpe(short call) >= Sharpe(short put)
-- procedure: price both legs at VIX IV each cycle, payoff from the SPY close, P&L normalised by spot
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: bootstrap p < 0.05 for Sharpe(call) < Sharpe(put), and the call mean's lower CI > 0
-- controls: Flat IV overprices the OTM call relative to the real smile (optimistic for the call) and underprices the 5%-OTM put (conservative for the put), so the bias favours the null: a pass is robust. Recheck with chain mids after 60 days.
-- note: from the options-library library: Short (Naked) Call; harness suggestion: vix_priced_option_returns(strategy='short_call', dte=30, strike='OTM5') compared to short_put | verifier: corrected claim/trial
-
 ### T-128 · short-naked-put
 
 **Claim.** Selling a 1-month ATM SPY put at VIX IV (model-priced), fully collateralised in 3-month bills with the PUT-index construction, has a higher Sharpe ratio than SPY buy-and-hold over 1993-2026.
@@ -1611,58 +1731,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Correction: VIX is usually above ATM IV, so pricing the ATM put at VIX overstates the premium and the result is optimistic, not conservative; the 0.9 x VIX run and the comparison with the real PUT index guard this. Sharpe flatters negatively skewed returns, so report skew, kurtosis and PSR. SPY is price-only unless total return is reconstructed; state the dividend convention.
 - note: from the options-library library: Short (Naked / Cash-Secured) Put; harness suggestion: putwrite_vs_spy() reproducing the Cboe PUT methodology with VIX pricing; later swap in captured SPY chain mids | verifier: corrected claim/trial
 
-### T-129 · bull-call-spread
-
-**Claim.** A 1-month ATM/+5% SPY bull call spread priced at VIX IV (model-priced) has a negative mean return per dollar of debit over 1993-2026, but less negative than the plain ATM long call.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bull-call-spread-debit-call-spread, https://cdn.cboe.com/resources/options/Trading_Strategies.pdf
-- statistic: mean return on debit for the spread and for the long call, each with block bootstrap CI, plus the paired difference
-- null: spread mean >= 0, or spread mean <= call mean
-- procedure: monthly cycles; price both strikes at VIX IV (and 0.9 x VIX); payoff from the SPY close; compute (payoff - D)/D
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: spread upper CI < 0 and paired (spread - call) lower CI > 0
-- controls: Correction: flat VIX overprices both C(K1) (VIX > ATM IV) and C(K2) (OTM call IV < ATM IV), so the sign of the bias on D is indeterminate and must be measured against chain mids at 60 days. Report the iv_scale sensitivity.
-- note: from the options-library library: Bull Call Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bull_call_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial
-
-### T-130 · bear-put-spread
-
-**Claim.** A 1-month ATM/-5% SPY bear put spread priced at VIX IV (model-priced) has a negative mean return per dollar of debit, and a lower mean than the matching ATM/+5% bull call spread, over 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bear-put-spread, https://cdn.cboe.com/resources/options/Trading_Strategies.pdf
-- statistic: mean return on debit with block bootstrap CI; paired difference vs the bull call spread
-- null: mean >= 0, or mean(bear put) >= mean(bull call)
-- procedure: same monthly engine; puts at K2 = spot and K1 = 0.95 x spot priced at VIX IV; payoff from the SPY close
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: upper CI < 0 and paired-difference upper CI < 0
-- controls: Flat VIX overprices the ATM long put (VIX > ATM IV) and underprices the short 5%-OTM put (skew), so both biases inflate the modelled D and push toward a too-negative result, favouring a pass. Rerun at 0.9 x VIX and with chain mids at 60 days. Report with and without 2008 and 2020.
-- note: from the options-library library: Bear Put Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bear_put_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial
-
-### T-131 · bull-put-credit-spread
-
-**Claim.** A 1-month 5%/10%-OTM SPY bull put spread priced at VIX IV (model-priced), rolled monthly, has a positive mean P&L per unit of max loss and a win rate above 85%, while its worst single month exceeds 10x the median credit, over 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bull-put-spread-credit-put-spread, https://cdn.cboe.com/api/global/us_indices/governance/Cboe_SP_500_PutWrite_Indices_Methodology.pdf
-- statistic: mean P&L / max loss with block bootstrap CI; win rate with binomial CI; ratio of the worst monthly loss to the median credit
-- null: mean <= 0 (no premium left after the tails)
-- procedure: monthly cycles; K2 = 0.95S, K1 = 0.90S puts priced at VIX IV; payoff from the SPY close; collateral earns DTB3
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: lower CI of the mean > 0 AND win rate > 0.85 AND worst/median > 10 (all three pre-registered)
-- controls: Correction: flat IV underprices both OTM puts, and the farther 10%-OTM long leg carries more skew, so the real credit may be smaller than modelled; the bias direction is indeterminate, not conservative. Use PSR with skew/kurtosis, walk-forward halves, and recheck with chain mids at 60 days.
-- note: from the options-library library: Bull Put Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bull_put_spread', dte=30, strikes=('OTM5','OTM10')) | verifier: corrected claim/trial
-
-### T-132 · bear-call-credit-spread
-
-**Claim.** A 1-month 3%/6%-OTM SPY bear call spread priced at VIX IV (model-priced) has a mean P&L per unit of max loss that is not positive over 1993-2026 (equity drift exceeds the flat-IV call premium).
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bear-call-spread-credit-call-spread
-- statistic: mean P&L / max loss with block bootstrap CI
-- null: mean > 0
-- procedure: monthly cycles; K1 = 1.03S, K2 = 1.06S at VIX IV; payoff from the SPY close
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: upper CI <= 0
-- controls: Correction: flat IV overprices both OTM calls relative to the real smile; the sign of the bias on the net credit is indeterminate (depends on the smile slope between K1 and K2), so do not assume the real result is more negative. Compare with the bull put spread in the same months and with chain mids at 60 days.
-- note: from the options-library library: Bear Call Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bear_call_spread', dte=30, strikes=('OTM3','OTM6')) | verifier: corrected claim/trial
-
 ### T-133 · ratio-front-spread-1x2
 
 **Claim.** A 1-month zero-cost 1x2 SPY call ratio spread (long 1 ATM call, short 2 calls at the strike where 2C(K2) = C(K1), all priced at VIX IV; model-priced) has a positive mean monthly P&L per unit spot, yet loses more than 3x its median gain in more than 3% of months, over 1993-2026.
@@ -1675,19 +1743,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: lower CI of the mean > 0 AND tail-frequency lower CI > 3% (both pre-registered)
 - controls: Flat IV overprices the OTM shorts relative to the real smile, so the real zero-cost K2 sits closer to ATM (more negative gamma); report by VIX tercile; recheck with chain mids at 60 days.
 - note: from the options-library library: Ratio Vertical Front Spread (1x2 Call or Put Ratio Spread); harness suggestion: vix_priced_option_returns(strategy='ratio_call_1x2', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial
-
-### T-134 · backspread-1x2
-
-**Claim.** A 1-month 1x2 SPY put backspread (short 1 ATM put, long 2 delta -0.25 puts, priced at VIX IV; model-priced) has a negative mean P&L overall but a positive mean P&L in months entered with VIX below 15, over 1993-2026.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/long-ratio-put-spread
-- statistic: mean P&L per unit spot, overall and conditional on VIX < 15 at entry, with block bootstrap CIs
-- null: conditional mean <= 0
-- procedure: monthly cycles; solve the delta -0.25 strike at VIX IV; payoff from the SPY close; split by entry VIX
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: overall upper CI < 0 AND conditional (VIX < 15) lower CI > 0
-- controls: The threshold of 15 is fixed before looking; report the number of low-VIX months (about 1/3 of the sample). Flat IV underprices the 25-delta puts relative to skew, which flatters the long wings: state this. With fixed 5% wings the position is short gamma at VIX < 15, which is why the strike rule is delta-based.
-- note: from the options-library library: Backspread (1x2 Long Ratio: Call or Put); harness suggestion: vix_priced_option_returns(strategy='put_backspread_1x2', dte=30, condition='vix<15') | verifier: corrected claim/trial
 
 ### T-135 · ladder-christmas-tree
 
@@ -4483,19 +4538,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: upper CI of (realised - RN) < 0
 - controls: Flat IV ignores skew, which raises the market's digital-put price further (the slope term -dC/dK includes the skew), so the real overpricing is larger than modelled. Follow-up (blocked): compare SPXW tight-vertical probabilities with Kalshi KXINX mids at synchronised snapshots.
 - note: from the options-library library: Digital (Binary) via Tight Vertical Spread; harness suggestion: digital_calibration(symbol='SPY', moneyness=0.97, dte=21) using proper scoring in mandel/forecasts.py; Kalshi follow-up after 30 synchronised SPXW + KXINX snapshots | added by the verifier pass
-
-### T-517 · seagull
-
-**Claim.** A 1-month zero-cost SPY seagull (long ATM call, short 5%-OTM call, short put struck to make net premium zero; all at VIX IV, model-priced) has a positive mean monthly P&L per unit spot over 1993-2026, holding in both walk-forward halves.
-
-- kind: options-strategy · origin: options-library:directional-vertical, https://www.optionseducation.org/strategies/all-strategies/bull-call-spread-debit-call-spread, https://www.optionseducation.org/strategies/all-strategies/naked-put-uncovered-put-short-put
-- statistic: mean P&L per unit spot with block bootstrap CI, per half
-- null: mean <= 0
-- procedure: monthly cycles; solve K1 for zero cost at VIX IV; payoff from the SPY close
-- data: SPY, VIX, DTB3 · min n: 300
-- pass: lower CI > 0 in the full sample and the mean > 0 in both halves
-- controls: Under flat pricing the zero-cost put sits near ATM, whereas with real skew it sits 3-6% OTM, so the model trade is far more put-heavy than the traded one: a chain-based rerun at 60 days is required before any trading conclusion. Run at iv_scale 0.9.
-- note: from the options-library library: Seagull (Put-Financed Call Spread); harness suggestion: overlay_backtest(strategy='seagull', k_put='zero_cost') in mandel/experiments/volatility.py | added by the verifier pass
 
 ### T-522 · election-event-straddle
 

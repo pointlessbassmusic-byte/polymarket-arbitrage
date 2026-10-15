@@ -1799,12 +1799,16 @@
     "pass": "upper CI < 0 for all three s; if the sign holds only at s = 1.00, report 'pricing-artefact, not supported'",
     "controls": "s grid pre-registered; s = 0.81 comes from one capture day and is refit as options-surface captures accumulate. VIX is SPX, not SPY. SPY closes are unadjusted (price return) and q = 0 in pricing, a small bias. No transaction costs (adding them strengthens a negative result). Prior evidence: the mirror short-straddle harness (T-57, short_straddle_model) gave +1.10%/month at s = 1.0 but +0.24%/month at s = 0.81 (p 0.07), so this claim is expected to FAIL at s = 0.81."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_100"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Long Straddle; harness suggestion: new module mandel/experiments/options.py with bs_price/bs_greeks and straddle_vrp(spy, vix, tbill); register harness 'straddle_vrp' in HARNESSES in mandel/experiments/run.py with bundles ['spy-daily-closes','cboe-vix-daily','fred-tbill-3m']; verdict via block_bootstrap_pvalue from mandel/validation/backtest_eval.py | verifier: corrected claim/trial"
+   "results": [
+    "X-ac351508"
+   ],
+   "notes": "from the options-library library: Long Straddle; harness suggestion: new module mandel/experiments/options.py with bs_price/bs_greeks and straddle_vrp(spy, vix, tbill); register harness 'straddle_vrp' in HARNESSES in mandel/experiments/run.py with bundles ['spy-daily-closes','cboe-vix-daily','fred-tbill-3m']; verdict via block_bootstrap_pvalue from mandel/validation/backtest_eval.py | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-101",
@@ -1851,12 +1855,16 @@
     "pass": "upper CI < 0 under the smile-scaled model AND under the SKEW-scaled sensitivity",
     "controls": "Width pre-registered at 5% (3% and 8% reported, deflated with n_trials = 3). The smile ratios come from one day: verdict capped at 'proxy' until 60 capture days refit them. Width varies with vol level; also report a delta-rule version."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_102"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Long Strangle; harness suggestion: harness 'strangle_vrp' in options.py; parameter width in {3,5,8}% declared up front and fed to deflated_sharpe_ratio(n_trials=3) | verifier: corrected claim/trial"
+   "results": [
+    "X-56e4027b"
+   ],
+   "notes": "from the options-library library: Long Strangle; harness suggestion: harness 'strangle_vrp' in options.py; parameter width in {3,5,8}% declared up front and fed to deflated_sharpe_ratio(n_trials=3) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-103",
@@ -1902,12 +1910,16 @@
     "pass": "lower CI > 0 under the smile-scaled model and at s = 0.90",
     "controls": "Wing width fixed at 5%. Flat VIX is reported only as the optimistic-for-buyer bound. Proxy cap until 60 capture days refit the smile."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_104"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Long Butterfly (call or put); harness suggestion: harness 'butterfly_density' in options.py; same bundles; can reuse a generic multi_leg_payoff(legs, S_T) helper | verifier: corrected claim/trial"
+   "results": [
+    "X-6c62e346"
+   ],
+   "notes": "from the options-library library: Long Butterfly (call or put); harness suggestion: harness 'butterfly_density' in options.py; same bundles; can reuse a generic multi_leg_payoff(legs, S_T) helper | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-105",
@@ -1928,12 +1940,16 @@
     "pass": "upper CI < 0",
     "controls": "One harness, two verdicts; the controls are the same as long-butterfly."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_105"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Short Butterfly (call or put); harness suggestion: same 'butterfly_density' harness emits both signs | verifier: corrected claim/trial"
+   "results": [
+    "X-71227f64"
+   ],
+   "notes": "from the options-library library: Short Butterfly (call or put); harness suggestion: same 'butterfly_density' harness emits both signs | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-106",
@@ -1953,12 +1969,16 @@
     "pass": "lower CI > 0 under the smile-scaled model and at ATM scale s = 0.90",
     "controls": "Wing width fixed. Flat VIX is reported as the optimistic bound. The same cost haircut applies. Proxy cap until the smile is refit."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_106"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Iron Butterfly (short, credit); harness suggestion: harness 'iron_fly_vs_straddle' with compare_strategies | verifier: corrected claim/trial"
+   "results": [
+    "X-7a424f37"
+   ],
+   "notes": "from the options-library library: Iron Butterfly (short, credit); harness suggestion: harness 'iron_fly_vs_straddle' with compare_strategies | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-107",
@@ -1978,12 +1998,16 @@
     "pass": "upper CI < 0 under the smile-scaled model and at s = 0.90",
     "controls": "Flat VIX reported as the pessimistic-for-buyer bound; proxy cap."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_107"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Reverse Iron Butterfly (long, debit); harness suggestion: same 'iron_fly_vs_straddle' harness, sign flipped, with decile conditioning | verifier: corrected claim/trial"
+   "results": [
+    "X-ebe24649"
+   ],
+   "notes": "from the options-library library: Reverse Iron Butterfly (long, debit); harness suggestion: same 'iron_fly_vs_straddle' harness, sign flipped, with decile conditioning | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-108",
@@ -2030,12 +2054,16 @@
     "pass": "lower CI > 0 under the smile-scaled model; flat-VIX result reported as the optimistic bound",
     "controls": "Widths fixed. The 30-day VIX vs 45-day tenor mismatch is flagged. Proxy cap until 60 capture days refit the smile (the 2026-10-14 calibration is a low-vol, high-SKEW day)."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_109"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Iron Condor (short, credit); harness suggestion: harness 'iron_condor_breach' in options.py; implied breach probability from norm_cdf already in backtest_eval.py | verifier: corrected claim/trial"
+   "results": [
+    "X-a5fdc39b"
+   ],
+   "notes": "from the options-library library: Iron Condor (short, credit); harness suggestion: harness 'iron_condor_breach' in options.py; implied breach probability from norm_cdf already in backtest_eval.py | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-110",
@@ -2055,12 +2083,16 @@
     "pass": "upper CI < 0 under the smile-scaled model",
     "controls": "Same as iron condor."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_110"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Reverse Iron Condor (long, debit); harness suggestion: same 'iron_condor_breach' harness, sign flipped | verifier: corrected claim/trial"
+   "results": [
+    "X-2b560d7e"
+   ],
+   "notes": "from the options-library library: Reverse Iron Condor (long, debit); harness suggestion: same 'iron_condor_breach' harness, sign flipped | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-111",
@@ -2158,12 +2190,16 @@
     "pass": "lower CI > 0 under the smile-scaled model and at s = 0.90",
     "controls": "Width fixed at 2%; proxy cap; costs haircut."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_114"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Big Lizard; harness suggestion: harness 'big_lizard_condition' sharing straddle engine | verifier: corrected claim/trial"
+   "results": [
+    "X-84bd401c"
+   ],
+   "notes": "from the options-library library: Big Lizard; harness suggestion: harness 'big_lizard_condition' sharing straddle engine | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-115",
@@ -2184,12 +2220,16 @@
     "pass": "upper CI of the difference < 0 at all three s",
     "controls": "Same dates; equity drift is the main driver, so also report a drift-removed version."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_115"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Strip; harness suggestion: include in 'straddle_vrp' harness as a ratio parameter (calls, puts) in {(1,1),(1,2),(2,1)} | verifier: corrected claim/trial"
+   "results": [
+    "X-b486bff8"
+   ],
+   "notes": "from the options-library library: Strip; harness suggestion: include in 'straddle_vrp' harness as a ratio parameter (calls, puts) in {(1,1),(1,2),(2,1)} | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-116",
@@ -2209,12 +2249,16 @@
     "pass": "lower CI of the difference > 0 at all three s",
     "controls": "Drift is the obvious driver; report a drift-removed version."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_116"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Strap; harness suggestion: same ratio parameter in 'straddle_vrp' | verifier: corrected claim/trial"
+   "results": [
+    "X-61fd43e1"
+   ],
+   "notes": "from the options-library library: Strap; harness suggestion: same ratio parameter in 'straddle_vrp' | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-117",
@@ -2415,12 +2459,16 @@
     "pass": "lower CI > 0 under the smile-scaled model AND under the 1.5x wing multiplier",
     "controls": "Flat VIX reported as the upper bound; proxy cap until the smile is refit; costs haircut."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_124"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Short Vol with Wings (tail-protected short straddle/strangle); harness suggestion: harness 'winged_short_vol' built on compare_strategies with wing-price multiplier sensitivity; later re-run on chain capture when available | verifier: corrected claim/trial"
+   "results": [
+    "X-03436e65"
+   ],
+   "notes": "from the options-library library: Short Vol with Wings (tail-protected short straddle/strangle); harness suggestion: harness 'winged_short_vol' built on compare_strategies with wing-price multiplier sensitivity; later re-run on chain capture when available | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-125",
@@ -2441,12 +2489,16 @@
     "pass": "upper CI bound < 0 at both iv_scale 1.0 and 0.9",
     "controls": "VIX exceeds 30-day ATM IV on average (it integrates the OTM put wing), so pricing ATM at VIX overprices the call and biases the result toward a pass; the 0.9 x VIX run is the guard. Compare with chain mids once capture reaches 60 days. DSR with n_trials = number of family strategies tested."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_125"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Long Call; harness suggestion: vix_priced_option_returns(strategy='long_call', dte=30, strike='ATM') in mandel/experiments/options.py; reuse block_bootstrap_pvalue and deflated_sharpe_ratio | verifier: corrected claim/trial"
+   "results": [
+    "X-1d7ea485"
+   ],
+   "notes": "from the options-library library: Long Call; harness suggestion: vix_priced_option_returns(strategy='long_call', dte=30, strike='ATM') in mandel/experiments/options.py; reuse block_bootstrap_pvalue and deflated_sharpe_ratio | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-126",
@@ -2467,12 +2519,16 @@
     "pass": "upper CI of (put - call) < 0 at both iv_scales",
     "controls": "Because both legs carry the same flat IV, this tests only drift plus the VIX-vs-realised gap. It does not test put-skew richness, which needs the captured chain (60+ days). VIX > ATM IV overprices both legs equally in vol terms. Paired design removes common vol shocks."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_126"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Long Put; harness suggestion: vix_priced_option_returns(strategy='long_put', dte=30) paired with long_call output | verifier: corrected claim/trial"
+   "results": [
+    "X-ef87c11c"
+   ],
+   "notes": "from the options-library library: Long Put; harness suggestion: vix_priced_option_returns(strategy='long_put', dte=30) paired with long_call output | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-127",
@@ -2493,12 +2549,16 @@
     "pass": "bootstrap p < 0.05 for Sharpe(call) < Sharpe(put), and the call mean's lower CI > 0",
     "controls": "Flat IV overprices the OTM call relative to the real smile (optimistic for the call) and underprices the 5%-OTM put (conservative for the put), so the bias favours the null: a pass is robust. Recheck with chain mids after 60 days."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_127"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Short (Naked) Call; harness suggestion: vix_priced_option_returns(strategy='short_call', dte=30, strike='OTM5') compared to short_put | verifier: corrected claim/trial"
+   "results": [
+    "X-7cde2127"
+   ],
+   "notes": "from the options-library library: Short (Naked) Call; harness suggestion: vix_priced_option_returns(strategy='short_call', dte=30, strike='OTM5') compared to short_put | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-128",
@@ -2545,12 +2605,16 @@
     "pass": "spread upper CI < 0 and paired (spread - call) lower CI > 0",
     "controls": "Correction: flat VIX overprices both C(K1) (VIX > ATM IV) and C(K2) (OTM call IV < ATM IV), so the sign of the bias on D is indeterminate and must be measured against chain mids at 60 days. Report the iv_scale sensitivity."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_129"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Bull Call Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bull_call_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial"
+   "results": [
+    "X-856f5dfa"
+   ],
+   "notes": "from the options-library library: Bull Call Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bull_call_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-130",
@@ -2571,12 +2635,16 @@
     "pass": "upper CI < 0 and paired-difference upper CI < 0",
     "controls": "Flat VIX overprices the ATM long put (VIX > ATM IV) and underprices the short 5%-OTM put (skew), so both biases inflate the modelled D and push toward a too-negative result, favouring a pass. Rerun at 0.9 x VIX and with chain mids at 60 days. Report with and without 2008 and 2020."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_130"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Bear Put Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bear_put_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial"
+   "results": [
+    "X-c50f79b2"
+   ],
+   "notes": "from the options-library library: Bear Put Spread (Debit); harness suggestion: vix_priced_option_returns(strategy='bear_put_spread', dte=30, strikes=('ATM','OTM5')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-131",
@@ -2597,12 +2665,16 @@
     "pass": "lower CI of the mean > 0 AND win rate > 0.85 AND worst/median > 10 (all three pre-registered)",
     "controls": "Correction: flat IV underprices both OTM puts, and the farther 10%-OTM long leg carries more skew, so the real credit may be smaller than modelled; the bias direction is indeterminate, not conservative. Use PSR with skew/kurtosis, walk-forward halves, and recheck with chain mids at 60 days."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_131"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Bull Put Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bull_put_spread', dte=30, strikes=('OTM5','OTM10')) | verifier: corrected claim/trial"
+   "results": [
+    "X-072c25c9"
+   ],
+   "notes": "from the options-library library: Bull Put Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bull_put_spread', dte=30, strikes=('OTM5','OTM10')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-132",
@@ -2622,12 +2694,16 @@
     "pass": "upper CI <= 0",
     "controls": "Correction: flat IV overprices both OTM calls relative to the real smile; the sign of the bias on the net credit is indeterminate (depends on the smile slope between K1 and K2), so do not assume the real result is more negative. Compare with the bull put spread in the same months and with chain mids at 60 days."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_132"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Bear Call Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bear_call_spread', dte=30, strikes=('OTM3','OTM6')) | verifier: corrected claim/trial"
+   "results": [
+    "X-591cc927"
+   ],
+   "notes": "from the options-library library: Bear Call Spread (Credit); harness suggestion: vix_priced_option_returns(strategy='bear_call_spread', dte=30, strikes=('OTM3','OTM6')) | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-133",
@@ -2672,12 +2748,16 @@
     "pass": "overall upper CI < 0 AND conditional (VIX < 15) lower CI > 0",
     "controls": "The threshold of 15 is fixed before looking; report the number of low-VIX months (about 1/3 of the sample). Flat IV underprices the 25-delta puts relative to skew, which flatters the long wings: state this. With fixed 5% wings the position is short gamma at VIX < 15, which is why the strike rule is delta-based."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_134"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Backspread (1x2 Long Ratio: Call or Put); harness suggestion: vix_priced_option_returns(strategy='put_backspread_1x2', dte=30, condition='vix<15') | verifier: corrected claim/trial"
+   "results": [
+    "X-19107292"
+   ],
+   "notes": "from the options-library library: Backspread (1x2 Long Ratio: Call or Put); harness suggestion: vix_priced_option_returns(strategy='put_backspread_1x2', dte=30, condition='vix<15') | verifier: corrected claim/trial | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-135",
@@ -12009,12 +12089,16 @@
     "pass": "lower CI > 0 in the full sample and the mean > 0 in both halves",
     "controls": "Under flat pricing the zero-cost put sits near ATM, whereas with real skew it sits 3-6% OTM, so the model trade is far more put-heavy than the traded one: a chain-based rerun at 60 days is required before any trading conclusion. Run at iv_scale 0.9."
    },
-   "experiments": [],
+   "experiments": [
+    "structure_t_517"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Seagull (Put-Financed Call Spread); harness suggestion: overlay_backtest(strategy='seagull', k_put='zero_cost') in mandel/experiments/volatility.py | added by the verifier pass"
+   "results": [
+    "X-19a801eb"
+   ],
+   "notes": "from the options-library library: Seagull (Put-Financed Call Spread); harness suggestion: overlay_backtest(strategy='seagull', k_put='zero_cost') in mandel/experiments/volatility.py | added by the verifier pass | tested with the model-priced structure engine; the smile shape comes from the captured SPY quote days (2 on 2026-10-15) and is held fixed through history, so verdicts are re-run as the capture grows"
   },
   {
    "id": "T-518",
