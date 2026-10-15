@@ -559,3 +559,7 @@ mandel/archive/data/sec-companyfacts-*.jsonl.gz
 mandel/archive/data/stocktwits-preopen-*.jsonl.gz
 mandel/archive/data/stocktwits-intensity-*.jsonl.gz
 mandel/archive/data/deribit-option-trades-near-*.jsonl.gz
+# batch-6c fetches in progress (local only)
+mandel/archive/data/polymarket-events-btc-above.jsonl.gz
+mandel/archive/data/polymarket-events-macro.jsonl.gz
+mandel/archive/data/polymarket-fetch-log.jsonl.gz
