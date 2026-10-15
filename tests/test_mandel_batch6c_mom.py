@@ -206,6 +206,40 @@ def test_t300_family_is_the_declared_grid():
     assert len(m.T300_FAMILY) == 56 and m.T300_N_TRIALS == 104 and m.T300_PRIMARY in m.T300_FAMILY
 
 
+def test_t300_dsr_uses_the_observed_trial_sharpe_variance_the_trial_names():
+    # regression (rule 1): trial.procedure says "DSR with n_trials = 104 and the observed variance of trial Sharpes";
+    # the 1/(T-1) floor replaced it and was printed as if observed
+    x = np.random.default_rng(3).normal(0.002, 0.02, 320)
+    fam = [0.010, 0.012, 0.011, 0.013]                                   # observed variance far below 1/(T-1)
+    v_obs = float(np.var(fam, ddof=1))
+    ds = m.family_dsr(x, fam, 104, var_source="observed")
+    assert ds["var_used"] == "observed" and ds["floor_binds"]
+    assert ds["var_trials_sr"] == pytest.approx(v_obs) and ds["var_floor"] == pytest.approx(1 / 319)
+    assert ds["dsr"] == pytest.approx(m.deflated_sharpe_ratio(x, n_trials=104, var_trials_sr=v_obs))
+    assert ds["dsr_floored"] == pytest.approx(m.deflated_sharpe_ratio(x, n_trials=104, var_trials_sr=1 / 319))
+    name = m.dsr_row(ds, "DSR(d) > 0.95")[0]
+    assert f"var(trial SR) {v_obs:.2e} = observed" in name and "floor 1/(T-1) 3.13e-03" in name
+    fam3 = (m.T300_PRIMARY, ("6-1", "LF", "excess", "sign"), ("3-1", "LF", "excess", "sign"))
+    j = m.tsmom_vs_hist_mean(_t300_assets(False), BILLS, family=fam3)
+    fs = [v for v in j["family_sharpes_pp"] if v is not None]
+    assert j["dsr"]["var_used"] == "observed" and j["dsr"]["var_trials_sr"] == pytest.approx(np.var(fs, ddof=1))
+
+
+def test_t300_idle_crypto_cash_earns_the_bill_as_the_claim_words_it():
+    # regression (rule 1): the comparator is "long ... else T-bill" and the controls say "T-bill on idle cash"; idle
+    # crypto cash sat in USD at 0. BTC rises for two years, then is flat: TSMOM goes flat (cash) while the historical
+    # mean stays positive (long a flat price), so d is exactly the hold's bill return in those months.
+    cd = cdays()
+    btc = (cd, price(np.where(np.arange(len(cd)) < 730, 0.001, 0.0)))
+    j = m.tsmom_vs_hist_mean({"BTC-USD": btc}, BILLS, family=(m.T300_PRIMARY,))
+    tail = [(l, x) for l, x in zip(j["d_labels"], j["d"]) if l >= "2018-01"]
+    assert len(tail) > 90
+    for l, x in tail:                                                    # crypto hold: fill on the 1st to the next 1st
+        rf = BILLS.growth(l + "-01", m._month_add(l, 1) + "-01") - 1.0
+        assert rf > 0.002 and x == pytest.approx(rf, rel=1e-9)
+    assert j["usd_cash_sensitivity"]["mean"] < j["mean"]["est"] - 0.001  # USD cash only as the reported sensitivity
+
+
 # ------------------------------------------------------------------------------------ T-301 SMA vs random --
 
 BEARS = (("2000-04", "2002-09", -0.0010), ("2007-11", "2009-02", -0.0022), ("2015-06", "2016-02", -0.0012), ("2022-01", "2022-10", -0.0018))
@@ -399,6 +433,31 @@ def test_t317_null_does_not_pass():
     assert j["verdict"] != "supported"
 
 
+def test_t317_quarterly_grid_pools_every_start_month_and_the_phases_partition_it():
+    # regression (rule 10): "quarterly returns" name no quarter calendar; calendar quarters were one arbitrary phase
+    labels = [m._month_add("1999-11", k) for k in range(40)]
+    r = (np.arange(40, dtype=float) * 1e-3)[None]
+    keys, Y = m._aggregate(r, labels, "quarterly", "2000-01")
+    assert len(keys) == 36 and keys[:2] == ["2000-01..2000-03", "2000-02..2000-04"]
+    assert Y[0, 1] == pytest.approx(np.prod(1 + r[0, 3:6]) - 1)        # 2000-02..2000-04 = label indices 3..5
+    parts = [m._aggregate(r, labels, "quarterly", "2000-01", ph)[0] for ph in range(3)]
+    assert sorted(sum(parts, [])) == sorted(keys) and sum(len(p) for p in parts) == len(keys)
+    assert all(k[5:7] in ("01", "04", "07", "10") for k in parts[0])         # phase 0 = calendar quarters
+    assert all(k[5:7] in ("02", "05", "08", "11") for k in parts[1])
+    assert m._aggregate(r, labels, "monthly", "2000-01")[0] == labels[2:]
+    assert m._key_years("2007-12..2008-02") == {"2007", "2008"} and m._key_years("2008-05") == {"2008"}
+
+
+def test_t317_primary_is_the_pooled_estimate_with_the_per_phase_range_reported():
+    j = m.crisis_smile(_t317_data(False), BILLS, family=(m.T317_PRIMARY,), n_sim=40, n_boot=200, reps=2)
+    assert j["primary"]["block"] == 12                                       # >= 2 x the 3-month hold, = 4 quarters
+    assert j["n"] == (j["n_windows"] + 2) // 3 >= 100 and j["n_windows"] > 3 * 100
+    ph = j["phases"]
+    assert sorted(ph) == [0, 1, 2] and sum(p["n"] for p in ph.values()) == j["n_windows"]
+    assert all(p["ci_hac"][0] < p["excess"] < p["ci_hac"][1] for p in ph.values())
+    assert len({round(p["excess"], 9) for p in ph.values()} | {round(j["primary"]["excess"], 9)}) == 4
+
+
 # ---------------------------------------------------------------------------------------- T-310 vol DiD --
 
 def _ohlc(days, adj):
@@ -502,6 +561,40 @@ def test_t481_null_does_not_pass():
     assert j["verdict"] != "supported"
 
 
+def test_dsr_row_reports_observed_and_floor_and_flags_a_floor_dependent_outcome():
+    # regression: the house floor 1/(T-1) was printed as "var(trial SR)" as if observed (T-481's strategy reading)
+    z = np.random.default_rng(5).normal(0, 1, 392)
+    x = 0.01 * ((z - z.mean()) / z.std() + 0.1432)                      # per-period Sharpe about 0.143, T = 392
+    fam = list(np.linspace(0.124, 0.184, 12))                            # observed variance about 3.5e-4 < 1/391
+    ds = m.family_dsr(x, fam, 12)                                        # house default: floored
+    assert ds["floor_binds"] and ds["var_trials_sr"] == pytest.approx(1 / 391)
+    assert ds["dsr"] < 0.95 < ds["dsr_observed"]
+    name, ok, _ = m.dsr_row(ds, "strategy")
+    assert ok is False and "= the 1/(T-1) floor" in name and f"observed {np.var(fam, ddof=1):.2e}" in name
+    assert "the outcome depends on the variance choice" in name and m.dsr_row(ds, "strategy", alt=True)[1] is True
+    ds2 = m.family_dsr(x, list(np.linspace(-0.2, 0.4, 12)), 12)         # observed above the floor: used, nothing to flag
+    assert not ds2["floor_binds"] and ds2["var_used"].startswith("observed") and "depends" not in m.dsr_row(ds2, "s")[0]
+
+
+def test_t481_says_when_the_dsr_criterion_rests_on_the_floor(monkeypatch):
+    # regression: T-481's strategy-reading DSR failed only because of the floor; the criterion must say so
+    z = np.random.default_rng(5).normal(0, 1, 392)
+    x_floor = 0.01 * ((z - z.mean()) / z.std() + 0.1432)
+    real, calls = m.family_dsr, []
+
+    def fake(x, fs, n, var_source="floor"):
+        calls.append(1)
+        if len(calls) == 1:                                              # strategy reading: passes only unfloored
+            return real(x_floor, list(np.linspace(0.124, 0.184, 12)), 12)
+        return real(-np.abs(x_floor), list(np.linspace(-0.2, 0.4, 12)), 12)   # difference reading: fails either way
+    monkeypatch.setattr(m, "family_dsr", fake)
+    spy, ief, tlt, dgs, bills = _t481_data(False, seed=61)
+    j = m.cross_asset_tsmom(spy, ief, tlt, dgs, bills, family=T481_TEST_FAMILY)
+    name, ok = j["criteria"][1]
+    assert ok is False and j["dsr_depends_on_floor"] and j["dsr_criterion_with_observed_variance"] is None
+    assert "would be undecided (the readings disagree): its outcome depends on the floor" in name
+
+
 def test_t481_yield_known_by_the_fill_only():
     spy, ief, tlt, _, bills = _t481_data(False, seed=43)
     ydays = bdays("1990-01-01", "2026-10-14")
@@ -591,6 +684,18 @@ def test_every_harness_runs_json_safe_on_a_fake_archive(small_families):
         assert isinstance(n, int) and n > 0, name
         assert verdict in ("supported", "not_supported", "inconclusive"), name
         assert " — " in reason, name
+
+
+def test_fixed_reasons_name_the_phase_range_the_dsr_variance_and_the_bill_cash(small_families):
+    a = _fake_archive()
+    st, _, _, why = m.b6c_mom_trend_crisis_smile(a)
+    assert "pooled all-start estimate" in why and "Per-phase range" in why and set(st["per_phase"]) == {"0", "1", "2"}
+    st, _, _, why = m.b6c_mom_tsmom_vs_hist_mean(a)
+    assert st["dsr"]["var_used"] == "observed" and "not the house 1/(T-1) floor" in why
+    assert "crypto included" in why and st["usd_cash_sensitivity"]["mean"] is not None
+    st, _, _, why = m.b6c_mom_cross_asset_tsmom(a)
+    assert "floored at 1/(T-1), the house convention" in why and "dsr_depends_on_floor" in st
+    assert "observed var" in why or "the observed" in why
 
 
 def test_missing_bundles_are_inconclusive():

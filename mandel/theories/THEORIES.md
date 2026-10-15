@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `6d993516654b4bdf`). 477 theories. supported 47, not_supported 177, inconclusive 34, untested 90, blocked 117, parked 12.
+Rendered from `registry.json` (hash `cfc8bd186dff56f4`). 477 theories. supported 50, not_supported 190, inconclusive 36, untested 72, blocked 117, parked 12.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (47)
+## Supported (50)
 
 ### T-06 · price-series-are-multifractal
 
@@ -604,6 +604,51 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-87c1a610: supported — SPY IBS<0.2 on 1310 of 6725 days 2000-01-03..2026-09-29: next-day +15.93 vs unconditional +3.90 bps, difference +12.03 bps (95% stationary-bootstrap CI +5.14..+19.55; needs lower > 2); block-shift p=0.0005; halves +16.66 / +7.10 bps; DSR 0.976 over 12 trials; execution diagnostics: next-open-to-close +7.54 bps, next-close entry +6.89 bps — all criteria pass
 - note: from the underlying-library library: Index ETF daily technical reversal (RSI(2), Bollinger, IBS, down-day streak); harness suggestion: daily_rule_grid: declared indicator set, conditional-mean test, split-sample sign check, dsr_pbo_harness feed (parallels the Polymarket T-10 harness) | verifier: corrected claim/trial | Scope (2026-10-15): min_n 2000 is counted in trading days (6,725 in the window); the signal fires on 1,310 days. The pass statistic trades at the close that defines IBS (optimistic for MOC); next-open-to-close +7.5 bps and next-close entry +6.9 bps are reported as execution diagnostics, both above the 2 bps bar but not tested against it.
 
+### T-345 · month-end-rebalancing-flow
+
+**Claim.** Over 2002-2026, in months where SPY has beaten TLT month-to-date by more than 2 pp at the T-3 close, SPY's return over the last two trading days is lower than its last-two-day return in all other months by at least 15 bps on average, with the gap negative in both halves.
+
+- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://www.nber.org/papers/w33554, https://research.aalto.fi/en/publications/dash-for-cash-monthly-market-impact-of-institutional-liquidity-ne/
+- statistic: Mean 2-day SPY return in signal months minus the mean in other months (bps). Secondary: the mean SPY-minus-TLT 2-day spread in signal months.
+- null: No conditional difference. Permutation of the signal label across months (10,000 draws), plus a block bootstrap over months (block 3).
+- procedure: The signal uses closes available at the T-3 close. The 2-day window is fixed. Halves 2002-2013 / 2014-2026. Declared grid: 3 thresholds x 2 decision days, plus quarter-end, equity-leg and GLD/BTC analogues = 10 trials (DSR/Holm).
+- data: daily-history-SPY, TLT (2002-07-), AGG, IWM, GLD, BTC-USD (stored); IEF via Yahoo (2002-07-30, verified). · min n: 80
+- pass: Difference < -15 bps with permutation p < 0.05, both halves negative, net of 2 bps per leg; min_n counts signal months.
+- controls: Look-ahead: signal at the T-3 close. Survivorship: n/a. Costs: 2 legs x up to 12 trades/yr at 1-2 bps. Multiple testing: 10 trials. Regime: halves; 2008, 2020 and the 2022 bond bear flagged.
+- harness: b6c_cal_month_end_rebalancing
+- result X-a500a4a7: supported — entry close: 128 signal of 290 months (2002-08..2026-09), SPY last-2-day -20.3 vs +29.3 bps, gross -49.6, net -45.6 bps (95% CI [-77.4, -13.1]), permutation p 0.0022 (MC +/-0.0009), block-bootstrap p 0.0030 (MC +/-0.0011); halves net -43.5 (61 signal) / -47.2 (67 signal) bps; previous close: 128 signal of 290 months (2002-08..2026-09), SPY last-2-day -21.5 vs +30.3 bps, gross -51.8, net -47.8 bps (95% CI [-77.9, -16.9]), permutation p 0.0013 (MC +/-0.0007), block-bootstrap p 0.0008 (MC +/-0.0006); halves net -46.0 (59 signal) / -49.9 (69 signal) bps; secondary: SPY-minus-TLT 2-day spread in signal months -54.9 bps (p 0.0005); declared 10-trial grid Holm p for the primary 0.0154 (reported, the pass names the unadjusted p) — all criteria pass
+- note: from the underlying-library library: Month-end rebalancing flow (stocks vs bonds); harness suggestion: events.py: month_end_rebalance(days_spy, closes_spy, days_tlt, closes_tlt, threshold_pp=2.0, decision_day=-3, window=2) -> conditional means, permutation p, halves; share the month-indexing helper with turn_of_month. | verifier: corrected claim/trial | 2026-10-15 batch 6c: supported under both rule-12 readings (T-3 close and previous close); net -45.6 bps (CI -77.4..-13.1), both halves about -45 bps; Holm over the declared 10-trial grid p 0.0154 (reported; the pass names the unadjusted p).
+
+### T-349 · pre-holiday-effect
+
+**Claim.** Over 2000-2026, IWM's return on the last trading day before scheduled NYSE holidays exceeds its mean return on all other days by at least 10 bps, with both halves positive.
+
+- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://ideas.repec.org/a/taf/apfiec/v15y2005i2p107-119.html, https://cfr.ivo-welch.info/published/papers/ko2021pre.pdf
+- statistic: Mean daily return difference (bps), pre-holiday days minus other days.
+- null: Equal means. Studentized block bootstrap (block 10) of the day-flagged series.
+- procedure: Holidays come from a rule-based NYSE schedule (an explicit list of the holiday rules plus the unscheduled-closure exclusion list). Halves 2000-2012 / 2013-2026. The other 6 variants are Holm-adjusted secondary trials.
+- data: daily-history-IWM, daily-history--RUT, daily-history-SPY (stored); FXI, EWY, INDA via Yahoo. · min n: 200
+- pass: Difference > 10 bps with p < 0.05 and both halves positive.
+- controls: Look-ahead: inferring holidays from missing bars would include unscheduled closures nobody knew in advance; the rule-based schedule avoids that. Survivorship: n/a. Costs: 10 round trips/yr at 1-2 bps. Multiple testing: 1 primary plus 6 Holm. Regime: halves; SPY expected null.
+- harness: b6c_cal_pre_holiday
+- result X-f37df8d5: supported — 238 pre-holiday sessions (rule calendar) 2000-05-30..2026-10-13: +16.2 vs +3.9 bps on 6395 other sessions, difference +12.3 bps (95% CI [-2.7, +27.3], p 0.0476 (MC +/-0.0023), 17 seeds x 2000); halves +2.6 (111) / +20.7 (127) bps; net of 2 bps (reported) +10.3 bps; rule calendar vs IWM bars: 0 unexplained gaps, 0 bars on closed days, 239 holiday and 10 unscheduled-closure gaps; secondaries (Holm over 6, not criteria): ^RUT 1987-2026 pre-holiday +19.1 bps, Holm p 0.0030, SPY pre-holiday +7.4 bps, Holm p 0.4098, IWM post-holiday session -3.1 bps, Holm p 1.0000, IWM Thanksgiving week and Christmas-New Year stretch +12.5 bps, Holm p 0.4098, Cultural New Year month in FXI/EWY/INDA None (not archived: daily-history-FXI, daily-history-EWY, daily-history-INDA; no declared Lunar New Year/Diwali date table), BTC on NYSE holidays vs NYSE sessions -0.4 bps, Holm p 0.0700 — all criteria pass
+- note: from the underlying-library library: Pre-holiday and holiday-week effects; harness suggestion: events.py: holidays_from_gaps(days) -> set of pre-holiday day indexes (weekday with missing bar); event_day_effect(days, closes, pre_holiday_days); loop over IWM, SPY, country ETFs. | verifier: corrected claim/trial | 2026-10-15 batch 6c: supported but fragile: p 0.0476 against the 0.05 bar under the trial's studentized circular block bootstrap. Choices the trial does not name move it: a non-circular moving-block bootstrap gives 0.0495 (undecided), price-only returns 0.062, an asymptotic HAC t 1.61 (p 0.054), and counting the Friday Dec-31 sessions before a Saturday New Year (not an NYSE holiday under the rule calendar the procedure names) gives 0.056. The first half is only +2.6 bps.
+
+### T-357 · presidential-cycle
+
+**Claim.** Over 1928-2026, the S&P 500's price return in pre-election years (year 3 of the presidential term) exceeds the mean annual return of the other three years by at least 5 percentage points, with both halves positive.
+
+- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://www.nber.org/papers/w23184, https://pwlcapital.com/?p=5381
+- statistic: Mean year-3 annual return minus mean annual return of other years (pp).
+- null: Equal means. Permute the cycle label within each 4-year block (preserving year-to-year dependence), 10,000 draws.
+- procedure: Annual returns from ^GSPC daily closes, price only. Halves 1928-1976 / 1977-2026; 1990-2026 reported separately. The party variant uses inauguration dates. 6 variants; the year-3 test is the single pre-registered one.
+- data: daily-history--GSPC (stored, 1927-12-30-; social.yahoo_history with period1=0 truncates to 1970, so re-fetch with a negative period1); SPY, IWM, TLT, GLD (stored); Polymarket election markets (stored). · min n: 20
+- pass: Year-3 excess > 5 pp with permutation p < 0.05 and both halves positive.
+- controls: Look-ahead: none. Survivorship: n/a. Costs: one trade per 4 years. Multiple testing: 6 variants, 1 pre-registered. Regime: halves, and the post-Almanac 1990-2026 period separately; dividends excluded (flagged).
+- harness: b6c_cal_presidential_year3
+- result X-71e7a233: supported — ^GSPC price return 1928-2025 (98 complete years, 24 year-3): year 3 +13.96% vs other years +6.20%, excess +7.76 pp (term-bootstrap 95% CI +0.78 to +14.22), permutation p 0.0227 (MC +/-0.0029) (term blocks) / 0.0430 (MC +/-0.0040) (1928-anchored), 10000 draws; halves +7.50 pp (12) / +8.02 pp (12); 1990- (reported) +10.67 pp (9); price only, pre-1957 S&P 90 flagged — all criteria pass
+- note: from the underlying-library library: Presidential election cycle and party-in-power effects; harness suggestion: events.py: cycle_year_effect(days, closes, anchor_year=1928, period=4, target=3) with within-block label permutation; party_effect(days, closes, terms) for the inauguration-based split. | verifier: corrected claim/trial | 2026-10-15 batch 6c: supported on ^GSPC price returns 1928-2025 (24 year-3 observations, min_n 20): +7.76 pp, permutation p 0.023 (term-aligned blocks) and 0.043 (1928-anchored), all four block phasings pass; pre-1957 is the S&P 90.
+
 ### T-436 · crypto-calendar-effects
 
 **Claim.** Over 2014-2026, BTC-USD's mean Monday (UTC) return exceeds the mean of the other six days by at least 20 bps, with both halves positive.
@@ -770,7 +815,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-a7f44bf6: supported — short variance struck at VIX^2, settled on SPY close-to-close returns; rule 10 (no entry calendar in the claim): 8460 daily entries 1993-01-29..2026-09-14 = 403 cycles: POOLED over all 21 grid offsets (8460 overlapping daily entries = 403 distinct 21-day holds; studentized circular block bootstrap, block 126 days): mean +8.12 %^2/month (CI +1.43 to +11.22); per grid offset (21 non-overlapping grids, n 401-403, block 6 cycles): mean +7.23 to +8.95, lower bound -0.95 to +3.84, 17/21 offsets pass; skew -7.60, kurtosis 93.0, worst cycle -630.8 entered 2020-02-26; ex-worst: pooled without the 41 entries overlapping it +9.44 (CI +4.54 to +12.30), per offset without its own worst cycle +8.60 to +10.36; units sensitivity (strike (VIX/100)^2 x 30/365 vs the un-annualised sum of 21 squared returns, %^2): pooled +7.62 (CI +0.91 to +10.78), 15/21 offsets pass; dividend-adjusted SPY basis +8.23 (pooled, 8460 entries); ^GSPC (SPX vs SPY) basis +8.81 (pooled, 8460 entries); close-to-close vs intraday RV (BTZ use 5-minute RV; not archived): on hourly SPY bars 2023-11-14..2026-09-14 (709 entries) intraday-only RV is 0.56 x close-to-close and the mean P&L +15.84 vs +7.09: close-to-close RV runs higher, so this test is conservative on the control; overlapping daily windows (T-48 vol units) VRP +2.45 vol pts, p 0.0140 (reported) — all criteria pass
 - note: from the options-library library: Variance Swap Replication (long / short variance via 1/K^2 strip); harness suggestion: Extend 'vrp_spx' (mandel/experiments/volatility.variance_risk_premium) with a variance-unit, non-overlapping mode and tail statistics; the same mode for vrp_btc and vrp_gold. | added by the verifier pass | 2026-10-15 re-run: supported pooled over all 21 start offsets (+8.12 %^2/month, CI +1.43 to +11.22); 17 of 21 single grids pass; worst cycle -630.8 entered 2020-02-26 (skew -7.6, kurtosis 93): the tail is the point, as the trial says.
 
-## Not Supported (177)
+## Not Supported (190)
 
 ### T-02 · longshot-bias
 
@@ -2469,6 +2514,36 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-9856d560: not_supported — T-275 MODEL-PRICED (Black-Scholes at a flat IV = SLV's trailing 60-day realised vol: no VRP, no skew, so optimistic): short 1 call at 0.50 delta, long 2 at 0.25 delta (strikes from the delta at the pricing vol; mean K1/S 1.018, K2/S 1.130), SLV raw (split-adjusted) closes (ex-dividend dates in the data: 0; an escrowed forward would be used inside a life), r = DTB3 known at entry (rule 7), net credit carried to expiry, P&L in % of S at entry. Rule 10(a): one cycle per standard monthly expiry (third Friday), entered at the last session on or before 90 calendar days ahead and settled at the expiry close (90-92-day lives); 239 backspreads 2006-08-18..2026-09-18. Mean P&L, two-sided 95% circular block bootstrap CI (blocks of 6 and 12 cycles >= the 3-cycle overlap): at RV mean +0.808% [-0.484%, +2.430%][6] [-0.455%, +2.422%][12], skew 2.94, hit 0.67; at RV + 5 vol points mean +0.247% [-0.891%, +1.661%][6] [-0.867%, +1.698%][12], skew 2.28, hit 0.67. IV sensitivity (reported): IV x0.9 mean +1.154% [-0.231%, +2.888%][6] [-0.210%, +2.893%][12], skew 3.24, hit 0.66; IV x1.2 mean +0.238% [-0.889%, +1.618%][6] [-0.853%, +1.656%][12], skew 2.10, hit 0.67; RV + 10 vol points mean -0.222% [-1.280%, +1.038%][6] [-1.278%, +0.996%][12], skew 1.33, hit 0.67. Robustness (not the claim's calendar): pooled entry every session, 5022 entries, mean +0.840% [-0.363%, +2.361%] (124-session blocks = 2 x hold). Controls: shuffled SLV returns mean +0.175% [-0.793%, +1.223%][6] [-0.782%, +1.214%][12], skew 1.54, hit 0.64; GLD same rule mean +0.114% [-0.349%, +0.582%][6] [-0.323%, +0.560%][12], skew 0.70, hit 0.62. Final verdict on captured IV: SLV chains are captured on 2026-10-14, 2026-10-15 only, so no historical backspread can be priced on captured IV/skew — failed: mean P&L 95% CI > 0 at RV (mean +0.808% of S, lower -0.484% [6-cycle blocks], -0.455% [12-cycle blocks]); mean P&L 95% CI > 0 at RV + 5 vol points (mean +0.247% of S, lower -0.891% [6-cycle blocks], -0.867% [12-cycle blocks]) (not implemented: final verdict on captured SLV IV/skew (not implementable: no captured SLV IV history))
 - note: from the options-library library: Silver call backspread (squeeze convexity); harness suggestion: Payoff engine template with K1/K2 rules; realised-vol proxy pricing flagged as model-priced | verifier: corrected claim/trial
 
+### T-300 · tsmom-12-1-multi-asset
+
+**Claim.** Pooled across the listed assets (2000-2026, asset-months as available), the 12-1 long/flat TSMOM rule earns a higher mean monthly after-cost return than the Huang et al. historical-mean strategy (long when the asset's expanding-window mean excess return is positive, else T-bill), with the studentized block-bootstrap 95% interval of the pooled mean difference excluding zero.
+
+- kind: underlying-strategy · origin: underlying-library:trend-momentum/time-series, https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum (fetched), https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing (fetched)
+- statistic: Pooled monthly return difference d = r(TSMOM 12-1 long/flat) - r(historical-mean strategy), equal-weighted across active assets each month; its mean and annualised Sharpe; DSR of the d series with n_trials = 104
+- null: E[d] = 0: the 12-1 sign carries no information beyond the asset's unconditional drift (Huang-Li-Wang-Zhou null)
+- procedure: Refetch adjclose histories; build monthly excess returns with fred-DTB3; compute both strategies per asset with identical execution and costs; pool by calendar month; studentized circular block bootstrap (block 12 months, 5,000 draws) on d; DSR with n_trials = 104 and the observed variance of trial Sharpes; report the 2013-2026 post-publication window separately and the per-asset d signs as diagnostics
+- data: Yahoo adjclose daily for SPY, QQQ, GLD, SLV, EFA, AGG, TLT, DBC, BTC-USD, ETH-USD (EFA, AGG, DBC not yet in the archive); fred-DTB3 (in archive) · min n: 300
+- pass: Mean d > 0 with bootstrap 95% interval excluding 0 AND DSR(d) > 0.95 over 300+ calendar months; post-2012 mean d >= 0 reported (a negative post-2012 d downgrades to 'decayed')
+- controls: Look-ahead: signal uses closes through month-end t, trade one day later, available_at enforced; survivorship: only surviving ETFs (delisted multi-asset ETFs ignored, small upward bias, stated); costs: 2 bps per side SPY/QQQ, 5 bps other ETFs, 25 bps plus 10 bps slippage crypto, T-bill on idle cash; multiple testing: 104 trials incl. T-58; regime: by decade, by VIX tercile at decision, and leave-one-asset-out; dividends: adjclose mandatory (price-only closes understate bond-ETF returns by their yield)
+- harness: b6c_mom_tsmom_vs_hist_mean
+- result X-b6f22a08: not_supported — 12-1 long/flat TSMOM minus the historical-mean strategy, pooled equal weight over the active assets of SPY, QQQ, GLD, SLV, EFA, AGG, TLT, DBC, BTC-USD, ETH-USD (each from its 13th month-end), hold months 2000-01..2026-09 (321 months, 1-10 assets active): signal on the month-end close, filled at the next session's close, DTB3 on idle cash for every asset, crypto included (the claim's 'else T-bill' and 'T-bill on idle cash'), 2/5/35 bps per side. Mean d -7.6 bps/month (CI -32.0 bps to +15.3 bps, studentized CBB, 12-month blocks), annualised Sharpe of d -0.11; DSR(d) 0.018 at 104 trials (56 declared grid trials computed + 48 T-58 trials in the count only; the observed variance of the computed trials' per-period d Sharpes 1.13e-03, as the trial states, not the house 1/(T-1) floor 3.13e-03: floored DSR 0.001; PSR vs 0 0.288); post-2012 mean d -25.8 bps over 165 months. Diagnostics: by decade 2000s +23.2, 2010s -11.7, 2020s -47.2 bps; per-asset mean d SPY +1.1, QQQ +2.2, GLD -14.0, SLV -2.3, EFA -6.5, AGG +1.7, TLT -16.6, DBC +9.9, BTC-USD -133.5, ETH-USD -207.0 bps; leave-one-asset-out pooled mean -SPY -12.3, -QQQ -5.2, -GLD -8.1, -SLV -9.5, -EFA -9.8, -AGG -9.3, -TLT -5.8, -DBC -10.0, -BTC-USD -3.5, -ETH-USD -2.7 bps; by VIX tercile at decision low +7.0, mid -5.2, high -24.6 bps. Sensitivity (the library's crypto note, not a criterion): crypto idle cash in USD instead of T-bills gives mean d -8.2 bps, post-2012 -26.9 bps, BTC-USD -140.0, ETH-USD -217.1 bps. Survivorship: surviving ETFs only (small upward bias, stated) — failed: mean d > 0 with studentized CBB 95% CI excluding 0 (lower -32.0 bps); DSR(d) > 0.95 (0.018 at 104 trials; var(trial SR) 1.13e-03 = observed; observed 1.13e-03 over 56 computed trials, floor 1/(T-1) 3.13e-03; with the floored variance 0.001); post-2012 mean d >= 0 (-25.8 bps over 165 months; negative = 'decayed')
+- note: from the underlying-library library: Time-series momentum 12-1 (TSMOM) on index, gold and crypto ETFs/pairs; harness suggestion: New module mandel/experiments/trend.py with signal library (sign_lookback, sma_cross, donchian, nearness_52w) returning per-period strategy returns; harness tsmom_vs_mean(archive, symbols, variants) that reuses backtest_eval.deflated_sharpe_ratio, overfit.pbo_cscv and the block bootstrap; add bundles via mandel.data.social.collect_history for GLD, SLV, EFA, AGG, TLT, DBC and a FRED fetcher for TB3MS. | verifier: corrected claim/trial
+
+### T-301 · sma-10m-timing-multi-asset
+
+**Claim.** On SPY 1994-2026, the 10-month SMA long/flat rule's maximum drawdown is smaller than that of at least 95% of 1,000 random in/out timing paths matched on time in market and on the number and length distribution of out-of-market spells.
+
+- kind: underlying-strategy · origin: underlying-library:trend-momentum/time-series, https://mebfaber.com/timing-model/ (fetched), https://www.aqr.com/Insights/Research/Journal-Article/Which-Trend-Is-Your-Friend (Levine-Pedersen; fetched)
+- statistic: Maximum drawdown of the rule; its percentile within the matched random-timing distribution; secondary guardrail: paired Sharpe difference (rule minus buy-and-hold) with studentized block-bootstrap interval
+- null: Drawdown reduction is what any timing path with the same exposure profile achieves (the rule's out-of-market months are no better chosen than random spells)
+- procedure: Monthly adjclose series; generate 1,000 random paths by randomly re-placing the rule's own out-of-market spells (spell-length preserving) within the sample; compute MDD for rule and paths; Holm correction across the 96 declared variants on the percentile p-values; Sharpe difference via block bootstrap (block 12 months)
+- data: Yahoo adjclose for SPY (and EFA, IEF, DBC, VNQ, QQQ, GLD, BTC-USD, ETH-USD for variants); fred-DTB3 · min n: 380
+- pass: Rule MDD below the 5th percentile of the matched null (Holm-adjusted p < 0.05) AND Sharpe difference lower 95% bound > -0.15 (non-inferiority)
+- controls: Look-ahead: month-end close, trade next day; survivorship: surviving ETFs only (stated); costs: 2 bps SPY, 5 bps others, 25+10 bps crypto per switch; dividends via adjclose (price-only SMA would bias exits for high-yield sleeves); multiple testing: 96 trials plus T-58's 48; regime: 1994-2008, 2009-2021, 2022-2026 reported separately since the reputation rests on 2000-02 and 2008
+- harness: b6c_mom_sma10_drawdown_vs_random
+- result X-e5086ee8: not_supported — SPY 10-month SMA long/flat on month-end adjcloses, filled at the next session's close, DTB3 when out, 2 bps per switch, hold months 1994-01..2026-09 (393 months, 78% in market, 23 out-of-market spells): MDD 24.3% vs buy-and-hold 52.9%; matched null (spell-length-preserving re-placement of the rule's own out spells) median 49.2%, 5th pct 32.4%, 99.3% of the first 1,000 paths deeper, p 0.0081 on 50000 paths; Holm over the 96 declared variants (lookback 6/8/10/12 x band 0/1/3% x SMA/EMA x monthly/daily x SPY/five-sleeve; daily = 21 x L-session MA, five-sleeve = SPY/EFA/IEF/DBC/VNQ at 20% rebalanced monthly; 95/96 variants with raw p < 0.05, 88 with a 1,000-path p within 0.01 of the primary's) settled by bounds (fail: at most 88 variants can rank before the primary, so Holm-adjusted p >= 8 x p = 0.0650). Excess-return Sharpe rule +0.69 vs buy-and-hold +0.57: difference +0.115 (CI -0.210 to +0.619, studentized paired CBB, 12-month blocks; need lower > -0.15). Regimes: 1994-2008 MDD 13% vs 46%, Sharpe diff +0.51; 2009-2021 MDD 18% vs 24%, Sharpe diff -0.09; 2022-2026 MDD 24% vs 22%, Sharpe diff -0.47. Reported only: DSR of the rule at 144 trials (96 + T-58's 48) 0.888 — failed: rule MDD below the 5th percentile of the matched null, Holm over 96 variants (p 0.0081 on 50000 paths; at most 88 variants can rank before the primary, so Holm-adjusted p >= 8 x p = 0.0650); Sharpe difference (rule - buy-and-hold, excess returns) lower 95% bound > -0.15 (lower -0.210)
+- note: from the underlying-library library: Long-moving-average timing (Faber 10-month SMA / 200-day) on multi-asset ETFs; harness suggestion: trend.py: sma_timing(prices, months, band) -> position series; harness sma_timing_vs_bh with the matched-time-in-market random null implemented as a permutation of monthly in/out flags; feed per-period returns to deflated_sharpe_ratio and pbo_cscv. | verifier: corrected claim/trial
+
 ### T-302 · crypto-trend-sma-50-200
 
 **Claim.** On BTC-USD 2014-2026, the 50/200 golden-cross long/flat rule has a maximum drawdown at least 40% smaller than buy-and-hold and a Sharpe ratio not lower than buy-and-hold after 25 bps per side, and the same direction holds on ETH 2017-2026.
@@ -2552,6 +2627,36 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-76080490: not_supported — sector top-3 alpha +17.3 bps/month over 322 months (95% CI -5.9 to +41.0; cost-matched random-pick 95th pct +23.2), PBO 0.29, leave-one-sector-out min -1.4, leave-one-decade-out 2000s +4.5/2010s +33.1/2020s +11.7 — failed: alpha > 0 with CI excluding 0; alpha above 95th pct of permutation null; alpha > 0 leaving out each sector
 - note: from the underlying-library library: Cross-sectional ETF momentum (sector and asset-class rotation); harness suggestion: trend.py xs_momentum(prices_df, lookback, skip, top_k, long_short) -> weights; harness xs_etf_momentum with within-month rank permutation null; reuse pbo_cscv. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-475 (verifier-corrected wording)
 
+### T-308 · residual-momentum
+
+**Claim.** On the 9 sector SPDRs 2002-2026, top-3 residual momentum (vs SPY, 36-month betas) has a higher after-cost Sharpe ratio than top-3 total-return 12-2 momentum, with the paired block-bootstrap 95% interval of the Sharpe difference excluding zero.
+
+- kind: underlying-strategy · origin: underlying-library:trend-momentum/cross-sectional, https://ideas.repec.org/a/eee/empfin/v18y2011i3p506-521.html (Blitz-Huij-Martens; abstract fetched)
+- statistic: Sharpe(residual) - Sharpe(total-return), paired monthly; rank correlation between the two signals (power diagnostic); worst 12-month return of each
+- null: Sharpe difference = 0
+- procedure: Rolling OLS on monthly excess returns using only months <= t-1; paired studentized block bootstrap (block 12 months, 5,000 draws); DSR over 8 trials; report the average Spearman correlation of the two rankings
+- data: Yahoo adjclose for the 9 SPDRs and SPY; fred-DTB3 · min n: 280
+- pass: Sharpe difference > 0 with 95% interval excluding 0 AND DSR > 0.95; if mean rank correlation > 0.9 the test is labelled low-power
+- controls: Look-ahead: betas and residuals from months up to t-1, trade at t+1; survivorship: constant SPDR set with the 2015/2018 sector reshuffle breaks reported; costs: 5 bps per side; multiple testing: 8 trials; regime: 2008-09 and 2020 reported separately since the claimed benefit is crash reduction
+- harness: b6c_mom_residual_vs_total_momentum
+- result X-0b696555: not_supported — 9 original SPDRs, decisions at month-ends from 2002-01 (36 months of SPY-beta history), hold months 2002-02..2026-09 (296 months), filled at the next session's close, 5 bps per side on drift-adjusted turnover. Top-3 residual momentum (OLS on SPY excess returns over months t-36..t-1, residual sum / sd over months t-12..t-2) excess Sharpe +0.73 vs top-3 12-2 total-return +0.64: difference +0.085 (CI -0.091 to +0.249, paired studentized CBB, 12-month blocks, 5,000 draws x 5 seeds); DSR over the 8 declared trials (window 36/24 x scaled/unscaled x top-3/long-short 3/3): residual series 0.947, difference series 0.292. Mean Spearman correlation of the two rankings 0.64. Worst 12-month return residual -43.4% vs total -41.2%; 2008-09: Sharpe -0.15 vs -0.26; 2020: Sharpe +0.81 vs +0.69; pre-2015-10: Sharpe +0.49 vs +0.49; 2015-10..2018-09: Sharpe +1.37 vs +1.36; 2018-10-: Sharpe +0.99 vs +0.75 (reported, not criteria) — failed: Sharpe(residual) - Sharpe(total-return) > 0 with 95% CI excluding 0 (paired studentized CBB) (lower -0.091); DSR > 0.95 over 8 trials under both readings: residual-momentum excess returns (0.947 at 8 trials; var(trial SR) 5.55e-03 = observed (above the 1/(T-1) floor); observed 5.55e-03 over 8 computed trials, floor 1/(T-1) 3.39e-03); residual minus total-return series (0.292 at 8 trials; var(trial SR) 3.39e-03 = the 1/(T-1) floor (house convention; it exceeds the observed variance); observed 1.36e-03 over 8 computed trials, floor 1/(T-1) 3.39e-03; with the observed variance 0.495)
+- note: from the underlying-library library: Residual (idiosyncratic) momentum; harness suggestion: trend.py residual_momentum(returns_df, factor_df, window) using numpy lstsq; harness residual_vs_total reusing xs_momentum for the comparison leg. | verifier: corrected claim/trial
+
+### T-310 · volatility-scaled-trend
+
+**Claim.** Volatility scaling raises the after-cost Sharpe ratio of the 12-1 TSMOM long/flat rule (pooled across the listed assets) by more than it raises the Sharpe ratio of buy-and-hold on the same assets, with the block-bootstrap 95% interval of this difference-in-differences excluding zero.
+
+- kind: underlying-strategy · origin: underlying-library:trend-momentum/risk-management, https://ideas.repec.org/a/eee/finmar/v30y2016icp103-124.html (Kim-Tse-Wald; fetched), https://ideas.repec.org/a/eee/jfinec/v116y2015i1p111-120.html (Barroso-Santa-Clara; fetched)
+- statistic: DiD = [Sharpe(scaled TSMOM) - Sharpe(unscaled TSMOM)] - [Sharpe(scaled B&H) - Sharpe(unscaled B&H)], pooled portfolio level; per-asset DiD as diagnostic
+- null: DiD = 0: scaling helps the trend rule only as much as it helps buy-and-hold (Kim-Tse-Wald/Cederburg null)
+- procedure: Daily data, monthly rebalancing; all four strategies computed with identical costs and financing; joint circular block bootstrap (block 60 days, 5,000 draws) resampling the same blocks for all four; DSR/Holm across 20 trials
+- data: Yahoo adjclose daily for the listed assets; fred-DTB3; deribit-dvol-BTC-history (archive) · min n: 300
+- pass: DiD > 0 with 95% interval excluding 0 AND Holm-adjusted across 20 trials; DiD sign positive in at least 2 of 3 decades
+- controls: Look-ahead: sigma_hat uses returns through t only and no full-sample scaling constant (the Cederburg critique of Moreira-Muir); survivorship: as TSMOM entry; costs: 2-5 bps ETFs and 25+10 bps crypto on all scaling turnover; financing above 1x at T-bill + 50 bps; multiple testing: 20 trials plus the TSMOM base count; regime: 2008, 2020, 2022 reported separately
+- harness: b6c_mom_vol_scaled_trend_did
+- result X-1b19b4a3: not_supported — Pooled equal-capital sleeves of SPY, QQQ, GLD, SLV, EFA, TLT, BTC-USD, ETH-USD (each from its 13th month-end), month-end decisions filled at the next SPY session's close, daily returns 1994-02-02..2026-10-01 (392 months, 8220 sessions), DTB3 cash (crypto: USD), leverage above 1x at DTB3 + 50 bps, 2/5/35 bps per side on all drift-adjusted turnover. Primary trial (EWMA 0.94, 10% target, cap 2x; crypto 40%, cap 1x): excess Sharpe scaled TSMOM +0.758, TSMOM +0.662, scaled B&H +0.810, B&H +0.632: DiD -0.082 (CI -0.198 to +0.023, joint circular block bootstrap of the four daily series, 60-day blocks, 5,000 draws x 5 seeds), one-sided p 0.9323; Holm over the 20 declared trials (EWMA/RV21/RV126/Yang-Zhang 21/DVOL-for-BTC x target 10/15% x cap 1/2x; DVOL replaces BTC's EWMA from 2021-03-24 only) adjusted p 1.0000; decades 1994-2003 -0.029, 2004-2013 -0.106, 2014-2026 -0.041. Reported: regimes 2008 +0.540, 2020 -0.036, 2022 +0.218; per-asset DiD SPY -0.07, QQQ -0.09, GLD +0.06, SLV +0.10, EFA +0.02, TLT -0.01, BTC-USD -0.04, ETH-USD -0.08; DSR of scaled TSMOM at 124 trials (20 + T-300's 104) 0.955 — failed: DiD -0.082 > 0 with joint 60-day block-bootstrap 95% CI excluding 0 (lower -0.198); Holm-adjusted across the 20 declared trials (raw p 0.9323) (Holm-adjusted p 1.0000 over 20 trials); DiD positive in at least 2 of 3 decades (1994-2003 -0.029, 2004-2013 -0.106, 2014-2026 -0.041)
+- note: from the underlying-library library: Volatility-scaled trend (constant-volatility targeting of TSMOM and momentum portfolios); harness suggestion: trend.py vol_scale(positions, returns, estimator, target, cap); harness vol_scaling_dod computing the difference-of-differences; add a Deribit DVOL fetcher (public get_volatility_index_data) for the BTC variant. | verifier: corrected claim/trial
+
 ### T-312 · trend-metals-gold-silver
 
 **Claim.** A gold+silver risk-parity 12-1 TSMOM long/flat strategy on GLD/SLV earns a positive after-cost excess return over 2006-2026 with a lower drawdown than buy-and-hold, and the pooled monthly return exceeds the historical-mean long strategy with the bootstrap interval excluding zero.
@@ -2585,6 +2690,51 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-b83f8cf1: not_supported — weekly TSMOM minus historical-mean strategy -41.3 bps/week over 604 weeks (164 BTC-only before ETH's warm-up ends; 95% CI -90.7 to +7.5), 2019- -39.9, DSR 0.99 — failed: difference vs historical-mean > 0 with CI excluding 0; 2019- difference > 0
 - result X-2f386b0a: not_supported — weekly TSMOM minus historical-mean strategy -41.3 bps/week over 604 weeks (164 BTC-only before ETH's warm-up ends; 95% CI -90.7 to +7.5), 2019- -39.9, DSR 0.99 — failed: difference vs historical-mean > 0 with CI excluding 0; 2019- difference > 0
 - note: from the underlying-library library: Short-horizon time-series momentum in BTC and ETH (1-4 week); harness suggestion: trend.py sign_lookback on weekly resample; harness btc_weekly_tsmom; reuse crypto_trend_vs_bh infrastructure. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-486 (verifier-corrected wording)
+
+### T-317 · trend-crisis-alpha-smile
+
+**Claim.** Over 2000-2026, the quarterly returns of the equal-risk TSMOM long/short portfolio have a positive coefficient on squared quarterly SPY excess return that exceeds the coefficient produced by the same rule applied to simulated driftless random walks with each sleeve's volatility and cross-correlation, with the block-bootstrap 95% interval of the excess coefficient excluding zero.
+
+- kind: underlying-strategy · origin: underlying-library:trend-momentum/portfolio-property, https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing (fetched), https://arxiv.org/abs/1404.3274 (fetched)
+- statistic: gamma = coefficient on SPY^2 (with SPY linear term) minus the mean gamma from 1,000 simulated no-autocorrelation paths (mechanical convexity); diagnostic: mean trend return in SPY's worst-decile quarters
+- null: gamma equals the mechanical convexity of a trend rule on random walks (no real crisis alpha)
+- procedure: Monthly sleeve returns from adjclose, quarterly aggregation; HAC regression plus block bootstrap (block 4 quarters, 5,000 draws); simulation null by resampling sleeve return vectors i.i.d. by month (keeps cross-correlation, removes autocorrelation); Holm across 8 trials
+- data: Yahoo adjclose for the 8 sleeves (most not in archive); fred-DTB3 · min n: 100
+- pass: gamma minus simulated gamma > 0 with 95% interval excluding 0, Holm-adjusted across 8 trials; leave-one-crisis-out (2000-02, 2008, 2020, 2022) keeps the sign
+- controls: Look-ahead: signals lagged one month, vol from past returns; survivorship: fixed sleeves; costs: 5 bps per side plus borrow on shorts; multiple testing: 8 trials (Holm, since DSR does not fit a regression coefficient); regime: about 4 crisis episodes drive the result, reported individually
+- harness: b6c_mom_trend_crisis_smile
+- result X-7d956b2f: not_supported — 12-1 TSMOM long/short on SPY, QQQ, EFA, TLT, IEF, GLD, SLV, DBC (each from 13 complete hold months, 10% ex-ante vol from a 60-day-centre-of-mass EWMA, cap 2x, equal risk across active sleeves, month-end signal filled at the next close, 5 bps per side, 50 bps/yr borrow on shorts), quarterly (3-month) excess returns on SPY's quarterly excess return and its square. The claim names no quarter calendar, so (rule 10) the primary statistic is the pooled all-start estimate: every 3-consecutive-hold-month window, one starting each month, 2000-01..2000-03 to 2026-07..2026-09 (319 overlapping windows, 107 quarters of data), with 12-month (4-quarter) blocks and HAC lag (12 >= 2 x the 3-month hold): gamma +0.07 (HAC s.e. 0.18), mean gamma of 1000 driftless simulations (whole fill-to-fill hold months of all sleeves' daily excess returns resampled jointly i.i.d. after demeaning: cross-correlation kept, autocorrelation removed) +0.05 (sd 0.43; actual above 52.0% of them); excess +0.02: block bootstrap CI -0.57 to +0.81, HAC CI -0.34 to +0.38; Holm over the 8 declared trials (quarterly/monthly x with/without BTC x long-short/long-flat) bootstrap-p adjusted 1.0000, HAC-p adjusted 1.0000; leave-one-crisis-out excess (every window touching the crisis years dropped) -2000-02 -0.10, -2008 -0.18, -2020 +0.08, -2022 +0.02. Per-phase range (non-overlapping quarters, 4-quarter HAC lag; reported, not criteria): starts Jan/Apr/Jul/Oct n 107, excess -0.16 (HAC CI -0.62 to +0.31); starts Feb/May/Aug/Nov n 106, excess +0.61 (HAC CI -0.27 to +1.48); starts Mar/Jun/Sep/Dec n 106, excess -0.01 (HAC CI -0.33 to +0.30); range -0.16 to +0.61. Diagnostics: mean portfolio return in SPY's worst-decile 3-month windows 1.49%; means over the windows touching each crisis 2000-02 0.84%, 2008 1.27%, 2020 -0.40%, 2022 -0.36%; before 2002-08 only SPY and QQQ are active — failed: gamma minus simulated gamma (+0.02 = +0.07 - +0.05) > 0 with 95% CI excluding 0: block bootstrap (12-month (4-quarter) blocks on the pooled all-start grid) CI -0.57 to +0.81; Newey-West HAC (lag 12) CI -0.34 to +0.38; Holm across the 8 declared trials, adjusted p < 0.05: block-bootstrap p (Holm-adjusted p 1.0000 over 8 trials); HAC p (Holm-adjusted p 1.0000 over 8 trials); leave-one-crisis-out keeps the sign (-2000-02 -0.10, -2008 -0.18, -2020 +0.08, -2022 +0.02)
+- note: from the underlying-library library: Trend-following crisis alpha: convexity of trend returns in large market moves; harness suggestion: trend.py tsmom_portfolio(...) feeding a harness crisis_smile with the quadratic regression and the worst-decile statistic; share sleeve code with the TSMOM entry. | verifier: corrected claim/trial
+
+### T-318 · ta-rule-universe-reality-check
+
+**Claim.** On SPY 1994-2026, the walk-forward-selected best rule from the frozen 88-rule universe does not beat buy-and-hold after costs: Hansen's SPA test of the full universe against buy-and-hold does not reject at 5% and the CSCV probability of backtest overfitting exceeds 0.5.
+
+- kind: underlying-strategy · origin: underlying-library:trend-momentum/meta-control, https://ideas.repec.org/a/bla/jfinan/v54y1999i5p1647-1691.html (Sullivan-Timmermann-White; abstract fetched), https://ideas.repec.org/a/bla/jecsur/v21y2007i4p786-826.html (Park-Irwin; fetched)
+- statistic: Hansen SPA p-value (benchmark buy-and-hold, loss = negative daily excess return); CSCV PBO; DSR of the in-sample best rule with n_trials = 88; out-of-sample Sharpe of the walk-forward-selected rule minus buy-and-hold
+- null: (for the control) No rule beats buy-and-hold (SPA null); selected rule's out-of-sample rank is random (PBO = 0.5)
+- procedure: Compute daily returns for all 88 rules; SPA with stationary bootstrap (mean block 20 days, 5,000 draws); pbo_cscv with 16 partitions; deflated_sharpe_ratio; walk-forward selection every 5 years with block bootstrap on the out-of-sample difference; repeat on QQQ, GLD, BTC as replications
+- data: Yahoo adjclose daily for SPY, QQQ, GLD, BTC-USD · min n: 8000
+- pass: Control confirmed if SPA p > 0.05 AND PBO > 0.5 AND the out-of-sample difference's interval includes or lies below 0; if SPA p < 0.05 and PBO < 0.5, record a surprise and promote the surviving rule to its own theory
+- controls: Look-ahead: one-bar delay; survivorship: single surviving assets; costs: 2 bps SPY, 5 bps GLD/QQQ, 25+10 bps BTC per switch (fast rules trade 20-50 times a year); multiple testing: this entry measures it; regime: PBO per decade
+- harness: b6c_misc_ta_reality_check
+- result X-33edd767: not_supported — SPY adjclose 1994-01-27..2026-10-13 (8232 daily returns after the 250-day warm-up): 88 long/flat rules (signal at close t, traded at close t+1, idle cash at DTB3, 2 bps per switch; the fastest rules switch 23-47 times a year) vs buy-and-hold (excess Sharpe +0.511). Hansen SPA (loss = negative daily excess return, stationary bootstrap mean block 20, 5000 draws): T = 0.000, consistent p 0.8456 (lower 0.5870, upper/Reality Check 0.9160); 0 of 88 rules have a positive mean differential, the most significant filter10%. CSCV PBO 0.392 (12870 splits of 16 partitions; median logit +0.25); by decade 1994-2003 0.21, 2004-2013 0.34, 2014-2026 0.66. In-sample best filter10% (annualised excess Sharpe 0.645) DSR at 88 trials 0.966. Walk-forward (best prior-5-year Sharpe on returns through the close before each switch, re-selected every 5 years on the calendar 1994 + 5k; out of sample 1999-01-04..2026-10-13, 6987 days; picks 1998-12 Donchian20/10, 2003-12 SMA50>SMA250, 2008-12 SMA40>SMA250, 2013-12 SMA40>SMA150, 2018-12 Donchian210/105, 2023-12 filter8%): excess Sharpe minus buy-and-hold +0.029 (CI -0.255 to +0.320, paired studentized CBB, 20-day blocks); pooled over 60 monthly re-selection phases +0.038 (CI -0.202 to +0.299); per-phase range -0.128 to +0.133. Replications (reported only): QQQ 2000-2026 SPA p_c 0.772, PBO 0.43, walk-forward Sharpe diff -0.328; GLD 2005-2026 SPA p_c 0.938, PBO 0.54, walk-forward Sharpe diff -0.068; BTC-USD 2015-2026 SPA p_c 0.907, PBO 0.60, walk-forward Sharpe diff +0.067 — failed: CSCV PBO > 0.5 (0.392 over 12870 splits, 16 partitions)
+- note: from the underlying-library library: Technical rule universe reality check on SPY and BTC (declared MA/channel search, expected to fail); harness suggestion: Extend mandel/experiments/overfit.py momentum_variants to a rule_universe(prices, spec) generator; harness ta_reality_check reusing pbo_cscv and deflated_sharpe_ratio; register as a control theory analogous to T-10 for underlyings. | verifier: corrected claim/trial
+
+### T-326 · gold-silver-ratio-reversion
+
+**Claim.** On GLD/SLV from 2008-04 (after a 500-day warm-up) to 2026-09, the declared 500-day-anchor z-score rule earns a positive mean daily net return after 20 bps per leg per trade and 50 bps/yr borrow on the short leg.
+
+- kind: underlying-strategy · origin: underlying-library:mean-reversion-statarb, https://doi.org/10.1016/s1044-0283(01)00034-5, https://www.tcd.ie/triss/assets/PDFs/iiis/iiisdp55.pdf
+- statistic: mean daily net return of the rule (and Sharpe); diagnostic: variance ratio VR(20/60/250) of the log ratio with heteroskedasticity-robust intervals
+- null: mean daily net return = 0 (stationary block bootstrap, block 60 days); VR = 1 for the diagnostic
+- procedure: Trailing statistics only. Simulate the rule. Block bootstrap. DSR with n_trials = this entry's 4 anchor/route variants plus T-61's tested variant. Repeat on roll-adjusted GC=F/SI=F from 2002.
+- data: Yahoo GLD (2004-11) and SLV (2006-04) adjusted closes; Yahoo GC=F and SI=F continuous front-month (2000-09), rolled using CME active-month calendars · min n: 2000
+- pass: 95% lower bound of mean daily net return > 0 AND DSR > 0.95 AND same sign on the GC/SI route
+- controls: Look-ahead: trailing windows; execution at the next close. Futures roll: GC (Feb/Apr/Jun/Aug/Oct/Dec) and SI (Mar/May/Jul/Sep/Dec) roll on different calendars, so roll jumps do NOT cancel in the ratio (corrects the earlier note); roll-adjust or use GLD/SLV as primary. Costs: 20 bps/leg plus borrow. Multiple testing: includes T-61. Regime: 2008, the 2011 silver spike, 2020 and 2024-2026 reported separately. Few trades expected (~10-25), so power is low: report trade count.
+- harness: b6c_misc_gold_silver_ratio
+- result X-159692aa: not_supported — x = ln(GLD/SLV adjclose), z on the trailing 500 sessions; z > 2 long SLV/short GLD, z < -2 the reverse, filled at the next close; exit at z = 0, 120-session time stop, stop at |z| = 3.5; 20 bps per leg per trade, 50 bps/yr borrow on the short leg; window 2008-04-23..2026-09-30 (4639 sessions, 19 trades, 11 winners, 1529 sessions in a trade). Mean daily net return +1.07 bp (CI -0.83 bp to +3.13 bp, stationary bootstrap mean block 60, 2000 draws x 5+ seeds), annualised Sharpe +0.208; DSR 0.150 at 5 trials (variance from GLD/SLV 500d (primary) +0.0131, GLD/SLV 1250d +0.0120, T-61 proxy: GLD/SLV 250d, 21-day hold -0.0408, GC/SI 500d (approximate roll) +0.0052, GC/SI 20-year (approximate roll) +0.0154 per-session Sharpes). GC=F/SI=F route (APPROXIMATE: scheduled CME roll windows replaced by GLD/SLV returns; 20 bps per leg, no borrow): mean +0.44 bp over 6045 sessions (24 trades), unadjusted +0.51 bp; not a criterion value. Regimes: 2008 -4.81 bp (14 days in trade), 2011 +7.74 bp (98 days in trade), 2020 -4.00 bp (112 days in trade), 2024-2026 +2.11 bp (176 days in trade). Variance ratio of the log ratio: VR(20) 0.980 (z* -0.14), VR(60) 0.992 (z* -0.03), VR(250) 0.750 (z* -0.68) — failed: stationary-bootstrap (mean block 60) 95% lower bound of the mean daily net return > 0 (two-sided lower -0.83 bp, one-sided lower -0.55 bp); DSR > 0.95 at 5 trials (0.150 at 5 trials, var(trial SR) 5.61e-04, PSR vs 0 0.816) (not implemented: same sign on the roll-adjusted GC=F/SI=F route (NOT IMPLEMENTED: the CME active-month roll of Yahoo's continuous series cannot be reconstructed, since Yahoo serves no expired contracts; approximate route reported only))
+- note: from the underlying-library library: Gold-silver ratio mean reversion; harness suggestion: ratio_reversion_harness: variance ratio + z-rule simulator, parameterised by two tickers (reusable for ETH/BTC, GLD/GDX) | verifier: corrected claim/trial
 
 ### T-333 · overnight-intraday-reversal
 
@@ -2684,6 +2834,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-c518ca95: not_supported — IWM quarter-end minus next-day -17.1 bps over 106 quarters (p=0.824), halves -55.6/+18.5; placebo month ends -26.7 bps (p=0.956) — failed: mean > 20 bps; bootstrap p < 0.05; both halves positive
 - result X-66ce388f: not_supported — IWM quarter-end minus next-day -17.1 bps over 106 quarters (p=0.824), halves -55.6/+18.5; placebo month ends -26.7 bps (p=0.956) — failed: mean > 20 bps; bootstrap p < 0.05; both halves positive
 - note: from the underlying-library library: Quarter-end window dressing and 'leaning for the tape'; harness suggestion: events.py: quarter_end_pairs(days) -> list of (last_day_idx, first_day_idx); paired_day_effect(closes, pairs, placebo_pairs) with bootstrap over pairs; run on IWM, ^RUT, SPY. | harness tests every stated criterion it can; a criterion it cannot implement makes the best possible verdict 'inconclusive' (see the reason) | superseded by T-439 (verifier-corrected wording)
+
+### T-347 · day-of-week-speculative-spread
+
+**Claim.** Over 2011-2026, the daily return of the SPHB-minus-SPLV spread is higher on Fridays than on Mondays by at least 10 bps on average, with the contrast positive in both halves.
+
+- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://alphaarchitect.com/2019/03/investor-mood-day-of-the-week-and-the-cross-section-of-returns/, https://academicnewsletter.sufe.edu.cn/info/356118
+- statistic: Mean spread return on Fridays minus mean on Mondays (bps). This is a single pre-registered contrast; no weekday Bonferroni applies to it.
+- null: Equal Friday and Monday means. Studentized block bootstrap (block 10 trading days) of the day-flagged spread series; plus a permutation of weekday labels within calendar weeks.
+- procedure: Build the spread series from daily closes. Run the contrast with halves 2011-2018 / 2019-2026. The 5 non-primary variants are Holm-adjusted secondary trials.
+- data: daily-history-SPHB, SPLV, USMV (stored); IWO, IWN, ARKK via Yahoo (ARKK verified from 2014-10-31); VIX (stored); GLD, SLV (stored). · min n: 600
+- pass: Contrast > 10 bps with p < 0.05 and both halves positive; the net-of-cost strategy (about 4-8 bps/week) is reported separately.
+- controls: Look-ahead: none. Survivorship: ETFs chosen ex ante except ARKK (flagged). Costs: 2 legs x 2 round trips/week at 1-2 bps. Multiple testing: 1 primary plus 5 Holm. Regime: halves; 2020-2021 meme period flagged.
+- harness: b6c_cal_weekday_speculative_spread
+- result X-f408bf40: not_supported — spread Fridays -4.4 vs Mondays -0.8 bps over 780 Fridays / 727 Mondays 2011-05-06..2026-10-13: contrast -3.6 bps (95% CI [-16.6, +9.8]), block-bootstrap p 0.6971 (MC +/-0.0090), within-week permutation p 0.6889 (MC +/-0.0091); halves +13.2 (389/361) / -20.1 (391/366) bps; net of 4/8 bps a week (reported) -7.6/-11.6 bps; secondaries (Holm over 5, not criteria): SPHB-USMV Holm p 1.0000, IWO-IWN None (not archived: daily-history-IWO, daily-history-IWN), ARKK-SPLV None (not archived: daily-history-ARKK), GLD/SLV Monday vs rest Holm p 1.0000, VIX log change, Friday minus Monday Holm p 0.0050 — failed: Friday-minus-Monday contrast > 10 bps; p < 0.05 under the 10-day studentized block bootstrap and the within-week weekday permutation (rule 11); contrast > 0 in 2019-2026
+- note: from the underlying-library library: Day-of-week effects: speculative-minus-safe Monday/Friday spread; harness suggestion: Reuse weekday_effect on a synthetic spread series: spread_closes = cumulative product of (1 + r_spec - r_safe); add a 'contrast' parameter to compare two named weekdays directly. | verifier: corrected claim/trial
 
 ### T-348 · overnight-vs-intraday
 
@@ -2882,6 +3047,36 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-a37f0b0b: not_supported — G10 carry (10 incl. USD, top 3 - bottom 3), test 2013-01..2026-09 (165 months), weights equal + VIX > 30 filter chosen on 2002-06..2012-12 (train Sharpe equal 0.33 vs inverse-vol 0.26, with VIX > 30 filter equal 0.38 vs inverse-vol 0.31; test Sharpe of the other weighting with the same filter -0.35; flat in 8 of 165 test months): net Sharpe -0.30 (need > 0.3); stationary-bootstrap 95% interval [-0.66, +0.10] (lower bound need > 0); DSR 0.008 at 6 trials (need > 0.95). Gross Sharpe 0.01, net -1.65%/yr, costs 0.05% trade + 1.67% financing a year, skew -0.26, MDD -27.9%, carry spread 2.39 pp; stale rates spliced by forward fill (flagged): EUR 2026-02..2026-08 (7 mo), GBP 2026-02..2026-08 (7 mo), JPY 2026-08..2026-08 (1 mo); Sharpe through 2026-02 (before the splice) -0.36; one-month gaps filled: USD 2020-04..2020-04 (1 mo) — failed: test-window net Sharpe > 0.3; stationary-bootstrap lower bound > 0; DSR > 0.95 with n_trials = 6
 - result X-c1c7d0cf: not_supported — G10 carry (10 incl. USD, top 3 - bottom 3), test 2013-01..2026-09 (165 months), weights equal + VIX > 30 filter chosen on 2002-06..2012-12 (train Sharpe equal 0.33 vs inverse-vol 0.26, with VIX > 30 filter equal 0.38 vs inverse-vol 0.31; test Sharpe of the other weighting with the same filter -0.35; flat in 8 of 165 test months): net Sharpe -0.30 (need > 0.3); stationary-bootstrap 95% interval [-0.66, +0.10] (lower bound need > 0); DSR 0.008 at 6 trials (need > 0.95). Gross Sharpe 0.01, net -1.65%/yr, costs 0.05% trade + 1.67% financing a year, skew -0.26, MDD -27.9%, carry spread 2.39 pp; stale rates spliced by forward fill (flagged): EUR 2026-02..2026-08 (7 mo), GBP 2026-02..2026-08 (7 mo), JPY 2026-08..2026-08 (1 mo); Sharpe through 2026-02 (before the splice) -0.36; one-month gaps filled: USD 2020-04..2020-04 (1 mo) — failed: test-window net Sharpe > 0.3; stationary-bootstrap lower bound > 0; DSR > 0.95 with n_trials = 6
 - note: from the underlying-library library: G10 FX carry for US retail (OANDA/IBKR); harness suggestion: mandel/experiments/carry.py: cross_sectional_carry(rates, spots, k=3) with bootstrap; FRED fetch list extended | verifier: corrected claim/trial
+
+### T-370 · metals-cash-and-carry-basis
+
+**Claim.** From 2005 to September 2026, the annualized gold futures implied financing rate (GC=F vs GLD-implied spot, excluding roll weeks) minus DTB3 has a mean within plus or minus 50 bp, so a GLD-long/GC-short lender earns no excess return over T-bills before GLD's 40 bp fee.
+
+- kind: underlying-strategy · origin: underlying-library:Carry, basis and yield, https://www.kitco.com/opinion/2026-04-23/londons-silver-running-out-room, https://finance.yahoo.com/news/exclusion-trumps-tariffs-reduces-premium-171033042.html
+- statistic: Mean of the daily (i - DTB3), with a HAC 95% CI. Also reported: its SD and the share of days with i < 0.
+- null: |mean(i - DTB3)| > 50 bp (a carry exists in either direction).
+- procedure: Daily from 2005-01: compute i per the rule, drop roll windows, HAC (lag 21) CI. Robustness: use GLD NAV (LBMA PM-based) instead of the GLD close. Run the silver/platinum/copper variants separately.
+- data: daily-history-GC=F, SI=F, PL=F, PA=F, HG=F, GLD, SLV, PPLT, PALL, CPER (to add); fred-DTB3. · min n: 4000
+- pass: HAC 95% CI of the mean deviation lies inside [-50, +50] bp. Each other metal is a separate trial with the same criterion; 6 trials counted.
+- controls: Asynchrony: GLD closes at 16:00 ET while the Yahoo GC=F close may be the 17:00 ET session end. This adds noise but no bias to the mean; check with GLD NAV. The roll date of Yahoo's continuous series is undocumented: windows dropped. GLD premium/discount to NAV. First notice and delivery not modeled. Costs: futures $2-5 per contract, GLD 40 bp a year. Survivorship: none. Regime: pre/post 2020 and the 2024-25 tariff EFP episode reported.
+- harness: b6c_misc_metals_basis
+- result X-295e4045: not_supported — Implied financing i = ln(F/S) x 365/d (continuous; DTB3 converted the same way, same-day print), S = ETF close / ounces per share by the rule's fee formula, d to the CME last trading day (third-last weekday) of the front active month (rolled at first notice), +-2 sessions around each scheduled roll and any > 5-robust-s.d. jump in ln(F/S) dropped. Gold (GC=F vs GLD): 2005-01-03..2026-09-24, 4460 days after dropping 1001 roll-window/jump days (median d 59 calendar days; daily ln(F/S) noise 55 bp): mean(i - DTB3) -159.3 bp (CI -185.5 bp to -133.1 bp, HAC lag 21; 6-trial Bonferroni CI -194.6 bp to -124.1 bp), simple-rate form -159.4 bp, s.d. 2.8%, i < 0 on 54.0% of days; 2005-2019 -186.6 bp (3073 d), 2020-2026 -99.1 bp (1387 d), 2024-12..2025-04 EFP -153.7 bp (85 d); a 0.1% error in S moves i by 62 bp at the median d; level-free diagnostic (decay of ln(F/S) between consecutive kept sessions of one contract, 17.0 years): implied carry +1.17% vs DTB3 +1.84%, deviation -67.2 bp (reported only); with Oct skipped (Yahoo's observed 2025 practice) the gold mean would be -171.5 bp (sensitivity only). The claim is gold-only and is judged on the gold interval at the pass's 6-trial Bonferroni level. Separate trials (reported, not this claim's criteria): silver (SI=F vs SLV, Mar/May/Jul/Sep/Dec): 2006-04-28..2026-09-30, 4376 days after dropping 758 roll-window/jump days (median d 65 calendar days; daily ln(F/S) noise 98 bp): mean(i - DTB3) -243.9 bp (CI -282.0 bp to -205.9 bp, HAC lag 21; 6-trial Bonferroni CI -295.2 bp to -192.7 bp), simple-rate form -243.4 bp, s.d. 4.3%, i < 0 on 63.6% of days; 2005-2019 -238.0 bp (2963 d), 2020-2026 -256.3 bp (1413 d), 2024-12..2025-04 EFP +66.2 bp (87 d); a 0.1% error in S moves i by 56 bp at the median d; level-free diagnostic (decay of ln(F/S) between consecutive kept sessions of one contract, 16.8 years): implied carry -0.81% vs DTB3 +1.71%, deviation -252.8 bp (reported only); platinum (PL=F vs PPLT), palladium (PA=F vs PALL) and copper (HG=F vs CPER) not archived. Measurement limits (rule 9): Yahoo's continuous contract identity and roll days are undocumented (expired contracts return 404), the GLD close trades at 16:00 ET against a 13:30 ET COMEX settle, and the fee formula stands in for the sponsor's ounces per share (the rule's own fallback), whose level error is amplified by 365/d; the trial's robustness check (GLD NAV, LBMA PM, instead of the GLD close; the controls' noise check) is report-only and cannot be run: the sponsor NAV / ounces-per-share history is not archived — failed: gold (GC=F vs GLD close / fee-formula ounces): HAC (lag 21) 99.17% CI (95% Bonferroni over 6 trials) of mean(i - DTB3) inside +-50 bp (mean -159.3 bp, CI -194.6 bp to -124.1 bp; unadjusted 95% CI -185.5 bp to -133.1 bp; 4460 days)
+- note: from the underlying-library library: Metals cash-and-carry and implied lease rate (GC, SI); harness suggestion: mandel/experiments/carry.py: implied_financing(fut, spot, rf); metals bundles GC=F, SI=F, PL=F, PA=F, HG=F added to daily-history | verifier: corrected claim/trial
+
+### T-372 · equity-index-futures-basis
+
+**Claim.** From 2010 to September 2026, the ES-implied financing rate (ES=F vs ^GSPC, with prior-year SPY dividends as the dividend forecast, measured on days 5-60 after each roll) exceeds DTB3 by more than 20 bp on average.
+
+- kind: underlying-strategy · origin: underlying-library:Carry, basis and yield, https://www.nber.org/papers/w26773, https://query1.finance.yahoo.com/v8/finance/chart/ES=F
+- statistic: Mean (r_imp - DTB3) with Newey-West CI (lag 21), plus a quarter-clustered bootstrap.
+- null: Mean spread <= 20 bp.
+- procedure: Daily per the rule. Robustness: realized dividends (ex-post) instead of forecast. Report ZIRP (2010-2015, 2020-2021) vs positive-rate regimes. Variants run separately.
+- data: daily-history-ES=F (from 2000), ^GSPC, SPY with events=div, NQ=F, ^NDX, QQQ dividends; fred-DTB3. Listed contracts (ESZ26.CME from 2021-09) for cross-checking the continuous series. · min n: 2500
+- pass: Lower 95% bound of the mean spread > 20 bp under both the HAC and the clustered bootstrap; 5 trials counted.
+- controls: Look-ahead: dividend forecast from the prior year (no realized dividends in the base test). Continuous-contract roll: only days 5-60 after the roll. ES=F daily close may be the 17:00 ET session end vs the index at 16:00 ET: also run on the 16:00 settle where available and report the difference. Costs: ES $2-4 round trip, SPY 1 bp. Survivorship: none. Regime: ZIRP vs post-2022, quarter-ends.
+- harness: b6c_misc_es_basis
+- result X-6453466b: not_supported — r_imp = ln((F + D)/I) x 365/d (continuous; DTB3 continuous, same-day print), F = ES=F close, I = ^GSPC close, d = calendar days to the next quarterly expiry (median 56), D = 10 x SPY dividends (recovered from close/adjclose) accrued uniformly over their quarters for the same window a year earlier (mean 7.1 index points; the literal 'ex-dates in the window' reading is degenerate because SPY goes ex on the expiry Friday itself, one day outside the shifted window in most years: D = 0 on 82% of days, mean spread -124.6 bp, reported only); calendar days 5-60 after each detected roll, 2010-01-04..2026-09-30: 2589 days in 68 quarters. Mean spread -7.1 bp; one-sided 99% bounds (the pass's 95% with its 5 trials counted, Bonferroni): HAC (lag 21) lower -15.7 bp / upper +1.5 bp, quarter-clustered bootstrap lower -18.3 bp / upper +3.9 bp (threshold +20 bp; unadjusted one-sided 95% lower bounds: HAC -13.2 bp, clustered -15.1 bp). Reported: simple-rate form -7.0 bp; realized (ex-post) dividends (the trial's robustness item, report-only) mean +6.3 bp (HAC lower +0.9 bp); sessions 5-60 reading 3732 days, mean +8.4 bp, HAC lower -3.7 bp; ZIRP (2010-15, 2020-03..2021) -21.2 bp (1207 d), positive-rate +5.2 bp (1382 d), 2022-2026 +16.6 bp (734 d), quarter-end weeks +23.3 bp (233 d). The 16:00 ET settle check needs hourly ES=F (not archived); NQ/NDX variants not archived — failed: HAC (Newey-West lag 21) one-sided 99% (95% Bonferroni over 5 trials) lower bound of mean(r_imp - DTB3) > 20 bp (lower -15.7 bp; unadjusted 95% -13.2 bp); quarter-clustered bootstrap (68 quarters) one-sided 99% (95% Bonferroni over 5 trials) lower bound > 20 bp (lower -18.3 bp; unadjusted 95% -15.1 bp)
+- note: from the underlying-library library: Equity index futures basis (implied financing) as lender/borrower; harness suggestion: mandel/experiments/carry.py: implied_financing(fut, spot, rf, dividends) shared with metals; add ES=F, NQ=F to bundles and SPY dividends via events=div | verifier: corrected claim/trial
 
 ### T-379 · vix-futures-roll-yield-carry
 
@@ -3310,6 +3505,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-f02e08fa: not_supported — Net issuance (<0)-Hi20 2008-05..2026-08 [data end 2026-08; claim window runs to 2026-09] (n=220 months): mean +0.30%/month, 95% studentized block-12 CI -0.18 to +0.86; FF5 alpha +0.23%/month (NW t +1.35, needs >= 2); before 2008-05 mean +0.55%/month; diagnostic PKW-SPY -0.01%/month 2007-01..2026-09 — failed: lower 95% bound of the mean monthly spread > 0; FF5 alpha NW t >= 2
 - note: from the underlying-library library: Net share issuance; harness suggestion: spread_test() on Ken French NI file; PKW via factor_etf_tilt. | added by the verifier pass
 
+### T-450 · pension-rebalancing-flow
+
+**Claim.** The SPY return over the last 3 trading days of the month plus the first day of the next month is negatively related to the month-to-date SPY-minus-AGG return differential over 2003-10 to 2026-09.
+
+- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.nber.org/papers/w33554 (fetched; abstract verified)
+- statistic: Slope of the 4-day window SPY excess return on the month-to-date differential (HAC t), plus the mean return of the threshold rule with bootstrap CI.
+- null: Slope >= 0.
+- procedure: Yahoo SPY, AGG adjusted closes; differential known at t-3 close; non-overlapping monthly windows; quarter-end subset; long-history replication using FF daily market and a FRED DGS10 duration proxy.
+- data: Yahoo SPY, AGG, TLT; Ken French daily market; FRED DGS10. · min n: 250
+- pass: Slope t <= -2 over >= 250 monthly windows AND negative point estimate in both halves (2003-2014, 2015-2026).
+- controls: Look-ahead: signal at t-3 close. Survivorship: none. Costs: 2 round trips/month at 1 bp + financing for 150%. Multiple testing: 4 variants. Regime: 2008, 2020, 2022 (stocks and bonds fell together).
+- harness: b6c_cal_pension_rebalancing
+- result X-d5506b2c: not_supported — entry close: 276 windows 2003-10..2026-09, slope -0.0426 (HAC t -1.29; lag 0 -1.09, lag 12 -1.34), halves -0.0535 (t -1.23, n 135) / -0.0280 (t -0.57, n 141); previous close: 276 windows 2003-10..2026-09, slope -0.0197 (HAC t -0.60; lag 0 -0.48, lag 12 -0.62), halves -0.0291 (t -0.71, n 135) / -0.0048 (t -0.09, n 141); threshold rule (reported) -0.3 bps/month (95% CI [-18.4, +17.6]) over 108 short / 59 long months; reported: quarter-end, month-to-date slope -0.0271 (t -0.36, n 92), quarter-end, quarter-to-date slope +0.0013 (t +0.03, n 92), SPY minus TLT differential slope -0.0257 (t -1.12, n 276), long history (French market, DGS10 duration proxy) slope -0.0625 (t -2.65, n 774) — failed: slope HAC t <= -2 (Newey-West, lag 5) under both rule-12 readings
+- note: from the underlying-library library: Pension and balanced-fund rebalancing flow (month-end); harness suggestion: Extend underlying.py turn_of_month() with a conditioning variable (month-to-date stock-bond differential). | added by the verifier pass
+
 ### T-475 · xs-momentum-etf-rotation
 
 **Claim.** Top-3 12-1 rotation across the 9 original sector SPDRs earns a positive after-cost monthly CAPM alpha versus SPY over 2000-01 to 2026-09, with the block-bootstrap 95% interval of alpha excluding zero.
@@ -3359,6 +3569,36 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-3b44aadc: not_supported — GEM excess Sharpe 0.59 vs 60/40 0.64 (diff -0.05, lower -0.44), MDD -24% vs -33%, proxy PBO (10 lookbacks, diagnostic) 0.61 over 264 months (fills at the next day's close, 6 bps per switch) — failed: Sharpe diff > 0 with 95% CI excluding 0 (not implemented: PBO < 0.5 over the declared 60-trial matrix (16 partitions); DSR > 0.95 (n_trials = 60))
 - result X-9bb47f39: not_supported — GEM excess Sharpe 0.59 vs 60/40 0.64 (diff -0.05, lower -0.44), MDD -24% vs -33%, proxy PBO (10 lookbacks, diagnostic) 0.61 over 264 months (fills at the next day's close, 6 bps per switch) — failed: Sharpe diff > 0 with 95% CI excluding 0 (not implemented: PBO < 0.5 over the declared 60-trial matrix (16 partitions); DSR > 0.95 (n_trials = 60))
 - note: from the underlying-library library: Dual momentum (Antonacci GEM): SPY vs foreign equity with T-bill filter and bond fallback; harness suggestion: underlying.py: dual_momentum(adj_monthly: dict, lookback, fallback, filter_on) -> monthly weights; harness gem_vs_6040 with pbo_cscv from overfit.py. | verifier-corrected restatement of T-305, whose verdict tested the earlier wording and stands
+
+### T-481 · cross-asset-tsmom-bond-equity
+
+**Claim.** On SPY 1994-2026, the cross-asset long/flat rule ((e + b)/2 clipped at 0) has a higher after-cost Sharpe ratio than SPY's own 12-1 long/flat TSMOM, with the paired block-bootstrap 95% interval of the Sharpe difference excluding zero.
+
+- kind: underlying-strategy · origin: underlying-library:trend-momentum/time-series, https://ideas.repec.org/a/eee/jfinec/v136y2020i1p63-85.html (Pitkäjärvi-Suominen-Vaittinen 2020; fetched in this pass)
+- statistic: Sharpe(cross-asset) - Sharpe(own TSMOM), paired monthly; DSR over 12 trials
+- null: Sharpe difference = 0: the bond signal adds nothing
+- procedure: Monthly adjclose and synthetic bond series; paired studentized block bootstrap (block 12 months, 5,000 draws); DSR; placebo with the bond signal shifted 12 months
+- data: Yahoo adjclose SPY, IEF, TLT; fred-DGS10 and fred-DTB3 (both in archive) · min n: 380
+- pass: Sharpe difference > 0 with 95% interval excluding 0, DSR > 0.95, placebo interval includes 0
+- controls: Look-ahead: month-end yields and closes used next day (FRED available_at respected); survivorship: n/a; costs: 2 bps per side SPY; synthetic bond return approximation error checked against IEF over 2002-2026; multiple testing: 12 trials; regime: 1994-2007, 2008-2021, 2022-2026
+- harness: b6c_mom_cross_asset_tsmom
+- result X-21d2486b: not_supported — SPY at month-end t: e = sign of SPY's 12-1 excess return, b = sign of the 12-1 excess return of the 10-year proxy (IEF adjclose from 2002-08, before that the synthetic constant-maturity return y_(t-1)/12 - 8 x dy from fred-DGS10 month-end yields known by the fill), position max(0, (e + b)/2) (1 / 0.5 / 0 in 44/0/56% of months) vs own max(0, e), filled at the next session's close, DTB3 cash, 2 bps per side; hold months 1994-02..2026-09 (392 months). Excess Sharpe cross-asset +0.496 vs own +0.712: difference -0.216 (CI -0.412 to -0.029, paired studentized CBB, 12-month blocks, 5,000 draws x 5 seeds); DSR over the 12 declared trials (IEF/TLT/synthetic proxy x long-flat/long-short x 12-1/6-1; trial-Sharpe variance floored at 1/(T-1), the house convention, as the trial names none): strategy 0.865 (var 2.56e-03 = the 1/(T-1) floor; the observed 2.84e-04 gives 0.985), difference series 0.000 (observed var 2.68e-03, above the 1/(T-1) floor 2.56e-03); with the observed variances the DSR criterion would be undecided, the readings disagreeing, so its outcome rests on the floor; placebo (b lagged 12 months) difference -0.133 (CI -0.339 to +0.066). Regimes: 1994-2007 -0.245, 2008-2021 -0.192, 2022-2026 -0.247. Synthetic bond vs IEF over 290 months: correlation 0.989, tracking error 1.15%/yr, mean gap -0.64%/yr, 12-1 sign agreement 95.7%; with the yield-dependent par-bond duration (1 - (1 + y/2)^-20)/y instead of the constant 8 (a 10-year par bond's modified duration runs from about 6.5 at 9% yields to 9.3 at 1.5%) the bond signal flips in 0 of 392 decision months and the primary difference is -0.216 (duration approximation, reported only). With e and b in {-1, +1}, (e + b)/2 takes -1/0/+1, so the clipped rule holds SPY only when both signals are positive (the library's 0.5 states need a zero sign) — failed: Sharpe(cross-asset) - Sharpe(own TSMOM) > 0 with 95% CI excluding 0 (paired studentized CBB) (lower -0.412); DSR > 0.95 over 12 trials under both readings: cross-asset excess returns (0.865 at 12 trials; var(trial SR) 2.56e-03 = the 1/(T-1) floor (house convention; it exceeds the observed variance); observed 2.84e-04 over 12 computed trials, floor 1/(T-1) 2.56e-03; with the observed variance 0.985 [the outcome depends on the variance choice]); cross-asset minus own series (0.000 at 12 trials; var(trial SR) 2.68e-03 = observed (above the 1/(T-1) floor); observed 2.68e-03 over 12 computed trials, floor 1/(T-1) 2.56e-03) [the trial names no trial-Sharpe variance, so the house 1/(T-1) floor applies where it exceeds the observed variance; with the observed variances this criterion would be undecided (the readings disagree): its outcome depends on the floor]
+- note: from the underlying-library library: Cross-asset time-series momentum (bond momentum times equities); harness suggestion: underlying.py synthetic_bond_returns(dgs10) and cross_asset_tsmom(); harness cross_asset_tsmom_vs_own. | added by the verifier pass
+
+### T-484 · bond-tsmom-fred-long-history
+
+**Claim.** Over 1963-2026, the 12-1 long/short TSMOM rule on the synthetic 10-year Treasury excess return earns a higher mean monthly return than the historical-mean strategy, with the studentized block-bootstrap 95% interval of the difference excluding zero.
+
+- kind: underlying-strategy · origin: underlying-library:trend-momentum/time-series, https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr657.html (Durham 2013; search result), https://arxiv.org/abs/1404.3274 (Lemperiere et al.; fetched in this pass)
+- statistic: Mean monthly difference d = r(TSMOM) - r(historical-mean); DSR over 8 trials; sub-periods 1963-1981, 1982-2020, 2021-2026
+- null: E[d] = 0
+- procedure: Monthly synthetic returns; studentized block bootstrap (block 12 months, 5,000 draws); DSR; validate the synthetic series against IEF adjclose 2002-2026 (correlation > 0.95 required)
+- data: fred-DGS10, fred-DGS2, fred-DTB3 (all in archive); Yahoo IEF adjclose for validation · min n: 700
+- pass: Mean d > 0 with 95% interval excluding 0, DSR > 0.95, and d > 0 in at least 2 of 3 sub-periods
+- controls: Look-ahead: FRED values used with available_at; survivorship: none; costs: 2 bps per side (futures/ETF equivalent); synthetic-return approximation error measured against IEF; multiple testing: 8 trials; regime: three rate regimes reported
+- harness: b6c_misc_bond_tsmom_fred
+- result X-80f8ff58: not_supported — Synthetic constant-maturity 10-year par-bond monthly total return from fred-DGS10 month-end prints (carry y/12 - D dy + C dy^2/2, D and C of a semiannual par bond at the prior yield) minus DTB3 accrued between the print days; at month-end t the 12-1 long/short TSMOM takes the sign of months t-11..t-1, the historical-mean strategy the sign of the expanding mean since 1962-02; 2 bps per side; hold months 1963-02..2026-09 (764 months). Mean d +13.5 bp/month (CI -6.1 bp to +44.3 bp, studentized CBB, 12-month blocks, 5000 draws x 5+ seeds); excess Sharpe TSMOM +0.282 vs historical mean +0.076 (TSMOM long in 53%, historical mean long in 65% of months); DSR at 8 trials: d 0.505, TSMOM series 0.747; sub-periods 1963-1981 +0.1 bp (227 m), 1982-2020 +13.2 bp (468 m), 2021-2026 +59.3 bp (69 m); synthetic vs IEF excess returns from 2002-08: correlation 0.990 over 290 months, tracking error +1.41%/yr. Family (mean d, bp/month): 10|LS|12 +13.5 bp, 10|LS|6 -1.9 bp, 10|LF|12 +6.7 bp, 10|LF|6 -1.0 bp, 2|LS|12 +4.0 bp, 2|LS|6 -0.4 bp, 2|LF|12 +2.0 bp, 2|LF|6 -0.2 bp — failed: mean d > 0 with the studentized CBB (12-month blocks) 95% CI excluding 0 (mean +13.5 bp/month, lower -6.1 bp); DSR > 0.95 over the 8 declared trials under both readings: difference series d (0.505 at 8 trials, var(trial SR) 1.31e-03, PSR vs 0 0.935); TSMOM excess-return series (0.747 at 8 trials, var(trial SR) 1.54e-03, PSR vs 0 0.988)
+- note: from the underlying-library library: Long-history Treasury trend from FRED yields (synthetic 10-year bond TSMOM since 1962); harness suggestion: underlying.py synthetic_bond_returns(dgs, maturity) shared with cross-asset-tsmom-bond-equity; harness bond_tsmom_long_history reusing the TSMOM harness. | added by the verifier pass
 
 ### T-485 · crypto-trend-sma-50-200
 
@@ -3618,7 +3858,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-e6e164dc: not_supported — T-539 SPY long put ladder (long 1 40-delta put, short 1 25-delta and 1 15-delta put) (expiry nearest 45 DTE within +/-7 days, strikes by vendor delta within 0.075; DoltHub end-of-day SPY quotes 2019-02-08..2026-10-14 (1232 quote days from 1291 snapshots; 59 duplicate snapshots of a quote day dropped, 2 stale-moved kept on their quote day); settled at intrinsic on SPY's raw close on the expiry date, early exercise ignored as the claim holds to expiry; naked-leg margin = Reg-T/CBOE naked put on one uncovered short put: premium + max(20% x S - OTM amount, 10% x K), OTM = max(S - K, 0), premium at the fill, the uncovered leg being the 15-delta put (the 25-delta put is covered by the long 40-delta put)): 565 entry days (54 distinct 52-day holds), 2019-02-08..2026-08-31; mid fills (the claim): mean +0.012 (pooled over 565 entry days in 396 weeks; block 15 weeks (2x hold) CI -0.009 to +0.030; block 30 weeks (4x hold) CI -0.012 to +0.030) -> lower 95% CI > 0: no (week-weighted, reported: mean +0.012, CI -0.017 to +0.030); bid/ask fills (the pass): mean +0.011 (pooled over 565 entry days in 396 weeks; block 15 weeks (2x hold) CI -0.012 to +0.029; block 30 weeks (4x hold) CI -0.015 to +0.028) -> lower 95% CI > 0: no (week-weighted, reported: mean +0.010, CI -0.020 to +0.029); every entry uses its entry-close quotes as the live proxy (the archive stamps every dolt-chain-SPY row available at 22:00Z on its snapshot date, after the 16:15 ET fill); snapshot-date sensitivity (drops the 24 entries whose snapshot was taken on a weekend, holiday or moved day; no kept entry is point in time either): mid mean +0.012 (CI -0.009 to +0.030); exec mean +0.011 (CI -0.012 to +0.029); bid/ask per start (rule 10: 4 non-overlapping chains from the entry days of the first hold, 4 distinct, 47-48 trades each, block 2 trades): mean -0.021 to -0.019, lower bound -0.223 to -0.212, 0/4 pass; mid per start (rule 10: 4 non-overlapping chains from the entry days of the first hold, 4 distinct, 47-48 trades each, block 2 trades): mean -0.019 to -0.018, lower bound -0.221 to -0.210, 0/4 pass; stress: VIX >= 40 months with an open trade 2020-02, 2020-03, 2020-04, 2020-06, 2020-10, 2025-04; months with SPY >= 10% below its 63-session high (reported) 2020-02, 2020-03, 2020-04, 2020-05, 2022-02, 2022-03, 2022-04, 2022-05, 2022-06, 2022-07, 2022-09, 2022-10, 2022-11, 2023-10, 2025-03, 2025-04; 46 trades open across a stress session, mean bid/ask ratio -0.091, without them +0.020; worst trade (bid/ask) -1.521 entered 2020-01-29, expiry 2020-03-20; credit at mid on 40.0% of entries (mean -0.38); mean naked-leg margin 68.73 = 12.89% of S; ratio of means at bid/ask +0.012; with $0.65/contract per leg at bid/ask: mean +0.010; DTE tolerance sensitivity at bid/ask: +/-4 DTE: n 367, mean +0.016 (CI -0.001 to +0.034); +/-14 DTE: n 961, mean +0.005 (CI -0.039 to +0.025); skipped quote days: no expiry within 45 +/- 7 DTE 623; unresolved (expiry after the last archived close) 26; no usable 40-, 25- or 15-delta put 18 — failed: mid fills (the claim): lower 95% CI > 0 for the mean, robust over blocks of 2/4x the hold; bid/ask fills (the pass): lower 95% CI > 0 for the mean, robust over blocks of 2/4x the hold
 - note: from the options-library library: Ladder / Christmas Tree (long or short, call or put); harness suggestion: Harness 'ladder_skew' sharing the delta selector with 'front_ratio_skew'. | added by the verifier pass
 
-## Inconclusive (34)
+## Inconclusive (36)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -4053,6 +4293,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-574db0ce: inconclusive — T-268 on BTCDVOL_USDC futures trades (deribit-dvol-futures-trades): mark of the trade nearest expiry - 7 d minus the DVOL settlement. Headline (trade within 24 h of T-7d): 38 expiries 2023-04-26..2026-07-29; mean +2.14 vol points, 95% iid bootstrap CI [+0.77, +3.48], positive in 0.76 of expiries. The trial's 'trades nearest T-7d' sets no time tolerance, so both criteria are judged under each: 6 h +2.04 (n 26, CI [+0.35, +3.46]); 12 h +2.38 (n 32, CI [+0.87, +3.93]); 24 h +2.14 (n 38, CI [+0.77, +3.48]); 36 h +1.91 (n 40, CI [+0.72, +3.22]); 48 h +1.91 (n 40, CI [+0.72, +3.22]); no cutoff +1.93 (n 41, CI [+0.73, +3.11]). Index-mark control (reported, not a criterion): in 16 of 38 headline points the mark_price equals index_price (Deribit published the DVOL index as the futures mark); real marks only +2.23 (n 22, CI [-0.05, +4.31]); trade price in place of an index-equal mark +2.32 (n 38, CI [+0.92, +3.69]); trade prices throughout +2.47 (n 38, CI [+1.06, +3.79]). Decomposition: futures basis at T-7d (mark - index) +0.26 (n 38, CI [-0.11, +0.64]) plus spot DVOL drift (index at T-7d - settlement) +1.87 (n 38, CI [+0.57, +3.12]); the spot DVOL drift carries the larger part of the mean. VIX futures roll-down control (structural comparison, reported): the front VX contract alive on each expiry day, settle on the last VX day <= T-7d minus settle on the last VX day <= expiry day, +0.45 (n 38, CI [+0.11, +0.77]) VIX points. Median |trade - mark| 0.73. Archived expiries 42: 38 used, dropped [('BTCDVOL_USDC-25JUN25', 'no trade within 24 h of T-7d'), ('BTCDVOL_USDC-26AUG26', 'no trade within 24 h of T-7d'), ('BTCDVOL_USDC-27AUG25', 'no trade within 24 h of T-7d'), ('BTCDVOL_USDC-30SEP26', 'no trades in the archived window [T-8d, T]')] — implemented criteria pass; not implemented: mean > 2 vol points (the pass's target, point estimate) under every trade-time tolerance (6 h pass, 12 h pass, 24 h pass, 36 h fail, 48 h fail, no cutoff fail) [undecided]
 - note: from the options-library library: DVOL futures vs straddle basis (vol-of-vol carry); harness suggestion: Extend deribit_book to USDC futures filtered to DVOL instruments | verifier: corrected claim/trial | 2026-10-15 Deribit history: inconclusive: the 95% CI > 0 holds under every trade-time tolerance (6 h to no cutoff), but the pass's 'target > 2 vol points' holds at 6/12/24 h and fails at 36/48 h and with no cutoff (+1.91 to +1.93), so it is undecided. Most of the +2.14 mean is spot DVOL falling over the final week (+1.87, CI +0.57..+3.12); the futures basis at T-7d is only +0.26 (CI -0.11..+0.64), and 16 of 38 'marks' are the DVOL index itself (Deribit published no independent futures mark). Reading: a DVOL drift into expiry, not a futures term premium.
 
+### T-311 · momentum-crash-protection
+
+**Claim.** Over 2000-2026, the bear-and-high-vol filter reduces the worst 3-month return of the sector-SPDR long/short momentum portfolio by more than 95% of random filters with the same number and length of activation spells.
+
+- kind: underlying-strategy · origin: underlying-library:trend-momentum/risk-management, https://www.nber.org/papers/w20439 (Daniel-Moskowitz; fetched), https://ideas.repec.org/a/eee/jfinec/v116y2015i1p111-120.html (Barroso-Santa-Clara; fetched)
+- statistic: Worst rolling 3-month return of the filtered portfolio; its percentile among 1,000 spell-preserving random activation paths; guardrail: paired Sharpe difference
+- null: The filter's activation dates are no better than random dates with the same activation profile
+- procedure: Point-in-time indicators; random activation paths by re-placing the filter's own spells; Holm across 24 trials; paired block bootstrap (block 12 months) for the Sharpe guardrail; count activation episodes
+- data: Yahoo adjclose for SPY and the 9 SPDRs; crypto variant: CMC data-api historical listings plus Yahoo coin histories · min n: 300
+- pass: Worst-3-month return below the 5th percentile of the random-filter null (Holm-adjusted) AND Sharpe difference lower 95% bound > -0.1 AND at least 5 distinct activation episodes; fewer than 5 = inconclusive
+- controls: Look-ahead: indicators from data through t; survivorship: constant SPDR set; costs: 5 bps per side at switches, 50 bps a year borrow on shorts; multiple testing: 24 trials; regime: the US sample likely has only 2 activation episodes (2001-03, 2008-09; SPY's 24-month return stayed positive through 2022), so the ETF test is expected to be inconclusive by its own gate and the crypto variant carries the power
+- harness: b6c_mom_crash_filter_vs_random
+- result X-d2b172be: inconclusive — Long top-3 / short bottom-3 12-1 sector-SPDR portfolio (dollar neutral on DTB3 collateral, 5 bps per side, 50 bps/yr borrow), hold months 2000-01..2026-09 (321 months). Filter at month-end t: SPY 24-month return < 0 AND SPY 126-day vol above the 80th percentile of its expanding daily distribution from 1994 -> short leg 0, long leg halved for t+1: 25 activation months in 3 runs, 3 episodes after merging gaps <= 2 months (2001-04..2001-07, 2002-08..2003-04, 2008-10..2009-09). Worst rolling 3-month return filtered -18.4% vs base -32.5%; random filters re-placing the filter's own spells: 95th pct -18.4%, filter better than 92.6% of them (raw p 0.0749); Holm over the 24 declared trials (bear 12/24 x vol 70/80/90 x both legs/short only x binary/Daniel-Moskowitz past-only scale; 1 with raw p < 0.05) adjusted p 1.0000. Excess Sharpe filtered -0.01 vs base -0.06: difference +0.053 (CI -0.084 to +0.244; need lower > -0.1). The crypto variant (CMC point-in-time listings, not archived) lies outside the claim and its 24-trial grid: not a criterion — implemented criteria pass; not implemented: worst 3-month return -18.4% (base -32.5%) better than 95% of 1000 spell-preserving random filters (null 95th pct -18.4%, raw p 0.0749) (Holm-adjusted p 1.0000 over 24 trials) [episode gate: decisive only if worse than 95% of random filters, p_worse 0.9930] [fails, not decisively, below the 5-episode gate]; at least 5 distinct activation episodes (3; fewer = inconclusive)
+- note: from the underlying-library library: Momentum crash protection (Daniel-Moskowitz dynamic momentum / bear-market filter); harness suggestion: trend.py crash_filter(base_weights, market_prices, lookback, vol_pct); harness crash_filter_vs_random with permuted activations; shares xs_momentum output. | verifier: corrected claim/trial
+
 ### T-329 · crypto-futures-basis-carry
 
 **Claim.** From 2018-01 to 2026-09, after the annualized CME front-month BTC basis rises more than 2 sd above its trailing 60-day mean, a long-spot/short-futures position held 5 trading days earns a positive mean net return after 20 bps round-trip costs (equivalently, the basis falls by more than its deterministic time decay plus costs).
@@ -4068,6 +4323,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-2543136c: inconclusive — 30 trades 2019-06-18..2026-08-18 (synchronous spot from 2019-05-01; z > 2 vs the valid settles in the trailing 60 trading days, at least 20, the 5 days before expiry excluded; enter next settle, hold 5 trading days in the same contract, 20 bp round trip; 17 exits inside the roll window): mean net +0.178%, one-sided 95% lower bound +0.070% (need > 0); pre-2024 mean +0.229% (n=22), post +0.039% (n=8) (need both > 0); DSR 0.982 (need > 0.95); window from 2018-01 covered: no, no settle-synchronous spot before 2019-05-01 — implemented criteria pass; not implemented: trades >= 40 (min_n); claim window from 2018-01 covered by settle-synchronous spot
 - result X-e60ced50: inconclusive — 30 trades 2019-06-18..2026-08-18 (synchronous spot from 2019-05-01; z > 2 vs the valid settles in the trailing 60 trading days, at least 20, the 5 days before expiry excluded; enter next settle, hold 5 trading days in the same contract, 20 bp round trip; 17 exits inside the roll window): mean net +0.178%, one-sided 95% lower bound +0.070% (need > 0); pre-2024 mean +0.229% (n=22), post +0.039% (n=8) (need both > 0); DSR 0.982 (need > 0.95); window from 2018-01 covered: no, no settle-synchronous spot before 2019-05-01; month-clustered one-sided 95% upper bound of the mean +0.301% (21 months; same draws as the lower bound, decisive below min_n when <= 0); month-clustered 95% CIs pre-2024 [+0.070, +0.433]% (15 months), post-2024 [-0.074, +0.160]% (6 months) — only 30 trades, below the trial's min_n 40, so the verdict cannot be supported and a failing criterion counts only when it fails decisively (house rule 5). Decisive failures: none. inconclusive: implemented criteria pass; not implemented: trades >= 40 (min_n); claim window from 2018-01 covered by settle-synchronous spot
 - note: from the underlying-library library: Crypto futures basis / cash-and-carry (CME BTC futures and Deribit); harness suggestion: basis_carry_harness: basis calculator with roll detection, hurdle rule, hold-to-expiry accounting; daily Deribit snapshot writer for the forward sample | verifier: corrected claim/trial
+
+### T-416 · fear-greed-extremes
+
+**Claim.** First crossings of F <= 20 predict a BTC 30-day forward log return at least 5 percentage points above the unconditional 30-day mean, after controlling for the trailing 30-day return.
+
+- kind: underlying-strategy · origin: underlying-library:Microstructure, liquidity and sentiment, https://api.alternative.me/fng/?limit=0 (full history, verified), mandel/experiments/social.py fear_greed_forward_returns (the 7-day result already recorded)
+- statistic: Coefficient on the first-crossing indicator in a regression of 30-day forward log return on the indicator and the trailing 30-day return, over non-overlapping events. Rule Sharpe vs buy-and-hold.
+- null: Coefficient <= 0 (stationary block bootstrap with 30-day blocks, 5,000 draws).
+- procedure: Event study over the 72 cells, deflated. Subsamples 2018-21 and 2022-26. Power note: with about 30 independent events and BTC's 30-day volatility of about 18%, the minimum detectable effect is about 8 points, so a non-rejection is recorded as underpowered, not as a refutation.
+- data: alternative.me FNG history 2018-02-01 to 2026-10-14 (3,174 days, in store); Yahoo BTC-USD and ETH-USD daily. · min n: 30
+- pass: At least 30 non-overlapping first-crossing events at H = 30 (the store has 30: 42 crossings, 30 non-overlapping at 30 days, 21 at 60 days). Coefficient >= 5 points with one-sided bootstrap p < 0.05. DSR >= 0.95 over the 72 cells. Same sign in both subsamples.
+- controls: Look-ahead: available_at = day + 1 at 00:00 UTC; entry at that day's close. Survivorship: not applicable. Costs: 0.5-1.2% round trip at retail Coinbase/Kraken taker tiers; 0.3-0.5% maker. Multiple testing: 72 cells plus the 7-day trial. Regime: halving-cycle phase; the 2022 drawdown reported separately.
+- harness: b6c_misc_fear_greed_extremes
+- result X-be21458b: inconclusive — alternative.me F&G 2018-02-01..2026-10-14 (3174 days; F for day t known at 00:00 UTC on t+1), BTC-USD bought at the close of t+1: 42 first crossings to <= 20 (F > 20 the previous day, none in the prior 10 days), 31 non-overlapping at 30 days. Regression of the 30-day forward log return on the event indicator and the trailing 30-day log return over 3132 daily entry rows: coefficient +1.81% (event raw mean +2.65% vs unconditional +2.06%); one-sided stationary-bootstrap percentile p = P(b* <= 0) 0.2138 (30-day blocks) / 0.1993 (60-day blocks, rule 10), one-sided 95% percentile upper bounds +5.5% / +5.0% (5000 draws x 5 seeds). DSR of the primary cell's per-event residual returns 0.009 at 72 cells (PSR vs 0 0.752; 72 cells computed). Subsamples: 2018-21 +2.6% (17 events), 2022-26 +0.5% (14 events). Rule (30 days or F >= 50) excess Sharpe +0.27 at 0.5% / +0.20 at 1.2% round trip vs buy-and-hold +0.67 (reported). Caveat: the F&G file is one current download (no vintages) — implemented criteria pass; not implemented: coefficient +1.81% >= 5 points with one-sided stationary-bootstrap p < 0.05: 30-day blocks: p 0.2138, one-sided 95% upper bound +5.5%; 60-day blocks: p 0.1993, one-sided 95% upper bound +5.0% [non-rejection not decisive: recorded as underpowered (trial power note)]; DSR >= 0.95 of the primary cell's per-event residual returns over the 72 cells (0.009 at 72 trials, var(trial SR) 5.30e-02, PSR vs 0 0.752) [shortfall not decisive: recorded as underpowered]
+- note: from the underlying-library library: Crypto Fear & Greed extremes at longer horizons; harness suggestion: Extend fear_greed_forward_returns in mandel/experiments/social.py to horizons 30/60/90, first-crossing events, and a trailing-return control; grid into pbo_cscv and deflated_sharpe_ratio; register the 7-day result as trial 1. | verifier: corrected claim/trial
 
 ### T-500 · butterfly-convexity-arbitrage
 
@@ -4161,7 +4431,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-66a6cce7: inconclusive — COR1M averages 37.1 vs realised equal-weight average pairwise correlation of the 9 sector SPDRs (XLB/XLE/XLF/XLI/XLK/XLP/XLU/XLV/XLY) 55.7. POOLED over all 21 grid offsets (5206 daily starts 2006-01-03..2026-09-14 = 248 distinct 21-session holds; studentized circular block bootstrap, block 126 sessions): mean gap -18.6 pts (95% CI -20.8 to -16.1), halves -19.0/-18.2. Per grid offset (21 non-overlapping grids, n 247 to 248 windows, block 6): mean gap -19.4 to -17.5 pts, lower bound -21.7 to -19.8 pts, 0/21 offsets with the lower bound > 0. Proxy verdict: NOT an acceptable stand-in under the claim's wording ('the index constituents'): sector baskets diversify away idiosyncratic risk, so their pairwise correlation is far above single-stock correlation (the gap above is dominated by that bias, not by the correlation premium); XLC/XLRE and cap weights are also missing, so the verdict is capped at inconclusive — implemented criteria pass; not implemented: proxy (9 sector SPDRs) POOLED lower 95% CI bound > 0 (a sector proxy bounds the claim from one side only: sector correlations exceed constituent ones, so a proxy shortfall is not a failure); realised average correlation of the index constituents (COR1M's top-50 S&P 500 names, cap-weighted): constituent closes and weights are not archived; vega-neutral short-index / long-constituent straddle book has positive mean P&L: needs index and single-stock chain history
 - note: from the options-library library: Dispersion Trade (short index vol, long constituent vol); harness suggestion: Harness 'implied_vs_realised_correlation' in mandel/experiments/volatility.py with bundles ['cboe-COR1M-history','daily-history-XL*']. | added by the verifier pass
 
-## Untested (90)
+## Untested (72)
 
 ### T-12 · volume-improves-calibration
 
@@ -4202,45 +4472,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: missing-data alignment; markets of the same event are mechanically correlated (exclude same-event pairs)
 - note: harness not yet written: low_rank_structure
 
-### T-300 · tsmom-12-1-multi-asset
-
-**Claim.** Pooled across the listed assets (2000-2026, asset-months as available), the 12-1 long/flat TSMOM rule earns a higher mean monthly after-cost return than the Huang et al. historical-mean strategy (long when the asset's expanding-window mean excess return is positive, else T-bill), with the studentized block-bootstrap 95% interval of the pooled mean difference excluding zero.
-
-- kind: underlying-strategy · origin: underlying-library:trend-momentum/time-series, https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum (fetched), https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing (fetched)
-- statistic: Pooled monthly return difference d = r(TSMOM 12-1 long/flat) - r(historical-mean strategy), equal-weighted across active assets each month; its mean and annualised Sharpe; DSR of the d series with n_trials = 104
-- null: E[d] = 0: the 12-1 sign carries no information beyond the asset's unconditional drift (Huang-Li-Wang-Zhou null)
-- procedure: Refetch adjclose histories; build monthly excess returns with fred-DTB3; compute both strategies per asset with identical execution and costs; pool by calendar month; studentized circular block bootstrap (block 12 months, 5,000 draws) on d; DSR with n_trials = 104 and the observed variance of trial Sharpes; report the 2013-2026 post-publication window separately and the per-asset d signs as diagnostics
-- data: Yahoo adjclose daily for SPY, QQQ, GLD, SLV, EFA, AGG, TLT, DBC, BTC-USD, ETH-USD (EFA, AGG, DBC not yet in the archive); fred-DTB3 (in archive) · min n: 300
-- pass: Mean d > 0 with bootstrap 95% interval excluding 0 AND DSR(d) > 0.95 over 300+ calendar months; post-2012 mean d >= 0 reported (a negative post-2012 d downgrades to 'decayed')
-- controls: Look-ahead: signal uses closes through month-end t, trade one day later, available_at enforced; survivorship: only surviving ETFs (delisted multi-asset ETFs ignored, small upward bias, stated); costs: 2 bps per side SPY/QQQ, 5 bps other ETFs, 25 bps plus 10 bps slippage crypto, T-bill on idle cash; multiple testing: 104 trials incl. T-58; regime: by decade, by VIX tercile at decision, and leave-one-asset-out; dividends: adjclose mandatory (price-only closes understate bond-ETF returns by their yield)
-- note: from the underlying-library library: Time-series momentum 12-1 (TSMOM) on index, gold and crypto ETFs/pairs; harness suggestion: New module mandel/experiments/trend.py with signal library (sign_lookback, sma_cross, donchian, nearness_52w) returning per-period strategy returns; harness tsmom_vs_mean(archive, symbols, variants) that reuses backtest_eval.deflated_sharpe_ratio, overfit.pbo_cscv and the block bootstrap; add bundles via mandel.data.social.collect_history for GLD, SLV, EFA, AGG, TLT, DBC and a FRED fetcher for TB3MS. | verifier: corrected claim/trial
-
-### T-301 · sma-10m-timing-multi-asset
-
-**Claim.** On SPY 1994-2026, the 10-month SMA long/flat rule's maximum drawdown is smaller than that of at least 95% of 1,000 random in/out timing paths matched on time in market and on the number and length distribution of out-of-market spells.
-
-- kind: underlying-strategy · origin: underlying-library:trend-momentum/time-series, https://mebfaber.com/timing-model/ (fetched), https://www.aqr.com/Insights/Research/Journal-Article/Which-Trend-Is-Your-Friend (Levine-Pedersen; fetched)
-- statistic: Maximum drawdown of the rule; its percentile within the matched random-timing distribution; secondary guardrail: paired Sharpe difference (rule minus buy-and-hold) with studentized block-bootstrap interval
-- null: Drawdown reduction is what any timing path with the same exposure profile achieves (the rule's out-of-market months are no better chosen than random spells)
-- procedure: Monthly adjclose series; generate 1,000 random paths by randomly re-placing the rule's own out-of-market spells (spell-length preserving) within the sample; compute MDD for rule and paths; Holm correction across the 96 declared variants on the percentile p-values; Sharpe difference via block bootstrap (block 12 months)
-- data: Yahoo adjclose for SPY (and EFA, IEF, DBC, VNQ, QQQ, GLD, BTC-USD, ETH-USD for variants); fred-DTB3 · min n: 380
-- pass: Rule MDD below the 5th percentile of the matched null (Holm-adjusted p < 0.05) AND Sharpe difference lower 95% bound > -0.15 (non-inferiority)
-- controls: Look-ahead: month-end close, trade next day; survivorship: surviving ETFs only (stated); costs: 2 bps SPY, 5 bps others, 25+10 bps crypto per switch; dividends via adjclose (price-only SMA would bias exits for high-yield sleeves); multiple testing: 96 trials plus T-58's 48; regime: 1994-2008, 2009-2021, 2022-2026 reported separately since the reputation rests on 2000-02 and 2008
-- note: from the underlying-library library: Long-moving-average timing (Faber 10-month SMA / 200-day) on multi-asset ETFs; harness suggestion: trend.py: sma_timing(prices, months, band) -> position series; harness sma_timing_vs_bh with the matched-time-in-market random null implemented as a permutation of monthly in/out flags; feed per-period returns to deflated_sharpe_ratio and pbo_cscv. | verifier: corrected claim/trial
-
-### T-308 · residual-momentum
-
-**Claim.** On the 9 sector SPDRs 2002-2026, top-3 residual momentum (vs SPY, 36-month betas) has a higher after-cost Sharpe ratio than top-3 total-return 12-2 momentum, with the paired block-bootstrap 95% interval of the Sharpe difference excluding zero.
-
-- kind: underlying-strategy · origin: underlying-library:trend-momentum/cross-sectional, https://ideas.repec.org/a/eee/empfin/v18y2011i3p506-521.html (Blitz-Huij-Martens; abstract fetched)
-- statistic: Sharpe(residual) - Sharpe(total-return), paired monthly; rank correlation between the two signals (power diagnostic); worst 12-month return of each
-- null: Sharpe difference = 0
-- procedure: Rolling OLS on monthly excess returns using only months <= t-1; paired studentized block bootstrap (block 12 months, 5,000 draws); DSR over 8 trials; report the average Spearman correlation of the two rankings
-- data: Yahoo adjclose for the 9 SPDRs and SPY; fred-DTB3 · min n: 280
-- pass: Sharpe difference > 0 with 95% interval excluding 0 AND DSR > 0.95; if mean rank correlation > 0.9 the test is labelled low-power
-- controls: Look-ahead: betas and residuals from months up to t-1, trade at t+1; survivorship: constant SPDR set with the 2015/2018 sector reshuffle breaks reported; costs: 5 bps per side; multiple testing: 8 trials; regime: 2008-09 and 2020 reported separately since the claimed benefit is crash reduction
-- note: from the underlying-library library: Residual (idiosyncratic) momentum; harness suggestion: trend.py residual_momentum(returns_df, factor_df, window) using numpy lstsq; harness residual_vs_total reusing xs_momentum for the comparison leg. | verifier: corrected claim/trial
-
 ### T-309 · fifty-two-week-high
 
 **Claim.** Over 2004-2026, the monthly long-short portfolio formed on 52-week-high nearness across the 19-ETF universe earns a positive after-cost mean return, with the block-bootstrap 95% interval excluding zero and the mean above the 95th percentile of a within-month rank-permutation null.
@@ -4253,32 +4484,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Mean > 0 with 95% interval excluding 0, above the permutation 95th percentile, DSR > 0.95
 - controls: Look-ahead: 252-day window ends at t inclusive, trade at t+1; survivorship: ETFs named ex ante; costs: 5 bps per side ETFs, 50 bps a year borrow on shorts; dividends: adjclose (price-only nearness penalises high-yield bond ETFs after each ex-date); multiple testing: 8 trials; regime: by decade
 - note: from the underlying-library library: 52-week-high proximity (George-Hwang) as a trend signal; harness suggestion: trend.py nearness_52w(prices) and reuse xs_momentum ranking machinery; harness fifty_two_week_vs_12_1. | verifier: corrected claim/trial
-
-### T-310 · volatility-scaled-trend
-
-**Claim.** Volatility scaling raises the after-cost Sharpe ratio of the 12-1 TSMOM long/flat rule (pooled across the listed assets) by more than it raises the Sharpe ratio of buy-and-hold on the same assets, with the block-bootstrap 95% interval of this difference-in-differences excluding zero.
-
-- kind: underlying-strategy · origin: underlying-library:trend-momentum/risk-management, https://ideas.repec.org/a/eee/finmar/v30y2016icp103-124.html (Kim-Tse-Wald; fetched), https://ideas.repec.org/a/eee/jfinec/v116y2015i1p111-120.html (Barroso-Santa-Clara; fetched)
-- statistic: DiD = [Sharpe(scaled TSMOM) - Sharpe(unscaled TSMOM)] - [Sharpe(scaled B&H) - Sharpe(unscaled B&H)], pooled portfolio level; per-asset DiD as diagnostic
-- null: DiD = 0: scaling helps the trend rule only as much as it helps buy-and-hold (Kim-Tse-Wald/Cederburg null)
-- procedure: Daily data, monthly rebalancing; all four strategies computed with identical costs and financing; joint circular block bootstrap (block 60 days, 5,000 draws) resampling the same blocks for all four; DSR/Holm across 20 trials
-- data: Yahoo adjclose daily for the listed assets; fred-DTB3; deribit-dvol-BTC-history (archive) · min n: 300
-- pass: DiD > 0 with 95% interval excluding 0 AND Holm-adjusted across 20 trials; DiD sign positive in at least 2 of 3 decades
-- controls: Look-ahead: sigma_hat uses returns through t only and no full-sample scaling constant (the Cederburg critique of Moreira-Muir); survivorship: as TSMOM entry; costs: 2-5 bps ETFs and 25+10 bps crypto on all scaling turnover; financing above 1x at T-bill + 50 bps; multiple testing: 20 trials plus the TSMOM base count; regime: 2008, 2020, 2022 reported separately
-- note: from the underlying-library library: Volatility-scaled trend (constant-volatility targeting of TSMOM and momentum portfolios); harness suggestion: trend.py vol_scale(positions, returns, estimator, target, cap); harness vol_scaling_dod computing the difference-of-differences; add a Deribit DVOL fetcher (public get_volatility_index_data) for the BTC variant. | verifier: corrected claim/trial
-
-### T-311 · momentum-crash-protection
-
-**Claim.** Over 2000-2026, the bear-and-high-vol filter reduces the worst 3-month return of the sector-SPDR long/short momentum portfolio by more than 95% of random filters with the same number and length of activation spells.
-
-- kind: underlying-strategy · origin: underlying-library:trend-momentum/risk-management, https://www.nber.org/papers/w20439 (Daniel-Moskowitz; fetched), https://ideas.repec.org/a/eee/jfinec/v116y2015i1p111-120.html (Barroso-Santa-Clara; fetched)
-- statistic: Worst rolling 3-month return of the filtered portfolio; its percentile among 1,000 spell-preserving random activation paths; guardrail: paired Sharpe difference
-- null: The filter's activation dates are no better than random dates with the same activation profile
-- procedure: Point-in-time indicators; random activation paths by re-placing the filter's own spells; Holm across 24 trials; paired block bootstrap (block 12 months) for the Sharpe guardrail; count activation episodes
-- data: Yahoo adjclose for SPY and the 9 SPDRs; crypto variant: CMC data-api historical listings plus Yahoo coin histories · min n: 300
-- pass: Worst-3-month return below the 5th percentile of the random-filter null (Holm-adjusted) AND Sharpe difference lower 95% bound > -0.1 AND at least 5 distinct activation episodes; fewer than 5 = inconclusive
-- controls: Look-ahead: indicators from data through t; survivorship: constant SPDR set; costs: 5 bps per side at switches, 50 bps a year borrow on shorts; multiple testing: 24 trials; regime: the US sample likely has only 2 activation episodes (2001-03, 2008-09; SPY's 24-month return stayed positive through 2022), so the ETF test is expected to be inconclusive by its own gate and the crypto variant carries the power
-- note: from the underlying-library library: Momentum crash protection (Daniel-Moskowitz dynamic momentum / bear-market filter); harness suggestion: trend.py crash_filter(base_weights, market_prices, lookback, vol_pct); harness crash_filter_vs_random with permuted activations; shares xs_momentum output. | verifier: corrected claim/trial
 
 ### T-313 · xs-commodity-momentum-etf-proxy
 
@@ -4318,32 +4523,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Mean > 0.02 with 95% interval excluding 0 and exceeding matched controls, DSR > 0.95, Kalshi replication sign agrees
 - controls: Look-ahead: shock at day t, entry at day t+1 price; variant B must use the endDate as first published, but the closed-markets snapshot was taken 2026-10-14 (available_at) so endDate may have been revised after the fact: restrict B to markets whose endDate is within 1 day of the actual close, or drop B; survivorship: the 399-market history set was selected by volume ex post (stated leak); costs: 2 cents Polymarket, Kalshi fee formula; multiple testing: 36 trials incl. T-10; regime: by category and days-to-resolution bucket
 - note: from the underlying-library library: Prediction-market price momentum revisited: event-time, shock-conditioned and cross-outcome versions; harness suggestion: mandel/experiments/pm_momentum.py: shock_continuation(series_by_market, sd_mult, hold) with matched controls; event_time_momentum(...) using listing/resolution dates from closed-markets; cross_outcome(...) grouping markets by event id (Gamma 'events' field); register as theories T-48..T-50 with T-10 named as the superseded search. | verifier: corrected claim/trial
-
-### T-317 · trend-crisis-alpha-smile
-
-**Claim.** Over 2000-2026, the quarterly returns of the equal-risk TSMOM long/short portfolio have a positive coefficient on squared quarterly SPY excess return that exceeds the coefficient produced by the same rule applied to simulated driftless random walks with each sleeve's volatility and cross-correlation, with the block-bootstrap 95% interval of the excess coefficient excluding zero.
-
-- kind: underlying-strategy · origin: underlying-library:trend-momentum/portfolio-property, https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing (fetched), https://arxiv.org/abs/1404.3274 (fetched)
-- statistic: gamma = coefficient on SPY^2 (with SPY linear term) minus the mean gamma from 1,000 simulated no-autocorrelation paths (mechanical convexity); diagnostic: mean trend return in SPY's worst-decile quarters
-- null: gamma equals the mechanical convexity of a trend rule on random walks (no real crisis alpha)
-- procedure: Monthly sleeve returns from adjclose, quarterly aggregation; HAC regression plus block bootstrap (block 4 quarters, 5,000 draws); simulation null by resampling sleeve return vectors i.i.d. by month (keeps cross-correlation, removes autocorrelation); Holm across 8 trials
-- data: Yahoo adjclose for the 8 sleeves (most not in archive); fred-DTB3 · min n: 100
-- pass: gamma minus simulated gamma > 0 with 95% interval excluding 0, Holm-adjusted across 8 trials; leave-one-crisis-out (2000-02, 2008, 2020, 2022) keeps the sign
-- controls: Look-ahead: signals lagged one month, vol from past returns; survivorship: fixed sleeves; costs: 5 bps per side plus borrow on shorts; multiple testing: 8 trials (Holm, since DSR does not fit a regression coefficient); regime: about 4 crisis episodes drive the result, reported individually
-- note: from the underlying-library library: Trend-following crisis alpha: convexity of trend returns in large market moves; harness suggestion: trend.py tsmom_portfolio(...) feeding a harness crisis_smile with the quadratic regression and the worst-decile statistic; share sleeve code with the TSMOM entry. | verifier: corrected claim/trial
-
-### T-318 · ta-rule-universe-reality-check
-
-**Claim.** On SPY 1994-2026, the walk-forward-selected best rule from the frozen 88-rule universe does not beat buy-and-hold after costs: Hansen's SPA test of the full universe against buy-and-hold does not reject at 5% and the CSCV probability of backtest overfitting exceeds 0.5.
-
-- kind: underlying-strategy · origin: underlying-library:trend-momentum/meta-control, https://ideas.repec.org/a/bla/jfinan/v54y1999i5p1647-1691.html (Sullivan-Timmermann-White; abstract fetched), https://ideas.repec.org/a/bla/jecsur/v21y2007i4p786-826.html (Park-Irwin; fetched)
-- statistic: Hansen SPA p-value (benchmark buy-and-hold, loss = negative daily excess return); CSCV PBO; DSR of the in-sample best rule with n_trials = 88; out-of-sample Sharpe of the walk-forward-selected rule minus buy-and-hold
-- null: (for the control) No rule beats buy-and-hold (SPA null); selected rule's out-of-sample rank is random (PBO = 0.5)
-- procedure: Compute daily returns for all 88 rules; SPA with stationary bootstrap (mean block 20 days, 5,000 draws); pbo_cscv with 16 partitions; deflated_sharpe_ratio; walk-forward selection every 5 years with block bootstrap on the out-of-sample difference; repeat on QQQ, GLD, BTC as replications
-- data: Yahoo adjclose daily for SPY, QQQ, GLD, BTC-USD · min n: 8000
-- pass: Control confirmed if SPA p > 0.05 AND PBO > 0.5 AND the out-of-sample difference's interval includes or lies below 0; if SPA p < 0.05 and PBO < 0.5, record a surprise and promote the surviving rule to its own theory
-- controls: Look-ahead: one-bar delay; survivorship: single surviving assets; costs: 2 bps SPY, 5 bps GLD/QQQ, 25+10 bps BTC per switch (fast rules trade 20-50 times a year); multiple testing: this entry measures it; regime: PBO per decade
-- note: from the underlying-library library: Technical rule universe reality check on SPY and BTC (declared MA/channel search, expected to fail); harness suggestion: Extend mandel/experiments/overfit.py momentum_variants to a rule_universe(prices, spec) generator; harness ta_reality_check reusing pbo_cscv and deflated_sharpe_ratio; register as a control theory analogous to T-10 for underlyings. | verifier: corrected claim/trial
 
 ### T-319 · xs-short-term-reversal
 
@@ -4409,19 +4588,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: 95% lower bound of mean monthly net return > 0 at 3%/yr borrow AND DSR > 0.95 over the 8 trials
 - controls: Look-ahead: none (mechanical). Structural changes: SVXY and UVXY leverage changes on 2018-02-28 modelled as breaks; reverse splits handled by split-adjusted closes. Costs: borrow is time-varying and spikes in stress (sensitivity grid); FINRA leveraged-ETF short margin (roughly leverage x standard requirement, up to ~90-100% for 3x) means forced covering in drawdowns, modelled with a margin-call stop at 2x initial margin. Regime: 2010-2019 vs 2020-2026; the 2022 trend year reported. Multiple testing: 8 trials.
 - note: from the underlying-library library: Leveraged ETF volatility decay: short both legs of a +3x/-3x pair; harness suggestion: letf_short_pair_sim: daily simulator with borrow/financing inputs and realized-variance regression; outputs borrow break-even | verifier: corrected claim/trial
-
-### T-326 · gold-silver-ratio-reversion
-
-**Claim.** On GLD/SLV from 2008-04 (after a 500-day warm-up) to 2026-09, the declared 500-day-anchor z-score rule earns a positive mean daily net return after 20 bps per leg per trade and 50 bps/yr borrow on the short leg.
-
-- kind: underlying-strategy · origin: underlying-library:mean-reversion-statarb, https://doi.org/10.1016/s1044-0283(01)00034-5, https://www.tcd.ie/triss/assets/PDFs/iiis/iiisdp55.pdf
-- statistic: mean daily net return of the rule (and Sharpe); diagnostic: variance ratio VR(20/60/250) of the log ratio with heteroskedasticity-robust intervals
-- null: mean daily net return = 0 (stationary block bootstrap, block 60 days); VR = 1 for the diagnostic
-- procedure: Trailing statistics only. Simulate the rule. Block bootstrap. DSR with n_trials = this entry's 4 anchor/route variants plus T-61's tested variant. Repeat on roll-adjusted GC=F/SI=F from 2002.
-- data: Yahoo GLD (2004-11) and SLV (2006-04) adjusted closes; Yahoo GC=F and SI=F continuous front-month (2000-09), rolled using CME active-month calendars · min n: 2000
-- pass: 95% lower bound of mean daily net return > 0 AND DSR > 0.95 AND same sign on the GC/SI route
-- controls: Look-ahead: trailing windows; execution at the next close. Futures roll: GC (Feb/Apr/Jun/Aug/Oct/Dec) and SI (Mar/May/Jul/Sep/Dec) roll on different calendars, so roll jumps do NOT cancel in the ratio (corrects the earlier note); roll-adjust or use GLD/SLV as primary. Costs: 20 bps/leg plus borrow. Multiple testing: includes T-61. Regime: 2008, the 2011 silver spike, 2020 and 2024-2026 reported separately. Few trades expected (~10-25), so power is low: report trade count.
-- note: from the underlying-library library: Gold-silver ratio mean reversion; harness suggestion: ratio_reversion_harness: variance ratio + z-rule simulator, parameterised by two tickers (reusable for ETH/BTC, GLD/GDX) | verifier: corrected claim/trial
 
 ### T-328 · btc-etf-premium-discount
 
@@ -4501,58 +4667,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: only option trades and Polymarket prices with timestamps <= decision time; resolution excluded from inputs. Model risk: two smile fits, difference used as an error bar; sparse-trade hours flagged. Risk-premium confound: tails excluded from the primary read. Fees: Polymarket crypto taker 0.07; makers free. Resolution-source mismatch: Binance vs Deribit index basis applied. Regime: weekends, macro-release days. Multiple testing: 7 variants in DSR.
 - note: from the underlying-library library: Polymarket BTC threshold contracts vs Deribit option-implied digital probabilities; harness suggestion: digital_vs_rn_harness: smile fitter + Breeden-Litzenberger integrator, gap store, fade simulator, proper-score comparison reusing scoring.py | verifier: corrected claim/trial
 
-### T-345 · month-end-rebalancing-flow
-
-**Claim.** Over 2002-2026, in months where SPY has beaten TLT month-to-date by more than 2 pp at the T-3 close, SPY's return over the last two trading days is lower than its last-two-day return in all other months by at least 15 bps on average, with the gap negative in both halves.
-
-- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://www.nber.org/papers/w33554, https://research.aalto.fi/en/publications/dash-for-cash-monthly-market-impact-of-institutional-liquidity-ne/
-- statistic: Mean 2-day SPY return in signal months minus the mean in other months (bps). Secondary: the mean SPY-minus-TLT 2-day spread in signal months.
-- null: No conditional difference. Permutation of the signal label across months (10,000 draws), plus a block bootstrap over months (block 3).
-- procedure: The signal uses closes available at the T-3 close. The 2-day window is fixed. Halves 2002-2013 / 2014-2026. Declared grid: 3 thresholds x 2 decision days, plus quarter-end, equity-leg and GLD/BTC analogues = 10 trials (DSR/Holm).
-- data: daily-history-SPY, TLT (2002-07-), AGG, IWM, GLD, BTC-USD (stored); IEF via Yahoo (2002-07-30, verified). · min n: 80
-- pass: Difference < -15 bps with permutation p < 0.05, both halves negative, net of 2 bps per leg; min_n counts signal months.
-- controls: Look-ahead: signal at the T-3 close. Survivorship: n/a. Costs: 2 legs x up to 12 trades/yr at 1-2 bps. Multiple testing: 10 trials. Regime: halves; 2008, 2020 and the 2022 bond bear flagged.
-- note: from the underlying-library library: Month-end rebalancing flow (stocks vs bonds); harness suggestion: events.py: month_end_rebalance(days_spy, closes_spy, days_tlt, closes_tlt, threshold_pp=2.0, decision_day=-3, window=2) -> conditional means, permutation p, halves; share the month-indexing helper with turn_of_month. | verifier: corrected claim/trial
-
-### T-347 · day-of-week-speculative-spread
-
-**Claim.** Over 2011-2026, the daily return of the SPHB-minus-SPLV spread is higher on Fridays than on Mondays by at least 10 bps on average, with the contrast positive in both halves.
-
-- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://alphaarchitect.com/2019/03/investor-mood-day-of-the-week-and-the-cross-section-of-returns/, https://academicnewsletter.sufe.edu.cn/info/356118
-- statistic: Mean spread return on Fridays minus mean on Mondays (bps). This is a single pre-registered contrast; no weekday Bonferroni applies to it.
-- null: Equal Friday and Monday means. Studentized block bootstrap (block 10 trading days) of the day-flagged spread series; plus a permutation of weekday labels within calendar weeks.
-- procedure: Build the spread series from daily closes. Run the contrast with halves 2011-2018 / 2019-2026. The 5 non-primary variants are Holm-adjusted secondary trials.
-- data: daily-history-SPHB, SPLV, USMV (stored); IWO, IWN, ARKK via Yahoo (ARKK verified from 2014-10-31); VIX (stored); GLD, SLV (stored). · min n: 600
-- pass: Contrast > 10 bps with p < 0.05 and both halves positive; the net-of-cost strategy (about 4-8 bps/week) is reported separately.
-- controls: Look-ahead: none. Survivorship: ETFs chosen ex ante except ARKK (flagged). Costs: 2 legs x 2 round trips/week at 1-2 bps. Multiple testing: 1 primary plus 5 Holm. Regime: halves; 2020-2021 meme period flagged.
-- note: from the underlying-library library: Day-of-week effects: speculative-minus-safe Monday/Friday spread; harness suggestion: Reuse weekday_effect on a synthetic spread series: spread_closes = cumulative product of (1 + r_spec - r_safe); add a 'contrast' parameter to compare two named weekdays directly. | verifier: corrected claim/trial
-
-### T-349 · pre-holiday-effect
-
-**Claim.** Over 2000-2026, IWM's return on the last trading day before scheduled NYSE holidays exceeds its mean return on all other days by at least 10 bps, with both halves positive.
-
-- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://ideas.repec.org/a/taf/apfiec/v15y2005i2p107-119.html, https://cfr.ivo-welch.info/published/papers/ko2021pre.pdf
-- statistic: Mean daily return difference (bps), pre-holiday days minus other days.
-- null: Equal means. Studentized block bootstrap (block 10) of the day-flagged series.
-- procedure: Holidays come from a rule-based NYSE schedule (an explicit list of the holiday rules plus the unscheduled-closure exclusion list). Halves 2000-2012 / 2013-2026. The other 6 variants are Holm-adjusted secondary trials.
-- data: daily-history-IWM, daily-history--RUT, daily-history-SPY (stored); FXI, EWY, INDA via Yahoo. · min n: 200
-- pass: Difference > 10 bps with p < 0.05 and both halves positive.
-- controls: Look-ahead: inferring holidays from missing bars would include unscheduled closures nobody knew in advance; the rule-based schedule avoids that. Survivorship: n/a. Costs: 10 round trips/yr at 1-2 bps. Multiple testing: 1 primary plus 6 Holm. Regime: halves; SPY expected null.
-- note: from the underlying-library library: Pre-holiday and holiday-week effects; harness suggestion: events.py: holidays_from_gaps(days) -> set of pre-holiday day indexes (weekday with missing bar); event_day_effect(days, closes, pre_holiday_days); loop over IWM, SPY, country ETFs. | verifier: corrected claim/trial
-
-### T-357 · presidential-cycle
-
-**Claim.** Over 1928-2026, the S&P 500's price return in pre-election years (year 3 of the presidential term) exceeds the mean annual return of the other three years by at least 5 percentage points, with both halves positive.
-
-- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://www.nber.org/papers/w23184, https://pwlcapital.com/?p=5381
-- statistic: Mean year-3 annual return minus mean annual return of other years (pp).
-- null: Equal means. Permute the cycle label within each 4-year block (preserving year-to-year dependence), 10,000 draws.
-- procedure: Annual returns from ^GSPC daily closes, price only. Halves 1928-1976 / 1977-2026; 1990-2026 reported separately. The party variant uses inauguration dates. 6 variants; the year-3 test is the single pre-registered one.
-- data: daily-history--GSPC (stored, 1927-12-30-; social.yahoo_history with period1=0 truncates to 1970, so re-fetch with a negative period1); SPY, IWM, TLT, GLD (stored); Polymarket election markets (stored). · min n: 20
-- pass: Year-3 excess > 5 pp with permutation p < 0.05 and both halves positive.
-- controls: Look-ahead: none. Survivorship: n/a. Costs: one trade per 4 years. Multiple testing: 6 variants, 1 pre-registered. Regime: halves, and the post-Almanac 1990-2026 period separately; dividends excluded (flagged).
-- note: from the underlying-library library: Presidential election cycle and party-in-power effects; harness suggestion: events.py: cycle_year_effect(days, closes, anchor_year=1928, period=4, target=3) with within-block label permutation; party_effect(days, closes, terms) for the inauguration-based split. | verifier: corrected claim/trial
-
 ### T-358 · binary-event-uncertainty-premium
 
 **Claim.** Over 2020-2026, across scheduled market-relevant binary events listed on Polymarket or Kalshi, SPY's return over the two trading days into resolution increases with the contracts' ex-ante uncertainty p(1-p) measured three trading days before; the regression slope is positive with p < 0.05.
@@ -4630,32 +4744,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Bootstrap 95% upper bound of the mean spread < 1.5%: claim supported (no carry). A venue whose own lower bound is above 1.5% is recorded as a venue-specific carry, and counted as a trial.
 - controls: Posted APY is not realized APY (bad debt, utilization spikes); use base APY only, no token rewards. Survivorship: the /pools endpoint lists current pools, so fix pool IDs from a dated snapshot and note that dead pools may be missing. Look-ahead: APY known at the timestamp. Costs: gas $1-10 per move. Multiple testing: 5 trials. US-access filter applied per venue.
 - note: from the underlying-library library: Stablecoin and tokenized-treasury yield as carry (US access); harness suggestion: mandel/data/social.py: defillama_yields(pool_ids) into store; mandel/experiments/carry.py: spread_over_rf() | verifier: corrected claim/trial
-
-### T-370 · metals-cash-and-carry-basis
-
-**Claim.** From 2005 to September 2026, the annualized gold futures implied financing rate (GC=F vs GLD-implied spot, excluding roll weeks) minus DTB3 has a mean within plus or minus 50 bp, so a GLD-long/GC-short lender earns no excess return over T-bills before GLD's 40 bp fee.
-
-- kind: underlying-strategy · origin: underlying-library:Carry, basis and yield, https://www.kitco.com/opinion/2026-04-23/londons-silver-running-out-room, https://finance.yahoo.com/news/exclusion-trumps-tariffs-reduces-premium-171033042.html
-- statistic: Mean of the daily (i - DTB3), with a HAC 95% CI. Also reported: its SD and the share of days with i < 0.
-- null: |mean(i - DTB3)| > 50 bp (a carry exists in either direction).
-- procedure: Daily from 2005-01: compute i per the rule, drop roll windows, HAC (lag 21) CI. Robustness: use GLD NAV (LBMA PM-based) instead of the GLD close. Run the silver/platinum/copper variants separately.
-- data: daily-history-GC=F, SI=F, PL=F, PA=F, HG=F, GLD, SLV, PPLT, PALL, CPER (to add); fred-DTB3. · min n: 4000
-- pass: HAC 95% CI of the mean deviation lies inside [-50, +50] bp. Each other metal is a separate trial with the same criterion; 6 trials counted.
-- controls: Asynchrony: GLD closes at 16:00 ET while the Yahoo GC=F close may be the 17:00 ET session end. This adds noise but no bias to the mean; check with GLD NAV. The roll date of Yahoo's continuous series is undocumented: windows dropped. GLD premium/discount to NAV. First notice and delivery not modeled. Costs: futures $2-5 per contract, GLD 40 bp a year. Survivorship: none. Regime: pre/post 2020 and the 2024-25 tariff EFP episode reported.
-- note: from the underlying-library library: Metals cash-and-carry and implied lease rate (GC, SI); harness suggestion: mandel/experiments/carry.py: implied_financing(fut, spot, rf); metals bundles GC=F, SI=F, PL=F, PA=F, HG=F added to daily-history | verifier: corrected claim/trial
-
-### T-372 · equity-index-futures-basis
-
-**Claim.** From 2010 to September 2026, the ES-implied financing rate (ES=F vs ^GSPC, with prior-year SPY dividends as the dividend forecast, measured on days 5-60 after each roll) exceeds DTB3 by more than 20 bp on average.
-
-- kind: underlying-strategy · origin: underlying-library:Carry, basis and yield, https://www.nber.org/papers/w26773, https://query1.finance.yahoo.com/v8/finance/chart/ES=F
-- statistic: Mean (r_imp - DTB3) with Newey-West CI (lag 21), plus a quarter-clustered bootstrap.
-- null: Mean spread <= 20 bp.
-- procedure: Daily per the rule. Robustness: realized dividends (ex-post) instead of forecast. Report ZIRP (2010-2015, 2020-2021) vs positive-rate regimes. Variants run separately.
-- data: daily-history-ES=F (from 2000), ^GSPC, SPY with events=div, NQ=F, ^NDX, QQQ dividends; fred-DTB3. Listed contracts (ESZ26.CME from 2021-09) for cross-checking the continuous series. · min n: 2500
-- pass: Lower 95% bound of the mean spread > 20 bp under both the HAC and the clustered bootstrap; 5 trials counted.
-- controls: Look-ahead: dividend forecast from the prior year (no realized dividends in the base test). Continuous-contract roll: only days 5-60 after the roll. ES=F daily close may be the 17:00 ET session end vs the index at 16:00 ET: also run on the 16:00 settle where available and report the difference. Costs: ES $2-4 round trip, SPY 1 bp. Survivorship: none. Regime: ZIRP vs post-2022, quarter-ends.
-- note: from the underlying-library library: Equity index futures basis (implied financing) as lender/borrower; harness suggestion: mandel/experiments/carry.py: implied_financing(fut, spot, rf, dividends) shared with metals; add ES=F, NQ=F to bundles and SPY dividends via events=div | verifier: corrected claim/trial
 
 ### T-373 · treasury-curve-carry-rolldown
 
@@ -4943,19 +5031,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: intensity samples taken before the close; RV from the next day's bars; IV at the same close. Survivorship: symbol list declared. Costs: none for the forecast; overlay costs belong to the options family. Multiple testing: 12 cells. Regime: earnings and FOMC days flagged.
 - note: from the underlying-library library: Social message volume predicts next-day realised volatility; harness suggestion: Extend attention_vs_abs_return in mandel/experiments/social.py into a HAR-RV regression with IV from mandel/data/options.py surface summaries; add QLIKE and Diebold-Mariano to mandel/validation/backtest_eval.py. | verifier: corrected claim/trial
 
-### T-416 · fear-greed-extremes
-
-**Claim.** First crossings of F <= 20 predict a BTC 30-day forward log return at least 5 percentage points above the unconditional 30-day mean, after controlling for the trailing 30-day return.
-
-- kind: underlying-strategy · origin: underlying-library:Microstructure, liquidity and sentiment, https://api.alternative.me/fng/?limit=0 (full history, verified), mandel/experiments/social.py fear_greed_forward_returns (the 7-day result already recorded)
-- statistic: Coefficient on the first-crossing indicator in a regression of 30-day forward log return on the indicator and the trailing 30-day return, over non-overlapping events. Rule Sharpe vs buy-and-hold.
-- null: Coefficient <= 0 (stationary block bootstrap with 30-day blocks, 5,000 draws).
-- procedure: Event study over the 72 cells, deflated. Subsamples 2018-21 and 2022-26. Power note: with about 30 independent events and BTC's 30-day volatility of about 18%, the minimum detectable effect is about 8 points, so a non-rejection is recorded as underpowered, not as a refutation.
-- data: alternative.me FNG history 2018-02-01 to 2026-10-14 (3,174 days, in store); Yahoo BTC-USD and ETH-USD daily. · min n: 30
-- pass: At least 30 non-overlapping first-crossing events at H = 30 (the store has 30: 42 crossings, 30 non-overlapping at 30 days, 21 at 60 days). Coefficient >= 5 points with one-sided bootstrap p < 0.05. DSR >= 0.95 over the 72 cells. Same sign in both subsamples.
-- controls: Look-ahead: available_at = day + 1 at 00:00 UTC; entry at that day's close. Survivorship: not applicable. Costs: 0.5-1.2% round trip at retail Coinbase/Kraken taker tiers; 0.3-0.5% maker. Multiple testing: 72 cells plus the 7-day trial. Regime: halving-cycle phase; the 2022 drawdown reported separately.
-- note: from the underlying-library library: Crypto Fear & Greed extremes at longer horizons; harness suggestion: Extend fear_greed_forward_returns in mandel/experiments/social.py to horizons 30/60/90, first-crossing events, and a trailing-return control; grid into pbo_cscv and deflated_sharpe_ratio; register the 7-day result as trial 1. | verifier: corrected claim/trial
-
 ### T-419 · high-volume-return-premium
 
 **Claim.** Across the declared ETF plus BTC/ETH universe, 2005-2026, a top-decile idiosyncratic volume day without a 2-sigma price move predicts a positive 10-day beta-adjusted forward return of at least 50 bps.
@@ -5059,19 +5134,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Excess > 10 bps with p < 0.05 and both halves positive; placebo not significant.
 - controls: Look-ahead: auction schedules are announced in advance and the auction date is known at entry. Survivorship: n/a. Costs: about 24 round trips/yr at 1-2 bps (TLT). Multiple testing: 6 variants Holm. Regime: halves; 2008, the 2020 dash for cash and the 2022 bond bear flagged; overlap with CPI weeks reported.
 - note: from the underlying-library library: Treasury auction cycle (pre-auction concession, post-auction recovery); harness suggestion: data/fetch.py: treasury_auctions(terms=('10-Year','30-Year','9-Year 11-Month','29-Year 11-Month')) cached as 'treasury-auctions'; events.py: event_window_effect(days, closes, event_days, start=0, end=3, cluster='week') reusing block_bootstrap_pvalue. | added by the verifier pass
-
-### T-450 · pension-rebalancing-flow
-
-**Claim.** The SPY return over the last 3 trading days of the month plus the first day of the next month is negatively related to the month-to-date SPY-minus-AGG return differential over 2003-10 to 2026-09.
-
-- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.nber.org/papers/w33554 (fetched; abstract verified)
-- statistic: Slope of the 4-day window SPY excess return on the month-to-date differential (HAC t), plus the mean return of the threshold rule with bootstrap CI.
-- null: Slope >= 0.
-- procedure: Yahoo SPY, AGG adjusted closes; differential known at t-3 close; non-overlapping monthly windows; quarter-end subset; long-history replication using FF daily market and a FRED DGS10 duration proxy.
-- data: Yahoo SPY, AGG, TLT; Ken French daily market; FRED DGS10. · min n: 250
-- pass: Slope t <= -2 over >= 250 monthly windows AND negative point estimate in both halves (2003-2014, 2015-2026).
-- controls: Look-ahead: signal at t-3 close. Survivorship: none. Costs: 2 round trips/month at 1 bp + financing for 150%. Multiple testing: 4 variants. Regime: 2008, 2020, 2022 (stocks and bonds fell together).
-- note: from the underlying-library library: Pension and balanced-fund rebalancing flow (month-end); harness suggestion: Extend underlying.py turn_of_month() with a conditioning variable (month-to-date stock-bond differential). | added by the verifier pass
 
 ### T-451 · piotroski-fscore-value
 
@@ -5281,19 +5343,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: month-end scores, next-day trades; survivorship: ETFs named ex ante by the authors (but chosen after seeing history: stated); costs: 5 bps per side, turnover reported; multiple testing: 4 trials plus threshold; regime: 2008, 2020, 2022 and post-2018
 - note: from the underlying-library library: Breadth momentum with a canary universe (Keller-Keuning DAA); harness suggestion: underlying.py score_13612w() and daa_weights(); harness daa_vs_rotation with pbo_cscv. | added by the verifier pass
 
-### T-481 · cross-asset-tsmom-bond-equity
-
-**Claim.** On SPY 1994-2026, the cross-asset long/flat rule ((e + b)/2 clipped at 0) has a higher after-cost Sharpe ratio than SPY's own 12-1 long/flat TSMOM, with the paired block-bootstrap 95% interval of the Sharpe difference excluding zero.
-
-- kind: underlying-strategy · origin: underlying-library:trend-momentum/time-series, https://ideas.repec.org/a/eee/jfinec/v136y2020i1p63-85.html (Pitkäjärvi-Suominen-Vaittinen 2020; fetched in this pass)
-- statistic: Sharpe(cross-asset) - Sharpe(own TSMOM), paired monthly; DSR over 12 trials
-- null: Sharpe difference = 0: the bond signal adds nothing
-- procedure: Monthly adjclose and synthetic bond series; paired studentized block bootstrap (block 12 months, 5,000 draws); DSR; placebo with the bond signal shifted 12 months
-- data: Yahoo adjclose SPY, IEF, TLT; fred-DGS10 and fred-DTB3 (both in archive) · min n: 380
-- pass: Sharpe difference > 0 with 95% interval excluding 0, DSR > 0.95, placebo interval includes 0
-- controls: Look-ahead: month-end yields and closes used next day (FRED available_at respected); survivorship: n/a; costs: 2 bps per side SPY; synthetic bond return approximation error checked against IEF over 2002-2026; multiple testing: 12 trials; regime: 1994-2007, 2008-2021, 2022-2026
-- note: from the underlying-library library: Cross-asset time-series momentum (bond momentum times equities); harness suggestion: underlying.py synthetic_bond_returns(dgs10) and cross_asset_tsmom(); harness cross_asset_tsmom_vs_own. | added by the verifier pass
-
 ### T-482 · frog-in-the-pan-continuity
 
 **Claim.** Over 2004-2026, among panel assets with positive 12-1 returns, the low-ID (continuous) half earns a higher mean next-month after-cost return than the high-ID half, with the block-bootstrap 95% interval of the difference excluding zero.
@@ -5319,19 +5368,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Mean log difference > 0 with 95% interval excluding 0, DSR > 0.95, SSO 2006-2026 point estimate same sign
 - controls: Look-ahead: one-bar delay; survivorship: n/a; costs: 2 bps per switch SPY, 5 bps SSO, financing at T-bill + 50 bps; multiple testing: 6 trials plus T-58; regime: 2018-Q4, 2020-03 and 2022 whipsaws reported
 - note: from the underlying-library library: Leverage for the long run: 2x S&P exposure above the 200-day SMA, T-bills below; harness suggestion: underlying.py leveraged_sma(adj, dtb3, lev, length); harness leverage_long_run. | added by the verifier pass
-
-### T-484 · bond-tsmom-fred-long-history
-
-**Claim.** Over 1963-2026, the 12-1 long/short TSMOM rule on the synthetic 10-year Treasury excess return earns a higher mean monthly return than the historical-mean strategy, with the studentized block-bootstrap 95% interval of the difference excluding zero.
-
-- kind: underlying-strategy · origin: underlying-library:trend-momentum/time-series, https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr657.html (Durham 2013; search result), https://arxiv.org/abs/1404.3274 (Lemperiere et al.; fetched in this pass)
-- statistic: Mean monthly difference d = r(TSMOM) - r(historical-mean); DSR over 8 trials; sub-periods 1963-1981, 1982-2020, 2021-2026
-- null: E[d] = 0
-- procedure: Monthly synthetic returns; studentized block bootstrap (block 12 months, 5,000 draws); DSR; validate the synthetic series against IEF adjclose 2002-2026 (correlation > 0.95 required)
-- data: fred-DGS10, fred-DGS2, fred-DTB3 (all in archive); Yahoo IEF adjclose for validation · min n: 700
-- pass: Mean d > 0 with 95% interval excluding 0, DSR > 0.95, and d > 0 in at least 2 of 3 sub-periods
-- controls: Look-ahead: FRED values used with available_at; survivorship: none; costs: 2 bps per side (futures/ETF equivalent); synthetic-return approximation error measured against IEF; multiple testing: 8 trials; regime: three rate regimes reported
-- note: from the underlying-library library: Long-history Treasury trend from FRED yields (synthetic 10-year bond TSMOM since 1962); harness suggestion: underlying.py synthetic_bond_returns(dgs, maturity) shared with cross-asset-tsmom-bond-equity; harness bond_tsmom_long_history reusing the TSMOM harness. | added by the verifier pass
 
 ## Blocked (117)
 

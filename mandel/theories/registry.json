@@ -7176,11 +7176,15 @@
     "pass": "Mean d > 0 with bootstrap 95% interval excluding 0 AND DSR(d) > 0.95 over 300+ calendar months; post-2012 mean d >= 0 reported (a negative post-2012 d downgrades to 'decayed')",
     "controls": "Look-ahead: signal uses closes through month-end t, trade one day later, available_at enforced; survivorship: only surviving ETFs (delisted multi-asset ETFs ignored, small upward bias, stated); costs: 2 bps per side SPY/QQQ, 5 bps other ETFs, 25 bps plus 10 bps slippage crypto, T-bill on idle cash; multiple testing: 104 trials incl. T-58; regime: by decade, by VIX tercile at decision, and leave-one-asset-out; dividends: adjclose mandatory (price-only closes understate bond-ETF returns by their yield)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_mom_tsmom_vs_hist_mean"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b6f22a08"
+   ],
    "notes": "from the underlying-library library: Time-series momentum 12-1 (TSMOM) on index, gold and crypto ETFs/pairs; harness suggestion: New module mandel/experiments/trend.py with signal library (sign_lookback, sma_cross, donchian, nearness_52w) returning per-period strategy returns; harness tsmom_vs_mean(archive, symbols, variants) that reuses backtest_eval.deflated_sharpe_ratio, overfit.pbo_cscv and the block bootstrap; add bundles via mandel.data.social.collect_history for GLD, SLV, EFA, AGG, TLT, DBC and a FRED fetcher for TB3MS. | verifier: corrected claim/trial"
   },
   {
@@ -7202,11 +7206,15 @@
     "pass": "Rule MDD below the 5th percentile of the matched null (Holm-adjusted p < 0.05) AND Sharpe difference lower 95% bound > -0.15 (non-inferiority)",
     "controls": "Look-ahead: month-end close, trade next day; survivorship: surviving ETFs only (stated); costs: 2 bps SPY, 5 bps others, 25+10 bps crypto per switch; dividends via adjclose (price-only SMA would bias exits for high-yield sleeves); multiple testing: 96 trials plus T-58's 48; regime: 1994-2008, 2009-2021, 2022-2026 reported separately since the reputation rests on 2000-02 and 2008"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_mom_sma10_drawdown_vs_random"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e5086ee8"
+   ],
    "notes": "from the underlying-library library: Long-moving-average timing (Faber 10-month SMA / 200-day) on multi-asset ETFs; harness suggestion: trend.py: sma_timing(prices, months, band) -> position series; harness sma_timing_vs_bh with the matched-time-in-market random null implemented as a permutation of monthly in/out flags; feed per-period returns to deflated_sharpe_ratio and pbo_cscv. | verifier: corrected claim/trial"
   },
   {
@@ -7414,11 +7422,15 @@
     "pass": "Sharpe difference > 0 with 95% interval excluding 0 AND DSR > 0.95; if mean rank correlation > 0.9 the test is labelled low-power",
     "controls": "Look-ahead: betas and residuals from months up to t-1, trade at t+1; survivorship: constant SPDR set with the 2015/2018 sector reshuffle breaks reported; costs: 5 bps per side; multiple testing: 8 trials; regime: 2008-09 and 2020 reported separately since the claimed benefit is crash reduction"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_mom_residual_vs_total_momentum"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0b696555"
+   ],
    "notes": "from the underlying-library library: Residual (idiosyncratic) momentum; harness suggestion: trend.py residual_momentum(returns_df, factor_df, window) using numpy lstsq; harness residual_vs_total reusing xs_momentum for the comparison leg. | verifier: corrected claim/trial"
   },
   {
@@ -7466,11 +7478,15 @@
     "pass": "DiD > 0 with 95% interval excluding 0 AND Holm-adjusted across 20 trials; DiD sign positive in at least 2 of 3 decades",
     "controls": "Look-ahead: sigma_hat uses returns through t only and no full-sample scaling constant (the Cederburg critique of Moreira-Muir); survivorship: as TSMOM entry; costs: 2-5 bps ETFs and 25+10 bps crypto on all scaling turnover; financing above 1x at T-bill + 50 bps; multiple testing: 20 trials plus the TSMOM base count; regime: 2008, 2020, 2022 reported separately"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_mom_vol_scaled_trend_did"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1b19b4a3"
+   ],
    "notes": "from the underlying-library library: Volatility-scaled trend (constant-volatility targeting of TSMOM and momentum portfolios); harness suggestion: trend.py vol_scale(positions, returns, estimator, target, cap); harness vol_scaling_dod computing the difference-of-differences; add a Deribit DVOL fetcher (public get_volatility_index_data) for the BTC variant. | verifier: corrected claim/trial"
   },
   {
@@ -7492,11 +7508,15 @@
     "pass": "Worst-3-month return below the 5th percentile of the random-filter null (Holm-adjusted) AND Sharpe difference lower 95% bound > -0.1 AND at least 5 distinct activation episodes; fewer than 5 = inconclusive",
     "controls": "Look-ahead: indicators from data through t; survivorship: constant SPDR set; costs: 5 bps per side at switches, 50 bps a year borrow on shorts; multiple testing: 24 trials; regime: the US sample likely has only 2 activation episodes (2001-03, 2008-09; SPY's 24-month return stayed positive through 2022), so the ETF test is expected to be inconclusive by its own gate and the crypto variant carries the power"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_mom_crash_filter_vs_random"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-d2b172be"
+   ],
    "notes": "from the underlying-library library: Momentum crash protection (Daniel-Moskowitz dynamic momentum / bear-market filter); harness suggestion: trend.py crash_filter(base_weights, market_prices, lookback, vol_pct); harness crash_filter_vs_random with permuted activations; shares xs_momentum output. | verifier: corrected claim/trial"
   },
   {
@@ -7662,11 +7682,15 @@
     "pass": "gamma minus simulated gamma > 0 with 95% interval excluding 0, Holm-adjusted across 8 trials; leave-one-crisis-out (2000-02, 2008, 2020, 2022) keeps the sign",
     "controls": "Look-ahead: signals lagged one month, vol from past returns; survivorship: fixed sleeves; costs: 5 bps per side plus borrow on shorts; multiple testing: 8 trials (Holm, since DSR does not fit a regression coefficient); regime: about 4 crisis episodes drive the result, reported individually"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_mom_trend_crisis_smile"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7d956b2f"
+   ],
    "notes": "from the underlying-library library: Trend-following crisis alpha: convexity of trend returns in large market moves; harness suggestion: trend.py tsmom_portfolio(...) feeding a harness crisis_smile with the quadratic regression and the worst-decile statistic; share sleeve code with the TSMOM entry. | verifier: corrected claim/trial"
   },
   {
@@ -7688,11 +7712,15 @@
     "pass": "Control confirmed if SPA p > 0.05 AND PBO > 0.5 AND the out-of-sample difference's interval includes or lies below 0; if SPA p < 0.05 and PBO < 0.5, record a surprise and promote the surviving rule to its own theory",
     "controls": "Look-ahead: one-bar delay; survivorship: single surviving assets; costs: 2 bps SPY, 5 bps GLD/QQQ, 25+10 bps BTC per switch (fast rules trade 20-50 times a year); multiple testing: this entry measures it; regime: PBO per decade"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_misc_ta_reality_check"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-33edd767"
+   ],
    "notes": "from the underlying-library library: Technical rule universe reality check on SPY and BTC (declared MA/channel search, expected to fail); harness suggestion: Extend mandel/experiments/overfit.py momentum_variants to a rule_universe(prices, spec) generator; harness ta_reality_check reusing pbo_cscv and deflated_sharpe_ratio; register as a control theory analogous to T-10 for underlyings. | verifier: corrected claim/trial"
   },
   {
@@ -7910,11 +7938,15 @@
     "pass": "95% lower bound of mean daily net return > 0 AND DSR > 0.95 AND same sign on the GC/SI route",
     "controls": "Look-ahead: trailing windows; execution at the next close. Futures roll: GC (Feb/Apr/Jun/Aug/Oct/Dec) and SI (Mar/May/Jul/Sep/Dec) roll on different calendars, so roll jumps do NOT cancel in the ratio (corrects the earlier note); roll-adjust or use GLD/SLV as primary. Costs: 20 bps/leg plus borrow. Multiple testing: includes T-61. Regime: 2008, the 2011 silver spike, 2020 and 2024-2026 reported separately. Few trades expected (~10-25), so power is low: report trade count."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_misc_gold_silver_ratio"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-159692aa"
+   ],
    "notes": "from the underlying-library library: Gold-silver ratio mean reversion; harness suggestion: ratio_reversion_harness: variance ratio + z-rule simulator, parameterised by two tickers (reusable for ETH/BTC, GLD/GDX) | verifier: corrected claim/trial"
   },
   {
@@ -8441,12 +8473,16 @@
     "pass": "Difference < -15 bps with permutation p < 0.05, both halves negative, net of 2 bps per leg; min_n counts signal months.",
     "controls": "Look-ahead: signal at the T-3 close. Survivorship: n/a. Costs: 2 legs x up to 12 trades/yr at 1-2 bps. Multiple testing: 10 trials. Regime: halves; 2008, 2020 and the 2022 bond bear flagged."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cal_month_end_rebalancing"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Month-end rebalancing flow (stocks vs bonds); harness suggestion: events.py: month_end_rebalance(days_spy, closes_spy, days_tlt, closes_tlt, threshold_pp=2.0, decision_day=-3, window=2) -> conditional means, permutation p, halves; share the month-indexing helper with turn_of_month. | verifier: corrected claim/trial"
+   "results": [
+    "X-a500a4a7"
+   ],
+   "notes": "from the underlying-library library: Month-end rebalancing flow (stocks vs bonds); harness suggestion: events.py: month_end_rebalance(days_spy, closes_spy, days_tlt, closes_tlt, threshold_pp=2.0, decision_day=-3, window=2) -> conditional means, permutation p, halves; share the month-indexing helper with turn_of_month. | verifier: corrected claim/trial | 2026-10-15 batch 6c: supported under both rule-12 readings (T-3 close and previous close); net -45.6 bps (CI -77.4..-13.1), both halves about -45 bps; Holm over the declared 10-trial grid p 0.0154 (reported; the pass names the unadjusted p)."
   },
   {
    "id": "T-346",
@@ -8499,11 +8535,15 @@
     "pass": "Contrast > 10 bps with p < 0.05 and both halves positive; the net-of-cost strategy (about 4-8 bps/week) is reported separately.",
     "controls": "Look-ahead: none. Survivorship: ETFs chosen ex ante except ARKK (flagged). Costs: 2 legs x 2 round trips/week at 1-2 bps. Multiple testing: 1 primary plus 5 Holm. Regime: halves; 2020-2021 meme period flagged."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cal_weekday_speculative_spread"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f408bf40"
+   ],
    "notes": "from the underlying-library library: Day-of-week effects: speculative-minus-safe Monday/Friday spread; harness suggestion: Reuse weekday_effect on a synthetic spread series: spread_closes = cumulative product of (1 + r_spec - r_safe); add a 'contrast' parameter to compare two named weekdays directly. | verifier: corrected claim/trial"
   },
   {
@@ -8556,12 +8596,16 @@
     "pass": "Difference > 10 bps with p < 0.05 and both halves positive.",
     "controls": "Look-ahead: inferring holidays from missing bars would include unscheduled closures nobody knew in advance; the rule-based schedule avoids that. Survivorship: n/a. Costs: 10 round trips/yr at 1-2 bps. Multiple testing: 1 primary plus 6 Holm. Regime: halves; SPY expected null."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cal_pre_holiday"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Pre-holiday and holiday-week effects; harness suggestion: events.py: holidays_from_gaps(days) -> set of pre-holiday day indexes (weekday with missing bar); event_day_effect(days, closes, pre_holiday_days); loop over IWM, SPY, country ETFs. | verifier: corrected claim/trial"
+   "results": [
+    "X-f37df8d5"
+   ],
+   "notes": "from the underlying-library library: Pre-holiday and holiday-week effects; harness suggestion: events.py: holidays_from_gaps(days) -> set of pre-holiday day indexes (weekday with missing bar); event_day_effect(days, closes, pre_holiday_days); loop over IWM, SPY, country ETFs. | verifier: corrected claim/trial | 2026-10-15 batch 6c: supported but fragile: p 0.0476 against the 0.05 bar under the trial's studentized circular block bootstrap. Choices the trial does not name move it: a non-circular moving-block bootstrap gives 0.0495 (undecided), price-only returns 0.062, an asymptotic HAC t 1.61 (p 0.054), and counting the Friday Dec-31 sessions before a Saturday New Year (not an NYSE holiday under the rule calendar the procedure names) gives 0.056. The first half is only +2.6 bps."
   },
   {
    "id": "T-350",
@@ -8805,12 +8849,16 @@
     "pass": "Year-3 excess > 5 pp with permutation p < 0.05 and both halves positive.",
     "controls": "Look-ahead: none. Survivorship: n/a. Costs: one trade per 4 years. Multiple testing: 6 variants, 1 pre-registered. Regime: halves, and the post-Almanac 1990-2026 period separately; dividends excluded (flagged)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cal_presidential_year3"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Presidential election cycle and party-in-power effects; harness suggestion: events.py: cycle_year_effect(days, closes, anchor_year=1928, period=4, target=3) with within-block label permutation; party_effect(days, closes, terms) for the inauguration-based split. | verifier: corrected claim/trial"
+   "results": [
+    "X-71e7a233"
+   ],
+   "notes": "from the underlying-library library: Presidential election cycle and party-in-power effects; harness suggestion: events.py: cycle_year_effect(days, closes, anchor_year=1928, period=4, target=3) with within-block label permutation; party_effect(days, closes, terms) for the inauguration-based split. | verifier: corrected claim/trial | 2026-10-15 batch 6c: supported on ^GSPC price returns 1928-2025 (24 year-3 observations, min_n 20): +7.76 pp, permutation p 0.023 (term-aligned blocks) and 0.043 (1928-anchored), all four block phasings pass; pre-1957 is the S&P 90."
   },
   {
    "id": "T-358",
@@ -9168,11 +9216,15 @@
     "pass": "HAC 95% CI of the mean deviation lies inside [-50, +50] bp. Each other metal is a separate trial with the same criterion; 6 trials counted.",
     "controls": "Asynchrony: GLD closes at 16:00 ET while the Yahoo GC=F close may be the 17:00 ET session end. This adds noise but no bias to the mean; check with GLD NAV. The roll date of Yahoo's continuous series is undocumented: windows dropped. GLD premium/discount to NAV. First notice and delivery not modeled. Costs: futures $2-5 per contract, GLD 40 bp a year. Survivorship: none. Regime: pre/post 2020 and the 2024-25 tariff EFP episode reported."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_misc_metals_basis"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-295e4045"
+   ],
    "notes": "from the underlying-library library: Metals cash-and-carry and implied lease rate (GC, SI); harness suggestion: mandel/experiments/carry.py: implied_financing(fut, spot, rf); metals bundles GC=F, SI=F, PL=F, PA=F, HG=F added to daily-history | verifier: corrected claim/trial"
   },
   {
@@ -9220,11 +9272,15 @@
     "pass": "Lower 95% bound of the mean spread > 20 bp under both the HAC and the clustered bootstrap; 5 trials counted.",
     "controls": "Look-ahead: dividend forecast from the prior year (no realized dividends in the base test). Continuous-contract roll: only days 5-60 after the roll. ES=F daily close may be the 17:00 ET session end vs the index at 16:00 ET: also run on the 16:00 settle where available and report the difference. Costs: ES $2-4 round trip, SPY 1 bp. Survivorship: none. Regime: ZIRP vs post-2022, quarter-ends."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_misc_es_basis"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-6453466b"
+   ],
    "notes": "from the underlying-library library: Equity index futures basis (implied financing) as lender/borrower; harness suggestion: mandel/experiments/carry.py: implied_financing(fut, spot, rf, dividends) shared with metals; add ES=F, NQ=F to bundles and SPY dividends via events=div | verifier: corrected claim/trial"
   },
   {
@@ -10420,11 +10476,15 @@
     "pass": "At least 30 non-overlapping first-crossing events at H = 30 (the store has 30: 42 crossings, 30 non-overlapping at 30 days, 21 at 60 days). Coefficient >= 5 points with one-sided bootstrap p < 0.05. DSR >= 0.95 over the 72 cells. Same sign in both subsamples.",
     "controls": "Look-ahead: available_at = day + 1 at 00:00 UTC; entry at that day's close. Survivorship: not applicable. Costs: 0.5-1.2% round trip at retail Coinbase/Kraken taker tiers; 0.3-0.5% maker. Multiple testing: 72 cells plus the 7-day trial. Regime: halving-cycle phase; the 2022 drawdown reported separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_misc_fear_greed_extremes"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-be21458b"
+   ],
    "notes": "from the underlying-library library: Crypto Fear & Greed extremes at longer horizons; harness suggestion: Extend fear_greed_forward_returns in mandel/experiments/social.py to horizons 30/60/90, first-crossing events, and a trailing-return control; grid into pbo_cscv and deflated_sharpe_ratio; register the 7-day result as trial 1. | verifier: corrected claim/trial"
   },
   {
@@ -11416,11 +11476,15 @@
     "pass": "Slope t <= -2 over >= 250 monthly windows AND negative point estimate in both halves (2003-2014, 2015-2026).",
     "controls": "Look-ahead: signal at t-3 close. Survivorship: none. Costs: 2 round trips/month at 1 bp + financing for 150%. Multiple testing: 4 variants. Regime: 2008, 2020, 2022 (stocks and bonds fell together)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cal_pension_rebalancing"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-d5506b2c"
+   ],
    "notes": "from the underlying-library library: Pension and balanced-fund rebalancing flow (month-end); harness suggestion: Extend underlying.py turn_of_month() with a conditioning variable (month-to-date stock-bond differential). | added by the verifier pass"
   },
   {
@@ -12244,11 +12308,15 @@
     "pass": "Sharpe difference > 0 with 95% interval excluding 0, DSR > 0.95, placebo interval includes 0",
     "controls": "Look-ahead: month-end yields and closes used next day (FRED available_at respected); survivorship: n/a; costs: 2 bps per side SPY; synthetic bond return approximation error checked against IEF over 2002-2026; multiple testing: 12 trials; regime: 1994-2007, 2008-2021, 2022-2026"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_mom_cross_asset_tsmom"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-21d2486b"
+   ],
    "notes": "from the underlying-library library: Cross-asset time-series momentum (bond momentum times equities); harness suggestion: underlying.py synthetic_bond_returns(dgs10) and cross_asset_tsmom(); harness cross_asset_tsmom_vs_own. | added by the verifier pass"
   },
   {
@@ -12322,11 +12390,15 @@
     "pass": "Mean d > 0 with 95% interval excluding 0, DSR > 0.95, and d > 0 in at least 2 of 3 sub-periods",
     "controls": "Look-ahead: FRED values used with available_at; survivorship: none; costs: 2 bps per side (futures/ETF equivalent); synthetic-return approximation error measured against IEF; multiple testing: 8 trials; regime: three rate regimes reported"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_misc_bond_tsmom_fred"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-80f8ff58"
+   ],
    "notes": "from the underlying-library library: Long-history Treasury trend from FRED yields (synthetic 10-year bond TSMOM since 1962); harness suggestion: underlying.py synthetic_bond_returns(dgs, maturity) shared with cross-asset-tsmom-bond-equity; harness bond_tsmom_long_history reusing the TSMOM harness. | added by the verifier pass"
   },
   {

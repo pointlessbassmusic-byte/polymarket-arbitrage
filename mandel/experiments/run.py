@@ -35,6 +35,7 @@ from mandel.experiments import options_market as om
 from mandel.experiments import batch4_carry, batch4_fact, batch4_fomc, batch4_ohlc, batch4_vx, batch5_fx, batch5_hourly, batch5_macro
 from mandel.experiments import batch6_dir, batch6_surf, batch6_term, batch6_var, batch6_xc
 from mandel.experiments import batch6b_bw, batch6b_chain, batch6b_dolt, batch6b_drb, batch6b_hedge, batch6b_misc, batch6b_volh
+from mandel.experiments import batch6c_cal, batch6c_misc, batch6c_mom
 from mandel.experiments import underlying2 as u2
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
@@ -970,12 +971,13 @@ XA_NULLS = {
 
 # Batch modules, one per data unlock: FOMC calendar, Fama-French/AQR factors, Deribit carry, OHLC, VX futures (batch 4); macro release
 # dates, FX spot and 3-month rates, hourly bars (batch 5); options-library claims on archived data (batch 6a) and on the stored Cboe strategy indices, DoltHub chains/vol history and
-# Deribit trades (batch 6b). Each exports HARNESSES
+# Deribit trades (batch 6b); underlying-library claims on archived data (batch 6c). Each exports HARNESSES
 # {name: fn(archive) -> (stat, n, verdict, reason)} and THEORY_MAP {theory id: harness}; each harness checks its own inputs.
 # BATCH_BUNDLES lists the bundles each one loads, traced on the archive (dated daily captures as name-* patterns).
 BATCH_MODULES = (batch4_fomc, batch4_fact, batch4_carry, batch4_ohlc, batch4_vx, batch5_macro, batch5_fx, batch5_hourly,
                  batch6_var, batch6_dir, batch6_term, batch6_surf, batch6_xc,
-                 batch6b_bw, batch6b_hedge, batch6b_chain, batch6b_misc, batch6b_dolt, batch6b_volh, batch6b_drb)
+                 batch6b_bw, batch6b_hedge, batch6b_chain, batch6b_misc, batch6b_dolt, batch6b_volh, batch6b_drb,
+                 batch6c_cal, batch6c_mom, batch6c_misc)
 BATCH_HARNESSES = {h: fn for m in BATCH_MODULES for h, fn in m.HARNESSES.items()}
 BATCH_THEORY = {h: tid for m in BATCH_MODULES for tid, h in m.THEORY_MAP.items()}
 BATCH_BUNDLES = {
@@ -1116,6 +1118,24 @@ BATCH_BUNDLES = {
     "b6b_drb_quarterly_basis": ["daily-history-BTC-USD", "deribit-funding-BTC-PERPETUAL", "deribit-quarterly-futures-btc", "fred-DTB3"],
     "b6b_drb_quarterly_box_rate": ["deribit-book-BTC-*", "deribit-funding-BTC-PERPETUAL", "fred-DTB3"],
     "b6b_drb_rr_skew_harvest": ["deribit-delivery-prices-btc", "deribit-option-trades-daily-BTC"],
+    "b6c_cal_month_end_rebalancing": ["daily-history-BTC-USD", "daily-history-GLD", "daily-history-SPY", "daily-history-TLT"],
+    "b6c_cal_pension_rebalancing": ["daily-history-AGG", "daily-history-SPY", "daily-history-TLT", "fred-DGS10", "fred-DTB3", "french-ff3-daily"],
+    "b6c_cal_pre_holiday": ["daily-history--RUT", "daily-history-BTC-USD", "daily-history-IWM", "daily-history-SPY"],
+    "b6c_cal_presidential_year3": ["daily-history--GSPC"],
+    "b6c_cal_weekday_speculative_spread": ["cboe-VIX-history", "daily-history-GLD", "daily-history-SLV", "daily-history-SPHB", "daily-history-SPLV", "daily-history-USMV"],
+    "b6c_mom_crash_filter_vs_random": ["daily-history-SPY", "daily-history-XLB", "daily-history-XLE", "daily-history-XLF", "daily-history-XLI", "daily-history-XLK", "daily-history-XLP", "daily-history-XLU", "daily-history-XLV", "daily-history-XLY", "fred-DTB3"],
+    "b6c_mom_cross_asset_tsmom": ["daily-history-IEF", "daily-history-SPY", "daily-history-TLT", "fred-DGS10", "fred-DTB3"],
+    "b6c_mom_residual_vs_total_momentum": ["daily-history-SPY", "daily-history-XLB", "daily-history-XLE", "daily-history-XLF", "daily-history-XLI", "daily-history-XLK", "daily-history-XLP", "daily-history-XLU", "daily-history-XLV", "daily-history-XLY", "fred-DTB3"],
+    "b6c_mom_sma10_drawdown_vs_random": ["daily-history-DBC", "daily-history-EFA", "daily-history-IEF", "daily-history-SPY", "daily-history-VNQ", "fred-DTB3"],
+    "b6c_mom_trend_crisis_smile": ["daily-history-BTC-USD", "daily-history-DBC", "daily-history-EFA", "daily-history-GLD", "daily-history-IEF", "daily-history-QQQ", "daily-history-SLV", "daily-history-SPY", "daily-history-TLT", "fred-DTB3"],
+    "b6c_mom_tsmom_vs_hist_mean": ["cboe-VIX-history", "daily-history-AGG", "daily-history-BTC-USD", "daily-history-DBC", "daily-history-EFA", "daily-history-ETH-USD", "daily-history-GLD", "daily-history-QQQ", "daily-history-SLV", "daily-history-SPY", "daily-history-TLT", "fred-DTB3"],
+    "b6c_mom_vol_scaled_trend_did": ["daily-history-BTC-USD", "daily-history-EFA", "daily-history-ETH-USD", "daily-history-GLD", "daily-history-QQQ", "daily-history-SLV", "daily-history-SPY", "daily-history-TLT", "deribit-dvol-BTC-history", "fred-DTB3"],
+    "b6c_misc_bond_tsmom_fred": ["daily-history-IEF", "fred-DGS10", "fred-DGS2", "fred-DTB3"],
+    "b6c_misc_es_basis": ["daily-history--GSPC", "daily-history-ES-F", "daily-history-SPY", "fred-DTB3"],
+    "b6c_misc_fear_greed_extremes": ["crypto-fear-greed-history", "daily-history-BTC-USD", "daily-history-ETH-USD", "fred-DTB3"],
+    "b6c_misc_gold_silver_ratio": ["daily-history-GC-F", "daily-history-GLD", "daily-history-SI-F", "daily-history-SLV"],
+    "b6c_misc_metals_basis": ["daily-history-GC-F", "daily-history-GLD", "daily-history-SI-F", "daily-history-SLV", "fred-DTB3"],
+    "b6c_misc_ta_reality_check": ["daily-history-BTC-USD", "daily-history-GLD", "daily-history-QQQ", "daily-history-SPY", "fred-DTB3"],
 }
 
 

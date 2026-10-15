@@ -18,8 +18,9 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            return better than 95% of 1,000 spell-preserving random filters (Holm over 24 trials), Sharpe difference lower
            bound > -0.1, >= 5 distinct activation episodes (fewer = inconclusive).
   * T-317  equal-risk 12-1 TSMOM long/short on 8 ETF sleeves: excess quadratic coefficient on quarterly SPY excess return
-           over the mean coefficient of 1,000 driftless i.i.d.-by-month simulations, 95% CI > 0 (block bootstrap AND HAC),
-           Holm over 8 trials, sign kept leaving out each of 4 crises.
+           (pooled over all quarterly start months, rule 10; per-phase range reported) over the mean coefficient of 1,000
+           driftless i.i.d.-by-month simulations, 95% CI > 0 (block bootstrap AND HAC), Holm over 8 trials, sign kept
+           leaving out each of 4 crises.
   * T-481  SPY cross-asset long/flat rule max(0, (e + b)/2) vs SPY's own 12-1 long/flat TSMOM, 1994-02..: paired Sharpe
            difference CI > 0, DSR > 0.95 over 12 trials, placebo (bond signal lagged 12 months) CI includes 0.
 
@@ -31,15 +32,19 @@ Conventions
   * Calendars (rule 10(a)). Every claim here names month-end rebalancing (its library rule: "at month-end t ... execute at
     the close of the first trading day of t+1"), so the decision is the month's last session close (crypto: the last
     calendar day) and the fill is the close of the next session (crypto: the next calendar day); a hold runs fill-to-fill.
-    There is no free grid phase, so no pooled all-start estimator is needed. T-317's quarters are calendar quarters of the
-    hold months. A month enters only when its hold is complete (the following month's fill exists).
+    The month grid has no free phase. T-317's 'quarterly returns' do: the claim names no quarter calendar, so its primary
+    statistic is the pooled all-start estimate over overlapping 3-month windows (one starting each month; 12-month blocks
+    and HAC lag, >= 2 x the hold) and the range over the three non-overlapping quarterly phases is reported (rule 10).
+    A month enters only when its hold is complete (the following month's fill exists).
   * Point in time (rules 4, 12). A daily bar is available the next day (available_at = bar + 24h), before the fill
     session's close; the signal, the volatility estimate and the fill price used at one decision are all known at that
     fill close (one information set). FRED prints are used on the day after their observation date at the earliest
     (Bills), DGS10 only when its available_at precedes the fill.
   * Bills and Sharpe (rule 7). FRED DTB3 is a 91-day discount yield: r = -ln(1 - d/100 x 91/360)/(91/365), accrued
-    calendar day by calendar day at the print dated strictly before the day (batch6b_bw.Bills). Idle ETF cash earns it;
-    crypto flat means USD (0), as the TSMOM library entry states. Sharpe ratios are on excess returns (mean/sd x sqrt(12)
+    calendar day by calendar day at the print dated strictly before the day (batch6b_bw.Bills). Idle ETF cash earns it.
+    T-300's idle crypto cash earns it too (its claim says "else T-bill" and its controls "T-bill on idle cash"; USD cash,
+    the library's crypto note, is reported as a sensitivity); T-310's crypto flat means USD (0), as the TSMOM library
+    entry states. Sharpe ratios are on excess returns (mean/sd x sqrt(12)
     monthly, sqrt(252) for T-310's daily ETF calendar).
   * Costs (rule 9) as each claim states, charged on every change in weight (drift-adjusted turnover): T-300/T-310 2 bps
     per side SPY/QQQ, 5 bps other ETFs, 25 + 10 bps crypto; T-301 2 bps SPY, 5 bps other sleeves per switch; T-308 5 bps;
@@ -52,15 +57,20 @@ Conventions
   * Families. Every Holm or DSR family is listed below exactly as the trial declares it, before any result: T-300 56 grid
     trials (+48 T-58 trials in the DSR count only), T-301 96, T-308 8, T-310 20, T-311 24, T-317 8, T-481 12. Where the
     trial's "DSR" could mean the strategy's own excess-return series or the paired difference series (T-308, T-481), both
-    are computed and the criterion needs both (rule 11 spirit: a pass must not hinge on the reading).
+    are computed and the criterion needs both (rule 11 spirit: a pass must not hinge on the reading). Trial-Sharpe
+    variance: the observed variance of the computed trials' per-period Sharpes where the trial names it (T-300); otherwise
+    the house convention (batch4_fact), that variance floored at the zero-skill 1/(T-1). Every DSR row reports the
+    observed variance, the floor and the one used, and the DSR under the other choice when the floor binds; T-481 says
+    when its DSR criterion's outcome rests on the floor.
   * Below trial.min_n (rule 5): never supported; a failing criterion counts only when it fails decisively.
 
 Claim-specific choices (declared before any result)
   * T-300: the 56 trials are formation (12-1, 6-1, 3-1, 1-0, 12-7, 6-2, the equal-weight ensemble of 1-0/3-0/12-0) x
     long/flat or long/short x excess or raw returns x sign rule or Baltas-Kosowski TREND (t-statistic of the window's
     daily log returns, neutral when |t| < 1); each trial's comparator is the historical-mean strategy on the same basis
-    and position type. The DSR uses n_trials = 104 and the variance of the 56 computed trials' per-period d Sharpes (T-58's
-    48 trials are daily-strategy Sharpes of another statistic: they enter the count only). 'Decayed' (post-2012 mean d <
+    and position type. The DSR uses n_trials = 104 and the observed variance of the 56 computed trials' per-period d
+    Sharpes, as the trial states, with no 1/(T-1) floor (the floored DSR is reported); T-58's 48 trials are daily-strategy
+    Sharpes of another statistic, so they enter the count only. 'Decayed' (post-2012 mean d <
     0) is a criterion: it cannot be supported while decayed.
   * T-301: null = the rule's own out-of-market spells re-placed at random (count and lengths kept, never merging), ties
     counted against the rule. The claim's "95% of 1,000 paths" is judged on the first 1,000 paths; the Holm-adjusted p
@@ -83,7 +93,10 @@ Claim-specific choices (declared before any result)
     sleeves' daily excess returns jointly, i.i.d., from the blocks in which every sleeve of the trial trades, demeaned per
     sleeve (driftless), with the actual activity calendar; it is run through the same engine (EWMA, caps, costs, borrow).
     Excess gamma = gamma - mean simulated gamma; its block-bootstrap CI shifts the actual gamma's bootstrap quantiles, the
-    HAC CI adds the simulation mean's s.e. Crisis years left out: 2000-2002, 2008, 2020, 2022.
+    HAC CI adds the simulation mean's s.e. The quarterly trials use the pooled all-start grid (every 3-month window, 12-row
+    blocks and HAC lag = the trial's 4 quarters), the simulations go through the same aggregation, and n is counted in
+    quarters of data (hold months / 3). Crisis years left out: 2000-2002, 2008, 2020, 2022; every window touching them is
+    dropped.
   * T-310: the pooled book holds 1/N of capital per active sleeve on SPY's session calendar (crypto priced at the same
     calendar day's close), drifting within the month. Estimators: EWMA 0.94, 21- and 126-session realized, Yang-Zhang
     over 21 sessions on adjusted OHLC, and DVOL for BTC (from 2021-03-24 only; EWMA before and for every other sleeve).
@@ -332,25 +345,70 @@ def sharpe_test(a, b, n_boot: Optional[int] = None, seed: int = SEED, reps: Opti
                        REPS if reps is None else reps, seed)
 
 
-def family_dsr(x, family_sharpes: Sequence[float], n_trials: int) -> dict:
-    """DSR of ``x`` against the best of ``n_trials`` trials, trial-Sharpe variance from the computed family (per-period
-    Sharpes), floored at 1/(T-1); the PSR against a zero Sharpe decides a failure (one-sided 95%: <= 0.05)."""
+def family_dsr(x, family_sharpes: Sequence[float], n_trials: int, var_source: str = "floor") -> dict:
+    """DSR of ``x`` against the best of ``n_trials`` trials; the PSR against a zero Sharpe decides a failure (one-sided
+    95%: <= 0.05). Trial-Sharpe variance from the computed family (per-period Sharpes): ``var_source`` 'floor' = the
+    house convention (batch4_fact), the observed variance floored at the zero-skill 1/(T-1); 'observed' = the observed
+    variance itself, for a trial that names it (the floor only when fewer than 2 trial Sharpes are computed). Both
+    variances and the DSR under each are returned, with the one used named."""
     x = np.asarray(x, float)
     fs = np.array([s for s in family_sharpes if s is not None and math.isfinite(s)], float)
-    v = float(fs.var(ddof=1)) if fs.size > 1 else 0.0
-    v = max(v, 1.0 / max(1, x.size - 1))
-    dsr = float(deflated_sharpe_ratio(x, n_trials=n_trials, var_trials_sr=v)) if x.size > 3 else None
-    psr0 = float(deflated_sharpe_ratio(x, n_trials=1)) if x.size > 3 else None
-    return {"dsr": dsr, "psr0": psr0, "var_trials_sr": v, "n_trials": int(n_trials), "n_family_computed": int(fs.size),
+    v_obs = float(fs.var(ddof=1)) if fs.size > 1 else None
+    v_floor = 1.0 / max(1, x.size - 1)
+    if var_source == "observed" and v_obs is not None and v_obs > 0:
+        v, used = v_obs, "observed"
+    elif v_obs is not None and v_obs >= v_floor:
+        v, used = v_obs, "observed (above the 1/(T-1) floor)"
+    else:
+        v, used = v_floor, ("the 1/(T-1) floor (house convention; it exceeds the observed variance)" if v_obs is not None
+                            else "the 1/(T-1) floor (fewer than 2 trial Sharpes computed)")
+    ok = x.size > 3
+    dsr_at = lambda var: float(deflated_sharpe_ratio(x, n_trials=n_trials, var_trials_sr=var)) if ok else None
+    dsr = dsr_at(v)
+    psr0 = float(deflated_sharpe_ratio(x, n_trials=1)) if ok else None
+    return {"dsr": dsr, "psr0": psr0, "var_trials_sr": v, "var_used": used, "var_source": var_source,
+            "var_observed": v_obs, "var_floor": v_floor, "floor_binds": bool(v_obs is not None and v_obs < v_floor),
+            "dsr_observed": dsr_at(v_obs) if (v_obs is not None and v_obs > 0) else None, "dsr_floored": dsr_at(max(v_obs or 0.0, v_floor)),
+            "n_trials": int(n_trials), "n_family_computed": int(fs.size),
             "sharpe_per_period": float(sharpe_ratio(x)) if x.size > 1 else None}
 
 
-def dsr_row(d: dict, label: str) -> tuple:
-    """(name, ok, decisive) for 'DSR > 0.95'; decisive when the PSR against a zero Sharpe is <= 0.05."""
+def _dsr_brief(d: dict) -> str:
+    """'0.865 (var 2.56e-03 = the 1/(T-1) floor; the observed 2.91e-04 gives 0.984)' for a reason line."""
+    if d.get("dsr") is None:
+        return "n/a"
+    if d.get("floor_binds") and d["var_used"] != "observed":
+        return (f"{d['dsr']:.3f} (var {d['var_trials_sr']:.2e} = the 1/(T-1) floor; the observed {_e(d['var_observed'])} "
+                f"gives {_f(d['dsr_observed'])})")
+    if d.get("floor_binds"):
+        return f"{d['dsr']:.3f} (observed var {_e(d['var_observed'])}; the 1/(T-1) floor {_e(d['var_floor'])} gives {_f(d['dsr_floored'])})"
+    return f"{d['dsr']:.3f} (observed var {_e(d['var_observed'])}, above the 1/(T-1) floor {_e(d['var_floor'])})"
+
+
+def _dsr_alt(d: dict) -> tuple:
+    """(name, DSR) of the other variance reading when it differs from the one used, else (None, None)."""
+    if d.get("dsr") is None or not d.get("floor_binds"):
+        return None, None
+    if d["var_used"] == "observed":
+        return "floored", d["dsr_floored"]
+    return ("observed", d["dsr_observed"]) if d.get("dsr_observed") is not None else (None, None)
+
+
+def dsr_row(d: dict, label: str, alt: bool = False) -> tuple:
+    """(name, ok, decisive) for 'DSR > 0.95'; decisive when the PSR against a zero Sharpe is <= 0.05. The name gives the
+    variance used, the observed variance and the 1/(T-1) floor, and the DSR under the other reading when they differ;
+    ``alt`` judges the row under that other reading instead (for reporting what the outcome would be)."""
     if d.get("dsr") is None:
         return f"{label} (n/a)", None, False
-    return (f"{label} ({d['dsr']:.3f} at {d['n_trials']} trials, var(trial SR) {d['var_trials_sr']:.2e})",
-            d["dsr"] > DSR_PASS, d["psr0"] is not None and d["psr0"] <= 1.0 - DSR_PASS)
+    an, av = _dsr_alt(d)
+    val = av if (alt and an is not None) else d["dsr"]
+    obs = "n/a" if d.get("var_observed") is None else f"{d['var_observed']:.2e}"
+    txt = (f"{label} ({val:.3f} at {d['n_trials']} trials; var(trial SR) {d['var_trials_sr']:.2e} = {d['var_used']}; "
+           f"observed {obs} over {d['n_family_computed']} computed trials, floor 1/(T-1) {d['var_floor']:.2e}")
+    if an is not None and not alt:
+        flip = (av > DSR_PASS) != (d["dsr"] > DSR_PASS)
+        txt += f"; with the {an} variance {av:.3f}" + (" [the outcome depends on the variance choice]" if flip else "")
+    return txt + ")", val > DSR_PASS, d["psr0"] is not None and d["psr0"] <= 1.0 - DSR_PASS
 
 
 def holm_adjusted(ps: dict) -> dict:
@@ -476,6 +534,10 @@ def _s(x, nd: int = 3) -> str:
     return "n/a" if x is None or (isinstance(x, float) and not math.isfinite(x)) else f"{x:+.{nd}f}"
 
 
+def _e(x, nd: int = 2) -> str:
+    return "n/a" if x is None or (isinstance(x, float) and not math.isfinite(x)) else f"{x:.{nd}e}"
+
+
 def _pc(x, nd: int = 1) -> str:
     return "n/a" if x is None or (isinstance(x, float) and not math.isfinite(x)) else f"{x * 100:.{nd}f}%"
 
@@ -516,8 +578,10 @@ T300_PRIMARY = ("12-1", "LF", "excess", "sign")
 T300_N_TRIALS = len(T300_FAMILY) + T58_TRIALS                  # 104
 
 
-def _prep_monthly(days: Sequence[str], adj: np.ndarray, bills: Bills, crypto: bool) -> dict:
-    """Month-end grid, month-end-to-month-end returns, fill-to-fill holds and daily log-return prefix sums of one asset."""
+def _prep_monthly(days: Sequence[str], adj: np.ndarray, bills: Bills, usd_cash: bool = False) -> dict:
+    """Month-end grid, month-end-to-month-end returns, fill-to-fill holds and daily log-return prefix sums of one asset.
+    Idle cash earns DTB3 (the claim's "else T-bill" and "T-bill on idle cash", crypto included); ``usd_cash`` = 0 instead
+    (the library's crypto note, reported as a sensitivity only)."""
     g = month_grid(days)
     me, ex = g["me"], g["ex"]
     C = bill_logcum(bills, days)
@@ -527,7 +591,7 @@ def _prep_monthly(days: Sequence[str], adj: np.ndarray, bills: Bills, crypto: bo
     out = {"months": g["months"], "me": me, "ex": ex, "M": adj[me], "Cme": C[me], "T": len(me),
            "S1": {"raw": np.cumsum(lr), "excess": np.cumsum(lrx)}, "S2": {"raw": np.cumsum(lr * lr), "excess": np.cumsum(lrx * lrx)}}
     out["R"] = adj[ex[1:]] / adj[ex[:-1]] - 1.0                                          # hold of decision t, t = 0..T-2
-    out["rf"] = np.zeros(len(me) - 1) if crypto else np.exp(C[ex[1:]] - C[ex[:-1]]) - 1.0
+    out["rf"] = np.zeros(len(me) - 1) if usd_cash else np.exp(C[ex[1:]] - C[ex[:-1]]) - 1.0
     out["labels"] = [days[i][:7] for i in ex[:-1]]
     M = out["M"]
     out["xm"] = {"raw": M[1:] / M[:-1] - 1.0, "excess": M[1:] / M[:-1] * np.exp(-(out["Cme"][1:] - out["Cme"][:-1])) - 1.0}
@@ -575,7 +639,7 @@ def tsmom_d_series(assets: dict, bills: Bills, variant: tuple, start: str = T300
     form, pos, basis, rule = variant
     per, pool = {}, {}
     for sym, (days, adj) in assets.items():
-        A = prepared[sym] if prepared and sym in prepared else _prep_monthly(days, adj, bills, sym in CRYPTO)
+        A = prepared[sym] if prepared and sym in prepared else _prep_monthly(days, adj, bills)
         T = A["T"]
         t = np.arange(12, T - 1)
         if t.size == 0:
@@ -601,17 +665,28 @@ def tsmom_vs_hist_mean(assets: dict, bills: Bills, start: str = T300_START, min_
                        vix: Optional[dict] = None, family: Optional[Sequence[tuple]] = None, n_trials: Optional[int] = None,
                        n_boot: Optional[int] = None, reps: Optional[int] = None, seed: int = SEED) -> dict:
     """T-300 core. ``assets``: {sym: (days, adjclose)}. Criteria: mean d > 0 with the studentized CBB 95% CI above 0;
-    DSR(d) > 0.95 at ``n_trials`` with the variance of the computed family's per-period d Sharpes; post-2012 mean d >= 0."""
+    DSR(d) > 0.95 at ``n_trials`` with the observed variance of the computed family's per-period d Sharpes (as the trial
+    states; the 1/(T-1)-floored DSR is reported); post-2012 mean d >= 0. Idle cash earns DTB3 for every asset, crypto
+    included (the claim's "else T-bill"); crypto cash in USD is reported as a sensitivity."""
     family = T300_FAMILY if family is None else tuple(family)
     n_trials = T300_N_TRIALS if n_trials is None else n_trials
-    prepared = {s: _prep_monthly(dd, a, bills, s in CRYPTO) for s, (dd, a) in assets.items()}
+    prepared = {s: _prep_monthly(dd, a, bills) for s, (dd, a) in assets.items()}
     fam = {v: tsmom_d_series(assets, bills, v, start, prepared=prepared) for v in family}
-    P = fam[T300_PRIMARY] if T300_PRIMARY in fam else fam[family[0]]
+    pkey = T300_PRIMARY if T300_PRIMARY in fam else family[0]
+    P = fam[pkey]
     labels, d = P["labels"], P["d"]
     n = d.size
     mt = mean_test(d, n_boot, seed, reps) if n >= 8 else {"est": float(d.mean()) if n else None, "ci": [None, None]}
     fam_sr = [_sr_pp(f["d"]) for f in fam.values()]
-    ds = family_dsr(d, fam_sr, n_trials)
+    ds = family_dsr(d, fam_sr, n_trials, var_source="observed")
+    usd = None
+    if any(s in CRYPTO for s in assets):            # sensitivity: crypto idle cash in USD (the library's note), not a criterion
+        prep_usd = {s: (_prep_monthly(dd, a, bills, usd_cash=True) if s in CRYPTO else prepared[s]) for s, (dd, a) in assets.items()}
+        U = tsmom_d_series(assets, bills, pkey, start, prepared=prep_usd)
+        up = np.array([x for l, x in zip(U["labels"], U["d"]) if l >= T300_POST])
+        usd = {"mean": float(U["d"].mean()) if U["d"].size else None, "post_mean": float(up.mean()) if up.size else None,
+               "per_asset_mean_bps": {s: float(np.mean(list(U["per_asset"][s].values())) * 1e4) for s in CRYPTO
+                                      if U["per_asset"].get(s)}}
     post = np.array([x for l, x in zip(labels, d) if l >= T300_POST])
     post_mean = float(post.mean()) if post.size else None
     crit = [_ci_crit(mt, "gt", 0.0, "mean d > 0 with studentized CBB 95% CI excluding 0", _fmt_bps) if n >= 8
@@ -657,6 +732,7 @@ def tsmom_vs_hist_mean(assets: dict, bills: Bills, start: str = T300_START, min_
             diag["vix_tercile_bps"] = {k: float(x.mean() * 1e4) if x.size else None for k, x in terc.items()}
     return {"n": int(n), "labels": [labels[0], labels[-1]] if labels else None, "mean": mt, "dsr": ds,
             "post_mean": post_mean, "post_n": int(post.size), "sharpe_d_ann": _sr_ann(d), "family_sharpes_pp": fam_sr,
+            "d_labels": list(labels), "d": [float(x) for x in d], "usd_cash_sensitivity": usd,
             "n_active_range": [int(min(P["n_active"])), int(max(P["n_active"]))] if n else None, "diag": diag,
             "label": label, "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
 
@@ -671,14 +747,17 @@ def b6c_mom_tsmom_vs_hist_mean(archive):
     assets = {s: (_daily(archive, dh(s))["days"], _daily(archive, dh(s))["adj"]) for s in T300_ASSETS}
     vix = _series(archive, VIX_B) if _has(archive, VIX_B) else None
     j = tsmom_vs_hist_mean(assets, bills, vix=vix)
-    mt, ds, dg = j["mean"], j["dsr"], j["diag"]
+    mt, ds, dg, us = j["mean"], j["dsr"], j["diag"], j["usd_cash_sensitivity"]
     reason = (f"12-1 long/flat TSMOM minus the historical-mean strategy, pooled equal weight over the active assets of "
               f"{', '.join(T300_ASSETS)} (each from its 13th month-end), hold months {j['labels'][0]}..{j['labels'][1]} "
               f"({j['n']} months, {j['n_active_range'][0]}-{j['n_active_range'][1]} assets active): signal on the "
-              f"month-end close, filled at the next session's close, DTB3 cash (crypto flat = USD), 2/5/35 bps per side. "
+              f"month-end close, filled at the next session's close, DTB3 on idle cash for every asset, crypto included (the "
+              f"claim's 'else T-bill' and 'T-bill on idle cash'), 2/5/35 bps per side. "
               f"Mean d {_fmt_bps(mt.get('est'))}/month ({_ci(mt.get('ci'), 1, 1e4, ' bps')}, studentized CBB, 12-month "
               f"blocks), annualised Sharpe of d {_s(j['sharpe_d_ann'], 2)}; DSR(d) {_f(ds['dsr'])} at {ds['n_trials']} "
               f"trials ({len(T300_FAMILY)} declared grid trials computed + {T58_TRIALS} T-58 trials in the count only; "
+              f"the observed variance of the computed trials' per-period d Sharpes {_e(ds['var_observed'])}, as the trial "
+              f"states, not the house 1/(T-1) floor {_e(ds['var_floor'])}: floored DSR {_f(ds['dsr_floored'])}; "
               f"PSR vs 0 {_f(ds['psr0'])}); post-2012 mean d {_fmt_bps(j['post_mean'])} over {j['post_n']} months"
               + (" (DECAYED)" if j["label"] == "decayed" else "")
               + ". Diagnostics: by decade " + ", ".join(f"{k} {x:+.1f}" for k, x in dg["by_decade_bps"].items())
@@ -686,11 +765,17 @@ def b6c_mom_tsmom_vs_hist_mean(archive):
               + " bps; leave-one-asset-out pooled mean " + ", ".join(f"-{s} {x:+.1f}" for s, x in dg["leave_one_asset_out_bps"].items() if x is not None)
               + " bps" + (("; by VIX tercile at decision " + ", ".join(f"{k} {x:+.1f}" for k, x in dg['vix_tercile_bps'].items() if x is not None) + " bps")
                           if dg.get("vix_tercile_bps") else "")
+              + ((". Sensitivity (the library's crypto note, not a criterion): crypto idle cash in USD instead of T-bills gives "
+                  f"mean d {_fmt_bps(us['mean'])}, post-2012 {_fmt_bps(us['post_mean'])}, "
+                  + ", ".join(f"{s_} {x:+.1f}" for s_, x in us["per_asset_mean_bps"].items()) + " bps")
+                 if us else "")
               + ". Survivorship: surviving ETFs only (small upward bias, stated) — " + j["why"])
     stat = {"n_months": j["n"], "window": j["labels"], "mean_d": mt.get("est"), "ci": mt.get("ci"), "ci_mc_se": mt.get("ci_mc_se"),
             "sharpe_d_ann": j["sharpe_d_ann"], "dsr": ds, "post2012_mean_d": j["post_mean"], "post2012_n": j["post_n"],
             "label": j["label"], "diagnostics": dg, "family": [list(v) for v in T300_FAMILY], "n_trials": T300_N_TRIALS,
-            "criteria": j["criteria"], "rule10": "calendar: month-end decisions named by the claim (rule 10(a))"}
+            "criteria": j["criteria"], "rule10": "calendar: month-end decisions named by the claim (rule 10(a))",
+            "cash": "DTB3 on idle cash for every asset, crypto included (claim: 'else T-bill')",
+            "usd_cash_sensitivity": j["usd_cash_sensitivity"]}
     return _out(stat, j["n"], j["verdict"], reason)
 
 
@@ -1417,11 +1502,14 @@ T317_CAP = 2.0
 T317_COST = 5e-4
 T317_BORROW = 0.005
 T317_N_SIM = 1000
-T317_QBLOCK = 4                # quarters
+T317_QBLOCK = 4                # quarters: the trial's block and HAC lag (per-phase non-overlapping quarters)
+T317_POOL_BLOCK = 12           # rows of the pooled all-start quarterly grid (one window per month): 4 quarters = 12
+                               # months, >= 2 x the 3-month hold (rule 10)
 T317_MBLOCK = 12               # months (monthly-regression trials: the same 1-year span)
 T317_FAMILY = tuple((freq, btc, pos) for freq in ("quarterly", "monthly") for btc in (False, True) for pos in ("LS", "LF"))
 T317_PRIMARY = ("quarterly", False, "LS")
 T317_CRISES = {"2000-02": ("2000", "2001", "2002"), "2008": ("2008",), "2020": ("2020",), "2022": ("2022",)}
+T317_PHASE_NAMES = ("Jan/Apr/Jul/Oct", "Feb/May/Aug/Nov", "Mar/Jun/Sep/Dec")
 
 
 def _t317_blocks(sleeves: dict, bills: Bills, master_days: Sequence[str]) -> dict:
@@ -1532,18 +1620,30 @@ def _gamma_rows(Y: np.ndarray, Xs: np.ndarray) -> np.ndarray:
     return sol[:, 2]
 
 
-def _aggregate(r: np.ndarray, labels: Sequence[str], freq: str, start: str) -> tuple:
-    """(period keys, compounded returns (Q, nP)) of hold-block returns r (Q, J) over complete quarters or months."""
-    groups = {}
-    for j, l in enumerate(labels):
-        if l < start:
-            continue
-        key = l if freq == "monthly" else f"{l[:4]}Q{(int(l[5:7]) - 1) // 3 + 1}"
-        groups.setdefault(key, []).append(j)
-    keys = [k for k in sorted(groups) if (freq == "monthly" or len(groups[k]) == 3)]
+def _aggregate(r: np.ndarray, labels: Sequence[str], freq: str, start: str, phase: Optional[int] = None) -> tuple:
+    """(period keys, compounded returns (Q, nP)) of hold-block returns r (Q, J) from hold month ``start`` on.
+    'monthly': each hold month (key 'YYYY-MM'). 'quarterly': the claim names no quarter calendar (rule 10), so every
+    window of 3 consecutive hold months, one starting each month (the pooled all-start estimate; key 'first..last');
+    ``phase`` k in 0..2 keeps only the non-overlapping windows starting in months k+1, k+4, k+7, k+10 (phase 0 =
+    calendar quarters), for the per-phase range."""
+    js = [j for j, l in enumerate(labels) if l >= start]
+    if freq == "monthly":
+        groups = [[j] for j in js]
+        keys = [labels[j] for j in js]
+    else:
+        groups = [js[a:a + 3] for a in range(len(js) - 2) if _month_add(labels[js[a]], 2) == labels[js[a + 2]]]
+        if phase is not None:
+            groups = [g for g in groups if (int(labels[g[0]][5:7]) - 1) % 3 == phase]
+        keys = [f"{labels[g[0]]}..{labels[g[-1]]}" for g in groups]
     lg = np.log1p(np.maximum(r, -0.999999))
-    out = np.stack([np.expm1(lg[:, groups[k]].sum(axis=1)) for k in keys], axis=1) if keys else np.zeros((r.shape[0], 0))
+    out = np.stack([np.expm1(lg[:, g].sum(axis=1)) for g in groups], axis=1) if groups else np.zeros((r.shape[0], 0))
     return keys, out
+
+
+def _key_years(k: str) -> set:
+    """Calendar years an aggregation key ('YYYY-MM' or 'YYYY-MM..YYYY-MM') touches."""
+    a, _, b = k.partition("..")
+    return {str(y) for y in range(int(a[:4]), int((b or a)[:4]) + 1)}
 
 
 def _cbb_idx(rng, n: int, block: int, k: int) -> np.ndarray:
@@ -1617,7 +1717,9 @@ def crisis_smile(sleeves: dict, bills: Bills, btc: Optional[tuple] = None, start
         keys, Y = _aggregate(r0[None], labels, freq, start)
         _, Xq = _aggregate(spy_hold[None], labels, freq, start)
         y, x = Y[0], Xq[0]
-        lag = T317_QBLOCK if freq == "quarterly" else T317_MBLOCK
+        lag = T317_POOL_BLOCK if freq == "quarterly" else T317_MBLOCK
+        # n in the claim's units: quarters of data (hold months / 3) for the pooled quarterly grid, months otherwise
+        n_units = (len(keys) + 2) // 3 if freq == "quarterly" else len(keys)
         D = np.column_stack([np.ones_like(x), x, x * x])
         coef, se = _ols_nw(y, D, lag)
         g_act = float(coef[2])
@@ -1687,8 +1789,27 @@ def crisis_smile(sleeves: dict, bills: Bills, btc: Optional[tuple] = None, start
         exc = g_act - g_bar
         ci_h = [exc - z * se_h, exc + z * se_h]
         p_h = 1 - NormalDist().cdf(exc / se_h) if se_h > 0 else (0.0 if exc > 0 else 1.0)
+        phases = None
+        if freq == "quarterly":                    # rule 10: the per-start range of the non-overlapping quarterly grids
+            phases = {}
+            for ph in range(3):
+                kq, Yp = _aggregate(r0[None], labels, freq, start, ph)
+                _, Xp = _aggregate(spy_hold[None], labels, freq, start, ph)
+                if len(kq) < 8:
+                    phases[ph] = None
+                    continue
+                yp, xp = Yp[0], Xp[0]
+                cp, sp = _ols_nw(yp, np.column_stack([np.ones_like(xp), xp, xp * xp]), T317_QBLOCK)
+                _, Ysp = _aggregate(Ysim_b, labels, freq, start, ph)
+                _, Xsp = _aggregate(Xsim_b, labels, freq, start, ph)
+                gsp = _gamma_rows(Ysp, Xsp)
+                ssp = float(gsp.std(ddof=1) / math.sqrt(gsp.size)) if gsp.size > 1 else 0.0
+                ep, hp = float(cp[2]) - float(gsp.mean()), math.sqrt(float(sp[2]) ** 2 + ssp ** 2)
+                phases[ph] = {"start_months": T317_PHASE_NAMES[ph], "n": len(kq), "g": float(cp[2]), "g_sim": float(gsp.mean()),
+                              "excess": ep, "ci_hac": [ep - z * hp, ep + z * hp]}
         res[v] = {"g": g_act, "g_sim": g_bar, "se_sim": se_sim, "excess": exc, "ci_boot": ci_b, "ci_boot_mc_se": math.sqrt(mc_b ** 2 + se_sim ** 2),
-                  "p_boot": float(np.mean(ps)), "ci_hac": ci_h, "se_hac": float(se[2]), "p_hac": float(p_h), "n": int(n), "keys": keys,
+                  "p_boot": float(np.mean(ps)), "ci_hac": ci_h, "se_hac": float(se[2]), "p_hac": float(p_h), "n": int(n_units),
+                  "n_windows": int(n), "block": int(blk), "keys": keys, "phases": phases,
                   "y": y, "x": x, "Ys": Ys, "Xs": Xs, "pct_in_sim": float(np.mean(g_sim < g_act)), "sim_sd": float(g_sim.std(ddof=1)) if g_sim.size > 1 else None}
     pk = T317_PRIMARY if res.get(T317_PRIMARY) else next(k for k in family if res.get(k))
     pv = res[pk]
@@ -1699,14 +1820,16 @@ def crisis_smile(sleeves: dict, bills: Bills, btc: Optional[tuple] = None, start
     decb = resolve(pv["ci_boot"][1], se_b, 0.0, "lt")[0] is True
     okh = pv["ci_hac"][0] > 0
     dech = pv["ci_hac"][1] < 0
-    c1 = all_constructions([(f"block bootstrap (4-quarter blocks) CI {_s(pv['ci_boot'][0], 2)} to {_s(pv['ci_boot'][1], 2)}{nb_note}", okb, decb),
-                            (f"Newey-West HAC CI {_s(pv['ci_hac'][0], 2)} to {_s(pv['ci_hac'][1], 2)}", okh, dech)],
+    blk_txt = (f"{pv['block']}-month (4-quarter) blocks on the pooled all-start grid" if pk[0] == "quarterly" else f"{pv['block']}-month blocks")
+    c1 = all_constructions([(f"block bootstrap ({blk_txt}) CI {_s(pv['ci_boot'][0], 2)} to {_s(pv['ci_boot'][1], 2)}{nb_note}", okb, decb),
+                            (f"Newey-West HAC (lag {pv['block']}) CI {_s(pv['ci_hac'][0], 2)} to {_s(pv['ci_hac'][1], 2)}", okh, dech)],
                            f"gamma minus simulated gamma ({_s(pv['excess'], 2)} = {_s(pv['g'], 2)} - {_s(pv['g_sim'], 2)}) > 0 with 95% CI excluding 0")
     c2 = all_constructions([holm_row(hb, "block-bootstrap p"), holm_row(hh, "HAC p")], f"Holm across the {len(family)} declared trials, adjusted p < 0.05")
     loco = {}
     yq, xq, keys = pv["y"], pv["x"], pv["keys"]
+    touch = {nm: np.array([bool(_key_years(k) & set(yrs)) for k in keys], bool) for nm, yrs in T317_CRISES.items()}
     for nm, yrs in T317_CRISES.items():
-        keep = np.array([k[:4] not in yrs for k in keys])
+        keep = ~touch[nm]                          # every window touching the crisis years is left out
         if keep.sum() < 8:
             loco[nm] = None
             continue
@@ -1720,9 +1843,10 @@ def crisis_smile(sleeves: dict, bills: Bills, btc: Optional[tuple] = None, start
     if yq.size >= 10:
         cut = np.quantile(xq, 0.1)
         worst = float(yq[xq <= cut].mean())
-    crises = {nm: (float(yq[np.array([k[:4] in yrs for k in keys])].mean()) if any(k[:4] in yrs for k in keys) else None) for nm, yrs in T317_CRISES.items()}
+    crises = {nm: (float(yq[touch[nm]].mean()) if touch[nm].any() else None) for nm in T317_CRISES}
     fam = {"|".join(map(str, k)): (None if r is None else {"excess": r["excess"], "p_boot": r["p_boot"], "p_hac": r["p_hac"], "n": r["n"]}) for k, r in res.items()}
-    return {"n": pv["n"], "keys": [keys[0], keys[-1]] if keys else None, "primary": {k: pv[k] for k in ("g", "g_sim", "se_sim", "excess", "ci_boot", "ci_hac", "p_boot", "p_hac", "se_hac", "pct_in_sim", "sim_sd")},
+    return {"n": pv["n"], "n_windows": pv["n_windows"], "keys": [keys[0], keys[-1]] if keys else None, "phases": pv["phases"],
+            "primary": {k: pv[k] for k in ("g", "g_sim", "se_sim", "excess", "ci_boot", "ci_hac", "p_boot", "p_hac", "se_hac", "pct_in_sim", "sim_sd", "block")},
             "holm_boot": hb, "holm_hac": hh, "loco": loco, "worst_decile_mean": worst, "crisis_means": crises, "family": fam,
             "criteria": [(c[0], c[1]) for c in (c1, c2, c3)], "verdict": v, "why": why}
 
@@ -1738,10 +1862,14 @@ def b6c_mom_trend_crisis_smile(archive):
     btc = (_daily(archive, dh(T317_BTC))["days"], _daily(archive, dh(T317_BTC))["adj"]) if _has(archive, dh(T317_BTC)) else None
     j = crisis_smile(sl, bills, btc)
     p = j["primary"]
+    phs = [ph_ for ph_ in (j["phases"] or {}).values() if ph_ is not None]
     reason = (f"12-1 TSMOM long/short on {', '.join(T317_SLEEVES)} (each from 13 complete hold months, 10% ex-ante vol from "
               f"a 60-day-centre-of-mass EWMA, cap 2x, equal risk across active sleeves, month-end signal filled at the next "
-              f"close, 5 bps per side, 50 bps/yr borrow on shorts), quarterly excess returns {j['keys'][0]}..{j['keys'][1]} "
-              f"({j['n']} quarters) on SPY's quarterly excess return and its square: gamma {_s(p['g'], 2)} (HAC s.e. "
+              f"close, 5 bps per side, 50 bps/yr borrow on shorts), quarterly (3-month) excess returns on SPY's quarterly "
+              f"excess return and its square. The claim names no quarter calendar, so (rule 10) the primary statistic is the "
+              f"pooled all-start estimate: every 3-consecutive-hold-month window, one starting each month, {j['keys'][0]} to "
+              f"{j['keys'][1]} ({j['n_windows']} overlapping windows, {j['n']} quarters of data), with {p['block']}-month "
+              f"(4-quarter) blocks and HAC lag ({p['block']} >= 2 x the 3-month hold): gamma {_s(p['g'], 2)} (HAC s.e. "
               f"{_f(p['se_hac'], 2)}), mean gamma of {T317_N_SIM} driftless simulations (whole fill-to-fill hold months of all "
               f"sleeves' daily excess returns resampled jointly i.i.d. after demeaning: cross-correlation kept, autocorrelation "
               f"removed) "
@@ -1749,13 +1877,21 @@ def b6c_mom_trend_crisis_smile(archive):
               f"{_s(p['excess'], 2)}: block bootstrap {_ci(p['ci_boot'], 2)}, HAC {_ci(p['ci_hac'], 2)}; Holm over the 8 declared "
               f"trials (quarterly/monthly x with/without BTC x long-short/long-flat) "
               + (f"bootstrap-p adjusted {j['holm_boot']['adj']:.4f}, HAC-p adjusted {j['holm_hac']['adj']:.4f}" if j['holm_boot']['adj'] is not None and j['holm_hac']['adj'] is not None else "bounded")
-              + "; leave-one-crisis-out excess " + ", ".join(f"-{k} {_s(x, 2)}" for k, x in j["loco"].items() if x is not None)
-              + f". Diagnostics: mean portfolio return in SPY's worst-decile quarters {_pc(j['worst_decile_mean'], 2)}; crisis-year "
-              f"means " + ", ".join(f"{k} {_pc(x, 2)}" for k, x in j["crisis_means"].items() if x is not None)
+              + "; leave-one-crisis-out excess (every window touching the crisis years dropped) "
+              + ", ".join(f"-{k} {_s(x, 2)}" for k, x in j["loco"].items() if x is not None)
+              + f". Per-phase range (non-overlapping quarters, {T317_QBLOCK}-quarter HAC lag; reported, not criteria): "
+              + "; ".join(f"starts {ph_['start_months']} n {ph_['n']}, excess {_s(ph_['excess'], 2)} (HAC {_ci(ph_['ci_hac'], 2)})"
+                          for ph_ in phs)
+              + (f"; range {_s(min(x_['excess'] for x_ in phs), 2)} to {_s(max(x_['excess'] for x_ in phs), 2)}" if phs else "")
+              + f". Diagnostics: mean portfolio return in SPY's worst-decile 3-month windows {_pc(j['worst_decile_mean'], 2)}; "
+              f"means over the windows touching each crisis " + ", ".join(f"{k} {_pc(x, 2)}" for k, x in j["crisis_means"].items() if x is not None)
               + "; before 2002-08 only SPY and QQQ are active — " + j["why"])
-    stat = {"n_quarters": j["n"], "window": j["keys"], **{k: p[k] for k in p}, "holm_boot": j["holm_boot"], "holm_hac": j["holm_hac"],
-            "loco": j["loco"], "worst_decile_mean": j["worst_decile_mean"], "crisis_means": j["crisis_means"], "family": j["family"],
-            "criteria": j["criteria"], "rule10": "calendar: month-end rebalancing, calendar quarters (rule 10(a))"}
+    stat = {"n_quarters": j["n"], "n_windows": j["n_windows"], "window": j["keys"], **{k: p[k] for k in p}, "holm_boot": j["holm_boot"],
+            "holm_hac": j["holm_hac"], "loco": j["loco"], "worst_decile_mean": j["worst_decile_mean"], "crisis_means": j["crisis_means"],
+            "family": j["family"], "per_phase": {str(k): v for k, v in (j["phases"] or {}).items()}, "criteria": j["criteria"],
+            "rule10": ("month-end rebalancing named by the claim; 'quarterly returns' name no quarter calendar, so the primary is "
+                       "the pooled all-start estimate over overlapping 3-month windows (12-month blocks and HAC lag), with the "
+                       "per-phase range of the three non-overlapping quarterly grids reported")}
     return _out(stat, j["n"], j["verdict"], reason)
 
 
@@ -2234,9 +2370,17 @@ def cross_asset_tsmom(spy: tuple, ief: tuple, tlt: tuple, dgs10: dict, bills: Bi
         lo_above = resolve(lo, se_lo, 0.0, "gt")[0]
         hi_below = resolve(hi, se_hi, 0.0, "lt")[0]
         pl_ok = True if (lo_below and hi_above) else (False if (lo_above or hi_below) else None)
+    dsr_c = all_constructions([dsr_row(d_strat, "cross-asset excess returns"), dsr_row(d_diff, "cross-asset minus own series")],
+                              f"DSR > {DSR_PASS} over {len(family)} trials under both readings")
+    # the trial names no trial-Sharpe variance: the house floor 1/(T-1) applies; say when the outcome depends on it
+    dsr_obs_ok = all_constructions([dsr_row(d_strat, "", alt=True), dsr_row(d_diff, "", alt=True)], "")[1]
+    if dsr_obs_ok != dsr_c[1]:
+        dsr_c = (dsr_c[0] + " [the trial names no trial-Sharpe variance, so the house 1/(T-1) floor applies where it exceeds "
+                 "the observed variance; with the observed variances this criterion would be "
+                 + {True: "passed", False: "failed", None: "undecided (the readings disagree)"}[dsr_obs_ok]
+                 + ": its outcome depends on the floor]", dsr_c[1], dsr_c[2])
     crit = [_ci_crit(sh, "gt", 0.0, "Sharpe(cross-asset) - Sharpe(own TSMOM) > 0 with 95% CI excluding 0 (paired studentized CBB)"),
-            all_constructions([dsr_row(d_strat, "cross-asset excess returns"), dsr_row(d_diff, "cross-asset minus own series")],
-                              f"DSR > {DSR_PASS} over {len(family)} trials under both readings"),
+            dsr_c,
             (f"placebo (bond signal lagged 12 months) Sharpe difference {_s(shp.get('diff'))} with 95% CI including 0 ({_ci(shp.get('ci'))})",
              pl_ok, pl_ok is False and n >= min_n)]
     v, why = _decide(crit, n, min_n, "months")
@@ -2275,7 +2419,7 @@ def cross_asset_tsmom(spy: tuple, ief: tuple, tlt: tuple, dgs10: dict, bills: Bi
             b_flips += int(np.isfinite(x1) and np.isfinite(x2) and np.sign(x1) != np.sign(x2))
     pos = pv["pos"]
     return {"n": int(n), "labels": [labs[0], labs[-1]] if labs else None, "sharpe": sh, "dsr_strategy": d_strat, "dsr_diff": d_diff,
-            "placebo": shp, "regimes": reg, "synthetic_check": chk, "duration_sensitivity_diff": sens, "duration_b_flips": b_flips,
+            "dsr_criterion_with_observed_variance": dsr_obs_ok, "dsr_depends_on_floor": dsr_obs_ok != dsr_c[1], "placebo": shp, "regimes": reg, "synthetic_check": chk, "duration_sensitivity_diff": sens, "duration_b_flips": b_flips,
             "position_shares": {"1": float(np.mean(pos == 1)), "0.5": float(np.mean(pos == 0.5)), "0": float(np.mean(pos == 0))},
             "family": {"|".join(map(str, k)): {"n": int(r["idx"].size), "sharpe_cross": _sr_ann(r["cross_ex"]), "sharpe_own": _sr_ann(r["own_ex"])} for k, r in res.items()},
             "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
@@ -2301,8 +2445,14 @@ def b6c_mom_cross_asset_tsmom(archive):
               f"filled at the next session's close, DTB3 cash, 2 bps per side; hold months {j['labels'][0]}..{j['labels'][1]} "
               f"({j['n']} months). Excess Sharpe cross-asset {_s(sh.get('sharpe_a'), 3)} vs own {_s(sh.get('sharpe_b'), 3)}: "
               f"difference {_s(sh.get('diff'))} ({_ci(sh.get('ci'))}, paired studentized CBB, 12-month blocks, {N_BOOT:,} draws x "
-              f"{REPS} seeds); DSR over the 12 declared trials (IEF/TLT/synthetic proxy x long-flat/long-short x 12-1/6-1): strategy "
-              f"{_f(j['dsr_strategy']['dsr'])}, difference series {_f(j['dsr_diff']['dsr'])}; placebo (b lagged 12 months) "
+              f"{REPS} seeds); DSR over the 12 declared trials (IEF/TLT/synthetic proxy x long-flat/long-short x 12-1/6-1; "
+              f"trial-Sharpe variance floored at 1/(T-1), the house convention, as the trial names none): strategy "
+              f"{_dsr_brief(j['dsr_strategy'])}, difference series {_dsr_brief(j['dsr_diff'])}"
+              + ("" if not j["dsr_depends_on_floor"] else
+                 f"; with the observed variances the DSR criterion would be "
+                 f"{ {True: 'passed', False: 'failed', None: 'undecided, the readings disagreeing'}[j['dsr_criterion_with_observed_variance']] }"
+                 f", so its outcome rests on the floor")
+              + f"; placebo (b lagged 12 months) "
               f"difference {_s(pl.get('diff'))} ({_ci(pl.get('ci'))}). Regimes: "
               + ", ".join(f"{k} {x['diff']:+.3f}" for k, x in j["regimes"].items())
               + (f". Synthetic bond vs IEF over {ck['months']} months: correlation {ck['corr']:.3f}, tracking error "
@@ -2315,7 +2465,9 @@ def b6c_mom_cross_asset_tsmom(archive):
               f"rule holds SPY only when both signals are positive (the library's 0.5 states need a zero sign) — " + j["why"])
     stat = {"n_months": j["n"], "window": j["labels"], "sharpe_cross": sh.get("sharpe_a"), "sharpe_own": sh.get("sharpe_b"),
             "diff": sh.get("diff"), "ci": sh.get("ci"), "ci_mc_se": sh.get("ci_mc_se"), "dsr_strategy": j["dsr_strategy"],
-            "dsr_diff": j["dsr_diff"], "placebo_diff": pl.get("diff"), "placebo_ci": pl.get("ci"), "regimes": j["regimes"],
+            "dsr_diff": j["dsr_diff"], "dsr_criterion_with_observed_variance": j["dsr_criterion_with_observed_variance"],
+            "dsr_depends_on_floor": j["dsr_depends_on_floor"],
+            "placebo_diff": pl.get("diff"), "placebo_ci": pl.get("ci"), "regimes": j["regimes"],
             "synthetic_check": ck, "duration": T481_DURATION, "duration_sensitivity_diff": j["duration_sensitivity_diff"],
             "duration_b_flips": j["duration_b_flips"],
             "position_shares": ps, "family": j["family"], "criteria": j["criteria"],

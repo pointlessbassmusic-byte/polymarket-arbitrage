@@ -185,6 +185,24 @@ def test_walk_forward_calendar_is_the_claims():
     assert m.walk_forward(ex, xr, days, 0.0, phase=7)["selections"][0]["month"] == "1999-07"
 
 
+def test_walk_forward_selects_on_bars_before_the_switch():
+    """Regression (T-318): the switch is made at re-selection close e, so the ranking may use returns through close e - 1
+    only (one-bar delay); the bar ending at close e must not enter it."""
+    days = wdays("1994-01-03", "2003-12-31")
+    n = len(days)
+    e = max(i for i, d in enumerate(days) if d[:7] == "1998-12")
+    xr = np.zeros(n)
+    ex = np.zeros((n, 2))
+    ex[:, 0] = 1e-5 + 1e-3 * np.sin(np.arange(n))           # per-day Sharpe about 0.014
+    ex[e, 1] = 0.01                                        # rule 1: one gain on the re-selection bar (Sharpe about 0.028)
+    W = m.walk_forward(ex, xr, days, 0.0)
+    s0 = W["selections"][0]
+    assert s0["month"] == "1998-12" and s0["is_days"] == e and s0["rule"] == 0
+    assert W["first"] == e + 1 and W["wf"][e + 1] == ex[e + 1, 0]
+    ex[e, 1], ex[e - 1, 1] = 0.0, 0.01                     # the same gain one bar earlier is known at the switch
+    assert m.walk_forward(ex, xr, days, 0.0)["selections"][0]["rule"] == 1
+
+
 # ============================================================================================ T-326 =====
 
 def _metals_pair(kind: str, n: int = 3600, seed: int = 2):
@@ -273,14 +291,16 @@ def test_cme_metals_calendar():
     assert m.front_contract(date(2025, 12, 15), m.SI_MONTHS) == (2026, 3)
 
 
-def _gold_world(carry: float, r: float = 0.02, seed: int = 0):
-    days = wdays("2005-01-03", "2016-12-30")
+def _gold_world(carry: float, r: float = 0.02, seed: int = 0, noise: float = 0.0003, silver: bool = False):
+    days = wdays("2006-05-01" if silver else "2005-01-03", "2016-12-30")
     rng = np.random.default_rng(seed)
     spot = 400 * np.exp(np.cumsum(rng.normal(0, 0.01, len(days))))
-    gld = spot * np.array([m.ounces_per_share(d, m.GLD_OZ0, m.GLD_FEE, m.GLD_LAUNCH) for d in days])
-    dd = np.array([(m.last_trade_day(*m.front_contract(date.fromisoformat(d), m.GC_MONTHS)) - date.fromisoformat(d)).days
+    oz0, fee, launch, months = ((m.SLV_OZ0, m.SLV_FEE, m.SLV_LAUNCH, m.SI_MONTHS) if silver else
+                                (m.GLD_OZ0, m.GLD_FEE, m.GLD_LAUNCH, m.GC_MONTHS))
+    gld = spot * np.array([m.ounces_per_share(d, oz0, fee, launch) for d in days])
+    dd = np.array([(m.last_trade_day(*m.front_contract(date.fromisoformat(d), months)) - date.fromisoformat(d)).days
                    for d in days], float)
-    F = spot * np.exp((r + carry) * dd / 365.0 + rng.normal(0, 0.0003, len(days)))
+    F = spot * np.exp((r + carry) * dd / 365.0 + rng.normal(0, noise, len(days)))
     return days, F, gld, (lambda ds: np.full(len(ds), r))
 
 
@@ -297,13 +317,41 @@ def test_band_test_planted_inside_and_null_outside():
     assert t["ok"] is False and t["decisive"] is True and t["mean"] == pytest.approx(0.02, abs=0.003)
 
 
-def test_metals_basis_needs_both_named_constructions():
-    for carry in (0.0, 0.02):
-        days, F, gld, rate = _gold_world(carry)
-        j = m.metals_basis((days, F, gld), None, rate, min_n=500)
-        assert j["criteria"][0][1] is None                   # rule 11: the NAV construction is not archived
-        assert j["verdict"] == "inconclusive"
-        assert j["gold"]["ok"] is (carry == 0.0)
+def test_metals_basis_planted_passes_and_null_fails_on_gold_alone():
+    """Regression (T-370): the GLD-NAV 'Robustness: ... instead of the GLD close' item is report-only (module convention),
+    so the rule's close construction decides; it no longer caps the verdict at inconclusive."""
+    days, F, gld, rate = _gold_world(0.0)
+    j = m.metals_basis((days, F, gld), None, rate, min_n=500)
+    assert len(j["criteria"]) == 1 and j["criteria"][0][1] is True and j["verdict"] == "supported"
+    assert "not archived" in j["robustness_nav"]
+    days, F, gld, rate = _gold_world(0.02)
+    j = m.metals_basis((days, F, gld), None, rate, min_n=500)
+    assert j["criteria"][0][1] is False and j["gold"]["decisive_bonf6"] is True and j["verdict"] == "not_supported"
+    j = m.metals_basis((days[:400], F[:400], gld[:400]), None, rate, min_n=500)   # below min_n: decisive failure counts
+    assert j["n"] < 500 and j["verdict"] == "not_supported"
+
+
+def test_metals_basis_other_metals_are_separate_trials():
+    """Regression (T-370): the claim is gold-only; a failing silver trial and the unarchived PL/PA/HG trials are reported,
+    not criteria, so they neither override nor cap the gold result."""
+    days, F, gld, rate = _gold_world(0.0)
+    sd, SF, SE, _ = _gold_world(0.03, seed=4, silver=True)
+    j = m.metals_basis((days, F, gld), (sd, SF, SE), rate, min_n=500)
+    assert j["silver"]["ok_bonf6"] is False and j["separate_trials"]["silver"]["decisive"] is True
+    assert set(j["separate_trials"]) == {"silver", "platinum", "palladium", "copper"}
+    assert "not archived" in j["separate_trials"]["copper"]
+    assert len(j["criteria"]) == 1 and j["criteria"][0][0].startswith("gold") and j["verdict"] == "supported"
+
+
+def test_metals_basis_judges_the_six_trial_bonferroni_interval():
+    """Regression (T-370): '6 trials counted' -> the band test uses the HAC interval at 1 - 0.05/6; a mean whose
+    unadjusted 95% CI is inside the band but whose Bonferroni CI crosses +50 bp fails (not decisively)."""
+    days, F, gld, rate = _gold_world(0.0037, noise=0.003)
+    j = m.metals_basis((days, F, gld), None, rate, min_n=500)
+    g = j["gold"]
+    assert g["ci"][1] < 0.005 < g["ci_bonf6"][1] and g["ok"] is True
+    assert j["criteria"][0][1] is False and g["decisive_bonf6"] is False and j["verdict"] == "not_supported"
+    assert "99.17% CI" in j["criteria"][0][0]
 
 
 # ============================================================================================ T-372 =====
@@ -352,6 +400,17 @@ def test_es_financing_null_fails():
     assert abs(j["mean"]) < 0.001 and j["verdict"] == "not_supported"
 
 
+def test_es_financing_counts_the_five_trials():
+    """T-372 under the module's trial-count convention: '5 trials counted' -> one-sided bounds at 1 - 0.05/5. An HAC
+    lower bound above 20 bp unadjusted but below it at the Bonferroni level fails; realized dividends stay report-only."""
+    es, gs, spy, rate = _es_world(0.0036)
+    j = m.es_financing(es, gs, spy, rate, min_n=500)
+    assert j["level_one_sided"] == pytest.approx(0.99)
+    assert j["hac_lower"] == pytest.approx(j["mean"] - 2.3263479 * j["hac_se"], rel=1e-6)
+    assert j["hac_lower95"] > m.T372_THR > j["hac_lower"] and j["criteria"][0][1] is False
+    assert len(j["criteria"]) == 2 and j["verdict"] == "not_supported"
+
+
 # ============================================================================================ T-416 =====
 
 def _fng_world(effect: float, seed: int = 3, last: str = "2025-06-30", spacing: int = 75):
@@ -396,6 +455,23 @@ def test_fear_greed_null_does_not_pass():
     px, fng, dips = _fng_world(0.0)
     j = m.fear_greed_study(px, None, fng, grid=False)
     assert j["criteria"][0][1] is not True and j["verdict"] != "supported"
+
+
+def test_coef_test_uses_percentile_bounds_and_p():
+    """Regression (T-416): rule 6 allows studentized or percentile intervals, so the one-sided bounds are the 5% / 95%
+    quantiles of the bootstrap coefficients b* and p = P(b* <= 0), not the basic (reverse-percentile) b - q(b* - b)."""
+    rng = np.random.default_rng(8)
+    n = 900
+    I = np.zeros(n)
+    I[rng.choice(n, 25, replace=False)] = 1.0
+    x = rng.normal(0, 0.1, n)
+    y = 0.03 * I + 0.2 * x + rng.exponential(0.05, n) * (1 + 3 * I) - 0.05
+    t = m.coef_test(y, I, x, 30, n_boot=400, seed=3)
+    bs = m._boot_coef(y, I, x, 30, 400, 3)
+    assert t["ci"] == pytest.approx([np.quantile(bs, 0.05), np.quantile(bs, 0.95)])
+    assert t["p"] == pytest.approx((np.sum(bs <= 0) + 1) / (bs.size + 1))
+    basic_up = t["coef"] - np.quantile(bs - t["coef"], 0.05)
+    assert abs(basic_up - t["ci"][1]) > 1e-3                 # the skewed draws separate the two constructions
 
 
 def test_fear_greed_grid_has_72_cells():
