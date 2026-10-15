@@ -21,6 +21,10 @@ IV term structure (the claims' model).
     reruns the headline statistic from 2008-01-02 (first VIX6M print) with a VIX3M proxy interpolated in total variance
     between VIX and VIX6M before 2009-09-18; its error against the real VIX3M on the overlap is reported. 2007-12 itself
     is not covered by any archived term index.
+    T-152 is the exception: its CLAIM names the window ("top-decile months of VIX increase since 2007-12") and has no
+    term-structure regime, so the house data guidance applies: VIX stands in for VIX3M before its first print (the
+    back-leg IV is then VIX), entries run from 2007-12-04, and the reason labels the proxy and gives its error against
+    the real VIX3M. The real-VIX3M-only run (2009-09-18 on) and the VIX/VIX6M proxy are report-only sensitivities.
 
 Conventions (house rules).
   * Prices: SPY RAW closes (``close``) for strikes and settlement. Cash dividends come from the step in the adjclose/close
@@ -261,8 +265,9 @@ class Term:
     v30: np.ndarray            # VIX / 100
     v93: np.ndarray            # VIX3M / 100 (NaN before its first print unless proxied)
     v182: np.ndarray           # VIX6M / 100 (NaN before its first print)
-    proxy: np.ndarray          # True where v93 is the VIX/VIX6M proxy
+    proxy: np.ndarray          # True where v93 is a proxy (named by proxy_label)
     first93: Optional[str] = None
+    proxy_label: str = "VIX/VIX6M VIX3M proxy"
 
 
 def make_term(days: Sequence[str], vix: dict, vix3m: dict, vix6m: Optional[dict] = None, proxy_before: bool = False) -> Term:
@@ -280,7 +285,27 @@ def make_term(days: Sequence[str], vix: dict, vix3m: dict, vix6m: Optional[dict]
 
 def scaled_term(term: Term, s: float) -> Term:
     """Every IV of the panel multiplied by s (the IV-scale sensitivity; ratios between tenors are unchanged)."""
-    return Term(term.v30 * s, term.v93 * s, term.v182 * s, term.proxy, term.first93)
+    return Term(term.v30 * s, term.v93 * s, term.v182 * s, term.proxy, term.first93, term.proxy_label)
+
+
+def vix_for_vix3m(term: Term, label: str = "VIX-for-VIX3M proxy") -> Term:
+    """House data guidance (T-152): VIX stands in for VIX3M where VIX3M has no print (before its first one), so the
+    30-to-93-day term is flat and a back leg inside 93 days is priced at VIX. Filled days are marked as proxy (OR-ed with
+    any proxy already in ``term``)."""
+    fill = ~np.isfinite(term.v93) & np.isfinite(term.v30)
+    return Term(term.v30, np.where(fill, term.v30, term.v93), term.v182, term.proxy | fill, term.first93, label)
+
+
+def vix_for_vix3m_fit(term: Term, T: float = 60.0) -> dict:
+    """Error of VIX standing in for VIX3M against the real VIX3M where both print (``term`` = the real panel), in vol
+    points: on VIX3M itself and on the T-day back-leg IV the structure prices (total-variance interpolation)."""
+    ok = np.flatnonzero(np.isfinite(term.v30) & np.isfinite(term.v93) & ~term.proxy)
+    if ok.size < 20:
+        return {"n": int(ok.size), "mean_err_3m": None, "mae_3m": None, "mean_err_back": None, "mae_back": None}
+    e3 = (term.v30[ok] - term.v93[ok]) * 100
+    eb = (term.v30[ok] - term_iv(term, ok, T)) * 100
+    return {"n": int(ok.size), "mean_err_3m": float(e3.mean()), "mae_3m": float(np.abs(e3).mean()),
+            "mean_err_back": float(eb.mean()), "mae_back": float(np.abs(eb).mean())}
 
 
 def term_iv(term: Term, i, T_days) -> np.ndarray:
@@ -761,7 +786,7 @@ def _window_note(term: Term, m: Market, a) -> str:
     if not a.size:
         return "no entries"
     prox = int(term.proxy[a].sum())
-    return (f"{m.days[int(a[0])]} to {m.days[int(a[-1])]}" + (f" ({prox} entries on the VIX/VIX6M VIX3M proxy)" if prox else ""))
+    return (f"{m.days[int(a[0])]} to {m.days[int(a[-1])]}" + (f" ({prox} entries on the {term.proxy_label})" if prox else ""))
 
 
 def _proxy_fit(term_real: Term, term_proxy_full: Term) -> str:
@@ -1376,6 +1401,8 @@ def eval_leaps_collar(m: Market, term: Term, spreads: Spreads, start: str, tilt:
 
 # ------------------------------------------------------------------------------ T-152 calendarised butterfly --
 
+T152_START = "2007-12-04"      # the claim's "since 2007-12": the first VIX3M (VXV) close, the trial's anchor
+
 def time_vs_plain_fly(m: Market, term: Term, a, spreads: Spreads, w: float = 0.03) -> dict:
     """Calendarised fly: long 60-DTE calls at (1 -/+ w) S (VIX/VIX3M), short 2 x 30-DTE ATM (VIX); plain fly: all three strikes
     at 30 DTE (VIX). Both valued at the front expiry; P&L / debit after half-spread costs on 6 vs 4 contracts (the time fly's
@@ -1405,8 +1432,8 @@ def judge_spike_decile(xt, xp, dvix, min_n: int = 15, n_boot: int = N_BOOT, extr
 
 def eval_time_fly(m: Market, term: Term, spreads: Spreads, start: str, min_n: int = 15, n_boot: int = N_BOOT, headline_only: bool = False,
                   window_gap: Optional[str] = None) -> dict:
-    """``window_gap``: why the claim's own window (top-decile months since 2007-12) is not fully priced; it becomes a
-    criterion that is not implemented."""
+    """``window_gap``: set only when the inputs cannot reach the claim's own window (top-decile months since 2007-12) even
+    with VIX standing in for VIX3M; it then becomes a criterion that is not implemented."""
     g = grid(m, term, start, MONTH); g = g[g + MONTH < len(m.days)]
     res = time_vs_plain_fly(m, term, g, spreads)
     extra = [(f"the claim's window, top-decile months since 2007-12 ({window_gap})", None, False)] if window_gap else []
@@ -1424,7 +1451,9 @@ def eval_time_fly(m: Market, term: Term, spreads: Spreads, start: str, min_n: in
               f"({_ci_txt(*j['ci'])}, paired percentile bootstrap); walk-forward halves (report only) {_p(hv[0])} / {_p(hv[1])}; "
               f"all months (not the claim) {_p(_mean(d_all))}; mean debit {_p(_mean(res['debit_t']))} vs {_p(_mean(res['debit_p']))} of spot")
     out = dict(j); out.update({"halves": hv, "mean_all": _mean(d_all), "model_priced": True, "reason_core": reason, "headline": j["diff"],
-                               "window": _window_note(term, m, g)})
+                               "window": _window_note(term, m, g), "first_entry": m.days[int(g[0])] if g.size else None,
+                               "spike_days": [m.days[int(i)] for i in g[top]], "proxy_entries": int(term.proxy[g].sum()),
+                               "proxy_spike_days": [m.days[int(i)] for i in g[top] if term.proxy[int(i)]]})
     return out
 
 
@@ -1776,13 +1805,41 @@ def b6_term_calendarised_fly(archive):
         return miss
     m, term, sp = _market(archive), _term(archive), _spreads(archive)
     f93 = _first93(archive)
+    tw = vix_for_vix3m(term)                    # the claim's window: VIX stands in for VIX3M before its first print
+    i0 = _start_index(m, tw, T152_START)
+    first = m.days[i0] if i0 < len(m.days) else "none"
     gap = None
-    if f93 > "2007-12-03":
-        gap = (f"the archived VIX3M starts {f93}, so months from 2007-12 to {f93} cannot be priced with the claim's VIX/VIX3M "
-               f"model; it needs VIX3M (VXV) closes from 2007-12-04, e.g. FRED VXVCLS")
-    rep = eval_time_fly(m, term, sp, f93, window_gap=gap)
-    ext = _window_sensitivity(archive, lambda tp, s: eval_time_fly(m, tp, sp, s, headline_only=True), "spike-decile difference")
-    ext += _scale_sensitivity(lambda k: eval_time_fly(m, scaled_term(term, k), sp, _first93(archive), headline_only=True), "spike-decile difference")
+    if first[:7] > T152_START[:7]:
+        gap = (f"the first entry SPY, VIX and the bill can price is {first}, so 2007-12 is not covered even with VIX for VIX3M; "
+               f"it needs SPY, VIX and DTB3 history from 2007-12-04")
+    rep = eval_time_fly(m, tw, sp, T152_START, window_gap=gap)
+    fit = vix_for_vix3m_fit(term); rep["proxy_fit"] = fit
+    if rep["proxy_entries"]:
+        ext = (f"; claim window: monthly entries from {T152_START} (the claim's 'since 2007-12'); the archived VIX3M starts "
+               f"{f93}, so before it VIX stands in for VIX3M (house data guidance; the back legs are then priced at VIX), a "
+               f"PROXY on {rep['proxy_entries']} entries and {len(rep['proxy_spike_days'])} of {rep['n']} spike-decile months ("
+               + (", ".join(d[:7] for d in rep["proxy_spike_days"]) or "none") + f"); proxy error against the real VIX3M on "
+               f"{fit['n']} overlap days: VIX - VIX3M mean {_f(fit['mean_err_3m'])} vol pts (mean |error| "
+               f"{_f(fit['mae_3m']).lstrip('+')}), on the 60-DTE back-leg IV mean {_f(fit['mean_err_back'])} vol pts (mean "
+               f"|error| {_f(fit['mae_back']).lstrip('+')})")
+    else:
+        ext = f"; claim window: monthly entries from {T152_START}, real VIX3M throughout"
+    sens = {}
+    real = eval_time_fly(m, term, sp, f93)
+    sens["real_vix3m_only"] = {"diff": real["diff"], "ci": real["ci"], "n": real["n"], "window": real["window"]}
+    ext += (f"; sensitivities (report only): real VIX3M only, from its first print {f93}: spike-decile difference "
+            f"{_p(real['diff'])} ({_ci_txt(*real['ci'])}, {real['n']} spike-decile months, {real['window']})")
+    if _has(archive, VIX6M):
+        tc = vix_for_vix3m(_term(archive, proxy=True), "VIX/VIX6M VIX3M proxy (VIX before the first VIX6M print)")
+        r6 = eval_time_fly(m, tc, sp, T152_START)
+        sens["vix6m_proxy"] = {"diff": r6["diff"], "ci": r6["ci"], "n": r6["n"], "window": r6["window"]}
+        ext += (f"; VIX3M proxied from VIX/VIX6M in total variance from the first VIX6M print {min(_index(archive, VIX6M))} "
+                f"(VIX before it; {_proxy_fit(term, _term(archive, proxy=True))}): {_p(r6['diff'])} ({_ci_txt(*r6['ci'])}, "
+                f"{r6['n']} spike-decile months)")
+    else:
+        ext += "; VIX/VIX6M proxy sensitivity: no VIX6M bundle"
+    rep["sensitivities"] = sens
+    ext += _scale_sensitivity(lambda k: eval_time_fly(m, scaled_term(tw, k), sp, T152_START, headline_only=True), "spike-decile difference")
     return _finish(rep, ext)
 
 

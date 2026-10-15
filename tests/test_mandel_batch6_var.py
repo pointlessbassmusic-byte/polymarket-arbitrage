@@ -127,7 +127,7 @@ def test_dividends_from_adjclose_step_and_forecast():
     assert div[2] == pytest.approx(1.0) and div[5] == pytest.approx(0.5)
     assert np.count_nonzero(div) == 2
     fc = v.div_forecast(div)
-    assert list(fc) == pytest.approx([1.0, 1.0, 1.0, 1.0, 1.0, 0.5])    # point in time: last paid (the first before any)
+    assert list(fc) == pytest.approx([0.0, 0.0, 1.0, 1.0, 1.0, 0.5])    # point in time: last paid (none before the first)
 
 
 # =========================================================================================== straddle engines ==
@@ -140,9 +140,10 @@ def test_hedged_straddle_matched_vol_is_fair_and_unmatched_is_not():
     assert y.std() < 0.3 * (r["payoff"] - r["prem"]).std() / r["vega"].mean()   # hedging removes most of the variance
     hi = v.straddle_cycles(_frame(4300, 20.0, 0.30, seed=6), 1.0, side=1, hedge=True)
     assert np.mean(hi["pnl"]) > 0                                        # realised above implied: long gamma earns
-    # dividend forward lowers the call and raises the put: an ex-date inside the life changes the price
-    fr2 = dict(fr)
+    # dividend forward lowers the call and raises the put: an ex-date inside the life changes the price (a dividend that
+    # went ex on the entry day makes the forecast known)
     div = np.zeros(len(fr["days"]))
+    div[0] = 2.0
     div[10] = 2.0
     fr2 = v.make_frame(fr["days"], fr["close"], fr["vix"], div=div)
     a = v.straddle_cycles(fr2, 1.0, side=-1, hedge=False, hold=21)
@@ -185,10 +186,118 @@ def test_tercile_oos_planted_and_null():
 
 def test_straddle_tercile_runs_and_gates_min_n():
     fr = _frame(3000, 20.0, 0.15, seed=12)
-    rep = v.straddle_tercile(fr, n_boot=NB)
+    rep = v.straddle_tercile(fr, n_boot=NB, n_rep=2)
     assert rep["n"] < 390 and rep["verdict"] in ("inconclusive", "not_supported")
     assert "MODEL-PRICED" in rep["reason"] and " — " in rep["reason"]
     json.dumps(v._clean(rep["stat"]), allow_nan=False)
+
+
+# ---- regression: T-101 verdict must not hinge on the bootstrap seed or the block length (reviewer defect 1) -------------
+
+def _ci(lo, hi, se_lo=0.0, se_hi=0.0):
+    return {"ci": [lo, hi], "ci_mc_se": [se_lo, se_hi]}
+
+
+def test_robust_exclusion_marginal_and_monte_carlo_rules():
+    # the reviewer's case: block 6 excludes 0 (+0.0038) but the percentile CI and blocks 1/3/12 include it -> not decided
+    ok, dec, note = v.robust_exclusion(_ci(0.0038, 0.297, 0.0004), {"the percentile interval": _ci(-0.010, 0.285),
+                                                                   "studentized block 1": _ci(-0.0062, 0.30),
+                                                                   "studentized block 12": _ci(-0.013, 0.31)})
+    assert ok is None and not dec and "MARGINAL" in note
+    # a lower bound inside 2 Monte Carlo s.e. of 0 is not resolved, whatever its sign
+    assert v.robust_exclusion(_ci(0.0016, 0.297, 0.0013), {})[0] is None
+    assert v.robust_exclusion(_ci(-0.0010, 0.297, 0.0013), {})[0] is None
+    # an alternative within its own Monte Carlo error of 0 also counts as including 0
+    assert v.robust_exclusion(_ci(0.05, 0.4, 0.001), {"studentized block 3": _ci(0.001, 0.4, 0.001)})[0] is None
+    assert v.robust_exclusion(_ci(0.05, 0.4, 0.001), {"studentized block 3": _ci(0.03, 0.4, 0.001)}) == (True, False, "")
+    assert v.robust_exclusion(_ci(-0.05, 0.4, 0.001), {}) == (False, False, "the declared CI includes 0")
+    assert v.robust_exclusion(_ci(-0.4, -0.05, 0.001, 0.001), {})[:2] == (False, True)
+    assert v.robust_exclusion(_ci(None, None), {})[0] is None
+
+
+def test_mc_group_ci_planted_null_and_seed_stability():
+    rng = np.random.default_rng(31)
+    n = 360
+    lab = rng.integers(0, 3, n)
+    x = rng.standard_normal(n) + np.where(lab == 2, 0.6, 0.0)
+    oks = set()
+    for seed in range(4):
+        m = v.mc_group_ci(x, lab == 2, lab == 0, 6, 0.95, NB, 4, seed)
+        alts = {f"studentized block {b}": v.mc_group_ci(x, lab == 2, lab == 0, b, 0.95, NB, 2, seed) for b in (1, 3, 12)}
+        oks.add(v.robust_exclusion(m, alts)[0])
+        assert m["n_boot_total"] == 4 * NB and len(m["lower_by_replicate"]) == 4
+        assert m["ci_mc_se"][0] == pytest.approx(np.std(m["lower_by_replicate"], ddof=1) / 2.0)
+        assert m["ci"][0] == pytest.approx(np.mean(m["lower_by_replicate"]))
+    assert oks == {True}                                                 # planted: passes at every base seed
+    x0 = rng.standard_normal(n)
+    for seed in range(4):
+        m0 = v.mc_group_ci(x0, lab == 2, lab == 0, 6, 0.95, NB, 4, seed)
+        assert v.robust_exclusion(m0, {})[0] is not True                 # null: never passes
+
+
+# ---- regression: T-101 is tested on SPY cycles only; ^GSPC pre-history is a labelled sensitivity (reviewer defect 2) ---
+
+def _tercile_frame(n_days, planted, seed):
+    """VIX constant within each 21-day cycle block and random across blocks. Planted: realised vol fixed at 0.15, so a high
+    VIX - RV21 means a rich premium. Null: realised vol = 0.90 x VIX, so P&L / premium does not depend on the VIX level."""
+    rng = np.random.default_rng(seed)
+    days = _bdays("1990-01-02", n_days)
+    vix = rng.uniform(12.0, 30.0, n_days // v.HOLD + 2)[np.arange(n_days) // v.HOLD]
+    close = _gbm(days, 0.15 if planted else 0.90 * vix / 100.0, seed + 1)
+    return v.make_frame(days, close, vix)
+
+
+def test_straddle_tercile_spy_only_planted_null_and_sensitivity():
+    planted = v.straddle_tercile(_tercile_frame(9600, True, 40), n_boot=NB, n_rep=2)
+    st = planted["stat"]
+    assert st["min_train"] == v.T101_MIN_TRAIN and planted["n"] == st["n_spy_cycles"] - v.T101_MIN_TRAIN
+    assert planted["n"] >= 390 and planted["verdict"] == "supported", planted["reason"]
+    assert st["min_n_unit"] == "out-of-sample SPY cycles" and st["gspc_pre_window_sensitivity"] is None
+    null = v.straddle_tercile(_tercile_frame(9600, False, 42), n_boot=NB, n_rep=2)
+    assert null["n"] >= 390 and null["verdict"] == "not_supported", null["reason"]
+    # pre-SPY training cycles never change n or the verdict: they only feed the labelled sensitivity
+    fr = _tercile_frame(3000, True, 44)
+    base = v.straddle_tercile(fr, n_boot=NB, n_rep=2)
+    sens = v.straddle_tercile(fr, pre_sensitivity=np.random.default_rng(45).normal(3.0, 4.0, 40), n_boot=NB, n_rep=2,
+                              sensitivity_note=" (pre-SPY proxy)")
+    assert sens["n"] == base["n"] == base["stat"]["n_spy_cycles"] - v.T101_MIN_TRAIN < 390
+    assert sens["verdict"] == base["verdict"] == "inconclusive"
+    assert "SPY history before" in base["reason"] and "more years of SPY cycles" in base["reason"]
+    s = sens["stat"]["gspc_pre_window_sensitivity"]
+    assert s["n_oos"] == base["stat"]["n_spy_cycles"] and s["n_pre_training_cycles"] == 40
+    assert "SENSITIVITY, not in the verdict or n (pre-SPY proxy)" in sens["reason"]
+
+
+def test_straddle_tercile_harness_does_not_count_gspc_pre_window():
+    gdays = _bdays("2014-01-01", 2500)
+    days = gdays[1000:]
+    spy = _gbm(days, 0.16, 46, 250.0)
+    arc = FakeArchive({"daily-history-SPY": _px_rows(days, spy),
+                       "daily-history--GSPC": _px_rows(gdays, _gbm(gdays, 0.16, 47, 2500.0), symbol="^GSPC"),
+                       "cboe-VIX-history": _idx_rows(gdays, np.full(len(gdays), 18.0)),
+                       "fred-DTB3": [{"value": {"day": d, "value": 2.0}} for d in gdays]})
+    stat, n, verdict, reason = v.b6_var_short_straddle_tercile(arc)
+    assert n == stat["n_spy_cycles"] - v.T101_MIN_TRAIN and verdict == "inconclusive"
+    assert stat["gspc_pre_window_sensitivity"]["n_oos"] == stat["n_spy_cycles"]          # all SPY cycles only there
+    assert "^GSPC" in reason and "SENSITIVITY, not in the verdict or n" in reason
+    json.dumps(stat, allow_nan=False)
+
+
+# ---- regression: no dividend is known before the first ex-date (reviewer defect 3) -------------------------------------
+
+def test_div_forecast_zero_before_first_ex_date_prices_on_spot():
+    fr = _frame(300, 20.0, 0.20, seed=48)
+    div = np.zeros(300)
+    div[10] = 2.0                                                        # the first dividend ever, inside cycle 1's life
+    fr_div = v.make_frame(fr["days"], fr["close"], fr["vix"], div=div)
+    assert fr_div["fc"][9] == 0.0 and fr_div["fc"][10] == 2.0
+    a = v.straddle_cycles(fr_div, 1.0, side=-1, hedge=False, hold=21)
+    b = v.straddle_cycles(fr, 1.0, side=-1, hedge=False, hold=21)
+    assert a["prem"][0] == pytest.approx(b["prem"][0])                  # not yet paid: priced on the spot, not S - PV(2.0)
+    div[30] = 2.0                                                        # once one is paid, the next life prices it
+    fr_div2 = v.make_frame(fr["days"], fr["close"], fr["vix"], div=div)
+    a2 = v.straddle_cycles(fr_div2, 1.0, side=-1, hedge=False, hold=21)
+    assert a2["prem"][1] != pytest.approx(b["prem"][1])
 
 
 # ======================================================================================= 45-DTE short premium ==

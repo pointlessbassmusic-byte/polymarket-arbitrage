@@ -272,7 +272,22 @@ def test_t152_spike_decile():
     assert j["verdict"] == "supported" and j["n"] == 22
     assert bt.judge_spike_decile(rng.normal(-0.2, 0.3, 220), xp, dv, 15, NB)["verdict"] == "not_supported"
     gap = bt.judge_spike_decile(xt, xp, dv, 15, NB, extra=[("claim window since 2007-12", None, False)])
-    assert gap["verdict"] == "inconclusive"                                  # the claim's own window caps the verdict
+    assert gap["verdict"] == "inconclusive"                  # an unreachable claim window (inputs after 2007-12) caps the verdict
+
+
+def test_t152_vix_for_vix3m_panel():
+    """Regression (T-152): VIX stands in for VIX3M only where VIX3M has no print; the fit is VIX - VIX3M on the overlap."""
+    n = 60; v30 = np.full(n, 0.20); v93 = np.full(n, 0.22); v93[:25] = np.nan
+    t = bt.Term(v30, v93, np.full(n, np.nan), np.zeros(n, bool), None)
+    tw = bt.vix_for_vix3m(t)
+    assert np.all(tw.v93[:25] == 0.20) and np.all(tw.v93[25:] == 0.22)
+    assert tw.proxy[:25].all() and not tw.proxy[25:].any() and tw.proxy_label == "VIX-for-VIX3M proxy"
+    assert bt.term_iv(tw, np.arange(25), 60.0) == pytest.approx(np.full(25, 0.20))     # back legs priced at VIX
+    assert bt.scaled_term(tw, 0.9).proxy_label == tw.proxy_label
+    fit = bt.vix_for_vix3m_fit(t)
+    assert fit["n"] == 35 and fit["mean_err_3m"] == pytest.approx(-2.0) and fit["mae_3m"] == pytest.approx(2.0)
+    assert -2.0 < fit["mean_err_back"] < 0.0                                 # the 60-DTE leg sits between VIX and VIX3M
+    assert bt.vix_for_vix3m_fit(bt.vix_for_vix3m(t))["n"] == 35              # filled days never count as overlap
 
 
 def test_swap_permutation_p():
@@ -363,7 +378,9 @@ def test_harness_end_to_end(fake, harness):
     assert isinstance(n, int) and n > 0
     assert reason.startswith("MODEL-PRICED") and " — " in reason
     assert "IV-scale sensitivity" in reason
-    if harness != "b6_term_roll_tested_put":
+    if harness == "b6_term_calendarised_fly":                               # T-152's claim names its window: priced from 2007-12
+        assert "claim window: monthly entries from 2007-12-04" in reason and "real VIX3M only, from its first print 2009-09-18" in reason
+    elif harness != "b6_term_roll_tested_put":
         assert "2009-09-18" in reason                                       # the claim window starts at the first VIX3M print
         assert "window sensitivity" in reason
 
@@ -379,6 +396,36 @@ def test_missing_inputs_inconclusive(harness):
     stat, n, verdict, reason = bt.HARNESSES[harness](FakeArchive({}))
     assert verdict == "inconclusive" and n == 0 and stat["missing_bundles"]
     assert "daily-history-SPY" in stat["missing_bundles"]
+
+
+@pytest.fixture(scope="module")
+def fake_long():
+    return _synthetic_archive(4600)                                           # 2007-01 to 2024-08: >= 15 spike-decile months
+
+
+def test_t152_prices_claim_window(fake_long):
+    """Regression (T-152): the claim's window (since 2007-12) is priced with VIX for VIX3M before the first VIX3M print and
+    is not a not-implemented criterion; the real-VIX3M-only run and the VIX/VIX6M proxy are report-only sensitivities."""
+    stat, n, verdict, reason = bt.HARNESSES["b6_term_calendarised_fly"](fake_long)
+    assert stat["first_entry"] == "2007-12-04" and stat["proxy_entries"] > 0
+    assert all(d < "2009-09-18" for d in stat["proxy_spike_days"])
+    assert n == stat["n"] >= 15 and verdict == "supported" and reason.endswith("all criteria pass")
+    assert "not implemented" not in reason and "the claim's window, top-decile months" not in reason
+    assert "VIX stands in for VIX3M" in reason and "proxy error against the real VIX3M" in reason
+    real = stat["sensitivities"]["real_vix3m_only"]
+    assert real["window"].startswith("2009-09-18") and real["n"] > 0 and len(real["ci"]) == 2
+    assert "vix6m_proxy" in stat["sensitivities"] and stat["proxy_fit"]["mean_err_3m"] is not None
+    json.dumps(stat, allow_nan=False)
+
+
+def test_t152_window_criterion_when_inputs_start_after_2007_12(fake_long):
+    """Regression (T-152) null: when SPY / VIX / the bill cannot reach 2007-12 even with VIX for VIX3M, the window stays a
+    criterion that is not implemented, so the same planted effect is inconclusive, never supported."""
+    late = {"daily-history-SPY", "cboe-VIX-history", "fred-DTB3"}
+    b = {k: ([r for r in rows if r["available_at"][:7] >= "2008-03"] if k in late else rows) for k, rows in fake_long.b.items()}
+    stat, n, verdict, reason = bt.HARNESSES["b6_term_calendarised_fly"](FakeArchive(b))
+    assert stat["first_entry"] >= "2008-03" and verdict == "inconclusive"
+    assert "not implemented: the claim's window, top-decile months since 2007-12" in reason
 
 
 def test_t147_without_smile_is_inconclusive_at_best(fake):

@@ -11,8 +11,9 @@ Model-free (VIX as the variance-swap strike, no option prices):
   * T-529 the VIX1D-implied next-day variance, (VIX1D/100)^2/365, against the next ^GSPC squared log return.
 
 MODEL-PRICED (Black-Scholes legs at a stated multiple of VIX/100; every result is labelled MODEL-PRICED):
-  * T-101 30-DTE ATM short straddle at 0.90 x VIX: top-minus-bottom tercile of VIX - RV21, tercile cut-points from the
-    training window of ``walk_forward_splits`` and applied out of sample;
+  * T-101 30-DTE ATM short straddle at 0.90 x VIX: top-minus-bottom tercile of VIX - RV21 (SPY log returns), tercile
+    cut-points from the training window of ``walk_forward_splits`` on SPY cycles only and applied out of sample (min_n in
+    out-of-sample cycles); the CI must exclude 0 whatever the bootstrap seed and block length (``robust_exclusion``);
   * T-123 30-DTE ATM long straddle at 0.90 x VIX, delta-hedged daily at the entry vol, 1 bp per share traded: P&L / vega;
   * T-233 the same straddle sold at 0.81 x VIX (and at the ATM-IV / VIX ratio measured on the captured SPY smile), hedged
     daily, after a 0.5 vol-point round trip: P&L / premium;
@@ -30,7 +31,7 @@ Conventions (shared):
   * Options settle on RAW closes (close, not adjclose). SPY dividends come from the adjclose/close ratio step: on an ex-day
     i, D = close[i-1] * (1 - f[i-1]/f[i]) with f = adjclose/close. An option whose life spans an ex-date is priced on the
     dividend forward, S - PV(D), with the amount forecast point in time as the last dividend paid at or before the
-    decision (ex-dates follow SPY's quarterly schedule). A hedge that holds shares across an ex-date receives (or, short,
+    decision (none before the first ex-date; ex-dates follow SPY's quarterly schedule). A hedge that holds shares across an ex-date receives (or, short,
     pays) the actual dividend in cash. The hedged P&L runs through a cash account that earns the bill rate.
   * Realised variance is the sum of squared close-to-close log returns, annualised with 252 / window (no mean removed).
   * Intervals. Studentized (bootstrap-t) circular block bootstraps: the statistic is studentized by a Bartlett long-run
@@ -174,6 +175,56 @@ def stud_ci_group_diff(x, top, bot, block: int, level: float = 0.95, n_boot: int
     out["ci"] = [d0 - float(np.quantile(t, 1.0 - a)) * se0, d0 - float(np.quantile(t, a)) * se0]
     out["ci_percentile"] = [float(np.quantile(dd, a)), float(np.quantile(dd, 1.0 - a))]
     return out
+
+
+def mc_group_ci(x, top, bot, block: int, level: float = 0.95, n_boot: int = 20000, n_rep: int = 10, seed: int = 0) -> dict:
+    """``stud_ci_group_diff`` repeated over ``n_rep`` independent replicates of ``n_boot`` draws (seeds seed .. seed+n_rep-1).
+    The studentized and percentile bounds are the replicate means, reported with their Monte Carlo s.e. (replicate sd /
+    sqrt(n_rep)), so a decision taken on them does not hinge on one seed."""
+    n_rep = max(2, int(n_rep))
+    reps = [stud_ci_group_diff(x, top, bot, block, level, n_boot, seed + k) for k in range(n_rep)]
+    out = {k: v for k, v in reps[0].items() if k not in ("ci", "ci_percentile")}
+
+    def agg(key):
+        arr = np.array([[np.nan if b is None else b for b in r.get(key, (None, None))] for r in reps], dtype=float)
+        if not np.isfinite(arr).all():
+            return [None, None], [None, None]
+        return [float(b) for b in arr.mean(axis=0)], [float(e) for e in arr.std(axis=0, ddof=1) / math.sqrt(n_rep)]
+
+    out["ci"], out["ci_mc_se"] = agg("ci")
+    out["ci_percentile"], out["ci_percentile_mc_se"] = agg("ci_percentile")
+    out.update(block=int(block), n_rep=n_rep, n_boot_per_rep=int(n_boot), n_boot_total=int(n_boot) * n_rep,
+               lower_by_replicate=[r["ci"][0] for r in reps])
+    return out
+
+
+def robust_exclusion(declared: dict, alternatives: dict, k_se: float = 2.0) -> tuple:
+    """Decide 'the 95% CI excludes 0 on the positive side' so that neither the bootstrap seed nor an undeclared interval
+    choice decides it. ``declared`` and each value of ``alternatives`` hold "ci" = [lo, hi] and "ci_mc_se" = [se_lo, se_hi]
+    (Monte Carlo s.e. of the bounds). Returns (ok, decisive_fail, note):
+      * (False, True)  the declared CI lies wholly below 0 beyond k_se Monte Carlo s.e. (a decisive failure);
+      * (False, False) its lower bound is below 0 beyond k_se s.e. (the CI includes 0);
+      * (None, False)  its lower bound is within k_se s.e. of 0 (the Monte Carlo error cannot resolve the sign), or it
+                       excludes 0 while an alternative interval (percentile, other block lengths) does not: MARGINAL;
+      * (True, False)  the declared and every alternative lower bound lie above 0 beyond k_se s.e."""
+    lo, hi = declared.get("ci", (None, None))
+    se_lo, se_hi = [e or 0.0 for e in declared.get("ci_mc_se", (None, None))]
+    if lo is None or hi is None:
+        return None, False, "the interval is not available"
+    if hi < -k_se * se_hi:
+        return False, True, "the declared CI lies wholly below 0"
+    if lo < -k_se * se_lo:
+        return False, False, "the declared CI includes 0"
+    if lo <= k_se * se_lo:
+        return None, False, (f"the declared lower bound {lo:+.4f} is within {k_se:g} Monte Carlo s.e. ({se_lo:.4f}) of 0: "
+                             "the sign is not resolved")
+    alt_in = [nm for nm, c in alternatives.items()
+              if c.get("ci", (None, None))[0] is None
+              or c["ci"][0] <= k_se * ((c.get("ci_mc_se") or (None, None))[0] or 0.0)]
+    if alt_in:
+        return None, False, ("MARGINAL: the declared interval excludes 0 but " + ", ".join(alt_in)
+                             + " does not (the claim fixes no interval or block length)")
+    return True, False, ""
 
 
 def _sr_diff_and_se(a: np.ndarray, b: np.ndarray, bw: int):
@@ -424,14 +475,11 @@ def dividends(close, adj) -> np.ndarray:
 
 
 def div_forecast(div) -> np.ndarray:
-    """Point-in-time forecast of an upcoming dividend at each close: the last dividend gone ex at or before that day (the
-    first dividend before any has been paid)."""
+    """Point-in-time forecast of an upcoming dividend at each close: the last dividend gone ex at or before that day; 0
+    before the first ex-date (no dividend is known yet, so an option entered then is priced on the spot)."""
     div = np.asarray(div, dtype=float)
-    nz = np.nonzero(div > 0)[0]
     out = np.zeros(div.size)
-    if nz.size == 0:
-        return out
-    last = float(div[nz[0]])
+    last = 0.0
     for i in range(div.size):
         if div[i] > 0:
             last = float(div[i])
@@ -590,49 +638,85 @@ def tercile_oos(signal, x_by_scale: dict, n_pre: int, n_splits: int = 5, block: 
             "by_scale": res, "oos_index": pi, "top": top, "bottom": bot}
 
 
-def straddle_tercile(fr: dict, pre_signal=None, scales=(0.81, 0.90, 1.00), main: float = 0.90, n_splits: int = 5,
-                     block: int = 6, n_boot: int = 20000, seed: int = 0, haircut: float = 0.05, min_n: int = 390,
-                     pre_note: str = "") -> dict:
+T101_MIN_TRAIN = 60          # SPY cycles in the first walk-forward training window (5 years of monthly cycles)
+
+
+def straddle_tercile(fr: dict, pre_sensitivity=None, scales=(0.81, 0.90, 1.00), main: float = 0.90, n_splits: int = 5,
+                     block: int = 6, n_boot: int = 20000, n_rep: int = 10, seed: int = 0, alt_blocks=(1, 3, 12),
+                     haircut: float = 0.05, min_n: int = 390, min_train: int = T101_MIN_TRAIN,
+                     sensitivity_note: str = "") -> dict:
     """T-101: short 30-DTE ATM SPY straddles at BS(s * VIX/100); mean P&L / premium, top minus bottom tercile of VIX - RV21
-    at entry, cut-points from walk-forward training windows, out of sample. Pass: CI excludes 0 at s = 0.90 (on the
-    claimed side, top higher) and the same sign at s = 0.81 and 1.00; min_n 390 out-of-sample cycles."""
+    (RV21 from SPY log returns) at entry, cut-points from walk-forward training windows of SPY cycles only, applied out of
+    sample. Pass: CI excludes 0 at s = 0.90 (on the claimed side, top higher) and the same sign at s = 0.81 and 1.00;
+    min_n 390 counted in out-of-sample SPY cycles (the sample the pass statistic is computed on).
+
+    The s = 0.90 interval is the declared studentized block bootstrap (block ``block``) averaged over ``n_rep`` replicates
+    of ``n_boot`` draws, with its Monte Carlo s.e. ``robust_exclusion`` passes it only when its lower bound clears 0 by 2
+    Monte Carlo s.e. and the percentile interval and the studentized intervals at ``alt_blocks`` and round(n^(1/3)) clear
+    0 too (the claim fixes no block length): neither the seed nor the block choice decides the verdict.
+
+    ``pre_sensitivity``: signals of training-only cycles before the first SPY cycle (e.g. ^GSPC RV21 before SPY listed).
+    They never enter the verdict or n; they feed a labelled sensitivity in which they form the first training window."""
     res = {s: straddle_cycles(fr, s, side=-1, hedge=False, first=HOLD) for s in scales}
     starts = res[scales[0]]["start"]
+    if starts.size < min_train + n_splits:
+        return {"verdict": "inconclusive", "n": 0,
+                "reason": f"only {starts.size} SPY cycles: too few for a {min_train}-cycle first training window and "
+                          f"{n_splits} walk-forward test windows — not implemented: n >= trial min_n (0 of {min_n} "
+                          f"out-of-sample SPY cycles)"}
     sig = fr["vix"][starts] - 100.0 * trailing_rv_vol(_logret_end(fr["adj"]), starts)
-    pre = np.asarray([] if pre_signal is None else pre_signal, dtype=float)
     x = {s: res[s]["pnl"] / res[s]["prem"] for s in scales}
-    if starts.size + pre.size < 30:
-        return {"verdict": "inconclusive", "n": 0, "reason": f"only {starts.size} SPY cycles — too few to split"}
-    t = tercile_oos(np.concatenate([pre, sig]), x, pre.size, n_splits, block, n_boot, seed)
+    t = tercile_oos(sig, x, 0, n_splits, block, n_boot, seed, min_train_fallback=min_train)
     n = t["n_oos"]
-    crit, parts = [], []
-    m = t["by_scale"][main]
+    oi, top, bot = t["oos_index"], t["top"], t["bottom"]
+    xo = x[main][oi]
+    m = mc_group_ci(xo, top, bot, block, 0.95, n_boot, n_rep, seed)
+    m["mean_middle"] = t["by_scale"][main].get("mean_middle")
+    t["by_scale"][main] = m
+    n_alt_rep = max(2, n_rep // 2)
+    alt_bl = sorted({int(b) for b in (*alt_blocks, max(1, int(round(n ** (1.0 / 3.0)))))} - {int(block)})
+    alts = {"the percentile interval": {"ci": m["ci_percentile"], "ci_mc_se": m["ci_percentile_mc_se"]}}
+    for b in alt_bl:
+        alts[f"studentized block {b}"] = mc_group_ci(xo, top, bot, b, 0.95, n_boot, n_alt_rep, seed)
+    ok, dec, note = robust_exclusion(m, alts)
     lo, hi = m["ci"]
-    crit.append((f"s={main:.2f}: OOS top-bottom > 0 with 95% CI excluding 0",
-                 None if lo is None else bool(lo > 0), lo is not None and hi < 0))
+    crit = [(f"s={main:.2f}: OOS top-bottom > 0 with 95% CI excluding 0 (declared studentized block {block}, robust to the "
+             f"seed and the block)" + (f" [not decided: {note}]" if ok is None else ""), ok, dec)]
     for s in scales:
         if s == main:
             continue
         ms = t["by_scale"][s]
         crit.append((f"s={s:.2f}: same sign (top-bottom > 0)", None if ms["diff"] is None else bool(ms["diff"] > 0),
                      ms["ci"][1] is not None and ms["ci"][1] < 0))
+    parts = []
     for s in scales:
         ms = t["by_scale"][s]
         parts.append(f"s={s:.2f}: top {_s(ms['mean_top'] and ms['mean_top'] * 100, 1)}% vs bottom "
                      f"{_s(ms['mean_bottom'] and ms['mean_bottom'] * 100, 1)}% of premium, diff "
                      f"{_s(ms['diff'] and ms['diff'] * 100, 1)} pts ({_ci_s(ms['ci'], 1, 100)}; n top/bottom "
                      f"{ms['n_top']}/{ms['n_bottom']})")
+    se_lo = m["ci_mc_se"][0]
+    parts.append(f"s={main:.2f} declared interval: studentized block {block}, mean of {m['n_rep']} replicates x {n_boot} draws, "
+                 f"lower bound {_s(lo and lo * 100, 2)} pts (Monte Carlo s.e. {_f(se_lo and se_lo * 100, 2)}); alternatives' "
+                 f"lower bounds ({n_alt_rep} replicates each): "
+                 + ", ".join(f"{k.replace('the ', '').replace('studentized ', '')} {_s(c['ci'][0] and c['ci'][0] * 100, 2)}"
+                             for k, c in alts.items())
+                 + (f"; {note}" if note else ""))
+    sens = None
+    pre = np.asarray([] if pre_sensitivity is None else pre_sensitivity, dtype=float)
+    if pre.size:
+        ts = tercile_oos(np.concatenate([pre, sig]), {main: x[main]}, pre.size, n_splits, block, n_boot, seed,
+                         min_train_fallback=min_train)
+        mss = mc_group_ci(x[main][ts["oos_index"]], ts["top"], ts["bottom"], block, 0.95, n_boot, n_alt_rep, seed)
+        sens = {"label": "SENSITIVITY, not in the verdict or n", "n_pre_training_cycles": int(pre.size), "n_oos": ts["n_oos"],
+                "min_train": ts["min_train"], "diff": mss["diff"], "ci": mss["ci"], "ci_mc_se": mss["ci_mc_se"],
+                "ci_percentile": mss["ci_percentile"], "note": sensitivity_note.strip(" ;()")}
+        parts.append(f"SENSITIVITY, not in the verdict or n{sensitivity_note}: {ts['n_oos']} OOS cycles, s={main:.2f} diff "
+                     f"{_s(mss['diff'] and mss['diff'] * 100, 1)} pts ({_ci_s(mss['ci'], 2, 100)}, percentile "
+                     f"{_ci_s(mss['ci_percentile'], 2, 100)})")
     # reported controls
     xm = x[main]
-    top_series = xm[t["oos_index"]][t["top"]]
-    xo = xm[t["oos_index"]]
-    block_sens = {b: stud_ci_group_diff(xo, t["top"], t["bottom"], b, 0.95, max(2000, n_boot // 5), seed)["ci"] for b in (3, 12)}
-    parts.append(f"s={main:.2f} interval sensitivity: percentile {_ci_s(m.get('ci_percentile', (None, None)), 1, 100)}, studentized "
-                 + ", ".join(f"block {b} {_ci_s(ci, 1, 100)}" for b, ci in block_sens.items())
-                 + f" ({n_boot} draws, block {block} as declared)"
-                 + ("; MARGINAL: the declared interval excludes 0 but an alternative interval does not"
-                    if lo is not None and lo > 0 and any(c[0] is not None and c[0] <= 0
-                                                          for c in [m.get("ci_percentile", (None, None)), *block_sens.values()]) else ""))
+    top_series = xo[top]
     uncond = {s: {"mean": float(x[s].mean()), "ci": list(stud_ci(x[s], block, 0.95, n_boot, seed))} for s in scales}
     spot_pnl = res[main]["pnl"] / res[main]["spot"]
     extras = {"unconditional": uncond, "s_main_desc": _desc(xm),
@@ -648,15 +732,23 @@ def straddle_tercile(fr: dict, pre_signal=None, scales=(0.81, 0.90, 1.00), main:
     parts.append(f"unconditional mean at s={main:.2f} {xm.mean() * 100:+.1f}% of premium "
                  f"({_ci_s(uncond[main]['ci'], 1, 100)}), skew {extras['s_main_desc'].get('skew', float('nan')):.2f}, "
                  f"PSR {extras['psr_all_cycles']:.2f}, DSR(top tercile, 3 trials) {_f(extras['dsr_top_tercile_oos_n_trials_3'])}")
-    verdict, why = _decide(crit, n, min_n, "out-of-sample cycles")
-    reason = (f"{MP} short 30-DTE ATM SPY straddle at s x VIX on the dividend forward, settled on raw closes; {n} OOS cycles "
-              f"({t['n_splits']} walk-forward test windows, cut-points on the training window's VIX - RV21{pre_note}): "
+    unit = "out-of-sample SPY cycles"
+    if n < min_n:
+        unit += (f"; the {min_n - n} missing cycles need SPY history before {fr['days'][0]} (the first archived SPY day) or "
+                 f"about {(min_n - n) * HOLD / PPY:.1f} more years of SPY cycles")
+    verdict, why = _decide(crit, n, min_n, unit)
+    reason = (f"{MP} short 30-DTE ATM SPY straddle at s x VIX on the dividend forward, settled on raw closes; {n} OOS cycles of "
+              f"{starts.size} SPY cycles ({t['n_splits']} walk-forward test windows; cut-points on the training window's "
+              f"VIX - RV21 from SPY log returns, SPY cycles only, the first {t['min_train']} cycles train the first cut-points; "
+              f"min_n counts out-of-sample cycles, the sample the pass statistic is computed on): "
               + "; ".join(parts) + f"; the tercile spread is model-priced (IV level only scales premium; {TRADED_NOTE})"
               + f" — {why}")
-    stat = {"model_priced": True, "n_oos_cycles": n, "n_spy_cycles": int(starts.size), "n_pre_training_cycles": int(pre.size),
-            "min_train": t["min_train"], "cuts_by_split": t["cuts"], "n_boot": n_boot, "block": block,
-            "block_sensitivity_ci": {str(b): ci for b, ci in block_sens.items()},
+    stat = {"model_priced": True, "n_oos_cycles": n, "min_n_unit": "out-of-sample SPY cycles", "n_spy_cycles": int(starts.size),
+            "min_train": t["min_train"], "cuts_by_split": t["cuts"], "n_boot_per_rep": n_boot, "n_rep": m["n_rep"],
+            "block": block, "main_criterion": {"ok": ok, "decisive_fail": dec, "note": note},
+            "alternative_intervals": {k: {"ci": c["ci"], "ci_mc_se": c.get("ci_mc_se")} for k, c in alts.items()},
             "by_scale": {str(s): {k: v for k, v in t["by_scale"][s].items()} for s in scales}, **extras,
+            "gspc_pre_window_sensitivity": sens,
             "first_entry": res[main]["day"][0] if res[main]["day"] else None, "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
@@ -1424,8 +1516,8 @@ def b6_var_short_straddle_tercile(archive):
     if miss:
         return miss
     fr = _spy_frame(archive)
-    pre, note = None, " from SPY cycles only (no ^GSPC history archived)"
-    if _has(archive, GSPC_B):
+    pre, note = None, ""
+    if _has(archive, GSPC_B):                       # labelled sensitivity only: the claim names SPY log returns
         gd, gc, _ = _daily(archive, GSPC_B)
         vix = _index(archive, VIX_B)
         first = fr["days"][0] if fr["days"] else "9999"
@@ -1435,9 +1527,10 @@ def b6_var_short_straddle_tercile(archive):
             c2 = gc[sel]
             st = np.arange(HOLD, len(d2), HOLD)
             pre = np.array([vix[d2[a]] for a in st]) - 100.0 * trailing_rv_vol(_logret_end(c2), st)
-            note = (f"; the first training window is the {st.size} pre-SPY cycles {d2[st[0]]}..{d2[st[-1]]} with RV21 from ^GSPC "
-                    f"price returns (SPY starts {first}); every SPY cycle is out of sample")
-    rep = straddle_tercile(fr, pre_signal=pre, pre_note=note)
+            note = (f" (first training window = the {st.size} pre-SPY cycles {d2[st[0]]}..{d2[st[-1]]} with RV21 from ^GSPC "
+                    f"price returns, a series the claim does not name; SPY starts {first}; every SPY cycle is then out of "
+                    f"sample)")
+    rep = straddle_tercile(fr, pre_sensitivity=pre, sensitivity_note=note)
     return _out(rep.get("stat", {"verdict": rep["verdict"]}), rep["n"], rep["verdict"], rep["reason"])
 
 

@@ -539,10 +539,13 @@ def eval_christmas_tree(P: dict, min_n: int = 300, n_boot: int = N_BOOT) -> dict
 # ---------------------------------------------------------------------------------------- T-136 stock repair --
 
 def drawdown_episodes(close, trigger: float = 0.10, look: int = YEAR, rearm: int = QUARTER, hold: int = QUARTER,
-                      new_crossing: bool = False) -> list:
+                      new_crossing: bool = True) -> list:
     """(entry index, trailing high) for the first day of each >= trigger drawdown from the trailing ``look``-day high
-    (inclusive of the day), re-armed ``rearm`` sessions after a trigger. ``new_crossing`` additionally requires the drawdown to
-    have recovered above -trigger since the last trigger. Episodes whose ``hold`` window runs past the data are dropped."""
+    (inclusive of the day). Primary rule (``new_crossing=True``): an episode starts only when the drawdown newly crosses
+    -trigger after having been above it since the last episode, with a ``rearm``-session lockout on top.
+    ``new_crossing=False`` is the looser level trigger (robustness only): it re-fires every ``rearm`` sessions while the
+    drawdown is still at or below -trigger, i.e. inside a drawdown already under way. Episodes whose ``hold`` window runs
+    past the data are dropped."""
     c = np.asarray(close, float); n = c.size; out = []; next_ok = 0; recovered = True
     if n < look:
         return out
@@ -554,6 +557,21 @@ def drawdown_episodes(close, trigger: float = 0.10, look: int = YEAR, rearm: int
         if i >= next_ok and dd <= -trigger and (recovered or not new_crossing):
             out.append((i, float(H))); next_ok = i + rearm; recovered = False
     return out
+
+
+def drawdown_refires(close, episodes: list, trigger: float = 0.10, look: int = YEAR) -> tuple:
+    """(re-fires, spells with re-fires, distinct spells hit): an episode is a re-fire when it falls inside a continuous spell of
+    drawdown <= -trigger (from the trailing ``look``-day high) that already holds an earlier episode."""
+    c = np.asarray(close, float)
+    if c.size < look or not episodes:
+        return 0, 0, 0
+    hi = np.lib.stride_tricks.sliding_window_view(c, look).max(axis=1)
+    below = np.zeros(c.size, bool); below[look - 1:] = c[look - 1:] / hi - 1 <= -trigger
+    spell = np.cumsum(np.r_[below[0], below[1:] & ~below[:-1]])                   # spell id, constant within a run
+    counts: dict = {}
+    for i, _ in episodes:
+        counts[int(spell[i])] = counts.get(int(spell[i]), 0) + 1
+    return sum(v - 1 for v in counts.values()), sum(1 for v in counts.values() if v > 1), len(counts)
 
 
 def stock_repair(m: Market, iv: np.ndarray, episodes: list, hold: int = QUARTER, scale: float = 1.0) -> dict:
@@ -571,33 +589,47 @@ def stock_repair(m: Market, iv: np.ndarray, episodes: list, hold: int = QUARTER,
 
 def eval_stock_repair(m: Market, iv: np.ndarray, min_n: int = 30, n_boot: int = N_BOOT, block: int = 2,
                       second: Optional[tuple] = None, iv_note: str = "") -> dict:
-    """``second`` = (label, Market, iv) for the QQQ sample (reported, not a criterion)."""
-    eps = drawdown_episodes(m.close); res = stock_repair(m, iv, eps); x = res["x"]; n = int(x.size)
+    """Primary episodes: the first day each >= 10% drawdown newly crosses -10% (63-session lockout on top); min_n counts those
+    drawdown episodes. The 63-session level-trigger re-arm (re-fires inside a continuing drawdown) is a robustness check.
+    ``second`` = (label, Market, iv) for the QQQ sample (reported, not a criterion)."""
+    eps = drawdown_episodes(m.close, new_crossing=True); res = stock_repair(m, iv, eps); x = res["x"]; n = int(x.size)
     lo, hi = _ci_stud(x, block, n_boot)
     c = Criteria(); c.ci("mean (repair - hold) / S lower CI > 0", lo, hi, "lower_gt")
-    v, why = c.finish(n, min_n, "episodes")
+    v, why = c.finish(n, min_n, "drawdown episodes")
     sd = float(x.std(ddof=1)) if n > 1 else float("nan"); mde = 2.8016 * sd / math.sqrt(n) if n > 1 else float("nan")
-    alt = stock_repair(m, iv, drawdown_episodes(m.close, new_crossing=True))
+    eps_l = drawdown_episodes(m.close, new_crossing=False); alt = stock_repair(m, iv, eps_l); xa = alt["x"]; na = int(xa.size)
+    lo_a, hi_a = _ci_stud(xa, block, n_boot)
+    ca = Criteria(); ca.ci("mean (repair - hold) / S lower CI > 0", lo_a, hi_a, "lower_gt")
+    v_a, _ = ca.finish(na, min_n, "episodes")
+    ref, ref_sp, _ = drawdown_refires(m.close, eps_l)
     sens = _sens(lambda s: stock_repair(m, iv, eps, scale=s))
     sec_txt, sec = "", None
     if second is not None:
-        lab, m2, iv2 = second; r2 = stock_repair(m2, iv2, drawdown_episodes(m2.close)); x2 = r2["x"]
+        lab, m2, iv2 = second; r2 = stock_repair(m2, iv2, drawdown_episodes(m2.close, new_crossing=True)); x2 = r2["x"]
         l2, h2 = _ci_stud(x2, block, n_boot)
         sec = {"label": lab, "n": int(x2.size), "mean": float(x2.mean()) if x2.size else None, "ci": [l2, h2]}
-        sec_txt = (f"; {lab} (second sample, overlaps SPY in time, not in the pass rule): {x2.size} episodes, mean "
-                   f"{_p(x2.mean() if x2.size else float('nan'), 2)} ({_rng(l2, h2, 2)})")
-    reason = (f"{MODEL} (calls at VIX3M IV{iv_note}, flat; dividend forward; raw closes): {n} SPY episodes of a "
-              f">= 10% drawdown from the trailing 252-day high (re-armed after 63 sessions), {res['days'][0] if n else ''} to "
-              f"{res['days'][-1] if n else ''}; K2 = (B + S)/2 median {_p(float(np.median(res['k2'])) - 1 if n else float('nan'), 2)} above "
+        sec_txt = (f"; {lab} (second sample, same first-crossing rule, overlaps SPY in time, not in the pass rule): {x2.size} "
+                   f"episodes, mean {_p(x2.mean() if x2.size else float('nan'), 2)} ({_rng(l2, h2, 2)})")
+    short = (f"; {n} drawdown episodes is {min_n - n} short of min_n {min_n}, and the CI failure is not decisive (upper bound "
+             f"above 0), so the sample cannot decide the claim" if n < min_n and np.isfinite(hi) and lo <= 0 <= hi else
+             (f"; {n} drawdown episodes is {min_n - n} short of min_n {min_n}" if n < min_n else ""))
+    reason = (f"{MODEL} (calls at VIX3M IV{iv_note}, flat; dividend forward; raw closes): {n} SPY drawdown episodes (first day "
+              f"the drawdown from the trailing 252-day high newly crosses -10% after having been above it, 63-session lockout), "
+              f"{res['days'][0] if n else ''} to {res['days'][-1] if n else ''}; K2 = (B + S)/2 median "
+              f"{_p(float(np.median(res['k2'])) - 1 if n else float('nan'), 2)} above "
               f"spot; median net premium {_p(float(np.median(res['net'])) if n else float('nan'), 2)} of S (negative = credit; the "
               f"fixed K2 rule is only roughly zero-cost); mean (repair - hold) / S = 1x2 ratio P&L {_p(x.mean() if n else float('nan'), 2)} "
-              f"(studentized block-{block} bootstrap {_rng(lo, hi, 2)}); power: sd {_p(sd, 2)}, minimum detectable mean at 80% "
-              f"power {_p(mde, 2)}; re-arm only after recovering above -10% (report): {alt['x'].size} episodes, mean "
-              f"{_p(alt['x'].mean() if alt['x'].size else float('nan'), 2)}{sec_txt}; IV-scale sensitivity (not in the pass rule; "
-              f"a traded test needs chain history): {_sens_txt(sens, 2)} — {why}")
-    return {"verdict": v, "reason": reason, "n": n, "mean": float(x.mean()) if n else None, "ci": [lo, hi],
+              f"(studentized block-{block} bootstrap {_rng(lo, hi, 2)}){short}; power: sd {_p(sd, 2)}, minimum detectable mean at "
+              f"80% power {_p(mde, 2)}; robustness (not the pass rule): the 63-session level-trigger re-arm, which re-fires while "
+              f"the drawdown is still at or below -10%, gives {na} episodes, of which {ref} are re-fires inside {ref_sp} continuing "
+              f"drawdown spells, mean {_p(xa.mean() if na else float('nan'), 2)} ({_rng(lo_a, hi_a, 2)}), verdict under that "
+              f"reading {v_a}{sec_txt}; IV-scale sensitivity (not in the pass rule; a traded test needs chain history): "
+              f"{_sens_txt(sens, 2)} — {why}")
+    return {"verdict": v, "reason": reason, "n": n, "episode_rule": "first crossing of -10% after being above it, 63-session lockout",
+            "mean": float(x.mean()) if n else None, "ci": [lo, hi],
             "episode_days": res["days"], "sd": sd, "min_detectable_mean_80pct": mde,
-            "new_crossing_rule": {"n": int(alt["x"].size), "mean": float(alt["x"].mean()) if alt["x"].size else None},
+            "rearm_level_trigger_variant": {"n": na, "mean": float(xa.mean()) if na else None, "ci": [lo_a, hi_a],
+                                            "verdict": v_a, "refires": ref, "spells_with_refires": ref_sp},
             "second_sample": sec, "iv_scale_sensitivity": sens, "model_priced": True, "min_n": min_n}
 
 

@@ -173,10 +173,43 @@ def test_christmas_tree_null_not_supported():
 
 def test_drawdown_episodes_trigger_and_rearm():
     c = np.array([10, 11, 12, 12, 10.7, 10.5, 10.4, 10.3, 10.2, 12, 12, 12, 12, 12, 12], float)
-    eps = bd.drawdown_episodes(c, trigger=0.10, look=5, rearm=3, hold=2)
-    assert [e[0] for e in eps] == [4, 7] and eps[0][1] == 12.0       # first day <= -10%, re-armed 3 sessions later
-    eps2 = bd.drawdown_episodes(c, trigger=0.10, look=5, rearm=3, hold=2, new_crossing=True)
-    assert [e[0] for e in eps2] == [4]                                # no recovery above -10% in between: one episode
+    eps = bd.drawdown_episodes(c, trigger=0.10, look=5, rearm=3, hold=2, new_crossing=False)
+    assert [e[0] for e in eps] == [4, 7] and eps[0][1] == 12.0       # level trigger: first day <= -10%, re-fires 3 sessions later
+    eps2 = bd.drawdown_episodes(c, trigger=0.10, look=5, rearm=3, hold=2)
+    assert [e[0] for e in eps2] == [4]                                # default (primary): no recovery above -10% in between
+    assert bd.drawdown_refires(c, eps, look=5) == (1, 1, 1)           # the level trigger's 2nd episode is a re-fire in 1 spell
+    assert bd.drawdown_refires(c, eps2, look=5) == (0, 0, 1)
+
+
+def _long_spell_path(n_spells=20, seed=1):
+    """Each drawdown drops to -20% and stays below -10% for three 63-session quarters, rising +3.5% per quarter, then rallies
+    to a new high: one drawdown per spell, but the 63-session level trigger re-fires inside it."""
+    rng = np.random.default_rng(seed)
+    c = list(100 * np.exp(np.cumsum(np.full(260, 0.0004))))
+    for _ in range(n_spells):
+        hi = c[-1] * 1.15
+        c.extend(list(np.linspace(c[-1], hi, 31)[1:]))
+        c.append(0.80 * hi)                                          # one-session drop to -20%
+        for _q in range(3):
+            base = c[-1]
+            c.extend(list(base * (1 + 0.035 * np.arange(1, 64) / 63 + rng.normal(0, 0.001, 63))))
+        c.extend([c[-1]] * 5)
+    return np.array(c)
+
+
+def test_stock_repair_counts_first_crossings_not_refires():
+    """Regression (T-136): the episode count behind min_n is the number of drawdowns (first crossing of -10%), not the
+    63-session level-trigger re-fires inside a drawdown already under way."""
+    close = _long_spell_path()
+    m = _mkt(close); iv = np.full(close.size, 0.20)
+    level = bd.drawdown_episodes(close, new_crossing=False)
+    assert len(level) >= 30 and bd.drawdown_refires(close, level)[0] >= 20      # the looser reading crosses min_n
+    rep = bd.eval_stock_repair(m, iv, n_boot=NB)
+    assert rep["n"] == 20 and rep["ci"][0] > 0                         # one episode per drawdown; planted edge
+    assert rep["verdict"] == "inconclusive" and "10 short of min_n 30" in rep["reason"]
+    alt = rep["rearm_level_trigger_variant"]
+    assert alt["n"] == len(level) and alt["refires"] == alt["n"] - 20 and alt["spells_with_refires"] == 20
+    assert alt["verdict"] == "supported"                              # reported only: the re-fires would have decided it
 
 
 def _repair_path(n_eps=36, seed=0):
