@@ -4123,6 +4123,27 @@
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {symbol, snapshot_date, quote_date (last NYSE trading day <= snapshot_date, or the one session whose 30-session close-to-close vol equals hv_current), hv_current, hv_week_ago, hv_month_ago, hv_year_high, hv_year_high_date, hv_year_low, hv_year_low_date, iv_current, iv_week_ago, iv_month_ago, iv_year_high, iv_year_high_date, iv_year_low, iv_year_low_date (decimals, annualised; hv_current = 30-session sample stdev of log returns x sqrt(252) to quote_date), dolt_commit_at (last named commit; provenance), backfilled (provenance; None = unknown), stale (True = quote_date moved off the rule, None = not checked), stale_basis}; observed_at = fetch time; available_at = 22:00 UTC on the later of snapshot_date and quote_date"
+  },
+  "deribit-option-trades-catalysts": {
+   "name": "deribit-option-trades-catalysts",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-option-trades-catalysts.jsonl.gz",
+   "created_at": "2026-10-15T17:07:48.031314+00:00",
+   "rows": 488998,
+   "bytes": 17654004,
+   "sha256": "1d53d7fd6b03906219068a52ba1ecb82317d65b49eb27ad65db59d9d17c38347",
+   "tags": [
+    "T-222",
+    "crypto",
+    "deribit",
+    "events",
+    "options",
+    "trades"
+   ],
+   "recipe": "GET https://history.deribit.com/api/v2/public/get_last_trades_by_currency_and_time?currency=<BTC|ETH>&kind=option&start_timestamp&end_timestamp&count=1000&include_old=true&sorting=asc, paged forward, for each window in mandel.data.options_misc.CATALYSTS [event date - 22 d, event date + 2 d) UTC, keeping only the first expiry after the event that was listed by the end of the entry day (event - 21 d; listing = min creation_timestamp from https://history.deribit.com/api/v2/public/get_instruments, expired=true and false); via mandel.data.options_misc.fetch_deribit_catalyst_trades; 0.25s pacing, 4 tries with exponential backoff on 429/5xx. Trade available_at = trade time; window available_at = max(end of the verified known_since day, target expiry listing time), else the event time; value.event_time_basis 'realised (ex post)' marks block-height events whose exact time and expiry boundary were not known in advance; trades_seen, trades_kept, pages and complete are fetch metadata. Windows stored: bch-hard-fork-2018:BTC, btc-bch-fork-2017:BTC, btc-btg-fork-2017:BTC, btc-halving-2020:BTC, btc-halving-2024:BTC, btc-spot-etf-2024:BTC, btc-taproot-2021:BTC, eth-beacon-genesis-2020:ETH, eth-berlin-2021:ETH, eth-dencun-2024:ETH, eth-fusaka-2025:ETH, eth-istanbul-2019:ETH, eth-london-2021:ETH, eth-merge-2022:ETH, eth-pectra-2025:ETH, eth-shapella-2023:ETH, eth-spot-etf-2024:ETH, us-election-2020:BTC, us-election-2020:ETH, us-election-2024:BTC, us-election-2024:ETH. Deribit states no data licence (no redistribution right): local disk only (in_git=False), rebuild from this recipe",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind option-trade: value = raw Deribit trade {trade_id, trade_seq, timestamp (ms), instrument_name, price (coin), mark_price, iv, index_price, amount, contracts?, direction, tick_direction, block_trade_id?} + {catalyst, currency, expiry, expiry_code, strike, type}; available_at = trade time | kind catalyst-window: value = {catalyst, currency, event, category, event_date, event_time, time_basis, event_time_basis (realised (ex post) | scheduled | statutory date, conventional time | approximate (ex post); 'realised (ex post)' = block-height event whose exact time and expiry boundary were not known in advance), entry_day, exit_day, window_start, window_end, target_expiry, target_expiry_code, target_listed_at, target_settlement_period, targets, trades_seen, trades_kept, pages, complete (these four are fetch metadata, not market information), known_since, known_since_basis|known_since_hint, available_basis}; available_at = max(end of the verified known_since day, target_listed_at) when known_since is verified, else the event time"
   }
  }
 }
