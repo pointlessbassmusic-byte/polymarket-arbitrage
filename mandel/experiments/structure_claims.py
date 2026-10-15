@@ -208,7 +208,9 @@ def evaluate(cid: str, c: Ctx) -> dict:
         crit.append(("net premium zero in every cycle", True if bad == 0 else None))   # otherwise not the claim's zero-cost trade
         if bad:
             parts.append(f"{bad} cycles with no zero-cost put strike in [0.5 S, 1.5 S]")
-        h = len(x) // 2; crit.append(("mean > 0 in both halves", x[:h].mean() > 0 and x[h:].mean() > 0)); parts.append(f"halves {x[:h].mean()*100:+.2f}%/{x[h:].mean()*100:+.2f}%")
+        half = len(x) // 2                              # not `h`: that is the grid-start count the report below describes
+        crit.append(("mean > 0 in both halves", x[:half].mean() > 0 and x[half:].mean() > 0))
+        parts.append(f"halves {x[:half].mean()*100:+.2f}%/{x[half:].mean()*100:+.2f}%")
     else:
         raise KeyError(cid)
     n, mn = min(sizes), MIN_N[cid]                      # the series actually tested, in the claim's own cycles
