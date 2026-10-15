@@ -304,3 +304,90 @@ def fetch_aqr_bab(store: ObservationStore) -> dict:
                            recipe="AQR Betting-Against-Beta-Equity-Factors-Daily.xlsx, sheet 'BAB Factors', column USA (decimal daily returns; AQR reconstructs the full history at every update, so past values are revised: not point in time)",
                            tags=["factors", "aqr", "history"], schema="value = {day, bab_usa}")
     return {"rows": e.rows, "first": rows[0]["day"] if rows else None, "last": rows[-1]["day"] if rows else None, "sheets": wb.sheetnames[:6]}
+
+
+# ------------------------------------------------------------ macro release dates --
+
+def fetch_macro_releases(store: ObservationStore, series=(("CPIAUCSL", "cpi"), ("PAYEMS", "employment-situation"), ("GDP", "gdp"))) -> dict:
+    """Release dates as ALFRED vintage dates (the days each data release first existed): CPI, Employment Situation (payrolls), GDP.
+    Works around bls.gov refusing this host. A vintage can also be a revision-only date; those are rare and kept (flagged by gap)."""
+    out = {}
+    with _client() as c:
+        th = Throttle(1.0)
+        for sid, name in series:
+            th.wait()
+            t = c.get("https://alfred.stlouisfed.org/series/downloaddata", params={"seid": sid}).text
+            dates = sorted(set(re.findall(r'<option[^>]*value="(\d{4}-\d{2}-\d{2})"', t)))
+            rows = []
+            for i, d in enumerate(dates):
+                gap = (date.fromisoformat(d) - date.fromisoformat(dates[i - 1])).days if i else None
+                rows.append({"day": d, "series": sid, "release": name, "days_since_previous": gap})
+            e = store.write_bundle(f"macro-release-{name}", (Observation("alfred", "release", f"{sid}:{x['day']}", observed_at=x["day"] + "T12:30:00+00:00", available_at=x["day"] + "T12:30:00+00:00", value=x) for x in rows),
+                                   recipe=f"https://alfred.stlouisfed.org/series/downloaddata?seid={sid} vintage-date options (release days; 08:30 ET)", tags=["calendar", "macro", name],
+                                   schema="value = {day, series, release, days_since_previous}")
+            out[name] = {"rows": e.rows, "first": dates[0] if dates else None, "last": dates[-1] if dates else None}
+    return out
+
+
+# --------------------------------------------------------------------- G10 FX --
+
+FX_SPOT = {"EUR": ("DEXUSEU", True), "GBP": ("DEXUSUK", True), "AUD": ("DEXUSAL", True), "NZD": ("DEXUSNZ", True),
+           "JPY": ("DEXJPUS", False), "CHF": ("DEXSZUS", False), "CAD": ("DEXCAUS", False), "NOK": ("DEXNOUS", False), "SEK": ("DEXSDUS", False)}
+FX_RATE3M = {"USD": "IR3TIB01USM156N", "EUR": "IR3TIB01EZM156N", "GBP": "IR3TIB01GBM156N", "AUD": "IR3TIB01AUM156N", "NZD": "IR3TIB01NZM156N",
+             "JPY": "IR3TIB01JPM156N", "CHF": "IR3TIB01CHM156N", "CAD": "IR3TIB01CAM156N", "NOK": "IR3TIB01NOM156N", "SEK": "IR3TIB01SEM156N"}
+
+
+def fetch_fx(store: ObservationStore) -> dict:
+    """FRED daily FX spot (all expressed as USD per unit of foreign currency) and OECD 3-month interbank rates (monthly, percent)."""
+    from mandel.data.options import fred_series
+    out, spot_rows, rate_rows = {}, [], []
+    with _client() as c:
+        th = Throttle(0.8)
+        for ccy, (sid, usd_per) in FX_SPOT.items():
+            for r in fred_series(sid, c, th):
+                v = r["value"] if usd_per else (1.0 / r["value"] if r["value"] else None)
+                if v:
+                    spot_rows.append({"day": r["day"], "ccy": ccy, "usd_per_unit": v, "fred_id": sid})
+        for ccy, sid in FX_RATE3M.items():
+            for r in fred_series(sid, c, th):
+                rate_rows.append({"month": r["day"][:7], "ccy": ccy, "rate3m": r["value"], "fred_id": sid})
+    e1 = store.write_bundle("fx-spot-g10", (Observation("fred", "fx", f"{x['ccy']}:{x['day']}", observed_at=x["day"] + "T17:00:00+00:00", available_at=x["day"] + "T21:00:00+00:00", value=x) for x in spot_rows),
+                            recipe="FRED " + ", ".join(s for s, _ in FX_SPOT.values()) + " (noon NY buying rates; inverted where FRED quotes foreign per USD)", tags=["fx", "history"], schema="value = {day, ccy, usd_per_unit, fred_id}")
+    e2 = store.write_bundle("fx-rates-3m", (Observation("fred", "rate", f"{x['ccy']}:{x['month']}", observed_at=x["month"] + "-01T00:00:00+00:00", available_at=x["month"] + "-28T00:00:00+00:00", value=x) for x in rate_rows),
+                            recipe="FRED OECD " + ", ".join(FX_RATE3M.values()) + " (monthly averages; available_at conservatively at month end)", tags=["fx", "rates", "history"], schema="value = {month, ccy, rate3m (percent), fred_id}")
+    out["spot_rows"] = e1.rows; out["rate_rows"] = e2.rows; out["currencies"] = sorted({x["ccy"] for x in spot_rows})
+    return out
+
+
+# --------------------------------------------------------------- hourly bars --
+
+HOURLY = ["SPY", "QQQ", "IWM", "TLT", "GLD", "BTC-USD", "ETH-USD", "IBIT", "^VIX"]
+
+
+def fetch_hourly(store: ObservationStore, symbols=HOURLY) -> dict:
+    """Yahoo 1-hour bars (Yahoo serves the last ~730 days). Each run merges with the stored bundle so history accumulates past the window."""
+    out = {}
+    a = store.archive
+    with _client() as c:
+        th = Throttle(1.0)
+        for sym in symbols:
+            th.wait()
+            r = c.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}", params={"range": "730d", "interval": "1h"})
+            try:
+                res = r.json()["chart"]["result"][0]; ts = res["timestamp"]; q = res["indicators"]["quote"][0]
+            except Exception:
+                out[sym] = f"HTTP {r.status_code}"; continue
+            new = {int(t): {"symbol": sym, "t": int(t), "open": q["open"][i], "high": q["high"][i], "low": q["low"][i], "close": q["close"][i], "volume": q["volume"][i]}
+                   for i, t in enumerate(ts) if q["close"][i] is not None}
+            name = "hourly-" + "".join(ch if ch.isalnum() or ch in "-_." else "-" for ch in sym)
+            try:
+                for row in a.load(name):
+                    new.setdefault(int(row["value"]["t"]), row["value"])
+            except Exception:
+                pass
+            rows = [new[k] for k in sorted(new)]
+            e = store.write_bundle(name, (Observation("yahoo", "bar1h", sym, observed_at=iso(x["t"]), available_at=iso(x["t"] + 3600), value=x) for x in rows),
+                                   recipe=f"yahoo /v8/finance/chart/{sym}?range=730d&interval=1h, merged with earlier captures (bar time = bar start)", tags=["prices", "hourly"],
+                                   schema="value = {symbol, t (bar start, unix), open, high, low, close, volume}")
+            out[sym] = {"rows": e.rows, "first": iso(rows[0]["t"])[:10] if rows else None}
+    return out

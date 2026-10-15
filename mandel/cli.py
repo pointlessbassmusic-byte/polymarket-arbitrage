@@ -438,13 +438,14 @@ def cmd_unlock_fetch(args) -> int:
     from mandel.data import unlocks as U
     from mandel.data.store import ObservationStore
     store = ObservationStore(Archive(ledger=Ledger()))
-    which = args.which.split(",") if args.which != "all" else ["prices", "french", "fomc", "deribit", "vx", "aqr"]
+    which = args.which.split(",") if args.which != "all" else ["prices", "french", "fomc", "deribit", "vx", "aqr", "macro", "fx", "hourly"]
     out = {}
     if "prices" in which:
         from mandel.data.social import collect_history
         out["prices"] = collect_history(store, symbols=["^GSPC", "^RUT", "SPY", "QQQ", "IWM", "TLT", "GLD", "SLV", "USO", "IBIT", "BTC-USD", "ETH-USD", "EFA", "AGG", "SPLV", "SPHB",
                                                         "USMV", "SVXY", "GC=F", "SI=F", "XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY", "IVV", "TQQQ", "SQQQ", "IJR", "IWD", "IWF", "QUAL", "COWZ", "PKW", "DBC", "IEF", "VNQ", "CL=F", "ES=F"])
-    for k, fn in (("french", U.fetch_french), ("fomc", U.fetch_fomc), ("deribit", U.fetch_deribit_history), ("vx", U.fetch_vx), ("aqr", U.fetch_aqr_bab)):
+    for k, fn in (("french", U.fetch_french), ("fomc", U.fetch_fomc), ("deribit", U.fetch_deribit_history), ("vx", U.fetch_vx), ("aqr", U.fetch_aqr_bab),
+                  ("macro", U.fetch_macro_releases), ("fx", U.fetch_fx), ("hourly", U.fetch_hourly)):
         if k in which:
             try:
                 out[k] = fn(store)

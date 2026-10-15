@@ -29,3 +29,9 @@ def test_french_and_vx():
     cols, rows = parse_french_daily("note\n\n,Mkt-RF,SMB,HML,RF\n20260828,   -0.33,   -0.02,   -0.39,    0.01\n20260831,  0.10,  0.20,  -99.99,  0.01\n\nAnnual\n,Mkt-RF\n2025, 10.0\n")
     assert cols == ["Mkt-RF", "SMB", "HML", "RF"] and len(rows) == 2 and "HML" not in rows[1]          # -99.99 is French's missing code
     assert [d.isoformat() for d in vx_expiries(date(2025, 10, 1), date(2025, 12, 31))] == ["2025-10-22", "2025-11-19", "2025-12-17"]
+
+
+def test_fx_quote_convention_and_constants():
+    from mandel.data.unlocks import FX_RATE3M, FX_SPOT
+    assert set(FX_SPOT) | {"USD"} == set(FX_RATE3M)                      # nine currencies against USD plus USD's own rate
+    assert FX_SPOT["EUR"] == ("DEXUSEU", True) and FX_SPOT["JPY"] == ("DEXJPUS", False)   # USD per EUR is direct; JPY per USD is inverted

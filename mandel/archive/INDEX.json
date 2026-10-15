@@ -2578,6 +2578,231 @@
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "macro-release-cpi": {
+   "name": "macro-release-cpi",
+   "kind": "data",
+   "path": "mandel/archive/data/macro-release-cpi.jsonl.gz",
+   "created_at": "2026-10-15T08:35:35.263751+00:00",
+   "rows": 670,
+   "bytes": 10036,
+   "sha256": "b84d3707bc4f1b5193496c327448e337f09cf3a2261fc04e21acd80141e834aa",
+   "tags": [
+    "calendar",
+    "cpi",
+    "macro"
+   ],
+   "recipe": "https://alfred.stlouisfed.org/series/downloaddata?seid=CPIAUCSL vintage-date options (release days; 08:30 ET)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, series, release, days_since_previous}"
+  },
+  "macro-release-employment-situation": {
+   "name": "macro-release-employment-situation",
+   "kind": "data",
+   "path": "mandel/archive/data/macro-release-employment-situation.jsonl.gz",
+   "created_at": "2026-10-15T08:35:35.667808+00:00",
+   "rows": 860,
+   "bytes": 12380,
+   "sha256": "a0691c38d9fdf993f9f58e06dc50e2391f5551e8ea70880d5a9b5e8dae589b9f",
+   "tags": [
+    "calendar",
+    "employment-situation",
+    "macro"
+   ],
+   "recipe": "https://alfred.stlouisfed.org/series/downloaddata?seid=PAYEMS vintage-date options (release days; 08:30 ET)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, series, release, days_since_previous}"
+  },
+  "macro-release-gdp": {
+   "name": "macro-release-gdp",
+   "kind": "data",
+   "path": "mandel/archive/data/macro-release-gdp.jsonl.gz",
+   "created_at": "2026-10-15T08:35:37.188914+00:00",
+   "rows": 415,
+   "bytes": 6224,
+   "sha256": "cbe0e785204230d7b8198fafb3603aee92857108fc7ac199dd7b99eb6f7141c2",
+   "tags": [
+    "calendar",
+    "gdp",
+    "macro"
+   ],
+   "recipe": "https://alfred.stlouisfed.org/series/downloaddata?seid=GDP vintage-date options (release days; 08:30 ET)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, series, release, days_since_previous}"
+  },
+  "fx-spot-g10": {
+   "name": "fx-spot-g10",
+   "kind": "data",
+   "path": "mandel/archive/data/fx-spot-g10.jsonl.gz",
+   "created_at": "2026-10-15T08:35:56.478381+00:00",
+   "rows": 118828,
+   "bytes": 2084802,
+   "sha256": "8d1101ece1f411825b6601ec2c55d4c72a1fbf4074b1edaad59dd6d9f6456ce8",
+   "tags": [
+    "fx",
+    "history"
+   ],
+   "recipe": "FRED DEXUSEU, DEXUSUK, DEXUSAL, DEXUSNZ, DEXJPUS, DEXSZUS, DEXCAUS, DEXNOUS, DEXSDUS (noon NY buying rates; inverted where FRED quotes foreign per USD)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, ccy, usd_per_unit, fred_id}"
+  },
+  "fx-rates-3m": {
+   "name": "fx-rates-3m",
+   "kind": "data",
+   "path": "mandel/archive/data/fx-rates-3m.jsonl.gz",
+   "created_at": "2026-10-15T08:35:56.576935+00:00",
+   "rows": 5871,
+   "bytes": 84278,
+   "sha256": "0a8d9df45799bc0489aa82ea5ed9333e103379b8a9328c92e2925a080a73ca97",
+   "tags": [
+    "fx",
+    "history",
+    "rates"
+   ],
+   "recipe": "FRED OECD IR3TIB01USM156N, IR3TIB01EZM156N, IR3TIB01GBM156N, IR3TIB01AUM156N, IR3TIB01NZM156N, IR3TIB01JPM156N, IR3TIB01CHM156N, IR3TIB01CAM156N, IR3TIB01NOM156N, IR3TIB01SEM156N (monthly averages; available_at conservatively at month end)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {month, ccy, rate3m (percent), fred_id}"
+  },
+  "hourly-SPY": {
+   "name": "hourly-SPY",
+   "kind": "data",
+   "path": "mandel/archive/data/hourly-SPY.jsonl.gz",
+   "created_at": "2026-10-15T08:35:57.397449+00:00",
+   "rows": 5080,
+   "bytes": 169559,
+   "sha256": "39339fc03d7dc8cd4c89116ef43942f6fcf54cdb4d50514a7ad1eeef0bc05202",
+   "tags": [
+    "hourly",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/SPY?range=730d&interval=1h, merged with earlier captures (bar time = bar start)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t (bar start, unix), open, high, low, close, volume}"
+  },
+  "hourly-QQQ": {
+   "name": "hourly-QQQ",
+   "kind": "data",
+   "path": "mandel/archive/data/hourly-QQQ.jsonl.gz",
+   "created_at": "2026-10-15T08:35:58.031449+00:00",
+   "rows": 5081,
+   "bytes": 174352,
+   "sha256": "6659a209fecadfee892cf4d4616eda17b8b719f2ceebb8bcbc6e4718933d8bc8",
+   "tags": [
+    "hourly",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/QQQ?range=730d&interval=1h, merged with earlier captures (bar time = bar start)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t (bar start, unix), open, high, low, close, volume}"
+  },
+  "hourly-IWM": {
+   "name": "hourly-IWM",
+   "kind": "data",
+   "path": "mandel/archive/data/hourly-IWM.jsonl.gz",
+   "created_at": "2026-10-15T08:35:58.985747+00:00",
+   "rows": 5080,
+   "bytes": 164576,
+   "sha256": "27c2ca6c7e9ddee00dacb8108f3b28540c377c99316765fd987832760e7799ef",
+   "tags": [
+    "hourly",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/IWM?range=730d&interval=1h, merged with earlier captures (bar time = bar start)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t (bar start, unix), open, high, low, close, volume}"
+  },
+  "hourly-TLT": {
+   "name": "hourly-TLT",
+   "kind": "data",
+   "path": "mandel/archive/data/hourly-TLT.jsonl.gz",
+   "created_at": "2026-10-15T08:35:59.982999+00:00",
+   "rows": 5081,
+   "bytes": 169055,
+   "sha256": "2d92f9ab9a84ea2050e08a515b2771b3f3158dccc4f795f9b871dbbea76566b6",
+   "tags": [
+    "hourly",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/TLT?range=730d&interval=1h, merged with earlier captures (bar time = bar start)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t (bar start, unix), open, high, low, close, volume}"
+  },
+  "hourly-GLD": {
+   "name": "hourly-GLD",
+   "kind": "data",
+   "path": "mandel/archive/data/hourly-GLD.jsonl.gz",
+   "created_at": "2026-10-15T08:36:01.042552+00:00",
+   "rows": 5080,
+   "bytes": 167604,
+   "sha256": "9bc92f95649c84c374937a45c40f050577b856804684b99a33151fe7c528a52c",
+   "tags": [
+    "hourly",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/GLD?range=730d&interval=1h, merged with earlier captures (bar time = bar start)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t (bar start, unix), open, high, low, close, volume}"
+  },
+  "hourly-BTC-USD": {
+   "name": "hourly-BTC-USD",
+   "kind": "data",
+   "path": "mandel/archive/data/hourly-BTC-USD.jsonl.gz",
+   "created_at": "2026-10-15T08:36:02.414158+00:00",
+   "rows": 17473,
+   "bytes": 599421,
+   "sha256": "2329eae39c56748595a307bda1f7a5703550bbe7807e61f7eb237f57abdb9d28",
+   "tags": [
+    "hourly",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/BTC-USD?range=730d&interval=1h, merged with earlier captures (bar time = bar start)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t (bar start, unix), open, high, low, close, volume}"
+  },
+  "hourly-ETH-USD": {
+   "name": "hourly-ETH-USD",
+   "kind": "data",
+   "path": "mandel/archive/data/hourly-ETH-USD.jsonl.gz",
+   "created_at": "2026-10-15T08:36:03.564213+00:00",
+   "rows": 17470,
+   "bytes": 647234,
+   "sha256": "e686ac66d3408e0b1be42941206e64cc39e98af51ca2582cc0ad7625a61a5e69",
+   "tags": [
+    "hourly",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ETH-USD?range=730d&interval=1h, merged with earlier captures (bar time = bar start)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t (bar start, unix), open, high, low, close, volume}"
+  },
+  "hourly--VIX": {
+   "name": "hourly--VIX",
+   "kind": "data",
+   "path": "mandel/archive/data/hourly--VIX.jsonl.gz",
+   "created_at": "2026-10-15T08:36:05.146742+00:00",
+   "rows": 9944,
+   "bytes": 230914,
+   "sha256": "daed58d2b61d5c94874875d8427a70bd7059d73030ddf6a1414806cbaab67725",
+   "tags": [
+    "hourly",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/^VIX?range=730d&interval=1h, merged with earlier captures (bar time = bar start)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t (bar start, unix), open, high, low, close, volume}"
   }
  }
 }
