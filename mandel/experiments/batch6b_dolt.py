@@ -16,7 +16,7 @@ Claims (each tested on its claim, trial.pass and trial.min_n as worded):
            positive mean P&L / naked-leg margin; same pass and min_n as T-121.
   * T-173  SPY 30-DTE overlays on the monthly expiry: the 1x2 overlay (short 2 5%-OTM calls, long 1 10%-OTM call) minus
            the single 5%-OTM covered call (the stock legs cancel, so the spread is short 1 5%-OTM call, long 1 10%-OTM
-           call); top-minus-bottom quartile difference of its mean P&L by the entry-day 5%-to-10% OTM call IV slope, pass
+           call); top-minus-bottom quartile difference of its mean P&L by the prior 5%-to-10% OTM call IV slope, pass
            "95% CI of the difference > 0"; min_n 24 monthly expiry cohorts.
 
 Conventions
@@ -26,11 +26,12 @@ Conventions
     that has its own), the one taken on the quote day and not flagged stale is kept, else the earliest. An entry trades at
     the quote day's close at those quotes (they were the market's public closing quotes then; DoltHub's publication time
     is provenance, per the data module), with the spot = SPY's raw close that day. Strike selection uses only that
-    snapshot (vendor deltas, vendor IVs, strikes vs that close). Rows of a weekend, holiday or stale-moved snapshot (every
-    2019 snapshot is a Saturday) carry the module's conservative available_at on the SNAPSHOT evening, after that close;
-    the harness still enters at the quote-day close because it uses nothing but those closing quotes and that close,
-    which participants saw at the time. A strict sensitivity drops those entries (available_at after the entry close)
-    and is reported for every claim.
+    snapshot (vendor deltas, vendor IVs, strikes vs that close). The archive stamps EVERY chain row available at 22:00Z
+    on its snapshot date, after the 16:15 ET fill (none of any claim's entries has its rows stamped before the fill), so
+    every entry uses the entry-close quotes as the live proxy of house rule 12; a weekend, holiday or stale-moved snapshot
+    (every 2019 snapshot is a Saturday) is stamped later still, on the snapshot evening. The snapshot-date sensitivity
+    reported for every claim drops those weekend, holiday and moved snapshots; it does not make the kept entries point
+    in time. T-173, whose decision is a signal plus strike targets, is also read at the previous close (below).
   * Expiry. The listed expiry nearest the claim's DTE (calendar days from the quote day), ties to the longer-dated, used
     only within +/- DTE_TOL = 7 days (one weekly listing interval; DoltHub lists only 3-4 expiries, so a 45- or 60-DTE
     expiry is missing on many days); +/- 4 and +/- 14 days are reported as sensitivities. T-173 names the monthly
@@ -38,8 +39,12 @@ Conventions
     when that Friday is a holiday) at 23-37 DTE (30 +/- 7).
   * Strikes. Delta legs: the usable listed strike whose |vendor delta| is nearest the target, within DELTA_TOL = 0.075
     (the thin grid's strike steps are up to ~0.12 delta near the money). ATM: the strike nearest the spot within 2%.
-    Moneyness legs (T-173): the strike nearest 1.05 S and 1.10 S, each within 2% of S. A leg is usable when bid > 0 and
-    ask >= bid. The structure's strike order must hold (T-119 K_25d > K_ATM; T-121 K_40d > K_20d; T-539 K_40d > K_25d >
+    Moneyness legs (T-173), two constructions that must agree (house rule 1: DoltHub's grid near 1.05 S is about 2% of
+    S apart, so the nearest strike can sit 3.7-6.2% OTM): EXACT = the claim's moneyness priced from tradable quotes, each
+    leg the strike-weighted mixture of the two usable strikes bracketing 1.05 S (1.10 S), at most SLOPE_GAP = 6% of S
+    apart, whose average strike is exactly the target (one strike at weight 1 when it sits on the target); NEAREST = the
+    usable strike nearest 1.05 S and 1.10 S, each within 2% of S. The realised K/S ranges of the nearest strikes and a
+    1%-of-S band are reported. A leg is usable when bid > 0 and ask >= bid. The structure's strike order must hold (T-119 K_25d > K_ATM; T-121 K_40d > K_20d; T-539 K_40d > K_25d >
     K_15d; T-173 K_10% > K_5%), else the day is skipped (counted by reason).
   * Fills. Mid = (bid + ask) / 2 for every leg, as each claim says; executable = buy at the ask, sell at the bid (reported
     for every claim; it is the pass's fill for T-121 and T-539). No commissions are stated; $0.65/contract per leg is a
@@ -72,11 +77,19 @@ Conventions
     of a monthly expiry (the trial's "overlapping cohorts"), the bootstrap resamples blocks of whole expiry cohorts (the
     trial's "block bootstrap by expiry cohort"; 2 and 4 cohorts, so blocks cover the up-to-9-day overlap between
     adjacent cohorts), and n counts cohorts.
-  * T-173's quartiles are the full-sample quartiles of the entry-day slope (the trial's statistic is the quartile
+  * T-173's quartiles are the full-sample quartiles of each reading's slope (the trial's statistic is the quartile
     contrast of the sample); the slope is the vendor call IV linearly interpolated in K/S at 1.10 minus that at 1.05, per
-    unit of moneyness, on the cohort's expiry, known at the entry close. Expanding point-in-time quartiles (cut from
-    earlier entries only, after 12 cohorts), one entry per cohort (nearest 30 DTE), executable fills, dollar P&L, the
-    early-exercise sensitivity and the difference without its most favourable cohort(s) are reported, not judged.
+    unit of moneyness. House rule 12: the slope and the strike targets are one decision, read from one capture two ways,
+    ENTRY CLOSE (the entry-day capture as the live proxy: slope on the cohort's expiry, targets x the entry close) and
+    PREVIOUS CAPTURE (the last capture whose rows are stamped before the entry close, 1-7 calendar days earlier: slope on
+    the cohort's expiry when it lists it, else on its listing nearest 30 DTE within 14 days; targets x that capture's
+    close); both fill at the entry-day quotes, the outcome of the order rather than a decision input. The criterion is
+    judged on the four readings (2 information sets x 2 strike constructions), each robust over blocks of 2 and 4
+    cohorts: it passes only when all four pass, fails only when all four fail, and is undecided otherwise. The previous-
+    capture reading on entries whose previous NYSE session was captured is reported. On the entry-close nearest-strike
+    reading, expanding point-in-time quartiles (cut from earlier entries only, after 12 cohorts), one entry per cohort
+    (nearest 30 DTE), executable fills, dollar P&L, the early-exercise sensitivity and the difference without its most
+    favourable cohort(s) are reported, not judged.
   * Stress month (T-121, T-539 pass). A calendar month with a VIX close >= 40; it is "in the sample" when at least one
     resolved trade was open across such a session (entry < session <= expiry). Months where SPY closed >= 10% below its
     63-session high are reported beside it. Without one the criterion is None (the trial's control caps at inconclusive).
@@ -136,6 +149,9 @@ FILLS = ("mid", "exec")
 EVENING = "T22:00:00+00:00"      # the data module's available_at time on a quote day's evening
 FILL_UTC = "T20:15:00+00:00"     # the 16:15 ET fill at its earliest in UTC (EDT): rows known before the fill are stamped before it
 NO_CONTROL = "the GLD and IBIT controls cannot run (DoltHub has neither symbol)"
+LIVE_PROXY_TXT = ("every entry uses its entry-close quotes as the live proxy (the archive stamps every dolt-chain-SPY row "
+                  "available at 22:00Z on its snapshot date, after the 16:15 ET fill)")
+SNAP_SENS = "snapshot-date sensitivity"
 
 
 # ===================================================================================================== formatting ==
@@ -716,23 +732,82 @@ def ladder_trade(day: dict, target: int = T539_DTE, tol: int = DTE_TOL):
     return _trade(day, e, [_leg(p40, "put", 1), _leg(p25, "put", -1), _leg(p15, "put", -1)], naked=2), None
 
 
-def overlay_trade(day: dict, monthly: set, target: int = T173_DTE, tol: int = DTE_TOL):
-    """T-173: the 1x2-minus-single overlay spread on the monthly expiry (short 1 call nearest 1.05 S, long 1 call
-    nearest 1.10 S) with the entry-day slope IV(1.10) - IV(1.05) per unit of moneyness."""
+def prev_capture(chain: dict, qdays: Sequence[str], q: str) -> Optional[dict]:
+    """House rule 12's previous-close information set for an entry at ``q``'s close: the latest capture of an earlier
+    quote day whose rows are available before that close (available_at < q + FILL_UTC). The archive stamps every chain
+    row at 22:00Z on its snapshot date, after that day's 16:15 ET close, so the entry day's own capture never qualifies."""
+    j = bisect_left(qdays, q) - 1
+    while j >= 0:
+        c = chain[qdays[j]]
+        if (c.get("available_at") or "9999") < q + FILL_UTC:
+            return c
+        j -= 1
+    return None
+
+
+def overlay_trade(day: dict, monthly: set, target: int = T173_DTE, tol: int = DTE_TOL, moneyness: str = "nearest",
+                  info: Optional[dict] = None):
+    """T-173: the 1x2-minus-single overlay spread on the monthly expiry (short 1 5%-OTM call, long 1 10%-OTM call),
+    filled at ``day``'s quotes, with the slope IV(1.10) - IV(1.05) per unit of moneyness.
+
+    ``moneyness``: "nearest" = the usable listed strike nearest 1.05 S and 1.10 S, each within MONEY_TOL of S; "exact" =
+    the claim's moneyness priced exactly, each leg the strike-weighted mixture of the two bracketing usable strikes
+    (``mix_legs``, at most SLOPE_GAP x S apart). ``info`` (house rule 12) is the capture whose close sets the slope and
+    the strike targets S: None = ``day`` itself (the entry close as the live proxy); else the last capture known before
+    the entry close (the previous-close reading), its slope read on the cohort's expiry when it lists it, else on its
+    listing nearest the target DTE within PREV_EXP_TOL days."""
     e, why = _base_checks(day, target, tol, monthly)
     if e is None:
         return None, why
-    calls, S = day["exp"][e]["call"], day["spot"]
-    c5, c10 = pick_moneyness(calls, S, 1.05, MONEY_TOL), pick_moneyness(calls, S, 1.10, MONEY_TOL)
-    if c5 is None or c10 is None:
-        return None, "no usable 5%- or 10%-OTM call"
-    if c10["strike"] <= c5["strike"]:
-        return None, "10%-OTM strike not above the 5%-OTM strike"
-    i5, i10 = iv_at(calls, S, 1.05), iv_at(calls, S, 1.10)
+    src = day if info is None else info
+    S = src.get("spot")
+    if S is None:
+        return None, "no SPY close on the information capture"
+    calls = day["exp"][e]["call"]
+    if moneyness == "exact":
+        m5, m10 = mix_legs(calls, 1.05 * S, SLOPE_GAP * S), mix_legs(calls, 1.10 * S, SLOPE_GAP * S)
+        if m5 is None or m10 is None:
+            return None, "no usable strikes bracketing 1.05 or 1.10 x S"
+        legs = [_leg(l, "call", -w) for l, w in m5] + [_leg(l, "call", w) for l, w in m10]
+    else:
+        c5, c10 = pick_moneyness(calls, S, 1.05, MONEY_TOL), pick_moneyness(calls, S, 1.10, MONEY_TOL)
+        if c5 is None or c10 is None:
+            return None, "no usable 5%- or 10%-OTM call"
+        if c10["strike"] <= c5["strike"]:
+            return None, "10%-OTM strike not above the 5%-OTM strike"
+        legs = [_leg(c5, "call", -1), _leg(c10, "call", 1)]
+    se = e if info is None or e in info["exp"] else pick_expiry(info, target, PREV_EXP_TOL)
+    if se is None:
+        return None, f"no listing within {target} +/- {PREV_EXP_TOL} DTE on the information capture"
+    icalls = src["exp"][se]["call"]
+    i5, i10 = iv_at(icalls, S, 1.05), iv_at(icalls, S, 1.10)
     if i5 is None or i10 is None:
         return None, "no vendor IV at 5% or 10% OTM"
-    return _trade(day, e, [_leg(c5, "call", -1), _leg(c10, "call", 1)], cohort=e, signal=(i10 - i5) / 0.05,
-                  iv5=i5, iv10=i10), None
+    k5 = sum(-l["qty"] * l["strike"] for l in legs if l["qty"] < 0)
+    k10 = sum(l["qty"] * l["strike"] for l in legs if l["qty"] > 0)
+    return _trade(day, e, legs, cohort=e, signal=(i10 - i5) / 0.05, iv5=i5, iv10=i10, k5=k5, k10=k10,
+                  info_day=src["quote_date"], info_gap=_ord(day["quote_date"]) - _ord(src["quote_date"])), None
+
+
+def overlay_trades(chain: dict, monthly: set, *, reading: str = "entry", moneyness: str = "nearest",
+                   target: int = T173_DTE, tol: int = DTE_TOL) -> tuple:
+    """T-173 entries on every capture day under one information set (``reading`` "entry": the entry close as the live
+    proxy; "prev": the last capture known before the entry close, ``prev_capture``) and one strike construction."""
+    qdays = sorted(chain)
+    trades, skips = [], Counter()
+    for q in qdays:
+        info = None
+        if reading == "prev":
+            info = prev_capture(chain, qdays, q)
+            if info is None:
+                skips["no capture known before the entry close"] += 1
+                continue
+        t, why = overlay_trade(chain[q], monthly, target, tol, moneyness, info)
+        if t is None:
+            skips[why] += 1
+        else:
+            trades.append(t)
+    return trades, skips
 
 
 def naked_put_margin(leg: dict, spot: float, fill: str) -> float:
@@ -960,8 +1035,8 @@ def mean_claim(trades: Sequence[dict], ratios: dict, *, hold_days: int, min_n: i
             ps = pooled_mean_test([days[i] for i in keep], np.asarray(ratios[f], dtype=float)[keep], hold_days, side,
                                   holds=(BLOCK_HOLDS[0],), n_boot=n_boot, seed=seed)
             strict[f] = {"mean": ps["mean"], "ci": ps["by_block"][0]["ci"]}
-    parts.append(f"strict available_at sensitivity (drops the {n - len(keep)} entries whose rows are stamped available "
-                 f"after the entry close: weekend, holiday or moved snapshots): "
+    parts.append(f"{LIVE_PROXY_TXT}; {SNAP_SENS} (drops the {n - len(keep)} entries whose snapshot was taken on a "
+                 f"weekend, holiday or moved day; no kept entry is point in time either): "
                  + "; ".join(f"{f} mean {_s(strict[f]['mean'], 3)} ({_ci_s(strict[f]['ci'])})"
                              for _, f, _ in criteria if f in strict))
     if stress is not None:
@@ -969,7 +1044,7 @@ def mean_claim(trades: Sequence[dict], ratios: dict, *, hold_days: int, min_n: i
     verdict, why = _decide(crit, n, min_n, "entry days")
     scans = {f: chain_scan(trades, ratios[f], hold_days, side, n_boot=n_boot, seed=seed) for _, f, side in criteria}
     return {"verdict": verdict, "why": why, "n": n, "pooled": pooled, "scans": scans, "parts": parts,
-            "week_weighted": weekly, "strict_available_at": strict, "n_holds": n_holds(days, hold_days)}
+            "week_weighted": weekly, "snapshot_date_sensitivity": strict, "n_holds": n_holds(days, hold_days)}
 
 
 def quartile_claim(trades: Sequence[dict], x, signal, *, min_n: int, blocks: Sequence[int] = COHORT_BLOCKS,
@@ -1189,7 +1264,7 @@ def b6b_dolt_backspread(archive):
              f"25-delta leg vendor delta {_f(float(deltas.min()))}-{_f(float(deltas.max()))}; skipped quote days: "
              f"{_skips_txt(skips, unres)}; {NO_CONTROL}"]
     stat.update({"n_distinct_holds": core["n_holds"], "first_entry": trades[0]["entry"], "last_entry": trades[-1]["entry"],
-                 "mean_ratio_mid": pe["mean"], "pooled_mid": pe, "pooled_exec": px, "week_weighted": core["week_weighted"], "strict_available_at": core["strict_available_at"],
+                 "mean_ratio_mid": pe["mean"], "pooled_mid": pe, "pooled_exec": px, "week_weighted": core["week_weighted"], "snapshot_date_sensitivity": core["snapshot_date_sensitivity"],
                  "per_start_mid": {k: v for k, v in core["scans"]["mid"].items()},
                  "credit_share_mid": float((credit_mid > 0).mean()), "mean_credit_mid": float(credit_mid.mean()),
                  "mean_credit_exec": float(credit_exec.mean()), "share_above_upper_breakeven": float(above.mean()),
@@ -1279,7 +1354,7 @@ def _put_harness(archive, *, claim: str, builder: Callable, target: int, min_n: 
              f"DTE tolerance sensitivity at bid/ask: {_tol_txt(sens)}",
              f"skipped quote days: {_skips_txt(skips, unres)}"]
     stat.update({"n_distinct_holds": core["n_holds"], "first_entry": trades[0]["entry"], "last_entry": trades[-1]["entry"],
-                 "mean_ratio_mid": pm["mean"], "mean_ratio_exec": px["mean"], "pooled_mid": pm, "pooled_exec": px, "week_weighted": core["week_weighted"], "strict_available_at": core["strict_available_at"],
+                 "mean_ratio_mid": pm["mean"], "mean_ratio_exec": px["mean"], "pooled_mid": pm, "pooled_exec": px, "week_weighted": core["week_weighted"], "snapshot_date_sensitivity": core["snapshot_date_sensitivity"],
                  "per_start_exec": core["scans"]["exec"], "per_start_mid": core["scans"]["mid"],
                  "stress_months_in_sample": hits, "stress_sessions": len(sess), "drawdown_months": ddm,
                  "n_trades_in_stress": int(in_stress.sum()),
@@ -1333,9 +1408,62 @@ def one_per_cohort(trades: Sequence[dict], target: int = T173_DTE) -> list:
     return sorted(i for _, i in best.values())
 
 
+T173_READINGS = (("entry", "entry close (live proxy)"), ("prev", "previous capture"))
+T173_MONEYNESS = (("exact", "exact 5%/10% OTM"), ("nearest", "nearest listed strike"))
+
+
+def judge_cells(cells: dict) -> tuple:
+    """House rules 1 and 12 for T-173: ``cells`` = {label: quartile_claim result} over the information-set readings x
+    strike constructions. ok is True only when every cell passes, False only when every cell fails, None (undecided)
+    when any cell is marginal or they disagree; decisive only when every cell fails decisively; n = the fewest cohorts."""
+    ok = _robust([c["ok"] for c in cells.values()])
+    dec = bool(cells) and all(bool(c["decisive_fail"]) for c in cells.values())
+    n = min((int(c["n"]) for c in cells.values()), default=0)
+    return ok, dec, n
+
+
+def _cell_word(ok) -> str:
+    return "pass" if ok is True else ("fail" if ok is False else "marginal (the blocks disagree)")
+
+
+def _t173_reading(W: dict, monthly: set, reading: str, moneyness: str) -> dict:
+    """One information set x strike construction: resolved entries, mid P&L per unit of the entry spot, signal, test."""
+    tr, skips = overlay_trades(W["chain"], monthly, reading=reading, moneyness=moneyness)
+    tr, unres = resolve(tr, W["close_by"], W["last"])
+    x = np.array([overlay_values(t)["mid"] for t in tr], dtype=float)
+    sig = np.array([t["signal"] for t in tr], dtype=float)
+    return {"trades": tr, "x": x, "sig": sig, "skips": skips + unres,
+            "q": quartile_claim(tr, x, sig, min_n=T173_MIN_N)}
+
+
+def _sub(r: dict, keep, blocks: Sequence[int] = COHORT_BLOCKS) -> Optional[dict]:
+    """A reading restricted to the entries flagged in ``keep`` (quartiles re-cut on them), or None with too few."""
+    keep = np.asarray(keep, dtype=bool)
+    tr = [t for t, k in zip(r["trades"], keep) if k]
+    if len(tr) < MIN_CLUSTERS:
+        return None
+    return quartile_claim(tr, r["x"][keep], r["sig"][keep], min_n=T173_MIN_N, blocks=blocks)
+
+
+def _cell_line(lab: str, c: dict) -> str:
+    cis = "; ".join(f"block {r['block']} {_ci_s(r['ci'], 2, 100)}" for r in c["rows"])
+    return (f"[{lab}] {c['n']} cohorts / {c['n_entries']} entries, difference {_s(c['diff'] and c['diff'] * 100)}% of S "
+            f"({cis}): {_cell_word(c['ok'])}")
+
+
+def _q_range(v, nd: int = 4) -> str:
+    v = np.asarray(v, dtype=float)
+    if not v.size:
+        return "n/a"
+    q = np.quantile(v, [0.0, 0.25, 0.5, 0.75, 1.0])
+    return f"min {q[0]:.{nd}f}, quartiles {q[1]:.{nd}f}/{q[2]:.{nd}f}/{q[3]:.{nd}f}, max {q[4]:.{nd}f}"
+
+
 def b6b_dolt_ratio_overlay_skew(archive):
-    """T-173: SPY 30-DTE 1x2 overlay minus the single 5%-OTM covered call, top minus bottom quartile of the entry-day
-    5%-to-10% OTM call IV slope; pass 95% CI of the difference > 0; min_n 24 monthly expiry cohorts."""
+    """T-173: SPY 30-DTE 1x2 overlay minus the single 5%-OTM covered call, top minus bottom quartile of the prior
+    5%-to-10% OTM call IV slope; pass 95% CI of the difference > 0; min_n 24 monthly expiry cohorts. Judged on the
+    claim's exact moneyness and the nearest listed strikes (they must agree), each under both house-rule-12 information
+    sets (the entry close as the live proxy, and the last capture known before the entry close)."""
     miss = _missing(archive, [CHAIN_B, SPY_B])
     if miss:
         return miss
@@ -1343,26 +1471,57 @@ def b6b_dolt_ratio_overlay_skew(archive):
     days = W["days"]
     monthly = monthly_expiries(int(days[0][:4]), int(days[-1][:4]) + 1) if days else set()
     head = (f"T-173 SPY overlay spread (1x2 overlay short 2 5%-OTM calls + long 1 10%-OTM call, minus the single 5%-OTM "
-            f"covered call: the stock legs cancel, leaving short 1 call nearest 1.05 S, long 1 nearest 1.10 S, each within "
-            f"{MONEY_TOL * 100:.0f}% of S) on the standard monthly expiry at {T173_DTE} +/- {DTE_TOL} DTE, every capture day "
-            f"an entry (the trial's overlapping cohorts), mid fills, P&L per unit of the entry spot, settled on SPY's raw "
-            f"close on the expiry date, early exercise ignored; signal = entry-day vendor call IV slope (IV at 1.10 S minus "
-            f"IV at 1.05 S, linear in K/S, per unit moneyness); {_data_txt(W)}")
-    trades, skips = build_trades(W["chain"], overlay_trade, monthly=monthly, target=T173_DTE, tol=DTE_TOL)
-    trades, unres = resolve(trades, W["close_by"], W["last"])
-    stat = {"claim": "T-173", "n_entries": len(trades), "skips": dict(skips + unres), "data": W["info"],
-            "dte_tol": DTE_TOL, "money_tol": MONEY_TOL}
+            f"covered call: the stock legs cancel, leaving short 1 5%-OTM call, long 1 10%-OTM call) on the standard "
+            f"monthly expiry at {T173_DTE} +/- {DTE_TOL} DTE, every capture day an entry (the trial's overlapping cohorts), "
+            f"mid fills at the entry-day quotes, P&L per unit of the entry spot, settled on SPY's raw close on the expiry "
+            f"date, early exercise ignored; signal = the prior vendor call IV slope (IV at 1.10 S minus IV at 1.05 S, "
+            f"linear in K/S, per unit moneyness); strikes two ways (rule 1: the claim's moneyness, and the listed strikes "
+            f"must agree): EXACT = each leg the strike-weighted mixture of the two usable strikes bracketing 1.05 S or "
+            f"1.10 S (at most {SLOPE_GAP * 100:.0f}% of S apart; the average strike is exactly the target), NEAREST = the "
+            f"usable listed strike nearest the target within {MONEY_TOL * 100:.0f}% of S; information sets (rule 12: the "
+            f"slope and the strike targets S come from one capture): ENTRY CLOSE = the entry-day capture as the live proxy "
+            f"(its rows are stamped available at 22:00Z, after the 16:15 ET fill), PREVIOUS CAPTURE = the last capture "
+            f"known before the entry close (slope on the cohort's expiry when that capture lists it, else on its listing "
+            f"nearest {T173_DTE} DTE within {PREV_EXP_TOL} days; strike targets 1.05 and 1.10 x that capture's close), "
+            f"filled at the entry-day quotes; {_data_txt(W)}")
+    R = {(rk, mk): _t173_reading(W, monthly, rk, mk) for rk, _ in T173_READINGS for mk, _ in T173_MONEYNESS}
+    base = R[("entry", "nearest")]
+    trades, x, sig, skips = base["trades"], base["x"], base["sig"], base["skips"]
+    stat = {"claim": "T-173", "n_entries": len(trades), "skips": dict(skips), "data": W["info"],
+            "dte_tol": DTE_TOL, "money_tol": MONEY_TOL, "mix_gap": SLOPE_GAP}
     n_coh = len({t["cohort"] for t in trades})
     if len(trades) < MIN_CLUSTERS or n_coh < MIN_CLUSTERS:
         return _too_few(stat, n_coh, T173_MIN_N, "monthly expiry cohorts", head)
-    vals = [overlay_values(t, W) for t in trades]
-    x = np.array([v["mid"] for v in vals])
-    sig = np.array([t["signal"] for t in trades])
-    core = quartile_claim(trades, x, sig, min_n=T173_MIN_N)
+    core = base["q"]
+    cells = {f"{rl}, {ml}": R[(rk, mk)]["q"] for rk, rl in T173_READINGS for mk, ml in T173_MONEYNESS}
+    ok, dec, n = judge_cells(cells)
+    oks = [c["ok"] for c in cells.values()]
+    tag = ("; a reading is marginal: undecided" if any(o is None for o in oks) else
+           "; the readings disagree: undecided" if len(set(oks)) > 1 else "")
     crit = [(f"95% CI of the top-minus-bottom quartile difference > 0 (studentized block bootstrap over expiry cohorts, "
-             f"robust over blocks of {'/'.join(str(b) for b in COHORT_BLOCKS)} cohorts)", core["ok"], core["decisive_fail"])]
-    verdict, why = _decide(crit, core["n"], T173_MIN_N, "monthly expiry cohorts")
-    # reported sensitivities
+             f"robust over blocks of {'/'.join(str(b) for b in COHORT_BLOCKS)} cohorts) under both information sets "
+             f"(rule 12) and both strike constructions (rule 1), passing only when every reading passes ("
+             + "; ".join(_cell_line(lab, c) for lab, c in cells.items()) + f"{tag})", ok, dec)]
+    verdict, why = _decide(crit, n, T173_MIN_N, "monthly expiry cohorts")
+    # moneyness actually traded (rule 1), and the tight-band reading
+    k5 = np.array([t["k5"] / t["spot"] for t in trades])
+    k10 = np.array([t["k10"] / t["spot"] for t in trades])
+    off5 = int((np.abs(k5 - 1.05) > BAND_TOL).sum())
+    off10 = int((np.abs(k10 - 1.10) > BAND_TOL).sum())
+    band = _sub(base, (np.abs(k5 - 1.05) <= BAND_TOL) & (np.abs(k10 - 1.10) <= BAND_TOL))
+    pn = R[("prev", "nearest")]
+    pk5 = np.array([t["k5"] / t["spot"] for t in pn["trades"]])
+    # previous-capture staleness, and the previous-capture reading on entries whose previous NYSE session was captured
+    gaps = {k: np.array([t["info_gap"] for t in R[("prev", k)]["trades"]]) for k, _ in T173_MONEYNESS}
+    g = gaps["nearest"]
+    sess_prev = {}
+    for i in range(1, len(days)):
+        sess_prev[days[i]] = days[i - 1]
+    a2 = {mk: _sub(R[("prev", mk)], [t["info_day"] == sess_prev.get(t["entry"]) for t in R[("prev", mk)]["trades"]])
+          for mk, _ in T173_MONEYNESS}
+    known = sum(1 for t in trades if (W["chain"][t["entry"]].get("available_at") or "9999") < t["entry"] + FILL_UTC)
+    # reported sensitivities on the entry-close nearest-strike reading (the earlier primary)
+    vals = [overlay_values(t, W) for t in trades]
     xe = np.array([v["exec"] for v in vals])
     xu = np.array([v["usd"] for v in vals])
     xa = np.array([v["early"] for v in vals])
@@ -1397,35 +1556,58 @@ def b6b_dolt_ratio_overlay_skew(archive):
     yrs = sorted({t["entry"][:4] for t in trades})
     by_year = {y: {"n_top": int(sum(1 for t, a in zip(trades, full_lab[0]) if a and t["entry"][:4] == y)),
                    "n_bottom": int(sum(1 for t, b in zip(trades, full_lab[1]) if b and t["entry"][:4] == y))} for y in yrs}
-    parts = [f"{len(trades)} entries in {core['n']} monthly cohorts ({min(per_coh)}..{max(per_coh)}; "
-             f"{min(len(v) for v in per_coh.values())}-{max(len(v) for v in per_coh.values())} entries per cohort)",
-             f"slope quartiles Q1 {_s(core['q1'], 3)}, Q3 {_s(core['q3'], 3)} (vol per unit moneyness; median "
-             f"{_s(float(np.median(sig)), 3)})",
-             f"mid: {_qrows_txt(core)} -> CI > 0: {_ok_txt(core['ok'])}",
-             f"unconditional mean spread {_s(float(x.mean()) * 100, 3)}% of S",
-             f"fragility (reported): without the most favourable cohort ({', '.join(drop1['dropped'])}) difference "
-             f"{_s(drop1['diff'] and drop1['diff'] * 100)}% of S ({_ci_s(drop1['ci'], 2, 100)}); without the two most "
-             f"favourable ({', '.join(drop2['dropped'])}) {_s(drop2['diff'] and drop2['diff'] * 100)}% "
-             f"({_ci_s(drop2['ci'], 2, 100)}); top/bottom entries by year "
+    parts = [f"{len(trades)} entries in {core['n']} monthly cohorts on the entry-close nearest-strike reading "
+             f"({min(per_coh)}..{max(per_coh)}; {min(len(v) for v in per_coh.values())}-"
+             f"{max(len(v) for v in per_coh.values())} entries per cohort)",
+             f"rule 12: {known} of {len(trades)} entries have chain rows stamped available before the fill, so the "
+             f"entry-close reading is a live proxy; the previous capture is {int(g.min()) if g.size else 'n/a'}-"
+             f"{int(g.max()) if g.size else 'n/a'} calendar days before the entry (median "
+             f"{_f(float(np.median(g)) if g.size else None, 0)}; the previous NYSE session on "
+             f"{int(sum(1 for t in pn['trades'] if t['info_day'] == sess_prev.get(t['entry'])))} of {len(pn['trades'])} "
+             f"entries)",
+             f"rule 1: the nearest listed strikes sit at K5/S {_q_range(k5)} and K10/S {_q_range(k10)} at the entry "
+             f"close ({off5} short and {off10} long legs more than {BAND_TOL * 100:.0f}% of S off target); at the "
+             f"previous capture's targets the short leg sits at K5/S_entry {_q_range(pk5)}; the exact construction "
+             f"averages the bracketing strikes to exactly 1.05 S and 1.10 S",
+             f"slope quartiles (entry close) Q1 {_s(core['q1'], 3)}, Q3 {_s(core['q3'], 3)} (vol per unit moneyness; "
+             f"median {_s(float(np.median(sig)), 3)})",
+             "readings, mid: " + "; ".join(f"[{lab}] {_qrows_txt(c)}" for lab, c in cells.items()),
+             f"reported, not judged: nearest strikes kept only within {BAND_TOL * 100:.0f}% of S of both targets "
+             + (f"({band['n']} cohorts) {_qrows_txt(band)}" if band else "too few entries")
+             + "; previous-capture reading on the entries whose previous NYSE session was captured: "
+             + "; ".join(f"[{ml}] " + (f"{a2[mk]['n']} cohorts, {_qrows_txt(a2[mk])}" if a2[mk] else "too few entries")
+                         for mk, ml in T173_MONEYNESS),
+             f"unconditional mean spread (entry close, nearest) {_s(float(x.mean()) * 100, 3)}% of S",
+             f"fragility (reported, entry close, nearest): without the most favourable cohort "
+             f"({', '.join(drop1['dropped'])}) difference {_s(drop1['diff'] and drop1['diff'] * 100)}% of S "
+             f"({_ci_s(drop1['ci'], 2, 100)}); without the two most favourable ({', '.join(drop2['dropped'])}) "
+             f"{_s(drop2['diff'] and drop2['diff'] * 100)}% ({_ci_s(drop2['ci'], 2, 100)}); top/bottom entries by year "
              + ", ".join(f"{y} {v['n_top']}/{v['n_bottom']}" for y, v in by_year.items()),
-             f"reported, not judged: executable (sell 5% at the bid, buy 10% at the ask) {_qrows_txt(q_exec)}; in $ "
-             f"{_qrows_txt(q_usd, 1.0, ' $')}; early-exercise sensitivity (a call is exercised at a cum-dividend close "
-             f"when the dividend exceeds its time value, BS put at the entry vendor IV, r = 0) {_qrows_txt(q_early)}; "
-             f"point-in-time expanding quartiles (after {PIT_MIN_COHORTS} cohorts) {_qrows_txt(q_pit)}; one entry per "
-             f"cohort (nearest {T173_DTE} DTE) {_qrows_txt(q_one)}; DTE window "
+             f"reported, not judged (entry close, nearest): executable (sell 5% at the bid, buy 10% at the ask) "
+             f"{_qrows_txt(q_exec)}; in $ {_qrows_txt(q_usd, 1.0, ' $')}; early-exercise sensitivity (a call is exercised "
+             f"at a cum-dividend close when the dividend exceeds its time value, BS put at the entry vendor IV, r = 0) "
+             f"{_qrows_txt(q_early)}; point-in-time expanding quartiles (after {PIT_MIN_COHORTS} cohorts) "
+             f"{_qrows_txt(q_pit)}; one entry per cohort (nearest {T173_DTE} DTE) {_qrows_txt(q_one)}; DTE window "
              + "; ".join(f"+/-{k}: {v['n_cohorts']} cohorts, difference {_s(v['diff'] and v['diff'] * 100)}% of S "
                          f"({_ci_s(v['ci'], 2, 100)})" for k, v in tol_sens.items())
-             + f"; strict available_at (drops the {len(trades) - len(keep)} entries whose rows are stamped after the "
-               f"entry close) " + (f"{q_strict['n']} cohorts, {_qrows_txt(q_strict)}" if q_strict else "too few entries"),
-             f"skipped quote days: {_skips_txt(skips, unres)}; {NO_CONTROL}"]
-    stat.update({"n_cohorts": core["n"], "quartile_test": core, "q1": core["q1"], "q3": core["q3"],
+             + f"; {SNAP_SENS} (drops the {len(trades) - len(keep)} entries whose snapshot was taken on a weekend, "
+               f"holiday or moved day; the kept entries are live-proxy entries too) "
+             + (f"{q_strict['n']} cohorts, {_qrows_txt(q_strict)}" if q_strict else "too few entries"),
+             f"skipped quote days (entry close, nearest): {_skips_txt(skips, Counter())}; {NO_CONTROL}"]
+    stat.update({"n_cohorts": n, "readings": cells,
+                 "decision": {"ok": ok, "decisive_fail": dec, "cells": {lab: c["ok"] for lab, c in cells.items()}},
+                 "quartile_test": core, "q1": core["q1"], "q3": core["q3"],
                  "diff_mid": core["diff"], "mean_spread_mid": float(x.mean()),
+                 "k5_over_s": _desc(k5), "k10_over_s": _desc(k10), "n_off_band_short": off5, "n_off_band_long": off10,
+                 "k5_over_s_entry_prev_capture": _desc(pk5), "band_1pct": band,
+                 "prev_capture_gap_days": {k: _desc(v) for k, v in gaps.items()}, "prev_session_only": a2,
+                 "n_entries_rows_known_before_fill": known,
                  "sens_exec": q_exec, "sens_usd": q_usd, "sens_early_exercise": q_early, "sens_point_in_time": q_pit,
                  "sens_one_per_cohort": q_one, "drop_most_favourable_cohort": drop1,
                  "drop_two_most_favourable_cohorts": drop2, "quartile_entries_by_year": by_year,
-                 "dte_window_sensitivity": tol_sens, "sens_strict_available_at": q_strict,
+                 "dte_window_sensitivity": tol_sens, "snapshot_date_sensitivity": q_strict,
                  "first_cohort": min(per_coh), "last_cohort": max(per_coh), "controls": NO_CONTROL})
-    return _out(stat, core["n"], verdict, head + ": " + "; ".join(parts) + " — " + why)
+    return _out(stat, n, verdict, head + ": " + "; ".join(parts) + " — " + why)
 
 
 # ============================================================================================== registry ==
