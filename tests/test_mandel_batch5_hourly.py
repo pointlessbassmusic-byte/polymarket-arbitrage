@@ -170,7 +170,7 @@ def test_momentum_null_is_not_supported():
 
 
 def test_momentum_cost_can_kill_a_small_gross_edge():
-    spy, others = _three(0.0001, 0.0015, 0.0015)                    # 1 bp gross < 2 bps cost
+    spy, others = _three(0.0001, 0.0015, 0.0015, n=720)             # 1 bp gross < 2 bps cost (original 720-day draw)
     rep = bh.intraday_momentum(spy, others, n_boot=300)
     assert rep["verdict"] == "not_supported" and rep["mean_net_bps"] < 0
 
