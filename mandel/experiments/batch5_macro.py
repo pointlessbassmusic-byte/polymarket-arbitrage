@@ -57,11 +57,15 @@ House rule 5 (``_rule5``). Below the trial's min_n, counted in the claim's own u
 events with IM and HM, T-224 FOMC/CPI days, T-219 witching Fridays), the unmet 'n >= trial min_n' criterion keeps the
 verdict from supported, and a failing criterion still counts only when it fails decisively: its 95% interval lies
 wholly on the wrong side of the claimed bound (a block-bootstrap CI of the event-minus-other difference, the bootstrap
-CI of T-208's Q1-Q5 difference, or a Fisher-z interval of T-208's Spearman rho). A p-value criterion decides when the
-interval of the statistic it tests lies wholly on the null side of 0. An interval from fewer than 4 events (per group
-for T-208's quintiles), from fewer than 4 blocks of days, or of zero width decides nothing. Any other failure there is
-undecided (None), so the verdict is inconclusive. At or above min_n every criterion is judged at face value, exactly
-as before. Below min_n the report's ``rule5`` holds the face-value and judged criteria and the decisive failures.
+CI of T-208's Q1-Q5 difference, or a Fisher-z interval of T-208's Spearman rho). A one-sided p < 0.05 criterion is
+mirrored at the same level, not by a two-sided 95% interval (a one-sided 97.5% bound): it decides when the same test
+run in the opposite direction on the same draws gives p < 0.05 (T-343 the studentized block-bootstrap p for H0
+diff >= 0; T-208 the permutation p for H0 rho <= 0; T-219 the label-permutation p for H0 witching >= other); those
+mirrored p-values are reported in ``rule5`` and the reason. An interval or test from fewer than 4 events (per group
+for T-208's quintiles), from fewer than 4 blocks of days, or an interval of zero width decides nothing. Any other
+failure there is undecided (None), so the verdict is inconclusive. At or above min_n every criterion is judged at face
+value, exactly as before. Below min_n the report's ``rule5`` holds the face-value and judged criteria and the decisive
+failures.
 """
 
 from __future__ import annotations
@@ -529,8 +533,9 @@ def announcement_day_premium(days: Sequence[str], closes, cpi_days, es_days, fom
     FOMC-excluded sensitivity, the runnable non-primary variants (CPI 2021-2026, jobs only, TLT) with Holm, day-type
     Sharpe (each type annualised by sqrt of its own days per year) and the release-only strategy Sharpe (flat otherwise,
     sqrt(252)), ex-2008/2020, ex shutdown-delayed releases, overlaps. ``tlt`` = (days, closes). Below ``min_n`` release
-    days house rule 5 applies: never supported, and a criterion fails decisively only when its 95% block-bootstrap CI
-    lies wholly at or below its bound (5 bps for the difference, 0 for the p criterion and for each half)."""
+    days house rule 5 applies: never supported; the difference and each half fail decisively only when their 95%
+    block-bootstrap CI lies wholly at or below the bound (5 bps for the difference, 0 for each half), and the p criterion
+    only when the opposite one-sided studentized p (H0: difference >= 0, the same test) is < 0.05."""
     ds, r = _returns(days, closes, start, end)
     if len(ds) == 0:
         return {"n": 0, "verdict": "inconclusive", "reason": f"no SPY returns in {start}..{end}"}
@@ -640,12 +645,17 @@ def announcement_day_premium(days: Sequence[str], closes, cpi_days, es_days, fom
             f"{_f(sharpe_release_only, '.2f')}); primary Holm p over "
             f"{len(holm_var)} variants {_f(holm_var.get('primary (pooled SPY)'), '.3f')}")
     if rep["n"] < min_n:
-        # rule 5: the difference fails decisively when its 95% CI lies wholly at or below 5 bps, the p criterion when it
-        # lies wholly at or below 0, and a half when that half's CI lies wholly at or below 0
-        dec = [_decides(g, block) and _ci_below(g["ci"], threshold_bps / 1e4), _decides(g, block) and _ci_below(g["ci"], 0.0)]
+        # rule 5: the difference fails decisively when its 95% CI lies wholly at or below 5 bps, and a half when that
+        # half's CI lies wholly at or below 0. The one-sided p < 0.05 criterion is mirrored at its own level by the same
+        # studentized block-bootstrap test in the opposite direction: p_less (H0: diff >= 0) < 0.05
+        dec = [_decides(g, block) and _ci_below(g["ci"], threshold_bps / 1e4),
+               _decides(g, block) and g["p_less"] is not None and g["p_less"] < 0.05]
         dec += [_decides(h, block) and _ci_below(h["ci"], 0.0) for h in hv.values()]
-        body += "; halves 95% CI " + ", ".join(f"{k} {_ci_bps(h['ci'])} bps" for k, h in hv.items())
-        return _below_min_n(rep, crit, dec, rep["n"], min_n, "release days", body)
+        body += ("; halves 95% CI " + ", ".join(f"{k} {_ci_bps(h['ci'])} bps" for k, h in hv.items())
+                 + f"; opposite one-sided studentized p (H0 diff >= 0) {_f(g['p_less'], '.4f')}")
+        rep_ = _below_min_n(rep, crit, dec, rep["n"], min_n, "release days", body)
+        rep_["rule5"]["p_opposite_studentized"] = g["p_less"]
+        return rep_
     v, why = _verdict(crit)
     rep["verdict"] = v
     rep["reason"] = f"{body} — {why}"
@@ -705,9 +715,10 @@ def im_hm_filter(days: Sequence[str], closes, vix: dict, fomc_days, opens: Optio
     and full rho, return-on-debit rho, rho partialling out the VIX level, a random non-event-day placebo, and the
     close-to-open realised definition (the 14:00 statement is after the open, so that one is a non-event control).
     ``min_n`` applies to the full event table. Below it house rule 5 applies: never supported, and a criterion fails
-    decisively only when its 95% interval lies wholly on the wrong side of the claimed bound (the OOS rho's Fisher-z
-    interval at or above -0.1 for the rho criterion and at or above 0 for the permutation test; the Q1-Q5 bootstrap CI
-    at or below 0 for both quintile criteria, with at least 4 events in Q1 and in Q5)."""
+    decisively only when it fails at the confidence of its pass (the OOS rho's two-sided 95% Fisher-z interval at or
+    above -0.1 for the rho criterion; the opposite one-sided permutation p, H0 rho <= 0 from the same draws, < 0.05 for
+    the permutation criterion; the Q1-Q5 bootstrap CI at or below 0 for both quintile criteria, with at least 4 events in
+    Q1 and in Q5)."""
     ev = sorted(e for e in fomc_days if e >= start and (end is None or e <= end))
     T = event_move_table(days, closes, vix, ev, n_hm=n_hm, opens=opens)
     n = int(len(T["days"]))
@@ -769,15 +780,22 @@ def im_hm_filter(days: Sequence[str], closes, vix: dict, fomc_days, opens: Optio
             f"return-on-debit OOS rho {_f(rho_debit)}, close-to-open OOS rho {_f(rho_open)}, random-day placebo mean rho "
             f"{_f(placebo['mean_rho'])}")
     if n < min_n:
-        # rule 5: rho fails decisively when its 95% interval (Fisher z) lies wholly at or above -0.1, the permutation test
-        # when it lies wholly at or above 0; the Q1-Q5 criteria when the Q1-Q5 CI lies wholly at or below 0 (>= 4 events
-        # in each of Q1 and Q5)
+        # rule 5: rho fails decisively when its 95% interval (Fisher z) lies wholly at or above -0.1; the one-sided
+        # permutation p < 0.05 criterion is mirrored at its own level by the opposite one-sided permutation test from the
+        # same draws (H0 rho <= 0): p_greater < 0.05; the Q1-Q5 criteria when the Q1-Q5 CI lies wholly at or below 0 (>= 4
+        # events in each of Q1 and Q5)
         rho_ci = spearman_ci(rho, n_oos)
+        p_rho_greater = spearman_perm_p(x, y, n_perm, seed, "greater") if n_oos >= MIN_DECISIVE_EVENTS else None
         q_ok = len(a) >= MIN_DECISIVE_EVENTS and len(b) >= MIN_DECISIVE_EVENTS
-        dec = [_ci_above(rho_ci, rho_threshold), _ci_above(rho_ci, 0.0), q_ok and _ci_below(ci, 0.0), q_ok and _ci_below(ci, 0.0)]
+        dec = [_ci_above(rho_ci, rho_threshold), p_rho_greater is not None and p_rho_greater < 0.05,
+               q_ok and _ci_below(ci, 0.0), q_ok and _ci_below(ci, 0.0)]
         rep["oos_spearman_rho_ci"] = rho_ci
-        body += f"; OOS rho 95% interval (Fisher z, Bonett-Wright) [{_f(rho_ci[0])}, {_f(rho_ci[1])}]"
-        return _below_min_n(rep, crit, dec, n, min_n, "FOMC events with IM and HM", body)
+        rep["oos_perm_p_greater"] = p_rho_greater
+        body += (f"; OOS rho 95% interval (Fisher z, Bonett-Wright) [{_f(rho_ci[0])}, {_f(rho_ci[1])}]; opposite one-sided "
+                 f"permutation p (H0 rho <= 0) {_f(p_rho_greater, '.4f')}")
+        rep_ = _below_min_n(rep, crit, dec, n, min_n, "FOMC events with IM and HM", body)
+        rep_["rule5"]["p_opposite_permutation"] = p_rho_greater
+        return rep_
     v, why = _verdict(crit)
     rep["verdict"] = v
     rep["reason"] = f"{body} — {why}"
@@ -899,7 +917,9 @@ def witching_straddle(days: Sequence[str], closes, vix: dict, fomc_days=(), star
     split, witching Fridays skipped (holiday or no Thursday session), and the dividend treatment sensitivity (ignored;
     previous ex-date yield as the forecast; dividend-adjusted closes). The 15:00-16:00 ET version is not run (needs a
     15:00 ET price; hourly SPY bars start on the half hour). Below ``min_n`` witching Fridays house rule 5 applies: never
-    supported, and the three criteria fail decisively only when the difference's 95% CI lies wholly at or below 0."""
+    supported; the difference and CI criteria fail decisively only when the difference's 95% CI lies wholly at or below
+    0, the permutation criterion only when the opposite one-sided permutation p (H0: witching >= other, from the same
+    label draws) is < 0.05."""
     P = friday_panel(days, closes, vix, start=start, end=end, div_yield=div_yield)
     if len(P["days"]) == 0:
         return {"n": 0, "verdict": "inconclusive", "reason": "no Friday with a Thursday SPY close and VIX"}
@@ -975,9 +995,17 @@ def witching_straddle(days: Sequence[str], closes, vix: dict, fomc_days=(), star
             + ", ".join(f"{k} {_f(v_['diff_bps'], '+.1f')} bps" for k, v_ in split_d.items())
             + ("; difference with the dividend " + ", ".join(f"{k} {_f(v_, '+.1f')}" for k, v_ in div_sens.items()) + " bps" if div_sens else ""))
     if rep["n"] < min_n:
-        # rule 5: all three criteria fail decisively when the difference's 95% CI (block 4 weeks) lies wholly at or below 0
+        # rule 5: the difference and the CI criteria fail decisively when the difference's 95% CI (block 4 weeks) lies
+        # wholly at or below 0; the one-sided permutation p < 0.05 criterion is mirrored at its own level by the opposite
+        # one-sided permutation test from the same label draws (H0: witching >= other): p_less < 0.05
         down = _decides(g, block) and _ci_below(g["ci"], 0.0)
-        return _below_min_n(rep, crit, [down, down, down], rep["n"], min_n, "witching Fridays with SPY and VIX", body)
+        p_perm_less = float((np.sum(perm <= g["diff"] + 1e-15) + 1) / (n_perm + 1))
+        rep["permutation_p_less"] = p_perm_less
+        body += f"; opposite one-sided permutation p (H0 witching >= other) {p_perm_less:.4f}"
+        rep_ = _below_min_n(rep, crit, [down, down, _decides(g, block) and p_perm_less < 0.05], rep["n"], min_n,
+                            "witching Fridays with SPY and VIX", body)
+        rep_["rule5"]["p_opposite_permutation"] = p_perm_less
+        return rep_
     v, why = _verdict(crit)
     rep["verdict"] = v
     rep["reason"] = f"{body} — {why}"

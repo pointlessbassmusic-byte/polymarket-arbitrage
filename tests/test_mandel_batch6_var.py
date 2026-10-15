@@ -3,7 +3,7 @@ network). Each core function gets a planted effect that passes and a null that d
 
 import json
 import math
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 import numpy as np
 import pytest
@@ -140,15 +140,17 @@ def test_hedged_straddle_matched_vol_is_fair_and_unmatched_is_not():
     assert y.std() < 0.3 * (r["payoff"] - r["prem"]).std() / r["vega"].mean()   # hedging removes most of the variance
     hi = v.straddle_cycles(_frame(4300, 20.0, 0.30, seed=6), 1.0, side=1, hedge=True)
     assert np.mean(hi["pnl"]) > 0                                        # realised above implied: long gamma earns
-    # dividend forward lowers the call and raises the put: an ex-date inside the life changes the price (a dividend that
-    # went ex on the entry day makes the forecast known)
+    # dividend forward lowers the call and raises the put: a SCHEDULED ex-date inside the life changes the price (a
+    # dividend that went ex on the entry day makes the forecast known)
+    q = int(np.nonzero(fr["sched"])[0][0])                               # first third Friday of Mar/Jun/Sep/Dec
+    k = (q - 1) // 21                                                    # the cycle whose life holds it
     div = np.zeros(len(fr["days"]))
     div[0] = 2.0
-    div[10] = 2.0
+    div[q] = 2.0
     fr2 = v.make_frame(fr["days"], fr["close"], fr["vix"], div=div)
     a = v.straddle_cycles(fr2, 1.0, side=-1, hedge=False, hold=21)
     b = v.straddle_cycles(fr, 1.0, side=-1, hedge=False, hold=21)
-    assert a["prem"][0] != pytest.approx(b["prem"][0]) and a["prem"][1] == pytest.approx(b["prem"][1])
+    assert a["prem"][k] != pytest.approx(b["prem"][k]) and a["prem"][k - 1] == pytest.approx(b["prem"][k - 1])
 
 
 def test_gamma_scalp_planted_and_null():
@@ -258,14 +260,17 @@ def test_straddle_tercile_spy_only_planted_null_and_sensitivity():
     # pre-SPY training cycles never change n or the verdict: they only feed the labelled sensitivity
     fr = _tercile_frame(3000, True, 44)
     base = v.straddle_tercile(fr, n_boot=NB, n_rep=2)
-    sens = v.straddle_tercile(fr, pre_sensitivity=np.random.default_rng(45).normal(3.0, 4.0, 40), n_boot=NB, n_rep=2,
-                              sensitivity_note=" (pre-SPY proxy)")
+    pre = np.random.default_rng(45).normal(3.0, 4.0, 40 * v.HOLD)        # 40 cycles' worth of pre-SPY daily entries
+    sens = v.straddle_tercile(fr, pre_sensitivity=pre, n_boot=NB, n_rep=2, sensitivity_note=" (pre-SPY proxy)")
     assert sens["n"] == base["n"] == base["stat"]["n_spy_cycles"] - v.T101_MIN_TRAIN < 390
     assert sens["verdict"] == base["verdict"] == "inconclusive"
     assert "SPY history before" in base["reason"] and "more years of SPY cycles" in base["reason"]
     s = sens["stat"]["gspc_pre_window_sensitivity"]
-    assert s["n_oos"] == base["stat"]["n_spy_cycles"] and s["n_pre_training_cycles"] == 40
+    assert s["n_oos"] == base["stat"]["n_spy_cycles"] and s["n_pre_training_entries"] == 40 * v.HOLD
     assert "SENSITIVITY, not in the verdict or n (pre-SPY proxy)" in sens["reason"]
+    # rule 10: the pooled estimate is primary and every grid offset is reported
+    assert st["rule10"].startswith("pooled") and len(st["offsets"]) == v.HOLD
+    assert st["offsets_summary"]["n_pass"] >= 15 and "21 non-overlapping grids" in planted["reason"]
 
 
 def test_straddle_tercile_harness_does_not_count_gspc_pre_window():
@@ -287,17 +292,19 @@ def test_straddle_tercile_harness_does_not_count_gspc_pre_window():
 
 def test_div_forecast_zero_before_first_ex_date_prices_on_spot():
     fr = _frame(300, 20.0, 0.20, seed=48)
+    q1, q2 = [int(i) for i in np.nonzero(fr["sched"])[0][:2]]           # the first two scheduled ex-dates
+    k1, k2 = (q1 - 1) // 21, (q2 - 1) // 21
     div = np.zeros(300)
-    div[10] = 2.0                                                        # the first dividend ever, inside cycle 1's life
+    div[q1] = 2.0                                                        # the first dividend ever, inside cycle k1's life
     fr_div = v.make_frame(fr["days"], fr["close"], fr["vix"], div=div)
-    assert fr_div["fc"][9] == 0.0 and fr_div["fc"][10] == 2.0
+    assert fr_div["fc"][q1 - 1] == 0.0 and fr_div["fc"][q1] == 2.0
     a = v.straddle_cycles(fr_div, 1.0, side=-1, hedge=False, hold=21)
     b = v.straddle_cycles(fr, 1.0, side=-1, hedge=False, hold=21)
-    assert a["prem"][0] == pytest.approx(b["prem"][0])                  # not yet paid: priced on the spot, not S - PV(2.0)
-    div[30] = 2.0                                                        # once one is paid, the next life prices it
+    assert a["prem"][k1] == pytest.approx(b["prem"][k1])                # not yet paid: priced on the spot, not S - PV(2.0)
+    div[q2] = 2.0                                                        # once one is paid, the next life prices it
     fr_div2 = v.make_frame(fr["days"], fr["close"], fr["vix"], div=div)
     a2 = v.straddle_cycles(fr_div2, 1.0, side=-1, hedge=False, hold=21)
-    assert a2["prem"][1] != pytest.approx(b["prem"][1])
+    assert a2["prem"][k2] != pytest.approx(b["prem"][k2])
 
 
 # ======================================================================================= 45-DTE short premium ==
@@ -536,3 +543,167 @@ def test_harnesses_run_on_synthetic_archive():
     for name in ("b6_var_short_straddle_tercile", "b6_var_gamma_scalp_long_straddle", "b6_var_theta_ladder",
                  "b6_var_variance_swap_units", "b6_var_variance_strip_win_rate", "b6_var_vix1d_premium"):
         assert v.HARNESSES[name](arc)[2] != "supported", name
+
+
+# ================================================================ rule 10: entry-calendar robustness (regression) ==
+
+def test_lrv_and_cp_ci_match_the_shared_helpers():
+    from mandel.experiments.options_market import _binom_two_sided_ci
+    from mandel.validation.backtest_eval import _hac_var
+    x = np.random.default_rng(60).standard_normal((5, 900)).cumsum(axis=1)
+    for bw in (3, 30, 126):
+        assert np.allclose(v._lrv(x, bw), _hac_var(x, bw), rtol=1e-10)
+    for k, n in ((0, 12), (12, 12), (37, 50), (373, 440)):
+        assert np.allclose(v._cp_ci(k, n), _binom_two_sided_ci(k, n), atol=1e-10)
+
+
+def test_expiry_calendars_and_projected_ex_dates():
+    days = [d for d in _bdays("2008-01-02", 400) if d not in ("2008-03-21", "2008-07-04")]   # Good Friday, July 4
+    me = v.monthly_expiry_idx(days)
+    assert [days[i] for i in me[:4]] == ["2008-01-18", "2008-02-15", "2008-03-20", "2008-04-18"]   # holiday: Thursday
+    wk = [days[i] for i in v.weekly_expiry_idx(days)]
+    assert "2008-03-20" in wk and "2008-07-03" in wk and all(date.fromisoformat(d).weekday() in (3, 4) for d in wk)
+    assert [days[i] for i in np.nonzero(v.quarterly_ex_mask(days))[0][:3]] == ["2008-03-20", "2008-06-20", "2008-09-19"]
+    o = v._ords(days)
+    e, x = v.calendar_entries(days, me, 30, non_overlap=True)
+    assert set((o[x] - o[e]).tolist()) <= {28, 29, 30, 31, 32} and (e[1:] >= x[:-1]).all()   # ~30 DTE, no overlap
+    e45, x45 = v.calendar_entries(days, me, 45)
+    assert (np.abs(o[x45] - o[e45] - 45) <= 2).all()
+    ok = np.ones(len(days), dtype=bool)
+    ok[e[3]] = False                                                     # no VIX close on that entry session: skipped
+    e2, _ = v.calendar_entries(days, me, 30, non_overlap=True, ok=ok)
+    assert e2.size == e.size - 1 and e[3] not in e2
+
+
+def test_dividend_timing_is_projected_not_read_from_the_data():
+    fr = _frame(400, 20.0, 0.20, seed=61)
+    k = next(k for k in range(2, 15) if not fr["sched"][k * 21 + 1:k * 21 + 22].any())   # a life with no scheduled ex-date
+    div = np.zeros(400)
+    div[2] = 1.0
+    div[k * 21 + 5] = 3.0                                                # an off-schedule (special) dividend in that life
+    fr_d = v.make_frame(fr["days"], fr["close"], fr["vix"], div=div)
+    a = v.straddle_cycles(fr_d, 1.0, side=-1, hedge=True, hold=21)
+    b = v.straddle_cycles(fr, 1.0, side=-1, hedge=True, hold=21)
+    assert a["prem"][k] == pytest.approx(b["prem"][k])                  # pricing never anticipates it ...
+    assert a["pnl"][k] != pytest.approx(b["pnl"][k])                    # ... the hedge still receives the cash
+
+
+def test_t540_entries_skip_days_without_vix_but_returns_stay_consecutive():
+    n = 1200
+    days = _bdays("2000-01-03", n)
+    c = _iid_closes(n, 0.01, 67)
+    vix = np.full(n, 16.0)
+    vix[100] = np.nan
+    rep = v.short_variance_units(days, c, vix, n_boot=200)
+    assert rep["stat"]["n_entries"] == n - v.HOLD - 1                    # every session but the one without a VIX close
+    rv = v._fwd_rv(c, [90], v.HOLD)[0]
+    assert rv == pytest.approx(252 / 21 * np.sum(np.log(c[91:112] / c[90:111]) ** 2))   # spans day 100's return
+
+
+def test_phase_planted_effect_does_not_pass_t540():
+    # VIX rich only on offset 0 of the 21-day grid and cheap on the other 20 phases: the offset-0 grid alone (the old
+    # harness) passes; the pooled all-offset estimate, the primary statistic under rule 10, must not
+    n = 8400
+    days = _bdays("1993-02-01", n)
+    c = _iid_closes(n, 0.01, 62)
+    ann = 0.01 * math.sqrt(252) * 100
+    vix = np.where(np.arange(n) % 21 == 0, ann * 1.30, ann * 0.97)
+    rep = v.short_variance_units(days, c, vix, n_boot=NB)
+    off = rep["stat"]["offsets"]
+    assert off[0]["ok"] is True and sum(bool(o["ok"]) for o in off) == 1
+    assert rep["n"] >= 390 and rep["verdict"] != "supported" and rep["stat"]["ci95"][0] < 0
+    assert "1/21 offsets pass" in rep["reason"] and "POOLED over all 21 grid offsets" in rep["reason"]
+
+
+def test_phase_planted_effect_does_not_pass_gamma_scalp():
+    # straddles expensive (0.9 VIX = 1.5 x realised) only on grid offset 0, cheap (0.93 x realised) on the other phases
+    n = 8400
+    days = _bdays("1993-02-01", n)
+    close = _gbm(days, 0.15, 63)
+    vix = np.where(np.arange(n) % 21 == 0, 15.0 / 0.9 * 1.5, 15.0 / 0.9 * 0.93)
+    rep = v.gamma_scalp(v.make_frame(days, close, vix), n_boot=NB, flip_grid=[0.8, 1.0])
+    off = rep["stat"]["offsets_main"]
+    assert off[0]["ok"] is True and sum(bool(o["ok"]) for o in off) == 1
+    assert rep["n"] >= 390 and rep["verdict"] == "not_supported", rep["reason"]
+
+
+def test_phase_scan_pooled_and_offsets():
+    rng = np.random.default_rng(68)
+    idx = np.arange(0, 4200)
+    x = 0.3 + rng.standard_normal(idx.size)
+    ps = v.phase_scan(idx, x, 21, 6, NB)
+    assert ps["pooled"]["n"] == 200 and ps["pooled"]["block_days"] == 126 and ps["pooled"]["ci"][0] > 0
+    assert len(ps["offsets"]) == 21 and all(o["n"] == 200 for o in ps["offsets"])
+    assert v.n_holds([5, 26, 47], 21) == 3 and v.pool_block_len(21) == 126 and v.pool_block_len(31) == 186
+
+
+def test_calendar_aligned_effect_t233():
+    # rule 10(a): an edge on the sessions SPY's monthly calendar enters (about 30 DTE before the third Friday) is found;
+    # the same edge on a 21-day grid phase the calendar does not use is not
+    days = _bdays("1993-02-01", 6900)
+    close = _gbm(days, 0.15, 64)
+    e, _ = v.spy_monthly_cycles(v.make_frame(days, close, np.full(len(days), 20.0)))
+    rich, cheap = 20.0 / 0.81, 12.0 / 0.81
+    cal = np.full(len(days), cheap)
+    cal[e] = rich
+    rep = v.vrp_hedged_short(v.make_frame(days, close, cal), 0.80, n_boot=NB)
+    assert rep["n"] >= 300 and rep["verdict"] == "supported", rep["reason"]
+    assert rep["stat"]["rule10"].startswith("SPY monthly expiry") and 28 <= rep["stat"]["dte_range"][0]
+    grid = np.full(len(days), cheap)
+    grid[np.arange(len(days)) % 21 == 7] = rich
+    assert v.vrp_hedged_short(v.make_frame(days, close, grid), 0.80, n_boot=NB)["verdict"] == "not_supported"
+
+
+def test_calendar_month_aligned_effect_t234():
+    n = 9300
+    days = _bdays("1990-01-02", n)
+    c = _iid_closes(n, 0.01, 65)
+    ann = 0.01 * math.sqrt(252) * 100
+    vix = np.full(n, ann * 0.9)
+    vix[v._month_first(days)] = ann * 1.6
+    rep = v.vix2_win_rate(days, c, vix, n_boot=NB)
+    assert rep["verdict"] == "supported" and rep["stat"]["grid_21d"]["n_offsets_pass"] <= 2
+    vix2 = np.full(n, ann * 0.9)
+    vix2[np.arange(n) % 21 == 10] = ann * 1.6
+    assert v.vix2_win_rate(days, c, vix2, n_boot=NB)["verdict"] == "not_supported"
+
+
+def test_45dte_books_use_the_expiry_calendars():
+    days = _bdays("2000-01-03", 1500)
+    fr = v.make_frame(days, _gbm(days, 0.18, 66), np.full(len(days), 20.0))
+    cal = v.ladder_calendars(fr)
+    o = fr["ords"]
+    for e, x in (cal["single"], cal["ladder"]):
+        assert (np.abs(o[x] - o[e] - 45) <= 2).all()
+        assert all(date.fromisoformat(days[i]).weekday() == 4 for i in x)
+    assert all(15 <= date.fromisoformat(days[i]).day <= 21 for i in cal["single"][1])      # third Fridays
+    assert 4.0 < cal["ladder"][0].size / cal["single"][0].size < 4.6
+    rep = v.theta_harvest(fr, daily=True, n_boot=200)
+    assert rep["stat"]["rule10"].startswith("SPY monthly expiry") and rep["stat"]["dte_range"][0] >= 43
+    assert rep["stat"]["daily_entries"]["n_entries"] > 1000
+    lad = v.theta_ladder(fr, n_boot=200)
+    assert lad["stat"]["rule10"].startswith("SPY weekly-Friday") and lad["stat"]["previous_anchor_sensitivity"]
+
+
+def test_scaled_short_variance_enters_on_calendar_months():
+    n = 9000
+    days = _bdays("1985-01-01", n)
+    c = _iid_closes(n, 0.01, 69)
+    rep = v.scaled_short_variance(days, c, {d: 18.0 + (i % 7) for i, d in enumerate(days) if d >= "1990-01-02"}, n_boot=200)
+    assert rep["stat"]["rule10"].startswith("calendar month")
+    assert len(rep["stat"]["robustness"]["grid_offsets"]) == v.HOLD and "21-day grid offsets" in rep["reason"]
+
+
+def test_truncation_breach_and_overnight_capture_are_flagged():
+    assert v._overnight_capture("2026-10-15T07:10:19+00:00") and v._overnight_capture("2026-10-14T11:12:25+00:00")
+    assert not v._overnight_capture("2026-10-14T21:30:00+00:00") and not v._overnight_capture("2026-10-14T15:00:00+00:00")
+    n = 9300
+    days = _bdays("1990-01-02", n)
+    c = _iid_closes(n, 0.01, 70)
+    tr = [{"quote_day": days[-2], "error": 0.087, "captured_at": "2026-10-15 07:10", "overnight_session": True,
+           "implied_spot_vs_close": -0.0036}, {"quote_day": days[-3], "error": -0.026}]
+    rep = v.vix2_win_rate(days, c, np.full(n, 20.0), n_boot=200, truncation=tr,
+                          atm_scales={"harness_short_straddle ratio": 0.81})
+    assert "+8.7% BREACHES the 5% tolerance" in rep["reason"] and "overnight SPX session" in rep["reason"]
+    assert "-2.6%" in rep["reason"] and "-2.6% BREACHES" not in rep["reason"]
+    assert "ATM-straddle-only VRP control (MODEL-PRICED" in rep["reason"] and rep["stat"]["atm_straddle_control"]

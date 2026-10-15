@@ -6,38 +6,60 @@ Nine options-library claims, each tested against its claim, trial.pass and trial
 
 Model-free (VIX as the variance-swap strike, no option prices):
   * T-540 short 30-day variance struck at VIX^2, settled on the next 21 SPY close-to-close returns (%^2 per month);
-  * T-234 the win rate of VIX^2 over the next 21-day ^GSPC realised variance (> 75% of non-overlapping months);
-  * T-235 a short variance position scaled by max(z, 0), z the z-score of VIX minus a walk-forward HAR(1,5,22) forecast;
+  * T-234 the win rate of VIX^2 over the next 21-day ^GSPC realised variance (> 75% of non-overlapping calendar months);
+  * T-235 a short variance position scaled by max(z, 0), z the z-score of VIX minus a walk-forward HAR(1,5,22) forecast,
+    on calendar-month cycles;
   * T-529 the VIX1D-implied next-day variance, (VIX1D/100)^2/365, against the next ^GSPC squared log return.
 
 MODEL-PRICED (Black-Scholes legs at a stated multiple of VIX/100; every result is labelled MODEL-PRICED):
   * T-101 30-DTE ATM short straddle at 0.90 x VIX: top-minus-bottom tercile of VIX - RV21 (SPY log returns), tercile
-    cut-points from the training window of ``walk_forward_splits`` on SPY cycles only and applied out of sample (min_n in
+    cut-points from the training window of ``walk_forward_splits`` on SPY entries only and applied out of sample (min_n in
     out-of-sample cycles); the CI must exclude 0 whatever the bootstrap seed and block length (``robust_exclusion``);
   * T-123 30-DTE ATM long straddle at 0.90 x VIX, delta-hedged daily at the entry vol, 1 bp per share traded: P&L / vega;
   * T-233 the same straddle sold at 0.81 x VIX (and at the ATM-IV / VIX ratio measured on the captured SPY smile), hedged
-    daily, after a 0.5 vol-point round trip: P&L / premium;
-  * T-156 45-DTE 0.16-delta short strangle at VIX: 21-DTE exit vs hold to expiry, P&L per day in the trade;
-  * T-157 weekly ladder of quarter-size 0.16-delta short puts vs one full-size monthly entry, both managed at 50% of the
-    credit or 21 DTE: ratio of maximum drawdowns.
+    daily, after a 0.5 vol-point round trip, on SPY's monthly expiry calendar: P&L / premium;
+  * T-156 45-DTE 0.16-delta short strangle at VIX on the monthly expiry calendar: 21-DTE exit vs hold to expiry, P&L per
+    day in the trade;
+  * T-157 weekly (Friday-expiry) ladder of quarter-size 0.16-delta short puts vs one full-size monthly-expiry entry, both
+    entered at 45 DTE and managed at 50% of the credit or 21 DTE: ratio of maximum drawdowns.
 
 Conventions (shared):
-  * Cycles. A "30-DTE monthly" cycle is entered at a close and expires 21 trading days later; T is the calendar time between
-    the two closes / 365 (28-32 days, about 30). Cycles do not overlap. 45-DTE positions expire on the last trading day on
-    or before entry + 45 calendar days.
-  * Point in time. Entries use the VIX and SPY closes of the entry day (both known at the close); forward windows start
-    with the next day's return. The 3-month bill (FRED DTB3, a discount yield published the next day) enters as the prior
-    print, converted to a continuous rate r = -ln(1 - d/100 * 91/360) / (91/365).
+  * Entry calendar (house rule 10: no verdict may depend on an arbitrary grid phase).
+    (a) A claim that names a calendar is tested on it. SPY's standard monthly expiry is the third Friday of the month, or
+        the prior session when that Friday is a holiday; a weekly expiry is every Friday, same holiday rule. An option of
+        stated DTE is entered at the session nearest DTE calendar days before its expiry (ties to the earlier session).
+        T-233's 30-DTE monthly cycles never overlap: when that session precedes the previous monthly expiry, the cycle
+        enters at the previous expiry's close (28 DTE). T-156 and T-157's single book enter 45 DTE before each monthly
+        expiry; T-157's ladder enters 45 DTE before every weekly expiry. A claim on months (T-234, T-235) enters at the
+        first session of each calendar month that has a VIX close.
+    (b) A claim on a plain non-overlapping 21-trading-day grid (T-101, T-123, T-540) has 21 equally valid start offsets.
+        The claimed statistic is computed on every offset (block 6 cycles) and on the POOLED overlapping daily entries of
+        all offsets, whose studentized circular block bootstrap uses blocks of 6 holds (126 days, >= 2 x hold). The pooled
+        estimate is the primary statistic of every criterion; the reason reports the per-offset range of the statistic
+        and of its bound and how many offsets pass. n stays in the claim's units: the number of distinct 21-day holds the
+        pooled entries span (equal to the offset-0 grid's cycle count).
+    (c) Daily series and fixed-date statistics (T-529's one-day windows) are unaffected.
+  * Cycles. A 21-trading-day cycle is entered at a close and expires 21 trading days later; T is the calendar time between
+    the two closes / 365 (28-32 days, about 30). Calendar cycles carry their own expiry session. Off-calendar 45-DTE
+    positions (the daily-entry checks) expire on the last trading day on or before entry + 45 calendar days.
+  * Point in time. Entries use the VIX and SPY closes of the entry day (both known at the close; VIX closes at 16:15 ET,
+    SPY at 16:00, a declared 15-minute mismatch; T-123 reports the prior-day VIX sensitivity); forward windows start with
+    the next day's return. Index days without a VIX close stay in the calendar (returns are always between consecutive
+    closes); no entry is taken on them and a daily mark uses the latest VIX close. The 3-month bill (FRED DTB3, a discount
+    yield published the next day) enters as the prior print, converted to a continuous rate
+    r = -ln(1 - d/100 * 91/360) / (91/365).
   * Options settle on RAW closes (close, not adjclose). SPY dividends come from the adjclose/close ratio step: on an ex-day
     i, D = close[i-1] * (1 - f[i-1]/f[i]) with f = adjclose/close. An option whose life spans an ex-date is priced on the
     dividend forward, S - PV(D), with the amount forecast point in time as the last dividend paid at or before the
-    decision (none before the first ex-date; ex-dates follow SPY's quarterly schedule). A hedge that holds shares across an ex-date receives (or, short,
-    pays) the actual dividend in cash. The hedged P&L runs through a cash account that earns the bill rate.
+    decision (none before the first ex-date) and the ex-date PROJECTED from SPY's quarterly schedule (the third Friday of
+    March, June, September and December, prior session on a holiday: 135 of the 136 archived ex-dates), never read from
+    the realised adjclose steps. A hedge that holds shares across an ex-date receives (or, short, pays) the actual
+    dividend in cash on the actual ex-date. The hedged P&L runs through a cash account that earns the bill rate.
   * Realised variance is the sum of squared close-to-close log returns, annualised with 252 / window (no mean removed).
   * Intervals. Studentized (bootstrap-t) circular block bootstraps: the statistic is studentized by a Bartlett long-run
-    s.e. with bandwidth = block (as in backtest_eval.block_bootstrap_pvalue). Differences are bootstrapped PAIRED on a
-    shared timeline. A drawdown ratio (T-157) has no closed-form s.e., so its interval is a percentile block bootstrap of
-    paired daily P&L paths. Blocks cover the overlap of overlapping windows.
+    s.e. with bandwidth = block (as in backtest_eval.block_bootstrap_pvalue; long bandwidths use the identical FFT form).
+    Differences are bootstrapped PAIRED on a shared timeline. A drawdown ratio (T-157) has no closed-form s.e., so its
+    interval is a percentile block bootstrap of paired daily P&L paths. Blocks cover the overlap of overlapping windows.
   * min_n is counted in the claim's own units (cycles, months, entries, days). Below min_n a claim cannot be supported,
     and a failing criterion counts only when it fails decisively (its interval wholly on the wrong side); otherwise the
     criterion is reported as not decisive and the verdict is inconclusive.
@@ -51,12 +73,11 @@ from __future__ import annotations
 import math
 import re
 from bisect import bisect_left
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Sequence
 
 import numpy as np
 
-from mandel.experiments.options_market import _binom_two_sided_ci
 from mandel.experiments.overfit import pbo_cscv
 from mandel.experiments.structures import Smile
 from mandel.experiments.underlying2 import _verdict
@@ -71,6 +92,7 @@ SPY_B = "daily-history-SPY"
 GSPC_B = "daily-history--GSPC"
 VIX_B = "cboe-VIX-history"
 VIX1D_B = "cboe-VIX1D-history"
+HOURLY_SPY_B = "hourly-SPY"
 DTB3_B = "fred-DTB3"
 SMILE_P = "spy-smile-"
 SPX_CHAIN_P = "options-chain-SPX-"
@@ -81,6 +103,23 @@ TRADED_NOTE = "the traded version needs SPY chain history (2 capture days archiv
 
 
 # =================================================================================================== statistics ==
+
+def _lrv(x, bw: int) -> np.ndarray:
+    """Row-wise Bartlett long-run variance, identical to backtest_eval._hac_var (bandwidth ``bw``). Long bandwidths (the
+    pooled overlapping series use 126 days) take the autocovariances from an FFT, the same sums at O(n log n)."""
+    x = np.atleast_2d(np.asarray(x, dtype=float))
+    bw = max(1, int(bw))
+    if bw <= 24:
+        return _hac_var(x, bw)
+    n = x.shape[1]
+    xc = x - x.mean(axis=1, keepdims=True)
+    m = 1 << int(math.ceil(math.log2(2 * n)))
+    f = np.fft.rfft(xc, m, axis=1)
+    ac = np.fft.irfft(f * np.conj(f), m, axis=1)[:, :min(bw, n)]
+    k = np.arange(ac.shape[1])
+    w = np.where(k == 0, 1.0, 2.0 * (1.0 - k / bw))
+    return np.maximum((ac * w).sum(axis=1) / n, 1e-300)
+
 
 def _boot_idx(rng, n: int, block: int, k: int) -> np.ndarray:
     nb = math.ceil(n / block)
@@ -105,7 +144,7 @@ def stud_ci(x, block: int, level: float = 0.95, n_boot: int = 2000, seed: int = 
         return None, None
     block = max(1, min(int(block), n // 4))
     m = float(x.mean())
-    v0 = float(_hac_var(x[None, :], block)[0])
+    v0 = float(_lrv(x[None, :], block)[0])
     if v0 <= 1e-30:
         return m, m
     se = math.sqrt(v0 / n)
@@ -113,7 +152,7 @@ def stud_ci(x, block: int, level: float = 0.95, n_boot: int = 2000, seed: int = 
     ts = []
     for k in _chunks(n_boot, n):
         xb = x[_boot_idx(rng, n, block, k)]
-        ts.append((xb.mean(axis=1) - m) / np.sqrt(_hac_var(xb, block) / n))
+        ts.append((xb.mean(axis=1) - m) / np.sqrt(_lrv(xb, block) / n))
     t = np.concatenate(ts)
     a = (1.0 - level) / 2.0
     return m - float(np.quantile(t, 1.0 - a)) * se, m - float(np.quantile(t, a)) * se
@@ -154,7 +193,7 @@ def stud_ci_group_diff(x, top, bot, block: int, level: float = 0.95, n_boot: int
         mt = (xb * tb).sum(axis=1) / nt
         mb = (xb * bb).sum(axis=1) / nbb
         psi = n * (tb * (xb - mt[:, None]) / nt[:, None] - bb * (xb - mb[:, None]) / nbb[:, None])
-        return mt - mb, np.sqrt(_hac_var(psi, block) / n), ok, mt, mb
+        return mt - mb, np.sqrt(_lrv(psi, block) / n), ok, mt, mb
 
     d0, se0, _, mt0, mb0 = stat(x[None, :], top[None, :], bot[None, :])
     d0, se0 = float(d0[0]), float(se0[0])
@@ -366,6 +405,202 @@ def _out(stat: dict, n: int, verdict: str, reason: str):
     return _clean(stat), int(n), verdict, reason
 
 
+# ============================================================== rule 10: entry calendars and grid phases ==
+
+POOL_HOLDS = 6               # pooled overlapping series: block = 6 holds (126 days >= 2 x hold), the span of a 6-cycle block
+
+
+def pool_block_len(hold: int = HOLD) -> int:
+    """Block length (days) of the pooled overlapping daily-entry bootstrap: max(2 x hold, 6 x hold)."""
+    return max(2 * int(hold), POOL_HOLDS * int(hold))
+
+
+def n_holds(idx, hold: int = HOLD) -> int:
+    """Distinct ``hold``-day holds spanned by sorted entry indices: the cycle count of the densest non-overlapping grid."""
+    idx = np.asarray(idx, dtype=np.int64)
+    return 0 if idx.size == 0 else int((idx[-1] - idx[0]) // hold + 1)
+
+
+def phase_summary(rows: list, side: int = 1, key: str = "mean") -> dict:
+    """min/max of the per-offset statistic and of its bounds, and how many offsets pass (row["ok"] True)."""
+    good = [r for r in rows if r.get(key) is not None and r.get("ci", (None, None))[0] is not None]
+    out = {"n_offsets": len(rows), "n_pass": int(sum(1 for r in rows if r.get("ok"))),
+           "n_min": min((r["n"] for r in rows), default=0), "n_max": max((r["n"] for r in rows), default=0)}
+    if not good:
+        return out | {k: None for k in ("stat_min", "stat_max", "lower_min", "lower_max", "upper_min", "upper_max",
+                                         "bound_min", "bound_max")}
+    lows, ups = [r["ci"][0] for r in good], [r["ci"][1] for r in good]
+    b = lows if side > 0 else ups
+    return out | {"stat_min": min(r[key] for r in good), "stat_max": max(r[key] for r in good),
+                  "lower_min": min(lows), "lower_max": max(lows), "upper_min": min(ups), "upper_max": max(ups),
+                  "bound_min": min(b), "bound_max": max(b)}
+
+
+def phase_scan(idx, x, hold: int = HOLD, block: int = 6, n_boot: int = 2000, seed: int = 0, side: int = 1,
+               level: float = 0.95, pool_n_boot: Optional[int] = None) -> dict:
+    """Rule 10(b) for a mean. ``idx``: sorted entry sessions (every valid daily entry); ``x``: the claimed per-entry
+    statistic. Offset k is the non-overlapping grid idx % hold == k (studentized CI, block ``block`` cycles); the pooled
+    estimate uses every entry (studentized circular block bootstrap, block ``pool_block_len(hold)`` days) and is the
+    primary statistic. side +1: a pass is lower bound > 0; side -1: upper bound < 0."""
+    idx = np.asarray(idx, dtype=np.int64)
+    x = np.asarray(x, dtype=float)
+    rows = []
+    for k in range(hold):
+        sel = idx % hold == k
+        xk = x[sel]
+        lo, hi = stud_ci(xk, block, level, n_boot, seed)
+        ok = None if lo is None else (bool(lo > 0) if side > 0 else bool(hi < 0))
+        rows.append({"offset": k, "n": int(sel.sum()), "mean": float(xk.mean()) if xk.size else None, "ci": [lo, hi],
+                     "ok": ok})
+    pb = pool_block_len(hold)
+    lo, hi = stud_ci(x, pb, level, pool_n_boot or n_boot, seed)
+    pooled = {"n_entries": int(x.size), "n": n_holds(idx, hold), "mean": float(x.mean()) if x.size else None,
+              "ci": [lo, hi], "block_days": pb}
+    return {"pooled": pooled, "offsets": rows, "summary": phase_summary(rows, side), "block_cycles": int(block),
+            "hold": int(hold)}
+
+
+def _scaled_summary(summary: dict, scale: float) -> dict:
+    """A ``phase_summary`` with its statistic and bound fields multiplied by ``scale`` (counts unchanged)."""
+    return {k: (v * scale if v is not None and not k.startswith("n_") else v) for k, v in summary.items()}
+
+
+def _phase_txt(ps: dict, side: int = 1, nd: int = 2, scale: float = 1.0, what: str = "mean") -> str:
+    """'per offset (...): mean a to b, lower bound c to d, k/21 offsets pass' for a ``phase_scan`` result."""
+    s = ps["summary"]
+    if s.get("stat_min") is None:
+        return "per-offset grids not available"
+    b = "lower" if side > 0 else "upper"
+    return (f"per grid offset ({s['n_offsets']} non-overlapping grids, n {s['n_min']}-{s['n_max']}, block "
+            f"{ps['block_cycles']} cycles): {what} {s['stat_min'] * scale:+.{nd}f} to {s['stat_max'] * scale:+.{nd}f}, "
+            f"{b} bound {s['bound_min'] * scale:+.{nd}f} to {s['bound_max'] * scale:+.{nd}f}, {s['n_pass']}/{s['n_offsets']} "
+            f"offsets pass")
+
+
+def _pool_txt(ps: dict, nd: int = 2, scale: float = 1.0, unit: str = "") -> str:
+    p = ps["pooled"]
+    return (f"POOLED over all {ps['hold']} grid offsets ({p['n_entries']} overlapping daily entries = {p['n']} distinct "
+            f"{ps['hold']}-day holds; studentized circular block bootstrap, block {p['block_days']} days): mean "
+            f"{_s(p['mean'] and p['mean'] * scale, nd)}{unit} ({_ci_s(p['ci'], nd, scale)})")
+
+
+def _ords(days) -> np.ndarray:
+    return np.array([date.fromisoformat(d).toordinal() for d in days], dtype=np.int64)
+
+
+def _third_friday(y: int, m: int) -> date:
+    d = date(y, m, 1)
+    d += timedelta(days=(4 - d.weekday()) % 7)
+    return d + timedelta(days=14)
+
+
+def _scheduled_sessions(days, targets) -> np.ndarray:
+    """Session index of each scheduled date: the date itself, or the prior session when it is a holiday (dates outside the
+    data, or with no session in the 4 days before, are skipped)."""
+    if not len(days):
+        return np.zeros(0, dtype=np.int64)
+    o = _ords(days)
+    out = set()
+    for t in targets:
+        to = t.toordinal()
+        if to < o[0] or to > o[-1]:
+            continue
+        j = int(np.searchsorted(o, to, side="right") - 1)
+        if j >= 0 and to - o[j] <= 4:
+            out.add(j)
+    return np.array(sorted(out), dtype=np.int64)
+
+
+def monthly_expiry_idx(days) -> np.ndarray:
+    """SPY's standard monthly expiries: the third Friday of each month, or the prior session on a holiday."""
+    if not len(days):
+        return np.zeros(0, dtype=np.int64)
+    y0, y1 = int(days[0][:4]), int(days[-1][:4])
+    return _scheduled_sessions(days, [_third_friday(y, m) for y in range(y0, y1 + 1) for m in range(1, 13)])
+
+
+def weekly_expiry_idx(days) -> np.ndarray:
+    """Weekly expiries: every Friday, or the prior session on a holiday."""
+    if not len(days):
+        return np.zeros(0, dtype=np.int64)
+    d0, d1 = date.fromisoformat(days[0]), date.fromisoformat(days[-1])
+    f, fr = d0 + timedelta(days=(4 - d0.weekday()) % 7), []
+    while f <= d1:
+        fr.append(f)
+        f += timedelta(days=7)
+    return _scheduled_sessions(days, fr)
+
+
+def quarterly_ex_mask(days) -> np.ndarray:
+    """SPY's quarterly ex-dividend schedule: the third Friday of Mar/Jun/Sep/Dec, or the prior session on a holiday."""
+    m = np.zeros(len(days), dtype=bool)
+    if len(days):
+        y0, y1 = int(days[0][:4]), int(days[-1][:4])
+        m[_scheduled_sessions(days, [_third_friday(y, q) for y in range(y0, y1 + 1) for q in (3, 6, 9, 12)])] = True
+    return m
+
+
+def calendar_entries(days, expiries, dte: int, non_overlap: bool = False, ok=None) -> tuple:
+    """(entries, expiries) for options of ``dte`` calendar days on an expiry calendar: each entry is the session nearest
+    expiry - dte (ties to the earlier, longer-dated session); an expiry whose entry date lies more than 4 days from any
+    session (before the data) is skipped. ``non_overlap``: an entry before the previous expiry moves to that expiry's
+    close. ``ok`` (bool per session): an entry on a session without it (no VIX close) is skipped."""
+    o = _ords(days)
+    ent, exp, prev = [], [], None
+    for e in np.asarray(expiries, dtype=np.int64):
+        t = o[e] - dte
+        j = int(np.searchsorted(o, t))
+        cands = [k for k in (j - 1, j) if 0 <= k < o.size]
+        k = min(cands, key=lambda c: (abs(int(o[c]) - t), o[c])) if cands else None
+        if k is not None and abs(int(o[k]) - t) <= 4:
+            if non_overlap and prev is not None and k < prev:
+                k = int(prev)
+            if k < e and (ok is None or bool(ok[k])):
+                ent.append(k)
+                exp.append(int(e))
+        prev = int(e)
+    return np.array(ent, dtype=np.int64), np.array(exp, dtype=np.int64)
+
+
+def _month_first(days, ok=None, start: str = "") -> np.ndarray:
+    """First session of each calendar month (on or after ``start``) where ``ok`` holds (a VIX close)."""
+    out, seen = [], set()
+    for i, d in enumerate(days):
+        if d < start or d[:7] in seen or (ok is not None and not ok[i]):
+            continue
+        seen.add(d[:7])
+        out.append(i)
+    return np.array(out, dtype=np.int64)
+
+
+def _month_last(days, ok=None, start: str = "") -> np.ndarray:
+    """Last session of each calendar month (on or after ``start``) where ``ok`` holds."""
+    by = {}
+    for i, d in enumerate(days):
+        if d >= start and (ok is None or ok[i]):
+            by[d[:7]] = i
+    return np.array(sorted(by.values()), dtype=np.int64)
+
+
+def _fwd_rv(closes, idx, hold: int = HOLD) -> np.ndarray:
+    """Annualised realised variance of the ``hold`` close-to-close log returns after each entry (returns a+1..a+hold);
+    NaN when a close in the window is missing or the window runs past the data."""
+    c = np.asarray(closes, dtype=float)
+    lr2 = np.full(c.size, np.nan)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        lr2[1:] = np.log(c[1:] / c[:-1]) ** 2
+    cs = np.concatenate([[0.0], np.cumsum(np.nan_to_num(lr2, nan=0.0))])
+    bad = np.concatenate([[0], np.cumsum(~np.isfinite(lr2))])
+    idx = np.asarray(idx, dtype=np.int64)
+    out = np.full(idx.size, np.nan)
+    ok = idx + hold < c.size
+    a = idx[ok]
+    s = cs[a + hold + 1] - cs[a + 1]
+    nb = bad[a + hold + 1] - bad[a + 1]
+    out[ok] = np.where(nb == 0, PPY / hold * s, np.nan)
+    return out
+
+
 # ============================================================================================ archive plumbing ==
 
 def _has(archive, name: str) -> bool:
@@ -487,34 +722,42 @@ def div_forecast(div) -> np.ndarray:
     return out
 
 
-def make_frame(days, close, vix, rate=None, div=None, adj=None) -> dict:
+def _ffill(v) -> tuple:
+    """(forward-filled values, mask of real prints); leading gaps take the first print."""
+    v = np.asarray(v, dtype=float)
+    has = np.isfinite(v) & (v > 0)
+    if not has.any():
+        return v.copy(), has
+    i = np.where(has, np.arange(v.size), -1)
+    i = np.maximum.accumulate(i)
+    i = np.where(i < 0, int(np.argmax(has)), i)
+    return v[i], has
+
+
+def make_frame(days, close, vix, rate=None, div=None, adj=None, sched=None) -> dict:
     """Aligned daily arrays for the option engines: ISO days, ordinal dates, raw close, adjclose, cash dividend by
-    ex-day, its point-in-time forecast, VIX close (vol points) and the continuous bill rate known at each close."""
+    ex-day, its point-in-time forecast, the projected ex-dividend schedule (``quarterly_ex_mask`` unless given), VIX close
+    (vol points; a missing print - NaN - is marked by ``has_vix`` False and carries the latest print for marking) and the
+    continuous bill rate known at each close."""
     days = list(days)
     close = np.asarray(close, dtype=float)
     div = np.zeros(close.size) if div is None else np.asarray(div, dtype=float)
-    return {"days": days, "ords": np.array([date.fromisoformat(d).toordinal() for d in days], dtype=np.int64),
-            "close": close, "adj": close.copy() if adj is None else np.asarray(adj, dtype=float),
-            "div": div, "fc": div_forecast(div), "vix": np.asarray(vix, dtype=float),
+    vff, has = _ffill(vix)
+    return {"days": days, "ords": _ords(days), "close": close,
+            "adj": close.copy() if adj is None else np.asarray(adj, dtype=float),
+            "div": div, "fc": div_forecast(div), "vix": vff, "has_vix": has,
+            "sched": quarterly_ex_mask(days) if sched is None else np.asarray(sched, dtype=bool),
             "rate": np.zeros(close.size) if rate is None else np.asarray(rate, dtype=float)}
 
 
 def _spy_frame(archive) -> dict:
-    """SPY raw closes on SPY days that have a VIX close, with dividends, VIX and the prior-print bill rate."""
+    """Every SPY session (raw close, adjclose, dividends) with the VIX close (NaN where VIX has none: no entry there) and
+    the prior-print bill rate."""
     days, close, adj = _daily(archive, SPY_B)
     vix = _index(archive, VIX_B)
     dtb3 = _series(archive, DTB3_B)
-    div_full = dividends(close, adj)
-    keep = np.array([d in vix for d in days], dtype=bool)
-    div = np.zeros(len(days))
-    carry = 0.0
-    for i in range(len(days)):                      # a dividend on a dropped day is paid on the next kept day
-        carry += div_full[i]
-        if keep[i]:
-            div[i], carry = carry, 0.0
-    sel = np.nonzero(keep)[0]
-    d2 = [days[i] for i in sel]
-    return make_frame(d2, close[sel], [vix[d] for d in d2], rate=bill_rates(d2, dtb3), div=div[sel], adj=adj[sel])
+    return make_frame(days, close, [vix.get(d, np.nan) for d in days], rate=bill_rates(days, dtb3),
+                      div=dividends(close, adj), adj=adj)
 
 
 def _pv_divs(ex, fc, tt, r) -> np.ndarray:
@@ -534,61 +777,90 @@ def _pv_divs(ex, fc, tt, r) -> np.ndarray:
 # ============================================================================================ straddle engine ==
 
 def straddle_cycles(fr: dict, scale: float, side: int = -1, hold: int = HOLD, first: int = 0, hedge: bool = True,
-                    hedge_every: int = 1, cost_bps: float = 0.0, vol_cost: float = 0.0, div_pricing: bool = True) -> dict:
-    """Non-overlapping ATM straddle cycles: entered at the close of day a (strike = that close), priced by Black-Scholes at
-    sigma = scale * VIX_a / 100 on the dividend forward, expiring at the close of a + hold (raw close). ``side`` +1 long,
-    -1 short. With ``hedge`` the straddle delta (at the entry vol) is hedged at each close (every ``hedge_every`` days),
-    1 share = 1 unit; ``cost_bps`` is charged on the value of every share traded (opening, rebalancing and unwinding);
-    ``vol_cost`` (vol, e.g. 0.005) is charged once as entry vega x vol_cost. P&L is the final value of a self-financing
-    cash account (premium, hedge trades, dividends on hedge shares, interest at the entry bill rate) plus the payoff."""
+                    hedge_every: int = 1, cost_bps: float = 0.0, vol_cost: float = 0.0, div_pricing: bool = True,
+                    starts=None, ends=None, vix_lag: int = 0) -> dict:
+    """ATM straddle cycles: entered at the close of session a (strike = that close), priced by Black-Scholes at
+    sigma = scale * VIX / 100 on the dividend forward, expiring at the close of session e (raw close). Cycles are the
+    non-overlapping grid a = first, first + hold, ... (e = a + hold) unless ``starts`` (and optionally ``ends``, for
+    calendar cycles of varying length) are given; an entry without a VIX close (``has_vix``) is dropped. ``vix_lag`` = 1
+    prices on the prior session's VIX close (a timing sensitivity). ``side`` +1 long, -1 short. With ``hedge`` the
+    straddle delta (at the entry vol) is hedged at each close (every ``hedge_every`` days), 1 share = 1 unit;
+    ``cost_bps`` is charged on the value of every share traded (opening, rebalancing and unwinding); ``vol_cost`` (vol,
+    e.g. 0.005) is charged once as entry vega x vol_cost. P&L is the final value of a self-financing cash account
+    (premium, hedge trades, dividends on hedge shares, interest at the entry bill rate) plus the payoff. Pricing projects
+    ex-dates from ``fr["sched"]``; the hedge receives the actual dividend on the actual ex-date. ``rv``: total-return
+    realised variance (what the hedge earns on); ``rv_px``: price-return (raw close) realised variance; ``var_term``: the
+    gamma P&L 0.5 Gamma Sx^2 ((dSx/Sx)^2 - sigma^2 dt) on the dividend forward Sx, summed to expiry."""
     n = len(fr["days"])
-    starts = np.arange(first, n - hold, hold)
-    keys = ("start", "pnl", "prem", "vega", "spot", "sig", "payoff", "rv", "var_term", "traded")
+    has = fr.get("has_vix", np.ones(n, dtype=bool))
+    starts = np.arange(first, n - hold, hold) if starts is None else np.asarray(starts, dtype=np.int64)
+    ends = starts + hold if ends is None else np.asarray(ends, dtype=np.int64)
+    ok = (starts - vix_lag >= 0) & (ends < n) & (ends > starts)
+    ok[ok] &= has[starts[ok] - vix_lag]
+    starts, ends = starts[ok], ends[ok]
+    keys = ("start", "end", "len", "pnl", "prem", "vega", "spot", "sig", "payoff", "rv", "rv_px", "var_term", "traded")
     if starts.size == 0:
         return {k: np.zeros(0) for k in keys} | {"day": []}
-    I = starts[:, None] + np.arange(hold + 1)[None, :]
+    m = starts.size
+    L = ends - starts
+    W = int(L.max())
+    col = np.arange(W + 1)[None, :]
+    live = col <= L[:, None]
+    I = np.minimum(starts[:, None] + col, n - 1)
     S = fr["close"][I]
     tt = fr["ords"][I].astype(float)
-    T = (tt[:, -1:] - tt) / 365.0
+    T = np.maximum(fr["ords"][ends].astype(float)[:, None] - tt, 0.0) / 365.0
     r = fr["rate"][starts]
-    sig = np.maximum(scale * fr["vix"][starts] / 100.0, 0.01)
+    sig = np.maximum(scale * fr["vix"][starts - vix_lag] / 100.0, 0.01)
     K = S[:, 0].copy()
-    D = fr["div"][I].copy()
+    D = np.where(live, fr["div"][I], 0.0)
     D[:, 0] = 0.0
-    pvd = _pv_divs(D > 0, fr["fc"][starts], tt, r) if div_pricing else np.zeros_like(S)
+    sched = fr.get("sched", fr["div"] > 0)
+    ex = live & sched[I]
+    ex[:, 0] = False
+    pvd = _pv_divs(ex, fr["fc"][starts], tt, r) if div_pricing else np.zeros_like(S)
     Sx = S - pvd
     prem = bs.price(Sx[:, 0], K, T[:, 0], r, sig, "call") + bs.price(Sx[:, 0], K, T[:, 0], r, sig, "put")
     vega = 2.0 * bs.greeks(Sx[:, 0], K, T[:, 0], r, sig, "call")["vega"]
-    payoff = np.abs(S[:, -1] - K)
-    g = bs.greeks(Sx[:, :hold], K[:, None], T[:, :hold], r[:, None], sig[:, None], "call")
-    gam = 2.0 * g["gamma"]
+    rows = np.arange(m)
+    payoff = np.abs(S[rows, L] - K)
+    on = col[:, :W] < L[:, None]                                       # sessions with time left (hedged)
+    g = bs.greeks(Sx[:, :W], K[:, None], np.where(on, T[:, :W], 1.0), r[:, None], sig[:, None], "call")
+    gam = np.where(on, 2.0 * g["gamma"], 0.0)
     if hedge:
-        delta = 2.0 * g["delta"] - 1.0                                  # call + put delta, q = 0 on the dividend forward
+        delta = np.where(on, 2.0 * g["delta"] - 1.0, 0.0)              # call + put delta, q = 0 on the dividend forward
         if hedge_every > 1:
-            delta = delta[:, (np.arange(hold) // hedge_every) * hedge_every]
+            delta = delta[:, (np.arange(W) // hedge_every) * hedge_every]
         h = -side * delta
     else:
-        h = np.zeros((starts.size, hold))
+        h = np.zeros((m, W))
     c = cost_bps / 1e4
     cash = -side * prem - h[:, 0] * S[:, 0] - c * np.abs(h[:, 0]) * S[:, 0]
     traded = np.abs(h[:, 0]).copy()
-    for j in range(hold):
+    for j in range(W):
+        act = j < L
         dt = (tt[:, j + 1] - tt[:, j]) / 365.0
-        cash = cash * np.exp(r * dt) + h[:, j] * D[:, j + 1]
-        if j + 1 < hold:
+        cash = np.where(act, cash * np.exp(r * dt) + h[:, j] * D[:, j + 1], cash)
+        if j + 1 < W:
+            mid = (j + 1) < L
             dh = h[:, j + 1] - h[:, j]
-            cash = cash - dh * S[:, j + 1] - c * np.abs(dh) * S[:, j + 1]
-            traded += np.abs(dh)
-        else:
-            cash = cash + h[:, j] * S[:, j + 1] - c * np.abs(h[:, j]) * S[:, j + 1]
-            traded += np.abs(h[:, j])
+            cash = np.where(mid, cash - dh * S[:, j + 1] - c * np.abs(dh) * S[:, j + 1], cash)
+            traded = traded + np.where(mid, np.abs(dh), 0.0)
+        fin = (j + 1) == L
+        cash = np.where(fin, cash + h[:, j] * S[:, j + 1] - c * np.abs(h[:, j]) * S[:, j + 1], cash)
+        traded = traded + np.where(fin, np.abs(h[:, j]), 0.0)
     pnl = cash + side * payoff - vol_cost * vega
-    gross = (S[:, 1:] + D[:, 1:]) / S[:, :-1]
-    rv = (PPY / hold) * np.sum(np.log(gross) ** 2, axis=1)
+    ret_on = col[:, 1:] <= L[:, None]                                  # returns 1..L
+    lg = np.where(ret_on, np.log((S[:, 1:] + D[:, 1:]) / S[:, :-1]), 0.0)
+    lp = np.where(ret_on, np.log(S[:, 1:] / S[:, :-1]), 0.0)
+    rv = PPY / L * np.sum(lg ** 2, axis=1)
+    rv_px = PPY / L * np.sum(lp ** 2, axis=1)
     dtm = (tt[:, 1:] - tt[:, :-1]) / 365.0
-    var_term = side * np.sum(0.5 * gam * S[:, :hold] ** 2 * ((gross - 1.0) ** 2 - sig[:, None] ** 2 * dtm), axis=1)
-    return {"start": starts, "day": [fr["days"][a] for a in starts], "pnl": pnl, "prem": prem, "vega": vega, "spot": K,
-            "sig": sig, "payoff": payoff, "rv": rv, "var_term": var_term, "traded": traded}
+    rx = Sx[:, 1:] / Sx[:, :-1] - 1.0
+    var_term = side * np.sum(np.where(on, 0.5 * gam * Sx[:, :W] ** 2 * (rx ** 2 - sig[:, None] ** 2 * dtm), 0.0), axis=1)
+    return {"start": starts, "end": ends, "len": L, "day": [fr["days"][a] for a in starts], "pnl": pnl, "prem": prem,
+            "vega": vega, "spot": K, "sig": sig, "payoff": payoff, "rv": rv, "rv_px": rv_px, "var_term": var_term,
+            "traded": traded}
 
 
 def trailing_rv_vol(logret_end: np.ndarray, idx, window: int = HOLD) -> np.ndarray:
@@ -611,15 +883,16 @@ def _logret_end(c) -> np.ndarray:
 # ================================================================================ T-101 tercile short straddle ==
 
 def tercile_oos(signal, x_by_scale: dict, n_pre: int, n_splits: int = 5, block: int = 6, n_boot: int = 2000, seed: int = 0,
-                min_train_fallback: int = 60) -> dict:
-    """Walk-forward tercile test. ``signal`` lists every cycle in time order: ``n_pre`` training-only cycles first (no
-    P&L), then the P&L cycles that ``x_by_scale[s]`` covers. Splits come from ``walk_forward_splits`` with min_train =
-    n_pre (or ``min_train_fallback`` P&L cycles when n_pre < 24); in each split the 1/3 and 2/3 quantiles of the training
-    window's signal label the test window (top: above the 2/3 cut; bottom: at or below the 1/3 cut). The pooled out-of-
-    sample top-minus-bottom difference of mean x gets a studentized block-bootstrap CI per scale."""
+                min_train_fallback: int = 60, min_pre: int = 24) -> dict:
+    """Walk-forward tercile test. ``signal`` lists every entry in time order: ``n_pre`` training-only entries first (no
+    P&L), then the P&L entries that ``x_by_scale[s]`` covers. Splits come from ``walk_forward_splits`` with min_train =
+    n_pre (or ``min_train_fallback`` P&L entries when n_pre < ``min_pre``); in each split the 1/3 and 2/3 quantiles of the
+    training window's signal label the test window (top: above the 2/3 cut; bottom: at or below the 1/3 cut). The pooled
+    out-of-sample top-minus-bottom difference of mean x gets a studentized block-bootstrap CI per scale. Entries may be
+    cycles (block in cycles) or overlapping daily entries (block in days, thresholds in days)."""
     signal = np.asarray(signal, dtype=float)
     n_all = signal.size
-    min_train = n_pre if n_pre >= 24 else max(n_pre, min_train_fallback)
+    min_train = n_pre if n_pre >= min_pre else max(n_pre, min_train_fallback)
     label = np.full(n_all, -1)
     cuts = []
     for tr, te in walk_forward_splits(n_all, n_splits, min_train):
@@ -641,125 +914,180 @@ def tercile_oos(signal, x_by_scale: dict, n_pre: int, n_splits: int = 5, block: 
 T101_MIN_TRAIN = 60          # SPY cycles in the first walk-forward training window (5 years of monthly cycles)
 
 
+def _t101_offsets(sig, x: dict, ent, scales, main, hold, n_splits, block, n_boot, seed, min_train) -> list:
+    """T-101 on each non-overlapping grid offset (entries ent % hold == k): walk-forward terciles in cycles, studentized
+    block-``block`` CI of the s = main difference; a pass is lower bound > 0 with the same sign at the other scales."""
+    rows = []
+    for k in range(hold):
+        sel = np.asarray(ent) % hold == k
+        try:
+            tk = tercile_oos(sig[sel], {s: x[s][sel] for s in scales}, 0, n_splits, block, n_boot, seed,
+                             min_train_fallback=min_train)
+        except ValueError:
+            rows.append({"offset": k, "n": 0, "diff": None, "ci": [None, None], "ok": None})
+            continue
+        ms = tk["by_scale"][main]
+        same = all(tk["by_scale"][s]["diff"] is not None and tk["by_scale"][s]["diff"] > 0 for s in scales if s != main)
+        ok = None if ms["ci"][0] is None else bool(ms["ci"][0] > 0 and same)
+        ts = x[main][sel][tk["oos_index"]][tk["top"]]
+        rows.append({"offset": k, "n": tk["n_oos"], "diff": ms["diff"], "ci": ms["ci"], "ok": ok,
+                     "diff_by_scale": {str(s): tk["by_scale"][s]["diff"] for s in scales},
+                     "dsr_top_tercile_n_trials_3": float(deflated_sharpe_ratio(ts, 3)) if ts.size > 3 else None})
+    return rows
+
+
 def straddle_tercile(fr: dict, pre_sensitivity=None, scales=(0.81, 0.90, 1.00), main: float = 0.90, n_splits: int = 5,
-                     block: int = 6, n_boot: int = 20000, n_rep: int = 10, seed: int = 0, alt_blocks=(1, 3, 12),
+                     block: int = 6, n_boot: int = 5000, n_rep: int = 10, seed: int = 0, alt_blocks=(2, 3, 12),
                      haircut: float = 0.05, min_n: int = 390, min_train: int = T101_MIN_TRAIN,
-                     sensitivity_note: str = "") -> dict:
+                     sensitivity_note: str = "", offset_n_boot: int = 1000, hold: int = HOLD) -> dict:
     """T-101: short 30-DTE ATM SPY straddles at BS(s * VIX/100); mean P&L / premium, top minus bottom tercile of VIX - RV21
-    (RV21 from SPY log returns) at entry, cut-points from walk-forward training windows of SPY cycles only, applied out of
-    sample. Pass: CI excludes 0 at s = 0.90 (on the claimed side, top higher) and the same sign at s = 0.81 and 1.00;
-    min_n 390 counted in out-of-sample SPY cycles (the sample the pass statistic is computed on).
+    (RV21 from SPY log returns) at entry, cut-points from walk-forward training windows of SPY entries only, applied out
+    of sample. Pass: CI excludes 0 at s = 0.90 (on the claimed side, top higher) and the same sign at s = 0.81 and 1.00;
+    min_n 390 counted in out-of-sample SPY cycles (distinct 21-day holds).
 
-    The s = 0.90 interval is the declared studentized block bootstrap (block ``block``) averaged over ``n_rep`` replicates
-    of ``n_boot`` draws, with its Monte Carlo s.e. ``robust_exclusion`` passes it only when its lower bound clears 0 by 2
-    Monte Carlo s.e. and the percentile interval and the studentized intervals at ``alt_blocks`` and round(n^(1/3)) clear
-    0 too (the claim fixes no block length): neither the seed nor the block choice decides the verdict.
+    Rule 10(b): the claim names no entry calendar, so the primary statistic pools all 21 grid offsets: every SPY session
+    with a VIX close and a trailing RV21 is an entry (overlapping), the walk-forward runs on that daily sequence (first
+    training window = ``min_train`` cycles x 21 sessions) and the s = 0.90 interval is the studentized circular block
+    bootstrap with blocks of ``block`` holds (126 days), averaged over ``n_rep`` replicates of ``n_boot`` draws with its
+    Monte Carlo s.e. ``robust_exclusion`` passes it only when its lower bound clears 0 by 2 Monte Carlo s.e. and the
+    percentile interval and the studentized intervals at ``alt_blocks`` holds clear 0 too (the claim fixes no block
+    length). Each of the 21 non-overlapping grids is reported (difference, lower bound, how many pass).
 
-    ``pre_sensitivity``: signals of training-only cycles before the first SPY cycle (e.g. ^GSPC RV21 before SPY listed).
-    They never enter the verdict or n; they feed a labelled sensitivity in which they form the first training window."""
-    res = {s: straddle_cycles(fr, s, side=-1, hedge=False, first=HOLD) for s in scales}
-    starts = res[scales[0]]["start"]
-    if starts.size < min_train + n_splits:
+    ``pre_sensitivity``: daily signals of training-only entries before the first SPY entry (e.g. ^GSPC RV21 before SPY
+    listed). They never enter the verdict or n; they feed a labelled sensitivity in which they form the first training
+    window."""
+    n_days = len(fr["days"])
+    res = {s: straddle_cycles(fr, s, side=-1, hedge=False, starts=np.arange(hold, max(hold, n_days - hold))) for s in scales}
+    ent = res[scales[0]]["start"]
+    n_all = n_holds(ent, hold)
+    if n_all < min_train + n_splits:
         return {"verdict": "inconclusive", "n": 0,
-                "reason": f"only {starts.size} SPY cycles: too few for a {min_train}-cycle first training window and "
-                          f"{n_splits} walk-forward test windows — not implemented: n >= trial min_n (0 of {min_n} "
-                          f"out-of-sample SPY cycles)"}
-    sig = fr["vix"][starts] - 100.0 * trailing_rv_vol(_logret_end(fr["adj"]), starts)
+                "reason": f"only {n_all} distinct 21-day holds of SPY entries: too few for a {min_train}-cycle first "
+                          f"training window and {n_splits} walk-forward test windows — not implemented: n >= trial min_n "
+                          f"(0 of {min_n} out-of-sample SPY cycles)"}
+    sig = fr["vix"][ent] - 100.0 * trailing_rv_vol(_logret_end(fr["adj"]), ent)
     x = {s: res[s]["pnl"] / res[s]["prem"] for s in scales}
-    t = tercile_oos(sig, x, 0, n_splits, block, n_boot, seed, min_train_fallback=min_train)
-    n = t["n_oos"]
+    pb = block * hold
+    t = tercile_oos(sig, x, 0, n_splits, pb, n_boot, seed, min_train_fallback=min_train * hold, min_pre=24 * hold)
     oi, top, bot = t["oos_index"], t["top"], t["bottom"]
+    oos_ent = ent[oi]
+    n = n_holds(oos_ent, hold)
     xo = x[main][oi]
-    m = mc_group_ci(xo, top, bot, block, 0.95, n_boot, n_rep, seed)
+    m = mc_group_ci(xo, top, bot, pb, 0.95, n_boot, n_rep, seed)
     m["mean_middle"] = t["by_scale"][main].get("mean_middle")
     t["by_scale"][main] = m
     n_alt_rep = max(2, n_rep // 2)
-    alt_bl = sorted({int(b) for b in (*alt_blocks, max(1, int(round(n ** (1.0 / 3.0)))))} - {int(block)})
+    alt_bl = sorted({max(2, int(b)) for b in alt_blocks} - {int(block)})
     alts = {"the percentile interval": {"ci": m["ci_percentile"], "ci_mc_se": m["ci_percentile_mc_se"]}}
     for b in alt_bl:
-        alts[f"studentized block {b}"] = mc_group_ci(xo, top, bot, b, 0.95, n_boot, n_alt_rep, seed)
+        alts[f"studentized block {b * hold} days"] = mc_group_ci(xo, top, bot, b * hold, 0.95, n_boot, n_alt_rep, seed)
     ok, dec, note = robust_exclusion(m, alts)
     lo, hi = m["ci"]
-    crit = [(f"s={main:.2f}: OOS top-bottom > 0 with 95% CI excluding 0 (declared studentized block {block}, robust to the "
-             f"seed and the block)" + (f" [not decided: {note}]" if ok is None else ""), ok, dec)]
+    crit = [(f"s={main:.2f}: pooled OOS top-bottom > 0 with 95% CI excluding 0 (declared studentized block {pb} days, "
+             f"robust to the seed and the block)" + (f" [not decided: {note}]" if ok is None else ""), ok, dec)]
     for s in scales:
         if s == main:
             continue
         ms = t["by_scale"][s]
-        crit.append((f"s={s:.2f}: same sign (top-bottom > 0)", None if ms["diff"] is None else bool(ms["diff"] > 0),
+        crit.append((f"s={s:.2f}: same sign (pooled top-bottom > 0)", None if ms["diff"] is None else bool(ms["diff"] > 0),
                      ms["ci"][1] is not None and ms["ci"][1] < 0))
+    offs = _t101_offsets(sig, x, ent, scales, main, hold, n_splits, block, offset_n_boot, seed, min_train)
+    osum = phase_summary(offs, 1, key="diff")
     parts = []
     for s in scales:
         ms = t["by_scale"][s]
         parts.append(f"s={s:.2f}: top {_s(ms['mean_top'] and ms['mean_top'] * 100, 1)}% vs bottom "
                      f"{_s(ms['mean_bottom'] and ms['mean_bottom'] * 100, 1)}% of premium, diff "
-                     f"{_s(ms['diff'] and ms['diff'] * 100, 1)} pts ({_ci_s(ms['ci'], 1, 100)}; n top/bottom "
+                     f"{_s(ms['diff'] and ms['diff'] * 100, 1)} pts ({_ci_s(ms['ci'], 1, 100)}; entries top/bottom "
                      f"{ms['n_top']}/{ms['n_bottom']})")
     se_lo = m["ci_mc_se"][0]
-    parts.append(f"s={main:.2f} declared interval: studentized block {block}, mean of {m['n_rep']} replicates x {n_boot} draws, "
-                 f"lower bound {_s(lo and lo * 100, 2)} pts (Monte Carlo s.e. {_f(se_lo and se_lo * 100, 2)}); alternatives' "
-                 f"lower bounds ({n_alt_rep} replicates each): "
+    parts.append(f"s={main:.2f} declared interval: studentized block {pb} days, mean of {m['n_rep']} replicates x {n_boot} "
+                 f"draws, lower bound {_s(lo and lo * 100, 2)} pts (Monte Carlo s.e. {_f(se_lo and se_lo * 100, 2)}); "
+                 f"alternatives' lower bounds ({n_alt_rep} replicates each): "
                  + ", ".join(f"{k.replace('the ', '').replace('studentized ', '')} {_s(c['ci'][0] and c['ci'][0] * 100, 2)}"
                              for k, c in alts.items())
                  + (f"; {note}" if note else ""))
+    if osum.get("stat_min") is not None:
+        parts.append(f"per grid offset ({osum['n_offsets']} non-overlapping grids, {osum['n_min']}-{osum['n_max']} OOS "
+                     f"cycles, block {block} cycles, {offset_n_boot} draws): s={main:.2f} diff {osum['stat_min'] * 100:+.1f} "
+                     f"to {osum['stat_max'] * 100:+.1f} pts, lower bound {osum['lower_min'] * 100:+.1f} to "
+                     f"{osum['lower_max'] * 100:+.1f}, {osum['n_pass']}/{osum['n_offsets']} offsets pass")
     sens = None
     pre = np.asarray([] if pre_sensitivity is None else pre_sensitivity, dtype=float)
     if pre.size:
-        ts = tercile_oos(np.concatenate([pre, sig]), {main: x[main]}, pre.size, n_splits, block, n_boot, seed,
-                         min_train_fallback=min_train)
-        mss = mc_group_ci(x[main][ts["oos_index"]], ts["top"], ts["bottom"], block, 0.95, n_boot, n_alt_rep, seed)
-        sens = {"label": "SENSITIVITY, not in the verdict or n", "n_pre_training_cycles": int(pre.size), "n_oos": ts["n_oos"],
-                "min_train": ts["min_train"], "diff": mss["diff"], "ci": mss["ci"], "ci_mc_se": mss["ci_mc_se"],
-                "ci_percentile": mss["ci_percentile"], "note": sensitivity_note.strip(" ;()")}
-        parts.append(f"SENSITIVITY, not in the verdict or n{sensitivity_note}: {ts['n_oos']} OOS cycles, s={main:.2f} diff "
-                     f"{_s(mss['diff'] and mss['diff'] * 100, 1)} pts ({_ci_s(mss['ci'], 2, 100)}, percentile "
-                     f"{_ci_s(mss['ci_percentile'], 2, 100)})")
-    # reported controls
+        try:
+            ts = tercile_oos(np.concatenate([pre, sig]), {main: x[main]}, pre.size, n_splits, pb, n_boot, seed,
+                             min_train_fallback=min_train * hold, min_pre=24 * hold)
+            mss = mc_group_ci(x[main][ts["oos_index"]], ts["top"], ts["bottom"], pb, 0.95, n_boot, n_alt_rep, seed)
+            n_s = n_holds(ent[ts["oos_index"]], hold)
+            sens = {"label": "SENSITIVITY, not in the verdict or n", "n_pre_training_entries": int(pre.size),
+                    "n_oos": n_s, "n_oos_entries": int(ts["n_oos"]), "min_train_entries": ts["min_train"],
+                    "diff": mss["diff"], "ci": mss["ci"], "ci_mc_se": mss["ci_mc_se"],
+                    "ci_percentile": mss["ci_percentile"], "note": sensitivity_note.strip(" ;()")}
+            parts.append(f"SENSITIVITY, not in the verdict or n{sensitivity_note}: {n_s} OOS cycles ({ts['n_oos']} entries), "
+                         f"s={main:.2f} diff {_s(mss['diff'] and mss['diff'] * 100, 1)} pts ({_ci_s(mss['ci'], 2, 100)}, "
+                         f"percentile {_ci_s(mss['ci_percentile'], 2, 100)})")
+        except ValueError:
+            pass
+    # reported controls (the pooled marginal distribution; Sharpe-type and drawdown figures on the non-overlapping grids)
     xm = x[main]
-    top_series = xo[top]
-    uncond = {s: {"mean": float(x[s].mean()), "ci": list(stud_ci(x[s], block, 0.95, n_boot, seed))} for s in scales}
+    uncond = {s: {"mean": float(x[s].mean()), "ci": list(stud_ci(x[s], pb, 0.95, min(n_boot, 2000), seed))} for s in scales}
     spot_pnl = res[main]["pnl"] / res[main]["spot"]
+    psr = [float(deflated_sharpe_ratio(xm[ent % hold == k], 1)) for k in range(hold) if (ent % hold == k).sum() > 3]
+    mdd = [float(_mdd_abs(spot_pnl[ent % hold == k])[0] * 100) for k in range(hold) if (ent % hold == k).any()]
+    dsr = [r["dsr_top_tercile_n_trials_3"] for r in offs if r.get("dsr_top_tercile_n_trials_3") is not None]
     extras = {"unconditional": uncond, "s_main_desc": _desc(xm),
-              "psr_all_cycles": float(deflated_sharpe_ratio(xm, 1)),
-              "dsr_top_tercile_oos_n_trials_3": float(deflated_sharpe_ratio(top_series, 3)) if top_series.size > 3 else None,
-              "max_drawdown_pct_of_spot": float(_mdd_abs(spot_pnl)[0] * 100),
+              "psr_by_offset_range": [min(psr), max(psr)] if psr else None,
+              "dsr_top_tercile_n_trials_3_by_offset_range": [min(dsr), max(dsr)] if dsr else None,
+              "max_drawdown_pct_of_spot_by_offset_range": [min(mdd), max(mdd)] if mdd else None,
               "haircut_5pct": {"mean_top": None if m["mean_top"] is None else m["mean_top"] - haircut,
                                "mean_bottom": None if m["mean_bottom"] is None else m["mean_bottom"] - haircut,
                                "diff": m["diff"], "note": "a constant per-premium haircut leaves the tercile difference unchanged"}}
     hc = extras["haircut_5pct"]
     parts.append(f"5%-of-premium round-trip haircut: top {_s(hc['mean_top'] and hc['mean_top'] * 100, 1)}% vs bottom "
                  f"{_s(hc['mean_bottom'] and hc['mean_bottom'] * 100, 1)}% (difference unchanged)")
-    parts.append(f"unconditional mean at s={main:.2f} {xm.mean() * 100:+.1f}% of premium "
-                 f"({_ci_s(uncond[main]['ci'], 1, 100)}), skew {extras['s_main_desc'].get('skew', float('nan')):.2f}, "
-                 f"PSR {extras['psr_all_cycles']:.2f}, DSR(top tercile, 3 trials) {_f(extras['dsr_top_tercile_oos_n_trials_3'])}")
-    unit = "out-of-sample SPY cycles"
+    pr = extras["psr_by_offset_range"] or [float("nan")] * 2
+    md = extras["max_drawdown_pct_of_spot_by_offset_range"] or [float("nan")] * 2
+    ds = extras["dsr_top_tercile_n_trials_3_by_offset_range"] or [float("nan")] * 2
+    parts.append(f"unconditional mean at s={main:.2f} {xm.mean() * 100:+.1f}% of premium (pooled, "
+                 f"{_ci_s(uncond[main]['ci'], 1, 100)}), skew {extras['s_main_desc'].get('skew', float('nan')):.2f}, kurtosis "
+                 f"{extras['s_main_desc'].get('kurtosis', float('nan')):.1f}; across the {hold} grids PSR {pr[0]:.2f}-{pr[1]:.2f}, "
+                 f"max drawdown {md[0]:.1f}-{md[1]:.1f}% of spot, DSR(top tercile, 3 trials) {ds[0]:.2f}-{ds[1]:.2f}")
+    unit = "out-of-sample SPY cycles (distinct 21-day holds of the pooled entries)"
     if n < min_n:
         unit += (f"; the {min_n - n} missing cycles need SPY history before {fr['days'][0]} (the first archived SPY day) or "
                  f"about {(min_n - n) * HOLD / PPY:.1f} more years of SPY cycles")
     verdict, why = _decide(crit, n, min_n, unit)
-    reason = (f"{MP} short 30-DTE ATM SPY straddle at s x VIX on the dividend forward, settled on raw closes; {n} OOS cycles of "
-              f"{starts.size} SPY cycles ({t['n_splits']} walk-forward test windows; cut-points on the training window's "
-              f"VIX - RV21 from SPY log returns, SPY cycles only, the first {t['min_train']} cycles train the first cut-points; "
-              f"min_n counts out-of-sample cycles, the sample the pass statistic is computed on): "
-              + "; ".join(parts) + f"; the tercile spread is model-priced (IV level only scales premium; {TRADED_NOTE})"
-              + f" — {why}")
-    stat = {"model_priced": True, "n_oos_cycles": n, "min_n_unit": "out-of-sample SPY cycles", "n_spy_cycles": int(starts.size),
-            "min_train": t["min_train"], "cuts_by_split": t["cuts"], "n_boot_per_rep": n_boot, "n_rep": m["n_rep"],
-            "block": block, "main_criterion": {"ok": ok, "decisive_fail": dec, "note": note},
+    reason = (f"{MP} short 30-DTE ATM SPY straddle at s x VIX on the dividend forward, settled on raw closes; rule 10 (no "
+              f"entry calendar in the claim): POOLED over all {hold} grid offsets, {oi.size} overlapping out-of-sample daily "
+              f"entries = {n} OOS cycles of {n_all} ({t['n_splits']} walk-forward test windows; cut-points on the training "
+              f"window's VIX - RV21 from SPY log returns, SPY entries only, the first {min_train} cycles ({t['min_train']} "
+              f"entries) train the first cut-points; min_n counts out-of-sample cycles, the sample the pass statistic is "
+              f"computed on): " + "; ".join(parts)
+              + f"; the tercile spread is model-priced (IV level only scales premium; {TRADED_NOTE})" + f" — {why}")
+    stat = {"model_priced": True, "rule10": "pooled all-offset estimate (no calendar in the claim)", "n_oos_cycles": n,
+            "n_oos_entries": int(oi.size), "min_n_unit": "out-of-sample SPY cycles", "n_spy_cycles": n_all,
+            "n_spy_entries": int(ent.size), "min_train": int(min_train), "min_train_entries": int(t["min_train"]),
+            "cuts_by_split": t["cuts"], "n_boot_per_rep": n_boot, "n_rep": m["n_rep"], "block_days": pb,
+            "main_criterion": {"ok": ok, "decisive_fail": dec, "note": note},
             "alternative_intervals": {k: {"ci": c["ci"], "ci_mc_se": c.get("ci_mc_se")} for k, c in alts.items()},
             "by_scale": {str(s): {k: v for k, v in t["by_scale"][s].items()} for s in scales}, **extras,
-            "gspc_pre_window_sensitivity": sens,
-            "first_entry": res[main]["day"][0] if res[main]["day"] else None, "verdict": verdict}
+            "offsets": offs, "offsets_summary": osum, "gspc_pre_window_sensitivity": sens,
+            "first_entry": fr["days"][ent[0]], "first_oos_entry": fr["days"][oos_ent[0]], "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
 
 # ============================================================================== T-123 gamma scalping long straddle ==
 
-def _flip_scale(fr: dict, grid, cost_bps: float) -> Optional[float]:
-    """Smallest s on ``grid`` where mean hedged long-straddle P&L/vega crosses from positive to negative (interpolated)."""
+BTZ_VRP = 18.3               # BTZ (2009, RFS) summary statistics: mean VIX^2 - RV (5-minute), monthly %^2, about 18
+
+
+def _flip_scale(fr: dict, grid, cost_bps: float, starts=None) -> Optional[float]:
+    """Smallest s on ``grid`` where mean hedged long-straddle P&L/vega crosses from positive to negative (interpolated),
+    over the entries ``starts`` (the pooled daily entries) or the offset-0 grid."""
     ms = []
     for s in grid:
-        r = straddle_cycles(fr, s, side=1, hedge=True, cost_bps=cost_bps)
+        r = straddle_cycles(fr, s, side=1, hedge=True, cost_bps=cost_bps, starts=starts)
         ms.append(float(np.mean(r["pnl"] / r["vega"])) if r["pnl"].size else float("nan"))
     for i in range(len(grid) - 1):
         a, b = ms[i], ms[i + 1]
@@ -768,72 +1096,161 @@ def _flip_scale(fr: dict, grid, cost_bps: float) -> Optional[float]:
     return None
 
 
+def vrp_anchor(days, closes, vix, start: str = "1990-01-01", end: str = "2007-12-31", hold: int = HOLD) -> Optional[dict]:
+    """Mean (VIX^2 - RV21)/12 in %^2 per month (close-to-close price returns) over every daily entry in [start, end]
+    (pooled over the grid offsets), with the per-offset range."""
+    days = list(days)
+    c = np.asarray(closes, dtype=float)
+    v = np.asarray(vix, dtype=float)
+    ent = np.array([i for i, d in enumerate(days) if start <= d <= end and np.isfinite(v[i]) and v[i] > 0], dtype=np.int64)
+    if ent.size == 0:
+        return None
+    rv = _fwd_rv(c, ent, hold)
+    ok = np.isfinite(rv)
+    ent, rv = ent[ok], rv[ok]
+    if ent.size < hold:
+        return None
+    x = (v[ent] ** 2 - rv * 1e4) / 12.0
+    ph = [float(x[ent % hold == k].mean()) for k in range(hold) if (ent % hold == k).any()]
+    return {"n_entries": int(ent.size), "n_cycles": n_holds(ent, hold), "first": days[ent[0]], "last": days[ent[-1]],
+            "mean": float(x.mean()), "offset_min": min(ph), "offset_max": max(ph)}
+
+
 def gamma_scalp(fr: dict, scales=(0.81, 0.90, 1.00), main: float = 0.90, cost_bps: float = 1.0, block: int = 6,
-                n_boot: int = 2000, seed: int = 0, flip_grid=None, min_n: int = 390) -> dict:
+                n_boot: int = 2000, seed: int = 0, flip_grid=None, min_n: int = 390, anchor: Optional[dict] = None,
+                hold: int = HOLD) -> dict:
     """T-123: long 30-DTE ATM SPY straddle bought at BS(s * VIX), delta-hedged at each close at the entry vol, 1 bp per share
-    traded; mean P&L / vega over non-overlapping cycles. Pass: upper 95% CI < 0 at s = 0.90; min_n 390 cycles."""
-    res = {s: straddle_cycles(fr, s, side=1, hedge=True, cost_bps=cost_bps) for s in scales}
-    n = int(res[main]["pnl"].size)
-    if n < 8:
-        return {"verdict": "inconclusive", "n": n, "reason": f"only {n} cycles"}
-    by = {}
+    traded; mean P&L / vega. Pass: upper 95% CI < 0 at s = 0.90; min_n 390 cycles.
+
+    Rule 10(b): the claim names no entry calendar, so the criterion is judged on the POOLED estimate over all 21 grid
+    offsets (every SPY session with a VIX close is an entry; studentized circular block bootstrap, 126-day blocks); each
+    non-overlapping grid is reported. n = distinct 21-day holds spanned. Secondary (as worded): corr(P&L, RV21 -
+    (s VIX)^2) with RV21 from raw-close price returns, in dollars and per unit vega. Controls: q = 0 (spot, no dividend
+    forward) and prior-day VIX (the 16:15 vs 16:00 close) with their CIs; the variance-term share of P&L; the BTZ
+    anchor on ``anchor`` = {"days", "close", "vix", "label"} (^GSPC 1990-2007 as the control words it)."""
+    n_days = len(fr["days"])
+    cand = np.arange(0, max(0, n_days - hold))
+    res = {s: straddle_cycles(fr, s, side=1, hedge=True, cost_bps=cost_bps, starts=cand) for s in scales}
+    rm = res[main]
+    ent = rm["start"]
+    n = n_holds(ent, hold)
+    if ent.size < 8 * hold:
+        return {"verdict": "inconclusive", "n": n, "reason": f"only {ent.size} daily entries ({n} cycles)"}
+    pb = pool_block_len(hold)
+    by, scans = {}, {}
     for s in scales:
         r = res[s]
         y = r["pnl"] / r["vega"]
-        lo, hi = stud_ci(y, block, 0.95, n_boot, seed)
-        excess = r["rv"] - r["sig"] ** 2
+        ps = phase_scan(r["start"], y, hold, block, n_boot, seed, side=-1)
+        scans[s] = ps
+        excess = r["rv_px"] - r["sig"] ** 2
+        lo, hi = ps["pooled"]["ci"]
         by[s] = {"mean_vol_pts": float(y.mean() * 100), "ci_vol_pts": [None if lo is None else lo * 100, None if hi is None else hi * 100],
-                 "corr_pnl_rv_minus_implied_var": float(np.corrcoef(y, excess)[0, 1]) if y.size > 2 else None,
+                 "offsets_summary_vol_pts": _scaled_summary(ps["summary"], 100.0),
+                 "corr_pnl_usd_rv_minus_implied_var": float(np.corrcoef(r["pnl"], excess)[0, 1]),
+                 "corr_pnl_per_vega_rv_minus_implied_var": float(np.corrcoef(y, excess)[0, 1]),
                  "mean_var_term_per_vega_vol_pts": float(np.mean(r["var_term"] / r["vega"]) * 100),
                  "mean_hedge_error_per_vega_vol_pts": float(np.mean((r["pnl"] - r["var_term"]) / r["vega"]) * 100),
-                 "mean_shares_traded_per_cycle": float(r["traded"].mean()), "desc": _desc(y * 100), "thirds_vol_pts": [v * 100 for v in _thirds(y)]}
-    rm = res[main]
-    btz = [i for i, d in enumerate(rm["day"]) if d <= "2007-12-31"]
-    btz_anchor = float(np.mean(((rm["sig"][btz] / main) ** 2 - rm["rv"][btz]) * 1e4 / 12.0)) if btz else None
-    q0 = straddle_cycles(fr, main, side=1, hedge=True, cost_bps=cost_bps, div_pricing=False)
-    q0m = float(np.mean(q0["pnl"] / q0["vega"]) * 100)
-    grid = np.round(np.arange(0.50, 1.301, 0.02), 2) if flip_grid is None else np.asarray(flip_grid, dtype=float)
-    flip = _flip_scale(fr, grid, cost_bps)
+                 "var_term_share_of_pnl": float(np.sum(r["var_term"]) / np.sum(r["pnl"])) if np.sum(r["pnl"]) != 0 else None,
+                 "mean_shares_traded_per_cycle": float(r["traded"].mean()), "desc": _desc(y * 100),
+                 "thirds_vol_pts": [v * 100 for v in _thirds(y)]}
     m = by[main]
     lo, hi = m["ci_vol_pts"]
-    crit = [(f"s={main:.2f}: upper 95% CI of mean P&L/vega < 0", None if hi is None else bool(hi < 0), lo is not None and lo > 0)]
-    parts = [f"s={s:.2f}: mean {by[s]['mean_vol_pts']:+.2f} vol pts per unit vega ({_ci_s(by[s]['ci_vol_pts'])}), "
-             f"corr with RV-(s VIX)^2 {_f(by[s]['corr_pnl_rv_minus_implied_var'])}" for s in scales]
-    parts.append(f"variance term {m['mean_var_term_per_vega_vol_pts']:+.2f} vs hedging error and costs "
-                 f"{m['mean_hedge_error_per_vega_vol_pts']:+.2f} vol pts at s={main:.2f}")
-    parts.append(f"sign flips at s = {_f(flip, 3) if flip is not None else 'none on ' + str(grid[0]) + '-' + str(grid[-1])}")
-    parts.append(f"q=0 control (no dividend forward) {q0m:+.2f}")
-    if btz_anchor is not None:
-        parts.append(f"BTZ anchor: mean (VIX^2 - RV21)/12 over the {len(btz)} cycles to 2007 {btz_anchor:+.1f} %^2/month")
-    verdict, why = _decide(crit, n, min_n, "cycles")
-    reason = (f"{MP} long 30-DTE ATM SPY straddle at s x VIX, delta-hedged daily at the entry vol on raw closes, 1 bp per share "
-              f"traded, cash at the bill rate; {n} non-overlapping cycles {res[main]['day'][0]}..{res[main]['day'][-1]}: "
+    crit = [(f"s={main:.2f}: upper 95% CI of mean P&L/vega < 0 (pooled over the {hold} grid offsets)",
+             None if hi is None else bool(hi < 0), lo is not None and lo > 0)]
+
+    def pooled_ctl(r):
+        y = r["pnl"] / r["vega"]
+        a, b = stud_ci(y, pb, 0.95, n_boot, seed)
+        return {"n_entries": int(y.size), "mean_vol_pts": float(y.mean() * 100),
+                "ci_vol_pts": [None if a is None else a * 100, None if b is None else b * 100]}
+
+    q0 = pooled_ctl(straddle_cycles(fr, main, side=1, hedge=True, cost_bps=cost_bps, div_pricing=False, starts=cand))
+    lag = pooled_ctl(straddle_cycles(fr, main, side=1, hedge=True, cost_bps=cost_bps, starts=cand, vix_lag=1))
+    grid = np.round(np.arange(0.50, 1.301, 0.02), 2) if flip_grid is None else np.asarray(flip_grid, dtype=float)
+    flip = _flip_scale(fr, grid, cost_bps, starts=cand)
+    btz = None
+    if anchor is not None:
+        btz = vrp_anchor(anchor["days"], anchor["close"], anchor["vix"], hold=hold)
+        if btz is not None:
+            btz["source"] = anchor.get("label", "")
+    if btz is None:                                     # fall back to SPY entries to 2007
+        sel = np.array([d <= "2007-12-31" for d in rm["day"]])
+        if sel.any():
+            xb = ((rm["sig"][sel] / main) ** 2 - rm["rv_px"][sel]) * 1e4 / 12.0
+            btz = {"source": "SPY", "n_entries": int(sel.sum()), "n_cycles": n_holds(ent[sel], hold),
+                   "first": rm["day"][int(np.argmax(sel))], "last": "2007-12-31", "mean": float(xb.mean()),
+                   "offset_min": None, "offset_max": None}
+    parts = [_pool_txt(scans[main], 2, 100, " vol pts per unit vega") + f" at s={main:.2f}",
+             _phase_txt(scans[main], -1, 2, 100)]
+    parts += [f"s={s:.2f}: pooled mean {by[s]['mean_vol_pts']:+.2f} ({_ci_s(by[s]['ci_vol_pts'])}), "
+              f"{scans[s]['summary']['n_pass']}/{hold} offsets with upper bound < 0" for s in scales if s != main]
+    parts.append("secondary corr(P&L, RV21 - (s VIX)^2), RV21 from raw-close price returns: "
+                 + ", ".join(f"s={s:.2f} {by[s]['corr_pnl_usd_rv_minus_implied_var']:.2f} in $ "
+                             f"({by[s]['corr_pnl_per_vega_rv_minus_implied_var']:.2f} per unit vega)" for s in scales))
+    vs = m["var_term_share_of_pnl"]
+    parts.append(f"variance term (0.5 Gamma Sx^2 ((dSx/Sx)^2 - sigma^2 dt) on the dividend forward) "
+                 f"{m['mean_var_term_per_vega_vol_pts']:+.2f} vs hedging error and costs {m['mean_hedge_error_per_vega_vol_pts']:+.2f} "
+                 f"vol pts per vega at s={main:.2f}: variance-term share of summed P&L {_f(vs, 2)}")
+    parts.append(f"sign flips at s = {_f(flip, 3) if flip is not None else 'none on ' + str(grid[0]) + '-' + str(grid[-1])} "
+                 f"(pooled entries)")
+    parts.append(f"q=0 control (spot, no dividend forward) {q0['mean_vol_pts']:+.2f} ({_ci_s(q0['ci_vol_pts'])}); "
+                 f"prior-day VIX close (VIX closes 16:15 ET, SPY 16:00) {lag['mean_vol_pts']:+.2f} ({_ci_s(lag['ci_vol_pts'])})")
+    if btz is not None:
+        rng_txt = ("" if btz.get("offset_min") is None else
+                   f", grid offsets {btz['offset_min']:+.1f} to {btz['offset_max']:+.1f}")
+        parts.append(f"BTZ anchor (monthly %^2): mean (VIX^2 - RV21)/12 on {btz['source']} close-to-close price returns, "
+                     f"{btz['n_entries']} daily entries {btz['first']}..{btz['last']} ({btz['n_cycles']} cycles) "
+                     f"{btz['mean']:+.1f}{rng_txt}, vs BTZ's published mean VRP of about {BTZ_VRP:.0f} (VIX^2 minus the realised "
+                     f"variance of the month just ended from 5-minute returns inside the trading day: it leaves out the "
+                     f"overnight return, so its RV is lower and its VRP higher than a close-to-close one)")
+    unit = f"cycles (distinct {hold}-day holds of the pooled entries)"
+    verdict, why = _decide(crit, n, min_n, unit)
+    reason = (f"{MP} long 30-DTE ATM SPY straddle at s x VIX, delta-hedged daily at the entry vol on raw closes, ex-dates "
+              f"projected from SPY's quarterly schedule, 1 bp per share traded, cash at the bill rate; rule 10 (no entry "
+              f"calendar in the claim): {ent.size} daily entries {rm['day'][0]}..{rm['day'][-1]} = {n} cycles: "
               + "; ".join(parts) + f" — {why}")
-    stat = {"model_priced": True, "n_cycles": n, "cost_bps_per_share": cost_bps, "by_scale": {str(s): by[s] for s in scales},
-            "sign_flip_scale": flip, "flip_grid": [float(grid[0]), float(grid[-1])], "q0_control_mean_vol_pts": q0m,
-            "btz_anchor_pct2_per_month_to_2007": btz_anchor,
-            "first_entry": res[main]["day"][0], "last_entry": res[main]["day"][-1], "verdict": verdict}
+    stat = {"model_priced": True, "rule10": "pooled all-offset estimate (no calendar in the claim)", "n_cycles": n,
+            "n_entries": int(ent.size), "block_days": pb, "cost_bps_per_share": cost_bps,
+            "by_scale": {str(s): by[s] for s in scales}, "offsets_main": scans[main]["offsets"],
+            "sign_flip_scale": flip, "flip_grid": [float(grid[0]), float(grid[-1])], "q0_control": q0,
+            "prior_day_vix_control": lag, "btz_anchor": btz, "btz_published_vrp": BTZ_VRP,
+            "first_entry": rm["day"][0], "last_entry": rm["day"][-1], "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
 
 # ========================================================================= T-233 hedged short straddle (VRP) ==
 
+def spy_monthly_cycles(fr: dict, dte: int = 30, non_overlap: bool = True) -> tuple:
+    """(entries, expiries) of ``dte``-DTE options on SPY's standard monthly expiry calendar (rule 10(a)): expiry on the
+    third Friday (prior session on a holiday), entry at the session nearest dte calendar days before it with a VIX close;
+    with ``non_overlap`` an entry before the previous expiry moves to that expiry's close."""
+    return calendar_entries(fr["days"], monthly_expiry_idx(fr["days"]), dte, non_overlap, ok=fr.get("has_vix"))
+
+
 def vrp_hedged_short(fr: dict, measured_scale: Optional[float], measured_note: str = "", main: float = 0.81,
-                     vol_cost: float = 0.005, block: int = 6, n_boot: int = 2000, seed: int = 0, min_n: int = 300) -> dict:
+                     vol_cost: float = 0.005, block: int = 6, n_boot: int = 2000, seed: int = 0, min_n: int = 300,
+                     cycles: Optional[tuple] = None, dte: int = 30) -> dict:
     """T-233: short 30-DTE ATM SPY straddle at ATM IV = s x VIX, delta-hedged at each close, 0.5 vol-point round trip charged
     as entry vega x 0.005; mean cycle P&L / premium. Pass: mean > 0 with the 95% CI excluding 0 at s = 0.81 and at the
     scale measured on the capture; deflated Sharpe p < 0.05 (DSR > 0.95) over the IV scales and hedge frequencies tried;
-    positive in all three thirds; min_n 300 cycles."""
+    positive in all three thirds; min_n 300 cycles.
+
+    Rule 10(a): 'per monthly cycle' of a 30-DTE option names SPY's monthly expiry calendar, so each cycle sells the
+    straddle expiring on a monthly expiry, entered at the session nearest 30 calendar days before it and never before the
+    previous expiry (cycles do not overlap: 28-30 DTE). ``cycles`` = (entries, expiries) overrides the calendar. The
+    pooled 21-day-grid estimate at s = 0.81 is reported as a cross-check (not in the verdict)."""
+    st, en = spy_monthly_cycles(fr, dte, True) if cycles is None else (np.asarray(cycles[0]), np.asarray(cycles[1]))
     scales = [main] + ([measured_scale] if measured_scale is not None else [])
     variants = {}
     for s in sorted(set([1.0, 0.9, main] + ([round(measured_scale, 4)] if measured_scale is not None else []))):
         for he in (1, 5):
-            r = straddle_cycles(fr, s, side=-1, hedge=True, hedge_every=he, vol_cost=vol_cost)
+            r = straddle_cycles(fr, s, side=-1, hedge=True, hedge_every=he, vol_cost=vol_cost, starts=st, ends=en)
             variants[(s, he)] = r["pnl"] / r["prem"] if r["pnl"].size else np.zeros(0)
-    base = straddle_cycles(fr, main, side=-1, hedge=True, vol_cost=vol_cost)
+    base = straddle_cycles(fr, main, side=-1, hedge=True, vol_cost=vol_cost, starts=st, ends=en)
     n = int(base["pnl"].size)
     if n < 8:
-        return {"verdict": "inconclusive", "n": n, "reason": f"only {n} cycles"}
+        return {"verdict": "inconclusive", "n": n, "reason": f"only {n} monthly-expiry cycles"}
     crit, parts, by = [], [], {}
     for j, s in enumerate(scales):
         y = variants[(round(s, 4) if j == 1 else s, 1)]
@@ -853,24 +1270,40 @@ def vrp_hedged_short(fr: dict, measured_scale: Optional[float], measured_note: s
     dsr = float(deflated_sharpe_ratio(variants[(main, 1)], len(keys), trial_sharpes=srs))
     crit.append((f"deflated Sharpe p < 0.05 (DSR > 0.95; {len(keys)} variants: IV scales x hedge daily/weekly)", bool(dsr > 0.95), False))
     parts.append(f"DSR {dsr:.3f} over {len(keys)} variants")
-    unhedged = straddle_cycles(fr, main, side=-1, hedge=False, vol_cost=vol_cost)
+    unhedged = straddle_cycles(fr, main, side=-1, hedge=False, vol_cost=vol_cost, starts=st, ends=en)
     uh = unhedged["pnl"] / unhedged["prem"]
     rng = np.random.default_rng(seed)
-    shuffled = dict(fr, vix=fr["vix"][rng.permutation(len(fr["vix"]))])
-    pl = straddle_cycles(shuffled, main, side=-1, hedge=True, vol_cost=vol_cost)
-    one_bp = straddle_cycles(fr, main, side=-1, hedge=True, vol_cost=vol_cost, cost_bps=1.0)
+    perm = rng.permutation(len(fr["vix"]))
+    shuffled = dict(fr, vix=fr["vix"][perm], has_vix=fr["has_vix"][perm])
+    pl = straddle_cycles(shuffled, main, side=-1, hedge=True, vol_cost=vol_cost, starts=st, ends=en)
+    one_bp = straddle_cycles(fr, main, side=-1, hedge=True, vol_cost=vol_cost, cost_bps=1.0, starts=st, ends=en)
     sens = {f"{k[0]:.4f}/{'daily' if k[1] == 1 else 'weekly'}": float(v.mean()) for k, v in variants.items()}
     parts.append("IV-scale sensitivity (daily hedge, mean % of premium) " + ", ".join(
         f"s={k[0]:.2f} {variants[k].mean() * 100:+.1f}" for k in keys if k[1] == 1))
     parts.append(f"controls: unhedged {uh.mean() * 100:+.2f}%, shuffled-VIX placebo {np.mean(pl['pnl'] / pl['prem']) * 100:+.2f}%, "
                  f"+1 bp/share hedge cost {np.mean(one_bp['pnl'] / one_bp['prem']) * 100:+.2f}%")
-    verdict, why = _decide(crit, n, min_n, "cycles")
-    reason = (f"{MP} short 30-DTE ATM SPY straddle, delta-hedged daily at the entry vol on raw closes, dividend forward, "
-              f"0.5 vol-pt round trip; {n} cycles {base['day'][0]}..{base['day'][-1]}{measured_note}: " + "; ".join(parts)
+    grid = straddle_cycles(fr, main, side=-1, hedge=True, vol_cost=vol_cost, starts=np.arange(0, max(0, len(fr["days"]) - HOLD)))
+    check = None
+    if grid["pnl"].size >= 8 * HOLD:
+        xg = grid["pnl"] / grid["prem"]
+        check = {"n_entries": int(xg.size), "mean": float(xg.mean()),
+                 "ci": list(stud_ci(xg, pool_block_len(HOLD), 0.95, n_boot, seed))}
+        parts.append(f"cross-check, not in the verdict: 21-day grid pooled over all offsets at s={main:.2f} "
+                     f"{check['mean'] * 100:+.2f}% ({_ci_s(check['ci'], 2, 100)}, {xg.size} daily entries)")
+    dte_days = fr["ords"][base["end"]] - fr["ords"][base["start"]]
+    verdict, why = _decide(crit, n, min_n, "monthly-expiry cycles")
+    reason = (f"{MP} short 30-DTE ATM SPY straddle, delta-hedged daily at the entry vol on raw closes, dividend forward "
+              f"(ex-dates projected from SPY's quarterly schedule), 0.5 vol-pt round trip; rule 10 (the claim names monthly "
+              f"cycles): {n} cycles on SPY's monthly expiry calendar (third Friday, prior session on a holiday; entered "
+              f"{int(dte_days.min())}-{int(dte_days.max())} DTE, mean {dte_days.mean():.1f}, non-overlapping) "
+              f"{base['day'][0]}..{base['day'][-1]}{measured_note}: " + "; ".join(parts)
               + f"; the edge hinges on the IV level ({TRADED_NOTE})" + f" — {why}")
-    stat = {"model_priced": True, "n_cycles": n, "measured_scale": measured_scale, "by_scale": by, "dsr": dsr,
+    stat = {"model_priced": True, "rule10": "SPY monthly expiry calendar (claim: per monthly cycle)", "n_cycles": n,
+            "dte_range": [int(dte_days.min()), int(dte_days.max())], "mean_dte": float(dte_days.mean()),
+            "measured_scale": measured_scale, "by_scale": by, "dsr": dsr,
             "variant_means": sens, "unhedged_mean": float(uh.mean()), "shuffled_vix_placebo_mean": float(np.mean(pl["pnl"] / pl["prem"])),
-            "hedge_cost_1bp_mean": float(np.mean(one_bp["pnl"] / one_bp["prem"])), "verdict": verdict}
+            "hedge_cost_1bp_mean": float(np.mean(one_bp["pnl"] / one_bp["prem"])), "grid_pooled_cross_check": check,
+            "first_entry": base["day"][0], "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
 
@@ -888,15 +1321,23 @@ def _smile_ratio(smile: Smile, m, dte) -> np.ndarray:
     return out
 
 
-def short_option_paths(fr: dict, entries, legs, dte: int = 45, iv_scale: float = 1.0, smile: Optional[Smile] = None) -> dict:
-    """Short option legs entered at the close of each entry day, expiring on the last trading day on or before entry +
-    ``dte`` calendar days. legs: [(kind, delta)]; strikes at the target BS delta on the dividend forward at
-    sigma = iv_scale * VIX/100. Marked to model at every close at the same scale of that day's VIX (or the captured smile
-    level: VIX_j/100 x IV/VIX ratio at K/S_j) to expiry, where the mark is the intrinsic value on the raw close."""
+def short_option_paths(fr: dict, entries, legs, dte: int = 45, iv_scale: float = 1.0, smile: Optional[Smile] = None,
+                       expiries=None) -> dict:
+    """Short option legs entered at the close of each entry day, expiring at the session ``expiries`` gives (an expiry
+    calendar) or, without it, on the last trading day on or before entry + ``dte`` calendar days. An entry without a VIX
+    close is dropped. legs: [(kind, delta)]; strikes at the target BS delta on the dividend forward (ex-dates projected
+    from ``fr["sched"]``) at sigma = iv_scale * VIX/100. Marked to model at every close at the same scale of that day's
+    VIX (the latest print; or the captured smile level: VIX_j/100 x IV/VIX ratio at K/S_j) to expiry, where the mark is
+    the intrinsic value on the raw close."""
     days, ords, n = fr["days"], fr["ords"], len(fr["days"])
     e = np.asarray(entries, dtype=np.int64)
-    xs = np.searchsorted(ords, ords[e] + dte, side="right") - 1
-    ok = (xs > e) & (ords[e] + dte <= ords[-1])
+    if expiries is None:
+        xs = np.searchsorted(ords, ords[e] + dte, side="right") - 1
+        ok = (xs > e) & (ords[e] + dte <= ords[-1])
+    else:
+        xs = np.asarray(expiries, dtype=np.int64)
+        ok = (xs > e) & (xs < n)
+    ok &= fr.get("has_vix", np.ones(n, dtype=bool))[e]
     e, xs = e[ok], xs[ok]
     if e.size == 0:
         return {"n": 0}
@@ -910,9 +1351,9 @@ def short_option_paths(fr: dict, entries, legs, dte: int = 45, iv_scale: float =
     T = np.maximum(tx[:, None] - tt, 0.0) / 365.0
     r = fr["rate"][e]
     v = fr["vix"][I] / 100.0
-    D = np.where(live, fr["div"][I], 0.0)
-    D[:, 0] = 0.0
-    Sx = S - _pv_divs(D > 0, fr["fc"][e], tt, r)
+    ex = live & fr.get("sched", fr["div"] > 0)[I]
+    ex[:, 0] = False
+    Sx = S - _pv_divs(ex, fr["fc"][e], tt, r)
     sig0 = np.maximum(iv_scale * v[:, 0], 0.01)
     marks = np.zeros(S.shape)
     strikes, itm = [], np.zeros(e.size, dtype=int)
@@ -995,23 +1436,29 @@ def _week_starts(days) -> np.ndarray:
 def theta_harvest(fr: dict, smile: Optional[Smile] = None, daily: bool = True, delta: float = 0.16, dte: int = 45,
                   block: int = 6, n_boot: int = 2000, seed: int = 0, min_n: int = 300) -> dict:
     """T-156: 45-DTE 0.16-delta SPY short strangle priced and marked at VIX (flat). Statistic: mean P&L per day in the trade
-    (P&L / entry spot / calendar days), 21-DTE exit minus hold to expiry, paired by entry. CIs on non-overlapping monthly
-    entries (first trading day of each month; block 6 covers the 45-day overlap), Bonferroni level for the three rules.
-    Pass: > 0 with the CI excluding 0 in both halves; min_n 300 monthly entries. Commissions $0.65 per contract."""
-    legs = [("put", -delta), ("call", delta)]
-    me = _month_starts(fr["days"])
+    (P&L / entry spot / calendar days), 21-DTE exit minus hold to expiry, paired by entry. CIs on the monthly entries,
+    Bonferroni level for the three rules. Pass: > 0 with the CI excluding 0 in both halves; min_n 300 monthly entries.
+    Commissions $0.65 per contract.
 
-    def run(entries, scale=1.0, sm=None):
-        p = short_option_paths(fr, entries, legs, dte, scale, sm)
+    Rule 10(a): 'monthly' 45-DTE entries name SPY's monthly expiry calendar: each entry sells the strangle expiring on a
+    monthly expiry (third Friday, prior session on a holiday) at the session nearest 45 calendar days before it (block 6
+    covers the overlap of consecutive 45-day positions). The trial's daily entries (every session with a VIX close,
+    expiring on the last session on or before entry + 45 days) are reported with a pooled CI (block 6 holds of 31
+    sessions), not in the verdict."""
+    legs = [("put", -delta), ("call", delta)]
+    me, mx = calendar_entries(fr["days"], monthly_expiry_idx(fr["days"]), dte, False, ok=fr.get("has_vix"))
+
+    def run(entries, scale=1.0, sm=None, expiries=None):
+        p = short_option_paths(fr, entries, legs, dte, scale, sm, expiries=expiries)
         if p["n"] == 0:
             return p, {}
         cols = exit_columns(p)
         return p, {k: rule_pnl(p, c) for k, c in cols.items()}
 
-    p, rules = run(me)
+    p, rules = run(me, expiries=mx)
     n = int(p.get("n", 0))
     if n < 8:
-        return {"verdict": "inconclusive", "n": n, "reason": f"only {n} monthly entries"}
+        return {"verdict": "inconclusive", "n": n, "reason": f"only {n} monthly-expiry entries"}
     diff = rules["dte21"]["ppd"] - rules["hold"]["ppd"]
     t = exit_rule_test(diff, 3, block, n_boot, seed)
     bp = 1e4
@@ -1028,40 +1475,56 @@ def theta_harvest(fr: dict, smile: Optional[Smile] = None, daily: bool = True, d
                  + ", ".join(f"{k} {means[k]:+.2f} ({sds[k]:.2f})" for k in ("hold", "dte21", "target50", "target50_or_dte21")))
     sens = {}
     for s in (0.81, 0.90):
-        _, rr = run(me, s)
+        _, rr = run(me, s, expiries=mx)
         sens[f"{s:.2f}"] = float((rr["dte21"]["ppd"] - rr["hold"]["ppd"]).mean() * bp)
     if smile is not None:
-        _, rr = run(me, 1.0, smile)
+        _, rr = run(me, 1.0, smile, expiries=mx)
         sens["captured_smile"] = float((rr["dte21"]["ppd"] - rr["hold"]["ppd"]).mean() * bp)
     parts.append("IV sensitivity of the mean difference (bp/day) " + ", ".join(f"{k} {v:+.3f}" for k, v in sens.items())
                  + ("" if smile is not None else "; captured-smile (skew) sensitivity not run: no spy-smile bundle"))
-    daily_est = None
+    daily_rep = None
     if daily:
-        _, rd = run(np.arange(len(fr["days"])))
+        dent = np.nonzero(fr.get("has_vix", np.ones(len(fr["days"]), dtype=bool)))[0]
+        _, rd = run(dent)
         if rd:
-            daily_est = float((rd["dte21"]["ppd"] - rd["hold"]["ppd"]).mean() * bp)
-            parts.append(f"daily entries ({rd['hold']['ppd'].size}) point estimate {daily_est:+.3f} bp/day")
+            dd = rd["dte21"]["ppd"] - rd["hold"]["ppd"]
+            hs = int(round(dte * PPY / 365.0))
+            pbd = pool_block_len(hs)
+            lvl = t["level"]
+            h = dd.size // 2
+            daily_rep = {"n_entries": int(dd.size), "mean_bp": float(dd.mean() * bp), "block_days": pbd, "level": lvl,
+                         "ci_bp": [None if b is None else b * bp for b in stud_ci(dd, pbd, lvl, n_boot, seed)],
+                         "halves": [{"mean_bp": float(q.mean() * bp),
+                                     "ci_bp": [None if b is None else b * bp for b in stud_ci(q, pbd, lvl, n_boot, seed)]}
+                                    for q in (dd[:h], dd[h:])]}
+            parts.append(f"trial's daily entries (reported, not in the verdict): {dd.size} entries, mean {daily_rep['mean_bp']:+.3f} "
+                         f"bp/day ({_ci_s(daily_rep['ci_bp'], 3)}, block {pbd} days), halves "
+                         + "/".join(f"{q['mean_bp']:+.3f} ({_ci_s(q['ci_bp'], 3)})" for q in daily_rep["halves"]))
+    dte_days = p["tx"] - p["tt"][:, 0]
     verdict, why = _decide(crit, n, min_n, "monthly entries")
     reason = (f"{MP} 45-DTE 0.16-delta SPY short strangle at VIX on the dividend forward, marked daily at VIX, settled on raw "
-              f"closes, $0.65/contract; {n} monthly entries {p['days'][0]}..{p['days'][-1]}, P&L per day in bp of entry spot: "
+              f"closes, $0.65/contract; rule 10 (the trial names monthly entries): {n} entries on SPY's monthly expiry "
+              f"calendar (third Friday, prior session on a holiday; entered {int(dte_days.min())}-{int(dte_days.max())} DTE) "
+              f"{p['days'][0]}..{p['days'][-1]}, P&L per day in bp of entry spot: "
               + "; ".join(parts) + f"; margin-time cost not charged (P&L per day already scales by time); {TRADED_NOTE}" + f" — {why}")
-    stat = {"model_priced": True, "n_monthly_entries": n, "test": t, "mean_ppd_bp": means, "sd_ppd_bp": sds,
+    stat = {"model_priced": True, "rule10": "SPY monthly expiry calendar (trial: monthly entries)", "n_monthly_entries": n,
+            "dte_range": [int(dte_days.min()), int(dte_days.max())], "test": t, "mean_ppd_bp": means, "sd_ppd_bp": sds,
             "mean_days_in_trade": {k: float(v["days"].mean()) for k, v in rules.items()}, "iv_sensitivity_bp": sens,
-            "daily_entries_estimate_bp": daily_est, "commission_per_contract": 0.65, "verdict": verdict}
+            "daily_entries": daily_rep, "commission_per_contract": 0.65, "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
 
 # ======================================================================================= T-157 theta ladder ==
 
 def put_book(fr: dict, entries, size: float, delta: float = -0.16, dte: int = 45, iv_scale: float = 1.0,
-             comm: float = COMM_PER_SHARE) -> dict:
-    """Daily P&L of a book of short puts (0.16 delta, 45 DTE, closed at 50% of the credit or 21 DTE), each sized at ``size``
-    units of strike notional (size / K shares). P&L per unit notional, marked to model at each close; commissions per share
-    on every fill. Returns the daily P&L and open notional on the frame's calendar."""
+             comm: float = COMM_PER_SHARE, expiries=None) -> dict:
+    """Daily P&L of a book of short puts (0.16 delta, 45 DTE - or the given ``expiries`` - closed at 50% of the credit or 21
+    DTE), each sized at ``size`` units of strike notional (size / K shares). P&L per unit notional, marked to model at each
+    close; commissions per share on every fill. Returns the daily P&L and open notional on the frame's calendar."""
     n = len(fr["days"])
     pnl = np.zeros(n)
     expo = np.zeros(n)
-    p = short_option_paths(fr, entries, [("put", delta)], dte, iv_scale)
+    p = short_option_paths(fr, entries, [("put", delta)], dte, iv_scale, expiries=expiries)
     if p["n"] == 0:
         return {"pnl": pnl, "exposure": expo, "n_positions": 0, "first": None, "last": None}
     cols = exit_columns(p)["target50_or_dte21"]
@@ -1101,12 +1564,25 @@ def ladder_verdict(pl_ladder, pl_single, block: int = 63, n_boot: int = 1000, se
     return {"full": full, "halves": halves, "crit": crit}
 
 
-def theta_ladder(fr: dict, block: int = 63, n_boot: int = 4000, seed: int = 0, min_n: int = 300) -> dict:
+def ladder_calendars(fr: dict, dte: int = 45) -> dict:
+    """Rule 10(a) entries for T-157: the single book sells the put expiring on each monthly expiry (third Friday), the
+    ladder the put expiring on every weekly Friday expiry (prior session on a holiday for both), each entered at the
+    session nearest ``dte`` calendar days before its expiry (both books enter on the same weekday)."""
+    days, ok = fr["days"], fr.get("has_vix")
+    sm, sx = calendar_entries(days, monthly_expiry_idx(days), dte, False, ok)
+    lw, lx = calendar_entries(days, weekly_expiry_idx(days), dte, False, ok)
+    return {"single": (sm, sx), "ladder": (lw, lx)}
+
+
+def theta_ladder(fr: dict, block: int = 63, n_boot: int = 4000, seed: int = 0, min_n: int = 300, dte: int = 45) -> dict:
     """T-157: weekly ladder of quarter-size 0.16-delta short puts vs a full-size monthly entry, both 45 DTE and closed at 50%
     of the credit or 21 DTE, priced and marked at VIX. Pass: drawdown ratio < 0.85 with the bootstrap CI upper < 1 in both
-    halves; min_n 300 months."""
-    single = put_book(fr, _month_starts(fr["days"]), 1.0)
-    ladder = put_book(fr, _week_starts(fr["days"]), 0.25)
+    halves; min_n 300 months. Rule 10(a): 'weekly' rungs and the 'monthly' entry are built on SPY's weekly-Friday and
+    monthly (third-Friday) expiry calendars, entered 45 DTE before each expiry (``ladder_calendars``); the previous
+    first-session-of-month/week anchors are reported as a sensitivity."""
+    cal = ladder_calendars(fr, dte)
+    single = put_book(fr, cal["single"][0], 1.0, dte=dte, expiries=cal["single"][1])
+    ladder = put_book(fr, cal["ladder"][0], 0.25, dte=dte, expiries=cal["ladder"][1])
     if single["first"] is None or ladder["first"] is None:
         return {"verdict": "inconclusive", "n": 0, "reason": "no complete positions"}
     a0 = min(single["first"], ladder["first"])
@@ -1117,10 +1593,18 @@ def theta_ladder(fr: dict, block: int = 63, n_boot: int = 4000, seed: int = 0, m
     crit = v["crit"]
     sens = {}
     for s in (0.81, 0.90):
-        s1 = put_book(fr, _month_starts(fr["days"]), 1.0, iv_scale=s)
-        l1 = put_book(fr, _week_starts(fr["days"]), 0.25, iv_scale=s)
+        s1 = put_book(fr, cal["single"][0], 1.0, dte=dte, iv_scale=s, expiries=cal["single"][1])
+        l1 = put_book(fr, cal["ladder"][0], 0.25, dte=dte, iv_scale=s, expiries=cal["ladder"][1])
         mb = float(_mdd_abs(s1["pnl"][a0:a1])[0])
         sens[f"{s:.2f}"] = float(_mdd_abs(l1["pnl"][a0:a1])[0]) / mb if mb > 0 else None
+    old = {}
+    s0 = put_book(fr, _month_starts(fr["days"]), 1.0, dte=dte)
+    l0 = put_book(fr, _week_starts(fr["days"]), 0.25, dte=dte)
+    if s0["first"] is not None and l0["first"] is not None:
+        b0, b1 = min(s0["first"], l0["first"]), max(s0["last"], l0["last"]) + 1
+        v0 = ladder_verdict(l0["pnl"][b0:b1], s0["pnl"][b0:b1], block, max(200, n_boot // 4), seed)
+        old = {"full_ratio": v0["full"]["ratio"], "half_ratios": [h["ratio"] for h in v0["halves"]],
+               "half_ci_upper": [h["ci"][1] for h in v0["halves"]]}
 
     def monthly(pl, ex):
         ms = {}
@@ -1142,114 +1626,300 @@ def theta_ladder(fr: dict, block: int = 63, n_boot: int = 4000, seed: int = 0, m
                  f"{mo['ladder']['mean_open_notional']:.2f} vs {mo['single']['mean_open_notional']:.2f}")
     parts.append(f"delta-matched (both 0.16 at entry): mean K/S {ladder['mean_moneyness']:.3f} vs {single['mean_moneyness']:.3f}")
     parts.append("IV sensitivity of the full-span ratio " + ", ".join(f"s={k} {_f(x, 3)}" for k, x in sens.items()))
+    if old:
+        parts.append(f"sensitivity, first-session-of-month/week entries at entry + 45 days (the previous anchors): full ratio "
+                     f"{_f(old['full_ratio'], 3)}, halves {_f(old['half_ratios'][0], 3)}/{_f(old['half_ratios'][1], 3)} (CI upper "
+                     f"{_f(old['half_ci_upper'][0], 2)}/{_f(old['half_ci_upper'][1], 2)})")
     verdict, why = _decide(crit, months, min_n, "months")
     reason = (f"{MP} 0.16-delta 45-DTE SPY short puts at VIX on the dividend forward, marked daily, closed at 50% of credit or "
-              f"21 DTE, $0.65/contract per fill (four times the fills for the ladder); {ladder['n_positions']} ladder rungs vs "
-              f"{single['n_positions']} monthly entries over {months} months {fr['days'][a0]}..{fr['days'][a1 - 1]}; drawdowns of the "
-              f"additive P&L per unit notional, paired percentile block bootstrap (block {block} days): " + "; ".join(parts)
+              f"21 DTE, $0.65/contract per fill (four times the fills for the ladder); rule 10 (the claim names weekly and "
+              f"monthly entries): {ladder['n_positions']} ladder rungs on the weekly Friday expiry calendar vs "
+              f"{single['n_positions']} entries on the monthly (third-Friday) expiry calendar, each entered 45 DTE before its "
+              f"expiry, over {months} months {fr['days'][a0]}..{fr['days'][a1 - 1]}; drawdowns of the additive P&L per unit "
+              f"notional, paired percentile block bootstrap (block {block} days): " + "; ".join(parts)
               + f"; {TRADED_NOTE}" + f" — {why}")
-    stat = {"model_priced": True, "n_months": months, "full": f, "halves": v["halves"], "monthly": mo, "iv_sensitivity_ratio": sens,
-            "n_ladder_rungs": ladder["n_positions"], "n_single_entries": single["n_positions"], "block_days": block, "verdict": verdict}
+    stat = {"model_priced": True, "rule10": "SPY weekly-Friday and monthly expiry calendars (claim: weekly ladder vs monthly entry)",
+            "n_months": months, "full": f, "halves": v["halves"], "monthly": mo, "iv_sensitivity_ratio": sens,
+            "previous_anchor_sensitivity": old, "n_ladder_rungs": ladder["n_positions"],
+            "n_single_entries": single["n_positions"], "block_days": block, "verdict": verdict}
     return {"verdict": verdict, "n": months, "reason": reason, "stat": stat}
 
 
 # =============================================================================== model-free variance claims ==
 
-def _cycles_rv(closes, idx_start: int = 0, hold: int = HOLD):
-    """Non-overlapping cycles from idx_start: entries a, forward realised variance over returns a+1..a+hold (annualised)."""
-    c = np.asarray(closes, dtype=float)
-    lr = np.log(c[1:] / c[:-1])
-    starts = np.arange(idx_start, c.size - hold, hold)
-    rv = np.array([PPY / hold * float(np.sum(lr[a:a + hold] ** 2)) for a in starts])
-    return starts, rv
+def intraday_var_by_day(rows) -> dict:
+    """{day: sum of squared hourly log returns inside the regular session} from an hourly bar bundle (the first bar from
+    its open; the overnight return is left out, as in intraday-only realised variance)."""
+    by: dict = {}
+    for r in rows:
+        v = r.get("value", {})
+        o, c, t = v.get("open"), v.get("close"), v.get("t")
+        if not o or not c or t is None or not (float(o) > 0 and float(c) > 0):
+            continue
+        d = datetime.fromtimestamp(float(t), tz=timezone.utc).strftime("%Y-%m-%d")
+        by.setdefault(d, []).append((float(t), float(o), float(c)))
+    out = {}
+    for d, bars in by.items():
+        bars.sort()
+        s = math.log(bars[0][2] / bars[0][1]) ** 2
+        for k in range(1, len(bars)):
+            s += math.log(bars[k][2] / bars[k - 1][2]) ** 2
+        out[d] = s
+    return out
 
 
 def short_variance_units(days, close, vix, block: int = 6, n_boot: int = 2000, seed: int = 0, min_n: int = 390,
-                         checks: Optional[dict] = None) -> dict:
+                         checks: Optional[dict] = None, intraday: Optional[dict] = None, hold: int = HOLD) -> dict:
     """T-540: short 30-day variance struck at VIX_t^2 settled on the next 21 close-to-close log returns; P&L = (VIX^2 -
-    RV21) / 12 in %^2 per month over non-overlapping cycles. Pass: lower 95% studentized CI > 0; min_n 390 cycles.
-    ``checks``: {label: closes aligned to ``days``} for basis checks on the same cycle dates."""
-    vix = np.asarray(vix, dtype=float)
-    starts, rv = _cycles_rv(close)
-    n = int(starts.size)
-    if n < 8:
-        return {"verdict": "inconclusive", "n": n, "reason": f"only {n} cycles"}
-    x = (vix[starts] ** 2 - rv * 1e4) / 12.0
-    lo, hi = stud_ci(x, block, 0.95, n_boot, seed)
+    RV21) / 12 in %^2 per month. Pass: lower 95% studentized CI > 0; min_n 390 cycles.
+
+    Rule 10(b): the claim's non-overlapping cycles have no calendar, so the criterion is judged on the POOLED estimate
+    over all 21 grid offsets (every session with a VIX close is an entry; studentized circular block bootstrap, 126-day
+    blocks); each offset is reported. ``days``/``close`` are the full index calendar (a session without a VIX close, NaN
+    in ``vix``, takes no entry but stays in the returns). ``checks``: {label: closes aligned to ``days``} for basis
+    checks on the same entries; ``intraday``: {day: intraday-only variance} for the partial 5-minute-RV control."""
+    days = list(days)
+    c = np.asarray(close, dtype=float)
+    v = np.asarray(vix, dtype=float)
+    cand = np.arange(0, max(0, c.size - hold))
+    ent = cand[np.isfinite(v[cand]) & (v[cand] > 0)]
+    rv = _fwd_rv(c, ent, hold)
+    keep = np.isfinite(rv)
+    ent, rv = ent[keep], rv[keep]
+    n = n_holds(ent, hold)
+    if ent.size < 8 * hold:
+        return {"verdict": "inconclusive", "n": n, "reason": f"only {ent.size} daily entries ({n} cycles)"}
+    x = (v[ent] ** 2 - rv * 1e4) / 12.0
+    ps = phase_scan(ent, x, hold, block, n_boot, seed, side=1)
+    lo, hi = ps["pooled"]["ci"]
     worst = int(np.argmin(x))
-    ex = np.delete(x, worst)
+    near = np.abs(ent - ent[worst]) < hold                       # every entry whose window overlaps the worst one
+    ex_lo, ex_hi = stud_ci(x[~near], pool_block_len(hold), 0.95, n_boot, seed)
+    exw = []
+    for k in range(hold):
+        xk = x[ent % hold == k]
+        if xk.size > 1:
+            exw.append(float(np.delete(xk, int(np.argmin(xk))).mean()))
     d = _desc(x)
+    # units sensitivity: strike (VIX/100)^2 x 30/365 against the un-annualised sum of 21 squared returns
+    x30 = v[ent] ** 2 * 30.0 / 365.0 - rv * hold / PPY * 1e4
+    ps30 = phase_scan(ent, x30, hold, block, max(500, n_boot // 2), seed, side=1)
     rep = {}
     for lab, cc in (checks or {}).items():
-        cc = np.asarray(cc, dtype=float)
-        ok = np.isfinite(cc)
-        sel = [i for i, a in enumerate(starts) if ok[a] and ok[a + HOLD] and ok[a:a + HOLD + 1].all()]
-        if sel:
-            _, rv2 = _cycles_rv(cc)
-            y = (vix[starts[sel]] ** 2 - rv2[sel] * 1e4) / 12.0
-            rep[lab] = {"n": len(sel), "mean": float(y.mean())}
-    crit = [("lower 95% CI of mean (VIX^2 - RV21)/12 > 0", None if lo is None else bool(lo > 0), hi is not None and hi < 0)]
-    verdict, why = _decide(crit, n, min_n, "cycles")
-    reason = (f"short variance struck at VIX^2, {n} non-overlapping 21-day cycles {days[starts[0]]}..{days[starts[-1]]}: mean "
-              f"{x.mean():+.2f} %^2/month (studentized 95% {_ci_s((lo, hi))}), skew {d['skew']:.2f}, kurtosis {d['kurtosis']:.1f}, "
-              f"worst cycle {x[worst]:+.1f} on {days[starts[worst]]}, mean ex-worst {ex.mean():+.2f}"
-              + "".join(f"; {k} basis {v['mean']:+.2f} (n {v['n']})" for k, v in rep.items()) + f" — {why}")
-    stat = {"n_cycles": n, "mean_pct2_per_month": float(x.mean()), "ci95": [lo, hi], **{f"desc_{k}": v for k, v in d.items()},
-            "worst_cycle": float(x[worst]), "worst_day": days[starts[worst]], "mean_ex_worst": float(ex.mean()),
-            "share_positive": float((x > 0).mean()), "thirds": _thirds(x), "checks": rep, "verdict": verdict}
+        rv2 = _fwd_rv(np.asarray(cc, dtype=float), ent, hold)
+        ok = np.isfinite(rv2)
+        if ok.any():
+            y = (v[ent[ok]] ** 2 - rv2[ok] * 1e4) / 12.0
+            rep[lab] = {"n_entries": int(ok.sum()), "mean": float(y.mean())}
+    intra = None
+    if intraday:
+        iv = np.array([intraday.get(dd, np.nan) for dd in days])
+        cs = np.concatenate([[0.0], np.cumsum(np.nan_to_num(iv, nan=0.0))])
+        bad = np.concatenate([[0], np.cumsum(~np.isfinite(iv))])
+        okw = (bad[ent + hold + 1] - bad[ent + 1]) == 0
+        if okw.sum() >= hold:
+            e2 = ent[okw]
+            rvi = PPY / hold * (cs[e2 + hold + 1] - cs[e2 + 1])
+            xi = (v[e2] ** 2 - rvi * 1e4) / 12.0
+            intra = {"n_entries": int(e2.size), "first": days[e2[0]], "last": days[e2[-1]],
+                     "mean_close_to_close": float(x[okw].mean()), "mean_intraday": float(xi.mean()),
+                     "rv_ratio_intraday_to_close": float(rvi.mean() / rv[okw].mean())}
+    crit = [(f"lower 95% CI of mean (VIX^2 - RV21)/12 > 0 (pooled over the {hold} grid offsets)",
+             None if lo is None else bool(lo > 0), hi is not None and hi < 0)]
+    verdict, why = _decide(crit, n, min_n, f"cycles (distinct {hold}-day holds of the pooled entries)")
+    parts = [_pool_txt(ps, 2, 1.0, " %^2/month"), _phase_txt(ps, 1, 2),
+             f"skew {d['skew']:.2f}, kurtosis {d['kurtosis']:.1f}, worst cycle {x[worst]:+.1f} entered {days[ent[worst]]}; "
+             f"ex-worst: pooled without the {int(near.sum())} entries overlapping it {x[~near].mean():+.2f} "
+             f"({_ci_s((ex_lo, ex_hi))}), per offset without its own worst cycle {min(exw):+.2f} to {max(exw):+.2f}",
+             f"units sensitivity (strike (VIX/100)^2 x 30/365 vs the un-annualised sum of 21 squared returns, %^2): pooled "
+             f"{ps30['pooled']['mean']:+.2f} ({_ci_s(ps30['pooled']['ci'])}), {ps30['summary']['n_pass']}/{hold} offsets pass"]
+    parts += [f"{k} basis {r['mean']:+.2f} (pooled, {r['n_entries']} entries)" for k, r in rep.items()]
+    if intra:
+        parts.append(f"close-to-close vs intraday RV (BTZ use 5-minute RV; not archived): on hourly SPY bars "
+                     f"{intra['first']}..{intra['last']} ({intra['n_entries']} entries) intraday-only RV is "
+                     f"{intra['rv_ratio_intraday_to_close']:.2f} x close-to-close and the mean P&L {intra['mean_intraday']:+.2f} vs "
+                     f"{intra['mean_close_to_close']:+.2f}: close-to-close RV runs higher, so this test is conservative on the control")
+    else:
+        parts.append("close-to-close vs 5-minute RV: 5-minute RV is not archived (intraday RV leaves out the overnight return "
+                     "and runs lower, so close-to-close is the conservative choice)")
+    reason = (f"short variance struck at VIX^2, settled on SPY close-to-close returns; rule 10 (no entry calendar in the "
+              f"claim): {ent.size} daily entries {days[ent[0]]}..{days[ent[-1]]} = {n} cycles: " + "; ".join(parts) + f" — {why}")
+    stat = {"rule10": "pooled all-offset estimate (no calendar in the claim)", "n_cycles": n, "n_entries": int(ent.size),
+            "mean_pct2_per_month": ps["pooled"]["mean"], "ci95": [lo, hi], "block_days": ps["pooled"]["block_days"],
+            "offsets": ps["offsets"], "offsets_summary": ps["summary"], **{f"desc_{k}": val for k, val in d.items()},
+            "worst_cycle": float(x[worst]), "worst_day": days[ent[worst]],
+            "mean_ex_worst_window": float(x[~near].mean()), "ci_ex_worst_window": [ex_lo, ex_hi],
+            "mean_ex_worst_by_offset_range": [min(exw), max(exw)], "share_positive": float((x > 0).mean()),
+            "thirds": _thirds(x), "units_30_365": {"pooled": ps30["pooled"], "summary": ps30["summary"]},
+            "checks": rep, "intraday_check": intra, "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
 
+def _cp_ci(k: int, n: int, alpha: float = 0.05) -> tuple:
+    """Clopper-Pearson interval: options_market._binom_two_sided_ci (bisection on the exact binomial tails), with the
+    tails summed in log space by numpy so the many per-third and per-offset intervals stay fast."""
+    k, n = int(k), int(n)
+    i = np.arange(n + 1)
+    lc = np.array([math.lgamma(n + 1) - math.lgamma(j + 1) - math.lgamma(n - j + 1) for j in i])
+
+    def cdf(x, p):
+        if p <= 0.0:
+            return 1.0
+        if p >= 1.0:
+            return 1.0 if x >= n else 0.0
+        j = i[:x + 1]
+        return float(np.exp(lc[:x + 1] + j * math.log(p) + (n - j) * math.log1p(-p)).sum())
+
+    def solve(f):
+        lo, hi = 0.0, 1.0
+        for _ in range(60):
+            mid = (lo + hi) / 2
+            if f(mid):
+                hi = mid
+            else:
+                lo = mid
+        return (lo + hi) / 2
+    lower = 0.0 if k == 0 else solve(lambda p: 1 - cdf(k - 1, p) >= alpha / 2)
+    upper = 1.0 if k == n else solve(lambda p: cdf(k, p) <= alpha / 2)
+    return lower, upper
+
+
+def _win_stats(win, block: int, n_boot: int, seed: int) -> dict:
+    k, n = int(np.sum(win)), int(np.size(win))
+    cp = _cp_ci(k, n) if n else (None, None)
+    bb = pct_ci(np.asarray(win, dtype=float), block, 0.95, n_boot, seed)
+    return {"wins": k, "n": n, "rate": k / n if n else None, "cp": list(cp), "bb": list(bb)}
+
+
 def vix2_win_rate(days, close, vix, bound: float = 0.75, block: int = 6, n_boot: int = 2000, seed: int = 0, min_n: int = 300,
-                  checks: Optional[dict] = None, truncation: Optional[list] = None) -> dict:
-    """T-234: share of non-overlapping 21-day cycles with (VIX_t/100)^2 > RV_{t,t+21}. Pass: lower 95% bound (exact
-    Clopper-Pearson, two-sided, and the percentile block bootstrap) > 0.75, and the win rate > 0.75 in all three thirds;
-    min_n 300 cycles. The strip truncation error on the captured chain is reported, not part of the pass."""
-    vix = np.asarray(vix, dtype=float)
-    starts, rv = _cycles_rv(close)
-    n = int(starts.size)
+                  checks: Optional[dict] = None, truncation: Optional[list] = None, atm_scales: Optional[dict] = None,
+                  start: str = "1990-01-01", hold: int = HOLD) -> dict:
+    """T-234: share of non-overlapping months with (VIX_t/100)^2 > RV_{t,t+21}. Pass: lower 95% bound (exact
+    Clopper-Pearson, two-sided, and the percentile block bootstrap) > 0.75, and the win rate > 0.75 in all three thirds
+    (the reading applied: the point win rate in each third, the analogue of the original 'mean positive in each third';
+    the per-third CIs are reported); min_n 300 months. The strip truncation error on the captured chain is reported, not
+    part of the pass.
+
+    Rule 10(a): 'months since 1990' names the calendar month: each month enters at the close of its first session with a
+    VIX close and settles on the next 21 ^GSPC price returns. The month-end anchor and the 21-day grid (pooled and per
+    offset) are reported. ``days``/``close`` are the full index calendar (NaN ``vix`` = no VIX close that day).
+    ``atm_scales``: {label: s} for the MODEL-PRICED ATM-straddle-only control at ATM IV = s x VIX."""
+    days = list(days)
+    c = np.asarray(close, dtype=float)
+    v = np.asarray(vix, dtype=float)
+    okv = np.isfinite(v) & (v > 0)
+    ent = _month_first(days, okv, start)
+    rv = _fwd_rv(c, ent, hold)
+    keep = np.isfinite(rv)
+    ent, rv = ent[keep], rv[keep]
+    n = int(ent.size)
     if n < 8:
-        return {"verdict": "inconclusive", "n": n, "reason": f"only {n} cycles"}
-    iv = (vix[starts] / 100.0) ** 2
+        return {"verdict": "inconclusive", "n": n, "reason": f"only {n} months"}
+    iv = (v[ent] / 100.0) ** 2
     win = (iv > rv).astype(float)
-    k = int(win.sum())
-    cp = _binom_two_sided_ci(k, n)
-    bb = pct_ci(win, block, 0.95, n_boot, seed)
-    th = _thirds(win)
+    ovl = int(np.max(np.maximum(ent[:-1] + hold - ent[1:], 0))) if n > 1 else 0
+    w = _win_stats(win, block, n_boot, seed)
+    k, cp, bb = w["wins"], w["cp"], w["bb"]
+    th_parts = np.array_split(win, 3)
+    thirds = [_win_stats(p, block, n_boot, seed) for p in th_parts]
+    th = [t["rate"] for t in thirds]
     crit = [(f"exact binomial lower 95% bound > {bound}", bool(cp[0] > bound), cp[1] < bound),
             (f"block-bootstrap lower 95% bound > {bound}", None if bb[0] is None else bool(bb[0] > bound), bb[1] is not None and bb[1] < bound),
-            (f"win rate > {bound} in all three thirds", all(t > bound for t in th), False)]
+            (f"win rate > {bound} in all three thirds (point estimate)", all(t > bound for t in th), False)]
+    strict = all(t["cp"][0] is not None and t["cp"][0] > bound and t["bb"][0] is not None and t["bb"][0] > bound for t in thirds)
     logr = np.log(np.maximum(rv, 1e-12) / iv)
-    pnl_vega1 = (vix[starts] ** 2 - rv * 1e4) / (2.0 * vix[starts])     # short variance swap, vega notional 1 per vol point
+    pnl_vega1 = (v[ent] ** 2 - rv * 1e4) / (2.0 * v[ent])          # short variance swap, vega notional 1 per vol point
+    vrp = (v[ent] ** 2 - rv * 1e4) / 12.0
+    # robustness: month-end anchor; the 21-day grid (pooled over offsets and per offset)
+    ent_e = _month_last(days, okv, start)
+    rv_e = _fwd_rv(c, ent_e, hold)
+    ke = np.isfinite(rv_e)
+    we = _win_stats(((v[ent_e[ke]] / 100.0) ** 2 > rv_e[ke]).astype(float), block, max(500, n_boot // 2), seed)
+    cand = np.arange(0, max(0, c.size - hold))
+    ge = cand[okv[cand] & (np.array(days)[cand] >= start)] if cand.size else cand
+    grv = _fwd_rv(c, ge, hold)
+    gk = np.isfinite(grv)
+    ge, grv = ge[gk], grv[gk]
+    gwin = ((v[ge] / 100.0) ** 2 > grv).astype(float)
+    gcp = [_cp_ci(int(gwin[ge % hold == q].sum()), int((ge % hold == q).sum()))[0] for q in range(hold)
+           if (ge % hold == q).any()]
+    gpool = pct_ci(gwin, pool_block_len(hold), 0.95, max(500, n_boot // 2), seed)
+    grid = {"pooled_rate": float(gwin.mean()) if gwin.size else None, "pooled_bb": list(gpool), "n_entries": int(gwin.size),
+            "cp_lower_min": min(gcp) if gcp else None, "cp_lower_max": max(gcp) if gcp else None,
+            "n_offsets_pass": int(sum(1 for x in gcp if x > bound)), "n_offsets": len(gcp)}
     rep = {}
     for lab, cc in (checks or {}).items():
-        cc = np.asarray(cc, dtype=float)
-        okc = np.isfinite(cc)
-        sel = [i for i, a in enumerate(starts) if okc[a:a + HOLD + 1].all()]
-        if sel:
-            _, rv2 = _cycles_rv(np.where(okc, cc, 1.0))
-            rep[lab] = {"n": len(sel), "win_rate": float(np.mean(iv[sel] > rv2[sel]))}
+        rv2 = _fwd_rv(np.asarray(cc, dtype=float), ent, hold)
+        ok = np.isfinite(rv2)
+        if ok.any():
+            rep[lab] = {"n": int(ok.sum()), "win_rate": float(np.mean(iv[ok] > rv2[ok])), "win_rate_index_same_months": float(win[ok].mean())}
+    atm = {}
+    for lab, s in (atm_scales or {}).items():
+        if s is None:
+            continue
+        ia = (s * v[ent] / 100.0) ** 2
+        atm[lab] = {"scale": float(s), "win_rate": float(np.mean(ia > rv)), "mean_vrp": float(np.mean((s * s * v[ent] ** 2 - rv * 1e4) / 12.0))}
     rng = np.random.default_rng(seed)
-    lr = np.log(np.asarray(close, dtype=float)[1:] / np.asarray(close, dtype=float)[:-1])
-    sh = rng.permutation(lr)
-    rv_sh = np.array([PPY / HOLD * float(np.sum(sh[a:a + HOLD] ** 2)) for a in starts])
+    with np.errstate(invalid="ignore", divide="ignore"):
+        lr = np.log(c[1:] / c[:-1])
+    okl = np.isfinite(lr)
+    sh = np.zeros(lr.size)
+    sh[okl] = rng.permutation(lr[okl])
+    csh = np.concatenate([[0.0], np.cumsum(sh ** 2)])
+    rv_sh = PPY / hold * (csh[ent + hold] - csh[ent])                # returns a+1..a+hold of the shuffled series
     placebo = float(np.mean(iv > rv_sh))
     parts = [f"win rate {k}/{n} = {k / n:.3f} (Clopper-Pearson {cp[0]:.3f}-{cp[1]:.3f}; block bootstrap {_f(bb[0], 3)}-{_f(bb[1], 3)})",
-             "thirds " + "/".join(f"{t:.3f}" for t in th),
-             f"mean ln(RV/VIX^2) {logr.mean():+.3f}, short var swap (vega notional 1) {pnl_vega1.mean():+.2f} per cycle",
+             "thirds " + ", ".join(f"{t['rate']:.3f} (CP {t['cp'][0]:.3f}-{t['cp'][1]:.3f}, bootstrap {_f(t['bb'][0], 3)}-{_f(t['bb'][1], 3)})"
+                                   for t in thirds)
+             + f" [reading applied: the point win rate > {bound} in each third; the stricter reading, every third's lower "
+               f"bound > {bound}, {'also holds' if strict else 'does not hold'}]",
+             f"mean ln(RV/VIX^2) {logr.mean():+.3f}, mean VRP {vrp.mean():+.2f} %^2/month, short var swap (vega notional 1) "
+             f"{pnl_vega1.mean():+.2f} per cycle",
+             f"robustness (not in the pass): month-end anchor {we['rate']:.3f} (CP lower {we['cp'][0]:.3f}, n {we['n']}); 21-day grid "
+             f"pooled over all offsets {_f(grid['pooled_rate'], 3)} (bootstrap {_f(gpool[0], 3)}-{_f(gpool[1], 3)}, "
+             f"{grid['n_entries']} entries), per-offset CP lower {_f(grid['cp_lower_min'], 3)} to {_f(grid['cp_lower_max'], 3)}, "
+             f"{grid['n_offsets_pass']}/{grid['n_offsets']} offsets pass",
              f"shuffled-returns placebo win rate {placebo:.3f}"]
-    parts += [f"{lab} check win rate {v['win_rate']:.3f} (n {v['n']})" for lab, v in rep.items()]
+    parts += [f"{lab} check win rate {r['win_rate']:.3f} (n {r['n']}; index {r['win_rate_index_same_months']:.3f} on those months)"
+              for lab, r in rep.items()]
+    if atm:
+        parts.append("ATM-straddle-only VRP control (MODEL-PRICED: no ATM-IV history is archived, so ATM IV = s x VIX; expected "
+                     "smaller): " + ", ".join(f"{lab} s={a['scale']:.3f} win rate {a['win_rate']:.3f}, mean VRP {a['mean_vrp']:+.2f} "
+                                              f"%^2/month" for lab, a in atm.items())
+                     + f" vs VIX {k / n:.3f}, {vrp.mean():+.2f}")
+    else:
+        parts.append("ATM-straddle-only VRP control not run (no ATM-IV history and no scale given)")
     if truncation:
-        parts.append("strip vs VIX^2 on the captured SPX chain (reported, not in the pass): " + ", ".join(
-            f"{t['quote_day']} {_s(t.get('error') and t['error'] * 100, 1)}%" for t in truncation))
+        tx = []
+        for t in truncation:
+            e = t.get("error")
+            flag = "" if e is None or abs(e) < 0.05 else (" BREACHES the 5% tolerance" + (
+                " (a positive error is the wrong sign for truncation, which drops wing strikes and biases the strip down)"
+                if e > 0 else ""))
+            tim = ""
+            if t.get("captured_at"):
+                g = t.get("implied_spot_vs_close")
+                tim = (f" [capture {t['captured_at']} UTC"
+                       + (" inside Cboe's overnight SPX session (20:15-09:15 ET): live overnight quotes, not the 16:15 ET "
+                          "close the VIX prints" if t.get("overnight_session") else "")
+                       + (f"; chain-implied spot {g * 100:+.2f}% vs the {t['quote_day']} close" if g is not None else "")
+                       + "]")
+            tx.append(f"{t['quote_day']} {_s(e and e * 100, 1)}%{flag}{tim}")
+        parts.append("strip vs VIX^2 on the captured SPX chain (reported, not in the pass; tolerance < 5%): " + ", ".join(tx))
     else:
         parts.append("strip truncation check not run (no captured SPX chain)")
-    verdict, why = _decide(crit, n, min_n, "cycles")
-    reason = (f"model-free: (VIX/100)^2 vs next 21-day ^GSPC realised variance (price returns), {n} non-overlapping cycles "
-              f"{days[starts[0]]}..{days[starts[-1]]}: " + "; ".join(parts) + f" — {why}")
-    stat = {"n_cycles": n, "wins": k, "win_rate": k / n, "clopper_pearson": list(cp), "block_bootstrap": list(bb), "thirds": th,
-            "mean_log_rv_over_vix2": float(logr.mean()), "short_var_swap_vega1_mean": float(pnl_vega1.mean()),
-            "shuffled_returns_placebo": placebo, "checks": rep, "truncation": truncation or [], "verdict": verdict}
+    verdict, why = _decide(crit, n, min_n, "months")
+    reason = (f"model-free: (VIX/100)^2 vs next 21-day ^GSPC realised variance (price returns); rule 10 (the claim names "
+              f"months): {n} calendar months entered at the first session with a VIX close, {days[ent[0]]}..{days[ent[-1]]} "
+              f"(a 21-session window overlaps the next month's by at most {ovl} sessions in short months): "
+              + "; ".join(parts) + f" — {why}")
+    stat = {"rule10": "calendar month (claim: non-overlapping months)", "n_months": n, "max_window_overlap_sessions": ovl,
+            "wins": k, "win_rate": k / n,
+            "clopper_pearson": list(cp), "block_bootstrap": list(bb), "thirds": th, "thirds_detail": thirds,
+            "thirds_strict_reading_holds": strict, "mean_log_rv_over_vix2": float(logr.mean()), "mean_vrp_pct2_month": float(vrp.mean()),
+            "short_var_swap_vega1_mean": float(pnl_vega1.mean()), "month_end_anchor": we, "grid_21d": grid,
+            "shuffled_returns_placebo": placebo, "checks": rep, "atm_straddle_control": atm, "truncation": truncation or [],
+            "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
 
@@ -1287,13 +1957,28 @@ def har_forecast(closes, refit_mask, min_obs: int = 500) -> np.ndarray:
             out[d] = float(X[d] @ beta)
     return out
 
+def _t235_eval(starts, z, zv, vv, lr, block: int, n_boot: int, seed: int, with_pbo: bool = True, hold: int = HOLD) -> dict:
+    """T-235 statistics on entries ``starts`` (z, zv: their z-scores): base P&L, the declared rules, the Sharpe-difference
+    test and PBO."""
+    rv = np.array([PPY / hold * float(np.sum(lr[a + 1:a + hold + 1] ** 2)) for a in starts])
+    base = vv[starts] ** 2 - rv
+    rules = {"linear max(z,0)": np.maximum(z, 0.0), "on/off z>0.5": (z > 0.5).astype(float), "on/off z>1": (z > 1.0).astype(float)}
+    R = np.column_stack([w * base for w in rules.values()])
+    t = sharpe_diff_test(R[:, 0], base, block, n_boot, seed)
+    pbo = (pbo_cscv(R, 8) if starts.size >= 32 else {"pbo": None}) if with_pbo else {"pbo": None}
+    return {"base": base, "rules": rules, "R": R, "t": t, "pbo": pbo}
+
 
 def scaled_short_variance(days, closes, vix: dict, start: str = "1991-01-01", block: int = 6, n_boot: int = 2000, seed: int = 0,
-                          min_n: int = 300, min_hist: int = 120) -> dict:
+                          min_n: int = 300, min_hist: int = 120, hold: int = HOLD) -> dict:
     """T-235: monthly (21-day) short variance P&L (VIX_t/100)^2 - RV_{t,t+21} on ^GSPC closes; scaled by N_t = max(z_t, 0)
     with z_t the expanding z-score of VIX/100 minus the walk-forward HAR vol forecast (history of daily spreads strictly
     before t). Pass: Sharpe(scaled) - Sharpe(constant) > 0 at one-sided p < 0.05 (studentized block bootstrap) and PBO < 0.3
-    across the declared rules {linear max(z,0), on/off z > 0.5, on/off z > 1}; min_n 300 cycles."""
+    across the declared rules {linear max(z,0), on/off z > 0.5, on/off z > 1}; min_n 300 cycles.
+
+    Rule 10(a): 'monthly cycles' over 'the same months' name the calendar month: each month enters at its first session
+    with a VIX close and a HAR forecast (the HAR refits at month starts too). The month-end anchor and every offset of the
+    21-day grid are reported (Sharpe difference and p), not in the verdict."""
     days = list(days)
     c = np.asarray(closes, dtype=float)
     refit = np.array([i == 0 or days[i][:7] != days[i - 1][:7] for i in range(len(days))])
@@ -1306,43 +1991,35 @@ def scaled_short_variance(days, closes, vix: dict, start: str = "1991-01-01", bl
     first = next((i for i, d in enumerate(days) if d >= start), None)
     if first is None:
         return {"verdict": "inconclusive", "n": 0, "reason": f"no data after {start}"}
-    starts = np.arange(first, c.size - HOLD, HOLD)
-    starts = starts[has_v[starts] & np.isfinite(spread[starts])]
-    # expanding z-score of the spread from the days strictly before each entry
+    # expanding z-scores of the spread and of the VIX level from the days strictly before each day
     sp_ok = np.isfinite(spread)
     s1 = np.concatenate([[0.0], np.cumsum(np.where(sp_ok, spread, 0.0))])
     s2 = np.concatenate([[0.0], np.cumsum(np.where(sp_ok, spread ** 2, 0.0))])
     cnt = np.concatenate([[0], np.cumsum(sp_ok)])
-    z = np.full(starts.size, np.nan)
-    zv = np.full(starts.size, np.nan)
     vl = np.where(has_v, vv, np.nan)
     v_ok = np.isfinite(vl)
     v1 = np.concatenate([[0.0], np.cumsum(np.where(v_ok, vl, 0.0))])
     v2 = np.concatenate([[0.0], np.cumsum(np.where(v_ok, vl ** 2, 0.0))])
     vc = np.concatenate([[0], np.cumsum(v_ok)])
-    for j, a in enumerate(starts):
-        k = cnt[a]
-        if k >= min_hist:
-            m = s1[a] / k
-            sd = math.sqrt(max(s2[a] / k - m * m, 1e-12))
-            z[j] = (spread[a] - m) / sd
-        kv = vc[a]
-        if kv >= min_hist:
-            m = v1[a] / kv
-            sd = math.sqrt(max(v2[a] / kv - m * m, 1e-12))
-            zv[j] = (vl[a] - m) / sd
-    keep = np.isfinite(z)
-    starts, z, zv = starts[keep], z[keep], zv[keep]
+    N = c.size
+    ka, kv = cnt[:N].astype(float), vc[:N].astype(float)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        m_s = s1[:N] / ka
+        sd_s = np.sqrt(np.maximum(s2[:N] / ka - m_s ** 2, 1e-12))
+        z_all = np.where((ka >= min_hist) & sp_ok, (spread - m_s) / sd_s, np.nan)
+        m_v = v1[:N] / kv
+        sd_v = np.sqrt(np.maximum(v2[:N] / kv - m_v ** 2, 1e-12))
+        zv_all = np.where((kv >= min_hist) & v_ok, (vl - m_v) / sd_v, np.nan)
+    good = has_v & np.isfinite(z_all)
+    good[max(0, N - hold):] = False
+    starts = _month_first(days, good, start)
     n = int(starts.size)
     if n < 16:
         return {"verdict": "inconclusive", "n": n, "reason": f"only {n} cycles with a HAR forecast and spread history"}
-    rv = np.array([PPY / HOLD * float(np.sum(lr[a + 1:a + HOLD + 1] ** 2)) for a in starts])
-    base = vv[starts] ** 2 - rv
-    rules = {"linear max(z,0)": np.maximum(z, 0.0), "on/off z>0.5": (z > 0.5).astype(float), "on/off z>1": (z > 1.0).astype(float)}
-    R = np.column_stack([w * base for w in rules.values()])
-    ppy = PPY / HOLD
-    t = sharpe_diff_test(R[:, 0], base, block, n_boot, seed)
-    pbo = pbo_cscv(R, 8) if n >= 32 else {"pbo": None}
+    z, zv = z_all[starts], zv_all[starts]
+    ev = _t235_eval(starts, z, zv, vv, lr, block, n_boot, seed, True, hold)
+    base, rules, R, t, pbo = ev["base"], ev["rules"], ev["R"], ev["t"], ev["pbo"]
+    ppy = PPY / hold
     sr = {k: float(sharpe_ratio(R[:, i], ppy)) for i, k in enumerate(rules)}
     sr_c = float(sharpe_ratio(base, ppy))
     vix_only = np.maximum(np.nan_to_num(zv, nan=0.0), 0.0) * base
@@ -1351,20 +2028,44 @@ def scaled_short_variance(days, closes, vix: dict, start: str = "1991-01-01", bl
     top = np.maximum(z, 0) * base
     q = np.quantile(z, 2 / 3)
     top_share = float(top[z > q].sum() / top.sum()) if top.sum() != 0 else None
+    # robustness: month-end anchor and the 21-day grid offsets
+    se = _month_last(days, good, start)
+    rob = {}
+    if se.size >= 16:
+        te = _t235_eval(se, z_all[se], zv_all[se], vv, lr, block, max(500, n_boot // 2), seed, False, hold)["t"]
+        rob["month_end"] = {"n": int(se.size), "diff": te["diff"], "p": te["p"]}
+    offs = []
+    for k in range(hold):
+        g = np.arange(first + k, N - hold, hold)
+        g = g[good[g]]
+        if g.size >= 16:
+            tk = _t235_eval(g, z_all[g], zv_all[g], vv, lr, block, max(500, n_boot // 2), seed, False, hold)["t"]
+            offs.append({"offset": int(k), "n": int(g.size), "diff": tk["diff"], "p": tk["p"],
+                         "ok": bool(tk["diff"] is not None and tk["diff"] > 0 and tk["p"] < 0.05)})
+    rob["grid_offsets"] = offs
     crit = [("Sharpe(linear max(z,0)) - Sharpe(constant) > 0 at one-sided p < 0.05",
              None if t["p"] is None else bool(t["diff"] > 0 and t["p"] < 0.05), t["ci"][1] is not None and t["ci"][1] < 0),
             ("PBO < 0.3 across the three declared rules", None if pbo.get("pbo") is None else bool(pbo["pbo"] < 0.3), False)]
-    verdict, why = _decide(crit, n, min_n, "cycles")
-    reason = (f"model-free short 21-day ^GSPC variance struck at VIX^2, {n} monthly cycles {days[starts[0]]}..{days[starts[-1]]}, "
-              f"HAR(1,5,22) refit monthly on an expanding window: annualised Sharpe scaled {sr['linear max(z,0)']:.2f} vs constant "
+    verdict, why = _decide(crit, n, min_n, "monthly cycles")
+    rob_txt = ""
+    if "month_end" in rob:
+        rob_txt += f"month-end anchor diff {_s(rob['month_end']['diff'], 3)} (p {_f(rob['month_end']['p'], 3)}); "
+    if offs:
+        ds = [o["diff"] for o in offs if o["diff"] is not None]
+        rob_txt += (f"21-day grid offsets: diff {min(ds):+.3f} to {max(ds):+.3f}, p {min(o['p'] for o in offs):.3f} to "
+                    f"{max(o['p'] for o in offs):.3f}, {sum(o['ok'] for o in offs)}/{len(offs)} pass")
+    reason = (f"model-free short 21-day ^GSPC variance struck at VIX^2; rule 10 (the claim names monthly cycles): {n} calendar "
+              f"months entered at the first session with a VIX close {days[starts[0]]}..{days[starts[-1]]}, HAR(1,5,22) refit "
+              f"monthly on an expanding window: annualised Sharpe scaled {sr['linear max(z,0)']:.2f} vs constant "
               f"{sr_c:.2f} (per-cycle difference {_s(t['diff'], 3)}, studentized one-sided p {_f(t['p'], 3)}, 95% {_ci_s(t['ci'], 3)}); "
               f"on/off z>0.5 {sr['on/off z>0.5']:.2f}, z>1 {sr['on/off z>1']:.2f}; PBO {_f(pbo.get('pbo'), 3)}; controls: "
               f"VIX-level-only scaling Sharpe {sharpe_ratio(vix_only, ppy):.2f}, random-z placebo {sharpe_ratio(placebo, ppy):.2f}, "
-              f"top-tercile-z share of scaled P&L {_f(top_share, 2)}" + f" — {why}")
-    stat = {"n_cycles": n, "sharpe_annual": sr, "sharpe_constant": sr_c, "sharpe_diff_test": t, "pbo": pbo.get("pbo"),
+              f"top-tercile-z share of scaled P&L {_f(top_share, 2)}; robustness (not in the verdict): {rob_txt}" + f" — {why}")
+    stat = {"rule10": "calendar month (claim: monthly cycles over the same months)", "n_cycles": n, "sharpe_annual": sr,
+            "sharpe_constant": sr_c, "sharpe_diff_test": t, "pbo": pbo.get("pbo"),
             "pbo_detail": pbo, "vix_level_only_sharpe": float(sharpe_ratio(vix_only, ppy)),
             "random_z_placebo_sharpe": float(sharpe_ratio(placebo, ppy)), "top_tercile_share": top_share,
-            "mean_z": float(z.mean()), "share_z_positive": float((z > 0).mean()), "verdict": verdict}
+            "mean_z": float(z.mean()), "share_z_positive": float((z > 0).mean()), "robustness": rob, "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
 
@@ -1411,9 +2112,11 @@ def vix1d_premium(days, closes, vix1d: dict, vix: Optional[dict] = None, events:
             parts.append(f"next day an event ({'/'.join(sorted(events))}) on {int(nxt.sum())} days: mean {x[nxt].mean() * s:+.4f}; "
                          f"ex-events {x[~nxt].mean() * s:+.4f} ({_ci_s((lo2, hi2), 4, s)})")
     verdict, why = _decide(crit, n, min_n, "one-day windows")
-    reason = (f"model-free: (VIX1D/100)^2/365 vs next-day ^GSPC squared log return, {n} days {days[idx[0]]}..{days[idx[-1]]}: "
+    reason = (f"model-free: (VIX1D/100)^2/365 vs next-day ^GSPC squared log return, {n} days {days[idx[0]]}..{days[idx[-1]]} "
+              f"(rule 10 does not apply: one-day windows have a single grid phase): "
               + "; ".join(parts) + f" — {why}")
-    stat = {"n_days": n, "mean": float(x.mean()), "ci95": [lo, hi], "halves": hv, "mean_252": float(x252.mean()),
+    stat = {"rule10": "not applicable (one-day windows)", "n_days": n, "mean": float(x.mean()), "ci95": [lo, hi], "halves": hv,
+            "mean_252": float(x252.mean()),
             "mean_implied": float(np.mean(v ** 2 / 365)), "mean_realised": float(r2.mean()), **rep, "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
@@ -1521,15 +2224,13 @@ def b6_var_short_straddle_tercile(archive):
         gd, gc, _ = _daily(archive, GSPC_B)
         vix = _index(archive, VIX_B)
         first = fr["days"][0] if fr["days"] else "9999"
-        sel = [i for i, d in enumerate(gd) if d < first and d in vix]
-        if len(sel) > 2 * HOLD:
-            d2 = [gd[i] for i in sel]
-            c2 = gc[sel]
-            st = np.arange(HOLD, len(d2), HOLD)
-            pre = np.array([vix[d2[a]] for a in st]) - 100.0 * trailing_rv_vol(_logret_end(c2), st)
-            note = (f" (first training window = the {st.size} pre-SPY cycles {d2[st[0]]}..{d2[st[-1]]} with RV21 from ^GSPC "
-                    f"price returns, a series the claim does not name; SPY starts {first}; every SPY cycle is then out of "
-                    f"sample)")
+        lr_end = _logret_end(gc)
+        st = np.array([i for i, d in enumerate(gd) if d < first and d in vix and i >= HOLD], dtype=np.int64)
+        if st.size > 2 * HOLD:
+            pre = np.array([vix[gd[a]] for a in st]) - 100.0 * trailing_rv_vol(lr_end, st)
+            note = (f" (first training window = the {st.size} pre-SPY daily entries {gd[st[0]]}..{gd[st[-1]]} with RV21 from "
+                    f"^GSPC price returns, a series the claim does not name; SPY starts {first}; every SPY entry is then out "
+                    f"of sample)")
     rep = straddle_tercile(fr, pre_sensitivity=pre, sensitivity_note=note)
     return _out(rep.get("stat", {"verdict": rep["verdict"]}), rep["n"], rep["verdict"], rep["reason"])
 
@@ -1539,7 +2240,12 @@ def b6_var_gamma_scalp_long_straddle(archive):
     miss = _missing(archive, [SPY_B, VIX_B, DTB3_B])
     if miss:
         return miss
-    rep = gamma_scalp(_spy_frame(archive))
+    anchor = None
+    if _has(archive, GSPC_B):                       # the BTZ control: ^GSPC 1990-2007 close-to-close
+        gd, gc, _ = _daily(archive, GSPC_B)
+        vix = _index(archive, VIX_B)
+        anchor = {"days": gd, "close": gc, "vix": [vix.get(d, np.nan) for d in gd], "label": "^GSPC"}
+    rep = gamma_scalp(_spy_frame(archive), anchor=anchor)
     return _out(rep.get("stat", {"verdict": rep["verdict"]}), rep["n"], rep["verdict"], rep["reason"])
 
 
@@ -1571,7 +2277,17 @@ def b6_var_vrp_short_straddle_hedged(archive):
     return _out(rep.get("stat", {"verdict": rep["verdict"]}), rep["n"], rep["verdict"], rep["reason"])
 
 
-def _truncation_checks(archive, vix_full: dict, dtb3: dict) -> list:
+def _overnight_capture(available_at: str) -> bool:
+    """A capture inside Cboe's overnight (global trading hours) SPX session, 20:15-09:15 ET: 01:15-13:15 UTC under both
+    EST and EDT. Its quotes are live overnight quotes, not the 16:15 ET close the VIX prints."""
+    hhmm = (available_at or "")[11:16]
+    return "01:15" <= hhmm < "13:15"
+
+
+def _truncation_checks(archive, vix_full: dict, dtb3: dict, closes: Optional[dict] = None) -> list:
+    """Strip vs VIX^2 on each captured SPX chain, with the capture timing: whether the capture falls in the overnight
+    session, the latest trade time on the chain and the chain-implied spot (near-term forward discounted at the bill rate,
+    dividends ignored, ~0.1%) against the quote day's index close."""
     out = []
     tdays = sorted(vix_full)
     for nm in _names(archive, SPX_CHAIN_P):
@@ -1584,10 +2300,18 @@ def _truncation_checks(archive, vix_full: dict, dtb3: dict) -> list:
         r = float(bill_rates([qd], dtb3)[0])
         sv = strip_variance([x["value"] for x in rows], qd, r)
         if sv is None:
-            out.append({"bundle": nm, "quote_day": qd, "error": None})
+            cap = str(rows[0].get("available_at") or "")
+            out.append({"bundle": nm, "quote_day": qd, "error": None, "captured_at": cap[:16].replace("T", " "),
+                        "overnight_session": _overnight_capture(cap)})
             continue
         vx2 = (vix_full[qd] / 100.0) ** 2
+        lt = max((str(x["value"].get("last_time") or "") for x in rows), default="")
+        cap = str(rows[0].get("available_at") or "")
+        cl = (closes or {}).get(qd)
+        gap = (sv["near"]["forward"] * math.exp(-r * sv["near"]["T"]) / cl - 1.0) if cl else None
         out.append({"bundle": nm, "quote_day": qd, "vix": vix_full[qd], "strip_vol30": sv["vol30"], "error": sv["var30"] / vx2 - 1.0,
+                    "captured_at": cap[:16].replace("T", " "), "overnight_session": _overnight_capture(cap),
+                    "latest_trade": lt[:16].replace("T", " ") or None, "implied_spot_vs_close": gap,
                     "near": {k: sv["near"][k] for k in ("expiry", "n_strikes", "forward")},
                     "next": {k: sv["next"][k] for k in ("expiry", "n_strikes", "forward")}})
     return out
@@ -1600,19 +2324,25 @@ def b6_var_variance_strip_win_rate(archive):
         return miss
     gd, gc, _ = _daily(archive, GSPC_B)
     vix = _index(archive, VIX_B)
-    days = [d for d in gd if d in vix and d >= "1990-01-01"]
-    pos = {d: i for i, d in enumerate(gd)}
-    close = np.array([gc[pos[d]] for d in days])
+    i0 = max(0, bisect_left(gd, "1990-01-01") - 1)          # keep the prior close: the first month's returns start there
+    days, close = gd[i0:], gc[i0:]
     checks = {}
     if _has(archive, SPY_B):
-        sd, _, sa = _daily(archive, SPY_B)
-        sp = dict(zip(sd, sa))
-        checks["dividend-adjusted SPY"] = np.array([sp.get(d, np.nan) for d in days])
+        sd, sc, sa = _daily(archive, SPY_B)
+        spa, spc = dict(zip(sd, sa)), dict(zip(sd, sc))
+        checks["dividend-adjusted SPY"] = np.array([spa.get(d, np.nan) for d in days])
+        checks["SPY price-return (raw close)"] = np.array([spc.get(d, np.nan) for d in days])
     trunc = None
     if _names(archive, SPX_CHAIN_P):
         vix_full = _index(archive, VIX_B, filtered=False)
-        trunc = _truncation_checks(archive, vix_full, _series(archive, DTB3_B) if _has(archive, DTB3_B) else {})
-    rep = vix2_win_rate(days, close, [vix[d] for d in days], checks=checks, truncation=trunc)
+        gfull = _daily_from_rows(_rows(archive, GSPC_B, filtered=False))
+        trunc = _truncation_checks(archive, vix_full, _series(archive, DTB3_B) if _has(archive, DTB3_B) else {},
+                                   dict(zip(gfull[0], gfull[1])))
+    ms, _ = _measured_scale(_smile(archive))
+    atm = {"harness_short_straddle ratio": 0.81, "0.90": 0.90}
+    if ms is not None:
+        atm["measured on the captured SPY smile"] = ms
+    rep = vix2_win_rate(days, close, [vix.get(d, np.nan) for d in days], checks=checks, truncation=trunc, atm_scales=atm)
     return _out(rep.get("stat", {"verdict": rep["verdict"]}), rep["n"], rep["verdict"], rep["reason"])
 
 
@@ -1635,14 +2365,13 @@ def b6_var_variance_swap_units(archive):
     vix_rows = _rows(archive, VIX_B)
     sd, sc, sa = _daily_from_rows(spy_rows)
     vix = index_closes(vix_rows)
-    keep = [i for i, d in enumerate(sd) if d in vix]
-    days = [sd[i] for i in keep]
-    checks = {"dividend-adjusted SPY": sa[keep]}
+    checks = {"dividend-adjusted SPY": sa}
     if _has(archive, GSPC_B):
         gd, gc, _ = _daily(archive, GSPC_B)
         gp = dict(zip(gd, gc))
-        checks["^GSPC (SPX vs SPY)"] = np.array([gp.get(d, np.nan) for d in days])
-    rep = short_variance_units(days, sc[keep], [vix[d] for d in days], checks=checks)
+        checks["^GSPC (SPX vs SPY)"] = np.array([gp.get(d, np.nan) for d in sd])
+    intra = intraday_var_by_day(_rows(archive, HOURLY_SPY_B)) if _has(archive, HOURLY_SPY_B) else None
+    rep = short_variance_units(sd, sc, [vix.get(d, np.nan) for d in sd], checks=checks, intraday=intra)
     if "stat" in rep:
         ov = variance_risk_premium(vix_rows, spy_rows, window=HOLD, symbol="SPY")
         rep["stat"]["overlapping_vol_units_T48"] = {k: ov.get(k) for k in ("n", "vrp_vol_points", "vrp_variance_points", "p_value",

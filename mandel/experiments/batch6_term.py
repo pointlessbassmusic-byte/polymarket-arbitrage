@@ -23,8 +23,10 @@ IV term structure (the claims' model).
     is not covered by any archived term index.
     T-152 is the exception: its CLAIM names the window ("top-decile months of VIX increase since 2007-12") and has no
     term-structure regime, so the house data guidance applies: VIX stands in for VIX3M before its first print (the
-    back-leg IV is then VIX), entries run from 2007-12-04, and the reason labels the proxy and gives its error against
-    the real VIX3M. The real-VIX3M-only run (2009-09-18 on) and the VIX/VIX6M proxy are report-only sensitivities.
+    back-leg IV is then VIX), entries run from every session of 2007-12 on (the first is 2007-12-03; under rule 10 no
+    single start day is chosen, where the earlier grid was anchored on 2007-12-04, the first FRED VXV print, which the
+    claim does not name), and the reason labels the proxy and gives its error against the real VIX3M. The
+    real-VIX3M-only run (2009-09-18 on) and the VIX/VIX6M proxy are report-only sensitivities.
 
 Conventions (house rules).
   * Prices: SPY RAW closes (``close``) for strikes and settlement. Cash dividends come from the step in the adjclose/close
@@ -39,7 +41,28 @@ Conventions (house rules).
     last one.
   * Cycles: a "30-DTE" front leg expires at the close 21 sessions after entry; T = calendar days / 365. Calendar back
     legs expire 30 calendar days after the front (so a 30/60 calendar's back leg has exactly 30 days left at the front
-    expiry); 90-DTE and 12-month legs bought on a monthly grid are replaced when 30 / 90 days remain.
+    expiry). On the monthly expiry calendar (rule 10a below) a 90-DTE long is the monthly expiry three cycles out, replaced
+    at the roll where it has one cycle (28-35 days) left, and a 12-month long is the monthly expiry twelve cycles out,
+    replaced with three cycles (about 90 days) left.
+
+Entry calendars (house rule 10: a verdict must not depend on an arbitrary grid phase).
+  * (a) T-145, T-150 and T-151 name monthly options ("the short rolled monthly", "a monthly 0.30-delta short call", "monthly
+    0.30-delta calls", "30 DTE rolled monthly"). Monthly SPY options expire on the standard monthly expiry: the third
+    Friday, or the prior session when that Friday is an exchange holiday. Each cycle buys at one monthly expiry close and
+    rolls at the next (28 or 35 days), and the long legs expire on that calendar. The old 21-session grid's start offsets
+    are reported as robustness only.
+  * (b) T-146, T-147, T-149 and T-152 name a tenor with "monthly" or "weekly" entries but no calendar, so their
+    non-overlapping grid (21 sessions; 5 for T-149's 5-day hold) has hold-many equally valid start offsets. The PRIMARY
+    statistic is the pooled all-offset estimate: one structure entered at every valid daily close (overlapping holds),
+    circular block bootstrap of the claimed (paired) statistic with blocks of at least 2 x hold entries. Pass, fail and
+    decisive are judged on it. The reason also reports, over every start offset, the min/max of the statistic and of its
+    bound and how many offsets pass (per-offset CIs use blocks of 6 monthly cycles, or the trial's 4 weeks). n stays in the
+    claim's units: distinct non-overlapping holds in the window, or for a gated or decile statistic the mean per-offset
+    count of such holds.
+  * T-143, T-144 and T-155 already enter on every session (their trials say "daily entries"). That is the pooled estimate
+    itself, so their bootstrap and block-shift blocks are raised to 2 x the 21-session hold (42). The trial's own block 21
+    is reported. The per-offset range of a non-overlapping 21-session grid is reported for robustness (for T-143 this is
+    the trial's "plain bootstrap on non-overlapping monthly entries").
   * Costs: half the bid-ask spread per contract fill, from the archived SPY chains (median half-spread / spot of OTM
     quotes by DTE and moneyness bucket, pooled over the capture days). An ITM leg is charged the same-strike OTM
     option's half-spread (put-call parity): the pre-open captures quote ITM SPY options 15-30 bp wide, which is staleness,
@@ -50,9 +73,9 @@ Conventions (house rules).
 
 Statistics. CIs are 95% two-sided unless the pass says otherwise; percentile circular block bootstraps (2000 resamples,
 seed 0) of the statistic the claim names, studentized (bootstrap-t, Bartlett long-run s.e., bandwidth = block) where the
-trial names it (T-143, T-144). Overlapping daily holds use blocks of 21 entries (>= the overlap); monthly cycles use 6;
-weekly entries 4 weeks, as T-149 states. Differences are bootstrapped PAIRED on one timeline. Deflation for the
-thresholds a trial lists is Bonferroni (k thresholds -> alpha / k).
+trial names it (T-143, T-144). Overlapping daily 21-session holds use blocks of 42 entries (2 x hold, rule 10). Monthly
+cycles use 6. T-149's 5-day holds use 4 weeks: 20 daily entries pooled, 4 weekly entries per offset. Differences are
+bootstrapped PAIRED on one timeline. Deflation for the thresholds a trial lists is Bonferroni (k thresholds -> alpha / k).
 
 Verdicts use ``underlying2._verdict``: any implemented criterion failing -> not_supported; any criterion not implemented
 -> at best inconclusive; supported only when every criterion is implemented and passes. Below trial.min_n (in the claim's
@@ -66,7 +89,7 @@ import bisect
 import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Callable, Optional, Sequence
 
 import numpy as np
@@ -84,7 +107,8 @@ YEAR = 252
 GAP = 30                       # calendar days between the front and back expiries of a 30/60 structure
 N_BOOT = 2000
 BLOCK_M = 6                    # bootstrap block for monthly cycles
-BLOCK_D = 21                   # bootstrap block for overlapping daily entries (>= the 21-session hold)
+BLOCK_D = 21                   # the trials' stated block for overlapping daily entries (= the 21-session hold; reported)
+BLOCK_P = 2 * MONTH            # rule 10: pooled overlapping 21-session holds use blocks of 2 x hold entries
 BLOCK_W = 4                    # weeks (T-149)
 MODEL = "MODEL-PRICED"
 SCALES = (0.81, 0.90)          # IV-scale sensitivities (never criteria): the captured SPY ATM IV / VIX ratio was about 0.81
@@ -661,6 +685,10 @@ class Criteria:
     def add(self, name: str, ok, decisive: bool = False):
         self.items.append((name, None if ok is None else bool(ok))); self.decisive.append(bool(decisive))
 
+    def all_pass(self) -> bool:
+        """Every criterion implemented and passing (min_n aside): an offset 'passes' in the rule-10 per-offset counts."""
+        return bool(self.items) and all(ok is True for _, ok in self.items)
+
     def finish(self, n: int, min_n: int, unit: str) -> tuple:
         crit = list(self.items)
         if n < min_n:
@@ -752,6 +780,87 @@ def grid(m: Market, term: Term, start: str, step: int, need93: bool = True) -> n
     return np.arange(i0, len(m.days), step)
 
 
+# ------------------------------------------------------------------------------------ rule 10: entry calendars --
+
+def third_friday(year: int, month: int) -> date:
+    d = date(year, month, 1)
+    return d + timedelta(days=(4 - d.weekday()) % 7 + 14)
+
+
+def monthly_expiries(m: Market, start: str) -> np.ndarray:
+    """Rule 10(a): session index of each SPY standard monthly expiry on or after ``start``: the third Friday, or the prior
+    session when the third Friday is not a trading day (exchange holiday). Months whose third Friday is after the last
+    archived day are dropped."""
+    if not m.days:
+        return np.array([], int)
+    out = []; y, mo = int(max(start, m.days[0])[:4]), int(max(start, m.days[0])[5:7]); last = date.fromisoformat(m.days[-1])
+    while date(y, mo, 1) <= last:
+        tf = third_friday(y, mo)
+        if tf <= last:
+            j = bisect.bisect_right(m.days, tf.isoformat()) - 1
+            if j >= 0 and m.days[j] >= start and tf.toordinal() - m.cal[j] <= 3:
+                out.append(j)
+        y, mo = (y + 1, 1) if mo == 12 else (y, mo + 1)
+    return np.array(out, int)
+
+
+def calendar_cycles(m: Market, term: Term, start: str, need93: bool = True, extend: int = 24) -> tuple:
+    """Rule 10(a) roll cycles: (g, exp_cal). g = the monthly expiry sessions from the first usable day on or after ``start``
+    (each cycle buys at one monthly expiry close and settles or rolls at the next); exp_cal = the expiry ordinals of g
+    followed by ``extend`` projected third Fridays, so a long leg bought near the end of the data still has its expiry."""
+    i0 = _start_index(m, term, start, need93)
+    if i0 >= len(m.days):
+        return np.array([], int), np.array([], float)
+    g = monthly_expiries(m, m.days[i0])
+    if not g.size:
+        return g, np.array([], float)
+    ec = [float(m.cal[i]) for i in g]; d = date.fromisoformat(m.days[int(g[-1])]); y, mo = d.year, d.month
+    for _ in range(extend):
+        y, mo = (y + 1, 1) if mo == 12 else (y, mo + 1)
+        ec.append(float(third_friday(y, mo).toordinal()))
+    return g, np.array(ec, float)
+
+
+def offset_positions(n: int, hold: int) -> list:
+    """Rule 10(b): positions, within ``n`` contiguous daily entries, of each start offset's non-overlapping grid."""
+    return [np.arange(k, n, hold) for k in range(min(int(hold), int(n)))]
+
+
+def n_holds(a, hold: int) -> int:
+    """Distinct non-overlapping ``hold``-session holds in the window of daily entries ``a`` (first entry to last exit)."""
+    a = np.asarray(a, int)
+    return int((a[-1] + hold - a[0]) // hold) if a.size else 0
+
+
+def _summ(rows: list) -> Optional[dict]:
+    """Per-offset summary of rows {'stat', 'bound', 'ok'}: offsets passing and the min/max of stat and of bound."""
+    if not rows:
+        return None
+    def rng(k):
+        v = np.array([np.nan if r.get(k) is None else r[k] for r in rows], float); v = v[np.isfinite(v)]
+        return [float(v.min()), float(v.max())] if v.size else [None, None]
+    return {"offsets": len(rows), "pass": int(sum(bool(r["ok"]) for r in rows)), "stat": rng("stat"), "bound": rng("bound")}
+
+
+def _summ_txt(s: Optional[dict], what: str, bound_name: str, fmt=None) -> str:
+    if not s:
+        return f"{what}: no offsets"
+    f = fmt or _p
+    return (f"{what}: {s['pass']} of {s['offsets']} start offsets pass (per-offset statistic {f(s['stat'][0])} to "
+            f"{f(s['stat'][1])}, {bound_name} {f(s['bound'][0])} to {f(s['bound'][1])})")
+
+
+def _pooled_txt(m: Market, a, hold: int, block: int, n_units: int, unit: str, daily_claim: bool = False) -> str:
+    a = np.asarray(a, int)
+    if not a.size:
+        return "rule 10: no entries"
+    head = ("rule 10: the trial enters on every session, which is itself the pooled all-offset estimate"
+            if daily_claim else "rule 10(b), the claim names no entry calendar: primary statistic pooled over all "
+            f"{min(hold, a.size)} start offsets of the non-overlapping {hold}-session grid")
+    return (f"{head} = {a.size} overlapping daily entries {m.days[int(a[0])]} to {m.days[int(a[-1])]} (circular block "
+            f"bootstrap, {block}-entry blocks >= 2 x the {hold}-session hold); n = {n_units} {unit}")
+
+
 # --------------------------------------------------------------------------------------- two-expiry engine --
 
 def two_expiry(m: Market, term: Term, a, legs: list, spreads: Spreads, hold: int = MONTH, gap: float = GAP,
@@ -802,12 +911,27 @@ def _proxy_fit(term_real: Term, term_proxy_full: Term) -> str:
 
 # ------------------------------------------------------------------------------------ T-143 long calendar --
 
+def _grp_diff_rows(x, g1, g2) -> Callable:
+    """Resample rows -> mean(x | g1) - mean(x | g2) per row (labels travel with their entries)."""
+    x = np.asarray(x, float); g1 = np.asarray(g1, bool); g2 = np.asarray(g2, bool)
+    def f(idx):
+        X, A, B = x[idx], g1[idx], g2[idx]; n1, n2 = A.sum(axis=1), B.sum(axis=1)
+        d = (X * A).sum(axis=1) / np.maximum(n1, 1) - (X * B).sum(axis=1) / np.maximum(n2, 1)
+        return np.where((n1 > 0) & (n2 > 0), d, np.nan)
+    return f
+
+
 def judge_regime(x, ratio, x_sens=None, min_n: int = 30, n_boot: int = N_BOOT, hi_thr: float = 1.0, lo_thr: float = 0.9,
-                 k_thr: int = 3, block: int = BLOCK_D, monthly_step: int = MONTH, need_sens: bool = True) -> dict:
-    """T-143 statistics on daily entries: diff = mean(x | ratio >= hi_thr) - mean(x | ratio <= lo_thr).
+                 k_thr: int = 3, block: int = BLOCK_P, monthly_step: int = MONTH, need_sens: bool = True,
+                 trial_block: Optional[int] = BLOCK_D) -> dict:
+    """T-143 statistics on daily entries (every session: the pooled all-offset estimate of rule 10):
+    diff = mean(x | ratio >= hi_thr) - mean(x | ratio <= lo_thr).
     Criteria: diff > 0 with block-shift p x k_thr < 0.05; studentized block bootstrap deflated one-sided lower bound > 0;
     diff > 0 in both walk-forward halves; diff > 0 in the sensitivity rerun ``x_sens`` (not implemented when it is None
-    and ``need_sens``)."""
+    and ``need_sens``). ``block`` (2 x the 21-session hold) drives the shift null and the bootstrap; the trial's own
+    ``trial_block`` bound is reported. Report only (rule 10 robustness, the trial's 'plain bootstrap on non-overlapping
+    monthly entries'): every start offset of the ``monthly_step`` grid, its difference, its deflated one-sided plain
+    bootstrap lower bound and whether it passes (bound > 0 and diff > 0 in both of its halves)."""
     x = np.asarray(x, float); ratio = np.asarray(ratio, float); n = x.size
     hi = ratio >= hi_thr; lo = ratio <= lo_thr
     d0 = _mean(x[hi]) - _mean(x[lo]) if hi.any() and lo.any() else float("nan")
@@ -819,13 +943,24 @@ def judge_regime(x, ratio, x_sens=None, min_n: int = 30, n_boot: int = N_BOOT, h
     p_up = float((np.sum(null >= d0) + 1) / (null.size + 1)) if null.size and np.isfinite(d0) else float("nan")
     p_dn = float((np.sum(null <= d0) + 1) / (null.size + 1)) if null.size and np.isfinite(d0) else float("nan")
     bt = boot_group_diff_t(x, hi, lo, block, n_boot)
-    lo_d, _ = t_bounds(bt, 0.05 / k_thr, two_sided=False)
-    _, hi_d = t_bounds(bt, 0.05 / k_thr, two_sided=False)
+    lo_d, hi_d = t_bounds(bt, 0.05 / k_thr, two_sided=False)
     p_t = t_pvalue(bt)
-    i1, i2 = _halves_idx(n)
-    halves = [(_mean(x[ii][hi[ii]]) - _mean(x[ii][lo[ii]])) if hi[ii].any() and lo[ii].any() else float("nan") for ii in (i1, i2)]
-    mo = np.arange(0, n, monthly_step); xm, him, lom = x[mo], hi[mo], lo[mo]
-    dm = boot_dist(mo.size, lambda idx: np.array([_mean(xm[r][him[r]]) - _mean(xm[r][lom[r]]) if him[r].any() and lom[r].any() else np.nan for r in idx]), 1, n_boot)
+    lo_trial = None
+    if trial_block and trial_block != block:
+        lo_trial = t_bounds(boot_group_diff_t(x, hi, lo, trial_block, n_boot), 0.05 / k_thr, two_sided=False)[0]
+    def halves_of(xx, hh, ll):
+        return [(_mean(xx[ii][hh[ii]]) - _mean(xx[ii][ll[ii]])) if hh[ii].any() and ll[ii].any() else float("nan")
+                for ii in _halves_idx(xx.size)]
+    halves = halves_of(x, hi, lo)
+    offs = []
+    for mo in offset_positions(n, monthly_step):
+        xm, him, lom = x[mo], hi[mo], lo[mo]
+        dmo = (_mean(xm[him]) - _mean(xm[lom])) if him.any() and lom.any() else float("nan")
+        dist = boot_dist(mo.size, _grp_diff_rows(xm, him, lom), 1, n_boot)
+        lb = _q(dist, 0.05 / k_thr); hm = halves_of(xm, him, lom)
+        ok = bool(np.isfinite(lb) and lb > 0 and dmo > 0 and all(np.isfinite(h) and h > 0 for h in hm))
+        offs.append({"start": int(mo[0]), "n": int(mo.size), "n_high": int(him.sum()), "n_low": int(lom.sum()), "stat": dmo,
+                     "bound": lb, "ci": [_q(dist, 0.025), _q(dist, 0.975)], "halves": hm, "ok": ok})
     d_sens = None
     if x_sens is not None:
         xs = np.asarray(x_sens, float); d_sens = _mean(xs[hi]) - _mean(xs[lo]) if hi.any() and lo.any() else float("nan")
@@ -846,9 +981,8 @@ def judge_regime(x, ratio, x_sens=None, min_n: int = 30, n_boot: int = N_BOOT, h
             "mean_high": _mean(x[hi]), "mean_low": _mean(x[lo]), "difference": d0, "p_shift": p_up,
             "p_shift_deflated": min(1.0, k_thr * p_up) if np.isfinite(p_up) else None, "p_studentized": p_t,
             "p_studentized_deflated": min(1.0, k_thr * p_t) if np.isfinite(p_t) else None, "lower_deflated": lo_d,
-            "upper_deflated": hi_d, "halves": halves, "monthly": {"n": int(mo.size), "n_high": int(him.sum()), "n_low": int(lom.sum()),
-            "difference": (_mean(xm[him]) - _mean(xm[lom])) if him.any() and lom.any() else None, "ci": [_q(dm, 0.025), _q(dm, 0.975)]},
-            "difference_sensitivity": d_sens, "min_n": min_n}
+            "upper_deflated": hi_d, "lower_deflated_trial_block": lo_trial, "block": block, "trial_block": trial_block,
+            "halves": halves, "offsets": offs, "offsets_summary": _summ(offs), "difference_sensitivity": d_sens, "min_n": min_n}
 
 
 def long_calendar(m: Market, term: Term, a, spreads: Spreads, back_shift: float = 0.0, tilt: Optional[Tilt] = None) -> dict:
@@ -882,13 +1016,19 @@ def eval_long_calendar(m: Market, term: Term, spreads: Spreads, start: str, spre
               f"{spreads.describe()} on 4 fills (open both legs, close both at T1); daily entries "
               f"{_window_note(term, m, a)}. P&L/debit: "
               f"VIX/VIX3M >= 1.0 mean {_p(j['mean_high'])} on {j['n_high']} days vs <= 0.9 mean {_p(j['mean_low'])} on "
-              f"{j['n_low']} days, difference {_p(j['difference'])}; block-shift p = {_pv(j['p_shift'])} (x3 thresholds = "
-              f"{_pv(j['p_shift_deflated'])}); studentized block-21 bootstrap one-sided 98.33% bounds {_p(j['lower_deflated'])} / "
-              f"{_p(j['upper_deflated'])} (p x3 = {_pv(j['p_studentized_deflated'])}); walk-forward halves {_p(j['halves'][0])} / "
+              f"{j['n_low']} days, difference {_p(j['difference'])}; block-shift p (shifts >= {j['block']} sessions) = "
+              f"{_pv(j['p_shift'])} (x3 thresholds = {_pv(j['p_shift_deflated'])}); studentized block-{j['block']} bootstrap "
+              f"one-sided 98.33% bounds {_p(j['lower_deflated'])} / "
+              f"{_p(j['upper_deflated'])} (p x3 = {_pv(j['p_studentized_deflated'])}; the trial's block 21 gives a lower bound of "
+              f"{_p(j['lower_deflated_trial_block'])}, report only); walk-forward halves {_p(j['halves'][0])} / "
               f"{_p(j['halves'][1])}; sensitivity rerun with the back IV shifted {_f(spread_shift * 100 if spread_shift is not None else None)} "
-              f"vol pts to the captured spread{shift_note}: difference {_p(j['difference_sensitivity'])}; non-overlapping monthly "
-              f"entries (plain bootstrap, report only): {j['monthly']['n_high']} high vs {j['monthly']['n_low']} low, difference "
-              f"{_p(j['monthly']['difference'])} ({_ci_txt(*j['monthly']['ci'])}); leave-one-year-out differences: "
+              f"vol pts to the captured spread{shift_note}: difference {_p(j['difference_sensitivity'])}; "
+              + _pooled_txt(m, a, MONTH, j["block"], j["n"], "daily entries in the smaller regime (the trial's unit)", daily_claim=True)
+              + "; " + _summ_txt(j["offsets_summary"], "the trial's non-overlapping monthly entries at every start offset (plain "
+                                 "bootstrap, report only; pass = difference > 0, deflated one-sided 98.33% lower bound > 0 and both "
+                                 "halves > 0; about " + str(int(np.median([o['n_high'] for o in j['offsets']])) if j['offsets'] else "0")
+                                 + " high-regime months per offset)", "lower bound")
+              + "; leave-one-year-out differences: "
               + ", ".join(f"ex-{y} {(_p(v) if not isinstance(v, str) else v)}" for y, v in yrs.items()))
     out = dict(j); out.update({"leave_year_out": yrs, "spread_shift": spread_shift, "model_priced": True, "reason_core": reason,
                                "window": _window_note(term, m, a), "headline": head})
@@ -911,21 +1051,24 @@ def spike_months(days: Sequence[str], vix: np.ndarray, top: int = 5, lo_day: str
     return [mo for _, mo in sorted(sp, reverse=True)[:top]]
 
 
-def judge_conditional_mean(x, keep_ex=None, min_n: int = 60, n_boot: int = N_BOOT, k_thr: int = 3, block: int = BLOCK_D) -> dict:
+def judge_conditional_mean(x, keep_ex=None, min_n: int = 60, n_boot: int = N_BOOT, k_thr: int = 3, block: int = BLOCK_P) -> dict:
     """T-144: conditional mean > 0 with the deflated (Bonferroni over k_thr thresholds) studentized CI excluding 0 in both
-    walk-forward halves, all entries and with ``keep_ex`` (entries outside the spike months)."""
+    walk-forward halves, all entries and with ``keep_ex`` (entries outside the spike months). ``bound`` is the lowest of the
+    four lower bounds (the binding one)."""
     x = np.asarray(x, float); n = x.size; alpha = 0.05 / k_thr
     keep_ex = np.ones(n, bool) if keep_ex is None else np.asarray(keep_ex, bool)
-    c = Criteria(); rows = {}
+    c = Criteria(); rows = {}; lows = []
     for label, xx in (("all", x), ("ex-spikes", x[keep_ex])):
         i1, i2 = _halves_idx(xx.size)
         for hname, ii in (("first half", i1), ("second half", i2)):
             res = boot_mean_t(xx[ii], block, n_boot); lo, hi = t_bounds(res, alpha)
             ok, dec = _ok(lo, hi, "gt")
             c.add(f"{label} {hname}: mean > 0 with the {100 * (1 - alpha):.2f}% studentized CI excluding 0", ok, dec)
-            rows[f"{label} {hname}"] = {"n": int(ii.size), "mean": _mean(xx[ii]), "ci": [lo, hi]}
-    v, why = c.finish(n, min_n, "conditional entries")
-    return {"verdict": v, "why": why, "n": n, "mean": _mean(x), "halves": rows, "min_n": min_n}
+            rows[f"{label} {hname}"] = {"n": int(ii.size), "mean": _mean(xx[ii]), "ci": [lo, hi]}; lows.append(lo)
+    v, why = c.finish(n, min_n, "conditional daily entries")
+    lows = [v_ for v_ in lows if np.isfinite(v_)]
+    return {"verdict": v, "why": why, "n": n, "mean": _mean(x), "halves": rows, "min_n": min_n, "block": block,
+            "bound": min(lows) if len(lows) == 4 else None, "criteria_pass": c.all_pass()}
 
 
 def short_calendar(m: Market, term: Term, a, spreads: Spreads) -> dict:
@@ -944,32 +1087,51 @@ def eval_short_calendar(m: Market, term: Term, spreads: Spreads, start: str, gat
     if headline_only:
         return {"headline": _mean(xc), "n": int(g.sum()), "window": _window_note(term, m, a)}
     sp = spike_months(m.days, term.v30 * 100, 5, m.days[int(a[0])] if a.size else "", m.days[int(a[-1] + MONTH)] if a.size else "")
-    keep = np.array([m.days[int(i)][:7] not in sp and m.days[int(i + MONTH)][:7] not in sp for i in ac], bool)
-    j = judge_conditional_mean(xc, keep, min_n, n_boot)
+    keep_all = np.array([m.days[int(i)][:7] not in sp and m.days[int(i + MONTH)][:7] not in sp for i in a], bool)
+    keep = keep_all[g]
+    j = judge_conditional_mean(xc, keep, min_n, n_boot, block=BLOCK_P)
+    offs = []                                                  # rule 10 robustness: each start offset of a 21-session grid
+    for P in offset_positions(a.size, MONTH):
+        Pg = P[g[P]]
+        if Pg.size < 4:
+            offs.append({"start": int(P[0]), "n": int(Pg.size), "stat": _mean(x[Pg]), "bound": None, "ok": False}); continue
+        jk = judge_conditional_mean(x[Pg], keep_all[Pg], min_n, n_boot, block=BLOCK_M)
+        offs.append({"start": int(P[0]), "n": int(Pg.size), "stat": jk["mean"], "bound": jk["bound"], "ok": jk["criteria_pass"]})
     def placebo(k):
         gg = np.roll(g, k)
         return _mean(x[gg]) if gg.any() else float("nan")
-    null = shift_null(placebo, x.size, BLOCK_D, n_boot)
+    null = shift_null(placebo, x.size, BLOCK_P, n_boot)
     p_pl = float((np.sum(null >= _mean(xc)) + 1) / (null.size + 1)) if null.size and xc.size else float("nan")
     q1, q2 = (np.quantile(term.v30[a], [1 / 3, 2 / 3]) if a.size else (np.nan, np.nan))
     terc = {}
     for nm, msk in (("low", term.v30[ac] <= q1), ("mid", (term.v30[ac] > q1) & (term.v30[ac] <= q2)), ("high", term.v30[ac] > q2)):
         terc[nm] = {"n": int(msk.sum()), "mean": _mean(xc[msk]) if msk.any() else None}
-    unc = boot_mean_t(x, BLOCK_D, n_boot); ulo, uhi = t_bounds(unc, 0.05)
+    unc = boot_mean_t(x, BLOCK_P, n_boot); ulo, uhi = t_bounds(unc, 0.05)
+    tr = {}
+    for k, r in j["halves"].items():                           # the trial's block 21 (report only)
+        ii = (np.arange(xc.size) if k.startswith("all") else np.flatnonzero(keep))
+        h1, h2 = _halves_idx(ii.size); sel = ii[h1 if k.endswith("first half") else h2]
+        tr[k] = t_bounds(boot_mean_t(xc[sel], BLOCK_D, n_boot), 0.05 / 3)[0]
     other = {f"{t:.2f}": {"n": int((slope >= t).sum()), "mean": _mean(x[slope >= t]) if (slope >= t).any() else None} for t in (1.10, 1.20)}
-    hv = j["halves"]
+    hv = j["halves"]; so = _summ(offs)
     reason = (f"{MODEL} short 30/60-DTE ATM SPY call calendar (long the 30-DTE front at VIX, short the back at the VIX/VIX3M "
               f"interpolation), closed at the front expiry with the back re-priced at that day's VIX; P&L per unit of the back "
               f"leg's premium after {spreads.describe()} on 4 fills; daily entries {_window_note(term, m, a)} on days with "
               f"VIX3M/VIX >= {gate:.2f}: {j['n']} conditional entries, mean {_p(j['mean'])}; deflated (x3 thresholds) "
-              f"studentized block-21 98.33% CIs: "
+              f"studentized block-{BLOCK_P} 98.33% CIs: "
               + "; ".join(f"{k} {_p(r['mean'])} (n {r['n']}, {_ci_txt(*r['ci'], level='98.33%')})" for k, r in hv.items())
-              + f"; spike months removed: {', '.join(sp) if sp else 'none'} ({int((~keep).sum())} entries); placebo (gate block-shifted) "
-              f"p = {_pv(p_pl)}; unconditional mean {_p(_mean(x))} on {x.size} days ({_ci_txt(ulo, uhi)}); other gates (report "
-              f"only): " + ", ".join(f">= {k} n {v['n']} mean {_p(v['mean'])}" for k, v in other.items())
+              + " (the trial's block 21, report only: lower bounds " + " / ".join(_p(v) for v in tr.values()) + "); "
+              + _pooled_txt(m, a, MONTH, BLOCK_P, j["n"], "conditional daily entries (the trial's unit)", daily_claim=True)
+              + "; " + _summ_txt(so, "robustness, the gate on each start offset of a non-overlapping 21-session grid (about "
+                                 + str(int(np.median([o['n'] for o in offs])) if offs else "0") + " conditional months each, "
+                                 "studentized block-6 CIs; pass = all four criteria)", "lowest of the four 98.33% lower bounds")
+              + f"; spike months removed: {', '.join(sp) if sp else 'none'} ({int((~keep).sum())} entries); placebo (gate block-shifted "
+              f">= {BLOCK_P} sessions) p = {_pv(p_pl)}; unconditional mean {_p(_mean(x))} on {x.size} days ({_ci_txt(ulo, uhi)}); "
+              f"other gates (report only): " + ", ".join(f">= {k} n {v['n']} mean {_p(v['mean'])}" for k, v in other.items())
               + "; VIX-tercile control of the conditional mean: " + ", ".join(f"{k} {_p(v['mean'])} (n {v['n']})" for k, v in terc.items()))
     out = dict(j); out.update({"spike_months": sp, "n_ex_spikes": int(keep.sum()), "placebo_p": p_pl, "unconditional": {"n": int(x.size),
                "mean": _mean(x), "ci": [ulo, uhi]}, "other_gates": other, "vix_terciles": terc, "model_priced": True,
+               "trial_block_lower": tr, "offsets": offs, "offsets_summary": so,
                "reason_core": reason, "headline": _mean(xc), "window": _window_note(term, m, a)})
     return out
 
@@ -977,15 +1139,20 @@ def eval_short_calendar(m: Market, term: Term, spreads: Spreads, start: str, gat
 # ------------------------------------------------------------------------------- rolling (monthly) engines --
 
 def long_schedule(m: Market, g: np.ndarray, L: int, extra: float, kind: str, delta: float, iv_fn: Callable, spreads: Spreads,
-                  tilt: Optional[Tilt] = None) -> dict:
+                  tilt: Optional[Tilt] = None, exp_cal: Optional[np.ndarray] = None, extra_cycles: int = 0) -> dict:
     """A long option bought at grid point j*L with expiry at grid point (j+1)*L plus ``extra`` days (so ``extra`` days remain
     at replacement), strike at ``delta`` (solved at the flat IV), marked at every grid point with iv_fn(i, days left).
+    On the monthly expiry calendar (``exp_cal``, rule 10a) the expiry is instead the calendar expiry ``L + extra_cycles``
+    cycles after the purchase, so ``extra_cycles`` monthly cycles remain at replacement.
     Per cycle k (g[k] -> g[k+1]): v0, v1 (value at both ends), cost (open fill at purchase, close fill at replacement)."""
     N = len(g) - 1
     K = np.full(N, np.nan); E = np.full(N, np.nan); cost = np.zeros(N); first = np.zeros(N, bool)
     for j in range(0, N, L):
         a = int(g[j])
-        Ej = float(m.cal[g[j + L]] + extra) if j + L < len(g) else float(m.cal[a] + L * MONTH * 365.0 / YEAR + extra)
+        if exp_cal is not None:
+            Ej = float(exp_cal[j + L + extra_cycles])
+        else:
+            Ej = float(m.cal[g[j + L]] + extra) if j + L < len(g) else float(m.cal[a] + L * MONTH * 365.0 / YEAR + extra)
         T = Ej - m.cal[a]; s = iv_fn(np.array([a]), np.array([T]))
         Kj = float(k_delta(m, [a], Ej, s, delta, kind)[0])
         K[j:min(j + L, N)] = Kj; E[j:min(j + L, N)] = Ej; first[j] = True
@@ -1016,12 +1183,14 @@ def bill_growth(m: Market, g: np.ndarray) -> np.ndarray:
 
 # ------------------------------------------------------------------------------- T-145 diagonal vs vertical --
 
-def diagonal_vs_vertical(m: Market, term: Term, g: np.ndarray, spreads: Spreads, tilt: Optional[Tilt] = None) -> dict:
+def diagonal_vs_vertical(m: Market, term: Term, g: np.ndarray, spreads: Spreads, tilt: Optional[Tilt] = None,
+                         exp_cal: Optional[np.ndarray] = None) -> dict:
     """0.70-delta 90-DTE long call replaced at 30 DTE (every 2 cycles) + monthly 0.30-delta 30-DTE short call, vs the 30-DTE
     vertical on the same strikes (long K1 = the diagonal's current long strike, short K2) rolled monthly. Excess P&L per
-    unit of spot: P&L - debit x bill return, / S."""
+    unit of spot: P&L - debit x bill return, / S. With ``exp_cal`` (rule 10a) g is the monthly expiry calendar and the long
+    call is the monthly expiry three cycles out, replaced with one cycle (28-35 days) left."""
     iv_term = lambda i, T: term_iv(term, i, T)
-    lg = long_schedule(m, g, 2, 30.0, "call", 0.70, iv_term, spreads, tilt)
+    lg = long_schedule(m, g, 2, 30.0, "call", 0.70, iv_term, spreads, tilt, exp_cal=exp_cal, extra_cycles=1)
     sh = monthly_leg(m, g, "call", 0.30, lambda i, T: term.v30[np.asarray(i, int)], spreads, tilt)
     i0, i1 = g[:-1], g[1:]; S0 = m.close[i0]; E = m.cal[i1]; T = E - m.cal[i0]; bill = bill_growth(m, g)
     pnl_d = (lg["v1"] - lg["v0"]) + (sh["prem"] - sh["pay"]) - lg["cost"] - sh["cost"]
@@ -1050,44 +1219,83 @@ def judge_sharpe_halves(a, b, ppy: float, side: str, min_n: int, unit: str, n_bo
     for nm, ok, dec in extra:
         c.add(nm, ok, dec)
     v, why = c.finish(n, min_n, unit)
+    lows = [h[1] for h in hv if np.isfinite(h[1])]
+    bound = (min(lows) if side == "gt" else max(lows)) if len(lows) == 2 else None     # the binding half's lower bound
     return {"verdict": v, "why": why, "n": n, "full": full, "halves": hv, "sharpe_a": float(_sr_rows(a[None, :], ppy)[0]) if n > 1 else None,
-            "sharpe_b": float(_sr_rows(b[None, :], ppy)[0]) if n > 1 else None, "min_n": min_n}
+            "sharpe_b": float(_sr_rows(b[None, :], ppy)[0]) if n > 1 else None, "min_n": min_n, "bound": bound,
+            "criteria_pass": c.all_pass()}
 
 
 def _sd_txt(r) -> str:
     return f"{_f(r[0])} ({_ci_txt(r[1], r[2], _f)})"
 
 
+def _calendar_txt(m: Market, g: np.ndarray) -> str:
+    """Rule 10(a) description of monthly roll cycles g."""
+    if g.size < 2:
+        return "rule 10(a): no complete monthly expiry cycle"
+    dd = np.diff(m.cal[g]).astype(int)
+    return (f"rule 10(a): monthly options = SPY's standard monthly expiry (third Friday, or the prior session when it is a "
+            f"holiday); each cycle buys at one monthly expiry close and rolls at the next ({dd.min()}-{dd.max()} calendar days; "
+            f"27/29/34/36 when a Good Friday moves an expiry to Thursday), {g.size - 1} cycles entered {m.days[int(g[0])]} to "
+            f"{m.days[int(g[-2])]}, the last settling {m.days[int(g[-1])]}")
+
+
+def grid_offsets_rolling(m: Market, term: Term, start: str, fn: Callable, step: int = MONTH) -> list:
+    """Rule 10 robustness for a calendar claim (report only): fn(g) on every start offset of the old ``step``-session grid."""
+    i0 = _start_index(m, term, start); out = []
+    for k in range(step):
+        if i0 + k + step >= len(m.days):
+            break
+        row = fn(grid(m, term, m.days[i0 + k], step)); row["start"] = m.days[i0 + k]; out.append(row)
+    return out
+
+
+def _sharpe_offset_row(j: dict) -> dict:
+    return {"stat": j["full"][0], "bound": j["bound"], "ok": j["criteria_pass"], "n": j["n"]}
+
+
 def eval_diagonal(m: Market, term: Term, spreads: Spreads, start: str, tilt: Optional[Tilt] = None, min_n: int = 150,
                   n_boot: int = N_BOOT, headline_only: bool = False) -> dict:
-    g = grid(m, term, start, MONTH); ppy = YEAR / MONTH
-    res = diagonal_vs_vertical(m, term, g, spreads); xd, xv = res["xd"], res["xv"]
+    g, ec = calendar_cycles(m, term, start); ppy = YEAR / MONTH
+    res = diagonal_vs_vertical(m, term, g, spreads, exp_cal=ec); xd, xv = res["xd"], res["xv"]
     head = float(_sr_rows(xd[None, :], ppy)[0] - _sr_rows(xv[None, :], ppy)[0]) if xd.size > 1 else float("nan")
     if headline_only:
         return {"headline": head, "n": int(xd.size), "window": _window_note(term, m, g[:-1])}
-    pbo = pbo_cscv(np.column_stack([xd, xv]), 8) if xd.size >= 16 else {"pbo": float("nan")}
-    j = judge_sharpe_halves(xd, xv, ppy, "gt", min_n, "months", n_boot,
-                            extra=[("PBO < 0.5 (CSCV, 8 partitions, diagonal vs vertical)", (pbo["pbo"] < 0.5) if np.isfinite(pbo["pbo"]) else None, False)])
+    def judge(a_, b_, nb=n_boot):
+        pbo_ = pbo_cscv(np.column_stack([a_, b_]), 8) if a_.size >= 16 else {"pbo": float("nan")}
+        ok_ = (pbo_["pbo"] < 0.5) if np.isfinite(pbo_["pbo"]) else None
+        return judge_sharpe_halves(a_, b_, ppy, "gt", min_n, "months", nb,
+                                   extra=[("PBO < 0.5 (CSCV, 8 partitions, diagonal vs vertical)", ok_, False)]), pbo_
+    j, pbo = judge(xd, xv)
     p_swap = swap_perm_p(xd, xv, ppy, n_boot)
     sr_d, sr_v = sharpe_ratio(xd), sharpe_ratio(xv)
     dsr = deflated_sharpe_ratio(xd, 2, trial_sharpes=[sr_d, sr_v]) if xd.size > 2 else float("nan")
     tl = None
     if tilt is not None:
-        rt = diagonal_vs_vertical(m, term, g, spreads, tilt)
+        rt = diagonal_vs_vertical(m, term, g, spreads, tilt, exp_cal=ec)
         tl = sharpe_diff_ci(rt["xd"], rt["xv"], ppy, BLOCK_M, n_boot)
+    def off(gk):
+        r = diagonal_vs_vertical(m, term, gk, spreads)
+        return _sharpe_offset_row(judge(r["xd"], r["xv"])[0])
+    offs = grid_offsets_rolling(m, term, start, off); so = _summ(offs)
     reason = (f"{MODEL} SPY diagonal: 0.70-delta call bought at 90 DTE (VIX/VIX3M interpolated IV, VIX6M past 93 days) and "
               f"sold at 30 DTE, plus a 0.30-delta 30-DTE short call (VIX) rolled monthly, vs the 30-DTE vertical on the same "
               f"strikes (both at VIX) rolled monthly; marked to model at each monthly roll (the statistic is monthly P&L); monthly "
               f"excess P&L per unit of spot (P&L minus the debit's bill return); "
-              f"costs {spreads.describe()} on every open and close; {j['n']} months {_window_note(term, m, g[:-1])}. "
+              f"costs {spreads.describe()} on every open and close; {_calendar_txt(m, g)}; the 90-DTE long is the monthly expiry "
+              f"three cycles out, replaced at the roll where it has one cycle left; {j['n']} months {_window_note(term, m, g[:-1])}. "
               f"Annualised Sharpe diagonal {_f(j['sharpe_a'])} vs vertical {_f(j['sharpe_b'])}: difference {_sd_txt(j['full'])}; "
               f"halves {_sd_txt(j['halves'][0])} / {_sd_txt(j['halves'][1])}; paired-swap permutation p (trial null, report only) "
               f"{_pv(p_swap)}; PBO {_pv(pbo['pbo'])}; deflated Sharpe of the diagonal "
               f"(2 trials) {_pv(dsr)}; SKEW-tilt rerun (report only): "
               + (f"difference {_sd_txt(tl)}" if tl else "not available (no spy-smile/SKEW)")
               + f"; tastylive setup (net debit < strike width) met on {res['tasty_share'] * 100:.0f}% of {res['n_long_entries']} long entries; "
-              f"{res['n_inverted']} months with the short strike at or below the long strike")
+              f"{res['n_inverted']} months with the short strike at or below the long strike; "
+              + _summ_txt(so, "robustness (report only, not the calendar the claim names): each start offset of a 21-session roll "
+                          "grid, pass = both halves' Sharpe-difference CI lower > 0 and PBO < 0.5", "lower half bound", _f))
     out = dict(j); out.update({"pbo": pbo.get("pbo"), "dsr": dsr, "p_swap": p_swap, "skew_tilt": tl, "tasty_share": res["tasty_share"], "n_inverted": res["n_inverted"],
+                               "offsets": offs, "offsets_summary": so, "first_entry": m.days[int(g[0])] if g.size else None,
                                "model_priced": True, "reason_core": reason, "headline": head, "window": _window_note(term, m, g[:-1])})
     return out
 
@@ -1107,8 +1315,11 @@ def _std_ratio_rows(xd, xs):
     return lambda idx: xd[idx].std(axis=1, ddof=1) / np.maximum(xs[idx].std(axis=1, ddof=1), 1e-300)
 
 
-def judge_std_ratio(xd, xs, min_n: int = 150, n_boot: int = N_BOOT, block: int = BLOCK_M, thr: float = 0.9) -> dict:
-    """T-146 on non-overlapping monthly entries: per half, std(xd)/std(xs) < thr and the paired-bootstrap 95% CI < 1."""
+def judge_std_ratio(xd, xs, min_n: int = 150, n_boot: int = N_BOOT, block: int = BLOCK_M, thr: float = 0.9,
+                    n_units: Optional[int] = None, unit: str = "non-overlapping monthly entries") -> dict:
+    """T-146: per half, std(xd)/std(xs) < thr and the paired-bootstrap 95% CI < 1. Pooled overlapping daily entries (rule
+    10b) use ``block`` = 2 x hold and ``n_units`` = distinct holds in the window; one offset's monthly entries use 6.
+    ``bound`` is the higher of the two halves' upper bounds (the binding one)."""
     xd = np.asarray(xd, float); xs = np.asarray(xs, float); n = xd.size
     def ratio_ci(ii):
         if ii.size < 4:
@@ -1122,35 +1333,53 @@ def judge_std_ratio(xd, xs, min_n: int = 150, n_boot: int = N_BOOT, block: int =
         c.add(f"{nm}: std ratio < {thr}", (r[0] < thr) if np.isfinite(r[0]) else None, bool(np.isfinite(r[1]) and r[1] > thr))
         ok, dec = _ok(r[1], r[2], "lt", 1.0)
         c.add(f"{nm}: 95% CI of the ratio excludes 1 (upper < 1)", ok, dec)
-    v, why = c.finish(n, min_n, "non-overlapping monthly entries")
-    return {"verdict": v, "why": why, "n": n, "full": full, "halves": hv, "min_n": min_n}
+    nu = n if n_units is None else int(n_units)
+    v, why = c.finish(nu, min_n, unit)
+    ups = [h[2] for h in hv if np.isfinite(h[2])]
+    return {"verdict": v, "why": why, "n": nu, "n_entries": n, "full": full, "halves": hv, "min_n": min_n, "block": block,
+            "bound": max(ups) if len(ups) == 2 else None, "criteria_pass": c.all_pass()}
+
+
+def std_ratio_rule10(xd, xs, min_n: int = 150, n_boot: int = N_BOOT, hold: int = MONTH, n_units: Optional[int] = None) -> dict:
+    """Rule 10(b) for T-146: the PRIMARY judge on every daily entry (blocks of 2 x hold, n = distinct holds), plus each start
+    offset's non-overlapping grid judged alone (blocks of 6 cycles; report only)."""
+    xd = np.asarray(xd, float); xs = np.asarray(xs, float)
+    nu = n_holds(np.arange(xd.size), hold) if n_units is None else n_units
+    j = judge_std_ratio(xd, xs, min_n, n_boot, 2 * hold, n_units=nu); offs = []
+    for P in offset_positions(xd.size, hold):
+        jk = judge_std_ratio(xd[P], xs[P], min_n, n_boot, BLOCK_M)
+        offs.append({"start": int(P[0]), "n": int(P.size), "stat": jk["full"][0], "bound": jk["bound"], "ok": jk["criteria_pass"]})
+    j["offsets"] = offs; j["offsets_summary"] = _summ(offs)
+    return j
 
 
 def eval_double_calendar(m: Market, term: Term, spreads: Spreads, start: str, tilt: Optional[Tilt] = None, min_n: int = 150,
                          n_boot: int = N_BOOT, headline_only: bool = False) -> dict:
-    a = daily_entries(m, term, start); mo = a[::MONTH]
-    res = double_vs_single(m, term, mo, spreads)
-    head = float(res["xd"].std(ddof=1) / res["xs"].std(ddof=1)) if mo.size > 2 else float("nan")
+    """Rule 10(b): every daily entry (pooled over the 21 start offsets of the trial's non-overlapping monthly subsample)."""
+    a = daily_entries(m, term, start); nu = n_holds(a, MONTH)
+    res = double_vs_single(m, term, a, spreads)
+    head = float(res["xd"].std(ddof=1) / res["xs"].std(ddof=1)) if a.size > 2 else float("nan")
     if headline_only:
-        return {"headline": head, "n": int(mo.size), "window": _window_note(term, m, mo)}
-    j = judge_std_ratio(res["xd"], res["xs"], min_n, n_boot)
-    daily = double_vs_single(m, term, a, spreads)
-    r_daily = float(daily["xd"].std(ddof=1) / daily["xs"].std(ddof=1)) if a.size > 2 else float("nan")
-    r_ml = float(res["md"].std(ddof=1) / res["ms"].std(ddof=1)) if mo.size > 2 else float("nan")
+        return {"headline": head, "n": nu, "window": _window_note(term, m, a)}
+    j = std_ratio_rule10(res["xd"], res["xs"], min_n, n_boot, n_units=nu)
+    offs, so = j["offsets"], j["offsets_summary"]
+    r_ml = float(res["md"].std(ddof=1) / res["ms"].std(ddof=1)) if a.size > 2 else float("nan")
     tl = None
     if tilt is not None:
-        rt = double_vs_single(m, term, mo, spreads, tilt); tl = float(rt["xd"].std(ddof=1) / rt["xs"].std(ddof=1))
+        rt = double_vs_single(m, term, a, spreads, tilt); tl = float(rt["xd"].std(ddof=1) / rt["xs"].std(ddof=1))
     f3 = lambda r: f"{_f(r[0], 3)} ({_ci_txt(r[1], r[2], lambda v: _f(v, 3))})"
     reason = (f"{MODEL} SPY +/-5% double calendar (0.95 S put calendar + 1.05 S call calendar, 30/60 DTE, flat IV per expiry) vs "
               f"the ATM call calendar, entered on the same days, held to the front expiry (back legs re-priced at that day's VIX "
-              f"for 30 days); P&L / debit after {spreads.describe()} on 8 vs 4 fills (open and close at T1; no commission amount is stated, so none beyond the half-spread); {j['n']} "
-              f"non-overlapping monthly entries {_window_note(term, m, mo)}; mean debit {_p(_mean(res['debit_d']))} vs "
-              f"{_p(_mean(res['debit_s']))} of spot. Std ratio (double / single) {f3(j['full'])}; halves {f3(j['halves'][0])} / "
-              f"{f3(j['halves'][1])} (paired block-6 percentile bootstrap); all daily entries (report only) {_f(r_daily, 3)}; per "
-              f"unit of max loss (debit + costs: a long calendar is never worth less than 0 at T1) {_f(r_ml, 3)}; SKEW-tilt rerun "
-              f"(report only) " + (_f(tl, 3) if tl is not None else "not available"))
-    out = dict(j); out.update({"ratio_daily": r_daily, "ratio_per_max_loss": r_ml, "skew_tilt_ratio": tl, "model_priced": True,
-                               "reason_core": reason, "headline": head, "window": _window_note(term, m, mo)})
+              f"for 30 days); P&L / debit after {spreads.describe()} on 8 vs 4 fills (open and close at T1; no commission amount is stated, so none beyond the half-spread); "
+              + _pooled_txt(m, a, MONTH, BLOCK_P, j["n"], "distinct non-overlapping monthly holds (the trial's unit)")
+              + f"; mean debit {_p(_mean(res['debit_d']))} vs {_p(_mean(res['debit_s']))} of spot. Std ratio (double / single) "
+              f"{f3(j['full'])}; halves {f3(j['halves'][0])} / {f3(j['halves'][1])} (paired block-{BLOCK_P} percentile bootstrap); "
+              + _summ_txt(so, "the trial's non-overlapping monthly subsample at every start offset (paired block-6 bootstrap; pass "
+                          "= ratio < 0.9 and CI upper < 1 in both halves)", "higher half upper bound", lambda v: _f(v, 3))
+              + f"; per unit of max loss (debit + costs: a long calendar is never worth less than 0 at T1) {_f(r_ml, 3)}; SKEW-tilt "
+              f"rerun (report only) " + (_f(tl, 3) if tl is not None else "not available"))
+    out = dict(j); out.update({"ratio_per_max_loss": r_ml, "skew_tilt_ratio": tl, "offsets": offs, "offsets_summary": so,
+                               "model_priced": True, "reason_core": reason, "headline": head, "window": _window_note(term, m, a)})
     return out
 
 
@@ -1185,10 +1414,13 @@ def double_diagonal_vs_condor(m: Market, term: Term, a, spreads: Spreads, tilt: 
             "credit_ic": -ic["debit"] / S, "K": np.column_stack([K1, K2, K3, K4]) / S[:, None]}
 
 
-def judge_paired_halves(d_sets: dict, min_n: int, unit: str, n_boot: int = N_BOOT, block: int = BLOCK_M) -> dict:
+def judge_paired_halves(d_sets: dict, min_n: int, unit: str, n_boot: int = N_BOOT, block: int = BLOCK_M,
+                        n_units: Optional[int] = None) -> dict:
     """Per named difference series: mean > 0 with the paired block-bootstrap 95% CI excluding 0 in both halves. A series
-    given as None is a criterion that cannot be implemented (its two half criteria are None)."""
-    c = Criteria(); rows = {}; n = None
+    given as None is a criterion that cannot be implemented (its two half criteria are None). ``n_units`` (claim units)
+    replaces the entry count for min_n when the series are pooled overlapping entries (rule 10b). ``bound`` is the lowest
+    half lower bound over the series (the binding one)."""
+    c = Criteria(); rows = {}; n = None; lows = []
     for name, d in d_sets.items():
         if d is None:
             for hn in ("first half", "second half"):
@@ -1197,40 +1429,81 @@ def judge_paired_halves(d_sets: dict, min_n: int, unit: str, n_boot: int = N_BOO
         d = np.asarray(d, float); n = d.size if n is None else n
         full = (_mean(d),) + boot_mean_ci(d, block, n_boot); hv = []
         for hn, ii in zip(("first half", "second half"), _halves_idx(d.size)):
-            r = (_mean(d[ii]),) + boot_mean_ci(d[ii], block, n_boot); hv.append(r)
+            r = (_mean(d[ii]),) + boot_mean_ci(d[ii], block, n_boot); hv.append(r); lows.append(r[1])
             ok, dec = _ok(r[1], r[2], "gt")
             c.add(f"{name}, {hn}: difference > 0 with the 95% CI excluding 0", ok, dec)
         rows[name] = {"full": full, "halves": hv}
-    v, why = c.finish(int(n or 0), min_n, unit)
-    return {"verdict": v, "why": why, "n": int(n or 0), "rows": rows, "min_n": min_n}
+    nu = int(n or 0) if n_units is None else int(n_units)
+    v, why = c.finish(nu, min_n, unit)
+    fin = [v_ for v_ in lows if np.isfinite(v_)]
+    return {"verdict": v, "why": why, "n": nu, "n_entries": int(n or 0), "rows": rows, "min_n": min_n, "block": block,
+            "bound": min(fin) if fin and len(fin) == len(lows) else None, "criteria_pass": c.all_pass()}
+
+
+def gated_units(gate, hold: int = MONTH) -> int:
+    """Claim units of a gated pooled statistic: the mean, over the start offsets, of the gated entries on each offset grid."""
+    gate = np.asarray(gate, bool); P_all = offset_positions(gate.size, hold)
+    return int(np.floor(np.mean([gate[P].sum() for P in P_all]) + 1e-9)) if P_all else 0
+
+
+def paired_halves_rule10(d_sets: dict, gate, min_n: int, unit: str, n_boot: int = N_BOOT, hold: int = MONTH) -> dict:
+    """Rule 10(b) for T-147: ``d_sets`` hold one value per GATED daily entry (gate = the entry filter over every daily entry).
+    The PRIMARY judge pools every gated entry (blocks of 2 x hold, n = the mean per-offset gated count); each start
+    offset's grid is judged alone on its gated entries (blocks of 6 cycles; report only). The per-offset statistic is the
+    first series' mean."""
+    gate = np.asarray(gate, bool); gpos = np.cumsum(gate) - 1
+    j = judge_paired_halves(d_sets, min_n, unit, n_boot, 2 * hold, n_units=gated_units(gate, hold))
+    first = next((np.asarray(v, float) for v in d_sets.values() if v is not None), np.array([])); offs = []
+    for P in offset_positions(gate.size, hold):
+        q = gpos[P[gate[P]]]
+        sk = {k: (None if v is None else np.asarray(v, float)[q]) for k, v in d_sets.items()}
+        jk = judge_paired_halves(sk, min_n, unit, n_boot, BLOCK_M)
+        offs.append({"start": int(P[0]), "n": int(q.size), "stat": _mean(first[q]) if first.size else None, "bound": jk["bound"],
+                     "ok": jk["criteria_pass"]})
+    j["offsets"] = offs; j["offsets_summary"] = _summ(offs)
+    return j
 
 
 def eval_double_diagonal(m: Market, term: Term, spreads: Spreads, start: str, tilt: Optional[Tilt] = None, min_n: int = 80,
                          n_boot: int = N_BOOT, headline_only: bool = False) -> dict:
-    g = grid(m, term, start, MONTH); g = g[g + MONTH < len(m.days)]
-    med = np.array([np.median(term.v30[max(0, i - YEAR):i]) if i >= YEAR else np.nan for i in g])
-    low = term.v30[g] < med; a = g[low]
+    """Rule 10(b): every daily entry with VIX below its trailing 252-session median (pooled over the 21 start offsets of the
+    trial's monthly grid); n = the mean per-offset count of low-VIX monthly entries."""
+    a_all = daily_entries(m, term, start)
+    med = np.array([np.median(term.v30[max(0, i - YEAR):i]) if i >= YEAR else np.nan for i in a_all])
+    low = term.v30[a_all] < med; a = a_all[low]
+    nu = gated_units(low, MONTH)
     res = double_diagonal_vs_condor(m, term, a, spreads); d = res["x_dd"] - res["x_ic"]
     if headline_only:
-        return {"headline": _mean(d), "n": int(a.size), "window": _window_note(term, m, a)}
+        return {"headline": _mean(d), "n": nu, "window": _window_note(term, m, a)}
     sets = {"flat IV": d, "SKEW tilt" + ("" if tilt is not None else " (no spy-smile / SKEW data)"): None}
     if tilt is not None:
         rt = double_diagonal_vs_condor(m, term, a, spreads, tilt); sets["SKEW tilt"] = rt["x_dd"] - rt["x_ic"]
-    j = judge_paired_halves(sets, min_n, "low-VIX monthly entries", n_boot)
-    rng = np.random.default_rng(0)
-    perm = np.array([_mean(d * rng.choice([-1.0, 1.0], d.size)) for _ in range(n_boot)]) if d.size else np.array([])
+    j = paired_halves_rule10(sets, low, min_n, "low-VIX monthly entries (mean per start offset)", n_boot)
+    offs, so = j["offsets"], j["offsets_summary"]
+    rng = np.random.default_rng(0); nb_ = math.ceil(d.size / BLOCK_P) if d.size else 0
+    if d.size:                                                 # block sign flips (blocks of 2 x hold overlapping entries)
+        sg = np.repeat(rng.choice([-1.0, 1.0], (n_boot, nb_)), BLOCK_P, axis=1)[:, :d.size]
+        perm = (d[None, :] * sg).mean(axis=1)
+    else:
+        perm = np.array([])
     p_perm = float((np.sum(perm >= _mean(d)) + 1) / (perm.size + 1)) if perm.size else float("nan")
     fx = lambda r: f"{_p(r[0])} ({_ci_txt(r[1], r[2])})"
     reason = (f"{MODEL} SPY double diagonal (short 0.16-delta 30-DTE strangle at VIX, long 0.10-delta 60-DTE wings at the "
               f"VIX/VIX3M interpolation, closed at the front expiry with the wings re-priced at that day's VIX) vs the 30-DTE iron "
-              f"condor on the same strikes (VIX, held to expiry); entries on the monthly grid {_window_note(term, m, a)} when VIX < "
-              f"its trailing 252-session median ({j['n']} of {g.size} months); costs {spreads.describe()} on 8 vs 4 fills; max loss "
+              f"condor on the same strikes (VIX, held to expiry); entries when VIX < its trailing 252-session median ({a.size} of "
+              f"{a_all.size} daily entries); "
+              + _pooled_txt(m, a_all, MONTH, BLOCK_P, j["n"], "low-VIX monthly entries (mean per start offset, the trial's unit)")
+              + f"; costs {spreads.describe()} on 8 vs 4 fills; max loss "
               f"of the diagonal = debit + costs - the lowest T1 value over spot (wings at T1's realised IV), of the condor = wider "
               f"wing - credit + costs. Mean P&L / max loss {_p(_mean(res['x_dd']))} vs {_p(_mean(res['x_ic']))}; difference "
               + "; ".join(f"[{k}] full {fx(r['full'])}, halves {fx(r['halves'][0])} / {fx(r['halves'][1])}" for k, r in j["rows"].items())
-              + f"; sign-flip permutation p (report only) {_pv(p_perm)}; median strikes (K/S) "
+              + f" (paired block-{BLOCK_P} percentile bootstrap over the low-VIX entries); "
+              + _summ_txt(so, "the trial's monthly grid at every start offset (paired block-6 bootstrap; pass = every series > 0 "
+                          "with the CI excluding 0 in both halves)", "lowest half lower bound")
+              + f"; block sign-flip permutation p (report only) {_pv(p_perm)}; median strikes (K/S) "
               + "/".join(f"{v:.3f}" for v in (np.median(res["K"], axis=0) if a.size else [np.nan] * 4)))
-    out = dict(j); out.update({"n_months_total": int(g.size), "mean_dd": _mean(res["x_dd"]), "mean_ic": _mean(res["x_ic"]), "p_perm": p_perm,
+    out = dict(j); out.update({"n_daily_total": int(a_all.size), "n_daily_low": int(a.size), "mean_dd": _mean(res["x_dd"]),
+                               "mean_ic": _mean(res["x_ic"]), "p_perm": p_perm, "offsets": offs, "offsets_summary": so,
                                "model_priced": True, "reason_core": reason, "headline": _mean(d), "window": _window_note(term, m, a)})
     return out
 
@@ -1257,52 +1530,79 @@ def ratio_calendar(m: Market, term: Term, a, spreads: Spreads, hold: int = WEEK)
     return {"x": pnl_r / S0, "x1": pnl_1 / S0, "xh": (pnl_r - delta * dS) / S0, "dvix": (term.v30[c] - term.v30[a]) * 100, "n_ratio": n}
 
 
-def judge_spearman(x, dv, min_n: int = 300, n_boot: int = N_BOOT, block: int = BLOCK_W, thr: float = 0.3) -> dict:
-    """T-149: per half, the upper bound of the 95% CI of |rho| (max(|lo|, |hi|) of the rho CI) < thr."""
+def judge_spearman(x, dv, min_n: int = 300, n_boot: int = N_BOOT, block: int = BLOCK_W, thr: float = 0.3,
+                   n_units: Optional[int] = None) -> dict:
+    """T-149: per half, the upper bound of the 95% CI of |rho| (max(|lo|, |hi|) of the rho CI) < thr. ``block`` is in
+    entries: 4 for one offset's weekly entries, 20 (4 weeks >= 2 x the 5-session hold) for pooled daily entries, whose
+    ``n_units`` (distinct 5-session holds = weeks) replaces the entry count. ``bound`` = the higher half's |rho| upper."""
     x = np.asarray(x, float); dv = np.asarray(dv, float); n = x.size
-    full = spearman_ci(x, dv, block, n_boot); c = Criteria(); hv = []
+    full = spearman_ci(x, dv, block, n_boot); c = Criteria(); hv = []; ups = []
     for nm, ii in zip(("first half", "second half"), _halves_idx(n)):
         r = spearman_ci(x[ii], dv[ii], block, n_boot); hv.append(r)
         if np.isfinite(r[1]) and np.isfinite(r[2]):
-            up = max(abs(r[1]), abs(r[2])); lo_abs = 0.0 if r[1] <= 0 <= r[2] else min(abs(r[1]), abs(r[2]))
+            up = max(abs(r[1]), abs(r[2])); lo_abs = 0.0 if r[1] <= 0 <= r[2] else min(abs(r[1]), abs(r[2])); ups.append(up)
             c.add(f"{nm}: upper bound of the 95% CI of |rho| < {thr}", up < thr, lo_abs >= thr)
         else:
             c.add(f"{nm}: upper bound of the 95% CI of |rho| < {thr}", None)
-    v, why = c.finish(n, min_n, "weeks")
-    return {"verdict": v, "why": why, "n": n, "full": full, "halves": hv, "min_n": min_n}
+    nu = n if n_units is None else int(n_units)
+    v, why = c.finish(nu, min_n, "weeks")
+    return {"verdict": v, "why": why, "n": nu, "n_entries": n, "full": full, "halves": hv, "min_n": min_n, "block": block,
+            "bound": max(ups) if len(ups) == 2 else None, "criteria_pass": c.all_pass()}
+
+
+def spearman_rule10(x, dv, min_n: int = 300, n_boot: int = N_BOOT, hold: int = WEEK, n_units: Optional[int] = None) -> dict:
+    """Rule 10(b) for T-149: the PRIMARY judge on every daily entry (blocks of max(4 weeks, 2 x hold) entries, n = distinct
+    holds), plus each start offset's weekly grid judged alone (blocks of 4 weeks; report only)."""
+    x = np.asarray(x, float); dv = np.asarray(dv, float)
+    nu = n_holds(np.arange(x.size), hold) if n_units is None else n_units
+    j = judge_spearman(x, dv, min_n, n_boot, max(BLOCK_W * hold, 2 * hold), n_units=nu); offs = []
+    for P in offset_positions(x.size, hold):
+        jk = judge_spearman(x[P], dv[P], min_n, n_boot, BLOCK_W)
+        offs.append({"start": int(P[0]), "n": int(P.size), "stat": jk["full"][0], "bound": jk["bound"], "ok": jk["criteria_pass"]})
+    j["offsets"] = offs; j["offsets_summary"] = _summ(offs)
+    return j
 
 
 def eval_ratio_calendar(m: Market, term: Term, spreads: Spreads, start: str, min_n: int = 300, n_boot: int = N_BOOT,
                         headline_only: bool = False) -> dict:
-    g = grid(m, term, start, WEEK); g = g[g + WEEK < len(m.days)]
-    res = ratio_calendar(m, term, g, spreads)
+    """Rule 10(b): the 5-session hold entered at every daily close (pooled over the 5 start offsets of the weekly grid)."""
+    a = daily_entries(m, term, start, hold=WEEK); nu = n_holds(a, WEEK); blk = max(BLOCK_W * WEEK, 2 * WEEK)
+    res = ratio_calendar(m, term, a, spreads)
     if headline_only:
-        return {"headline": spearman(res["x"], res["dvix"]), "n": int(g.size), "window": _window_note(term, m, g)}
-    j = judge_spearman(res["x"], res["dvix"], min_n, n_boot)
-    r1 = spearman_ci(res["x1"], res["dvix"], BLOCK_W, n_boot); rh = spearman_ci(res["xh"], res["dvix"], BLOCK_W, n_boot)
-    top = res["dvix"] >= np.quantile(res["dvix"], 0.9) if g.size else np.zeros(0, bool)
-    r_ex = spearman(res["x"][~top], res["dvix"][~top]) if g.size else float("nan")
+        return {"headline": spearman(res["x"], res["dvix"]), "n": nu, "window": _window_note(term, m, a)}
+    j = spearman_rule10(res["x"], res["dvix"], min_n, n_boot, n_units=nu)
+    offs, so = j["offsets"], j["offsets_summary"]
+    r1 = spearman_ci(res["x1"], res["dvix"], blk, n_boot); rh = spearman_ci(res["xh"], res["dvix"], blk, n_boot)
+    top = res["dvix"] >= np.quantile(res["dvix"], 0.9) if a.size else np.zeros(0, bool)
+    r_ex = spearman(res["x"][~top], res["dvix"][~top]) if a.size else float("nan")
     abs_up = lambda r: max(abs(r[1]), abs(r[2])) if np.isfinite(r[1]) and np.isfinite(r[2]) else float("nan")
     fr = lambda r: f"{_f(r[0], 3)} ({_ci_txt(r[1], r[2], lambda v: _f(v, 3))}, |rho| upper {abs(abs_up(r)):.3f})"
-    reason = (f"{MODEL} SPY 30/90-DTE ATM ratio call calendar re-sized vega-neutral each week (short n x 30-DTE at VIX per long "
-              f"90-DTE at the VIX/VIX3M interpolation; median n {float(np.median(res['n_ratio'])) if g.size else float('nan'):.2f}), held "
-              f"5 sessions and re-priced with that day's interpolated IVs; weekly P&L per unit of spot after {spreads.describe()} on "
-              f"1 + n contract fills; {j['n']} weeks {_window_note(term, m, g)}. Spearman(P&L, delta-VIX) {fr(j['full'])}; halves "
-              f"{fr(j['halves'][0])} / {fr(j['halves'][1])} (block-4-week percentile bootstrap); 1:1 calendar {fr(r1)}; delta-hedged "
-              f"ratio P&L {fr(rh)}; without the top-decile VIX-spike weeks {_f(r_ex, 3)}")
-    out = dict(j); out.update({"one_to_one": r1, "delta_hedged": rh, "ex_top_decile": r_ex, "median_n_ratio": float(np.median(res["n_ratio"])) if g.size else None,
-                               "model_priced": True, "reason_core": reason, "headline": j["full"][0], "window": _window_note(term, m, g)})
+    reason = (f"{MODEL} SPY 30/90-DTE ATM ratio call calendar re-sized vega-neutral at each entry (short n x 30-DTE at VIX per long "
+              f"90-DTE at the VIX/VIX3M interpolation; median n {float(np.median(res['n_ratio'])) if a.size else float('nan'):.2f}), held "
+              f"5 sessions and re-priced with that day's interpolated IVs; 5-day P&L per unit of spot after {spreads.describe()} on "
+              f"1 + n contract fills; "
+              + _pooled_txt(m, a, WEEK, blk, j["n"], "distinct 5-session holds = weeks (the trial's unit)")
+              + f" (the trial's 4-week block = {blk} daily entries). Spearman(P&L, delta-VIX) {fr(j['full'])}; halves "
+              f"{fr(j['halves'][0])} / {fr(j['halves'][1])}; "
+              + _summ_txt(so, "the weekly grid at every start offset (block-4-week bootstrap; pass = |rho| upper < 0.3 in both "
+                          "halves)", "higher half |rho| upper", lambda v: _f(v, 3))
+              + f"; 1:1 calendar {fr(r1)}; delta-hedged ratio P&L {fr(rh)}; without the top-decile VIX-spike holds {_f(r_ex, 3)}")
+    out = dict(j); out.update({"one_to_one": r1, "delta_hedged": rh, "ex_top_decile": r_ex, "median_n_ratio": float(np.median(res["n_ratio"])) if a.size else None,
+                               "offsets": offs, "offsets_summary": so,
+                               "model_priced": True, "reason_core": reason, "headline": j["full"][0], "window": _window_note(term, m, a)})
     return out
 
 
 # ---------------------------------------------------------------------------------- T-150 PMCC vs covered call --
 
-def pmcc_vs_cc(m: Market, term: Term, g: np.ndarray, spreads: Spreads, leaps_shift: float = 0.0, leaps_scale: float = 1.0) -> dict:
+def pmcc_vs_cc(m: Market, term: Term, g: np.ndarray, spreads: Spreads, leaps_shift: float = 0.0, leaps_scale: float = 1.0,
+               exp_cal: Optional[np.ndarray] = None) -> dict:
     """PMCC: 0.80-delta 12-month LEAPS call at VIX3M (x scale + shift) replaced at 90 DTE (every 9 cycles) + monthly 0.30-delta
     30-DTE short call at VIX. Covered call: SPY (total return) + the same short call. Monthly excess return on capital
-    deployed (PMCC: LEAPS value - short premium; CC: S - premium) over the bill."""
+    deployed (PMCC: LEAPS value - short premium; CC: S - premium) over the bill. With ``exp_cal`` (rule 10a) the LEAPS is
+    the monthly expiry twelve cycles out, replaced with three cycles (about 90 days) left."""
     iv_l = lambda i, T: np.maximum(term.v93[np.asarray(i, int)] * leaps_scale + leaps_shift, 0.01)
-    lg = long_schedule(m, g, 9, 90.0, "call", 0.80, iv_l, spreads)
+    lg = long_schedule(m, g, 9, 90.0, "call", 0.80, iv_l, spreads, exp_cal=exp_cal, extra_cycles=3)
     sh = monthly_leg(m, g, "call", 0.30, lambda i, T: term.v30[np.asarray(i, int)], spreads)
     i0, i1 = g[:-1], g[1:]; S0 = m.close[i0]; bill = bill_growth(m, g)
     pnl_p = (lg["v1"] - lg["v0"]) + (sh["prem"] - sh["pay"]) - lg["cost"] - sh["cost"]
@@ -1315,8 +1615,8 @@ def pmcc_vs_cc(m: Market, term: Term, g: np.ndarray, spreads: Spreads, leaps_shi
 
 def eval_pmcc(m: Market, term: Term, spreads: Spreads, start: str, chain_ratio: Optional[float] = None, chain_note: str = "",
               min_n: int = 150, n_boot: int = N_BOOT, headline_only: bool = False) -> dict:
-    g = grid(m, term, start, MONTH); ppy = YEAR / MONTH
-    res = pmcc_vs_cc(m, term, g, spreads)
+    g, ec = calendar_cycles(m, term, start); ppy = YEAR / MONTH
+    res = pmcc_vs_cc(m, term, g, spreads, exp_cal=ec)
     head = float(_sr_rows(res["xp"][None, :], ppy)[0] - _sr_rows(res["xc"][None, :], ppy)[0]) if res["xp"].size > 1 else float("nan")
     if headline_only:
         return {"headline": head, "n": int(res["xp"].size), "window": _window_note(term, m, g[:-1])}
@@ -1324,19 +1624,27 @@ def eval_pmcc(m: Market, term: Term, spreads: Spreads, start: str, chain_ratio: 
     sens = {}
     for nm, kw in (("VIX3M - 3 vol pts", {"leaps_shift": -0.03}), ("VIX3M + 3 vol pts", {"leaps_shift": 0.03})) + (
             ((f"chain 12-month ATM IV / VIX3M = {chain_ratio:.3f}", {"leaps_scale": chain_ratio}),) if chain_ratio else ()):
-        r = pmcc_vs_cc(m, term, g, spreads, **kw); sens[nm] = sharpe_diff_ci(r["xp"], r["xc"], ppy, BLOCK_M, n_boot)
+        r = pmcc_vs_cc(m, term, g, spreads, exp_cal=ec, **kw); sens[nm] = sharpe_diff_ci(r["xp"], r["xc"], ppy, BLOCK_M, n_boot)
+    def off(gk):
+        r = pmcc_vs_cc(m, term, gk, spreads)
+        return _sharpe_offset_row(judge_sharpe_halves(r["xp"], r["xc"], ppy, "not_above", min_n, "months", n_boot))
+    offs = grid_offsets_rolling(m, term, start, off); so = _summ(offs)
     ann = lambda r: float(np.prod(1 + r) ** (ppy / r.size) - 1) if r.size else float("nan")
     reason = (f"{MODEL} SPY poor man's covered call (0.80-delta 12-month LEAPS call at VIX3M IV, replaced at 90 DTE; monthly "
               f"0.30-delta 30-DTE short call at VIX; no dividends) vs the covered call (SPY total return + the same short call), "
               f"marked to model at each monthly roll; "
               f"monthly returns on capital deployed (PMCC: LEAPS value - short premium, median {_p(float(np.median(res['cap_p'])) if res['cap_p'].size else float('nan'), 1)} "
               f"of spot; CC: spot - premium) in excess of the bill; costs {spreads.describe()} on the monthly short-call fills and "
-              f"the LEAPS rolls; {j['n']} months {_window_note(term, m, g[:-1])}. Annualised Sharpe PMCC {_f(j['sharpe_a'])} vs CC "
+              f"the LEAPS rolls; {_calendar_txt(m, g)}; the LEAPS is the monthly expiry twelve cycles out, replaced at the roll "
+              f"where it has three cycles (about 90 days) left; {j['n']} months {_window_note(term, m, g[:-1])}. Annualised Sharpe PMCC {_f(j['sharpe_a'])} vs CC "
               f"{_f(j['sharpe_b'])}: difference {_sd_txt(j['full'])}; halves {_sd_txt(j['halves'][0])} / {_sd_txt(j['halves'][1])} "
               f"(the claim survives a half unless its CI lies entirely above 0); return on capital {_p(ann(res['rp']), 1)} vs "
               f"{_p(ann(res['rc']), 1)} a year, max drawdown {_p(_mdd(res['rp']), 1)} vs {_p(_mdd(res['rc']), 1)}; LEAPS-IV "
-              f"sensitivity (report only): " + "; ".join(f"{k}: {_sd_txt(v)}" for k, v in sens.items()) + (chain_note or ""))
+              f"sensitivity (report only): " + "; ".join(f"{k}: {_sd_txt(v)}" for k, v in sens.items()) + (chain_note or "")
+              + "; " + _summ_txt(so, "robustness (report only, not the calendar the claim names): each start offset of a 21-session "
+                                 "roll grid, pass = neither half's CI lies entirely above 0", "highest half lower bound", _f))
     out = dict(j); out.update({"sensitivity": sens, "ann_return": [ann(res["rp"]), ann(res["rc"])], "mdd": [_mdd(res["rp"]), _mdd(res["rc"])],
+                               "offsets": offs, "offsets_summary": so, "first_entry": m.days[int(g[0])] if g.size else None,
                                "model_priced": True, "reason_core": reason, "headline": head, "window": _window_note(term, m, g[:-1])})
     return out
 
@@ -1344,13 +1652,14 @@ def eval_pmcc(m: Market, term: Term, spreads: Spreads, start: str, chain_ratio: 
 # ------------------------------------------------------------------------------------ T-151 LEAPS collar --
 
 def leaps_vs_standard_collar(m: Market, term: Term, g: np.ndarray, spreads: Spreads, put_shift: float = 0.0, put_scale: float = 1.0,
-                             tilt: Optional[Tilt] = None) -> dict:
+                             tilt: Optional[Tilt] = None, exp_cal: Optional[np.ndarray] = None) -> dict:
     """LEAPS collar: SPY (total return) + 12-month -0.25-delta put at VIX3M (x scale + shift) replaced at 90 DTE + monthly
     0.30-delta 30-DTE short call at VIX. Standard collar: SPY + 30-DTE -0.25-delta put + 0.30-delta call, both at VIX, rolled
-    monthly. Monthly excess return on the net outlay (S + put - call premium) over the bill."""
+    monthly. Monthly excess return on the net outlay (S + put - call premium) over the bill. With ``exp_cal`` (rule 10a) the
+    LEAPS put is the monthly expiry twelve cycles out, replaced with three cycles (about 90 days) left."""
     v30 = lambda i, T: term.v30[np.asarray(i, int)]
     iv_p = lambda i, T: np.maximum(term.v93[np.asarray(i, int)] * put_scale + put_shift, 0.01)
-    lp = long_schedule(m, g, 9, 90.0, "put", -0.25, iv_p, spreads, tilt)
+    lp = long_schedule(m, g, 9, 90.0, "put", -0.25, iv_p, spreads, tilt, exp_cal=exp_cal, extra_cycles=3)
     ca = monthly_leg(m, g, "call", 0.30, v30, spreads, tilt)
     sp = monthly_leg(m, g, "put", -0.25, v30, spreads, tilt)
     i0, i1 = g[:-1], g[1:]; S0 = m.close[i0]; bill = bill_growth(m, g); stock = S0 * (m.adj[i1] / m.adj[i0] - 1.0)
@@ -1369,8 +1678,8 @@ def leaps_vs_standard_collar(m: Market, term: Term, g: np.ndarray, spreads: Spre
 
 def eval_leaps_collar(m: Market, term: Term, spreads: Spreads, start: str, tilt: Optional[Tilt] = None, chain_ratio: Optional[float] = None,
                       chain_note: str = "", min_n: int = 150, n_boot: int = N_BOOT, headline_only: bool = False) -> dict:
-    g = grid(m, term, start, MONTH); ppy = YEAR / MONTH
-    res = leaps_vs_standard_collar(m, term, g, spreads)
+    g, ec = calendar_cycles(m, term, start); ppy = YEAR / MONTH
+    res = leaps_vs_standard_collar(m, term, g, spreads, exp_cal=ec)
     head = float(_sr_rows(res["xl"][None, :], ppy)[0] - _sr_rows(res["xs"][None, :], ppy)[0]) if res["xl"].size > 1 else float("nan")
     if headline_only:
         return {"headline": head, "n": int(res["xl"].size), "window": _window_note(term, m, g[:-1])}
@@ -1383,77 +1692,178 @@ def eval_leaps_collar(m: Market, term: Term, spreads: Spreads, start: str, tilt:
     if tilt is not None:
         runs.append(("SKEW tilt (45-day smile shape)", {"tilt": tilt}))
     for nm, kw in runs:
-        r = leaps_vs_standard_collar(m, term, g, spreads, **kw); sens[nm] = sharpe_diff_ci(r["xl"], r["xs"], ppy, BLOCK_M, n_boot)
+        r = leaps_vs_standard_collar(m, term, g, spreads, exp_cal=ec, **kw); sens[nm] = sharpe_diff_ci(r["xl"], r["xs"], ppy, BLOCK_M, n_boot)
+    def off(gk):
+        r = leaps_vs_standard_collar(m, term, gk, spreads)
+        return _sharpe_offset_row(judge_sharpe_halves(r["xl"], r["xs"], ppy, "gt", min_n, "months", n_boot))
+    offs = grid_offsets_rolling(m, term, start, off); so = _summ(offs)
     reason = (f"{MODEL} SPY LEAPS collar (SPY + 12-month -0.25-delta put at VIX3M IV replaced at 90 DTE + monthly 0.30-delta "
               f"30-DTE short call at VIX) vs the standard collar (SPY + 30-DTE -0.25-delta put and 0.30-delta call, both at VIX, "
               f"rolled monthly), marked to model at each monthly roll; dividends credited to SPY in both; monthly excess return on "
               f"the net outlay; costs "
-              f"{spreads.describe()} on every option fill; {j['n']} months {_window_note(term, m, g[:-1])}. Annualised Sharpe "
+              f"{spreads.describe()} on every option fill; {_calendar_txt(m, g)}; the LEAPS put is the monthly expiry twelve cycles "
+              f"out, replaced at the roll where it has three cycles (about 90 days) left; {j['n']} months {_window_note(term, m, g[:-1])}. Annualised Sharpe "
               f"LEAPS collar {_f(j['sharpe_a'])} vs standard {_f(j['sharpe_b'])}: difference {_sd_txt(j['full'])}; halves "
               f"{_sd_txt(j['halves'][0])} / {_sd_txt(j['halves'][1])}; paired-swap permutation p (trial null, report only) "
               f"{_pv(p_swap)}; max drawdown {_p(_mdd(res['rl']), 1)} vs {_p(_mdd(res['rs']), 1)}; "
               f"credit coverage (call premium / net put cost) {res['coverage'][0]:.2f} vs {res['coverage'][1]:.2f}; sensitivities "
-              f"(report only): " + "; ".join(f"{k}: {_sd_txt(v)}" for k, v in sens.items()) + (chain_note or ""))
+              f"(report only): " + "; ".join(f"{k}: {_sd_txt(v)}" for k, v in sens.items()) + (chain_note or "")
+              + "; " + _summ_txt(so, "robustness (report only, not the calendar the claim names): each start offset of a 21-session "
+                                 "roll grid, pass = both halves' Sharpe-difference CI lower > 0", "lower half bound", _f))
     out = dict(j); out.update({"sensitivity": sens, "mdd": [_mdd(res["rl"]), _mdd(res["rs"])], "coverage": res["coverage"], "p_swap": p_swap,
+                               "offsets": offs, "offsets_summary": so, "first_entry": m.days[int(g[0])] if g.size else None,
                                "model_priced": True, "reason_core": reason, "headline": head, "window": _window_note(term, m, g[:-1])})
     return out
 
 
 # ------------------------------------------------------------------------------ T-152 calendarised butterfly --
 
-T152_START = "2007-12-04"      # the claim's "since 2007-12": the first VIX3M (VXV) close, the trial's anchor
+T152_START = "2007-12-01"      # the claim's "since 2007-12": every session from the first one in 2007-12 (pooled, rule 10b)
 
-def time_vs_plain_fly(m: Market, term: Term, a, spreads: Spreads, w: float = 0.03) -> dict:
+
+def time_vs_plain_fly(m: Market, term: Term, a, spreads: Spreads, w: float = 0.03, close_front: bool = False) -> dict:
     """Calendarised fly: long 60-DTE calls at (1 -/+ w) S (VIX/VIX3M), short 2 x 30-DTE ATM (VIX); plain fly: all three strikes
     at 30 DTE (VIX). Both valued at the front expiry; P&L / debit after half-spread costs on 6 vs 4 contracts (the time fly's
-    wings are closed at T1; expiring legs settle without a fill)."""
+    wings are closed at T1 at model mid minus half the spread; expiring legs settle at intrinsic on the raw close without a
+    fill). ``close_front`` (pin-risk sensitivity) also closes every expiring leg at T1 at intrinsic minus half the 0-DTE
+    spread, for both structures."""
     a = np.asarray(a, int); S = m.close[a]
     tf = two_expiry(m, term, a, [("call", "long", 1, (1 - w) * S, "back"), ("call", "short", 2, S, "front"), ("call", "long", 1, (1 + w) * S, "back")],
-                    spreads, close_front=False)
+                    spreads, close_front=close_front)
     pf = two_expiry(m, term, a, [("call", "long", 1, (1 - w) * S, "front"), ("call", "short", 2, S, "front"), ("call", "long", 1, (1 + w) * S, "front")],
-                    spreads, close_front=False)
+                    spreads, close_front=close_front)
     return {"xt": tf["pnl"] / tf["debit"], "xp": pf["pnl"] / pf["debit"], "dvix": (term.v30[a + MONTH] - term.v30[a]) * 100,
             "debit_t": tf["debit"] / S, "debit_p": pf["debit"] / S}
 
 
-def judge_spike_decile(xt, xp, dvix, min_n: int = 15, n_boot: int = N_BOOT, extra: Sequence = ()) -> dict:
-    """Top-decile delta-VIX holding periods: mean paired (time - plain) P&L/debit > 0 with the paired bootstrap 95% CI
-    excluding 0 (percentile; spike months are not contiguous, so resampled individually). ``extra``: (name, ok, decisive)."""
+def _decile_mean_rows(d, dv, q: float = 0.9) -> Callable:
+    """Resample rows -> mean of d over the entries in the top (1 - q) of dv within that resample (the decile is re-drawn)."""
+    d = np.asarray(d, float); dv = np.asarray(dv, float)
+    def f(idx):
+        D, V = d[idx], dv[idx]; T = V >= np.quantile(V, q, axis=1)[:, None]
+        return (D * T).sum(axis=1) / np.maximum(T.sum(axis=1), 1)
+    return f
+
+
+def _sub_mean_rows(d, top) -> Callable:
+    """Resample rows -> mean of d over the entries flagged ``top`` (flags travel with their entries)."""
+    d = np.asarray(d, float); top = np.asarray(top, bool)
+    def f(idx):
+        T = top[idx]; k = T.sum(axis=1)
+        return np.where(k > 0, (d[idx] * T).sum(axis=1) / np.maximum(k, 1), np.nan)
+    return f
+
+
+def judge_spike_decile(xt, xp, dvix, min_n: int = 15, n_boot: int = N_BOOT, extra: Sequence = (), block: int = BLOCK_M,
+                       n_units: Optional[int] = None) -> dict:
+    """Top-decile delta-VIX holding periods: mean paired (time - plain) P&L/debit > 0 with the 95% CI excluding 0. The CI is
+    a percentile circular block bootstrap of the WHOLE timeline in blocks of ``block`` entries, the decile re-drawn in each
+    resample: spike entries cluster (2008-09, 2008-10 and 2008-11 are consecutive monthly entries), so they are not
+    resampled one by one. Blocks: 6 monthly cycles for one start offset's grid, 42 (2 x hold) for pooled daily entries.
+    n is ``n_units`` (claim units: spike-decile months, the mean per-offset count when pooled) when given, else the number
+    of spike-decile entries. ``extra``: (name, ok, decisive) criteria."""
     xt = np.asarray(xt, float); xp = np.asarray(xp, float); dv = np.asarray(dvix, float)
     top = dv >= np.quantile(dv, 0.9) if dv.size else np.zeros(0, bool)
-    d = (xt - xp)[top]; lo, hi = boot_mean_ci(d, 1, n_boot)
+    d_all = xt - xp; d = d_all[top]
+    if dv.size >= 10:
+        dist = boot_dist(dv.size, _decile_mean_rows(d_all, dv), block, n_boot); lo, hi = _q(dist, 0.025), _q(dist, 0.975)
+    else:
+        lo = hi = float("nan")
     c = Criteria(); ok, dec = _ok(lo, hi, "gt")
     c.add("spike decile: difference > 0 with the 95% CI excluding 0", ok, dec)
+    pass_core = c.all_pass()
     for nm, okx, decx in extra:
         c.add(nm, okx, decx)
-    v, why = c.finish(int(d.size), min_n, "spike-decile months")
-    return {"verdict": v, "why": why, "n": int(d.size), "diff": _mean(d), "ci": [lo, hi], "top": top, "min_n": min_n}
+    nu = int(d.size) if n_units is None else int(n_units)
+    v, why = c.finish(nu, min_n, "spike-decile months")
+    return {"verdict": v, "why": why, "n": nu, "n_entries": int(d.size), "diff": _mean(d), "ci": [lo, hi], "top": top,
+            "min_n": min_n, "block": block, "criteria_pass": pass_core}
+
+
+def _spike_units(dv, hold: int = MONTH) -> int:
+    """Claim units for pooled daily entries: the mean, over the start offsets, of each offset grid's spike-decile count."""
+    dv = np.asarray(dv, float); cnt = []
+    for P in offset_positions(dv.size, hold):
+        v = dv[P]; cnt.append(int((v >= np.quantile(v, 0.9)).sum()) if v.size else 0)
+    return int(np.floor(np.mean(cnt) + 1e-9)) if cnt else 0
+
+
+def spike_decile_rule10(xt, xp, dvix, min_n: int = 15, n_boot: int = N_BOOT, extra: Sequence = (), hold: int = MONTH,
+                        per_offset: bool = True) -> dict:
+    """Rule 10(b) for T-152: the PRIMARY judge on every daily entry (pooled, blocks of 2 x hold, n = mean per-offset spike
+    months), plus each start offset's non-overlapping grid judged alone (blocks of 6 cycles; report only)."""
+    xt = np.asarray(xt, float); xp = np.asarray(xp, float); dv = np.asarray(dvix, float)
+    j = judge_spike_decile(xt, xp, dv, min_n, n_boot, extra, block=2 * hold, n_units=_spike_units(dv, hold))
+    offs = []
+    if per_offset:
+        for P in offset_positions(dv.size, hold):
+            jk = judge_spike_decile(xt[P], xp[P], dv[P], min_n, n_boot, block=BLOCK_M)
+            offs.append({"start": int(P[0]), "n": jk["n"], "stat": jk["diff"], "bound": jk["ci"][0], "upper": jk["ci"][1],
+                         "ok": jk["criteria_pass"]})
+    j["offsets"] = offs; j["offsets_summary"] = _summ(offs)
+    return j
+
+
+def _fly_pooled(m: Market, term: Term, spreads: Spreads, start: str, n_boot: int = N_BOOT, close_front: bool = False,
+                ci: bool = True) -> dict:
+    """Pooled spike-decile difference (and its block-42 CI) for a sensitivity run (report only)."""
+    a = daily_entries(m, term, start)
+    if not a.size:
+        return {"diff": float("nan"), "ci": [float("nan")] * 2, "n": 0, "window": "no entries", "headline": float("nan")}
+    r = time_vs_plain_fly(m, term, a, spreads, close_front=close_front); d = r["xt"] - r["xp"]
+    top = r["dvix"] >= np.quantile(r["dvix"], 0.9)
+    lohi = [float("nan")] * 2
+    if ci:
+        dist = boot_dist(a.size, _decile_mean_rows(d, r["dvix"]), BLOCK_P, n_boot); lohi = [_q(dist, 0.025), _q(dist, 0.975)]
+    return {"diff": _mean(d[top]), "headline": _mean(d[top]), "ci": lohi, "n": _spike_units(r["dvix"]), "window": _window_note(term, m, a)}
 
 
 def eval_time_fly(m: Market, term: Term, spreads: Spreads, start: str, min_n: int = 15, n_boot: int = N_BOOT, headline_only: bool = False,
                   window_gap: Optional[str] = None) -> dict:
-    """``window_gap``: set only when the inputs cannot reach the claim's own window (top-decile months since 2007-12) even
-    with VIX standing in for VIX3M; it then becomes a criterion that is not implemented."""
-    g = grid(m, term, start, MONTH); g = g[g + MONTH < len(m.days)]
-    res = time_vs_plain_fly(m, term, g, spreads)
-    extra = [(f"the claim's window, top-decile months since 2007-12 ({window_gap})", None, False)] if window_gap else []
-    j = judge_spike_decile(res["xt"], res["xp"], res["dvix"], min_n, n_boot, extra)
+    """Rule 10(b): every daily entry from ``start`` (pooled over the 21 start offsets of the monthly grid). ``window_gap``:
+    set only when the inputs cannot reach the claim's own window (top-decile months since 2007-12) even with VIX standing
+    in for VIX3M; it then becomes a criterion that is not implemented."""
     if headline_only:
-        return {"headline": j["diff"], "n": j["n"], "window": _window_note(term, m, g)}
-    top = j.pop("top"); d_all = res["xt"] - res["xp"]
-    hv = [_mean(d_all[ii][top[ii]]) if top[ii].any() else float("nan") for ii in _halves_idx(g.size)]
+        r = _fly_pooled(m, term, spreads, start, n_boot, ci=False)
+        return {"headline": r["diff"], "n": r["n"], "window": r["window"]}
+    a = daily_entries(m, term, start)
+    res = time_vs_plain_fly(m, term, a, spreads)
+    extra = [(f"the claim's window, top-decile months since 2007-12 ({window_gap})", None, False)] if window_gap else []
+    j = spike_decile_rule10(res["xt"], res["xp"], res["dvix"], min_n, n_boot, extra)
+    top = j.pop("top"); d_all = res["xt"] - res["xp"]; so = j["offsets_summary"]
+    hv = []
+    for ii in _halves_idx(a.size):                            # walk-forward halves with the full-sample decile (report only)
+        dd, tt = d_all[ii], top[ii]
+        dist = boot_dist(ii.size, _sub_mean_rows(dd, tt), BLOCK_P, n_boot) if tt.any() else np.array([])
+        hv.append({"diff": _mean(dd[tt]) if tt.any() else float("nan"), "ci": [_q(dist, 0.025), _q(dist, 0.975)],
+                   "n": int(np.floor(tt.sum() / MONTH + 1e-9)), "n_entries": int(tt.sum())})
+    pin = _fly_pooled(m, term, spreads, start, n_boot, close_front=True)
+    thr = float(np.quantile(res["dvix"], 0.9)) if a.size else float("nan")
+    ft = lambda h: f"{_p(h['diff'])} ({_ci_txt(*h['ci'])}, n {h['n']} months{' < min_n ' + str(min_n) if h['n'] < min_n else ''})"
     reason = (f"{MODEL} SPY calendarised butterfly (long 60-DTE calls at 0.97 S and 1.03 S at the VIX/VIX3M interpolation, short "
               f"2 x 30-DTE ATM at VIX; wings re-priced at the front expiry at that day's VIX) vs the 30-DTE butterfly on the same "
-              f"strikes (VIX); P&L / debit at the front expiry after {spreads.describe()} on 6 vs 4 contracts; {g.size} monthly "
-              f"entries {_window_note(term, m, g)}, top delta-VIX decile over the hold = {j['n']} months (delta-VIX >= "
-              f"{_f(float(np.quantile(res['dvix'], 0.9)) if g.size else float('nan'))} pts). Spike-decile mean P&L/debit time fly "
-              f"{_p(_mean(res['xt'][top]))} vs plain {_p(_mean(res['xp'][top]))}: paired difference {_p(j['diff'])} "
-              f"({_ci_txt(*j['ci'])}, paired percentile bootstrap); walk-forward halves (report only) {_p(hv[0])} / {_p(hv[1])}; "
-              f"all months (not the claim) {_p(_mean(d_all))}; mean debit {_p(_mean(res['debit_t']))} vs {_p(_mean(res['debit_p']))} of spot")
-    out = dict(j); out.update({"halves": hv, "mean_all": _mean(d_all), "model_priced": True, "reason_core": reason, "headline": j["diff"],
-                               "window": _window_note(term, m, g), "first_entry": m.days[int(g[0])] if g.size else None,
-                               "spike_days": [m.days[int(i)] for i in g[top]], "proxy_entries": int(term.proxy[g].sum()),
-                               "proxy_spike_days": [m.days[int(i)] for i in g[top] if term.proxy[int(i)]]})
+              f"strikes (VIX); P&L / debit at the front expiry after {spreads.describe()} on 6 vs 4 contracts; pin risk: the time "
+              f"fly's wings are exited at T1 at model mid minus half the spread and every expiring leg (body; all three plain-fly "
+              f"strikes) settles at intrinsic on the raw close; "
+              + _pooled_txt(m, a, MONTH, j["block"], j["n"], "spike-decile months (mean per start offset, the claim's unit)")
+              + f"; top delta-VIX decile over the hold = {j['n_entries']} daily entries (delta-VIX >= {_f(thr)} pts). Spike-decile "
+              f"mean P&L/debit time fly {_p(_mean(res['xt'][top]))} vs plain {_p(_mean(res['xp'][top]))}: paired difference "
+              f"{_p(j['diff'])} ({_ci_txt(*j['ci'])}, timeline block-{j['block']} percentile bootstrap, decile re-drawn per "
+              f"resample); "
+              + _summ_txt(so, "each start offset's non-overlapping monthly grid alone (timeline block-6 bootstrap; pass = CI "
+                          "lower > 0; the earlier single grid started 2007-12-04, the first FRED VXV print, which the claim does "
+                          "not specify)", "CI lower bound")
+              + f"; walk-forward halves with the full-sample decile (report only, not the pass rule) {ft(hv[0])} / {ft(hv[1])}; "
+              f"all entries (not the claim): mean P&L/debit time fly {_p(_mean(res['xt']))}, plain {_p(_mean(res['xp']))}, "
+              f"difference {_p(_mean(d_all))}; pin-risk sensitivity (every expiring leg also closed at T1 at intrinsic minus half "
+              f"the 0-DTE spread, 8 vs 8 fills): {_p(pin['diff'])} ({_ci_txt(*pin['ci'])}); mean debit {_p(_mean(res['debit_t']))} "
+              f"vs {_p(_mean(res['debit_p']))} of spot")
+    out = dict(j); out.update({"halves": hv, "mean_all": _mean(d_all), "mean_all_time": _mean(res["xt"]), "mean_all_plain": _mean(res["xp"]),
+                               "pin_risk": {"diff": pin["diff"], "ci": pin["ci"]}, "model_priced": True, "reason_core": reason,
+                               "headline": j["diff"], "window": _window_note(term, m, a),
+                               "first_entry": m.days[int(a[0])] if a.size else None, "n_daily": int(a.size),
+                               "spike_days": [m.days[int(i)] for i in a[top]], "proxy_entries": int(term.proxy[a].sum()),
+                               "proxy_spike_days": [m.days[int(i)] for i in a[top] if term.proxy[int(i)]]})
     return out
 
 
@@ -1495,14 +1905,15 @@ def roll_vs_reset(m: Market, v30: np.ndarray, a, spreads: Spreads, tilt: Optiona
         return pnl, days
     pnl_r, dr = path(pr0, pr1, K, Er, er); pnl_s, ds = path(ps0, ps1, Ks, Es, es)
     orig = p_entry - p_close
-    return {"a": a, "tested": test, "roll": pnl_r / dr / Sc, "reset": pnl_s / ds / Sc, "days_roll": dr, "days_reset": ds,
+    return {"a": a, "tested": test, "roll": pnl_r / dr / Sc, "reset": pnl_s / ds / Sc, "days_roll": dr, "days_reset": ds, "exit_roll": er,
             "life_roll": (orig + pnl_r) / (m.cal[er] - m.cal[a]) / Sc, "life_reset": (orig + pnl_s) / (m.cal[es] - m.cal[a]) / Sc,
             "delta_check": dl}
 
 
-def judge_roll(roll, reset, min_n: int = 200, n_boot: int = N_BOOT, block: int = BLOCK_D) -> dict:
+def judge_roll(roll, reset, min_n: int = 200, n_boot: int = N_BOOT, block: int = BLOCK_P) -> dict:
     """T-155: the claim survives a half when the paired block-bootstrap 95% CI of mean(roll - reset) includes 0 or lies
-    below it."""
+    below it. Daily entries are the pooled estimate (rule 10), so ``block`` = 2 x the 21-session decision-to-exit window;
+    ``bound`` = the higher half's lower bound (the binding one)."""
     d = np.asarray(roll, float) - np.asarray(reset, float); n = d.size
     full = (_mean(d),) + boot_mean_ci(d, block, n_boot); c = Criteria(); hv = []
     for nm, ii in zip(("first half", "second half"), _halves_idx(n)):
@@ -1511,7 +1922,9 @@ def judge_roll(roll, reset, min_n: int = 200, n_boot: int = N_BOOT, block: int =
         c.add(f"{nm}: 95% CI of (roll - reset) P&L/day includes 0 or lies below it", ok, dec)
     v, why = c.finish(n, min_n, "tested entries")
     vr = float(np.var(roll, ddof=1) / np.var(reset, ddof=1)) if n > 2 and np.var(reset) > 0 else float("nan")
-    return {"verdict": v, "why": why, "n": n, "full": full, "halves": hv, "var_ratio": vr, "min_n": min_n}
+    lows = [h[1] for h in hv if np.isfinite(h[1])]
+    return {"verdict": v, "why": why, "n": n, "full": full, "halves": hv, "var_ratio": vr, "min_n": min_n, "block": block,
+            "bound": max(lows) if len(lows) == 2 else None, "criteria_pass": c.all_pass()}
 
 
 def eval_roll(m: Market, v30: np.ndarray, spreads: Spreads, start: str = "1993-01-29", tilt: Optional[Tilt] = None, min_n: int = 200,
@@ -1522,13 +1935,23 @@ def eval_roll(m: Market, v30: np.ndarray, spreads: Spreads, start: str = "1993-0
     t = res["tested"]
     if headline_only:
         d = res["roll"][t] - res["reset"][t]
-        return {"headline": _mean(d), "n": int(t.sum()), "ci": boot_mean_ci(d, BLOCK_D, n_boot)}
-    j = judge_roll(res["roll"][t], res["reset"][t], min_n, n_boot)
-    life = (_mean(res["life_roll"][t] - res["life_reset"][t]),) + boot_mean_ci(res["life_roll"][t] - res["life_reset"][t], BLOCK_D, n_boot)
+        return {"headline": _mean(d), "n": int(t.sum()), "ci": boot_mean_ci(d, BLOCK_P, n_boot)}
+    j = judge_roll(res["roll"][t], res["reset"][t], min_n, n_boot, BLOCK_P)
+    life = (_mean(res["life_roll"][t] - res["life_reset"][t]),) + boot_mean_ci(res["life_roll"][t] - res["life_reset"][t], BLOCK_P, n_boot)
     tl = None
     if tilt is not None:
         rt = roll_vs_reset(m, v30, a, spreads, tilt); tt = rt["tested"]
-        dd = rt["roll"][tt] - rt["reset"][tt]; tl = (_mean(dd),) + boot_mean_ci(dd, BLOCK_D, n_boot) + (int(tt.sum()),)
+        dd = rt["roll"][tt] - rt["reset"][tt]; tl = (_mean(dd),) + boot_mean_ci(dd, BLOCK_P, n_boot) + (int(tt.sum()),)
+    life_s = int(np.median(res["exit_roll"] - res["a"])) if res["a"].size else MONTH      # entry-to-exit sessions (roll path)
+    jl = judge_roll(res["roll"][t], res["reset"][t], min_n, n_boot, 2 * life_s)
+    jt = judge_roll(res["roll"][t], res["reset"][t], min_n, n_boot, BLOCK_D)
+    offs = []                                                  # rule 10 robustness: entries on each 21-session grid offset
+    ph = (res["a"] - (res["a"][0] if res["a"].size else 0)) % MONTH
+    for k in range(MONTH if res["a"].size else 0):
+        sel = t & (ph == k)
+        jk = judge_roll(res["roll"][sel], res["reset"][sel], min_n, n_boot, BLOCK_M)
+        offs.append({"start": k, "n": int(sel.sum()), "stat": jk["full"][0], "bound": jk["bound"], "ok": jk["criteria_pass"]})
+    so = _summ(offs)
     bp = lambda x: "n/a" if x is None or not np.isfinite(x) else f"{x * 1e4:+.3f} bp"
     fr = lambda r: f"{bp(r[0])} (95% CI {bp(r[1])} to {bp(r[2])})"
     ad = res["a"][t]
@@ -1538,11 +1961,20 @@ def eval_roll(m: Market, v30: np.ndarray, spreads: Spreads, start: str = "1993-0
               f"({m.days[int(ad[0])] if ad.size else ''} to {m.days[int(ad[-1])] if ad.size else ''}); roll = same strike to the "
               f"next monthly (+28 days), reset = fresh 0.16-delta 45-DTE put, both exited at their 21-DTE close; P&L per day held "
               f"from the decision per unit of spot, after {spreads.describe()} on 3 fills per path and margin-time at the bill "
-              f"rate. Roll - reset: {fr(j['full'])}; halves {fr(j['halves'][0])} / {fr(j['halves'][1])} (paired block-21 percentile "
-              f"bootstrap; the claim survives a half unless its CI lies entirely above 0); mean roll {bp(_mean(res['roll'][t]))} vs reset "
+              f"rate. Roll - reset: {fr(j['full'])}; halves {fr(j['halves'][0])} / {fr(j['halves'][1])} (paired block-{j['block']} percentile "
+              f"bootstrap over the tested entries; the claim survives a half unless its CI lies entirely above 0); rule 10: the "
+              f"trial enters on every session, which is itself the pooled all-offset estimate, so blocks are 2 x the 21-session "
+              f"decision-to-exit window (the trial's block 21: halves' lower bounds {bp(jt['halves'][0][1])} / {bp(jt['halves'][1][1])}; "
+              f"blocks of 2 x the {life_s}-session entry-to-exit life: {bp(jl['halves'][0][1])} / {bp(jl['halves'][1][1])}; report "
+              f"only); " + _summ_txt(so, "robustness, the tested entries of each start offset of a 21-session entry grid (about "
+                                     + str(int(np.median([o['n'] for o in offs])) if offs else "0") + " each, block-6 bootstrap; pass "
+                                     "= neither half's CI lies entirely above 0)", "higher half lower bound", bp)
+              + f"; mean roll {bp(_mean(res['roll'][t]))} vs reset "
               f"{bp(_mean(res['reset'][t]))} per day; variance ratio (roll / reset) {j['var_ratio']:.3f}; whole-life variant "
               f"(report only) {fr(life)}; SKEW-tilt rerun (report only) " + (f"{fr(tl)} on {tl[3]} tested entries" if tl else "not available"))
-    out = dict(j); out.update({"n_entries": int(res["a"].size), "life_variant": life, "skew_tilt": tl, "model_priced": True, "reason_core": reason})
+    out = dict(j); out.update({"n_entries": int(res["a"].size), "life_variant": life, "skew_tilt": tl, "offsets": offs, "offsets_summary": so,
+                               "trial_block_halves": jt["halves"], "life_block": 2 * life_s, "life_block_halves": jl["halves"],
+                               "model_priced": True, "reason_core": reason})
     return out
 
 
@@ -1799,7 +2231,8 @@ def b6_term_leaps_collar(archive):
 
 
 def b6_term_calendarised_fly(archive):
-    """T-152: MODEL-PRICED calendarised vs plain ATM butterfly in the top delta-VIX decile: paired difference > 0 (95% CI)."""
+    """T-152: MODEL-PRICED calendarised vs plain ATM butterfly in the top delta-VIX decile: paired difference > 0 (95% CI),
+    pooled over every start day since 2007-12 (rule 10b)."""
     miss = _missing(archive, TERM_BASE, [CHAIN])
     if miss:
         return miss
@@ -1811,27 +2244,28 @@ def b6_term_calendarised_fly(archive):
     gap = None
     if first[:7] > T152_START[:7]:
         gap = (f"the first entry SPY, VIX and the bill can price is {first}, so 2007-12 is not covered even with VIX for VIX3M; "
-               f"it needs SPY, VIX and DTB3 history from 2007-12-04")
+               f"it needs SPY, VIX and DTB3 history from 2007-12")
     rep = eval_time_fly(m, tw, sp, T152_START, window_gap=gap)
     fit = vix_for_vix3m_fit(term); rep["proxy_fit"] = fit
     if rep["proxy_entries"]:
-        ext = (f"; claim window: monthly entries from {T152_START} (the claim's 'since 2007-12'); the archived VIX3M starts "
-               f"{f93}, so before it VIX stands in for VIX3M (house data guidance; the back legs are then priced at VIX), a "
-               f"PROXY on {rep['proxy_entries']} entries and {len(rep['proxy_spike_days'])} of {rep['n']} spike-decile months ("
-               + (", ".join(d[:7] for d in rep["proxy_spike_days"]) or "none") + f"); proxy error against the real VIX3M on "
-               f"{fit['n']} overlap days: VIX - VIX3M mean {_f(fit['mean_err_3m'])} vol pts (mean |error| "
+        pm = sorted({d[:7] for d in rep["proxy_spike_days"]})
+        ext = (f"; claim window: daily entries from {rep['first_entry']} (the claim's 'since 2007-12', every session); the "
+               f"archived VIX3M starts {f93}, so before it VIX stands in for VIX3M (house data guidance; the back legs are then "
+               f"priced at VIX), a PROXY on {rep['proxy_entries']} daily entries and {len(rep['proxy_spike_days'])} of "
+               f"{rep['n_entries']} spike-decile entries (" + (", ".join(pm) or "none") + f"); proxy error against the real "
+               f"VIX3M on {fit['n']} overlap days: VIX - VIX3M mean {_f(fit['mean_err_3m'])} vol pts (mean |error| "
                f"{_f(fit['mae_3m']).lstrip('+')}), on the 60-DTE back-leg IV mean {_f(fit['mean_err_back'])} vol pts (mean "
                f"|error| {_f(fit['mae_back']).lstrip('+')})")
     else:
-        ext = f"; claim window: monthly entries from {T152_START}, real VIX3M throughout"
+        ext = f"; claim window: daily entries from {rep['first_entry']}, real VIX3M throughout"
     sens = {}
-    real = eval_time_fly(m, term, sp, f93)
+    real = _fly_pooled(m, term, sp, f93)
     sens["real_vix3m_only"] = {"diff": real["diff"], "ci": real["ci"], "n": real["n"], "window": real["window"]}
-    ext += (f"; sensitivities (report only): real VIX3M only, from its first print {f93}: spike-decile difference "
-            f"{_p(real['diff'])} ({_ci_txt(*real['ci'])}, {real['n']} spike-decile months, {real['window']})")
+    ext += (f"; sensitivities (report only, pooled, block {BLOCK_P}): real VIX3M only, from its first print {f93}: spike-decile "
+            f"difference {_p(real['diff'])} ({_ci_txt(*real['ci'])}, {real['n']} spike-decile months, {real['window']})")
     if _has(archive, VIX6M):
         tc = vix_for_vix3m(_term(archive, proxy=True), "VIX/VIX6M VIX3M proxy (VIX before the first VIX6M print)")
-        r6 = eval_time_fly(m, tc, sp, T152_START)
+        r6 = _fly_pooled(m, tc, sp, T152_START)
         sens["vix6m_proxy"] = {"diff": r6["diff"], "ci": r6["ci"], "n": r6["n"], "window": r6["window"]}
         ext += (f"; VIX3M proxied from VIX/VIX6M in total variance from the first VIX6M print {min(_index(archive, VIX6M))} "
                 f"(VIX before it; {_proxy_fit(term, _term(archive, proxy=True))}): {_p(r6['diff'])} ({_ci_txt(*r6['ci'])}, "

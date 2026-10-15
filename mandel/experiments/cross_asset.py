@@ -10,6 +10,18 @@ min_n (in the claim's own units: non-overlapping signals, entries, episodes or c
 (see _rule5): the verdict is never supported, and a failing criterion still counts only when it fails decisively (its
 interval lies wholly on the wrong side of the claimed bound, or the failure would persist at min_n whatever the missing
 observations are); any other failure there is undecided (None), so the verdict is inconclusive.
+
+House rule 10 (no arbitrary grid phase). The option-writing claims name monthly options (T-253/T-254/T-270/T-279 'each month',
+T-176 'the last-Friday cycle'), so their cycles follow the standard monthly expiry, written at one expiry and settled at the next:
+the third Friday (the prior session on a holiday) for GLD; Deribit's last Friday of the month (08:00 UTC) for BTC, whose daily close
+is 24:00 UTC, so the BTC cycles run between the last closes before expiry (the Thursdays) and T-176 settles at the Friday's 08:00
+delivery price. Claims on a cycle grid that names no calendar (T-245's 21-day variance cycles, T-514's 20-day samples, T-267's
+30-day put rolls, and the 21- or 30-day variance-premium cycles of T-244/T-246/T-271/T-512) take the pooled all-phase estimate as
+the primary statistic for every criterion: an entry on every day (every phase of the grid), a circular block bootstrap with blocks
+of at least twice the hold, n and min_n in the claim's own cycles; each reason reports the per-phase range and how many of the
+phases pass on their own. Unaffected: T-175/T-177 (statistics on the daily series), and the event-triggered entries of
+ratio_extremes (T-247/T-266), ratio_mean_reversion_signal (T-274) and conditional_straddle (T-256/T-272), where each entry is fixed by
+its signal, not by a grid phase (conditional_straddle's all-days arm already pools every day with blocks of twice the hold).
 """
 
 from __future__ import annotations
@@ -21,7 +33,7 @@ from typing import Optional
 
 import numpy as np
 
-from mandel.experiments.structures import run_structure
+from mandel.experiments.structures import monthly_cycles, run_structure
 from mandel.experiments.underlying2 import _mdd, _mean_ci, _sharpe_diff_lower, _sr, _verdict
 from mandel.validation.backtest_eval import deflated_sharpe_ratio, sharpe_ratio
 
@@ -32,10 +44,16 @@ _TRIAL = {
     ("ratio_extremes", "ETH/BTC DVOL"): {"min_n": 25, "statistic": "level"},   # T-266: mean of RV_ETH/RV_BTC - DVOL_ETH/DVOL_BTC
     ("conditional_straddle", "DVOL"): {"min_n": 25},                           # T-256: non-overlapping low-DVOL entries
     ("conditional_straddle", "GVZ"): {"min_n": 20},                            # T-272: non-overlapping low-GVZ entries
-    ("covered_call_vs_hold", "DVOL"): {"min_n": 60},                           # T-253: monthly cycles
-    ("covered_call_vs_hold", "GVZ"): {"min_n": 100},                           # T-270
-    ("short_put_mean", "DVOL"): {"min_n": 60},                                 # T-254
-    ("short_put_mean", "GVZ"): {"min_n": 100},                                 # T-279
+    ("covered_call_vs_hold", "DVOL"): {"min_n": 60, "calendar": "deribit"},    # T-253: monthly cycles
+    ("covered_call_vs_hold", "GVZ"): {"min_n": 100, "calendar": "monthly"},    # T-270
+    ("short_put_mean", "DVOL"): {"min_n": 60, "calendar": "deribit"},          # T-254
+    ("short_put_mean", "GVZ"): {"min_n": 100, "calendar": "monthly"},          # T-279
+    # gap_test: claims stated on non-overlapping cycles (rule 10: the daily series is their pooled all-phase estimate); keyed by label,
+    # plus ' thirds' for T-244, which shares T-271's label. T-175 and T-177 are daily statistics and have no entry.
+    ("gap_test", "GVZ^2 vs GLD thirds"): {"cycle": 21, "min_n": 180},           # T-244: non-overlapping 21-day cycles
+    ("gap_test", "GVZ^2 vs GLD"): {"cycle": 21, "min_n": 150},                  # T-271: non-overlapping windows (21 trading days)
+    ("gap_test", "DVOL^2 vs BTC"): {"cycle": 30, "min_n": 60},                  # T-246: non-overlapping 30-calendar-day cycles
+    ("gap_test", "OVX^2 vs USO"): {"cycle": 21, "min_n": 150},                  # T-512
 }
 
 
@@ -72,6 +90,50 @@ def _first_half_fails_at_min_n(n: int, min_n: Optional[int], first_half_ok) -> b
     h observations."""
     h = (min_n or 0) // 2
     return bool(min_n) and h >= 1 and h <= n < min_n and not first_half_ok(h)
+
+
+def _settled_windows_bad(n_rows: int, min_rows: int, bad) -> int:
+    """A '>= 2 of 3 windows' criterion at min_n: how many of the three windows of the first min_rows rows (np.array_split) are already
+    fully observed (later data only appends) and fail. bad(s) judges the rows s."""
+    return sum(bool(bad(s)) for s in np.array_split(np.arange(min_rows), 3) if len(s) and s[-1] < n_rows)
+
+
+def _phases_txt(stats, passes, fmt: str = "{:+.2f}") -> str:
+    """Rule 10: the claimed statistic on each phase of the grid on its own, and how many phases pass all criteria."""
+    return f"per phase {fmt.format(min(stats))} to {fmt.format(max(stats))}, {sum(bool(p) for p in passes)} of {len(passes)} phases pass on their own"
+
+
+def _deribit_expiry_sessions(days) -> list:
+    """Deribit's standard monthly BTC expiry is 08:00 UTC on the last Friday of the month. A daily close is 24:00 UTC, so the last close
+    before expiry is the Thursday's (the prior available day when it is missing). Only months whose Thursday lies inside the data."""
+    ds = [str(d) for d in days]; out = []
+    if not ds:
+        return out
+    y, m = int(ds[0][:4]), int(ds[0][5:7])
+    while (y, m) <= (int(ds[-1][:4]), int(ds[-1][5:7])):
+        last = date(y + m // 12, m % 12 + 1, 1) - timedelta(days=1)
+        thu = (last - timedelta(days=(last.weekday() - 4) % 7 + 1)).isoformat()      # the day before the month's last Friday
+        if ds[0] <= thu <= ds[-1]:
+            e = ds[bisect_right(ds, thu) - 1]
+            if not out or e != out[-1]:
+                out.append(e)
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def _calendar_cycles(days, calendar) -> tuple[list, str]:
+    """(entry, expiry) cycles of a named expiry calendar (house rule 10), and its description. 'monthly': the standard monthly expiry
+    (third Friday, the prior session on a holiday); 'deribit': Deribit's last-Friday monthly expiry, between the last closes before
+    each expiry; a list of (entry, expiry) pairs is used as given."""
+    if calendar == "monthly":
+        return monthly_cycles(days), "standard monthly expiry calendar (third Friday, the prior session on a holiday), each written at one expiry close and settled at the next"
+    if calendar == "deribit":
+        e = _deribit_expiry_sessions(days)
+        return list(zip(e[:-1], e[1:])), ("Deribit monthly expiry calendar (last Friday 08:00 UTC), each written at the last daily close before one expiry "
+                                          "(the Thursday) and settled at the last close before the next")
+    if isinstance(calendar, (list, tuple)):
+        return [tuple(c) for c in calendar], "explicit (entry, expiry) schedule"
+    raise ValueError(f"calendar must be 'monthly', 'deribit' or a list of (entry, expiry) pairs, got {calendar!r}")
 
 
 def _asof(series: dict):
@@ -116,34 +178,66 @@ def iv_minus_rv(days, closes, idx, n, ppy, units="vol", start=None):
     return ds, np.array(out)
 
 
-def gap_test(days, closes, idx, n, ppy, threshold, units, block, thirds=False, start=None, label=""):
+def gap_test(days, closes, idx, n, ppy, threshold, units, block, thirds=False, start=None, label="", cycle: Optional[int] = None, min_n: Optional[int] = None):
+    """Mean of implied minus forward realised over n periods, on the daily series. A claim stated on the daily series (T-175, T-177)
+    is judged on it as before. A claim stated on non-overlapping `cycle`-day cycles (T-244, T-246, T-271, T-512; cycle and min_n
+    default to the _TRIAL entry for the label, plus ' thirds' when thirds is set) names no entry calendar, so under house rule 10 the
+    daily series is its pooled all-phase estimate and the primary statistic for every criterion: blocks of at least 2 x cycle days,
+    n and min_n in cycles (house rule 5 below it), and the reason reports each of the `cycle` phases (x[k::cycle], blocks of 3 cycles)."""
     ds, x = iv_minus_rv(days, closes, idx, n, ppy, units, start)
-    lo, hi = _mean_ci(x, block)
-    h = len(x) // 2; halves = [float(x[:h].mean()), float(x[h:].mean())]
-    crit = [(f"lower 95% CI > {threshold}", lo > threshold)]
-    if thirds:
-        t3 = [float(z.mean()) for z in np.array_split(x, 3)]
-        crit.append(("positive in >= 2 of 3 thirds", sum(z > 0 for z in t3) >= 2)); extra = f", thirds " + "/".join(f"{z:+.4f}" for z in t3)
-    else:
-        crit.append(("same sign in both halves", np.sign(halves[0]) == np.sign(halves[1]) == np.sign(x.mean()))); extra = f", halves {halves[0]:+.4f}/{halves[1]:+.4f}"
-    v, why = _verdict(crit)
+    key = label + " thirds" if thirds else label
+    cycle = _trial("gap_test", key, "cycle", cycle, None); min_n = _trial("gap_test", key, "min_n", min_n, None)
+    if cycle:
+        block = max(block, 2 * cycle)
+
+    def judge(v, b):                              # (lo, hi, [(criterion, passes)], text) for the series v with blocks of b
+        lo, hi = _mean_ci(v, b)
+        if thirds:
+            t3 = [float(z.mean()) for z in np.array_split(v, 3)]
+            shape = ("positive in >= 2 of 3 thirds", sum(z > 0 for z in t3) >= 2); txt = f", thirds " + "/".join(f"{z:+.4f}" for z in t3)
+        else:
+            h = len(v) // 2; halves = [float(v[:h].mean()), float(v[h:].mean())]
+            shape = ("same sign in both halves", np.sign(halves[0]) == np.sign(halves[1]) == np.sign(v.mean())); txt = f", halves {halves[0]:+.4f}/{halves[1]:+.4f}"
+        return lo, hi, [(f"lower 95% CI > {threshold}", lo > threshold), shape], txt
+
+    lo, hi, crit, extra = judge(x, block)
     unit = "vol pts" if units == "vol" else "variance"
-    return {"n": int(len(x)), "first_day": ds[0], "mean": float(x.mean()), "ci": [lo, hi], "verdict": v,
-            "reason": f"{label} implied minus realised over {n} periods: {x.mean():+.4f} {unit} since {ds[0]} (95% CI {lo:+.4f} to {hi:+.4f}){extra} — {why}"}
+    if not cycle:
+        v, why = _verdict(crit)
+        return {"n": int(len(x)), "first_day": ds[0], "mean": float(x.mean()), "ci": [lo, hi], "verdict": v,
+                "reason": f"{label} implied minus realised over {n} periods: {x.mean():+.4f} {unit} since {ds[0]} (95% CI {lo:+.4f} to {hi:+.4f}){extra} — {why}"}
+    phases = [judge(x[k::cycle], 3) for k in range(min(cycle, len(x)))]
+    p_mean = [float(x[k::cycle].mean()) for k in range(len(phases))]; p_ok = [all(bool(ok) for _, ok in p[2]) for p in phases]
+    n_cyc = len(x[0::cycle])                      # non-overlapping cycles, the claim's unit (the most any phase holds)
+    if thirds:                                    # >= 2 of the 3 windows at min_n already observed and not positive
+        dec_shape = bool(min_n) and n_cyc < min_n and _settled_windows_bad(len(x), min_n * cycle, lambda s: not x[s].mean() > 0) >= 2
+    else:
+        dec_shape = _first_half_fails_at_min_n(n_cyc, min_n, lambda k: x[:k * cycle].mean() > 0)
+    # (name, passes, fails decisively below min_n)
+    v, why = _rule5([(crit[0][0], crit[0][1], hi <= threshold), (crit[1][0], crit[1][1], dec_shape)], n_cyc, min_n, f"non-overlapping {cycle}-day cycles")
+    return {"n": int(n_cyc), "n_days": int(len(x)), "cycle": cycle, "min_n": min_n, "first_day": ds[0], "mean": float(x.mean()), "ci": [lo, hi], "block": int(block),
+            "phase_means": p_mean, "phase_pass": p_ok, "verdict": v,
+            "reason": f"{label} implied minus realised over {n} periods, pooled over every daily entry (all {cycle} phases of the non-overlapping {cycle}-day "
+                      f"cycles, house rule 10; {len(x)} days = {n_cyc} cycles, blocks of {block} days): {x.mean():+.4f} {unit} since {ds[0]} "
+                      f"(95% CI {lo:+.4f} to {hi:+.4f}){extra}; {_phases_txt(p_mean, p_ok, '{:+.4f}')} — {why}"}
 
 
 def multi_asset_short_variance(legs: dict, n: int = 21, block: int = 3, min_n: int = 180):
     """T-245: equal-vega short 21-day variance on SPX, GLD, USO, TLT (pnl_i = (K_i^2 - RV_i^2) / (2 K_i)) vs SPX alone:
-    Sharpe difference > 0 with one-sided p < 0.05, positive in both halves. Non-overlapping 21-day cycles on common dates.
-    Below min_n cycles (house rule 5) the Sharpe criterion fails decisively only when the one-sided 95% upper bound of the difference
-    is <= 0, and the halves criterion only when the first half at min_n (cycles [0, min_n // 2), already observed) is <= 0."""
+    Sharpe difference > 0 with one-sided p < 0.05, positive in both halves. Non-overlapping 21-day cycles on common dates, with no entry
+    calendar named, so (house rule 10) the primary statistic pools every phase of the n-day grid: an entry on every common day, Sharpe
+    ratios of the overlapping n-day P&L (12 a year), a circular block bootstrap of the paired difference with blocks of
+    max(2, block) x n days, halves of the pooled series; n_cycles counts non-overlapping cycles (the most any phase holds), and the
+    reason reports each phase (every n-th entry, blocks of `block` cycles) on its own. Below min_n cycles (house rule 5) the Sharpe
+    criterion fails decisively only when the one-sided 95% upper bound of the difference is <= 0, and the halves criterion only when
+    the first half at min_n (the entries of cycles [0, min_n // 2), already observed) is <= 0."""
     common = sorted(set.intersection(*(set(d for d in v[0] if d in v[2]) for v in legs.values())))
     series = {}
     for k, (days, closes, idx) in legs.items():
         pos = {d: i for i, d in enumerate(days)}
         series[k] = (pos, closes, idx)
-    port, spx = [], []
-    for j in range(0, len(common) - n, n):
+    port, spx, js = [], [], []
+    for j in range(0, len(common) - n):                   # every common day: all n phases of the old first-day grid (j % n == phase)
         d0 = common[j]; vals = {}
         ok = True
         for k, (pos, closes, idx) in series.items():
@@ -153,19 +247,33 @@ def multi_asset_short_variance(legs: dict, n: int = 21, block: int = 3, min_n: i
             K = idx[d0] / 100; rv = _fwd_rv(closes, i, n, 252)
             vals[k] = (K ** 2 - rv ** 2) / (2 * K)
         if ok:
-            port.append(np.mean(list(vals.values()))); spx.append(vals["SPX"])
-    port, spx = np.array(port), np.array(spx)
-    obs, lo = _sharpe_diff_lower(port, spx, 12, block, q=0.05)
-    _, up = _sharpe_diff_lower(port, spx, 12, block, q=0.95)              # same draws: the one-sided 95% upper bound
+            port.append(np.mean(list(vals.values()))); spx.append(vals["SPX"]); js.append(j)
+    port, spx, js = np.array(port), np.array(spx), np.array(js)
+    B = max(2, block) * n
+    obs, lo = _sharpe_diff_lower(port, spx, 12, B, q=0.05)
+    _, up = _sharpe_diff_lower(port, spx, 12, B, q=0.95)                  # same draws: the one-sided 95% upper bound
     h = len(port) // 2
     halves = [_sr(port[:h], 12) - _sr(spx[:h], 12), _sr(port[h:], 12) - _sr(spx[h:], 12)]
+    p_diff, p_ok, p_n = [], [], []
+    for k in range(n):                                     # each phase on its own, as the old harness judged phase 0
+        p, s = port[js % n == k], spx[js % n == k]
+        if len(p) < 4:
+            continue
+        o, l = _sharpe_diff_lower(p, s, 12, block, q=0.05); hp = len(p) // 2
+        p_diff.append(o); p_n.append(len(p))
+        p_ok.append(o > 0 and l > 0 and _sr(p[:hp], 12) - _sr(s[:hp], 12) > 0 and _sr(p[hp:], 12) - _sr(s[hp:], 12) > 0)
+    n_cyc = max(p_n) if p_n else 0
     # (name, passes, fails decisively below min_n)
     v, why = _rule5([("Sharpe diff > 0 with one-sided p < 0.05", obs > 0 and lo > 0, up <= 0),
                      ("positive in both halves", all(x > 0 for x in halves),
-                      _first_half_fails_at_min_n(len(port), min_n, lambda k: _sr(port[:k], 12) - _sr(spx[:k], 12) > 0))],
-                    len(port), min_n, "non-overlapping 21-day cycles")
-    return {"n_cycles": int(len(port)), "sharpe_portfolio": _sr(port, 12), "sharpe_spx": _sr(spx, 12), "diff": obs, "lower": lo, "upper": up, "halves": halves, "verdict": v,
-            "reason": f"equal-vega short variance on SPX/GLD/USO/TLT Sharpe {_sr(port,12):.2f} vs SPX alone {_sr(spx,12):.2f} over {len(port)} months since {common[0]} (diff {obs:+.2f}, one-sided lower {lo:+.2f}; halves {halves[0]:+.2f}/{halves[1]:+.2f}) — {why}"}
+                      _first_half_fails_at_min_n(n_cyc, min_n, lambda k: _sr(port[:k * n], 12) - _sr(spx[:k * n], 12) > 0))],
+                    n_cyc, min_n, "non-overlapping 21-day cycles")
+    ph = _phases_txt(p_diff, p_ok) if p_diff else "no phase with 4 cycles"
+    return {"n_cycles": int(n_cyc), "n_entries": int(len(port)), "sharpe_portfolio": _sr(port, 12), "sharpe_spx": _sr(spx, 12), "diff": obs, "lower": lo, "upper": up,
+            "halves": halves, "block_days": int(B), "phase_diffs": p_diff, "phase_pass": p_ok, "verdict": v,
+            "reason": f"equal-vega short variance on SPX/GLD/USO/TLT Sharpe {_sr(port,12):.2f} vs SPX alone {_sr(spx,12):.2f}, pooled over all {n} phases of the "
+                      f"non-overlapping {n}-day cycles (house rule 10; {len(port)} daily entries = {n_cyc} cycles since {common[0]}, blocks of {B} days): "
+                      f"diff {obs:+.2f}, one-sided lower {lo:+.2f}; halves {halves[0]:+.2f}/{halves[1]:+.2f}; {ph} — {why}"}
 
 
 def ratio_extremes(a_days, a_closes, b_days, b_closes, ia: dict, ib: dict, n: int = 21, ppy: int = 252, window: int = 756, lo_q=0.10, hi_q=0.90, block=3, win_req=0.6, label="GVZ/VIX",
@@ -256,52 +364,88 @@ def ratio_mean_reversion_signal(a_days, a_closes, b_days, b_closes, window: int 
 
 def zscore_slope(days, a_idx: dict, b_idx: dict, window: int = 252, horizon: int = 20, start: str = "2010-01-01", min_n: int = 150):
     """T-514: OLS slope of the 20-day forward change in log(a/b) on its z-score vs the trailing 252-day mean; slope 95% CI < 0 in both
-    halves. Non-overlapping 20-day samples. Below min_n samples (house rule 5) a half's criterion fails decisively only when its slope
-    95% CI lies wholly at or above 0 (lower bound >= 0)."""
+    halves. The trial's samples are non-overlapping 20-day ones with no entry calendar named, so (house rule 10) the primary statistic
+    pools every phase of the 20-day grid: a sample on every day from `start` (after the warm-up), each half's slope CI from a circular
+    block bootstrap of (z, change) pairs with blocks of 2 x horizon days; n counts non-overlapping samples (the most any phase holds),
+    and the reason reports each phase (every horizon-th day, iid bootstrap as before) on its own. Below min_n samples (house rule 5) a
+    half's criterion fails decisively only when its slope 95% CI lies wholly at or above 0 (lower bound >= 0)."""
     common = [d for d in sorted(set(a_idx) & set(b_idx))]
     lr = np.log(np.array([a_idx[d] / b_idx[d] for d in common]))
-    z, f, ds = [], [], []
-    for t in range(window, len(lr) - horizon, horizon):
+    z, f, ds, ph = [], [], [], []
+    for t in range(window, len(lr) - horizon):            # every day: all horizon phases of the old grid (range(window, ..., horizon))
         if common[t] < start:
             continue
         w = lr[t - window:t]; sd = w.std()
         if sd > 0:
-            z.append((lr[t] - w.mean()) / sd); f.append(lr[t + horizon] - lr[t]); ds.append(common[t])
-    z, f = np.array(z), np.array(f)
-    def slope_ci(zz, ff, seed=0):
-        rng = np.random.default_rng(seed); n = len(zz); bs = []
-        for _ in range(2000):
-            i = rng.integers(0, n, n); bs.append(np.polyfit(zz[i], ff[i], 1)[0])
-        return float(np.polyfit(zz, ff, 1)[0]), float(np.quantile(bs, 0.025)), float(np.quantile(bs, 0.975))
-    h = len(z) // 2
-    s1, l1, u1 = slope_ci(z[:h], f[:h]); s2, l2, u2 = slope_ci(z[h:], f[h:], 1)
+            z.append((lr[t] - w.mean()) / sd); f.append(lr[t + horizon] - lr[t]); ds.append(common[t]); ph.append((t - window) % horizon)
+    z, f, ph = np.array(z), np.array(f), np.array(ph)
+
+    def slope_ci(zz, ff, block, seed=0):                  # (OLS slope, 2.5% and 97.5% quantiles) by circular block bootstrap of pairs
+        rng = np.random.default_rng(seed); n = len(zz); b = max(1, min(int(block), n)); nb = math.ceil(n / b); bs = np.empty(2000)
+        for r in range(2000):
+            i = ((rng.integers(0, n, nb)[:, None] + np.arange(b)[None, :]).ravel()[:n]) % n
+            zc = zz[i] - zz[i].mean(); bs[r] = float(zc @ (ff[i] - ff[i].mean()) / (zc @ zc))
+        zc = zz - zz.mean()
+        return float(zc @ (ff - ff.mean()) / (zc @ zc)), float(np.quantile(bs, 0.025)), float(np.quantile(bs, 0.975))
+
+    def halves(zz, ff, block):
+        h = len(zz) // 2
+        return slope_ci(zz[:h], ff[:h], block), slope_ci(zz[h:], ff[h:], block, 1)
+
+    B = 2 * horizon
+    (s1, l1, u1), (s2, l2, u2) = halves(z, f, B)
+    p_slope, p_ok, p_n = [], [], []
+    for k in range(horizon):
+        m = ph == k
+        if m.sum() < 8:
+            continue
+        (a1, _, v1), (a2, _, v2) = halves(z[m], f[m], 1)
+        p_slope += [a1, a2]; p_ok.append(v1 < 0 and v2 < 0); p_n.append(int(m.sum()))
+    n_s = max(p_n) if p_n else 0
     # (name, passes, fails decisively below min_n: the half's CI lies wholly at or above 0)
     v, why = _rule5([("first-half slope CI < 0", u1 < 0, l1 >= 0), ("second-half slope CI < 0", u2 < 0, l2 >= 0)],
-                    len(z), min_n, "non-overlapping 20-day samples")
-    return {"n": int(len(z)), "slopes": [s1, s2], "lower": [l1, l2], "upper": [u1, u2], "verdict": v,
-            "reason": f"GVZ/VIX 20-day reversion: slope on z-score {s1:+.4f} (upper {u1:+.4f}) and {s2:+.4f} (upper {u2:+.4f}) in the two halves, {len(z)} samples — {why}"}
+                    n_s, min_n, "non-overlapping 20-day samples")
+    ph_txt = (f"half slopes {_phases_txt(p_slope, p_ok, '{:+.4f}')}" if p_slope else "no phase with 8 samples")
+    return {"n": int(n_s), "n_entries": int(len(z)), "slopes": [s1, s2], "lower": [l1, l2], "upper": [u1, u2], "block_days": B, "phase_slopes": p_slope, "phase_pass": p_ok,
+            "verdict": v,
+            "reason": f"GVZ/VIX 20-day reversion, pooled over all {horizon} phases of the non-overlapping {horizon}-day samples (house rule 10; {len(z)} daily "
+                      f"entries = {n_s} samples, blocks of {B} days): slope on z-score {s1:+.4f} (upper {u1:+.4f}) and {s2:+.4f} (upper {u2:+.4f}) in the two halves; "
+                      f"{ph_txt} — {why}"}
 
 
 # ------------------------------------------------------------ model-priced (flat index IV) --
 
-def _cycles(days, closes, idx, rates, legs, dte, hold, start):
-    return run_structure(days, closes, idx, rates, legs, dte, hold, ("flat", 1.0), None, start=start, q=0.0)
+def _cycles(days, closes, idx, rates, legs, dte, hold, start, schedule=None):
+    """Model-priced cycles at the index as flat IV. With `schedule` ((entry, expiry) pairs, e.g. _calendar_cycles) each cycle is priced
+    at its own T = calendar days to expiry / 365. Without one, the first-day grid of `hold` days: one of `hold` equally valid phases
+    (house rule 10), so no verdict here rests on it alone."""
+    if schedule is None:
+        return run_structure(days, closes, idx, rates, legs, dte, hold, ("flat", 1.0), None, start=start, q=0.0)
+    return run_structure(days, closes, idx, rates, legs, dte, hold, ("flat", 1.0), None, start=start, q=0.0, schedule=schedule)
 
 
-def covered_call_vs_hold(days, closes, idx, rates, delta, dte, hold, ppy_cycles, start, label, dsr_variants=(0.15, 0.25, 0.35), min_n: Optional[int] = None):
+def covered_call_vs_hold(days, closes, idx, rates, delta, dte, hold, ppy_cycles, start, label, dsr_variants=(0.15, 0.25, 0.35), min_n: Optional[int] = None,
+                         calendar=None):
     """T-253 / T-270: monthly delta-d covered call (priced at the index as flat IV) vs holding: pooled Sharpe-difference 95% CI excludes 0,
     sign holds in both halves, deflated Sharpe > 0 over the declared delta variants. deflated_sharpe_ratio returns a probability
     (PSR against the expected best-of-N zero-skill Sharpe SR*), so 'deflated Sharpe > 0' (SR_hat > SR*) is DSR probability > 0.5.
     The claim's 'higher Sharpe' is its own criterion (difference > 0), so a CI excluding 0 on the negative side fails the claim.
+    Cycles (house rule 10): the claims write monthly options, so `calendar` (default: the _TRIAL entry for the label, else 'monthly';
+    see _calendar_cycles) sets them: GLD on the standard monthly expiry, BTC on Deribit's last-Friday expiry, each written at one
+    expiry and settled at the next with its own T (dte and hold are the trial's nominal 30 days / month).
     Below min_n cycles (default: the _TRIAL entry for the label; house rule 5) only that criterion can fail decisively, when the 95% CI of
     the difference lies wholly at or below 0; a straddling CI, a halves sign flip or a DSR shortfall there is undecided."""
     min_n = _trial("covered_call_vs_hold", label, "min_n", min_n, 0)
+    sched, cal = _calendar_cycles(days, _trial("covered_call_vs_hold", label, "calendar", calendar, "monthly"))
     def run(d):
-        res = _cycles(days, closes, idx, rates, [("underlying", "long", 1, None), ("call", "short", 1, ("delta", d))], dte, hold, start)
+        res = _cycles(days, closes, idx, rates, [("underlying", "long", 1, None), ("call", "short", 1, ("delta", d))], dte, hold, start, sched)
         return res["pnl"] / res["spot"]
     cc = run(delta)
-    hold_res = _cycles(days, closes, idx, rates, [("underlying", "long", 1, None)], dte, hold, start)
+    hold_res = _cycles(days, closes, idx, rates, [("underlying", "long", 1, None)], dte, hold, start, sched)
     bh = hold_res["pnl"] / hold_res["spot"]
+    if len(cc) < 4:
+        return {"n_cycles": int(len(cc)), "calendar": cal, "verdict": "inconclusive",
+                "reason": f"MODEL-PRICED at flat {label}: only {len(cc)} cycles on the {cal} (min_n {min_n})"}
     obs, lo = _sharpe_diff_lower(cc, bh, ppy_cycles, 3, q=0.025); _, hi = _sharpe_diff_lower(cc, bh, ppy_cycles, 3, q=0.975)
     h = len(cc) // 2; halves = [_sr(cc[:h], ppy_cycles) - _sr(bh[:h], ppy_cycles), _sr(cc[h:], ppy_cycles) - _sr(bh[h:], ppy_cycles)]
     dsr = deflated_sharpe_ratio(cc - bh, n_trials=len(dsr_variants), trial_sharpes=[sharpe_ratio(run(d) - bh) for d in dsr_variants])
@@ -312,25 +456,35 @@ def covered_call_vs_hold(days, closes, idx, rates, delta, dte, hold, ppy_cycles,
                      ("sign holds in both halves", np.sign(halves[0]) == np.sign(halves[1]) == np.sign(obs), False),
                      ("deflated Sharpe > 0 (DSR probability > 0.5)", dsr > 0.5, False)],
                     len(cc), min_n, "cycles")
-    return {"n_cycles": int(len(cc)), "sharpe_cc": _sr(cc, ppy_cycles), "sharpe_hold": _sr(bh, ppy_cycles), "diff": obs, "ci": [lo, hi], "halves": halves, "dsr": float(dsr), "verdict": v,
-            "reason": f"MODEL-PRICED at flat {label}: {delta:.2f}-delta covered call Sharpe {_sr(cc,ppy_cycles):.2f} vs hold {_sr(bh,ppy_cycles):.2f} over {len(cc)} cycles (diff {obs:+.2f}, 95% CI {lo:+.2f} to {hi:+.2f}; halves {halves[0]:+.2f}/{halves[1]:+.2f}), DSR probability {dsr:.2f} (deflated Sharpe > 0 needs > 0.5), MDD {_mdd(cc)*100:.0f}% vs {_mdd(bh)*100:.0f}% — {why}"}
+    return {"n_cycles": int(len(cc)), "calendar": cal, "first_day": hold_res["day"][0], "sharpe_cc": _sr(cc, ppy_cycles), "sharpe_hold": _sr(bh, ppy_cycles), "diff": obs, "ci": [lo, hi],
+            "halves": halves, "dsr": float(dsr), "verdict": v,
+            "reason": f"MODEL-PRICED at flat {label}: {delta:.2f}-delta covered call Sharpe {_sr(cc,ppy_cycles):.2f} vs hold {_sr(bh,ppy_cycles):.2f} over {len(cc)} cycles "
+                      f"from {hold_res['day'][0]} on the {cal} (diff {obs:+.2f}, 95% CI {lo:+.2f} to {hi:+.2f}; halves {halves[0]:+.2f}/{halves[1]:+.2f}), DSR probability {dsr:.2f} "
+                      f"(deflated Sharpe > 0 needs > 0.5), MDD {_mdd(cc)*100:.0f}% vs {_mdd(bh)*100:.0f}% — {why}"}
 
 
-def short_put_mean(days, closes, idx, rates, delta, dte, hold, start, label, min_n: Optional[int] = None):
+def short_put_mean(days, closes, idx, rates, delta, dte, hold, start, label, min_n: Optional[int] = None, calendar=None):
     """T-254 / T-279: monthly delta-d short put at flat index IV, P&L = (premium - payoff)/K: 95% CI of the mean > 0, positive in both halves.
+    Cycles (house rule 10): monthly options, so `calendar` (default: the _TRIAL entry for the label, else 'monthly'; see
+    _calendar_cycles) sets them, each written at one expiry and settled at the next with its own T.
     Below min_n cycles (default: the _TRIAL entry for the label; house rule 5) the CI criterion fails decisively only when the CI lies
     wholly at or below 0, and the halves criterion only when the first half at min_n (cycles [0, min_n // 2), already observed) is <= 0."""
     min_n = _trial("short_put_mean", label, "min_n", min_n, 0)
-    res = _cycles(days, closes, idx, rates, [("put", "short", 1, ("delta", delta))], dte, hold, start)
+    sched, cal = _calendar_cycles(days, _trial("short_put_mean", label, "calendar", calendar, "monthly"))
+    res = _cycles(days, closes, idx, rates, [("put", "short", 1, ("delta", delta))], dte, hold, start, sched)
     K = np.array([k[0] for k in res["strikes"]])
     x = res["pnl"] / K
+    if len(x) < 4:
+        return {"n_cycles": int(len(x)), "calendar": cal, "verdict": "inconclusive",
+                "reason": f"MODEL-PRICED at flat {label}: only {len(x)} cycles on the {cal} (min_n {min_n})"}
     lo, hi = _mean_ci(x, 3); h = len(x) // 2
     # (name, passes, fails decisively below min_n)
     v, why = _rule5([("95% CI of the mean > 0", lo > 0, hi <= 0),
                      ("positive in both halves", x[:h].mean() > 0 and x[h:].mean() > 0, _first_half_fails_at_min_n(len(x), min_n, lambda k: x[:k].mean() > 0))],
                     len(x), min_n, "cycles")
-    return {"n_cycles": int(len(x)), "mean": float(x.mean()), "ci": [lo, hi], "verdict": v,
-            "reason": f"MODEL-PRICED at flat {label}: {abs(delta):.2f}-delta short put mean {x.mean()*100:+.2f}% of strike per cycle over {len(x)} cycles (95% CI {lo*100:+.2f} to {hi*100:+.2f}), halves {x[:h].mean()*100:+.2f}/{x[h:].mean()*100:+.2f} — {why}"}
+    return {"n_cycles": int(len(x)), "calendar": cal, "first_day": res["day"][0], "mean": float(x.mean()), "ci": [lo, hi], "verdict": v,
+            "reason": f"MODEL-PRICED at flat {label}: {abs(delta):.2f}-delta short put mean {x.mean()*100:+.2f}% of strike per cycle over {len(x)} cycles from {res['day'][0]} "
+                      f"on the {cal} (95% CI {lo*100:+.2f} to {hi*100:+.2f}), halves {x[:h].mean()*100:+.2f}/{x[h:].mean()*100:+.2f} — {why}"}
 
 
 def conditional_straddle(days, closes, idx, rates, dte, hold, start, window, pct, label, report_conditional=True, min_n: Optional[int] = None, block: int = 2):
@@ -386,54 +540,111 @@ def protective_put_calmar(days, closes, idx, rates, start, label="DVOL", dte: in
     """T-267: 1 BTC plus one 10-delta 90-DTE put (BS at the index as flat IV, q = 0), rolled monthly as the trial's procedure states: every
     `roll` days the held put (then dte - roll days to expiry) is sold at its BS mark and a new 90-DTE 10-delta put is bought; vs buy-and-hold.
     Both arms are marked daily (spot plus the put at BS with that day's index and bill rate), and Calmar = CAGR / |max drawdown of the daily
-    path|. Pass: bootstrap 95% lower bound of the Calmar difference > 0 (circular blocks of `block` roll periods, each keeping its daily
-    path) and positive in >= 2 of 3 windows. Below min_n roll periods (house rule 5) the CI criterion fails decisively only when the
-    bootstrap 95% CI lies wholly at or below 0 (upper bound <= 0), and the windows criterion only when at least 2 of the 3 windows at
-    min_n (np.array_split of the first min_n periods) are already fully observed and not positive."""
+    path|. Pass: bootstrap 95% lower bound of the Calmar difference > 0 and positive in >= 2 of 3 windows.
+    Roll dates (house rule 10): 'monthly rolls' of a 90-DTE put name no calendar, so each of the `roll` start days is an equally valid
+    phase: sleeve k rolls on days start + k, start + k + roll, ... The primary statistic pools every phase: the mean over the `roll`
+    sleeves of the claimed Calmar difference, each on the same daily path (the days on which every sleeve holds a put), with one joint
+    circular block bootstrap of those days (blocks of max(2, block) x roll days, every sleeve and buy-and-hold resampled alike) and
+    thirds of that path as the windows; n counts roll periods (the most any sleeve holds). It is the claimed strategy at an unknown
+    phase, not a ladder rebalanced across sleeves (whose rebalancing would add a return none of the phases earns). Each sleeve on its
+    own over its own span (the old harness was sleeve 0: blocks of `block` roll periods, each keeping its daily path) is reported as the
+    per-phase range.
+    Below min_n roll periods (house rule 5) the CI criterion fails decisively only when the bootstrap 95% CI lies wholly at or below 0
+    (upper bound <= 0), and the windows criterion only when at least 2 of the 3 windows at min_n (np.array_split of the first
+    min_n x roll days) are already fully observed and not positive."""
     from mandel.options import bs
     vol, rate = _asof(idx), _asof(rates)
-    i = next((k for k, d in enumerate(days) if d >= start and d in idx), len(days))
-    GH, GB, cost, first = [], [], [], None
-    while i + roll < len(days):
-        d0 = days[i]; S0 = float(closes[i]); V0 = vol(d0) / 100; r0 = math.log(1 + rate(d0) / 100); first = first or d0
-        K = bs.strike_for_delta(S0, dte / 365.0, r0, V0, delta, "put", 0.0); P0 = float(bs.price(S0, K, dte / 365.0, r0, V0, "put", 0.0))
-        dk = days[i + 1:i + roll + 1]; Sk = np.asarray(closes[i + 1:i + roll + 1], dtype=float)
-        tau = np.array([(dte - (date.fromisoformat(x) - date.fromisoformat(d0)).days) / 365.0 for x in dk])
-        Pk = bs.price(Sk, K, tau, np.array([math.log(1 + rate(x) / 100) for x in dk]), np.array([vol(x) / 100 for x in dk]), "put", 0.0)
-        GH.append((Sk + Pk) / (S0 + P0)); GB.append(Sk / S0); cost.append(P0 / S0); i += roll
-    n = len(GH)
+    i0 = next((k for k, d in enumerate(days) if d >= start and d in idx), len(days))
+
+    def sleeve(i):                                    # roll periods from day index i: per-period cumulative growth (hedged, hold), premium cost
+        GH, GB, cost = [], [], []
+        while i + roll < len(days):
+            d0 = days[i]; S0 = float(closes[i]); V0 = vol(d0) / 100; r0 = math.log(1 + rate(d0) / 100)
+            K = bs.strike_for_delta(S0, dte / 365.0, r0, V0, delta, "put", 0.0); P0 = float(bs.price(S0, K, dte / 365.0, r0, V0, "put", 0.0))
+            dk = days[i + 1:i + roll + 1]; Sk = np.asarray(closes[i + 1:i + roll + 1], dtype=float)
+            tau = np.array([(dte - (date.fromisoformat(x) - date.fromisoformat(d0)).days) / 365.0 for x in dk])
+            Pk = bs.price(Sk, K, tau, np.array([math.log(1 + rate(x) / 100) for x in dk]), np.array([vol(x) / 100 for x in dk]), "put", 0.0)
+            GH.append((Sk + Pk) / (S0 + P0)); GB.append(Sk / S0); cost.append(P0 / S0); i += roll
+        return np.array(GH).reshape(-1, roll), np.array(GB).reshape(-1, roll), cost
+
+    sleeves = [sleeve(i0 + k) for k in range(roll)]
+    n = len(sleeves[0][0])                            # roll periods, the claim's unit (sleeve 0, the old harness, holds the most)
     if n < 3:
         return {"n_cycles": n, "verdict": "inconclusive", "reason": f"MODEL-PRICED at flat {label}: only {n} monthly roll periods (min_n {min_n})"}
-    GH, GB = np.array(GH), np.array(GB)
 
     def path(G):                                      # daily equity path from per-period cumulative growth
         starts = np.concatenate([[1.0], np.cumprod(G[:, -1])[:-1]])
         return np.concatenate([[1.0], (starts[:, None] * G).ravel()])
 
-    def mdd(G):
-        e = path(G); return float((e / np.maximum.accumulate(e) - 1).min())
+    def calmar_g(e, n_days):                          # Calmar of an equity path over n_days days
+        dd = abs(float((e / np.maximum.accumulate(e) - 1).min())); cagr = e[-1] ** (ppy / n_days) - 1
+        return cagr / dd if dd > 0 else float("nan")
 
     def calmar(G):
-        cagr = path(G)[-1] ** (ppy / (len(G) * roll)) - 1; dd = abs(mdd(G)); return cagr / dd if dd > 0 else float("nan")
+        return calmar_g(path(G), len(G) * roll)
 
-    obs = calmar(GH) - calmar(GB)
-    rng = np.random.default_rng(0); b = max(1, min(block, n)); draws = []
+    # each sleeve on its own (sleeve 0 is the old harness): Calmar difference, its period-block bootstrap, thirds
+    p_diff, p_ok = [], []
+    for k, (GH, GB, _) in enumerate(sleeves):
+        m = len(GH)
+        if m < 3:
+            continue
+        rng = np.random.default_rng(0); b = max(1, min(block, m)); dr = []
+        for _ in range(2000):
+            j = ((rng.integers(0, m, math.ceil(m / b))[:, None] + np.arange(b)[None, :]).ravel()[:m]) % m; dr.append(calmar(GH[j]) - calmar(GB[j]))
+        th = [calmar(GH[s]) - calmar(GB[s]) for s in np.array_split(np.arange(m), 3)]
+        p_diff.append(calmar(GH) - calmar(GB)); p_ok.append(float(np.nanquantile(dr, 0.025)) > 0 and sum(t > 0 for t in th) >= 2)
+    # pooled over every phase: each sleeve's daily returns on the days every sleeve holds a put, the claimed Calmar difference averaged
+    # over the sleeves (no rebalancing between them), one joint block bootstrap of those days
+    R = np.full((roll, len(days)), np.nan)
+    for k, (GH, _, _) in enumerate(sleeves):
+        if len(GH):
+            g = (GH / np.concatenate([np.ones((len(GH), 1)), GH[:, :-1]], axis=1)).ravel()
+            R[k, i0 + k + 1:i0 + k + 1 + g.size] = g
+    on = np.flatnonzero(np.isfinite(R).all(axis=0))
+    if len(on) < 3 * roll:
+        return {"n_cycles": n, "verdict": "inconclusive", "reason": f"MODEL-PRICED at flat {label}: only {len(on)} days on which all {roll} roll phases hold a put"}
+    RH = R[:, on]; gB = np.asarray(closes, dtype=float)[on] / np.asarray(closes, dtype=float)[on - 1]
+    nd = len(on); first = days[on[0] - 1]
+
+    def paths(G):                                     # equity paths (rows) from gross daily returns (rows)
+        G = np.atleast_2d(G); return np.concatenate([np.ones((len(G), 1)), np.cumprod(G, axis=1)], axis=1)
+
+    def mdds(G):
+        E = paths(G); return (E / np.maximum.accumulate(E, axis=1) - 1).min(axis=1)
+
+    def calmars(G):
+        dd = np.abs(mdds(G)); cagr = paths(G)[:, -1] ** (ppy / np.atleast_2d(G).shape[1]) - 1
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.where(dd > 0, cagr / dd, np.nan)
+
+    def pooled(j):                                    # mean over the sleeves of Calmar(sleeve) - Calmar(hold) on the days j
+        return float(np.nanmean(calmars(RH[:, j]))) - float(calmars(gB[j])[0])
+
+    allj = np.arange(nd)
+    obs = pooled(allj)
+    B = max(2, block) * roll
+    rng = np.random.default_rng(0); b = max(1, min(B, nd)); draws = []
     for _ in range(2000):
-        j = ((rng.integers(0, n, math.ceil(n / b))[:, None] + np.arange(b)[None, :]).ravel()[:n]) % n; draws.append(calmar(GH[j]) - calmar(GB[j]))
+        j = ((rng.integers(0, nd, math.ceil(nd / b))[:, None] + np.arange(b)[None, :]).ravel()[:nd]) % nd; draws.append(pooled(j))
     lo, hi = float(np.nanquantile(draws, 0.025)), float(np.nanquantile(draws, 0.975))
-    thirds = [calmar(GH[s]) - calmar(GB[s]) for s in np.array_split(np.arange(n), 3)]
-    # windows at min_n that are already fully observed (later periods only append) and not positive: >= 2 fails at min_n whatever comes
-    settled_bad = sum(not (calmar(GH[s]) - calmar(GB[s]) > 0) for s in np.array_split(np.arange(min_n), 3) if len(s) and s[-1] < n) if min_n and n < min_n else 0
+    thirds = [pooled(s) for s in np.array_split(allj, 3)]
+    # windows at min_n that are already fully observed (later days only append) and not positive: >= 2 fails at min_n whatever comes
+    settled_bad = _settled_windows_bad(nd, min_n * roll, lambda s: not (pooled(s) > 0)) if min_n and n < min_n else 0
     # (name, passes, fails decisively below min_n)
     v, why = _rule5([("Calmar difference 95% CI > 0", lo > 0, hi <= 0),
                      ("positive in >= 2 of 3 windows", sum(t > 0 for t in thirds) >= 2, settled_bad >= 2)],
                     n, min_n, "monthly roll periods")
-    mh, mb = mdd(GH), mdd(GB); annual_cost = float(np.mean(cost) * ppy / roll)
-    return {"n_cycles": int(n), "first_day": first, "calmar_hedged": calmar(GH), "calmar_hold": calmar(GB), "diff": obs, "lower": lo, "upper": hi, "thirds": thirds,
-            "mdd_hedged": mh, "mdd_hold": mb, "annual_premium": annual_cost, "verdict": v,
-            "reason": f"MODEL-PRICED at flat {label}: BTC + 10-delta {dte}-DTE puts rolled every {roll} days Calmar {calmar(GH):.2f} vs hold {calmar(GB):.2f} over {n} roll periods "
-                      f"since {first} (daily-path MDD {mh*100:.0f}% vs {mb*100:.0f}%, gross premium {annual_cost*100:.1f}% of spot a year; diff {obs:+.2f}, 95% lower {lo:+.2f}; thirds "
-                      + "/".join(f"{t:+.2f}" for t in thirds) + f") — {why}"}
+    cH, cB = float(np.nanmean(calmars(RH))), float(calmars(gB)[0])
+    mh, mb = float(mdds(RH).mean()), float(mdds(gB)[0])
+    annual_cost = float(np.mean([c for _, _, cs in sleeves for c in cs]) * ppy / roll)
+    return {"n_cycles": int(n), "n_days": int(nd), "first_day": first, "calmar_hedged": cH, "calmar_hold": cB, "diff": obs, "lower": lo, "upper": hi,
+            "thirds": thirds, "block_days": int(B), "phase_diffs": p_diff, "phase_pass": p_ok, "mdd_hedged": mh, "mdd_hold": mb, "annual_premium": annual_cost, "verdict": v,
+            "reason": f"MODEL-PRICED at flat {label}: BTC + 10-delta {dte}-DTE puts rolled every {roll} days, pooled over all {roll} roll phases (house rule 10: the "
+                      f"mean over the phases on the {nd} days since {first} on which all of them hold a put; n = {n} roll periods, the most any phase holds; "
+                      f"blocks of {B} days) Calmar {cH:.2f} vs hold "
+                      f"{cB:.2f} (daily-path MDD {mh*100:.0f}% (mean over phases) vs {mb*100:.0f}%, gross premium {annual_cost*100:.1f}% of spot a year; diff {obs:+.2f}, "
+                      f"95% lower {lo:+.2f}; thirds " + "/".join(f"{t:+.2f}" for t in thirds) + f"; {_phases_txt(p_diff, p_ok)}) — {why}"}
 
 
 def delivery_prices(rows) -> dict:
@@ -446,24 +657,30 @@ def delivery_prices(rows) -> dict:
     return out
 
 
-def inverse_covered_call_btc(days, closes, idx, rates, start, delivery: Optional[dict] = None, settle_offset_days: int = 31, min_n: int = 60):
+def inverse_covered_call_btc(days, closes, idx, rates, start, delivery: Optional[dict] = None, calendar="deribit", min_n: int = 60):
     """T-176: 25-delta 30-day BTC call written against 1 BTC, the registry statistic in BTC: c - max(S_T - K, 0)/S_T - 2 x 0.0003 BTC fee,
     with c = USD premium / S_0 (the BTC received at inception). Pass: 95% CI of the mean > 0. Black-76 at DVOL on the forward
-    F = S e^{rT} equals BS with q = 0, which _cycles uses. Settlement: `delivery` ({date: Deribit delivery price}, see delivery_prices)
-    on entry date + settle_offset_days. The entry is the daily close (24:00 UTC), so the 30-day expiry falls at 00:00 UTC of day +31
-    and the first 08:00 UTC delivery at or after it is on day +31. Cycles without a delivery price are dropped. Without `delivery`,
-    spot closes on day +30 stand in and the claim's 'settlement at Deribit delivery prices' criterion is not implemented (None), so
-    the verdict is at best inconclusive. Below min_n cycles (house rule 5) the verdict cannot be supported, and the CI criterion fails
-    decisively only when the CI lies wholly at or below 0."""
-    res = _cycles(days, closes, idx, rates, [("call", "short", 1, ("delta", 0.25))], 30, 30, start)
+    F = S e^{rT} equals BS with q = 0, which _cycles uses. Cycles (house rule 10): the trial names the monthly roll on the last-Friday
+    cycle, so `calendar` defaults to 'deribit' (see _calendar_cycles): each call is written at the last daily close (24:00 UTC) before
+    one last-Friday expiry and expires at the next, priced at its own T (28 or 35 days, from 00:00 UTC Friday to 00:00 UTC Friday).
+    Settlement: `delivery` ({date: Deribit delivery price}, see delivery_prices) on the day after each cycle's last close, i.e. the
+    expiry Friday's 08:00 UTC delivery. Cycles without a delivery price are dropped. Without `delivery`, spot at that last close stands
+    in and the claim's 'settlement at Deribit delivery prices' criterion is not implemented (None), so the verdict is at best
+    inconclusive. Below min_n cycles (house rule 5) the verdict cannot be supported, and the CI criterion fails decisively only when the
+    CI lies wholly at or below 0."""
+    sched, cal = _calendar_cycles(days, calendar)
+    res = _cycles(days, closes, idx, rates, [("call", "short", 1, ("delta", 0.25))], 30, 30, start, sched)
+    if not len(res["day"]):
+        return {"n_cycles": 0, "dropped": 0, "calendar": cal, "verdict": "inconclusive", "reason": f"MODEL-PRICED at flat DVOL: no cycle on the {cal} (min_n {min_n})"}
     K = np.array([s[0] for s in res["strikes"]])
     premium_btc = -res["debit"] / res["spot"]                     # c: BTC received at inception (debit < 0 for a short call)
     if delivery is not None:
-        settle = np.array([delivery.get((date.fromisoformat(d) + timedelta(days=settle_offset_days)).isoformat(), np.nan) for d in res["day"]])
-        src = f"Deribit delivery prices on day +{settle_offset_days}"
+        settle = np.array([delivery.get((date.fromisoformat(x) + timedelta(days=1)).isoformat(), np.nan) for x in res["exit"]], dtype=float)
+        src = "Deribit delivery prices at each expiry (08:00 UTC, the day after the last close before it)"
     else:
-        settle = np.array([closes[days.index(d) + 30] for d in res["day"]], dtype=float)
-        src = "spot closes on day +30 stand in for Deribit delivery prices"
+        pos = {d: i for i, d in enumerate(days)}
+        settle = np.array([closes[pos[x]] for x in res["exit"]], dtype=float)
+        src = "spot at the last close before each expiry stands in for Deribit delivery prices"
     ok = np.isfinite(settle); dropped = int((~ok).sum())
     x = premium_btc[ok] - np.maximum(settle[ok] - K[ok], 0) / settle[ok] - 0.0006
     if len(x) < 2:
@@ -472,6 +689,7 @@ def inverse_covered_call_btc(days, closes, idx, rates, start, delivery: Optional
     # (name, passes, fails decisively below min_n)
     v, why = _rule5([("95% CI of the mean > 0", lo > 0, hi <= 0), ("settled at Deribit delivery prices", True if delivery is not None else None, False)],
                     len(x), min_n, "monthly cycles")
-    return {"n_cycles": int(len(x)), "dropped": dropped, "mean_btc": float(x.mean()), "mean_premium_btc": float(premium_btc[ok].mean()), "ci": [lo, hi], "verdict": v,
+    return {"n_cycles": int(len(x)), "dropped": dropped, "calendar": cal, "first_day": res["day"][0], "mean_btc": float(x.mean()), "mean_premium_btc": float(premium_btc[ok].mean()),
+            "ci": [lo, hi], "verdict": v,
             "reason": f"MODEL-PRICED at flat DVOL: 25-delta 30-day BTC call against 1 BTC earns {x.mean():+.4f} BTC per cycle on average (premium {premium_btc[ok].mean():.4f} BTC at S_0) "
-                      f"over {len(x)} cycles (95% CI {lo:+.4f} to {hi:+.4f}); {src}" + (f", {dropped} cycles without one dropped" if dropped else "") + f" — {why}"}
+                      f"over {len(x)} cycles from {res['day'][0]} on the {cal} (95% CI {lo:+.4f} to {hi:+.4f}); {src}" + (f", {dropped} cycles without one dropped" if dropped else "") + f" — {why}"}

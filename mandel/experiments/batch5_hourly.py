@@ -54,13 +54,16 @@ cover the claimed 2023-11..2026-10 (data limits) -> at best inconclusive.
 
 House rule 5 (``_rule5``). Below the trial's min_n (500 usable days) the unmet 'at least 500 days' criterion keeps the
 verdict from supported, and a failing criterion still counts only when it fails decisively: its 95% interval lies
-wholly on the wrong side of the claimed bound. T-427: the mean and the deflated-p criteria when the mean's 95%
-block-bootstrap CI lies wholly at or below 0 (the deflation benchmark, the expected best of 60 zero-skill Sharpes, is
->= 0 at any sample size); the QQQ/IWM criterion when either asset's 95% HAC interval of its mean net return lies
-wholly at or below 0 (HAC t <= -1.96, at least 8 days). T-428: the slope criterion when the slope's 95% block-bootstrap
-CI lies wholly above -0.2, the deflated-p criterion when it lies wholly at or above 0, and the reversal leg (when a
-15:45 signal is supplied) when its annualised Sharpe's 95% block-bootstrap interval lies wholly at or below 0.5. A
-zero-width interval decides nothing. Any other failure there is undecided (None), so the verdict is inconclusive;
+wholly on the wrong side of the claimed bound. T-427: the mean criterion when the mean's 95% block-bootstrap CI lies
+wholly at or below 0; the deflated-p criterion, a one-sided 95% test (DSR > 0.95), at the same confidence: when the
+Sharpe's one-sided 95% upper bound lies at or below 0, i.e. the PSR against a zero Sharpe
+(``deflated_sharpe_ratio(net, n_trials=1)``) is <= 0.05 (the deflation benchmark, the expected best of 60 zero-skill
+Sharpes, is >= 0 at any sample size, so the DSR is then <= 0.05 too), or when the mean's 95% CI lies wholly at or
+below 0 (a one-sided 97.5% bound on the same sign); the PSR is reported in ``rule5`` and the reason. The QQQ/IWM
+criterion when either asset's 95% HAC interval of its mean net return lies wholly at or below 0 (HAC t <= -1.96, at
+least 8 days). T-428: the slope criterion when the slope's 95% block-bootstrap CI lies wholly above -0.2, the
+deflated-p criterion when it lies wholly at or above 0, and the reversal leg (when a 15:45 signal is supplied) when its
+annualised Sharpe's 95% block-bootstrap interval lies wholly at or below 0.5. A zero-width interval decides nothing. Any other failure there is undecided (None), so the verdict is inconclusive;
 under 8 (T-427) or 10 (T-428) usable days nothing is computed. At or above min_n every criterion is judged at face
 value, exactly as before. Below min_n the report's ``rule5`` holds the face-value and judged criteria and the decisive
 failures.
@@ -411,9 +414,11 @@ def intraday_momentum(spy: dict, others: Optional[dict] = None, cost_rt: float =
                       min_n: int = MIN_N, alpha: float = 0.05, regimes: Optional[dict] = None, n_boot: int = 2000,
                       seed: int = 0) -> dict:
     """T-427 on sessions from ``build_sessions``. ``others`` = {"QQQ": sessions or None, "IWM": sessions or None}.
-    Below ``min_n`` usable days house rule 5 applies: never supported; the mean and deflated-p criteria fail decisively
-    when the mean's 95% block-bootstrap CI lies wholly at or below 0, the QQQ/IWM criterion when either asset's HAC t of
-    its mean net return is <= -1.96. Under 8 usable days nothing is computed."""
+    Below ``min_n`` usable days house rule 5 applies: never supported; the mean criterion fails decisively when the
+    mean's 95% block-bootstrap CI lies wholly at or below 0; the deflated-p criterion (a one-sided 95% test) when the PSR
+    against a zero Sharpe is <= ``alpha`` (the Sharpe's one-sided 95% upper bound at or below 0; the deflation benchmark
+    is >= 0) or that mean CI lies wholly at or below 0; the QQQ/IWM criterion when either asset's HAC t of its mean net
+    return is <= -1.96. The PSR is reported in ``rule5`` and the reason. Under 8 usable days nothing is computed."""
     others = {"QQQ": None, "IWM": None} if others is None else others
     leg = momentum_leg(spy, cost_rt)
     n = len(leg["net"])
@@ -469,9 +474,14 @@ def intraday_momentum(spy: dict, others: Optional[dict] = None, cost_rt: float =
     if all(per.get(s) and per[s]["n"] for s in ("QQQ", "IWM")):
         same = bool(per["QQQ"]["mean_net_bps"] > 0 and per["IWM"]["mean_net_bps"] > 0)
     if n < min_n:
-        # rule 5: the mean and the deflated p (benchmark >= 0) fail decisively when the mean's 95% CI lies wholly at or
-        # below 0; the QQQ/IWM sign when either asset's 95% HAC interval lies wholly at or below 0 (HAC t <= -1.96)
+        # rule 5: the mean fails decisively when its 95% CI lies wholly at or below 0. The deflated p (DSR > 1 - alpha, a
+        # one-sided test of SR > SR* >= 0) is mirrored at its own confidence: the Sharpe's one-sided 95% upper bound lies
+        # at or below 0, i.e. the PSR against a zero Sharpe (the same draws) is <= alpha; SR* >= 0 at any length, so the
+        # DSR is then <= alpha against every benchmark. A mean CI wholly at or below 0 (one-sided 97.5%) also decides it.
+        # The QQQ/IWM sign when either asset's 95% HAC interval lies wholly at or below 0 (HAC t <= -1.96).
         down = _ci_below(ci, 0.0)
+        psr0 = float(deflated_sharpe_ratio(net, n_trials=1))
+        dsr0_down = bool(mean_net < 0 and psr0 <= alpha)
         oth_down = any(per.get(s) and per[s]["n"] >= 8 and per[s]["hac_t"] is not None and per[s]["hac_t"] <= -Z95
                        for s in ("QQQ", "IWM"))
         v, why, r5 = _rule5([
@@ -479,8 +489,11 @@ def intraday_momentum(spy: dict, others: Optional[dict] = None, cost_rt: float =
             ("SPY mean net return > 0", mean_net > 0),
             (f"deflated p < {alpha} over {n_cells} cells", p_defl < alpha),
             ("same sign on QQQ and IWM (mean net return > 0 on both)", same),
-        ], [False, down, down, oth_down], n, min_n)
-        rep.update(verdict=v, reason=head + " — " + why, rule5=r5)
+        ], [False, down, dsr0_down or down, oth_down], n, min_n)
+        r5["psr_vs_zero_sharpe"] = psr0
+        psr_txt = (f"; PSR against a zero Sharpe {psr0:.3f} (the deflated-p criterion fails decisively below min_n when "
+                   f"<= {alpha}, the Sharpe's one-sided {1 - alpha:.0%} upper bound at or below 0)")
+        rep.update(verdict=v, reason=head + psr_txt + " — " + why, rule5=r5)
         return rep
     v, why = _verdict([
         (f"at least {min_n} days", n >= min_n),

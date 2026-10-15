@@ -2,8 +2,15 @@
 Model-priced option structures on SPY with a captured smile.
 ============================================================
 
-One engine for the library's single-expiry structure claims. Each cycle (non-overlapping) prices every leg by Black-Scholes
-at entry and settles at intrinsic value on the SPY close at expiry. Pricing modes:
+One engine for the library's single-expiry structure claims. Each cycle prices every leg by Black-Scholes at entry and settles
+at intrinsic value on the SPY close at expiry. Entries (house rule 10, no arbitrary grid phase):
+  * default: the non-overlapping ``hold``-day grid from the first valid day (one of its ``hold`` phases; kept for callers
+    that pick their own phase);
+  * ``step=1``: an entry on every valid day, i.e. every phase of that grid pooled (cycle ``k + j*hold`` of the result is
+    phase k's j-th cycle);
+  * ``schedule``: explicit (entry day, expiry day) cycles, e.g. ``monthly_cycles`` (the standard monthly expiry calendar);
+    each cycle is priced at its own T = calendar days to expiry / 365.
+Pricing modes:
   * ``("flat", s)``: every leg at sigma = s * VIX / 100 (the claims' ATM-scale grid, s in {0.81, 0.90, 1.00});
   * ``("smile", m)``: sigma(K) = VIX/100 * r(K/S) where r is the captured SPY smile (IV/VIX on the quote date, averaged over all
     ``spy-smile-*`` bundles, nearest of the 30- and 45-day shapes), flat beyond the captured grid; ``m`` scales the IV-ratio
@@ -19,7 +26,9 @@ whose bracket holds no root (the trade then is not zero-cost).
 
 from __future__ import annotations
 
+import bisect
 import math
+from datetime import date, timedelta
 from typing import Optional
 
 import numpy as np
@@ -54,19 +63,55 @@ class Smile:
         return base
 
 
+def third_friday(y: int, m: int) -> date:
+    d = date(y, m, 1)
+    return d + timedelta(days=(4 - d.weekday()) % 7 + 14)
+
+
+def monthly_expiries(days) -> list:
+    """Standard monthly option expiries inside the trading calendar ``days``: the third Friday of each month, or the prior
+    session when that Friday is not a trading day (a holiday such as Good Friday)."""
+    ds = [str(d) for d in days]
+    if not ds:
+        return []
+    y, m = int(ds[0][:4]), int(ds[0][5:7]); out = []
+    while (y, m) <= (int(ds[-1][:4]), int(ds[-1][5:7])):
+        tf = third_friday(y, m).isoformat()
+        if ds[0] <= tf <= ds[-1]:
+            e = ds[bisect.bisect_right(ds, tf) - 1]                       # the session on or before the third Friday
+            if not out or e != out[-1]:
+                out.append(e)
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def monthly_cycles(days) -> list:
+    """The monthly roll on the standard expiry calendar: each cycle enters at the close of one monthly expiry and settles at
+    the next (27-35 calendar days later)."""
+    e = monthly_expiries(days)
+    return list(zip(e[:-1], e[1:]))
+
+
 def run_structure(days, closes, vix: dict, rates: dict, legs, dte: int, hold: int, mode: tuple, smile: Optional[Smile] = None,
-                  start: str = "1993-01-01", q: float = Q) -> dict:
+                  start: str = "1993-01-01", q: float = Q, step: Optional[int] = None, schedule=None) -> dict:
     """legs: list of (kind, side, qty, strike_spec) with strike_spec = moneyness float, ('delta', d), or ('zero_cost_put',).
-    Returns per-cycle arrays: debit (+ paid / - received), payoff, pnl, max_loss (>0), spot, vix, zero_cost_ok."""
-    T = dte / 365.0
-    idx = [i for i, d in enumerate(days) if d >= start and d in vix]
-    out = {k: [] for k in ("day", "debit", "payoff", "pnl", "max_loss", "spot", "vix", "strikes", "zero_cost_ok")}
-    i = 0
-    while i < len(idx):
-        a = idx[i]
-        if a + hold >= len(days):
-            break
-        d = days[a]; S = float(closes[a]); S1 = float(closes[a + hold]); V = vix[d] / 100
+    Entries: every ``step`` valid days (default ``hold``: the non-overlapping grid from the first valid day; 1: every phase of
+    that grid pooled), or the (entry day, expiry day) pairs of ``schedule`` (dte and hold then come from each pair).
+    Returns per-cycle arrays: day (entry), exit, debit (+ paid / - received), payoff, pnl, max_loss (>0), spot, vix, zero_cost_ok."""
+    if schedule is not None:
+        pos = {str(d): i for i, d in enumerate(days)}
+        cycles = [(pos[e], pos[x], (date.fromisoformat(x) - date.fromisoformat(e)).days / 365.0)
+                  for e, x in schedule if e >= start and e in vix and e in pos and x in pos and x > e]
+    else:
+        idx = [i for i, d in enumerate(days) if d >= start and d in vix]
+        cycles = []
+        for i in range(0, len(idx), hold if step is None else step):
+            if idx[i] + hold >= len(days):
+                break
+            cycles.append((idx[i], idx[i] + hold, dte / 365.0))
+    out = {k: [] for k in ("day", "exit", "debit", "payoff", "pnl", "max_loss", "spot", "vix", "strikes", "zero_cost_ok")}
+    for a, b, T in cycles:
+        d = days[a]; S = float(closes[a]); S1 = float(closes[b]); V = vix[d] / 100
         r = math.log(1 + rates.get(d, rates[max(k for k in rates if k <= d)]) / 100) if rates else 0.0
         def sig(K):
             if mode[0] == "flat":
@@ -102,12 +147,14 @@ def run_structure(days, closes, vix: dict, rates: dict, legs, dte: int, hold: in
                 v = (x - S) if kind == "underlying" else (max(x - K, 0) if kind == "call" else max(K - x, 0))
                 tot += (1 if side == "long" else -1) * qty * v
             return tot
-        grid = np.linspace(0.0, 2.0 * S, 801)
-        pnl_grid = np.array([pay(x) for x in grid]) - debit
-        out["day"].append(d); out["debit"].append(debit); out["payoff"].append(pay(S1)); out["pnl"].append(pay(S1) - debit)
+        grid = np.linspace(0.0, 2.0 * S, 801); pnl_grid = np.zeros_like(grid)
+        for (kind, side, qty, _), K in zip(legs, strikes):                # pay() on the whole grid, same terms in the same order
+            v = (grid - S) if kind == "underlying" else (np.maximum(grid - K, 0) if kind == "call" else np.maximum(K - grid, 0))
+            pnl_grid += (1 if side == "long" else -1) * qty * v
+        pnl_grid = pnl_grid - debit
+        out["day"].append(d); out["exit"].append(days[b]); out["debit"].append(debit); out["payoff"].append(pay(S1)); out["pnl"].append(pay(S1) - debit)
         out["max_loss"].append(max(-pnl_grid.min(), 1e-9)); out["spot"].append(S); out["vix"].append(vix[d]); out["strikes"].append(list(strikes)); out["zero_cost_ok"].append(bool(zc_ok))
-        i += hold
-    return {k: (np.array(v) if k not in ("day", "strikes") else v) for k, v in out.items()}
+    return {k: (np.array(v) if k not in ("day", "exit", "strikes") else v) for k, v in out.items()}
 
 
 def metric(res: dict, kind: str) -> np.ndarray:

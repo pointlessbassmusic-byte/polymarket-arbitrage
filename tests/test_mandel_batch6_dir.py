@@ -1,4 +1,6 @@
-"""Batch-6 directional/ratio structure harnesses on synthetic series: planted effects pass, nulls do not. No archive, no network."""
+"""Batch-6 directional/ratio structure harnesses on synthetic series: planted effects pass, nulls do not, and (house rule 10)
+an effect that exists on one arbitrary grid phase does not pass while an effect aligned to the claim's expiry calendar does.
+No archive, no network."""
 
 import json
 import math
@@ -17,10 +19,10 @@ NB = 1000                               # bootstrap resamples in tests
 
 # ---------------------------------------------------------------------------------------------- synthetic data --
 
-def _days(n, start=date(1993, 1, 4)):
+def _days(n, start=date(1993, 1, 4), skip=()):
     d, out = start, []
     while len(out) < n:
-        if d.weekday() < 5:
+        if d.weekday() < 5 and d.isoformat() not in skip:
             out.append(d.isoformat())
         d += timedelta(days=1)
     return out
@@ -44,16 +46,49 @@ def _pattern(n_cycles, rets, hold=21, s0=100.0):
     return np.array(c)
 
 
-def _mkt(close, bills_pct=0.0, adj=None):
-    days = _days(len(close))
+def _bridge(n, anchors, levels, vol, seed=0):
+    """Closes whose log price is pinned to ``levels`` at the sessions ``anchors`` (sorted), with Brownian-bridge noise of
+    annual vol ``vol`` in between (flat before the first anchor and after the last)."""
+    rng = np.random.default_rng(seed); lp = np.empty(n); sd = vol / math.sqrt(252)
+    for i0, i1, l0, l1 in zip(anchors[:-1], anchors[1:], levels[:-1], levels[1:]):
+        L = i1 - i0; t = np.arange(L + 1) / L
+        w = np.concatenate([[0.0], np.cumsum(rng.normal(0.0, sd, L))])
+        lp[i0:i1 + 1] = l0 + (l1 - l0) * t + (w - t * w[-1])
+    lp[:anchors[0]] = levels[0]; lp[anchors[-1]:] = levels[-1]
+    return 100 * np.exp(lp)
+
+
+def _phase0_path(n, step, vol, hold=21, seed=0):
+    """An effect planted on ONE grid phase: the log price moves by exactly ``step`` over every hold that starts at a
+    multiple of ``hold`` sessions (grid offset 0), with large bridge noise everywhere in between."""
+    anchors = list(range(0, n, hold))
+    return _bridge(n, anchors, [step * k for k in range(len(anchors))], vol, seed)
+
+
+def _mkt(close, bills_pct=0.0, adj=None, days=None):
+    days = days or _days(len(close))
     prev = (date.fromisoformat(days[0]) - timedelta(days=3)).isoformat()
     return bd.make_market(days, close, close if adj is None else adj, {prev: bills_pct})
 
 
-def _panel(close, vol, bills_pct=0.0):
+def _grid(close, vol, bills_pct=0.0, hold=bd.MONTH):
+    """Rule 10(b): every daily entry pooled, with the hold start offsets."""
     m = _mkt(close, bills_pct)
     iv = np.full(len(close), vol)
-    return m, iv, bd.cycle_panel(m, iv, bd.MONTH, start=m.days[0])
+    return m, iv, bd.offsets_grid(m, iv, hold, start=m.days[0])
+
+
+def _dte_grid(close, vol, dte=30):
+    """Rule 10(a): SPY monthly expiries entered about ``dte`` calendar days ahead."""
+    m = _mkt(close); iv = np.full(len(close), vol)
+    ent, exp = bd.dte_cycles(m, iv, bd.monthly_expiries(m, m.days[0]), dte, m.days[0])
+    return m, iv, bd.calendar_grid(m, iv, ent, exp, "monthly expiries")
+
+
+def _offset0(m, iv, G):
+    """The pre-rule-10 construction: one fixed grid from the first day (offset 0 only)."""
+    a = [int(x) for x in G.P["a"][G.offsets[0]]]
+    return bd.calendar_grid(m, iv, a, [x + G.hold for x in a], "offset 0 only")
 
 
 # --------------------------------------------------------------------------------------------- data conventions --
@@ -64,6 +99,17 @@ def test_cont_rate_and_prior_print():
                        {"2020-01-02": 2.0, "2020-01-03": 4.0})
     assert math.isnan(m.rate[0])                                      # no print before the first day
     assert m.rate[1] == pytest.approx(bd.cont_rate(2.0)) and m.rate[2] == pytest.approx(bd.cont_rate(4.0))
+
+
+def test_bill_accrual_is_day_by_day_at_the_prior_print():
+    days = ["2020-01-02", "2020-01-03", "2020-01-06", "2020-01-07"]
+    m = bd.make_market(days, [100] * 4, [100] * 4, {"2020-01-01": 2.0, "2020-01-03": 6.0})
+    r1, r2 = bd.cont_rate(2.0), bd.cont_rate(6.0)
+    # (Jan 2, Jan 3] at the rate known on Jan 2 (2%); (Jan 3, Jan 6] at the rate known on Jan 3 (still 2%: the Jan 3 print is
+    # dated that day); (Jan 6, Jan 7] at the 6% print
+    assert m.accrual(0, 3) == pytest.approx(math.exp(r1 * 1 / 365 + r1 * 3 / 365 + r2 * 1 / 365))
+    P = bd.cycle_panel(m, np.full(4, 0.2), hold=3, start=days[0])
+    assert P["acc"][0] == pytest.approx(m.accrual(0, 3))
 
 
 def test_dividends_from_adj_and_forward():
@@ -108,25 +154,121 @@ def test_settle_and_tree_zone_match_payoff_engine():
     assert be[0] == pytest.approx(100.0 + D, abs=1e-3) and be[1] == pytest.approx(107.5 - D / 2, abs=1e-3)
 
 
+# ------------------------------------------------------------------------------------- rule 10: grids and calendars --
+
+def test_offsets_grid_pools_every_daily_entry_and_partitions_it_by_start_offset():
+    close = _gbm(_days(1000), 0.2, seed=1)
+    m, iv, G = _grid(close, 0.2)
+    assert G.pooled and G.P["n"] == 1000 - 21 and len(G.offsets) == 21 and G.block == 42
+    assert G.n_holds == 999 // 21                                      # distinct non-overlapping holds in the window
+    allpos = np.sort(np.concatenate(G.offsets))
+    assert np.array_equal(allpos, np.arange(G.P["n"]))                 # the offsets partition the pooled entries
+    for k, idx in enumerate(G.offsets):
+        a = G.P["a"][idx]
+        assert a[0] == k and np.all(np.diff(a) == 21)                  # offset k: non-overlapping grid from session k
+
+
+def test_monthly_expiries_third_friday_and_holiday_shift():
+    assert bd.third_friday(2003, 4) == date(2003, 4, 18) and bd.third_friday(2026, 6) == date(2026, 6, 19)
+    assert bd.third_friday(1993, 10) == date(1993, 10, 15)             # the 1st is a Friday: the third Friday is the 15th
+    days = _days(3000, start=date(2000, 1, 3), skip={"2003-04-18"})    # Good Friday 2003 falls on the third Friday
+    m = _mkt(np.full(len(days), 100.0), days=days)
+    ex = [m.days[i] for i in bd.monthly_expiries(m, m.days[0])]
+    assert "2003-04-17" in ex and "2003-03-21" in ex and "2003-05-16" in ex
+    assert all(date.fromisoformat(d).weekday() == 4 for d in ex if d != "2003-04-17")
+    assert len(ex) == len(set(d[:7] for d in ex))                      # one expiry per month
+    iv = np.full(len(days), 0.2)
+    ent, exp = bd.dte_cycles(m, iv, bd.monthly_expiries(m, m.days[0]), 30, m.days[0])
+    for a, b in zip(ent, exp):
+        gap = m.cal[b] - m.cal[a]
+        assert gap >= 30 and m.cal[a + 1] > m.cal[b] - 30               # the last session on or before 30 days ahead
+    ent, exp = bd.roll_cycles(m, iv, bd.monthly_expiries(m, m.days[0]))
+    assert ent[1:] == exp[:-1]                                         # expiry-to-expiry roll
+
+
+def test_rule10_digital_effect_on_one_grid_phase_does_not_pass():
+    """Regression (T-154/T-540 refutation): realised < RN only on grid offset 0. The old single-phase construction passes;
+    the pooled all-offset estimate (the primary statistic under rule 10) does not, and only offset 0 passes."""
+    close = _phase0_path(6700, 0.01, 0.50, seed=3)
+    m, iv, G = _grid(close, 0.10)
+    old = bd.eval_digital(_offset0(m, iv, G), n_boot=NB)
+    assert old["verdict"] == "supported" and old["ci"][1] < 0
+    rep = bd.eval_digital(G, n_boot=NB)
+    assert rep["verdict"] == "not_supported" and rep["ci"][1] > 0
+    s = rep["rule10"]["per_offset"]["ci"]
+    assert s["offsets"] == 21 and 1 <= s["pass"] <= 2 and f"{s['pass']} of 21 start offsets pass" in rep["reason"]
+    assert rep["n"] == G.n_holds and "rule 10(b)" in rep["reason"]
+
+
+def test_rule10_christmas_tree_effect_on_one_grid_phase_does_not_pass():
+    close = _phase0_path(6700, 0.04, 1.0, seed=4)                     # +4% over every offset-0 hold: inside the zone
+    m, iv, G = _grid(close, 0.20)
+    old = bd.eval_christmas_tree(_offset0(m, iv, G), n_boot=NB)
+    assert old["verdict"] == "supported" and old["hit_rate"] == pytest.approx(1.0)
+    rep = bd.eval_christmas_tree(G, n_boot=NB)
+    assert rep["verdict"] == "not_supported" and rep["rule10"]["per_offset"]["ci"]["pass"] <= 2
+
+
+def test_rule10_zebra_calendar_aligned_effect_passes_and_grid_phase_effect_does_not():
+    """T-154 ('monthly 30-DTE'): the ZEBRA - delta0 x SPY difference is negative for a moderate decline (S_T between about
+    0.94 S and S; it is convex and positive for large moves either way). An effect aligned to the monthly expiry calendar
+    (SPY ends exactly 1% lower over every 30-DTE cycle, large noise in between) passes on the calendar even though the
+    21-session grid fails; the same effect on the 21-session grid's offset 0 only does not pass on the calendar."""
+    n = 6700; days = _days(n)
+    m0 = _mkt(np.full(n, 100.0)); iv0 = np.full(n, 0.20)
+    ent, exp = bd.dte_cycles(m0, iv0, bd.monthly_expiries(m0, m0.days[0]), 30, m0.days[0])
+    lev = {**{e: 0.0 for e in ent}, **{x: -0.01 for x in exp}}
+    assert not set(ent) & set(exp)
+    anchors = sorted(lev)
+    close = _bridge(n, anchors, [lev[a] for a in anchors], 0.80, seed=5)
+    m, iv, C = _dte_grid(close, 0.20)
+    _, _, G = _grid(close, 0.20)
+    rep = bd.eval_zebra(C, n_boot=NB, robust=G)
+    assert C.n_holds >= 300 and rep["ci"][1] < 0 and rep["verdict"] == "supported"
+    rob = rep["rule10"]["grid_robustness"]
+    assert rob["ci"][1] > 0 and "robustness (not the claim's calendar" in rep["reason"]
+
+    close = _phase0_path(n, -0.01, 0.80, seed=6)                       # -1% over every offset-0 hold of the 21-session grid
+    m, iv, C = _dte_grid(close, 0.20)
+    _, _, G = _grid(close, 0.20)
+    assert bd.eval_zebra(_offset0(m, iv, G), n_boot=NB)["verdict"] == "supported"          # the old construction
+    rep = bd.eval_zebra(C, n_boot=NB, robust=G)
+    assert rep["verdict"] == "not_supported" and "rule 10(a)" in rep["reason"]
+    assert rep["rule10"]["grid_robustness"]["per_offset"]["pass"] <= 2
+
+
 # --------------------------------------------------------------------------------------------- T-113 jade lizard --
 
 def test_jade_lizard_planted_short_premium_edge_supported():
     days = _days(6600)
-    m, iv, P = _panel(_gbm(days, 0.08, seed=1), 0.25)
-    rep = bd.eval_jade_lizard(P, n_boot=NB)
+    m, iv, G = _grid(_gbm(days, 0.08, seed=1), 0.25)
+    rep = bd.eval_jade_lizard(G, n_boot=NB)
     assert rep["n"] >= 250 and rep["n_skipped"] == 0 and rep["ci"][0] > 0
+    assert rep["n"] == G.n_holds                                       # nothing skipped: n = distinct holds
+    assert rep["rule10"]["per_offset"]["both"]["pass"] == 21
     assert rep["verdict"] == "supported" and "MODEL-PRICED" in rep["reason"] and " — " in rep["reason"]
+    assert "median credit over entered cycles" in rep["reason"] and "chain mids at 60 days" in rep["reason"]
 
 
 def test_jade_lizard_null_not_supported_and_skips_low_credit():
     days = _days(6600)
-    m, iv, P = _panel(_gbm(days, 0.20, seed=2), 0.20)
-    rep = bd.eval_jade_lizard(P, n_boot=NB)
+    m, iv, G = _grid(_gbm(days, 0.20, seed=2), 0.20)
+    rep = bd.eval_jade_lizard(G, n_boot=NB)
     assert rep["verdict"] != "supported"
-    m, iv, P = _panel(_gbm(days, 0.05, seed=2), 0.05)             # at 5% IV the credit is below 1% of S: every month skipped
-    res = bd.jade_lizard(P)
+    m, iv, G = _grid(_gbm(days, 0.05, seed=2), 0.05)             # at 5% IV the credit is below 1% of S: every month skipped
+    res = bd.jade_lizard(G.P)
     assert res["n_skipped"] == res["n_total"] and res["x"].size == 0
-    assert bd.eval_jade_lizard(P, n_boot=NB)["verdict"] == "inconclusive"
+    rep = bd.eval_jade_lizard(G, n_boot=NB)
+    assert rep["verdict"] == "inconclusive" and rep["n"] == 0
+
+
+def test_jade_lizard_n_counts_entered_months_in_claim_units():
+    days = _days(6600); close = _gbm(days, 0.10, seed=21)
+    m = _mkt(close); iv = np.where(np.arange(len(days)) % 42 < 21, 0.25, 0.05)       # alternate high/low IV months
+    G = bd.offsets_grid(m, iv, bd.MONTH, start=m.days[0])
+    rep = bd.eval_jade_lizard(G, n_boot=NB)
+    frac = 1 - rep["n_skipped"] / rep["n_total_entries"]
+    assert 0.3 < frac < 0.7 and rep["n"] == round(G.n_holds * frac)
 
 
 # -------------------------------------------------------------------------------------------- T-133 1x2 ratio --
@@ -135,37 +277,39 @@ def test_ratio_zero_cost_strike():
     K2 = bd.zero_cost_k2(100.0, 100.0, 30 / 365, 0.0, 0.2)
     assert 2 * float(bs.price(100.0, K2, 30 / 365, 0.0, 0.2, "call")) == pytest.approx(float(bs.price(100.0, 100.0, 30 / 365, 0.0, 0.2, "call")), rel=1e-8)
     assert 1.02 < K2 / 100 < 1.04
+    K2v = bd.zero_cost_k2(np.array([100.0, 100.0]), np.array([100.0, 100.0]), 30 / 365, 0.0, np.array([0.2, 0.4]))
+    assert K2v[0] == pytest.approx(K2) and K2v[1] > K2v[0]
 
 
 def test_ratio_1x2_planted_mean_and_tail_supported():
     rets = [0.025] * 22 + [-0.05] + [0.20] * 2              # gains of +2.5% (below K2), 8% of months far above 2 K2 - K1
     close = _pattern(325, rets)
-    m, iv, P = _panel(close, 0.20)
-    rep = bd.eval_ratio_1x2(P, n_boot=NB)
-    assert rep["tail"]["freq"] == pytest.approx(0.08, abs=0.005) and rep["tail"]["ci"][0] > 0.03
-    assert rep["ci"][0] > 0 and rep["verdict"] == "supported"
+    m, iv, G = _grid(close, 0.20)
+    rep = bd.eval_ratio_1x2(G, n_boot=NB)
+    assert rep["tail"]["ci"][0] > 0.03 and rep["ci"][0] > 0 and rep["verdict"] == "supported"
+    assert rep["rule10"]["per_offset"]["both"]["pass"] >= 10              # the pattern is cut at offset 0, so some offsets miss it
 
 
 def test_ratio_1x2_null_not_supported():
     days = _days(6600)
-    m, iv, P = _panel(_gbm(days, 0.20, seed=3), 0.20)
-    assert bd.eval_ratio_1x2(P, n_boot=NB)["verdict"] == "not_supported"
+    m, iv, G = _grid(_gbm(days, 0.20, seed=3), 0.20)
+    assert bd.eval_ratio_1x2(G, n_boot=NB)["verdict"] == "not_supported"
 
 
 # ------------------------------------------------------------------------------------- T-135 Christmas tree --
 
 def test_christmas_tree_planted_zone_supported():
     close = _pattern(320, [0.04, 0.04, 0.04, 0.04, -0.05])
-    m, iv, P = _panel(close, 0.20)
-    rep = bd.eval_christmas_tree(P, n_boot=NB)
-    assert rep["hit_rate"] == pytest.approx(0.8, abs=0.01) and rep["rn_mean"] < 0.45
-    assert rep["verdict"] == "supported"
+    m, iv, G = _grid(close, 0.20)
+    rep = bd.eval_christmas_tree(G, n_boot=NB)
+    assert rep["hit_rate"] > 0.55 and rep["rn_mean"] < 0.45
+    assert rep["verdict"] == "supported" and "mechanism (report only)" in rep["reason"]
 
 
 def test_christmas_tree_null_not_supported():
     days = _days(6600)
-    m, iv, P = _panel(_gbm(days, 0.20, seed=4), 0.20)
-    rep = bd.eval_christmas_tree(P, n_boot=NB)
+    m, iv, G = _grid(_gbm(days, 0.20, seed=4), 0.20)
+    rep = bd.eval_christmas_tree(G, n_boot=NB)
     assert abs(rep["diff"]) < 0.05 and rep["verdict"] != "supported"
 
 
@@ -210,6 +354,7 @@ def test_stock_repair_counts_first_crossings_not_refires():
     alt = rep["rearm_level_trigger_variant"]
     assert alt["n"] == len(level) and alt["refires"] == alt["n"] - 20 and alt["spells_with_refires"] == 20
     assert alt["verdict"] == "supported"                              # reported only: the re-fires would have decided it
+    assert rep["rule10"]["kind"] == "not applicable" and "rule 10(c)" in rep["reason"]
 
 
 def _repair_path(n_eps=36, seed=0):
@@ -258,12 +403,12 @@ def _skew_setup(planted, seed=6, n_cycles=330):
     for r in rets:
         a = close[-1]; b = a * (1 + r); close.extend(list(a + (b - a) * np.arange(1, 22) / 21))
     close = np.array(close)
-    m, iv, P = _panel(close, 0.18)
+    m, iv, G = _grid(close, 0.18)
     skew = {}
-    for k, a in enumerate(P["a"]):
-        for i in range(a, a + 21):
+    for k in range(n_cycles):
+        for i in range(21 * k, 21 * k + 21):
             skew[m.days[i]] = levels[lab[k]] + rng.normal(0, 0.5)
-    return P, skew
+    return G, skew
 
 
 def test_group_diff_ci_matches_difference():
@@ -274,15 +419,15 @@ def test_group_diff_ci_matches_difference():
 
 
 def test_risk_reversal_skew_planted_supported():
-    P, skew = _skew_setup(True)
-    rep = bd.eval_risk_reversal(P, skew, n_boot=NB)
+    G, skew = _skew_setup(True)
+    rep = bd.eval_risk_reversal(G, skew, n_boot=NB)
     assert rep["groups"]["full"]["ci"][0] > 0 and rep["groups"]["expanding"]["ci"][0] > 0
-    assert rep["verdict"] == "supported"
+    assert rep["verdict"] == "supported" and rep["n"] == G.n_holds
 
 
 def test_risk_reversal_skew_null_not_supported():
-    P, skew = _skew_setup(False, seed=7)
-    assert bd.eval_risk_reversal(P, skew, n_boot=NB)["verdict"] != "supported"
+    G, skew = _skew_setup(False, seed=7)
+    assert bd.eval_risk_reversal(G, skew, n_boot=NB)["verdict"] != "supported"
 
 
 # -------------------------------------------------------------------------------------- T-139 / T-140 funded calls --
@@ -295,6 +440,10 @@ def test_funded_call_path_identity():
     bills = (S0 - C0) * math.exp(m.rate[0] * (m.cal[21] - m.cal[0]) / 365)
     assert p["R"][0] == pytest.approx((max(close[21] - K, 0) + bills) / S0 - 1, rel=1e-9)
     assert np.allclose(np.cumprod(1 + p["ret"]), p["V"][1:] / p["V"][0]) and p["idx"].size == 64
+    P = bd.cycle_panel(m, iv, 21, entries=[0, 21, 42])                 # the vectorised hold-to-expiry returns match
+    assert np.allclose(bd.funded_call_cycles(P, 0.9)["R"], p["R"], rtol=1e-10)
+    q = bd.funded_call_path(m, iv, [0, 23], None, 0.9, expiries=[23, 50])               # explicit (calendar) expiries
+    assert q["idx"][-1] == 50 and q["R"].size == 2
 
 
 def _crash_path(n, seed=9):
@@ -311,6 +460,8 @@ def test_leaps_planted_supported():
     rep = bd.eval_leaps(m, iv, n_boot=NB)
     assert rep["n"] >= 30 and rep["ci"][1] < 0 and rep["mdd_ratio_mean"] < 1
     assert rep["verdict"] == "supported"
+    r10 = rep["rule10"]
+    assert r10["start_offsets"] == 252 and r10["bootstrap_block"] == 504 and rep["n"] == r10["n_holds"] == 8199 // 252
 
 
 def test_leaps_null_not_supported():
@@ -324,7 +475,8 @@ def test_deep_itm_planted_supported():
     m = _mkt(close); iv = np.full(close.size, 0.15)
     rep = bd.eval_deep_itm(m, iv, n_boot=NB)
     assert rep["n"] >= 300 and rep["corr_ci"][0] > 0.98 and rep["shortfall_ci"][1] < 0.01
-    assert rep["verdict"] == "supported"
+    assert rep["verdict"] == "supported" and rep["rule10"]["kind"] == "calendar"
+    assert "rule 10(a)" in rep["reason"] and rep["rule10"]["grid_robustness"]["corr"]["offsets"] == 21
 
 
 def test_deep_itm_high_vol_not_supported():
@@ -338,33 +490,44 @@ def test_deep_itm_high_vol_not_supported():
 
 def test_zebra_planted_supported():
     days = _days(6600)
-    m, iv, P = _panel(_gbm(days, 0.10, seed=13), 0.30)
-    res = bd.zebra(P)
-    assert np.allclose(np.median(res["delta0"]), 2 * 0.70 - np.median(np.asarray(bs.greeks(P["F"], P["S"], P["T"], P["r"], P["sig"], "call")["delta"])), atol=1e-6)
-    rep = bd.eval_zebra(P, n_boot=NB)
-    assert rep["ci"][1] < 0 and rep["verdict"] == "supported"
+    m, iv, C = _dte_grid(_gbm(days, 0.10, seed=13), 0.30)
+    res = bd.zebra(C.P)
+    assert np.allclose(np.median(res["delta0"]), 2 * 0.70 - np.median(np.asarray(bs.greeks(C.P["F"], C.P["S"], C.P["T"], C.P["r"], C.P["sig"], "call")["delta"])), atol=1e-6)
+    rep = bd.eval_zebra(C, n_boot=NB)
+    assert rep["ci"][1] < 0 and rep["verdict"] == "supported" and rep["n"] >= 300
 
 
 def test_zebra_null_not_supported():
     days = _days(6600)
-    m, iv, P = _panel(_gbm(days, 0.20, seed=14), 0.20)
-    assert bd.eval_zebra(P, n_boot=NB)["verdict"] != "supported"
+    m, iv, C = _dte_grid(_gbm(days, 0.20, seed=14), 0.20)
+    assert bd.eval_zebra(C, n_boot=NB)["verdict"] != "supported"
 
 
 # --------------------------------------------------------------------------------------------- T-516 digital --
 
 def test_digital_planted_supported():
     days = _days(6600)
-    m, iv, P = _panel(_gbm(days, 0.10, seed=15), 0.25)
-    rep = bd.eval_digital(P, n_boot=NB)
+    m, iv, G = _grid(_gbm(days, 0.10, seed=15), 0.25)
+    rep = bd.eval_digital(G, n_boot=NB)
     assert rep["realised"] < rep["rn_mean"] and rep["ci"][1] < 0 and rep["verdict"] == "supported"
+    assert rep["breakeven_iv_scale"] is not None and rep["breakeven_iv_scale"] < 0.81
+    assert all(o["ci"][1] < 0 for o in rep["iv_scale_sensitivity"].values())
 
 
 def test_digital_null_not_supported():
     days = _days(6600)
-    m, iv, P = _panel(_gbm(days, 0.20, seed=16), 0.20)
-    rep = bd.eval_digital(P, n_boot=NB)
+    m, iv, G = _grid(_gbm(days, 0.20, seed=16), 0.20)
+    rep = bd.eval_digital(G, n_boot=NB)
     assert abs(rep["diff"]) < 0.05 and rep["verdict"] != "supported"
+
+
+def test_expanding_climatology_is_point_in_time():
+    P = {"a": np.array([0, 1, 2, 3, 4, 5]), "b": np.array([2, 3, 4, 5, 6, 7])}
+    y = np.array([1.0, 0.0, 1.0, 1.0, 0.0, 0.0])
+    c = bd.expanding_climatology(P, y, 1)
+    # entry 2 sees only cycle 0 (settled at 2); entry 3 sees cycles 0-1; entry 5 sees cycles 0-3; entries 0-1 see none
+    assert np.isnan(c[0]) and np.isnan(c[1]) and c[2] == 1.0 and c[3] == 0.5 and c[5] == pytest.approx(0.75)
+    assert np.isnan(bd.expanding_climatology(P, y, 3)[3])
 
 
 # ------------------------------------------------------------------------------------------ harness plumbing --
@@ -405,9 +568,12 @@ def test_harnesses_run_on_fake_archive_and_are_json_safe():
         json.dumps(stat, allow_nan=False)
         assert verdict in ("supported", "not_supported", "inconclusive") and isinstance(n, int)
         assert "MODEL-PRICED" in reason and " — " in reason
+        assert "rule 10" in reason and "rule10" in stat
     stat, n, verdict, reason = bd.b6_dir_digital_put(fa)
     assert verdict == "supported"                                       # planted: realised 10% vs IV 25%
     assert bd._prices(fa, "SPY")[0][-1] == days[-2]                     # unavailable last bar dropped
+    stat, n, verdict, reason = bd.b6_dir_zebra(fa)
+    assert stat["rule10"]["kind"] == "calendar" and "monthly expiries" in reason
 
 
 def test_missing_bundles_inconclusive():

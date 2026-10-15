@@ -38,6 +38,29 @@ Conventions (house rules)
     entries use an ASSUMED constant q = 3.0% (PRE_YIELD, stated ex ante), never a value computed from later dividends.
   * MODEL-PRICED results price legs at the IV proxy the claim names and say so in the reason; the archive has only two
     captured chain days, so no traded version can be tested here.
+  * ^GSPC claims (T-227, T-228, T-229) run on the index's OWN trading calendar: a "21-trading-day" window is 21 ^GSPC
+    sessions, and SKEW and VIX enter as the last print at or before each session (point in time; a print older than 15
+    calendar days is not used). The S&P 500 index itself is used for the whole sample, as the claims word it; T-228
+    reports the SPY splice (SPY closes from 1993-01-29) as a sensitivity.
+
+Entry calendars (house rule 10: a verdict must not depend on an arbitrary grid phase)
+  (a) A claim that names a calendar is tested on it. T-229's "monthly 30-DTE" SPX spread uses SPX's standard monthly
+      expiry (the third Friday, or the prior session when it is a holiday), bought at the close of the session nearest 30
+      calendar days before it (ties to the earlier session), or at the previous expiry's close when that comes later
+      (holds never overlap). T-239's "rolling 1-month" VIX calls follow the VIX monthly expiry (the Wednesday 30 days
+      before the next month's third Friday; holiday rules as CBOE's), each bought at one expiry's close and held to the
+      next; its SPY-put control rolls on the SPX monthly expiries the same way. T-240's "non-overlapping months" are
+      calendar months, each entered at its first session (its secondary VIX call ratio rolls on the VIX expiries).
+  (b) A plain non-overlapping k-session grid (T-228 and T-538: 21 sessions; T-249: 63) has k equally valid start
+      offsets. The claimed statistic is computed on EVERY offset and on the POOLED overlapping daily entries of all
+      offsets, whose studentized circular block bootstrap uses blocks of max(2, the module's cycle block) holds (126
+      sessions here, >= 2 x hold). The pooled estimate is the primary statistic of every criterion; the reason reports
+      the per-offset range of the statistic and of its bound and how many offsets pass. n stays in the claim's units:
+      the number of distinct holds the pooled entries span (the cycle count of the densest non-overlapping grid).
+      T-159's MODEL-PRICED strangle secondary and T-239's grid sensitivity are reported the same way.
+  (c) Daily series and event entries have no grid phase: T-159's and T-227's daily-start windows (the trials' own
+      design; their 42-session-block sensitivities are reported), T-237's z-score events (data-determined dates), and
+      T-511's weekly statistics are unaffected.
 
 Statistics
   * Intervals are circular block bootstraps (2000 resamples, seed 0) of the statistic the claim names. Means use the
@@ -60,7 +83,7 @@ from __future__ import annotations
 
 import math
 from bisect import bisect_left, bisect_right
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Callable, Optional, Sequence
 
 import numpy as np
@@ -101,6 +124,23 @@ PRE_YIELD = 0.03        # T-229: assumed S&P 500 dividend yield (stated ex ante)
 
 # =================================================================================================== statistics ==
 
+def _lrv(x, bw: int) -> np.ndarray:
+    """Row-wise Bartlett long-run variance, identical to backtest_eval._hac_var (bandwidth ``bw``). Long bandwidths (the
+    pooled overlapping series use 126 sessions) take the autocovariances from an FFT: the same sums at O(n log n)."""
+    x = np.atleast_2d(np.asarray(x, dtype=float))
+    bw = max(1, int(bw))
+    if bw <= 24:
+        return _hac_var(x, bw)
+    n = x.shape[1]
+    xc = x - x.mean(axis=1, keepdims=True)
+    m = 1 << int(math.ceil(math.log2(2 * n)))
+    f = np.fft.rfft(xc, m, axis=1)
+    ac = np.fft.irfft(f * np.conj(f), m, axis=1)[:, :min(bw, n)]
+    k = np.arange(ac.shape[1])
+    w = np.where(k == 0, 1.0, 2.0 * (1.0 - k / bw))
+    return np.maximum((ac * w).sum(axis=1) / n, 1e-300)
+
+
 def _boot_idx(rng, n: int, block: int, k: int) -> np.ndarray:
     nb = math.ceil(n / block)
     starts = rng.integers(0, n, size=(k, nb))
@@ -128,7 +168,7 @@ def stud_mean(x, block: int, n_boot: int = N_BOOT, seed: int = 0) -> Optional[di
         return None
     b = _blk(block, n)
     m = float(x.mean())
-    se = math.sqrt(float(_hac_var(x[None, :], b)[0]) / n)
+    se = math.sqrt(float(_lrv(x[None, :], b)[0]) / n)
     out = {"est": m, "se": se, "t": None, "n": int(n), "block": b}
     if not se > 1e-14:
         out["se"] = 0.0
@@ -137,7 +177,7 @@ def stud_mean(x, block: int, n_boot: int = N_BOOT, seed: int = 0) -> Optional[di
     ts = []
     for k in _chunks(n_boot, n):
         xb = x[_boot_idx(rng, n, b, k)]
-        ts.append((xb.mean(axis=1) - m) / np.sqrt(_hac_var(xb, b) / n))
+        ts.append((xb.mean(axis=1) - m) / np.sqrt(_lrv(xb, b) / n))
     out["t"] = np.concatenate(ts)
     return out
 
@@ -160,7 +200,7 @@ def stud_group(x, a, b, block: int, n_boot: int = N_BOOT, seed: int = 0, min_cou
         ma = (xb * ab).sum(axis=1) / na
         mb = (xb * bb).sum(axis=1) / nb
         psi = n * (ab * (xb - ma[:, None]) / na[:, None] - bb * (xb - mb[:, None]) / nb[:, None])
-        return ma - mb, np.sqrt(_hac_var(psi, bl) / n), (ca > 0) & (cb > 0), ma, mb
+        return ma - mb, np.sqrt(_lrv(psi, bl) / n), (ca > 0) & (cb > 0), ma, mb
 
     d0, se0, _, ma0, mb0 = stat(x[None, :], a[None, :], b[None, :])
     out = {"est": float(d0[0]), "se": float(se0[0]), "t": None, "n": int(n), "block": bl, "n_a": int(a.sum()),

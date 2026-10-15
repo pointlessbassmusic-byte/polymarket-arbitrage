@@ -14,14 +14,20 @@ Model-free tests on the free histories:
 Model-priced overlay backtests (``overlay_backtest``) price monthly SPY options with Black-Scholes using
 VIX as a flat implied volatility and the 3-month bill as the rate. That is a logic test, not a market
 test: a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results
-are an upper bound. Every result carries ``model_priced: True``.
+are an upper bound. Every result carries ``model_priced: True``. The claims (T-54..T-57) name monthly
+options, so the cycles are the standard monthly expiries (harness rule 10), not a 21-session grid from
+whichever day the data happen to start on.
+
+Rule 10 does not touch the other harnesses here: the variance premium, SKEW tail and term-structure tests
+use every day (overlapping windows, blocks of at least twice the window or a block-shift null), and the
+implied-move test pools every daily capture, so none of them rests on one phase of a cycle grid.
 """
 
 from __future__ import annotations
 
 import bisect
 import math
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional
 
 import numpy as np
@@ -171,11 +177,40 @@ def term_structure_reversion(vix_rows: Iterable[dict], vix3m_rows: Iterable[dict
 
 # ------------------------------------------------------------- model-priced overlays --
 
+def _third_friday(y: int, m: int) -> str:
+    d = date(y, m, 1)
+    d += timedelta(days=(4 - d.weekday()) % 7)
+    return (d + timedelta(days=14)).isoformat()
+
+
+def monthly_expiry_sessions(days: list[str]) -> list[int]:
+    """Indices into the sorted trading days of the standard monthly option expiries: the third Friday of each month, or the
+    prior session when it is not a trading day (a Good Friday, as in 2008 and 2019; Juneteenth 2026). Only months whose third Friday
+    lies inside the data are listed, so the last expiry is one that has been observed."""
+    out: list[int] = []
+    if not days:
+        return out
+    for y in range(int(days[0][:4]), int(days[-1][:4]) + 1):
+        for m in range(1, 13):
+            tf = _third_friday(y, m)
+            if days[0] <= tf <= days[-1]:
+                j = bisect.bisect_right(days, tf) - 1
+                if not out or j > out[-1]:
+                    out.append(j)
+    return out
+
+
 def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_rows: Optional[Iterable[dict]], strategy: str, symbol: str = "SPY",
-                     hold_days: int = 21, call_delta: float = 0.30, put_delta: float = -0.30, q: float = 0.0, iv_scale: float = 1.0) -> dict:
-    """Monthly (hold_days) non-overlapping cycles. Options priced by Black-Scholes at entry with VIX/100 as IV and
+                     hold_days: int = 21, call_delta: float = 0.30, put_delta: float = -0.30, q: float = 0.0, iv_scale: float = 1.0,
+                     calendar: str = "monthly_expiry", offset: int = 0) -> dict:
+    """Monthly non-overlapping cycles. Options priced by Black-Scholes at entry with VIX/100 as IV and
     the bill rate; settled at intrinsic value at exit. Returns per-cycle simple returns on the position's notional.
     strategies: covered_call, cash_secured_put, collar, short_straddle, long_straddle, buy_and_hold.
+
+    Cycles (harness rule 10): the claims name monthly options, so ``calendar='monthly_expiry'`` (the default) writes each
+    option at one standard monthly expiry's close and settles it at the next (19-25 sessions, about the 21-session month the
+    trials state; T is the cycle's own session count / 252). ``calendar='grid'`` is a fixed grid of ``hold_days`` sessions
+    starting at session ``offset``: one of ``hold_days`` equally valid phases, a diagnostic, never a verdict basis on its own.
 
     Options are priced on the price-only close, but every stock leg (buy-and-hold, covered call, collar) also earns the
     dividends paid over the cycle, adjclose[t1]/adjclose[t0] - close[t1]/close[t0] (zero when the rows carry no adjclose),
@@ -190,11 +225,24 @@ def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_
     A = np.array([adj.get(d, np.nan) for d in days])
     rate = np.array([rt.get(d, np.nan) for d in days]) / 100.0
     rate = np.where(np.isnan(rate), np.nanmean(rate) if np.isfinite(np.nanmean(rate)) else 0.0, rate)
-    T = hold_days / TRADING_DAYS
+    if calendar == "monthly_expiry":
+        ex = monthly_expiry_sessions(days)
+        cycles = list(zip(ex[:-1], ex[1:]))
+        ppy = 12.0
+        cal = "monthly expiry: written at one third-Friday expiry close (prior session on a holiday), settled at the next"
+    elif calendar == "grid":
+        if not 0 <= offset < hold_days:
+            raise ValueError(f"offset {offset} outside the {hold_days} grid phases")
+        cycles = [(i, i + hold_days) for i in range(offset, len(S) - hold_days, hold_days)]
+        ppy = TRADING_DAYS / hold_days
+        cal = f"grid: every {hold_days} sessions from session {offset} (one of {hold_days} phases; diagnostic only, rule 10)"
+    else:
+        raise ValueError(calendar)
     rets, bh, bill = [], [], []
-    for i in range(0, len(S) - hold_days, hold_days):
-        s0, s1, sig, r = S[i], S[i + hold_days], max(iv[i], 0.02), rate[i]
-        a0, a1 = A[i], A[i + hold_days]
+    for i, i1 in cycles:
+        T = (i1 - i) / TRADING_DAYS
+        s0, s1, sig, r = S[i], S[i1], max(iv[i], 0.02), rate[i]
+        a0, a1 = A[i], A[i1]
         div = float(a1 / a0 - s1 / s0) if (np.isfinite(a0) and np.isfinite(a1) and a0 > 0) else 0.0   # dividend return over the cycle
         dcash = s0 * div                                                                               # per share held
         if strategy == "buy_and_hold":
@@ -219,10 +267,12 @@ def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_
         rets.append(pnl / notional); bh.append((s1 - s0) / s0 + div); bill.append(math.exp(r * T) - 1)
     rets, bh, bill = np.array(rets), np.array(bh), np.array(bill)
     funded = strategy not in ("short_straddle", "long_straddle")
-    ppy = TRADING_DAYS / hold_days
     def dd(x):
         c = np.cumprod(1 + x); peak = np.maximum.accumulate(c); return float((c / peak - 1).min())
-    return {"strategy": strategy, "symbol": symbol, "model_priced": True, "iv_scale": iv_scale, "n_cycles": int(len(rets)), "first_day": days[0], "last_day": days[min(len(days) - 1, (len(rets)) * hold_days)],
+    lens = [i1 - i for i, i1 in cycles]
+    return {"strategy": strategy, "symbol": symbol, "model_priced": True, "iv_scale": iv_scale, "n_cycles": int(len(rets)),
+            "first_day": days[cycles[0][0]] if cycles else (days[0] if days else None), "last_day": days[cycles[-1][1]] if cycles else (days[-1] if days else None),
+            "calendar": cal, "cycle_sessions": [int(min(lens)), int(max(lens))] if lens else None,
             "mean_cycle_return": float(rets.mean()), "sharpe": float(sharpe_ratio(rets - bill if funded else rets, ppy)), "cagr": float(np.prod(1 + rets) ** (ppy / max(len(rets), 1)) - 1), "max_drawdown": dd(rets),
             "benchmark_sharpe": float(sharpe_ratio(bh - bill, ppy)), "benchmark_cagr": float(np.prod(1 + bh) ** (ppy / max(len(bh), 1)) - 1), "benchmark_max_drawdown": dd(bh),
             "sharpe_basis": ("excess of the per-cycle 3m bill" if funded else "raw (unfunded position: already an excess return)") + "; benchmark excess of the bill",

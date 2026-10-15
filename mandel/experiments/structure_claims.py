@@ -3,19 +3,27 @@ Library structure claims evaluated with the model-priced engine (mandel/experime
 Each entry restates the claim's pass rule in code; ``_verdict`` from underlying2 applies the shared rule (an implemented criterion
 failing -> not_supported; a criterion not implemented caps the verdict at inconclusive). Verdicts are for the MODEL-PRICED proxy the
 claim itself names, with the smile calibrated on the captured quote days stated in every reason.
-CIs are 95% circular block bootstraps (block 6 cycles): studentized (bootstrap-t, Bartlett HAC s.e.) for the claims whose
+Entries (house rule 10, no arbitrary grid phase): the claims that roll a 1-month option monthly ('rolled monthly', 'monthly
+cycles': CALENDAR) run on the standard monthly expiry calendar (enter at one monthly expiry, the third Friday or the prior
+session on a holiday, settle at the next). The others name only a hold of h trading days (21, or 31 for the 45-DTE condor),
+whose non-overlapping grid has h equally valid start days: every criterion is decided on the pooled all-start series
+(an entry on every day, block >= 2h days) and the reason reports, per criterion, the range of the h per-start means and how
+many of the h starts pass on their own (block 6 cycles).
+CIs are 95% circular block bootstraps: studentized (bootstrap-t, Bartlett HAC s.e., bandwidth = block) for the claims whose
 trial.statistic names a studentized CI (STUDENTIZED), percentile otherwise. n_cycles is the shortest full-sample series a
-criterion actually tests (in the claim's own cycles); below trial.min_n (MIN_N) a pass cannot confirm and only a decisive
-failure (CI wholly on the wrong side of zero) can decide.
+criterion actually tests, in the claim's own non-overlapping cycles (a pooled series of m daily entries counts ceil(m / h),
+its first-start grid); below trial.min_n (MIN_N) a pass cannot confirm and only a decisive failure (CI wholly on the wrong
+side of zero) can decide.
 """
 
 from __future__ import annotations
 
+import copy
 import math
 
 import numpy as np
 
-from mandel.experiments.structures import Q, Smile, metric, run_structure
+from mandel.experiments.structures import Q, Smile, metric, monthly_cycles, run_structure
 from mandel.experiments.underlying2 import _mean_ci, _sharpe_diff_lower, _verdict
 from mandel.validation.backtest_eval import _hac_var
 
@@ -27,6 +35,11 @@ STUDENTIZED = {"T-100", "T-102", "T-104", "T-106", "T-109", "T-115", "T-124", "T
 MIN_N = {"T-100": 390, "T-102": 390, "T-104": 390, "T-105": 390, "T-106": 390, "T-107": 390, "T-109": 260, "T-110": 260,
          "T-114": 390, "T-115": 390, "T-116": 390, "T-124": 390, "T-125": 300, "T-126": 300, "T-127": 300, "T-129": 300,
          "T-130": 300, "T-131": 300, "T-132": 300, "T-134": 300, "T-517": 300}
+# Claims that name an entry/expiry calendar: a 1-month option 'rolled monthly' or run in 'monthly cycles' is the standard
+# monthly option (house rule 10). T-125/T-126 name 'non-overlapping 21-trading-day cycles' instead (T-126: 'same engine').
+CALENDAR = {"T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"}
+# Hold in trading days of the claims that name no calendar (their grid has this many start days).
+HOLD = {"T-109": 31, "T-110": 31}
 
 
 def _flip(legs):
@@ -34,22 +47,30 @@ def _flip(legs):
 
 
 class Ctx:
-    def __init__(self, days, closes, vix, rates, smile_rows):
+    """entries: None = the first-day non-overlapping grid (direct use only; evaluate never decides on it), "daily" = an entry
+    on every valid day (all grid starts pooled), "monthly" = the standard monthly expiry calendar. ``aligned`` returns a view
+    with other entries that shares the data and the cache."""
+    def __init__(self, days, closes, vix, rates, smile_rows, entries=None):
         self.days, self.closes, self.vix, self.rates = days, closes, vix, rates
-        self.smile = Smile(smile_rows); self._cache = {}
+        self.smile = Smile(smile_rows); self._cache = {}; self.entries = entries
+
+    def aligned(self, entries):
+        v = copy.copy(self); v.entries = entries
+        return v
 
     def run(self, legs, mode, dte=30, hold=21, q=Q):
-        key = (tuple(legs), mode, dte, hold, q)
+        key = (tuple(legs), mode, dte, hold, q) + ((self.entries,) if self.entries else ())
         if key not in self._cache:
-            self._cache[key] = run_structure(self.days, self.closes, self.vix, self.rates, legs, dte, hold, mode, self.smile, q=q)
+            kw = {"step": 1} if self.entries == "daily" else {"schedule": monthly_cycles(self.days)} if self.entries == "monthly" else {}
+            self._cache[key] = run_structure(self.days, self.closes, self.vix, self.rates, legs, dte, hold, mode, self.smile, q=q, **kw)
         return self._cache[key]
 
     def m(self, legs, mode, kind, dte=30, hold=21, q=Q):
         return metric(self.run(legs, mode, dte, hold, q), kind)
 
 
-def _ci(x):
-    return _mean_ci(x, 6)
+def _ci(x, block=6):
+    return _mean_ci(x, block)
 
 
 def _ci_t(x, block=6, n_boot=2000, seed=0):
@@ -72,16 +93,31 @@ def _fmt(name, x, lo, hi):
 
 
 def evaluate(cid: str, c: Ctx) -> dict:
+    """A context with ``aligned`` (Ctx) is switched to the claim's entries; any other context supplies its own
+    non-overlapping cycle series, used as given."""
     SM = ("smile", 1.0)
     ci = _ci_t if cid in STUDENTIZED else _ci
+    if hasattr(c, "aligned"):
+        c = c.aligned("monthly" if cid in CALENDAR else "daily")
+    entries = getattr(c, "entries", None)
+    h = HOLD.get(cid, 21) if entries == "daily" else 1          # grid starts pooled in each series (1: non-overlapping cycles)
+    block = 2 * h if h > 1 else 6                                # days for a pooled series (>= 2 x the hold), else cycles
+    pci = lambda x: ci(x, block)                                 # the primary CI: pooled over every start when h > 1
     crit, parts, sizes, decisive = [], [], [], {}
     def _ci_crit(name, x, label, ok_fn, wrong_side_fn, full):
-        """A CI criterion; full=False marks a conditional subsample (not counted against trial.min_n)."""
-        lo, hi = ci(x); finite = bool(np.isfinite(lo) and np.isfinite(hi))
+        """A CI criterion, decided on the pooled series; full=False marks a conditional subsample (not counted against
+        trial.min_n; only on the calendar claims, never on a pooled grid series)."""
+        x = np.asarray(x, float); lo, hi = pci(x); finite = bool(np.isfinite(lo) and np.isfinite(hi))
         decisive[len(crit)] = finite and wrong_side_fn(lo, hi)                 # CI wholly on the wrong side of zero
-        crit.append((f"{name}: {label}", ok_fn(lo, hi) if finite else None)); parts.append(_fmt(name, x, lo, hi))
+        crit.append((f"{name}: {label}", ok_fn(lo, hi) if finite else None)); part = _fmt(name, x, lo, hi)
+        if h > 1:                                                              # each start's own non-overlapping grid
+            starts = [x[k::h] for k in range(h)]; cis = [ci(s) for s in starts]
+            npass = sum(bool(np.isfinite(a) and np.isfinite(b) and ok_fn(a, b)) for a, b in cis)
+            mus = [float(s.mean()) * 100 for s in starts]
+            part += f" [pooled over {h} starts; per-start means {min(mus):+.1f}% to {max(mus):+.1f}%, {npass} of {h} starts pass]"
+        parts.append(part)
         if full:
-            sizes.append(int(np.asarray(x).size))
+            sizes.append(-(-x.size // h))                                      # in the claim's non-overlapping cycles
     def upper_lt0(name, x, full=True):
         _ci_crit(name, x, "upper CI < 0", lambda lo, hi: hi < 0, lambda lo, hi: lo > 0, full)
     def lower_gt0(name, x, full=True):
@@ -131,7 +167,7 @@ def evaluate(cid: str, c: Ctx) -> dict:
             if mult == 1.5:
                 lower_gt0("wing prices x1.5", x)
             else:
-                lo, hi = ci(x); parts.append(_fmt("wing prices x2.0 (sensitivity, not in the pass rule)", x, lo, hi))
+                lo, hi = pci(x); parts.append(_fmt("wing prices x2.0 (sensitivity, not in the pass rule)", x, lo, hi))
     elif cid == "T-125":
         for q in (0.0, 0.018):                          # procedure: run q = 0 and q = 1.8%; the pass rule must hold under each
             for s in (1.0, 0.9):
@@ -181,9 +217,14 @@ def evaluate(cid: str, c: Ctx) -> dict:
     crit.append((f"n >= trial min_n ({n} of {mn} cycles)", True if n >= mn else None))
     v, why = _verdict(crit)
     kind = "studentized" if cid in STUDENTIZED else "percentile"
-    return {"n_cycles": n, "min_n": mn, "ci": f"{kind} block bootstrap, block 6", "smile_quote_days": c.smile.n_days, "verdict": v,
+    unit = f"{block} days" if h > 1 else f"{block} cycles"
+    ent = (f"no entry calendar named: all {h} starts of the {h}-day grid pooled (daily entries), per-start range reported" if h > 1
+           else "standard monthly expiry calendar (third Friday or the prior session; entered at the previous monthly expiry)"
+           if entries == "monthly" else "cycles as supplied")
+    return {"n_cycles": n, "min_n": mn, "ci": f"{kind} block bootstrap, block {unit}", "entries": ent, "grid_starts": h,
+            "smile_quote_days": c.smile.n_days, "verdict": v,
             "reason": "MODEL-PRICED proxy (smile from " + f"{c.smile.n_days} quote days, held fixed in shape; {n} cycles, trial min_n {mn}; "
-                      f"{kind} block-bootstrap CIs): " + "; ".join(parts) + f" — {why}"}
+                      f"{ent}; {kind} block-bootstrap CIs, block {unit}): " + "; ".join(parts) + f" — {why}"}
 
 
 CLAIMS = ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126",

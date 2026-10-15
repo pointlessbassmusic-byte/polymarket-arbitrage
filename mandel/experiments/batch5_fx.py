@@ -55,14 +55,19 @@ implemented -> at best inconclusive; supported only when every criterion is impl
 House rule 5 (``_rule5``). Below the trial's min_n (T-368/T-431: 150 test months; T-478: 300 holding months) the unmet
 'n >= trial min_n' criterion keeps the verdict from supported, and a failing criterion still counts only when it fails
 decisively: its 95% interval lies wholly on the wrong side of the claimed bound. Carry: the Sharpe criterion when the
-stationary-bootstrap 95% Sharpe interval lies wholly at or below 0.3, the lower-bound criterion and the DSR when it lies
-wholly at or below 0 (the DSR's benchmark, the expected best of the trials' zero-skill Sharpes, is >= 0 at any sample
-size). Momentum: the mean and DSR criteria when the mean's 95% block-bootstrap CI lies wholly at or below 0, the
-permutation criterion when it lies wholly at or below the permutation 95th percentile. A zero-width interval decides
-nothing. Under 48 months (4 blocks of the 12-month bootstrap) no interval is computed, no failure can be decisive and
-the verdict is inconclusive. Any other failure below min_n is undecided (None), so the verdict is inconclusive. At or
-above min_n every criterion is judged at face value, exactly as before. Below min_n the report's ``criteria`` are the
-ones judged and ``rule5`` holds the face-value criteria and the decisive failures.
+stationary-bootstrap 95% Sharpe interval lies wholly at or below 0.3, the lower-bound criterion when it lies wholly at
+or below 0. Momentum: the mean criterion when the mean's 95% block-bootstrap CI lies wholly at or below 0, the
+permutation criterion when it lies wholly at or below the permutation 95th percentile. 'DSR > 0.95' is a one-sided 95%
+test, so in both it fails decisively at the same confidence: when the Sharpe's one-sided 95% upper bound lies at or below
+0, i.e. the PSR against a zero Sharpe (``deflated_sharpe_ratio(net, n_trials=1)``) is <= 0.05 (the DSR's benchmark, the
+expected best of the trials' zero-skill Sharpes, is >= 0 at any sample size, so the DSR is then <= 0.05 too) and, since
+the PSR treats months as independent and these monthly books are serially correlated, the Newey-West t (6 lags) of the
+mean agrees at the same level (<= -1.645); or when the 95% interval above (carry's Sharpe, momentum's mean) lies wholly
+at or below 0, a one-sided 97.5% bound on the same sign. The PSR and the t are reported in ``rule5`` and the reason. A
+zero-width interval decides nothing. Under 48 months (4 blocks of the 12-month bootstrap) no interval is computed, no
+failure can be decisive and the verdict is inconclusive. Any other failure below min_n is undecided (None), so the
+verdict is inconclusive. At or above min_n every criterion is judged at face value, exactly as before. Below min_n the
+report's ``criteria`` are the ones judged and ``rule5`` holds the face-value criteria and the decisive failures.
 """
 
 from __future__ import annotations
@@ -560,6 +565,31 @@ def _ci_below(lo, hi, bound: float) -> bool:
     return lo is not None and hi is not None and math.isfinite(lo) and math.isfinite(hi) and lo < hi and hi <= bound
 
 
+Z_ONE_SIDED_95 = 1.644854
+
+
+def _psr0_dec(x, n: int) -> tuple[float, float, bool]:
+    """(PSR of ``x`` against a zero Sharpe, Newey-West t (6 lags) of its mean, decisive failure of 'DSR > 0.95' below
+    min_n). The DSR criterion is a one-sided 95% test that the Sharpe beats the deflation benchmark, which is never below
+    0; it fails decisively at the same confidence when the Sharpe's one-sided 95% upper bound lies at or below 0, i.e.
+    the PSR against a zero Sharpe from the same returns is <= 1 - DSR_PASS (the DSR is then <= 0.05 against every
+    benchmark the trial can face). The PSR treats the months as independent and these monthly books are serially
+    correlated, so the serial-correlation-robust bound at the same level must agree: Newey-West t <= -1.645. Never
+    decisive under ``MIN_RULE5_MONTHS`` months or with a mean at or above 0 (the PSR's zero-denominator fallback)."""
+    x = np.asarray(x, dtype=float)
+    psr = float(deflated_sharpe_ratio(x, n_trials=1))
+    t = nw_tstat(x, 6)
+    dec = (n >= MIN_RULE5_MONTHS and x.size >= MIN_RULE5_MONTHS and x.mean() < 0 and psr <= 1.0 - DSR_PASS
+           and math.isfinite(t) and t <= -Z_ONE_SIDED_95)
+    return psr, t, bool(dec)
+
+
+def _psr0_txt(psr: float, t: float) -> str:
+    return (f"; PSR against a zero Sharpe {psr:.3f}, Newey-West t {t:+.2f} (the DSR criterion fails decisively below "
+            f"min_n when the PSR is <= {1.0 - DSR_PASS:.2f} and the t <= -{Z_ONE_SIDED_95:.3f}: the Sharpe's one-sided 95% "
+            f"upper bound at or below 0)")
+
+
 def _rule5(crit, decisive, n: int, min_n: int, unit: str) -> tuple[str, str, list, dict]:
     """House rule 5 below the trial's min_n (``n`` in the claim's own units; at or above min_n callers judge ``crit`` at
     face value with ``_verdict``, exactly as before). ``crit``: the face-value criteria [(name, ok)]; ``decisive``: one
@@ -684,7 +714,10 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
     stationary-bootstrap 2.5% lower bound > 0, DSR > 0.95 at ``n_trials``. ``family`` = 'g10' (6 declared trials) or
     'em' (4 EM trials + the G10 entry's 6). Below ``min_n`` test months house rule 5 applies: never supported; the
     Sharpe fails decisively when its stationary-bootstrap 95% interval lies wholly at or below ``sharpe_bar``, the
-    lower-bound criterion and the DSR when it lies wholly at or below 0; under 48 months nothing is computed."""
+    lower-bound criterion when it lies wholly at or below 0, and the DSR (a one-sided 95% test) when the PSR against a
+    zero Sharpe is <= 0.05 with the Newey-West t <= -1.645 (the Sharpe's one-sided 95% upper bound at or below 0) or that
+    interval lies wholly at or below 0; the PSR and t are in ``rule5`` and the reason. Under 48 months nothing is
+    computed."""
     universe = list(universe)
     sel = choose_weighting(panel, universe, train, cost_bps, admin, vix=vix)
     ws = sel["chosen"]
@@ -699,9 +732,9 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
     if n < min_n and n < MIN_RULE5_MONTHS:
         rep.update(verdict="inconclusive",
                    reason=f"{label}: only {n} test months in {test[0]}..{test[1]} with every currency's spot and lagged rate (need {min_n}); "
-                          f"dropped {len(bt['dropped'])} months, fewer than {MIN_RULE5_MONTHS} (4 blocks of the {BOOT_BLOCK}-month "
-                          f"bootstrap), so no interval and no decisive failure below min_n (house rule 5) — the archived data cannot "
-                          f"support the claim's window")
+                          f"dropped {len(bt['dropped'])} months; {n} test months is fewer than {MIN_RULE5_MONTHS} (4 blocks of the "
+                          f"{BOOT_BLOCK}-month bootstrap), so no interval and no decisive failure below min_n (house rule 5) — the "
+                          f"archived data cannot support the claim's window")
         return rep
     perf = _perf(net, bt["gross"], n_boot, seed)
     other = "invvol" if ws == "equal" else "equal"
@@ -735,13 +768,20 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
     crit = [(f"test-window net Sharpe > {sharpe_bar:g}", perf["sharpe"] > sharpe_bar),
             ("stationary-bootstrap lower bound > 0", perf["boot_lo"] > 0),
             (f"DSR > {DSR_PASS} with n_trials = {n_trials}", d["dsr"] > DSR_PASS)]
-    r5 = None
+    r5, r5_txt = None, ""
     if n < min_n:
         # rule 5: the Sharpe fails decisively when its stationary-bootstrap 95% interval lies wholly at or below the bar;
-        # the lower-bound criterion and the DSR (benchmark >= 0) when it lies wholly at or below 0
+        # the lower-bound criterion when it lies wholly at or below 0. The DSR (> 0.95, one-sided 95%) is mirrored at its own
+        # confidence: the PSR against a zero Sharpe is <= 0.05 with the Newey-West t <= -1.645 (the Sharpe's one-sided 95%
+        # upper bound at or below 0; the benchmark, the expected best of the trials' zero-skill Sharpes, is >= 0), or the
+        # 95% interval lies wholly at or below 0 (a one-sided 97.5% bound on the same sign)
         lo_, hi_ = perf["boot_lo"], perf["boot_hi"]
-        v, why, judged, r5 = _rule5(crit, [_ci_below(lo_, hi_, sharpe_bar), _ci_below(lo_, hi_, 0.0), _ci_below(lo_, hi_, 0.0)],
+        psr0, t0, dsr_dec = _psr0_dec(net, n)
+        v, why, judged, r5 = _rule5(crit, [_ci_below(lo_, hi_, sharpe_bar), _ci_below(lo_, hi_, 0.0),
+                                           dsr_dec or _ci_below(lo_, hi_, 0.0)],
                                     n, min_n, "test months")
+        r5["psr_vs_zero_sharpe"], r5["nw_t_vs_zero"] = psr0, t0
+        r5_txt = _psr0_txt(psr0, t0)
     else:
         v, why = _verdict(crit)
         judged = crit
@@ -763,7 +803,7 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
               f"Gross Sharpe {perf['gross_sharpe']:.2f}, net {perf['ann_mean_pct']:+.2f}%/yr, costs "
               f"{rep['costs_pct_year']['trade']:.2f}% trade + {rep['costs_pct_year']['financing']:.2f}% financing a year, "
               f"skew {perf['skew']:+.2f}, MDD {perf['mdd'] * 100:.1f}%, carry spread {rep['carry_spread_pp_mean']:.2f} pp; "
-              f"stale rates spliced by forward fill (flagged): {_fmt_filled(filled)}{pre_txt}; one-month gaps filled: {_fmt_filled(gaps)} — {why}")
+              f"stale rates spliced by forward fill (flagged): {_fmt_filled(filled)}{pre_txt}; one-month gaps filled: {_fmt_filled(gaps)}{r5_txt} — {why}")
     rep.update(verdict=v, reason=reason, criteria=[[c, b] for c, b in judged])
     if r5:
         rep["rule5"] = r5
@@ -786,9 +826,11 @@ def momentum_report(panel: dict, *, universe: Sequence[str] = G10_FX, window: tu
     per side. Pass: mean net monthly return > 0 with the two-sided 95% block-bootstrap CI (block 12) excluding 0,
     DSR > 0.95 at ``n_trials`` (family: formation 1/3/6/12 x thirds/top-bottom-2 x with/without differentials),
     mean above the 95th percentile of ``n_perm`` random-ranking books. Below ``min_n`` holding months house rule 5
-    applies: never supported; the mean and DSR criteria fail decisively when the mean's 95% CI lies wholly at or below
-    0, the permutation criterion when it lies wholly at or below the permutation 95th percentile; under 48 months
-    nothing is computed."""
+    applies: never supported; the mean criterion fails decisively when the mean's 95% CI lies wholly at or below 0, the
+    DSR (a one-sided 95% test) when the PSR against a zero Sharpe is <= 0.05 with the Newey-West t <= -1.645 (the
+    Sharpe's one-sided 95% upper bound at or below 0) or that CI lies wholly at or below 0, the permutation criterion
+    when the CI lies wholly at or below the permutation 95th percentile; the PSR and t are in ``rule5`` and the reason.
+    Under 48 months nothing is computed."""
     universe = list(universe)
     ms = mrange(*window)
     bt = momentum_backtest(panel, universe, ms, 1, "thirds", True, cost_bps, True)
@@ -835,12 +877,17 @@ def momentum_report(panel: dict, *, universe: Sequence[str] = G10_FX, window: tu
     crit = [("mean net monthly excess return > 0 with block-bootstrap 95% CI excluding 0", net.mean() > 0 and lo > 0),
             (f"DSR > {DSR_PASS} with {n_trials} trials", d["dsr"] > DSR_PASS),
             ("mean above the permutation 95th percentile", net.mean() > q95)]
-    r5 = None
+    r5, r5_txt = None, ""
     if n < min_n:
-        # rule 5: the mean and the DSR (benchmark >= 0) fail decisively when the mean's 95% block-bootstrap CI lies wholly
-        # at or below 0; the permutation criterion when it lies wholly at or below the permutation 95th percentile
-        v, why, judged, r5 = _rule5(crit, [_ci_below(lo, hi, 0.0), _ci_below(lo, hi, 0.0), _ci_below(lo, hi, q95)],
+        # rule 5: the mean fails decisively when its 95% block-bootstrap CI lies wholly at or below 0; the permutation
+        # criterion when it lies wholly at or below the permutation 95th percentile. The DSR (> 0.95, one-sided 95%) is
+        # mirrored at its own confidence: the PSR against a zero Sharpe is <= 0.05 with the Newey-West t <= -1.645
+        # (benchmark >= 0), or the mean's CI lies wholly at or below 0 (a one-sided 97.5% bound on the same sign)
+        psr0, t0, dsr_dec = _psr0_dec(net, n)
+        v, why, judged, r5 = _rule5(crit, [_ci_below(lo, hi, 0.0), dsr_dec or _ci_below(lo, hi, 0.0), _ci_below(lo, hi, q95)],
                                     n, min_n, "holding months")
+        r5["psr_vs_zero_sharpe"], r5["nw_t_vs_zero"] = psr0, t0
+        r5_txt = _psr0_txt(psr0, t0)
     else:
         v, why = _verdict(crit)
         judged = crit
@@ -854,7 +901,7 @@ def momentum_report(panel: dict, *, universe: Sequence[str] = G10_FX, window: tu
               f"{rep['cost_bps_month']:.1f} bps/month, net Sharpe {rep['sharpe']:.2f}{sub_txt}; same-fixing (no skip) "
               f"{_f(rep['same_fixing_mean_bps'])} bps; stale rates spliced by forward fill (flagged): {_fmt_filled(filled)}; "
               f"one-month gaps filled: {_fmt_filled(gaps)}; "
-              f"ETF cost check not run (FXE/FXY/FXB/FXF/FXC/FXA not archived; reported item, not a pass criterion) — {why}")
+              f"ETF cost check not run (FXE/FXY/FXB/FXF/FXC/FXA not archived; reported item, not a pass criterion){r5_txt} — {why}")
     rep.update(verdict=v, reason=reason, criteria=[[c, b] for c, b in judged])
     if r5:
         rep["rule5"] = r5

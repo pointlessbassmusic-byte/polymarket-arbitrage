@@ -74,9 +74,9 @@ Options misc: four free research and history sources behind T-188, T-518, T-222 
    Deribit sends a ticker snapshot for every subscribed instrument when Tardis resubscribes at 00:00, so the legs are
    near-synchronous (the 2024-03-01 probe had all four legs within 0.31 s). Legs per capture day: every BTC expiry 30-90
    calendar days out (expiry date minus capture day, so a quarterly exactly 90 days out is included) that was listed
-   then (instrument ``creation_timestamp``), the ``n_side`` strikes at or below and above the
-   spot hint (BTC-PERPETUAL 1-hour bar ending at 00:00 UTC, Deribit chart API) that have both a call and a put listed;
-   any pair of those strikes forms a box. Kept per instrument: the first ticker message (the snapshot) and the last in
+   then (instrument ``creation_timestamp``), the ``n_side`` strikes at or below and above the spot hint (BTC-PERPETUAL
+   1-hour bar ending at 00:00 UTC, Deribit chart API) that have both a call and a put listed; any pair of those strikes
+   forms a box. Kept per instrument: the first ticker message (the snapshot) and the last in
    the minute, raw. An empty line in the feed marks a disconnect (Tardis docs; the 2024-03-01 probe had one at about
    00:00:29): the capture row records them and each leg row says whether its message came after a reconnect.
    ``available_at`` = Tardis's local receive timestamp. Deribit options are on Tardis from 2019-03-30,
@@ -97,7 +97,8 @@ Options misc: four free research and history sources behind T-188, T-518, T-222 
 
 Deribit's API documentation states no data licence (its Terms page needs JavaScript and could not be read); its
 usage policy is fair use with per-IP limits for public calls and a special 1 request/second limit on get_instruments.
-The trades bundle is treated like the deribit-book-* captures: local disk only.
+With no redistribution licence, the trades bundle is treated like the deribit-book-* captures: local disk only
+(``in_git=False``, the lead's decision), rebuilt from the recipe.
 
 Each ``fetch_*`` takes ``store`` (an Archive, an ObservationStore whose ``.archive`` is used, or None to only return the
 rows), ``limit`` and ``dry_run``; a failed or partial fetch never overwrites a stored bundle, and the two Deribit
@@ -279,7 +280,10 @@ def fetch_box_rates_bdg(store=None, limit: Optional[int] = None, dry_run: bool =
                         min_interval: float = 1.0, retries: int = 4, backoff: float = 1.0, report: Optional[dict] = None,
                         in_git: bool = False) -> list[dict]:
     """Bundle ``box-rates-bdg``: 2 calls (landing page for the deposit date and licence, then the xlsx). Returns archive rows.
-    ``limit`` returns only the first N days and then nothing is stored (a preview never replaces the full bundle)."""
+    ``limit`` returns only the first N days and then nothing is stored (a preview never replaces the full bundle).
+    The bundle is always local-only: ``in_git=True`` is refused (CC BY-NC-ND 4.0 does not allow republishing it here)."""
+    if in_git:
+        raise ValueError("box-rates-bdg is CC BY-NC-ND 4.0 and stays out of git (in_git=False); rebuild it from the recipe")
     rep = report if report is not None else {}
     if dry_run:
         rep["_plan"] = {"calls": 2, "urls": [BDG_PAGE, BDG_XLSX], "est_rows": 3548, "est_raw_kb": 321, "est_gz_kb": 180}
@@ -339,9 +343,32 @@ KANZIG_PUBLISHED_GIT = {
 }
 KANZIG_PUBLISHED = {k: datetime.fromisoformat(v).astimezone(timezone.utc).isoformat() for k, v in KANZIG_PUBLISHED_GIT.items()}
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+# Verified advance notice of an OPEC meeting date: {announcement day as in the Känzig file: {"known_since": "YYYY-MM-DD" (the
+# date of the earlier OPEC press release that announced this exact meeting date; a rescheduled meeting counts from the
+# release that set the final date), "basis": "<release title, date and URL>: '<the sentence that names the date>'"}}.
+# Add an entry only after reading that press release. Empty: on 2026-10-15 opec.org answered 403 (Cloudflare) and
+# web.archive.org was unreachable from this host, so no release could be read.
+OPEC_KNOWN_SINCE: dict[str, dict] = {}
 OPEC_SCHEMA = ("kind opec-announcement: value = {day, weekday, effective_weekday (next Monday for a weekend date; holidays not adjusted), "
-               "vintage, in_pre_covid_sheet}, available_at = the announcement date 00:00 UTC | kind oil-supply-surprise: value = {day, vintage, "
-               "surprise{Front, 1M..12M, PC} as published, pc_pre_covid}, available_at = the vintage's GitHub commit time")
+               "vintage, in_pre_covid_sheet (vintage and in_pre_covid_sheet describe the research file, ex post), known_since, "
+               "known_since_basis, available_basis}; available_at = the end of the announcement day (23:59:59 UTC; the day's 00:00 comes "
+               "before unscheduled announcements, which the file does not mark), or the end of the day of the earlier OPEC press release "
+               "that announced the meeting date when known_since is verified (then known_since and known_since_basis are set). A harness "
+               "entering at the T-1 close may only use rows with a verified known_since; the available_at filter enforces this | "
+               "kind oil-supply-surprise: value = {day, vintage, surprise{Front, 1M..12M, PC} as published, pc_pre_covid}, available_at = "
+               "the vintage's GitHub commit time (a lower bound on the push), never before the end of the event day")
+
+
+def verified_known_since(entry: Optional[dict], day: str) -> Optional[dict]:
+    """The entry ``{known_since, basis}`` when it is usable for ``day``: a valid date strictly before ``day`` and a non-empty
+    basis naming the press release; else None."""
+    if not isinstance(entry, dict) or not str(entry.get("basis") or "").strip():
+        return None
+    try:
+        ks = date.fromisoformat(str(entry.get("known_since"))[:10])
+    except ValueError:
+        return None
+    return {"known_since": ks.isoformat(), "basis": str(entry["basis"]).strip()} if ks < date.fromisoformat(day) else None
 
 
 def _kanzig_sheet(wb, sheet: str) -> list[dict]:
@@ -388,18 +415,26 @@ def effective_weekday(day: str) -> str:
     return d.isoformat()
 
 
-def opec_rows(parsed: list[dict], vintage: str, observed_at: str, published_at: str) -> list[dict]:
+def opec_rows(parsed: list[dict], vintage: str, observed_at: str, published_at: str,
+              known_since: Optional[dict[str, dict]] = None) -> list[dict]:
+    """Event rows (dated at the end of the announcement day, or at the end of the day of a verified earlier press release
+    from ``known_since``, default ``OPEC_KNOWN_SINCE``) and surprise rows (dated at the vintage's commit time)."""
+    ks_map = OPEC_KNOWN_SINCE if known_since is None else known_since
     out = []
     for r in parsed:
         day = r["day"]
+        ks = verified_known_since(ks_map.get(day), day)
         out.append({"source": "kanzig-oilsupplynews", "kind": "opec-announcement", "key": day, "observed_at": observed_at,
-                    "available_at": _cap(day + "T00:00:00+00:00", observed_at),
+                    "available_at": _cap(_end_of_day(ks["known_since"] if ks else day), observed_at),
                     "value": {"day": day, "weekday": WEEKDAYS[date.fromisoformat(day).weekday()], "effective_weekday": effective_weekday(day),
-                              "vintage": vintage, "in_pre_covid_sheet": r["in_pre_covid_sheet"]}})
+                              "vintage": vintage, "in_pre_covid_sheet": r["in_pre_covid_sheet"],
+                              "known_since": ks["known_since"] if ks else None, "known_since_basis": ks["basis"] if ks else None,
+                              "available_basis": ("end of the day of the earlier OPEC press release that announced the date" if ks
+                                                  else "end of the announcement day (advance notice not verified)")}})
     for r in parsed:
         day = r["day"]
         out.append({"source": "kanzig-oilsupplynews", "kind": "oil-supply-surprise", "key": f"{day}:{vintage}", "observed_at": observed_at,
-                    "available_at": _cap(max(published_at, day + "T23:59:59+00:00", key=_ms), observed_at),
+                    "available_at": _cap(max(published_at, _end_of_day(day), key=_ms), observed_at),
                     "value": {"day": day, "vintage": vintage, "surprise": r["surprise"], "pc_pre_covid": r["pc_pre_covid"]}})
     return out
 
@@ -421,10 +456,13 @@ def kanzig_published_at(vintage: str, client: httpx.Client, throttle: Throttle, 
 
 def fetch_opec_announcements(store=None, vintage: str = KANZIG_VINTAGE, limit: Optional[int] = None, dry_run: bool = False,
                              client: Optional[httpx.Client] = None, min_interval: float = 1.0, retries: int = 4, backoff: float = 1.0,
-                             report: Optional[dict] = None, in_git: bool = True) -> list[dict]:
+                             report: Optional[dict] = None, in_git: bool = True, known_since: Optional[dict[str, dict]] = None) -> list[dict]:
     """Bundle ``opec-announcements``: the xlsx plus one GitHub API call for the vintage's commit time. ``limit`` keeps only
-    the most recent N dates and then nothing is stored."""
+    the most recent N dates and then nothing is stored. ``known_since`` (default ``OPEC_KNOWN_SINCE``) holds verified
+    advance notice from earlier OPEC press releases; entries that are not strictly earlier or have no basis are ignored
+    and listed in the report. In git: CC BY 4.0 allows redistribution with attribution, which the recipe carries."""
     rep = report if report is not None else {}
+    ks_map = OPEC_KNOWN_SINCE if known_since is None else known_since
     url = KANZIG_URL.format(vintage=vintage)
     if dry_run:
         rep["_plan"] = {"calls": 2, "urls": [url, KANZIG_COMMITS], "est_rows": 2 * 169, "est_gz_kb": 25}
@@ -446,19 +484,26 @@ def fetch_opec_announcements(store=None, vintage: str = KANZIG_VINTAGE, limit: O
     if limit:
         parsed = parsed[-limit:]
     pub = published or observed
-    rows = opec_rows(parsed, vintage, observed, pub)
+    rows = opec_rows(parsed, vintage, observed, pub, known_since=ks_map)
+    days = {p["day"] for p in parsed}
+    verified = sorted(d for d in days if verified_known_since(ks_map.get(d), d))
     rep["coverage"] = {"dates": len(parsed), "first": parsed[0]["day"] if parsed else None, "last": parsed[-1]["day"] if parsed else None,
                        "since_2009_09": sum(1 for p in parsed if p["day"] >= "2009-09-01"), "weekend": sum(1 for p in parsed if date.fromisoformat(p["day"]).weekday() >= 5),
-                       "published_at": pub, "published_basis": basis if published else "fetch time (no commit date)"}
+                       "published_at": pub, "published_basis": basis if published else "fetch time (no commit date)",
+                       "known_since_verified": len(verified),
+                       "known_since_ignored": sorted(d for d in ks_map if d not in days or not verified_known_since(ks_map.get(d), d))}
     archive = _archive(store)
     if archive is not None and parsed and not limit:
         e = archive.store("opec-announcements", kind="data", rows=rows,
                           recipe=(f"GET {url} (openpyxl, sheets 'Daily' and 'Daily (pre-Covid)'; column 'Date/Contract' = OPEC announcement dates) and "
                                   f"{KANZIG_COMMITS}?path={KANZIG_FILE.format(vintage=vintage)} (vintage commit time) via "
                                   f"mandel.data.options_misc.fetch_opec_announcements; {min_interval}s pacing, {retries} tries with backoff. "
-                                  f"Event rows: available_at = the announcement date 00:00 UTC (scheduled meetings are known in advance; unscheduled ones "
-                                  f"are not marked, so the date itself is used for all). Surprise rows: available_at = vintage commit {pub} ({basis}). "
-                                  f"{KANZIG_CITATION}"),
+                                  f"Event rows: available_at = the end of the announcement day, 23:59:59 UTC (the day's 00:00 comes before unscheduled "
+                                  f"announcements, which the file does not mark), or the end of the day of an earlier OPEC press release that announced "
+                                  f"the meeting date where that is verified (mandel.data.options_misc.OPEC_KNOWN_SINCE; value.known_since and "
+                                  f"known_since_basis; {len(verified)} verified in this build). A harness entering at the T-1 close may only use the "
+                                  f"verified rows. Surprise rows: available_at = vintage commit {pub} ({basis}; a lower bound on the push), never "
+                                  f"before the end of the event day. {KANZIG_CITATION}"),
                           tags=["calendar", "opec", "oil", "events", "research-series", "T-518"], schema=OPEC_SCHEMA, in_git=in_git)
         rep["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}
     return rows
@@ -470,66 +515,78 @@ DERIBIT_HISTORY = "https://history.deribit.com/api/v2/public/"
 CATALYST_BUNDLE = "deribit-option-trades-catalysts"
 _INSTRUMENT = re.compile(r"^(?P<cur>[A-Z]+)-(?P<d>\d{1,2})(?P<mon>[A-Z]{3})(?P<yy>\d{2})-(?P<strike>\d+(?:d\d+)?)-(?P<cp>[CP])$")
 
+# How the event time was known (``event_time_basis``). REALISED: a block-height or TTD event; the time is the realised block
+# time, so the exact moment, and with it which expiry falls after the event, was not known in advance (a harness must not
+# treat it as known at entry). SCHEDULED: the moment was fixed in advance (beacon epoch, MTP activation time, genesis_time
+# once the deposit threshold was met). STATUTORY: the date is fixed by statute; the time is a convention. APPROXIMATE: an
+# agency decision at an unscheduled time on or before a deadline; the time is approximate and realised.
+REALISED = "realised (ex post)"
+SCHEDULED = "scheduled"
+STATUTORY = "statutory date, conventional time"
+APPROXIMATE = "approximate (ex post)"
+EVENT_TIME_BASES = (REALISED, SCHEDULED, STATUTORY, APPROXIMATE)
+
 # Frozen candidate calendar (unblock sweep T-222 recheck list). ``time`` = the event moment in UTC, checked on chain where
 # there is a chain event; ``known_since`` is set only when the date was fixed by statute or protocol and the fixing date is
-# verified; ``known_since_hint`` is unverified and must be checked by the harness before the sample is frozen.
+# verified (it counts from the end of that UTC day); ``known_since_hint`` is unverified and must be checked by the harness
+# before the sample is frozen.
 CATALYSTS: list[dict] = [
     {"id": "btc-bch-fork-2017", "currencies": ["BTC"], "category": "fork", "event": "Bitcoin Cash hard fork (UAHF)", "date": "2017-08-01",
-     "time": "2017-08-01T13:16:14+00:00", "time_basis": "BTC block 478558, the last common block (mempool.space)",
+     "time": "2017-08-01T13:16:14+00:00", "time_basis": "BTC block 478558, the last common block (mempool.space)", "event_time_basis": REALISED,
      "known_since": None, "known_since_hint": "UAHF activation time 2017-08-01 12:20 UTC published by Bitcoin ABC in summer 2017 (unverified)"},
     {"id": "btc-btg-fork-2017", "currencies": ["BTC"], "category": "fork", "event": "Bitcoin Gold fork", "date": "2017-10-24",
-     "time": "2017-10-24T01:20:39+00:00", "time_basis": "BTC block 491407 (mempool.space)",
+     "time": "2017-10-24T01:20:39+00:00", "time_basis": "BTC block 491407 (mempool.space)", "event_time_basis": REALISED,
      "known_since": None, "known_since_hint": "fork height 491407 announced in 2017 (unverified)"},
     {"id": "bch-hard-fork-2018", "currencies": ["BTC"], "category": "fork", "event": "Bitcoin Cash November upgrade (ABC/SV split)", "date": "2018-11-15",
-     "time": "2018-11-15T16:40:00+00:00", "time_basis": "BCH upgrade activation at median time past 1542300000",
+     "time": "2018-11-15T16:40:00+00:00", "time_basis": "BCH upgrade activation at median time past 1542300000", "event_time_basis": SCHEDULED,
      "known_since": None, "known_since_hint": "BCH semiannual upgrade date (Nov 15) from the 2017 upgrade schedule (unverified)"},
     {"id": "eth-istanbul-2019", "currencies": ["ETH"], "category": "protocol", "event": "Ethereum Istanbul hard fork", "date": "2019-12-08",
-     "time": "2019-12-08T00:25:09+00:00", "time_basis": "ETH block 9,069,000 (public RPC)",
+     "time": "2019-12-08T00:25:09+00:00", "time_basis": "ETH block 9,069,000 (public RPC)", "event_time_basis": REALISED,
      "known_since": None, "known_since_hint": "block chosen on an All Core Devs call in autumn 2019 (unverified)"},
     {"id": "btc-halving-2020", "currencies": ["BTC"], "category": "halving", "event": "Bitcoin halving (block 630,000)", "date": "2020-05-11",
-     "time": "2020-05-11T19:23:43+00:00", "time_basis": "BTC block 630000 (mempool.space)",
+     "time": "2020-05-11T19:23:43+00:00", "time_basis": "BTC block 630000 (mempool.space)", "event_time_basis": REALISED,
      "known_since": "2020-03-12", "known_since_basis": "height fixed by protocol since 2009; the date was a few-day estimate; set 60 days ahead"},
     {"id": "us-election-2020", "currencies": ["BTC", "ETH"], "category": "macro", "event": "US presidential election", "date": "2020-11-03",
-     "time": "2020-11-04T05:00:00+00:00", "time_basis": "midnight US Eastern after Election Day",
+     "time": "2020-11-04T05:00:00+00:00", "time_basis": "midnight US Eastern after Election Day", "event_time_basis": STATUTORY,
      "known_since": "2019-11-03", "known_since_basis": "date fixed by statute (3 U.S.C. 1); set one year ahead"},
     {"id": "eth-beacon-genesis-2020", "currencies": ["ETH"], "category": "protocol", "event": "Ethereum beacon chain genesis", "date": "2020-12-01",
-     "time": "2020-12-01T12:00:23+00:00", "time_basis": "beacon genesis_time 1606824023",
+     "time": "2020-12-01T12:00:23+00:00", "time_basis": "beacon genesis_time 1606824023", "event_time_basis": SCHEDULED,
      "known_since": "2020-11-24", "known_since_basis": "the 16,384-validator threshold was met on 2020-11-24; from 2020-11-04 the date was conditional"},
     {"id": "eth-berlin-2021", "currencies": ["ETH"], "category": "protocol", "event": "Ethereum Berlin hard fork", "date": "2021-04-15",
-     "time": "2021-04-15T10:07:03+00:00", "time_basis": "ETH block 12,244,000 (public RPC)",
+     "time": "2021-04-15T10:07:03+00:00", "time_basis": "ETH block 12,244,000 (public RPC)", "event_time_basis": REALISED,
      "known_since": None, "known_since_hint": "Ethereum Foundation blog announcement 2021-03-08 (unverified)"},
     {"id": "eth-london-2021", "currencies": ["ETH"], "category": "protocol", "event": "Ethereum London hard fork (EIP-1559)", "date": "2021-08-05",
-     "time": "2021-08-05T12:33:42+00:00", "time_basis": "ETH block 12,965,000 (public RPC)",
+     "time": "2021-08-05T12:33:42+00:00", "time_basis": "ETH block 12,965,000 (public RPC)", "event_time_basis": REALISED,
      "known_since": None, "known_since_hint": "Ethereum Foundation blog announcement 2021-07-15, 21 days ahead (unverified)"},
     {"id": "btc-taproot-2021", "currencies": ["BTC"], "category": "protocol", "event": "Bitcoin Taproot activation", "date": "2021-11-14",
-     "time": "2021-11-14T05:15:27+00:00", "time_basis": "BTC block 709632 (mempool.space)",
+     "time": "2021-11-14T05:15:27+00:00", "time_basis": "BTC block 709632 (mempool.space)", "event_time_basis": REALISED,
      "known_since": "2021-06-12", "known_since_basis": "Speedy Trial lock-in at block 687284 (2021-06-12 12:04 UTC, mempool.space) fixed the activation height"},
     {"id": "eth-merge-2022", "currencies": ["ETH"], "category": "protocol", "event": "Ethereum Merge (terminal total difficulty)", "date": "2022-09-15",
-     "time": "2022-09-15T06:42:42+00:00", "time_basis": "ETH block 15,537,393 reached TTD (public RPC)",
+     "time": "2022-09-15T06:42:42+00:00", "time_basis": "ETH block 15,537,393 reached TTD (public RPC)", "event_time_basis": REALISED,
      "known_since": None, "known_since_hint": "Ethereum Foundation mainnet announcement with the TTD 2022-08-24; tentative mid-September date from mid-July (unverified)"},
     {"id": "eth-shapella-2023", "currencies": ["ETH"], "category": "protocol", "event": "Ethereum Shanghai/Capella upgrade", "date": "2023-04-12",
-     "time": "2023-04-12T22:27:35+00:00", "time_basis": "beacon epoch 194048 = genesis + 194048 x 384 s",
+     "time": "2023-04-12T22:27:35+00:00", "time_basis": "beacon epoch 194048 = genesis + 194048 x 384 s", "event_time_basis": SCHEDULED,
      "known_since": None, "known_since_hint": "date set on an All Core Devs call in March 2023 (unverified)"},
     {"id": "btc-spot-etf-2024", "currencies": ["BTC"], "category": "etf", "event": "US spot bitcoin ETF decision (ARK 21Shares final deadline)", "date": "2024-01-10",
-     "time": "2024-01-10T21:00:00+00:00", "time_basis": "SEC approval order after the US close (approximate)",
+     "time": "2024-01-10T21:00:00+00:00", "time_basis": "SEC approval order after the US close (approximate)", "event_time_basis": APPROXIMATE,
      "known_since": "2023-12-01", "known_since_basis": "statutory 240-day final deadline of the 19b-4 filing, widely reported from August 2023; set conservatively"},
     {"id": "eth-dencun-2024", "currencies": ["ETH"], "category": "protocol", "event": "Ethereum Dencun upgrade", "date": "2024-03-13",
-     "time": "2024-03-13T13:55:35+00:00", "time_basis": "beacon epoch 269568 = genesis + 269568 x 384 s",
+     "time": "2024-03-13T13:55:35+00:00", "time_basis": "beacon epoch 269568 = genesis + 269568 x 384 s", "event_time_basis": SCHEDULED,
      "known_since": None, "known_since_hint": "date set on the 2024-02-08 All Core Devs call (unverified)"},
     {"id": "btc-halving-2024", "currencies": ["BTC"], "category": "halving", "event": "Bitcoin halving (block 840,000)", "date": "2024-04-20",
-     "time": "2024-04-20T00:09:27+00:00", "time_basis": "BTC block 840000 (mempool.space)",
+     "time": "2024-04-20T00:09:27+00:00", "time_basis": "BTC block 840000 (mempool.space)", "event_time_basis": REALISED,
      "known_since": "2024-02-20", "known_since_basis": "height fixed by protocol since 2009; the date was a few-day estimate; set 60 days ahead"},
     {"id": "eth-spot-etf-2024", "currencies": ["ETH"], "category": "etf", "event": "US spot ether ETF 19b-4 decision (VanEck final deadline)", "date": "2024-05-23",
-     "time": "2024-05-23T21:00:00+00:00", "time_basis": "SEC approval order after the US close (approximate)",
+     "time": "2024-05-23T21:00:00+00:00", "time_basis": "SEC approval order after the US close (approximate)", "event_time_basis": APPROXIMATE,
      "known_since": "2024-04-01", "known_since_basis": "statutory 240-day final deadline of the 19b-4 filing; set conservatively"},
     {"id": "us-election-2024", "currencies": ["BTC", "ETH"], "category": "macro", "event": "US presidential election", "date": "2024-11-05",
-     "time": "2024-11-06T05:00:00+00:00", "time_basis": "midnight US Eastern after Election Day",
+     "time": "2024-11-06T05:00:00+00:00", "time_basis": "midnight US Eastern after Election Day", "event_time_basis": STATUTORY,
      "known_since": "2023-11-05", "known_since_basis": "date fixed by statute (3 U.S.C. 1); set one year ahead"},
     {"id": "eth-pectra-2025", "currencies": ["ETH"], "category": "protocol", "event": "Ethereum Pectra upgrade", "date": "2025-05-07",
-     "time": "2025-05-07T10:05:11+00:00", "time_basis": "beacon epoch 364032 = genesis + 364032 x 384 s",
+     "time": "2025-05-07T10:05:11+00:00", "time_basis": "beacon epoch 364032 = genesis + 364032 x 384 s", "event_time_basis": SCHEDULED,
      "known_since": None, "known_since_hint": "date set on the 2025-04-03 All Core Devs call (unverified)"},
     {"id": "eth-fusaka-2025", "currencies": ["ETH"], "category": "protocol", "event": "Ethereum Fusaka upgrade", "date": "2025-12-03",
-     "time": "2025-12-03T21:49:11+00:00", "time_basis": "beacon epoch 411392 = genesis + 411392 x 384 s",
+     "time": "2025-12-03T21:49:11+00:00", "time_basis": "beacon epoch 411392 = genesis + 411392 x 384 s", "event_time_basis": SCHEDULED,
      "known_since": None, "known_since_hint": "mainnet date set in autumn 2025 (unverified)"},
 ]
 BEACON_GENESIS = 1_606_824_023                       # 2020-12-01T12:00:23Z
@@ -543,9 +600,12 @@ TRADES_PER_DAY = {("BTC", 2017): 250, ("BTC", 2018): 500, ("BTC", 2019): 600, ("
                   ("ETH", 2024): 16000, ("ETH", 2025): 8000}
 TRADE_SCHEMA = ("kind option-trade: value = raw Deribit trade {trade_id, trade_seq, timestamp (ms), instrument_name, price (coin), mark_price, iv, "
                 "index_price, amount, contracts?, direction, tick_direction, block_trade_id?} + {catalyst, currency, expiry, expiry_code, strike, type}; "
-                "available_at = trade time | kind catalyst-window: value = {catalyst, currency, event, category, event_date, event_time, entry_day, "
-                "exit_day, window_start, window_end, target_expiry, target_expiry_code, target_listed_at, trades_seen, trades_kept, pages, complete, "
-                "known_since, known_since_basis|known_since_hint}; available_at = known_since if verified else the event time")
+                "available_at = trade time | kind catalyst-window: value = {catalyst, currency, event, category, event_date, event_time, time_basis, "
+                f"event_time_basis ({' | '.join(EVENT_TIME_BASES)}; '{REALISED}' = block-height event whose exact time and expiry boundary were not "
+                "known in advance), entry_day, exit_day, window_start, window_end, target_expiry, target_expiry_code, target_listed_at, "
+                "target_settlement_period, targets, trades_seen, trades_kept, pages, complete (these four are fetch metadata, not market "
+                "information), known_since, known_since_basis|known_since_hint, available_basis}; available_at = max(end of the verified known_since "
+                "day, target_listed_at) when known_since is verified, else the event time")
 
 
 def parse_instrument(name: str) -> Optional[dict]:
@@ -688,18 +748,50 @@ def _trade_row(t: dict, catalyst: str, currency: str, observed_at: str) -> dict:
             "available_at": _cap(_iso_ms(int(t["timestamp"])), observed_at), "value": v}
 
 
+def window_available_at(cat: dict, targets: Optional[list[dict]], event_time: str) -> tuple[str, str]:
+    """(available_at, basis) of a catalyst-window row. With a verified ``known_since``: the later of the end of that UTC day
+    and the listing time of every target expiry the row names (no one knew the target before it was listed). Otherwise
+    the event time itself."""
+    if not cat.get("known_since"):
+        return event_time, "event time (known_since not verified)"
+    cands = [_end_of_day(cat["known_since"])] + [t["listed_at"] for t in (targets or []) if t.get("listed_at")]
+    av = max(cands, key=_ms)
+    return av, ("end of the verified known_since day" if av == cands[0] else "target expiry listing time (after the verified known_since)")
+
+
 def _window_row(w: dict, cat: dict, info: dict, kept: int, observed_at: str) -> dict:
     tgt = (w.get("targets") or [None])[0] or {}
-    av = cat.get("known_since") + "T00:00:00+00:00" if cat.get("known_since") else w["event_time"]
+    av, av_basis = window_available_at(cat, w.get("targets"), w["event_time"])
     v = {"catalyst": w["catalyst"], "currency": w["currency"], "event": w["event"], "category": w["category"], "event_date": w["event_date"],
-         "event_time": w["event_time"], "time_basis": cat.get("time_basis"), "entry_day": w["entry_day"], "exit_day": w["exit_day"],
+         "event_time": w["event_time"], "time_basis": cat.get("time_basis"), "event_time_basis": cat.get("event_time_basis"),
+         "entry_day": w["entry_day"], "exit_day": w["exit_day"],
          "window_start": _iso_ms(w["start_ms"]), "window_end": _iso_ms(w["end_ms"]), "target_expiry": tgt.get("expiry"),
          "target_expiry_code": tgt.get("expiry_code"), "target_listed_at": tgt.get("listed_at"), "target_settlement_period": tgt.get("settlement_period"),
          "targets": [x["expiry_code"] for x in (w.get("targets") or [])], "trades_seen": info.get("seen"), "trades_kept": kept,
          "pages": info.get("pages"), "complete": bool(info.get("complete")), "known_since": cat.get("known_since"),
-         "known_since_basis": cat.get("known_since_basis"), "known_since_hint": cat.get("known_since_hint")}
+         "known_since_basis": cat.get("known_since_basis"), "known_since_hint": cat.get("known_since_hint"), "available_basis": av_basis}
     return {"source": "mandel-catalysts", "kind": "catalyst-window", "key": f"{w['catalyst']}:{w['currency']}", "observed_at": observed_at,
             "available_at": _cap(av, observed_at), "value": v}
+
+
+def catalyst_known_coverage(catalysts: Optional[list[dict]] = None, currencies: Optional[Iterable[str]] = None, entry_days: int = 21,
+                            n_target: int = 20) -> dict:
+    """How many windows carry a verified ``known_since``, and how many of those were known by the end of the entry day
+    (known_since <= entry day; the target expiry is listed by then by construction), i.e. usable by a harness entering
+    ``entry_days`` before the event. For the frozen calendar: 21 windows, 10 verified, 9 known by entry (the beacon genesis
+    was fixed only 7 days ahead), so 11 more verified windows are needed for n >= 20."""
+    cats = catalysts if catalysts is not None else CATALYSTS
+    by_id = {c["id"]: c for c in cats}
+    wins = catalyst_windows(cats, None, currencies, entry_days=entry_days)
+    key = lambda w: f"{w['catalyst']}:{w['currency']}"
+    verified = [w for w in wins if by_id[w["catalyst"]].get("known_since")]
+    by_entry = [w for w in verified if by_id[w["catalyst"]]["known_since"] <= w["entry_day"]]
+    return {"windows": len(wins), "verified": len(verified), "known_by_entry": len(by_entry),
+            "more_needed": max(0, n_target - len(by_entry)), "n_target": n_target, "known_by_entry_windows": [key(w) for w in by_entry],
+            "realised_event_time": sorted(key(w) for w in wins if by_id[w["catalyst"]].get("event_time_basis") == REALISED)}
+
+
+PAGE_SECONDS = 0.55                                     # measured 0.36-0.71 s per 1,000-trade page (gzip, ~240 KB decoded), 2026-10-15
 
 
 def _plan_estimate(windows: list[dict]) -> dict:
@@ -739,9 +831,12 @@ def fetch_deribit_catalyst_trades(store=None, catalysts: Optional[list[dict]] = 
         windows = [w for w in windows if f"{w['catalyst']}:{w['currency']}" not in have]
     if limit is not None:
         windows = windows[:limit]
+    rep["_known_since"] = catalyst_known_coverage(cats, currencies)
     if dry_run:
-        rep["_plan"] = {**_plan_estimate(windows), "instrument_calls": 2 * len({w["currency"] for w in windows}) if instruments is None else 0,
-                        "instrument_mb_each": 77, "min_interval": min_interval}
+        plan = _plan_estimate(windows)
+        rep["_plan"] = {**plan, "instrument_calls": 2 * len({w["currency"] for w in windows}) if instruments is None else 0,
+                        "instrument_mb_each": 77, "min_interval": min_interval,
+                        "est_minutes": round(plan["est_calls"] * max(min_interval, PAGE_SECONDS) / 60)}
         return []
     own = client is None
     c = client or _client()
@@ -797,8 +892,11 @@ def _store_catalyst_bundle(archive, rows: list[dict], done: set[str], before_day
                               f"[event date - {before_days} d, event date + {after_days + 1} d) UTC, keeping only the first expiry after the event that was "
                               f"listed by the end of the entry day (event - 21 d; listing = min creation_timestamp from {DERIBIT_HISTORY}get_instruments"
                               f", expired=true and false); via mandel.data.options_misc.fetch_deribit_catalyst_trades; {min_interval}s pacing, {retries} tries with "
-                              f"exponential backoff on 429/5xx. Trade available_at = trade time; window available_at = verified known_since else the "
-                              f"event time. Windows stored: {', '.join(windows_stored)}. Deribit states no data licence: local disk only"),
+                              f"exponential backoff on 429/5xx. Trade available_at = trade time; window available_at = max(end of the verified "
+                              f"known_since day, target expiry listing time), else the event time; value.event_time_basis '{REALISED}' marks "
+                              f"block-height events whose exact time and expiry boundary were not known in advance; trades_seen, trades_kept, "
+                              f"pages and complete are fetch metadata. Windows stored: {', '.join(windows_stored)}. Deribit states no data licence "
+                              f"(no redistribution right): local disk only (in_git=False), rebuild from this recipe"),
                       tags=["options", "crypto", "deribit", "trades", "events", "T-222"], schema=TRADE_SCHEMA, in_git=False)
     rep["stored"] = {"rows": e.rows, "bytes": e.bytes, "windows": windows_stored}
 
@@ -813,12 +911,24 @@ TARDIS_LICENCE = ("Tardis.dev licence (FAQ 'What can I use the data for?' and Te
                   "free first-of-month data included; no redistribution or resale of raw data (aggregates >= 10 minutes that cannot be "
                   "reverse-engineered excepted); no training or evaluation of general-purpose AI models; bind external service providers "
                   "(e.g. cloud AI services) in writing before giving them the data or results derived from it")
-BOX_TICKER_SCHEMA = ("kind option-ticker: value = {capture_day, instrument, expiry, expiry_code, dte, strike, type, snap ('first' = the 00:00 "
-                     "resubscribe snapshot, 'last' = last message in minute 00:00-00:01), n_messages, local_timestamp, spot_hint, ticker (raw "
+TARDIS_ACCESS = {
+    "status": "blocked from this host",
+    "checked": "2026-10-15",
+    "detail": ("keyless calls share one data-transfer budget per IP; this host is a shared egress proxy. HTTP 429 code 277 'This account "
+               "has reached its data transfer limit' with retryAfterSeconds 45818 at about 12:03Z; one small call got through at about "
+               "12:30Z; exhausted again minutes later (retryAfterSeconds 51829)"),
+    "run_from": "a host with its own IP (e.g. the Linode); never call /v1/exchanges/deribit (about 222 MB) from a shared host",
+}
+BOX_EXPIRIES_PER_DAY = 1.9          # measured 30-90 calendar-DTE expiry mix over the 91 capture days (quarterlies exactly 90 days out included)
+BOX_TICKER_SCHEMA = ("kind option-ticker: value = {capture_day, instrument, expiry, expiry_code, dte (fractional days from capture 00:00 UTC "
+                     "to the 08:00 UTC expiry), dte_days (calendar days, expiry date minus capture day; the 30-90 selection band uses this), "
+                     "strike, type, snap ('first' = the 00:00 resubscribe snapshot, 'last' = last message in minute 00:00-00:01), n_messages, "
+                     "local_timestamp, after_reconnect (the message came after a feed disconnect), spot_hint, ticker (raw "
                      "Deribit ticker: best_bid_price, best_ask_price, best_bid_amount, best_ask_amount, mark_price, mark_iv, bid_iv, ask_iv, "
                      "underlying_price, underlying_index, index_price, interest_rate, open_interest, greeks, timestamp, ...)}; prices in BTC; "
                      "available_at = Tardis local receive time | kind capture: value = {capture_day, spot_hint, expiries, strikes, symbols, "
-                     "received, status}; available_at = capture day 00:01 UTC")
+                     "received, status, disconnects {count, times [{after, before}]: empty feed lines, between the local timestamps of the "
+                     "neighbouring messages}}; available_at = capture day 00:01 UTC")
 
 
 def box_capture_days(first: str = TARDIS_FIRST_DAY, last: Optional[str] = None) -> list[str]:
@@ -849,9 +959,11 @@ def spot_hint(day: str, client: httpx.Client, throttle: Throttle, retries: int =
 
 
 def select_box_legs(instruments: Iterable[dict], day: str, spot: float, dte_min: float = 30, dte_max: float = 90, n_side: int = 2) -> list[dict]:
-    """For every expiry ``dte_min``..``dte_max`` days after ``day`` 00:00 UTC that was listed then: the ``n_side`` strikes at or
-    below ``spot`` and the ``n_side`` above it that have both a call and a put listed at that moment."""
+    """For every expiry ``dte_min``..``dte_max`` calendar days after ``day`` (expiry date minus capture day, both ends
+    included) that was listed at ``day`` 00:00 UTC: the ``n_side`` strikes at or below ``spot`` and the ``n_side`` above it
+    that have both a call and a put listed at that moment. ``dte`` keeps the fractional days to the 08:00 expiry."""
     t = _ms(day)
+    d0 = date.fromisoformat(day)
     by_exp: dict[int, dict[float, dict[str, str]]] = defaultdict(lambda: defaultdict(dict))
     for x in instruments:
         e, c = x.get("expiration_timestamp"), x.get("creation_timestamp")
@@ -861,7 +973,8 @@ def select_box_legs(instruments: Iterable[dict], day: str, spot: float, dte_min:
     out = []
     for e in sorted(by_exp):
         dte = (e - t) / DAY_MS
-        if not (dte_min <= dte <= dte_max):
+        dte_days = (datetime.fromtimestamp(e / 1000, tz=timezone.utc).date() - d0).days
+        if not (dte_min <= dte_days <= dte_max):
             continue
         both = sorted(k for k, v in by_exp[e].items() if "call" in v and "put" in v)
         below = [k for k in both if k <= spot][-n_side:]
@@ -870,8 +983,8 @@ def select_box_legs(instruments: Iterable[dict], day: str, spot: float, dte_min:
             continue
         strikes = below + above
         names = [by_exp[e][k][cp] for k in strikes for cp in ("call", "put")]
-        out.append({"expiry": _iso_ms(e)[:10], "expiry_code": expiry_code(e), "expiry_ts": e, "dte": round(dte, 3), "strikes": strikes,
-                    "instruments": names})
+        out.append({"expiry": _iso_ms(e)[:10], "expiry_code": expiry_code(e), "expiry_ts": e, "dte": round(dte, 3), "dte_days": dte_days,
+                    "strikes": strikes, "instruments": names})
     return out
 
 
@@ -881,10 +994,21 @@ def tardis_filters(symbols: list[str]) -> str:
 
 def parse_tardis(text: str) -> list[tuple[str, dict]]:
     """NDJSON lines ``<local ISO timestamp> <json>`` -> [(local timestamp as UTC ISO with microseconds, message)]."""
-    out = []
+    return parse_tardis_feed(text)[0]
+
+
+def parse_tardis_feed(text: str) -> tuple[list[tuple[str, dict]], list[dict]]:
+    """(messages as in ``parse_tardis``, disconnects). An empty line marks a disconnect (Tardis docs); it carries no time,
+    so each disconnect is recorded as {after: local timestamp of the last message before it, before: of the first after
+    it} (None at either end). The final newline of the body is not an empty line."""
+    out: list[tuple[str, dict]] = []
+    disconnects: list[dict] = []
     for ln in text.splitlines():
         ln = ln.strip()
-        if not ln or " " not in ln:
+        if not ln:
+            disconnects.append({"after": out[-1][0] if out else None, "before": None})
+            continue
+        if " " not in ln:
             continue
         ts, payload = ln.split(" ", 1)
         m = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?$", ts)
@@ -896,7 +1020,14 @@ def parse_tardis(text: str) -> list[tuple[str, dict]]:
             continue
         frac = (m.group(2) or "")[:6].ljust(6, "0")
         out.append((f"{m.group(1)}.{frac}+00:00", msg))
-    return out
+        for d in disconnects:
+            if d["before"] is None:
+                d["before"] = out[-1][0]
+    return out, disconnects
+
+
+def _after_reconnect(ts: str, disconnects: list[dict]) -> bool:
+    return any(d["before"] is not None and ts >= d["before"] for d in disconnects)
 
 
 def ticker_snapshots(lines: list[tuple[str, dict]]) -> dict[str, dict]:
@@ -928,7 +1059,9 @@ def tardis_minute(day: str, symbols: list[str], client: httpx.Client, throttle: 
     return None, info
 
 
-def box_rows(day: str, legs: list[dict], snaps: dict[str, dict], spot: Optional[float], observed_at: str, status: str) -> list[dict]:
+def box_rows(day: str, legs: list[dict], snaps: dict[str, dict], spot: Optional[float], observed_at: str, status: str,
+             disconnects: Optional[list[dict]] = None) -> list[dict]:
+    disconnects = disconnects or []
     meta = {name: (L, parse_instrument(name) or {}) for L in legs for name in L["instruments"]}
     rows = []
     for name in sorted(snaps):
@@ -940,12 +1073,14 @@ def box_rows(day: str, legs: list[dict], snaps: dict[str, dict], spot: Optional[
             rows.append({"source": "tardis", "kind": "option-ticker", "key": f"{day}:{name}:{snap}", "observed_at": observed_at,
                          "available_at": _cap(ts, observed_at),
                          "value": {"capture_day": day, "instrument": name, "expiry": L["expiry"], "expiry_code": L["expiry_code"], "dte": L["dte"],
-                                   "strike": p.get("strike"), "type": p.get("type"), "snap": snap, "n_messages": snaps[name]["n"],
-                                   "local_timestamp": ts, "spot_hint": spot, "ticker": data}})
+                                   "dte_days": L.get("dte_days"), "strike": p.get("strike"), "type": p.get("type"), "snap": snap,
+                                   "n_messages": snaps[name]["n"], "local_timestamp": ts, "after_reconnect": _after_reconnect(ts, disconnects),
+                                   "spot_hint": spot, "ticker": data}})
     rows.append({"source": "tardis", "kind": "capture", "key": day, "observed_at": observed_at, "available_at": _cap(day + "T00:01:00+00:00", observed_at),
                  "value": {"capture_day": day, "spot_hint": spot, "expiries": [L["expiry_code"] for L in legs],
                            "strikes": {L["expiry_code"]: L["strikes"] for L in legs}, "symbols": sum(len(L["instruments"]) for L in legs),
-                           "received": sum(1 for n in snaps if n in meta), "status": status}})
+                           "received": sum(1 for n in snaps if n in meta), "status": status,
+                           "disconnects": {"count": len(disconnects), "times": disconnects}}})
     return rows
 
 
@@ -955,6 +1090,10 @@ def fetch_tardis_box_monthly(store=None, days: Optional[Iterable[str]] = None, l
                              min_interval: float = 1.0, retries: int = 4, backoff: float = 1.0, report: Optional[dict] = None,
                              skip_stored: bool = False) -> list[dict]:
     """Bundle ``deribit-box-monthly`` (never in git: Tardis licence). Returns the archive rows of this run.
+
+    BLOCKED FROM THIS HOST as of 2026-10-15 (``TARDIS_ACCESS``): the keyless transfer budget is shared by everyone behind
+    the egress IP and was exhausted; the fetcher is kept and works from a host with its own IP. It stops at the first
+    long Retry-After (``rep['_aborted']``, with ``TARDIS_ACCESS`` attached) instead of sleeping through it.
 
     ``days`` defaults to every first-of-month from 2019-04-01 to today; ``limit`` keeps the first N of them (each capture
     day is fetched whole). ``instruments`` (compact BTC option list) skips the get_instruments download; ``spots``
@@ -971,11 +1110,12 @@ def fetch_tardis_box_monthly(store=None, days: Optional[Iterable[str]] = None, l
     if limit is not None:
         want = want[:limit]
     if dry_run:
+        per_day = 1 + BOX_EXPIRIES_PER_DAY * 2 * 4 * n_side          # capture row + (first, last) x (call, put) x 2*n_side strikes per expiry
         rep["_plan"] = {"days": len(want), "first": want[0] if want else None, "last": want[-1] if want else None,
                         "calls": len(want) * (1 if spots else 2) + (0 if instruments is not None else 2),
-                        "instrument_mb": 0 if instruments is not None else 77, "est_rows": round(len(want) * (1 + 2 * 1.5 * 4 * n_side)),
-                        "est_gz_kb": round(len(want) * (1 + 2 * 1.5 * 4 * n_side) * 0.15), "est_seconds": round(len(want) * 2 * (min_interval + 0.5) + 30),
-                        "est_tardis_transfer_kb": round(len(want) * 1.5 * 4 * n_side * 24 * 0.8 / 8)}
+                        "instrument_mb": 0 if instruments is not None else 77, "est_rows": round(len(want) * per_day),
+                        "est_gz_kb": round(len(want) * per_day * 0.15), "est_seconds": round(len(want) * 2 * (min_interval + 0.5) + 30),
+                        "est_tardis_transfer_kb": round(len(want) * BOX_EXPIRIES_PER_DAY * 4 * n_side * 24 * 0.8 / 8), "access": TARDIS_ACCESS}
         return []
     own = client is None
     c = client or _client()
@@ -998,16 +1138,18 @@ def fetch_tardis_box_monthly(store=None, days: Optional[Iterable[str]] = None, l
                 continue
             text, info = tardis_minute(day, symbols, c, th_feed, retries=retries, backoff=backoff)
             observed = now_iso()
-            snaps = ticker_snapshots(parse_tardis(text)) if text else {}
+            lines, disconnects = parse_tardis_feed(text) if text else ([], [])
+            snaps = ticker_snapshots(lines)
             got = sum(1 for s in symbols if s in snaps)
             status = "ok" if got == len(symbols) else ("partial" if got else "empty")
-            rep[day] = {**info, "spot": spot, "expiries": [L["expiry_code"] for L in legs], "symbols": len(symbols), "received": got, "status": status}
+            rep[day] = {**info, "spot": spot, "expiries": [L["expiry_code"] for L in legs], "symbols": len(symbols), "received": got, "status": status,
+                        "disconnects": len(disconnects)}
             if text is None and info.get("retry_after"):
-                rep["_aborted"] = {"day": day, "retry_after_s": info["retry_after"], "body": info.get("body")}
+                rep["_aborted"] = {"day": day, "retry_after_s": info["retry_after"], "body": info.get("body"), "access": TARDIS_ACCESS}
                 break
             if text is None or not got:
                 continue
-            rows.extend(box_rows(day, legs, snaps, spot, observed, status))
+            rows.extend(box_rows(day, legs, snaps, spot, observed, status, disconnects))
             done.add(day)
     finally:                                                # also on an interrupt: fetched days are kept
         if own:
@@ -1026,10 +1168,12 @@ def _store_box_bundle(archive, rows: list[dict], done: set[str], dte_min: float,
     stored_days = sorted({r["value"]["capture_day"] for r in allrows})
     e = archive.store(name, kind="data", rows=allrows,
                       recipe=(f"GET {TARDIS_FEED}?from=<YYYY-MM-01>&offset=0&filters=[{{\"channel\":\"ticker\",\"symbols\":[...]}}] (keyless, first day "
-                              f"of each month only; minute 00:00-00:01 UTC) for BTC box legs: every expiry {dte_min}-{dte_max} DTE listed that day "
+                              f"of each month only; minute 00:00-00:01 UTC; the keyless transfer budget is per IP, so run from a host with its own "
+                              f"IP) for BTC box legs: every expiry {dte_min}-{dte_max} calendar days out listed that day "
                               f"(creation_timestamp from {DERIBIT_HISTORY}get_instruments, expired=true and false), {n_side} strikes at/below and {n_side} above the "
                               f"spot hint ({DERIBIT_CHART} BTC-PERPETUAL 1h bar ending 00:00 UTC) with both call and put listed; first and last ticker "
-                              f"message per leg kept raw. via mandel.data.options_misc.fetch_tardis_box_monthly; {min_interval}s pacing, {retries} tries "
+                              f"message per leg kept raw; empty feed lines (disconnects) recorded on the capture row. via "
+                              f"mandel.data.options_misc.fetch_tardis_box_monthly; {min_interval}s pacing, {retries} tries "
                               f"with backoff (Retry-After honoured). available_at = Tardis local receive time. Capture days stored: {stored_days[0]}.."
                               f"{stored_days[-1]} ({len(stored_days)}). {TARDIS_LICENCE}: never in git"),
                       tags=["options", "crypto", "deribit", "tardis", "box", "monthly", "T-260"], schema=BOX_TICKER_SCHEMA, in_git=False)

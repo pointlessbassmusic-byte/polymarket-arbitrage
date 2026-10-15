@@ -378,8 +378,10 @@ def test_harness_end_to_end(fake, harness):
     assert isinstance(n, int) and n > 0
     assert reason.startswith("MODEL-PRICED") and " — " in reason
     assert "IV-scale sensitivity" in reason
+    assert "rule 10" in reason                                              # every harness states its entry-calendar treatment
     if harness == "b6_term_calendarised_fly":                               # T-152's claim names its window: priced from 2007-12
-        assert "claim window: monthly entries from 2007-12-04" in reason and "real VIX3M only, from its first print 2009-09-18" in reason
+        assert "claim window: daily entries from 2007-12-03" in reason and "real VIX3M only, from its first print 2009-09-18" in reason
+        assert "rule 10(b)" in reason and "start offsets pass" in reason
     elif harness != "b6_term_roll_tested_put":
         assert "2009-09-18" in reason                                       # the claim window starts at the first VIX3M print
         assert "window sensitivity" in reason
@@ -407,7 +409,9 @@ def test_t152_prices_claim_window(fake_long):
     """Regression (T-152): the claim's window (since 2007-12) is priced with VIX for VIX3M before the first VIX3M print and
     is not a not-implemented criterion; the real-VIX3M-only run and the VIX/VIX6M proxy are report-only sensitivities."""
     stat, n, verdict, reason = bt.HARNESSES["b6_term_calendarised_fly"](fake_long)
-    assert stat["first_entry"] == "2007-12-04" and stat["proxy_entries"] > 0
+    assert stat["first_entry"] == "2007-12-03" and stat["proxy_entries"] > 0     # every session of 2007-12 (pooled, rule 10b)
+    assert stat["offsets_summary"]["offsets"] == 21 and len(stat["halves"]) == 2 and all(len(h["ci"]) == 2 for h in stat["halves"])
+    assert "pin-risk sensitivity" in reason and "all entries (not the claim): mean P&L/debit time fly" in reason
     assert all(d < "2009-09-18" for d in stat["proxy_spike_days"])
     assert n == stat["n"] >= 15 and verdict == "supported" and reason.endswith("all criteria pass")
     assert "not implemented" not in reason and "the claim's window, top-decile months" not in reason
@@ -432,3 +436,112 @@ def test_t147_without_smile_is_inconclusive_at_best(fake):
     b = {k: v for k, v in fake.b.items() if not k.startswith("spy-smile-")}
     stat, n, verdict, reason = bt.HARNESSES["b6_term_double_diagonal"](FakeArchive(b))
     assert verdict == "inconclusive" and "spy-smile-<date>" in stat["missing_bundles"]
+
+
+# ------------------------------------------------------------------------- rule 10: entry calendars and grid phase --
+
+def test_monthly_expiries_third_friday_and_holiday():
+    """Rule 10(a): the standard monthly expiry is the third Friday, or the prior session when it is a holiday."""
+    days = [d for d in _days(260, date(2008, 1, 2)) if d != "2008-03-21"]           # Good Friday 2008: exchange holiday
+    m = bt.make_market(days, np.full(len(days), 100.0), np.full(len(days), 100.0), {"2007-12-31": 3.0})
+    g = bt.monthly_expiries(m, "2008-01-01"); got = [m.days[i] for i in g]
+    assert got[:5] == ["2008-01-18", "2008-02-15", "2008-03-20", "2008-04-18", "2008-05-16"]
+    assert all(date.fromisoformat(d).weekday() == 4 for d in got if d != "2008-03-20") and len(got) == 12
+    assert list(bt.monthly_expiries(m, "2008-01-19")) == list(g[1:])
+    g2, ec = bt.calendar_cycles(m, _flat_term(len(days), 0.2), "2008-01-21")
+    assert m.days[g2[0]] == "2008-02-15" and ec.size == g2.size + 24
+    assert list(ec[:g2.size]) == list(m.cal[g2]) and ec[g2.size] == date(2009, 1, 16).toordinal()   # projected past the data
+
+
+def test_calendar_roll_long_legs_expire_on_the_calendar():
+    """Rule 10(a): on the monthly expiry calendar the 90-DTE long is the expiry three cycles out (one cycle left at its
+    replacement) and the 12-month LEAPS the expiry twelve cycles out (three cycles, about 90 days, left)."""
+    n = 700; rng = np.random.default_rng(3)
+    m = _mkt(100 * np.exp(np.cumsum(rng.normal(0, 0.01, n))), 2.0); t = _flat_term(n, 0.2)
+    g, ec = bt.calendar_cycles(m, t, m.days[0])
+    assert all(date.fromisoformat(m.days[i]).weekday() == 4 and 15 <= int(m.days[i][8:]) <= 21 for i in g)
+    iv = lambda i, T: t.v30[np.asarray(i, int)]
+    for L, xc, buy, left in ((2, 1, (83, 99), (27, 36)), (9, 3, (356, 372), (83, 99))):
+        lg = bt.long_schedule(m, g, L, 0.0, "call", 0.7, iv, bt.Spreads.zero(), exp_cal=ec, extra_cycles=xc)
+        for j in np.flatnonzero(lg["first"]):
+            E = lg["E"][j]
+            assert E in set(ec) and buy[0] <= E - m.cal[g[j]] <= buy[1]
+            if j + L < g.size:
+                assert left[0] <= E - m.cal[g[j + L]] <= left[1]
+    dv = bt.diagonal_vs_vertical(m, t, g, bt.Spreads.zero(), exp_cal=ec)
+    assert dv["xd"].size == g.size - 1 and np.all(np.isfinite(dv["xd"]))
+
+
+def _phase_only_fly(effect_all=False, n_cycles=200, seed=20):
+    rng = np.random.default_rng(seed); n = 21 * n_cycles
+    dv = rng.normal(0, 3, n); top = dv >= np.quantile(dv, 0.9); ph0 = np.arange(n) % 21 == 0
+    xp = rng.normal(-0.2, 0.3, n)
+    plant = np.where(top, 0.5, 0.0) if effect_all else np.where(top & ph0, 0.5, np.where(top, -0.5 / 20, 0.0))
+    return xp + rng.normal(0, 0.1, n) + plant, xp, dv
+
+
+def test_rule10_t152_phase_only_effect_does_not_pass():
+    """Regression (T-540/T-154/T-152 refutation): an effect that exists on one start offset of the 21-session grid passes
+    on that grid alone but must not pass the pooled all-offset statistic, which is the primary one."""
+    xt, xp, dv = _phase_only_fly()
+    P0 = np.arange(0, xt.size, 21)
+    assert bt.judge_spike_decile(xt[P0], xp[P0], dv[P0], 15, NB)["verdict"] == "supported"     # the lucky single grid
+    j = bt.spike_decile_rule10(xt, xp, dv, 15, NB)
+    assert j["verdict"] == "not_supported" and j["block"] == 42 and j["n"] == 20           # n in spike-decile months
+    s = j["offsets_summary"]
+    assert s["offsets"] == 21 and 1 <= s["pass"] <= 2 and s["stat"][1] > 0.4
+    jp = bt.spike_decile_rule10(*_phase_only_fly(effect_all=True), 15, NB)                 # control: effect on every offset
+    assert jp["verdict"] == "supported" and jp["offsets_summary"]["pass"] == 21
+
+
+def test_rule10_t146_phase_only_effect_does_not_pass():
+    rng = np.random.default_rng(21); n = 21 * 220; ph0 = np.arange(n) % 21 == 0
+    xs = rng.normal(0, 1, n); xd = np.where(ph0, 0.5, 1.02) * xs + rng.normal(0, 0.05, n)
+    P0 = np.arange(0, n, 21)
+    assert bt.judge_std_ratio(xd[P0], xs[P0], 150, NB)["verdict"] == "supported"
+    j = bt.std_ratio_rule10(xd, xs, 150, NB)
+    assert j["verdict"] == "not_supported" and j["n"] == 220 and j["block"] == 42
+    assert j["offsets_summary"]["pass"] == 1 and j["offsets_summary"]["offsets"] == 21
+    ok = bt.std_ratio_rule10(0.5 * xs + rng.normal(0, 0.05, n), xs, 150, NB)
+    assert ok["verdict"] == "supported" and ok["offsets_summary"]["pass"] == 21
+
+
+def test_rule10_t147_gated_phase_only_effect_does_not_pass():
+    rng = np.random.default_rng(22); n = 21 * 240; gate = rng.random(n) < 0.6; ph0 = np.arange(n) % 21 == 0
+    d_all = rng.normal(0, 0.05, n) + np.where(ph0, 0.10, -0.10 / 20); d = d_all[gate]
+    old = d_all[ph0 & gate]
+    assert bt.judge_paired_halves({"flat IV": old, "SKEW tilt": old}, 80, "months", NB)["verdict"] == "supported"
+    j = bt.paired_halves_rule10({"flat IV": d, "SKEW tilt": d}, gate, 80, "low-VIX monthly entries", NB)
+    assert j["verdict"] == "not_supported" and j["n"] == bt.gated_units(gate) and 80 <= j["n"] <= 160
+    assert j["offsets_summary"]["pass"] == 1
+    miss = bt.paired_halves_rule10({"flat IV": d, "SKEW tilt": None}, gate, 80, "low-VIX monthly entries", NB)
+    assert miss["verdict"] == "not_supported"                                            # a failing series still fails
+
+
+def test_rule10_t149_pooled_weekly_offsets():
+    rng = np.random.default_rng(23); n = 5 * 400; dv = rng.normal(0, 2, n)
+    j = bt.spearman_rule10(rng.normal(0, 1, n), dv, 300, NB)
+    assert j["verdict"] == "supported" and j["n"] == 400 and j["block"] == 20 and j["offsets_summary"]["offsets"] == 5
+    ph0 = np.arange(n) % 5 == 0                                                         # correlated on one weekday only
+    x = np.where(ph0, dv, 0.0) + rng.normal(0, 1, n)
+    jj = bt.spearman_rule10(x, dv, 300, NB)
+    assert jj["offsets_summary"]["pass"] == 4 and jj["verdict"] == "supported"           # pooled |rho| ~ 0.17: the claim holds
+
+
+def test_rule10_t143_blocks_and_offsets():
+    x, ratio = _regime_data(1.0)
+    j = bt.judge_regime(x, ratio, x, 30, NB)
+    assert j["block"] == 42 and j["trial_block"] == 21 and j["lower_deflated_trial_block"] is not None
+    assert len(j["offsets"]) == 21 and j["offsets_summary"]["offsets"] == 21
+    assert bt.n_holds(np.arange(100, 4300), 21) == 200
+
+
+def test_rule10_calendar_harnesses_enter_on_monthly_expiries(fake):
+    for h in ("b6_term_long_diagonal", "b6_term_pmcc", "b6_term_leaps_collar"):
+        stat, n, verdict, reason = bt.HARNESSES[h](fake)
+        d = date.fromisoformat(stat["first_entry"])
+        assert d.weekday() == 4 and 15 <= d.day <= 21 and "rule 10(a)" in reason
+        assert stat["offsets_summary"]["offsets"] == 21 and "not the calendar the claim names" in reason
+    for h in ("b6_term_double_calendar", "b6_term_double_diagonal", "b6_term_ratio_calendar", "b6_term_calendarised_fly"):
+        stat, n, verdict, reason = bt.HARNESSES[h](fake)
+        assert "rule 10(b)" in reason and stat["offsets_summary"]["offsets"] in (5, 21) and stat["block"] in (20, 42)

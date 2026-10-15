@@ -7,6 +7,18 @@ data part and a strategy-simulation part and only the data part is implemented, 
 ``not_supported`` (the data part fails, so the claim fails) but never ``supported``: a passing data part
 returns ``inconclusive`` with the reason. Market-priced harnesses read the raw daily CBOE chain bundles,
 which live on the capturing machine's disk; elsewhere they report the missing bundles.
+
+Harness rule 10 (no arbitrary grid phase). No claim here names an entry or expiry calendar for its cycles. The claims tested on
+non-overlapping h-day cycles (T-148's sign test, T-231, T-232, T-238, T-243, T-530, T-533, T-534, T-536) have h equally valid grid
+starts, so the PRIMARY statistic pools them: an entry on every valid (signal) day with overlapping holds, a circular block bootstrap
+with blocks of 2h entries (2h consecutive entries span at least 2h sessions), studentized where the harness studentizes; a
+conditional frequency resamples the whole daily timeline in 2h-day blocks. Pass, fail and decisive are judged on it; the reason
+also reports each start's own non-overlapping grid (range, starts passing). n stays in the claim's units: non-overlapping cycles
+(for a conditional claim, the most non-overlapping cycles its signal days admit, i.e. the earliest-first lockout count). The spike
+claims (T-241, T-535) name event entries (the first event, then the first event after each 21-day hold), which do not depend on
+where the data starts; the pooled all-event-day frequency is reported beside them as robustness. Unaffected: T-148's overlapping
+daily series (block 63, as its trial states), the capture-day chain statistics (T-181, T-186, T-187, T-503, T-505, T-506), the
+fixed expiration dates of T-502 and the weekday splits of the daily series in T-264 and T-515.
 """
 
 from __future__ import annotations
@@ -65,6 +77,76 @@ def _rv_annual(r: np.ndarray, start: int, end: int, ppy: int = 252) -> float:
     return float(np.sum(seg ** 2) * ppy / len(seg))
 
 
+# ------------------------------------------------------------ rule 10: grid phase --
+
+def _lockout(entries, nxt) -> list:
+    """Earliest-first non-overlapping entries among sorted entry days: take one, skip to nxt(it). For equal holds this is the
+    largest set of non-overlapping cycles the days admit: the claim-unit count n of a conditional claim."""
+    out, free = [], -1
+    for t in entries:
+        if t >= free:
+            out.append(int(t)); free = nxt(int(t))
+    return out
+
+
+def _pooled_p(x, block: int, seed: int = 0) -> Optional[float]:
+    """Studentized circular block-bootstrap p (H0: mean <= 0) of pooled overlapping entries, blocks of ``block`` (>= 2 x hold)
+    entries; None when fewer than four blocks fit (block_bootstrap_pvalue would shorten the block below 2 x hold)."""
+    x = np.asarray(x, float)
+    return block_bootstrap_pvalue(x, np.zeros_like(x), n_boot=2000, block_len=block, seed=seed) if x.size >= 4 * block else None
+
+
+def _cycle_p(x) -> Optional[float]:
+    """One grid start's p on its non-overlapping cycles (studentized, block 2 cycles); None under 8 cycles."""
+    x = np.asarray(x, float)
+    return block_bootstrap_pvalue(x, np.zeros_like(x), n_boot=2000, block_len=2) if x.size >= 8 else None
+
+
+def _cbb_shares(hit, mask, block: int, n_boot: int = 2000, seed: int = 0) -> np.ndarray:
+    """Circular block bootstrap of the daily timeline (blocks of ``block`` days): mean(hit[mask]) on each resample, so clustered
+    signal days and their overlapping holds stay together. Resamples without a signal day are dropped."""
+    hit, mask = np.asarray(hit, bool), np.asarray(mask, bool)
+    n = hit.size; rng = np.random.default_rng(seed); nb = math.ceil(n / block)
+    idx = (rng.integers(0, n, (n_boot, nb))[:, :, None] + np.arange(block)).reshape(n_boot, -1)[:, :n] % n
+    m = mask[idx]; c = m.sum(axis=1); ok = c > 0
+    return (hit[idx] & m).sum(axis=1)[ok] / c[ok]
+
+
+def _pooled_freq_ci(hit, mask, block: int, alpha: float = 0.05):
+    """Percentile 1-alpha CI of the pooled conditional frequency mean(hit[mask]) (timeline blocks of ``block`` days); (None, None)
+    when fewer than four blocks fit or there is no signal day."""
+    hit, mask = np.asarray(hit, bool), np.asarray(mask, bool)
+    if hit.size < 4 * block or not mask.any():
+        return None, None
+    lo, hi = np.quantile(_cbb_shares(hit, mask, block), [alpha / 2, 1 - alpha / 2])
+    return float(lo), float(hi)
+
+
+def _pooled_share_p(pos, p0: float, block: int) -> Optional[float]:
+    """One-sided p for H0: share of True <= p0 on pooled overlapping entries (centred circular block bootstrap of the share,
+    blocks of ``block`` entries); None when fewer than four blocks fit."""
+    pos = np.asarray(pos, bool)
+    if pos.size < 4 * block:
+        return None
+    f = _cbb_shares(pos, np.ones(pos.size, bool), block); s = float(pos.mean())
+    return float((np.sum(f - s >= s - p0) + 1) / (f.size + 1))
+
+
+def _by_start(keys, hold: int, fn) -> list:
+    """Each of the ``hold`` start offsets' own non-overlapping grid: fn(mask) on the entries whose key % hold == k."""
+    keys = np.asarray(keys, dtype=np.int64)
+    return [dict(fn(keys % hold == k), start=k) for k in range(hold)]
+
+
+def _starts(rows: list, key: str, label: str, fmt: str = "+.4f") -> tuple[dict, str]:
+    """Summary of a _by_start scan (range of ``key``, starts passing) and its reason clause."""
+    v = [float(r[key]) for r in rows if r.get(key) is not None and np.isfinite(r[key])]
+    s = {"starts": len(rows), "passing": int(sum(bool(r["pass"]) for r in rows)), "passing_starts": [r["start"] for r in rows if r["pass"]],
+         "range": [min(v), max(v)] if v else [None, None]}
+    rng = f"{label} {s['range'][0]:{fmt}} to {s['range'][1]:{fmt}}, " if v else ""
+    return s, f"each of the {s['starts']} grid starts alone: {rng}{s['passing']} of {s['starts']} pass"
+
+
 # ------------------------------------------------------------------ FRED rates --
 
 def _bill_obs(series: dict, day: str) -> tuple[str, float]:
@@ -98,7 +180,11 @@ def _bill_used(dtb3: dict, day: str) -> dict:
 
 def forward_variance_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
     """T-148: FV = (93*VIX3M^2 - 30*VIX^2)/63 exceeds realised SPY variance over trading days 21..63 after entry;
-    pass: mean gap > 1 vol point, block-bootstrap CI excludes 0 in both halves, sign test p < 0.05 on non-overlapping windows."""
+    pass: mean gap > 1 vol point, block-bootstrap CI excludes 0 in both halves, sign test p < 0.05 on non-overlapping windows.
+    Rule 10: the mean and halves use the trial's overlapping daily series (block 63, as the trial states) and are unaffected. The
+    non-overlapping 63-day windows have 63 equally valid grid starts, so the sign test's primary form pools them: the share of
+    positive daily entries, one-sided p from a circular block bootstrap of that share with 126-day blocks (2 x hold); each
+    start's exact sign test is reported. Fewer than 4 x 126 entries: the pooled sign test cannot run (inconclusive)."""
     days, (vix, v3), S = _aligned_index_and_price([vix_rows, vix3m_rows], spy_rows, "SPY")
     r = np.diff(np.log(S))
     n = len(r) - 63
@@ -112,61 +198,84 @@ def forward_variance_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
     idx = np.array([g[0] for g in gaps]); g = np.array([g[1] for g in gaps])
     half = len(g) // 2
     p1 = _one_sided_p_mean_positive(g[:half], 63); p2 = _one_sided_p_mean_positive(g[half:], 63, 1)
-    non = g[::63]; k = int((non > 0).sum()); p_sign = _sign_test_p(k, len(non))
-    ok = g.mean() > 1.0 and p1 < 0.025 and p2 < 0.025 and p_sign < 0.05
-    return {"n": int(len(g)), "first_day": days[0], "mean_gap_vol_pts": float(g.mean()), "share_positive": float((g > 0).mean()),
-            "halves": [float(g[:half].mean()), float(g[half:].mean())], "p_halves": [p1, p2], "nonoverlap_n": len(non), "nonoverlap_positive": k, "p_sign": p_sign,
-            "verdict": "supported" if ok else "not_supported",
-            "reason": f"forward vol (VIX/VIX3M, days 21-63) exceeds realised by {g.mean():+.2f} vol pts on average ({(g > 0).mean()*100:.0f}% of {len(g)} days since {days[0]}); halves {g[:half].mean():+.2f}/{g[half:].mean():+.2f} (p {p1:.3f}/{p2:.3f}); sign test {k}/{len(non)} p={p_sign:.4f}"}
+    pos = g > 0
+    p_sign = _pooled_share_p(pos, 0.5, 126)
+    def _sign(sel):
+        k, m = int(pos[sel].sum()), int(sel.sum()); ps = _sign_test_p(k, m)
+        return {"n": m, "share": k / m if m else None, "p": ps, "pass": bool(m and ps < 0.05)}
+    per = _by_start(idx, 63, _sign)
+    ss, stxt = _starts(per, "share", "share positive", ".2f")
+    main_ok = bool(g.mean() > 1.0 and p1 < 0.025 and p2 < 0.025)
+    verdict = "not_supported" if not main_ok or (p_sign is not None and p_sign >= 0.05) else ("supported" if p_sign is not None else "inconclusive")
+    sign_txt = f"p={p_sign:.4f}" if p_sign is not None else "p n/a (fewer than 4 x 126 entries)"
+    return {"n": int(len(g)), "first_day": days[0], "mean_gap_vol_pts": float(g.mean()), "share_positive": float(pos.mean()),
+            "halves": [float(g[:half].mean()), float(g[half:].mean())], "p_halves": [p1, p2], "nonoverlap_n": -(-len(g) // 63), "p_sign": p_sign,
+            "sign_test_starts": ss, "verdict": verdict,
+            "reason": f"forward vol (VIX/VIX3M, days 21-63) exceeds realised by {g.mean():+.2f} vol pts on average ({pos.mean()*100:.0f}% of {len(g)} days since {days[0]}); halves {g[:half].mean():+.2f}/{g[half:].mean():+.2f} (p {p1:.3f}/{p2:.3f}; the trial's daily series, rule 10 unaffected); "
+                      f"sign test on non-overlapping 63d windows (rule 10, no entry calendar named): POOLED over all 63 grid starts, {pos.mean()*100:.0f}% of {len(g)} overlapping entries positive, block bootstrap (126-day blocks) {sign_txt}; {stxt} (sign test p < 0.05)"}
 
 
 T231_MIN_CYCLES = 70        # T-231 trial.min_n, in non-overlapping 63-day cycles
 
 
-def _significantly_negative(x: np.ndarray) -> bool:
+def _significantly_negative(x: np.ndarray, block: int = 2) -> bool:
     """Mean of x below 0 with the 95% CI wholly below 0: the mirror one-sided test (H0: mean >= 0) rejects at 2.5%, by the same studentized
-    block bootstrap as the pass-side test. Under 8 points no bootstrap runs, so nothing can be shown and the answer is False."""
-    return len(x) >= 8 and float(x.mean()) < 0 and block_bootstrap_pvalue(-x, np.zeros_like(x), n_boot=2000, block_len=2) < 0.025
+    block bootstrap as the pass-side test. With fewer than max(8, 4 x block) points no bootstrap runs, so nothing can be shown and the
+    answer is False."""
+    return len(x) >= max(8, 4 * block) and float(x.mean()) < 0 and block_bootstrap_pvalue(-x, np.zeros_like(x), n_boot=2000, block_len=block) < 0.025
 
 
 def term_vs_spot_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
     """T-231: (F^2 - RV[22..63]) - (VIX^2 - RV[1..21]) > 0 with F^2 = (3*VIX3M^2 - VIX^2)/2; conditional forward premium
     (VIX3M/VIX > 1.10) positive in both halves. Non-overlapping 63-day cycles.
+    Rule 10: the claim names no entry calendar, so the 63 grid starts are pooled: an entry on every day (overlapping cycles),
+    studentized circular block bootstrap with 126-day blocks; the halves split the pooled conditional entries in time. Each start's
+    own grid is reported. n_cycles stays in non-overlapping 63-day cycles (ceil(entries / 63)).
     Below trial.min_n (70 cycles) the verdict cannot be supported, and a failing criterion decides only when it fails decisively: the main
     premium's 95% CI lies wholly at or below 0, or a conditional half's mean is significantly negative. A non-significant shortfall there,
-    or a sample under 8 cycles (no bootstrap), is inconclusive."""
+    or a sample too short for four 126-day blocks (no bootstrap), is inconclusive."""
     days, (vix, v3), S = _aligned_index_and_price([vix_rows, vix3m_rows], spy_rows, "SPY")
     r = np.diff(np.log(S))
-    d, cond, ts = [], [], []
-    for t in range(0, len(r) - 63, 63):
+    ts = np.arange(max(len(r) - 63, 0))
+    d, fw = np.zeros(len(ts)), np.zeros(len(ts))
+    for t in ts:
         f2 = (3 * (v3[t] / 100) ** 2 - (vix[t] / 100) ** 2) / 2
-        fwd = f2 - _rv_annual(r, t + 21, t + 63); spot = (vix[t] / 100) ** 2 - _rv_annual(r, t, t + 21)
-        d.append(fwd - spot); ts.append(t)
-        if v3[t] / vix[t] > 1.10:
-            cond.append(fwd)
-    d = np.array(d, dtype=float); cond = np.array(cond, dtype=float)
+        fw[t] = f2 - _rv_annual(r, t + 21, t + 63); d[t] = fw[t] - ((vix[t] / 100) ** 2 - _rv_annual(r, t, t + 21))
+    con = (v3[:len(ts)] / vix[:len(ts)]) > 1.10
+    cond = fw[con]
+    n_cycles = -(-len(d) // 63)
     mean = float(d.mean()) if len(d) else float("nan")
-    p = block_bootstrap_pvalue(d, np.zeros_like(d), n_boot=2000, block_len=2) if len(d) >= 8 else None   # under 8 cycles: no test, never a decision
+    p = _pooled_p(d, 126)                                        # under four 126-day blocks: no test, never a decision
     h = len(cond) // 2
     parts = [cond[:h], cond[h:]]
     halves = [float(x.mean()) if len(x) else float("nan") for x in parts]
-    full = len(d) >= T231_MIN_CYCLES
+    full = n_cycles >= T231_MIN_CYCLES
     # (name, passes, fails decisively: the failure stands below trial.min_n because its interval lies wholly on the wrong side)
-    rows = [("forward premium > spot premium, 95% CI excluding 0", p is not None and mean > 0 and p < 0.025, _significantly_negative(d)),
-            ("conditional (VIX3M/VIX > 1.10) forward premium positive in both halves", all(x > 0 for x in halves), any(_significantly_negative(x) for x in parts))]
+    rows = [("forward premium > spot premium, 95% CI excluding 0", p is not None and mean > 0 and p < 0.025, _significantly_negative(d, 126)),
+            ("conditional (VIX3M/VIX > 1.10) forward premium positive in both halves", all(x > 0 for x in halves), any(_significantly_negative(x, 126) for x in parts))]
     criteria = [(name, bool(ok)) if (full or ok or decisive) else (name + " (fails, not decisively, below min_n: undecided)", None)
                 for name, ok, decisive in rows]
     # The claim's strategy clause is a criterion too: never supported until it is simulated.
     criteria.append(("short far leg / reverse calendar (vega-weighted) when VIX3M/VIX > 1.10 has positive expectancy (walk-forward "
                      "threshold, deflated Sharpe on the conditional short-forward-variance series, shuffled-ratio placebo, "
                      "ex-2008/2020 sensitivity): not implemented", None))
-    criteria.append((f"sample reaches trial min_n {T231_MIN_CYCLES} cycles ({len(d)} so far)", True if full else None))
+    criteria.append((f"sample reaches trial min_n {T231_MIN_CYCLES} cycles ({n_cycles} so far)", True if full else None))
     verdict, why = _verdict(criteria)
-    return {"n_cycles": int(len(d)), "min_n": T231_MIN_CYCLES, "mean_term_minus_spot_var": mean, "p_value": p, "n_conditional": int(len(cond)),
-            "conditional_forward_premium_halves": halves, "criteria": [[c, ok] for c, ok in criteria], "verdict": verdict,
-            "reason": f"forward premium minus spot premium {mean:+.4f} (variance units) over {len(d)} non-overlapping 63d cycles, "
-                      + (f"p={p:.3f}" if p is not None else "p n/a (under 8 cycles)")
-                      + f"; conditional (VIX3M/VIX>1.10, n={len(cond)}) forward premium halves {halves[0]:+.4f}/{halves[1]:+.4f}; verdict: {why}"}
+
+    def _one(sel):
+        x, c = d[sel], fw[sel & con]; pk = _cycle_p(x); hk = len(c) // 2
+        hv = [float(c[:hk].mean()), float(c[hk:].mean())] if hk else [float("nan")] * 2
+        return {"n": int(x.size), "mean": float(x.mean()) if x.size else None, "p": pk,
+                "pass": bool(x.size and pk is not None and x.mean() > 0 and pk < 0.025 and all(v > 0 for v in hv))}
+    ss, stxt = _starts(_by_start(ts, 63, _one), "mean", "premium")
+    return {"n_cycles": int(n_cycles), "min_n": T231_MIN_CYCLES, "n_entries": int(len(d)), "mean_term_minus_spot_var": mean, "p_value": p,
+            "n_conditional": len(_lockout(np.flatnonzero(con), lambda t: t + 63)), "n_conditional_entries": int(len(cond)),
+            "conditional_forward_premium_halves": halves, "grid_starts": ss, "criteria": [[c, ok] for c, ok in criteria], "verdict": verdict,
+            "reason": f"forward premium minus spot premium {mean:+.4f} (variance units), rule 10 (no entry calendar named): POOLED over all 63 starts of the "
+                      f"non-overlapping 63d grid = {len(d)} overlapping daily entries ({n_cycles} cycles), studentized block bootstrap (126-day blocks) "
+                      + (f"p={p:.3f}" if p is not None else "p n/a (fewer than four 126-day blocks)")
+                      + f"; conditional (VIX3M/VIX>1.10, {len(cond)} entries) forward premium halves {halves[0]:+.4f}/{halves[1]:+.4f}; "
+                      + f"{stxt} both data criteria; verdict: {why}"}
 
 
 
@@ -174,7 +283,9 @@ def term_vs_spot_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
 
 def vvix_premium(vvix_rows, vix_rows) -> dict:
     """T-243 (data part): VVIX - realised vol of VIX over the next 21 days > 10 pts with 99% CI excluding 0, quartile
-    means increasing in VVIX. The strangle simulation is not implemented, so a pass is reported inconclusive."""
+    means increasing in VVIX. The strangle simulation is not implemented, so a pass is reported inconclusive.
+    Rule 10: the trial's non-overlapping 21-day cycles have 21 grid starts; the primary statistic already pools them (every day, studentized
+    circular block bootstrap, 42-day blocks = 2 x hold). Each start's own grid is reported (block 2 cycles)."""
     vv = index_closes(vvix_rows); vx = index_closes(vix_rows)
     days = sorted(d for d in vv if d in vx)
     VV = np.array([vv[d] for d in days]); VX = np.array([vx[d] for d in days])
@@ -185,38 +296,54 @@ def vvix_premium(vvix_rows, vix_rows) -> dict:
         gaps.append(VV[t] - rv); lvl.append(VV[t])
     g = np.array(gaps); L = np.array(lvl)
     p = _one_sided_p_mean_positive(g - 10.0, 42)
-    qs = np.quantile(L, [0.25, 0.5, 0.75]); qi = np.searchsorted(qs, L)
-    qmeans = [float(g[qi == i].mean()) for i in range(4)]
-    mono = all(qmeans[i] < qmeans[i + 1] for i in range(3))
+
+    def _quart(gx, Lx):
+        qi = np.searchsorted(np.quantile(Lx, [0.25, 0.5, 0.75]), Lx)
+        qm = [float(gx[qi == i].mean()) if (qi == i).any() else float("nan") for i in range(4)]
+        return qm, all(qm[i] < qm[i + 1] for i in range(3))
+    qmeans, mono = _quart(g, L)
     data_ok = g.mean() > 10 and p < 0.005 and mono
+
+    def _one(sel):
+        x = g[sel]; pk = _cycle_p(x - 10.0)
+        return {"n": int(x.size), "mean": float(x.mean()) if x.size else None,
+                "pass": bool(x.size >= 8 and x.mean() > 10 and pk < 0.005 and _quart(x, L[sel])[1])}
+    ss, stxt = _starts(_by_start(np.arange(len(g)), 21, _one), "mean", "mean gap", "+.1f")
     return {"n": int(len(g)), "first_day": days[0], "mean_gap": float(g.mean()), "p_gap_above_10": p, "quartile_means": qmeans, "monotone": mono,
-            "verdict": "inconclusive" if data_ok else "not_supported",
-            "reason": (f"VVIX exceeds realised VIX vol by {g.mean():.1f} pts on average over {len(g)} days (p for gap > 10: {p:.4f}); quartile gaps " + "/".join(f"{x:.1f}" for x in qmeans)
-                       + (" increasing" if mono else " NOT monotone") + ("; data part passes, strangle simulation not implemented" if data_ok else "")
+            "grid_starts": ss, "verdict": "inconclusive" if data_ok else "not_supported",
+            "reason": (f"VVIX exceeds realised VIX vol by {g.mean():.1f} pts on average over {len(g)} days (rule 10: all 21 starts of the 21d grid pooled, 42-day blocks; p for gap > 10: {p:.4f}); quartile gaps " + "/".join(f"{x:.1f}" for x in qmeans)
+                       + (" increasing" if mono else " NOT monotone") + f"; {stxt}" + ("; data part passes, strangle simulation not implemented" if data_ok else "")
                        + "; note: VVIX is the implied vol of VIX futures, which move less than spot VIX, so comparing it with spot-VIX realised vol (as the claim does) understates any vol-of-vol premium")}
 
 
 def short_horizon_conditional(vix9d_rows, spy_rows) -> dict:
     """T-232 (data part): when VIX9D < trailing 10-day realised SPY vol, next-9-day RV^2 - VIX9D^2 > 0 with CI excluding 0.
-    Non-overlapping 9-day cycles. Simulation part not implemented (pass -> inconclusive)."""
+    Non-overlapping 9-day cycles. Simulation part not implemented (pass -> inconclusive).
+    Rule 10: no entry calendar is named, so the primary statistic pools every signal day (overlapping 9-day cycles, studentized circular
+    block bootstrap, blocks of 18 entries = 2 x hold); each start of the 9-day grid is reported. n = non-overlapping signal cycles."""
     days, (v9,), S = _aligned_index_and_price([vix9d_rows], spy_rows, "SPY")
     r = np.diff(np.log(S))
-    d = []
-    t = 10
-    while t + 9 <= len(r):
-        trailing = math.sqrt(_rv_annual(r, t - 10, t)) * 100
-        if v9[t] < trailing:
-            d.append(_rv_annual(r, t, t + 9) - (v9[t] / 100) ** 2); t += 9
-        else:
-            t += 1
-    d = np.array(d)
-    if len(d) < 30:
-        return {"n": len(d), "verdict": "inconclusive", "reason": f"only {len(d)} signal cycles"}
-    p = block_bootstrap_pvalue(d, np.zeros_like(d), n_boot=2000, block_len=2)
-    data_ok = d.mean() > 0 and p < 0.025
-    return {"n_signals": int(len(d)), "mean_rv2_minus_iv2": float(d.mean()), "win_rate": float((d > 0).mean()), "p_value": p,
-            "verdict": "inconclusive" if data_ok else "not_supported",
-            "reason": f"{len(d)} signals (VIX9D below trailing 10d realised): next-9d RV^2 - VIX9D^2 mean {d.mean():+.4f}, realised wins {(d > 0).mean()*100:.0f}%, p={p:.3f}" + ("; data part passes, swap simulation not implemented" if data_ok else "")}
+    ts, d = [], []
+    for t in range(10, len(r) - 8):                               # t + 9 <= len(r)
+        if v9[t] < math.sqrt(_rv_annual(r, t - 10, t)) * 100:
+            ts.append(t); d.append(_rv_annual(r, t, t + 9) - (v9[t] / 100) ** 2)
+    ts = np.array(ts, dtype=np.int64); d = np.array(d, dtype=float)
+    n = len(_lockout(ts, lambda t: t + 9))
+    if n < 30:
+        return {"n": n, "verdict": "inconclusive", "reason": f"only {n} non-overlapping signal cycles"}
+    p = _pooled_p(d, 18)
+    data_ok = bool(d.mean() > 0 and p is not None and p < 0.025)
+
+    def _one(sel):
+        x = d[sel]; pk = _cycle_p(x)
+        return {"n": int(x.size), "mean": float(x.mean()) if x.size else None, "pass": bool(x.size and pk is not None and x.mean() > 0 and pk < 0.025)}
+    ss, stxt = _starts(_by_start(ts, 9, _one), "mean", "mean")
+    p_txt = f"p={p:.3f}" if p is not None else "p n/a (fewer than four 18-entry blocks)"
+    return {"n_signals": n, "n_entries": int(len(d)), "mean_rv2_minus_iv2": float(d.mean()), "win_rate": float((d > 0).mean()), "p_value": p,
+            "grid_starts": ss, "verdict": "inconclusive" if (data_ok or p is None) else "not_supported",
+            "reason": f"{n} non-overlapping signal cycles (VIX9D below trailing 10d realised); rule 10 (no entry calendar named): POOLED over all {len(d)} signal days "
+                      f"(every start of the 9d grid, overlapping, 18-entry blocks): next-9d RV^2 - VIX9D^2 mean {d.mean():+.4f}, realised wins {(d > 0).mean()*100:.0f}%, {p_txt}; {stxt}"
+                      + ("; data part passes, swap simulation not implemented" if data_ok else "")}
 
 
 # ------------------------------------------------------------------ VIX forwards --
@@ -228,27 +355,54 @@ def _vix_forward(vix, v3):
 
 def vix_forward_contango(vix_rows, vix3m_rows) -> dict:
     """T-238 (data part): when VIX3M/VIX > 1.10, P(VIX_{t+21} < F) > 0.60 with 95% CI above 0.5 and mean F - VIX_{t+21} > 0 (p < 0.05).
-    Non-overlapping 21-day cycles. Call-spread simulation not implemented (pass -> inconclusive)."""
+    Non-overlapping 21-day cycles. Call-spread simulation not implemented (pass -> inconclusive).
+    Rule 10: no entry calendar is named, so the primary statistics pool every contango day (overlapping 21-day cycles): the frequency's
+    95% CI from a circular block bootstrap of the daily timeline (42-day blocks), the mean gap's p studentized (blocks of 42 entries).
+    Each start of the 21-day grid is reported (exact binomial CI, block 2 cycles). n = non-overlapping contango cycles."""
     vx = index_closes(vix_rows); v3 = index_closes(vix3m_rows)
     days = sorted(d for d in vx if d in v3)
     VX = np.array([vx[d] for d in days]); V3 = np.array([v3[d] for d in days]); F = _vix_forward(VX, V3)
-    hits, gaps = [], []
-    t = 0
-    while t + 21 < len(VX):
-        if V3[t] / VX[t] > 1.10:
-            hits.append(VX[t + 21] < F[t]); gaps.append(F[t] - VX[t + 21]); t += 21
-        else:
-            t += 1
-    n = len(hits); k = int(sum(hits)); g = np.array(gaps)
-    lo, hi = _binom_two_sided_ci(k, n)
-    p = block_bootstrap_pvalue(g, np.zeros_like(g), n_boot=2000, block_len=2) if n >= 8 else 1.0
-    data_ok = k / n > 0.60 and lo > 0.5 and g.mean() > 0 and p < 0.05
-    return {"n": n, "freq_below_forward": k / n, "ci95": [lo, hi], "mean_F_minus_vix21": float(g.mean()), "p_value": p,
-            "verdict": "inconclusive" if data_ok else "not_supported",
-            "reason": f"in contango (VIX3M/VIX>1.10), VIX 21 days later is below the forward {k}/{n} = {k/n:.0%} (95% CI {lo:.2f}-{hi:.2f}); mean F - VIX(t+21) {g.mean():+.2f} pts, p={p:.4f}" + ("; data part passes, call-spread simulation not implemented" if data_ok else "")}
+    ts = np.arange(max(len(VX) - 21, 0))
+    con = V3[ts] / VX[ts] > 1.10; hit_all = VX[ts + 21] < F[ts]
+    e = ts[con]; hit = hit_all[con]; g = F[e] - VX[e + 21]
+    n, m, k = len(_lockout(e, lambda t: t + 21)), int(hit.size), int(hit.sum())
+    if m == 0:
+        return {"n": 0, "verdict": "inconclusive", "reason": "no contango day (VIX3M/VIX > 1.10) with a 21-day forward window"}
+    lo, hi = _pooled_freq_ci(hit_all, con, 42)
+    p = _pooled_p(g, 42)
+    testable = lo is not None and p is not None
+    data_ok = bool(testable and k / m > 0.60 and lo > 0.5 and g.mean() > 0 and p < 0.05)
+
+    def _one(sel):
+        kk, nn, x = int(hit[sel].sum()), int(sel.sum()), g[sel]
+        lk = _binom_two_sided_ci(kk, nn)[0] if nn else 0.0; pk = _cycle_p(x)
+        return {"n": nn, "freq": kk / nn if nn else None, "pass": bool(nn and kk / nn > 0.60 and lk > 0.5 and x.mean() > 0 and pk is not None and pk < 0.05)}
+    ss, stxt = _starts(_by_start(e, 21, _one), "freq", "frequency", ".2f")
+    ci_txt = f"95% CI {lo:.2f}-{hi:.2f}" if lo is not None else "CI n/a (fewer than four 42-day blocks)"
+    p_txt = f"p={p:.4f}" if p is not None else "p n/a"
+    return {"n": n, "n_entries": m, "freq_below_forward": k / m, "ci95": [lo, hi], "mean_F_minus_vix21": float(g.mean()), "p_value": p,
+            "grid_starts": ss, "verdict": "inconclusive" if (data_ok or not testable) else "not_supported",
+            "reason": f"{n} non-overlapping contango cycles (VIX3M/VIX>1.10); rule 10 (no entry calendar named): POOLED over all {m} contango days (every start of the 21d grid, overlapping, "
+                      f"42-day blocks): VIX 21 days later is below the forward {k}/{m} = {k/m:.0%} ({ci_txt}); mean F - VIX(t+21) {g.mean():+.2f} pts, {p_txt}; {stxt}"
+                      + ("; data part passes, call-spread simulation not implemented" if data_ok else "")}
 
 
 T241_MIN_EVENTS = 25        # T-241 trial.min_n, in spike events
+
+
+def _spike_pooled(VX, V3, Fx, label: str) -> tuple[dict, str]:
+    """Robustness for the spike claims (rule 10 does not apply: they name event entries, the first event and then the first event
+    after each 21-day hold, which do not depend on where the data starts): every event day pooled with overlapping 21-day holds,
+    frequencies below ``Fx`` and below spot with 95% CIs from a circular block bootstrap of the daily timeline (42-day blocks)."""
+    ts = np.arange(max(len(VX) - 21, 0))
+    ev = (VX[ts] > 30) & (VX[ts] > V3[ts]); bf = VX[ts + 21] < Fx[ts]; bs = VX[ts + 21] < VX[ts]
+    if not ev.any():
+        return {"event_days": 0}, "no event day to pool"
+    (fl, fh), (sl, sh) = _pooled_freq_ci(bf, ev, 42), _pooled_freq_ci(bs, ev, 42)
+    out = {"event_days": int(ev.sum()), "p_below_forward": float(bf[ev].mean()), "ci_forward": [fl, fh], "p_below_spot": float(bs[ev].mean()), "ci_spot": [sl, sh]}
+    ci = lambda lo, hi: f" ({lo:.2f}-{hi:.2f})" if lo is not None else ""
+    return out, (f"robustness, all {out['event_days']} event days pooled (overlapping, 42-day timeline blocks): below {label} {out['p_below_forward']:.0%}{ci(fl, fh)}, "
+                 f"below spot {out['p_below_spot']:.0%}{ci(sl, sh)} (rule 10 does not apply: event entries, independent of where the data starts)")
 
 
 def vix_spike_forward(vix_rows, vix3m_rows) -> dict:
@@ -257,7 +411,8 @@ def vix_spike_forward(vix_rows, vix3m_rows) -> dict:
     VIX in MORE than 75% of events; the put-spread P&L part (priced with VVIX) is not implemented, so the verdict is at best inconclusive.
     The strategy-side reading (P(<F) > 0.5 with the CI above 0.5) refutes this claim; it is T-535's wording (spike_forward_v2).
     Below trial.min_n (25 events) only a decisive failure (an exact CI on the wrong side of the claimed bound) can decide.
-    Non-overlapping 21-day event entries."""
+    Non-overlapping 21-day event entries. Rule 10 does not apply: the claim names its entries (the first event, then the first event after
+    each 21-day hold), which do not depend on where the data starts; the pooled all-event-day frequencies are reported as robustness."""
     vx = index_closes(vix_rows); v3 = index_closes(vix3m_rows)
     days = sorted(d for d in vx if d in v3)
     VX = np.array([vx[d] for d in days]); V3 = np.array([v3[d] for d in days]); F = _vix_forward(VX, V3)
@@ -283,12 +438,13 @@ def vix_spike_forward(vix_rows, vix3m_rows) -> dict:
                  (f"sample reaches trial min_n {T241_MIN_EVENTS} events ({n} so far)", True if full else None)]
     verdict, why = _verdict(criteria)
     strategy_passes = kf / n > 0.5 and lf > 0.5
+    pooled, ptxt = _spike_pooled(VX, V3, F, "F")
     return {"n_events": n, "min_n": T241_MIN_EVENTS, "p_below_forward": kf / n, "ci_forward": [lf, hf], "p_below_spot": ks / n, "ci_spot": [ls, hs],
-            "criteria": [[c, ok] for c, ok in criteria], "verdict": verdict,
+            "pooled_event_days": pooled, "criteria": [[c, ok] for c, ok in criteria], "verdict": verdict,
             "reason": f"{n} spike events (VIX>30, backwardation): VIX 21 days later below the forward in {kf}/{n} ({lf:.2f}-{hf:.2f}), below spot in {ks}/{n} ({ls:.2f}-{hs:.2f})"
                       + ("; the curve UNDER-prices the reversion (the strategy-side pass rule is met), which refutes the claim sentence that the curve already prices the decline (that reading is T-535)"
                          if strategy_passes else "; finding: the forward is fair after spikes")
-                      + f"; verdict: {why}"}
+                      + f"; {ptxt}; verdict: {why}"}
 
 
 # ------------------------------------------------------------- chains: boxes, parity --
@@ -734,44 +890,64 @@ def btc_weekend_ratio_v2(btc_rows, start_year: int = 2017, n_boot: int = 2000, s
 
 def conditional_forward_v2(vix_rows, vix3m_rows, spy_rows) -> dict:
     """T-530: conditional on VIX3M/VIX > 1.10, F^2 = (93*VIX3M^2 - 30*VIX^2)/63 minus SPY variance over trading days 22-63 > 0 with the 95% CI
-    excluding zero, positive in both halves (non-overlapping 63-day entries)."""
+    excluding zero, positive in both halves (non-overlapping 63-day entries).
+    Rule 10: no entry calendar is named, so the primary statistic pools every contango day ("plus all daily starts", as the trial also
+    asks): overlapping 63-day cycles, studentized circular block bootstrap with blocks of 126 entries (2 x hold), halves split the pooled
+    entries in time. Each start of the 63-day grid is reported. n = non-overlapping contango cycles (the trial's units)."""
     days, (vix, v3), S = _aligned_index_and_price([vix_rows, vix3m_rows], spy_rows, "SPY")
-    r = np.diff(np.log(S)); x = []
-    t = 0
-    while t + 63 <= len(r):
-        if v3[t] / vix[t] > 1.10:
-            f2 = (93 * (v3[t] / 100) ** 2 - 30 * (vix[t] / 100) ** 2) / 63
-            x.append(f2 - _rv_annual(r, t + 21, t + 63)); t += 63
-        else:
-            t += 1
-    x = np.array(x)
-    p = block_bootstrap_pvalue(x, np.zeros_like(x), n_boot=2000, block_len=2)
-    h = len(x) // 2; halves = [float(x[:h].mean()), float(x[h:].mean())]
-    ok = x.mean() > 0 and p < 0.025 and all(z > 0 for z in halves)
-    return {"n": int(len(x)), "mean_var": float(x.mean()), "p": p, "halves": halves, "verdict": "supported" if ok else "not_supported",
-            "reason": f"{len(x)} contango entries: forward variance minus realised (days 22-63) {x.mean():+.4f} (p={p:.4f}), halves {halves[0]:+.4f}/{halves[1]:+.4f}"}
+    r = np.diff(np.log(S))
+    e = np.array([t for t in range(max(len(r) - 62, 0)) if v3[t] / vix[t] > 1.10], dtype=np.int64)     # t + 63 <= len(r)
+    x = np.array([(93 * (v3[t] / 100) ** 2 - 30 * (vix[t] / 100) ** 2) / 63 - _rv_annual(r, t + 21, t + 63) for t in e], dtype=float)
+    n = len(_lockout(e, lambda t: t + 63))
+    if not x.size:
+        return {"n": 0, "verdict": "inconclusive", "reason": "no contango day (VIX3M/VIX > 1.10) with a 63-day forward window"}
+    p = _pooled_p(x, 126)
+    h = len(x) // 2; halves = [float(x[:h].mean()) if h else float("nan"), float(x[h:].mean())]
+    ok = bool(x.mean() > 0 and p is not None and p < 0.025 and all(z > 0 for z in halves))
+
+    def _one(sel):
+        xs = x[sel]; pk = _cycle_p(xs); hk = len(xs) // 2
+        return {"n": int(xs.size), "mean": float(xs.mean()) if xs.size else None,
+                "pass": bool(hk and pk is not None and xs.mean() > 0 and pk < 0.025 and xs[:hk].mean() > 0 and xs[hk:].mean() > 0)}
+    ss, stxt = _starts(_by_start(e, 63, _one), "mean", "mean")
+    p_txt = f"p={p:.4f}" if p is not None else "p n/a (fewer than four 126-entry blocks)"
+    return {"n": n, "n_entries": int(x.size), "mean_var": float(x.mean()), "p": p, "halves": halves, "grid_starts": ss,
+            "verdict": "supported" if ok else ("inconclusive" if p is None else "not_supported"),
+            "reason": f"{n} non-overlapping contango cycles; rule 10 (no entry calendar named): POOLED over all {x.size} contango days (every start of the 63d grid, "
+                      f"overlapping, 126-entry blocks): forward variance minus realised (days 22-63) {x.mean():+.4f} ({p_txt}), halves {halves[0]:+.4f}/{halves[1]:+.4f}; {stxt}"}
 
 
 def vix9d_v2(vix9d_rows, spy_rows) -> dict:
     """T-533: conditional on VIX9D < trailing 10-day realised SPY vol, SPY variance realised over the next 9 calendar days exceeds VIX9D^2
-    on average (95% CI excluding zero). Non-overlapping signals."""
+    on average (95% CI excluding zero). Non-overlapping signals.
+    Rule 10: the trial's non-overlapping 9-calendar-day windows name no entry calendar, so the primary statistic pools every signal day
+    (overlapping windows, studentized circular block bootstrap, blocks of 18 entries >= 2 x 9 days); each start of the 9-calendar-day
+    grid (calendar ordinal mod 9) is reported. n = non-overlapping signal windows (the next window opens after the last one closes)."""
     days, (v9,), S = _aligned_index_and_price([vix9d_rows], spy_rows, "SPY")
-    r = np.diff(np.log(S)); dts = [date.fromisoformat(d) for d in days]; x = []
-    t = 10
-    while t < len(r) - 8:
+    r = np.diff(np.log(S)); dts = [date.fromisoformat(d) for d in days]
+    ts, ends, x = [], [], []
+    for t in range(10, len(r) - 8):
         end = t
         while end + 1 < len(dts) and (dts[end + 1] - dts[t]).days <= 9:
             end += 1
-        trailing = math.sqrt(_rv_annual(r, t - 10, t)) * 100
-        if v9[t] < trailing and end > t:
-            x.append(_rv_annual(r, t, end) - (v9[t] / 100) ** 2); t = end + 1
-        else:
-            t += 1
-    x = np.array(x)
-    p = block_bootstrap_pvalue(x, np.zeros_like(x), n_boot=2000, block_len=2)
-    ok = x.mean() > 0 and p < 0.025
-    return {"n_signals": int(len(x)), "mean": float(x.mean()), "p": p, "verdict": "supported" if ok else "not_supported",
-            "reason": f"{len(x)} signals: next-9-calendar-day RV^2 - VIX9D^2 mean {x.mean():+.4f} (realised larger in {(x > 0).mean()*100:.0f}%), p={p:.3f}"}
+        if v9[t] < math.sqrt(_rv_annual(r, t - 10, t)) * 100 and end > t:
+            ts.append(t); ends.append(end); x.append(_rv_annual(r, t, end) - (v9[t] / 100) ** 2)
+    x = np.array(x, dtype=float)
+    end_of = dict(zip(ts, ends)); n = len(_lockout(ts, lambda t: end_of[t] + 1))
+    if not x.size:
+        return {"n_signals": 0, "verdict": "inconclusive", "reason": "no signal day (VIX9D below trailing 10-day realised) with a 9-day window"}
+    p = _pooled_p(x, 18)
+    ok = bool(x.mean() > 0 and p is not None and p < 0.025)
+
+    def _one(sel):
+        xs = x[sel]; pk = _cycle_p(xs)
+        return {"n": int(xs.size), "mean": float(xs.mean()) if xs.size else None, "pass": bool(xs.size and pk is not None and xs.mean() > 0 and pk < 0.025)}
+    ss, stxt = _starts(_by_start([dts[t].toordinal() for t in ts], 9, _one), "mean", "mean")
+    p_txt = f"p={p:.3f}" if p is not None else "p n/a (fewer than four 18-entry blocks)"
+    return {"n_signals": n, "n_entries": int(x.size), "mean": float(x.mean()), "p": p, "grid_starts": ss,
+            "verdict": "supported" if ok else ("inconclusive" if p is None else "not_supported"),
+            "reason": f"{n} non-overlapping signal windows; rule 10 (no entry calendar named): POOLED over all {x.size} signal days (every start of the 9-calendar-day grid, overlapping, "
+                      f"18-entry blocks): next-9-calendar-day RV^2 - VIX9D^2 mean {x.mean():+.4f} (realised larger in {(x > 0).mean()*100:.0f}%), {p_txt}; {stxt}"}
 
 
 def _f93(vix, v3):
@@ -780,27 +956,43 @@ def _f93(vix, v3):
 
 def contango_forward_v2(vix_rows, vix3m_rows, vvix_rows) -> dict:
     """T-534: when VIX3M/VIX > 1.10, VIX(t+21) < F_adj in > 60% of non-overlapping months: the exact lower 95% bound of the frequency > 0.60
-    on F_adj = F exp(-(VVIX/100)^2 T/2), T = 1/12, and mean F_adj - VIX(t+21) > 0 at p < 0.05. F (unadjusted) reported."""
+    on F_adj = F exp(-(VVIX/100)^2 T/2), T = 1/12, and mean F_adj - VIX(t+21) > 0 at p < 0.05. F (unadjusted) reported.
+    Rule 10: 'non-overlapping months' (the trial's non-overlapping 21-day cycles) name no entry calendar, so the primary statistics pool
+    every contango day (overlapping 21-day cycles): the frequency's 95% CI from a circular block bootstrap of the daily timeline (42-day
+    blocks), the mean gap's p studentized (blocks of 42 entries). Each start of the 21-day grid is reported (exact binomial CI, block 2
+    cycles). n = non-overlapping contango months."""
     vx, v3, vv = index_closes(vix_rows), index_closes(vix3m_rows), index_closes(vvix_rows)
     days = sorted(d for d in vx if d in v3 and d in vv)
     VX = np.array([vx[d] for d in days]); V3 = np.array([v3[d] for d in days]); VV = np.array([vv[d] for d in days])
     F = _f93(VX, V3); Fa = F * np.exp(-((VV / 100) ** 2) * (1 / 12) / 2)
-    hit, hitF, gap = [], [], []
-    t = 0
-    while t + 21 < len(VX):
-        if V3[t] / VX[t] > 1.10:
-            hit.append(VX[t + 21] < Fa[t]); hitF.append(VX[t + 21] < F[t]); gap.append(Fa[t] - VX[t + 21]); t += 21
-        else:
-            t += 1
-    n, k = len(hit), int(sum(hit)); lo, hi = _binom_two_sided_ci(k, n); g = np.array(gap)
-    p = block_bootstrap_pvalue(g, np.zeros_like(g), n_boot=2000, block_len=2)
-    ok = lo > 0.60 and g.mean() > 0 and p < 0.05
-    return {"n": n, "freq_adj": k / n, "ci": [lo, hi], "freq_unadj": float(np.mean(hitF)), "mean_gap": float(g.mean()), "p": p, "verdict": "supported" if ok else "not_supported",
-            "reason": f"contango months: VIX 21 days later below F_adj in {k}/{n} = {k/n:.0%} (95% CI {lo:.2f}-{hi:.2f}, needs lower > 0.60), below unadjusted F in {np.mean(hitF):.0%}; mean F_adj - VIX(t+21) {g.mean():+.2f}, p={p:.4f}"}
+    ts = np.arange(max(len(VX) - 21, 0))
+    con = V3[ts] / VX[ts] > 1.10; hit_all = VX[ts + 21] < Fa[ts]
+    e = ts[con]; hit = hit_all[con]; hitF = VX[e + 21] < F[e]; g = Fa[e] - VX[e + 21]
+    n, m, k = len(_lockout(e, lambda t: t + 21)), int(hit.size), int(hit.sum())
+    if m == 0:
+        return {"n": 0, "verdict": "inconclusive", "reason": "no contango day (VIX3M/VIX > 1.10) with a 21-day forward window"}
+    lo, hi = _pooled_freq_ci(hit_all, con, 42)
+    p = _pooled_p(g, 42)
+    testable = lo is not None and p is not None
+    ok = bool(testable and lo > 0.60 and g.mean() > 0 and p < 0.05)
+
+    def _one(sel):
+        kk, nn, x = int(hit[sel].sum()), int(sel.sum()), g[sel]
+        lk = _binom_two_sided_ci(kk, nn)[0] if nn else 0.0; pk = _cycle_p(x)
+        return {"n": nn, "freq": kk / nn if nn else None, "pass": bool(nn and lk > 0.60 and x.mean() > 0 and pk is not None and pk < 0.05)}
+    ss, stxt = _starts(_by_start(e, 21, _one), "freq", "frequency", ".2f")
+    ci_txt = f"95% CI {lo:.2f}-{hi:.2f}" if lo is not None else "CI n/a (fewer than four 42-day blocks)"
+    p_txt = f"p={p:.4f}" if p is not None else "p n/a"
+    return {"n": n, "n_entries": m, "freq_adj": k / m, "ci": [lo, hi], "freq_unadj": float(np.mean(hitF)), "mean_gap": float(g.mean()), "p": p, "grid_starts": ss,
+            "verdict": "supported" if ok else ("inconclusive" if not testable else "not_supported"),
+            "reason": f"{n} non-overlapping contango months; rule 10 (no entry calendar named): POOLED over all {m} contango days (every start of the 21d grid, overlapping, 42-day blocks): "
+                      f"VIX 21 days later below F_adj in {k}/{m} = {k/m:.0%} ({ci_txt}, needs lower > 0.60), below unadjusted F in {np.mean(hitF):.0%}; mean F_adj - VIX(t+21) {g.mean():+.2f}, {p_txt}; {stxt}"}
 
 
 def spike_forward_v2(vix_rows, vix3m_rows, vvix_rows) -> dict:
-    """T-535: after VIX > 30 and VIX > VIX3M, P(VIX(t+21) < F_adj) > 0.5 with the exact 95% CI excluding 0.5; otherwise 'the forward is fair'."""
+    """T-535: after VIX > 30 and VIX > VIX3M, P(VIX(t+21) < F_adj) > 0.5 with the exact 95% CI excluding 0.5; otherwise 'the forward is fair'.
+    Non-overlapping 21-day event entries. Rule 10 does not apply: the claim names its entries (the first event, then the first event after
+    each 21-day hold), which do not depend on where the data starts; the pooled all-event-day frequencies are reported as robustness."""
     vx, v3, vv = index_closes(vix_rows), index_closes(vix3m_rows), index_closes(vvix_rows)
     days = sorted(d for d in vx if d in v3 and d in vv)
     VX = np.array([vx[d] for d in days]); V3 = np.array([v3[d] for d in days]); VV = np.array([vv[d] for d in days])
@@ -814,17 +1006,34 @@ def spike_forward_v2(vix_rows, vix3m_rows, vvix_rows) -> dict:
             t += 1
     n, k = len(a), int(sum(a)); lo, hi = _binom_two_sided_ci(k, n)
     ok = k / n > 0.5 and lo > 0.5
-    return {"n_events": n, "p_adj": k / n, "ci": [lo, hi], "p_unadj": float(np.mean(b)), "p_spot": float(np.mean(s)), "verdict": "supported" if ok else "not_supported",
-            "reason": f"{n} spike events since {days[0]}: VIX 21 days later below F_adj in {k}/{n} ({lo:.2f}-{hi:.2f}), below unadjusted F in {np.mean(b):.0%}, below spot in {np.mean(s):.0%}" + ("" if ok else "; finding: the forward is fair after spikes")}
+    pooled, ptxt = _spike_pooled(VX, V3, Fa, "F_adj")
+    return {"n_events": n, "p_adj": k / n, "ci": [lo, hi], "p_unadj": float(np.mean(b)), "p_spot": float(np.mean(s)), "pooled_event_days": pooled,
+            "verdict": "supported" if ok else "not_supported",
+            "reason": f"{n} spike events since {days[0]}: VIX 21 days later below F_adj in {k}/{n} ({lo:.2f}-{hi:.2f}), below unadjusted F in {np.mean(b):.0%}, below spot in {np.mean(s):.0%}"
+                      + ("" if ok else "; finding: the forward is fair after spikes") + f"; {ptxt}"}
 
 
 def vvix_v2(vvix_rows, vix_rows, start: str = "2006-01-01") -> dict:
     """T-536: non-overlapping months since 2006: VVIX minus realised 21-day vol of daily log changes in spot VIX, lower 99% bound of the
-    mean gap > 10 vol points."""
+    mean gap > 10 vol points.
+    Rule 10: the trial's non-overlapping 21-day windows name no calendar (no month-end or expiry), so the primary statistic pools all 21
+    grid starts: every day's window (overlapping), studentized circular block bootstrap with 42-day blocks (2 x hold); the lower 99%
+    bound exceeds 10 when the one-sided p for mean > 10 is below 0.005. Each start's grid is reported with its iid-se lower 99% bound.
+    n_months stays in non-overlapping 21-day months (ceil(entries / 21))."""
     vv = index_closes(vvix_rows); vx = index_closes(vix_rows)
     days = sorted(d for d in vv if d in vx and d >= start)
     VV = np.array([vv[d] for d in days]); lr = np.diff(np.log(np.array([vx[d] for d in days])))
-    g = np.array([VV[t] - np.std(lr[t:t + 21], ddof=1) * math.sqrt(252) * 100 for t in range(0, len(lr) - 21, 21)])
-    se = g.std(ddof=1) / math.sqrt(len(g)); lo99 = g.mean() - 2.576 * se
-    return {"n_months": int(len(g)), "mean_gap": float(g.mean()), "lower99": float(lo99), "verdict": "supported" if lo99 > 10 else "not_supported",
-            "reason": f"{len(g)} non-overlapping months: VVIX minus realised spot-VIX vol {g.mean():+.1f} pts (lower 99% {lo99:+.1f}, needs > 10); VVIX prices VIX futures, which move less than spot"}
+    g = np.array([VV[t] - np.std(lr[t:t + 21], ddof=1) * math.sqrt(252) * 100 for t in range(max(len(lr) - 21, 0))])
+    n_months = -(-len(g) // 21)
+    p = _pooled_p(g - 10.0, 42)
+
+    def _one(sel):
+        x = g[sel]; lo = float(x.mean() - 2.576 * x.std(ddof=1) / math.sqrt(x.size)) if x.size > 1 else None
+        return {"n": int(x.size), "lower99": lo, "pass": bool(lo is not None and lo > 10)}
+    ss, stxt = _starts(_by_start(np.arange(len(g)), 21, _one), "lower99", "lower 99% bound", "+.1f")
+    verdict = "inconclusive" if p is None else ("supported" if p < 0.005 else "not_supported")
+    p_txt = f"p={p:.4f}" if p is not None else "p n/a (fewer than four 42-day blocks)"
+    return {"n_months": int(n_months), "n_entries": int(len(g)), "mean_gap": float(g.mean()) if len(g) else None, "p_mean_above_10": p, "grid_starts": ss, "verdict": verdict,
+            "reason": f"{n_months} non-overlapping months; rule 10 (no calendar named): POOLED over all 21 grid starts = {len(g)} overlapping 21-day windows: VVIX minus realised spot-VIX vol "
+                      f"{g.mean():+.1f} pts, studentized block bootstrap (42-day blocks) one-sided {p_txt} for mean > 10 (lower 99% bound > 10 needs p < 0.005); {stxt}; "
+                      "VVIX prices VIX futures, which move less than spot"}
