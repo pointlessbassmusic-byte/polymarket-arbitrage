@@ -173,3 +173,19 @@ def test_u2_5_golden_cross_v2_window_starts_at_the_first_held_position():
     assert rep["BTC"]["start"] == "2015-04-06" == bd[201]               # signal through close index 199, held from close 200
     assert rep["ETH"]["start"] == ed[201]
     assert rep["ETH"]["n_days"] == len(ed) - 1 - 200 and rep["n"] == rep["BTC"]["n_days"]
+
+
+# ------------------------------------------------------------------------- T-435 window end and min_n basis --
+
+def test_svxy_v2_stops_at_the_claim_end_and_counts_min_n_on_the_claim_window():
+    rng = np.random.default_rng(7)
+    days = _days("2011-10-03", "2026-10-14"); n = len(days)
+    vix = {d: 20.0 for d in days}; vix3m = {d: 22.0 for d in days}
+    ret = rng.normal(0.0004, 0.02, n)
+    rep = u2.svxy_v2((days, _closes(ret)), vix, vix3m, bill_days=days, bill_vals=[2.0] * n)
+    in_test = sum(1 for d in days[1:] if "2018-01-01" <= d <= "2026-09-30")
+    assert rep["n_test_days"] == in_test                          # October 2026 is outside the claim window
+    assert rep["n"] == rep["n_claim_window_days"] == sum(1 for d in days[1:] if "2011-10-01" <= d <= "2026-09-30")
+    assert rep["n"] >= 2500 and "claim-window sample >= min_n 2500" not in rep["reason"]
+    short = u2.svxy_v2((days[-800:], _closes(ret[-800:])), vix, vix3m, bill_days=days, bill_vals=[2.0] * n)
+    assert short["verdict"] != "supported" and "claim-window sample >= min_n 2500" in short["reason"]

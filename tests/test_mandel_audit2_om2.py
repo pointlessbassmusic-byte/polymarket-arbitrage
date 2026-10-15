@@ -102,11 +102,12 @@ def test_om2_t231_below_min_n_conditional_half_decisive_only_when_significantly_
 
 
 def test_om2_t231_at_min_n_non_significant_mean_is_not_supported_and_clear_pass_supported():
-    """At or above min_n every failing criterion counts; a clear pass is supported."""
+    """At or above min_n every failing criterion counts; a clear pass stays inconclusive while the strategy clause is
+    unimplemented (this test used to expect supported, which encoded that defect)."""
     weak = _run(0.0015 + _noise(75, 0.01, 9), np.full(75, 0.006))
     assert weak["n_cycles"] == 75 and weak["p_value"] > 0.025 and weak["mean_term_minus_spot_var"] > 0
     assert weak["verdict"] == "not_supported"
     clear = _run(0.01 + _noise(75, 0.005, 10), np.full(75, 0.006))
-    assert clear["p_value"] < 0.025 and clear["verdict"] == "supported"
+    assert clear["p_value"] < 0.025 and clear["verdict"] == "inconclusive"
     short = _run(0.01 + _noise(40, 0.005, 10), np.full(40, 0.006))
     assert short["p_value"] < 0.025 and short["verdict"] == "inconclusive"

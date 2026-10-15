@@ -959,15 +959,19 @@ def metals_v2(gld, slv, gcf, scf, bill_days, bill_vals, cost_side: float = 0.000
             "reason": f"metals TSMOM minus historical-mean strategy {d.mean()*1e4:+.1f} bps/month over {len(d)} months from {months[0] if months else 'n/a'} (95% CI {lo*1e4:+.1f} to {hi*1e4:+.1f}), DSR {dsr:.2f} (n_trials {n_trials}), futures {fdm:+.1f} over the same {fd.size} months — {why}"}
 
 
-def svxy_v2(svxy, vix, vix3m, cost_switch: float = 0.001, test_from: str = "2018-01-01", bill_days=None, bill_vals=None) -> dict:
+def svxy_v2(svxy, vix, vix3m, cost_switch: float = 0.001, test_from: str = "2018-01-01", bill_days=None, bill_vals=None,
+            claim_from: str = "2011-10-01", end: str = "2026-09-30") -> dict:
     """T-435: SVXY only after VIX3M/VIX > 1.05 (else SGOV) vs always SVXY: test-window Sharpe difference > 0 with p < 0.05,
     DSR > 0.95 with n_trials = 6 thresholds (1.00, 1.025, 1.05, 1.075, 1.10, 1.15). Timing as the procedure states:
     signal at close t, position from close t+1 (the return earned on close t+1 -> t+2), switch cost on the lagged
     position. Cash days earn the T-bill rate known at the start of the day (bill_days/bill_vals, annual %) as the SGOV
     proxy, and both Sharpe ratios (and their difference) are on daily excess returns over that rate, so crediting cash
     does not flatter the lower-volatility filtered leg; without the T-bill series cash earns 0, returns are raw and the
-    SGOV criterion is not implemented (verdict capped at inconclusive). The DSR is on s - b, where the bill cancels."""
-    days, c = svxy[0], svxy[1]; r = c[1:] / c[:-1] - 1; ds = days[1:]; m = np.array([d >= test_from for d in ds])
+    SGOV criterion is not implemented (verdict capped at inconclusive). The DSR is on s - b, where the bill cancels.
+    Both windows end at the claim's end (2026-09-30). min_n (2500) counts trading-day returns in the claim window
+    2011-10..2026-09 (the 2018-2026 test window alone cannot reach it), reported as n."""
+    days, c = svxy[0], svxy[1]; r = c[1:] / c[:-1] - 1; ds = days[1:]; m = np.array([test_from <= d <= end for d in ds])
+    n_claim = int(sum(1 for d in ds if claim_from <= d <= end))
     have_bills = bill_days is not None and bill_vals is not None and len(bill_days) > 0
     rf = _rf_per_period(days[:-1], bill_days, bill_vals, 252) if have_bills else np.zeros(len(r))
     def strat(th):
@@ -980,7 +984,10 @@ def svxy_v2(svxy, vix, vix3m, cost_switch: float = 0.001, test_from: str = "2018
     crit = [("Sharpe diff > 0 with one-sided p < 0.05", obs > 0 and lo > 0), ("DSR > 0.95", dsr > 0.95)]
     if not have_bills:
         crit.append(("cash leg earns the T-bill rate as SGOV proxy (T-bill series not supplied)", None))
+    if n_claim < 2500:
+        crit.append((f"claim-window sample >= min_n 2500 days ({n_claim})", None))
     v, why = _verdict(crit)
-    return {"n_test_days": int(m.sum()), "sharpe": _sr(s - rfm, 252), "always_sharpe": _sr(b - rfm, 252), "excess_over_bills": bool(have_bills), "sharpe_diff": obs, "lower90": lo, "dsr": float(dsr), "cash_leg": "T-bill" if have_bills else "zero (bills not supplied)", "strategy_mean_bps_day": float(s.mean() * 1e4), "verdict": v,
-            "reason": f"SVXY contango filter (position from close t+1, cash at {'T-bill' if have_bills else '0'}) vs always, 2018-: {'excess' if have_bills else 'raw'} Sharpe {_sr(s - rfm, 252):.2f} vs {_sr(b - rfm, 252):.2f}, "
+    return {"n": n_claim, "n_claim_window_days": n_claim, "n_test_days": int(m.sum()), "sharpe": _sr(s - rfm, 252), "always_sharpe": _sr(b - rfm, 252), "excess_over_bills": bool(have_bills), "sharpe_diff": obs, "lower90": lo, "dsr": float(dsr), "cash_leg": "T-bill" if have_bills else "zero (bills not supplied)", "strategy_mean_bps_day": float(s.mean() * 1e4), "verdict": v,
+            "reason": f"SVXY contango filter (position from close t+1, cash at {'T-bill' if have_bills else '0'}) vs always, test {test_from}..{end} "
+                      f"({int(m.sum())} days; claim window {n_claim} days vs min_n 2500): {'excess' if have_bills else 'raw'} Sharpe {_sr(s - rfm, 252):.2f} vs {_sr(b - rfm, 252):.2f}, "
                       f"diff {obs:+.2f} (one-sided 95% lower {lo:+.2f}), DSR {dsr:.2f} — {why}"}

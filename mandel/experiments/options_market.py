@@ -156,6 +156,10 @@ def term_vs_spot_premium(vix_rows, vix3m_rows, spy_rows) -> dict:
             ("conditional (VIX3M/VIX > 1.10) forward premium positive in both halves", all(x > 0 for x in halves), any(_significantly_negative(x) for x in parts))]
     criteria = [(name, bool(ok)) if (full or ok or decisive) else (name + " (fails, not decisively, below min_n: undecided)", None)
                 for name, ok, decisive in rows]
+    # The claim's strategy clause is a criterion too: never supported until it is simulated.
+    criteria.append(("short far leg / reverse calendar (vega-weighted) when VIX3M/VIX > 1.10 has positive expectancy (walk-forward "
+                     "threshold, deflated Sharpe on the conditional short-forward-variance series, shuffled-ratio placebo, "
+                     "ex-2008/2020 sensitivity): not implemented", None))
     criteria.append((f"sample reaches trial min_n {T231_MIN_CYCLES} cycles ({len(d)} so far)", True if full else None))
     verdict, why = _verdict(criteria)
     return {"n_cycles": int(len(d)), "min_n": T231_MIN_CYCLES, "mean_term_minus_spot_var": mean, "p_value": p, "n_conditional": int(len(cond)),

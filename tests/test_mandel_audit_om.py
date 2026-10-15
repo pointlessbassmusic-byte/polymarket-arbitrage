@@ -128,7 +128,9 @@ def test_om1_t241_min_n_non_decisive_failure_is_inconclusive():
 
 
 def test_om1_t231_pass_below_min_n_is_not_supported_verdict():
-    """T-231 (min_n 70 cycles): a clear pass on 40 cycles is inconclusive; the same on 75 cycles is supported."""
+    """T-231 (min_n 70 cycles): a clear pass on 40 cycles is inconclusive. On 75 cycles it is still inconclusive, because the
+    claim's strategy clause (reverse calendar expectancy) is not implemented; this test used to expect supported, which
+    encoded that defect (audit round 2 checker flag)."""
     rng = np.random.default_rng(3)
 
     def run(cycles):
@@ -138,7 +140,7 @@ def test_om1_t231_pass_below_min_n_is_not_supported_verdict():
         return om.term_vs_spot_premium(_idx(days, np.full(n, 20.0)), _idx(days, np.full(n, 23.0)), _px(days, closes))
     short, full = run(40), run(75)
     assert short["n_cycles"] < 70 and short["p_value"] < 0.025 and short["verdict"] == "inconclusive"
-    assert full["n_cycles"] >= 70 and full["verdict"] == "supported"
+    assert full["n_cycles"] >= 70 and full["verdict"] == "inconclusive"
 
 
 # ----------------------------------------------------------------------------------------------- OM-2: bill conversions --
