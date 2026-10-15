@@ -87,10 +87,13 @@ class Archive:
         return MANDEL_ROOT.parent / p
 
     def _reload_index(self) -> None:
+        """Merge the INDEX on disk into memory under the store lock. The disk copy wins for every name it holds: another
+        process may have re-stored a bundle since this one loaded the INDEX, and writing back the stale in-memory entry
+        would point the INDEX at the old sha256 and row count of a file that has since been replaced."""
         if self.index_path.exists():
             raw = self.index_path.read_text(encoding="utf-8").strip()
             for d in (json.loads(raw) if raw else {}).get("bundles", {}).values():
-                self._entries.setdefault(d["name"], BundleEntry(**d))
+                self._entries[d["name"]] = BundleEntry(**d)
 
     def _flush(self) -> None:
         atomic_write_text(self.index_path, json.dumps({"note": "Cold storage index. Bundles are gzip JSONL; "

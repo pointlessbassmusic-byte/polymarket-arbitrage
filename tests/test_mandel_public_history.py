@@ -6,9 +6,9 @@ publication lag, CNMS universe filtering and month completeness, SEC buckets (ac
 and resume), the StockTwits anchor search and windows, Deribit near-expiry days, dry runs that make no request, skip-stored
 and refresh, and the licence / .gitignore decisions."""
 
-import gzip
 import io
 import json
+import math
 import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, unquote, urlparse
@@ -70,25 +70,89 @@ def test_cot_release_rule(report, release):
     assert ph.cot_release_rule(report)[0] == release
 
 
-def test_cot_shutdown_bound_and_federal_calendar():
-    rel, basis = ph.cot_release_rule("2013-10-08")
-    assert rel == "2013-11-29T20:30:00+00:00" and basis.startswith("conservative bound")
-    assert ph.cot_release_rule("2013-11-19")[0] == "2013-11-22T20:30:00+00:00"      # after the bound window: rule
+def test_cot_shutdown_catchups_and_federal_calendar():
+    # 2013 (regression: was a 2013-11-29 bound): CFTC 6745-13 first delayed report 10-25; notice 11-06 'week of October 29
+    # ... now available'; the 11-05 report on its normal Friday 11-08 (notice of that day)
+    assert ph.cot_release_rule("2013-10-01")[:3:2] == ("2013-10-25T23:59:59+00:00", "schedule")
+    for d in ("2013-10-08", "2013-10-15", "2013-10-22", "2013-10-29"):
+        assert ph.cot_release_rule(d)[0] == "2013-11-06T23:59:59+00:00"
+    assert ph.cot_release_rule("2013-11-05")[0] == "2013-11-08T20:30:00+00:00"
+    assert ph.cot_release_rule("2013-11-19")[0] == "2013-11-22T20:30:00+00:00"
+    rel, basis, pit = ph.cot_release_rule("1995-12-05")                                # 1995-96: conservative bound kept
+    assert rel == "1996-02-29T23:59:59+00:00" and basis.startswith("conservative bound") and pit == "bound"
     hol = ph.federal_closures(2021)
     assert datetime(2021, 12, 31).date() in hol          # New Year 2022 is a Saturday: observed Friday Dec 31, 2021
     assert datetime(2021, 6, 18).date() in hol and datetime(2020, 6, 19).date() not in ph.federal_closures(2020)
 
 
 def test_cot_available_at_live_and_bulk():
-    av, basis, rule = ph.cot_available_at("2026-10-06", "2026-10-09T19:30:07.543Z")
-    assert (av, basis) == ("2026-10-09T19:30:08+00:00", "Socrata :created_at (live publication)") and rule == "2026-10-09T19:30:00+00:00"
+    av, basis, rule, pit = ph.cot_available_at("2026-10-06", "2026-10-09T19:30:07.543Z")
+    assert (av, basis, pit) == ("2026-10-09T19:30:08+00:00", "Socrata :created_at (live publication)", "live")
+    assert rule == "2026-10-09T19:30:00+00:00"
     # created before the Friday 15:30 ET release: never earlier than the release
     assert ph.cot_available_at("2026-10-06", "2026-10-09T15:39:00Z")[0] == "2026-10-09T19:30:00+00:00"
     # a 2022 bulk-load creation time far after an old report: the rule
-    av, basis, _ = ph.cot_available_at("2012-03-13", "2022-08-01T18:54:48.615Z")
-    assert av == "2012-03-16T19:30:00+00:00" and basis.startswith("rule")
+    av, basis, _, pit = ph.cot_available_at("2012-03-13", "2022-08-01T18:54:48.615Z")
+    assert av == "2012-03-16T19:30:00+00:00" and basis.startswith("rule") and pit == "schedule"
     # a delayed live publication (2025 shutdown) keeps the real time
     assert ph.cot_available_at("2025-10-14", "2025-11-25T20:30:48Z")[0] == "2025-11-25T20:30:48+00:00"
+
+
+BULK = "2022-09-13T14:25:38.412Z"
+
+
+@pytest.mark.parametrize("asof,available,pit", [
+    # checker's case (regression): 1990-03-30 was released at 15:30 ET that day, before its own observed_at; the 1990
+    # switch month to the 6th-business-day schedule is not stated, so 1990 keeps the later monthly schedule
+    ("1990-03-30", "1990-04-12T23:59:59+00:00", "bound"),
+    ("1987-03-13", "1987-04-13T23:59:59+00:00", "not_realtime"),   # pre-1990 mid-month: no real-time publication (12th = Sunday)
+    ("1987-03-31", "1987-04-13T23:59:59+00:00", "bound"),          # pre-1990 month-end: the monthly publication
+    ("1991-03-29", "1991-04-08T23:59:59+00:00", "schedule"),       # 1991-92: 6th federal business day
+    ("1992-09-30", "1992-10-08T23:59:59+00:00", "schedule"),
+    ("1996-06-04", "1996-06-14T23:59:59+00:00", "bound"),          # 1992-10..2000 biweekly: the following week's release day
+    ("2000-12-26", "2001-01-05T23:59:59+00:00", "bound"),          # all of 2000 keeps the biweekly bound
+    ("2001-12-21", "2001-12-28T20:30:00+00:00", "schedule"),       # Friday as-of (regression): the next week's Friday
+    ("2003-02-14", "2003-02-21T20:30:00+00:00", "schedule"),
+    ("2010-12-23", "2011-01-03T20:30:00+00:00", "schedule"),       # Thursday as-of; Friday Dec 31 closed -> Monday
+    ("2007-01-03", "2007-01-08T20:30:00+00:00", "schedule"),       # Wednesday as-of: 3rd federal business day minimum
+])
+def test_cot_release_eras_and_holiday_weeks(asof, available, pit):
+    av, basis, rule, p = ph.cot_available_at(asof, BULK, "legacy-f", "088691")
+    assert (av, p) == (available, pit) and rule == available
+    assert ph._parse_iso(av) > ph._parse_iso(ph._et(asof, "17:00"))     # strictly after the positions' own close
+
+
+def test_cot_backcasts_disaggregated_and_tff():
+    # regression: disaggregated rows before 2009-09 were released as history on 2009-10-20, not on the weekly rule
+    av, basis, rule, pit = ph.cot_available_at("2006-06-13", BULK, "disagg-fo", "088691")
+    assert (av, pit, rule) == ("2009-10-20T23:59:59+00:00", "backcast", "2006-06-16T19:30:00+00:00")
+    assert basis.startswith("CFTC historical disaggregated release 2009-10-20 (backcast")
+    assert ph.cot_available_at("2009-08-25", BULK, "disagg-f", "084691")[0] == "2009-10-20T23:59:59+00:00"
+    # gold and silver were in the first disaggregated report (as of 2009-09-01, published 2009-09-04)
+    assert ph.cot_available_at("2009-09-01", BULK, "disagg-f", "084691")[::3] == ("2009-09-04T19:30:00+00:00", "schedule")
+    # a market not known to be among the first 22 (platinum) counts from its 2009-12-04 addition
+    assert ph.cot_available_at("2009-09-01", BULK, "disagg-fo", "076651")[::3] == ("2009-12-04T23:59:59+00:00", "backcast")
+    assert ph.cot_available_at("2009-12-01", BULK, "disagg-fo", "076651")[::3] == ("2009-12-04T20:30:00+00:00", "schedule")
+    # the legacy report of the same date is not a backcast
+    assert ph.cot_available_at("2006-06-13", BULK, "legacy-fo", "088691")[3] == "schedule"
+    # TFF: first report as of 2010-07-20; earlier rows from the December 2010 history release; CME bitcoin is live
+    assert ph.cot_available_at("2010-07-13", BULK, "tff-f", "13874A")[::3] == ("2010-12-07T23:59:59+00:00", "backcast")
+    assert ph.cot_available_at("2018-04-10", BULK, "tff-f", "133741")[::3] == ("2018-04-13T19:30:00+00:00", "schedule")
+
+
+def test_parse_cot_rows_pit_and_observed_guard(monkeypatch):
+    raw = [_cot_row(d, BULK) for d in ("1987-03-13", "1990-03-30", "2001-12-21", "2001-12-28", "2012-03-13")]
+    stats = {}
+    rows = ph.parse_cot_rows(raw, "legacy-f", "088691", "2026-10-15T00:00:00+00:00", stats)
+    assert all(ph._parse_iso(r["available_at"]) > ph._parse_iso(r["observed_at"]) for r in rows)
+    assert [r["value"]["pit"] for r in rows] == ["not_realtime", "bound", "schedule", "schedule", "schedule"]
+    assert stats == {"not_realtime": 1, "bound": 1, "schedule": 3}
+    # the guard: an availability before the positions' close is raised to observed_at and counted
+    monkeypatch.setattr(ph, "cot_available_at", lambda rd, ca, rp=None, cd=None: (ph._et(rd, "15:30"), "test", ph._et(rd, "15:30"), "schedule"))
+    stats = {}
+    rows = ph.parse_cot_rows(raw[2:3], "legacy-f", "088691", "2026-10-15T00:00:00+00:00", stats)
+    assert rows[0]["available_at"] == rows[0]["observed_at"] == "2001-12-21T22:00:00+00:00"
+    assert stats["raised_to_observed"] == 1 and rows[0]["value"]["available_basis"].endswith("raised to observed_at (guard)")
 
 
 def _cot_row(day, created=None, code="088691"):
@@ -723,3 +787,148 @@ def test_main_sources_option(capsys, tmp_path):
     assert "treasury-auctions" in out and "stocktwits-preopen" not in out.split("mandel/archive/data/")[0]
     with pytest.raises(SystemExit):
         ph.main(["all", "--dry-run", "--sources", "nope"])
+
+
+# ================================================================ checker fixes (COT store, writers, plans) ==
+
+def test_fetch_cftc_disagg_backcast_stored(archive):
+    days = ["2006-06-13", "2009-08-25", "2009-09-01"]
+
+    def handler(req):
+        q = {k: v[0] for k, v in parse_qs(urlparse(str(req.url)).query).items()}
+        return httpx.Response(200, json=[_cot_row(d, BULK) for d in days] if q["$offset"] == "0" else [])
+
+    rep = ph.fetch_cftc_cot(archive, series=[("disagg-fo", "088691")], client=_client(handler), min_interval=0)
+    name = "cftc-cot-disagg-fo-088691"
+    assert rep[name]["pit"] == {"schedule": 1, "backcast": 2} and rep[name]["raised_to_observed"] == 0
+    rows = _rows(archive, name)
+    assert [r["available_at"] for r in rows] == ["2009-10-20T23:59:59+00:00", "2009-10-20T23:59:59+00:00", "2009-09-04T19:30:00+00:00"]
+    assert rows[0]["value"]["release_rule"] == "2006-06-16T19:30:00+00:00" and rows[0]["value"]["pit"] == "backcast"
+    rec = archive.get(name).recipe
+    assert "2009-10-20" in rec and "backcast 2" in rec and "never before observed_at" in rec
+
+
+def _hold_lock(root, name):
+    import fcntl
+    root.mkdir(parents=True, exist_ok=True)
+    fh = open(root / name, "a+")
+    fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    return fh
+
+
+def test_run_lock_refuses_a_second_writer(archive, tmp_path):
+    with ph.run_lock(archive) as paths:
+        assert [p.name for p in paths] == ["public_history.run.lock", "crypto_history.run.lock"]
+        other = Archive(root=archive.root, ledger=archive.ledger)
+        with pytest.raises(RuntimeError, match="another writer"):
+            with ph.run_lock(other):
+                pass
+        with pytest.raises(RuntimeError):                                             # fetch_all_misc storing run refused
+            ph.fetch_all_misc(other, sources=["treasury"])
+    with ph.run_lock(archive):                                                        # released on exit
+        pass
+    # a crypto_history run holding its own lock also blocks this module (and the lock is released after the refusal)
+    fh = _hold_lock(archive.root, "crypto_history.run.lock")
+    try:
+        with pytest.raises(RuntimeError, match="crypto_history.run.lock"):
+            ph.fetch_all_misc(archive, sources=["treasury"])
+    finally:
+        fh.close()
+    with ph.run_lock(archive):
+        pass
+    assert ph.fetch_all_misc(archive, dry_run=True, sources=["treasury"])["_totals"]["bundles"] == 1     # dry runs take no lock
+
+
+def test_index_check_reports_a_stale_concurrent_writer(tmp_path):
+    root = tmp_path / "a"
+    st = Archive(root=root, ledger=Ledger(tmp_path / "l.jsonl"))                     # the checker's reproduction
+    before = {e.name: e.sha256 for e in st.entries()}
+    st.store("stocktwits-preopen-2025-W44", "data", [{"value": {"day": "2025-10-27"}}], recipe="r", tags=["partial"], in_git=False)
+    other = Archive(root=root, ledger=Ledger(tmp_path / "l.jsonl"))
+    other.store("finra-short-interest-2017-12-29", "data", [{"v": 1}], recipe="r", tags=["complete"], in_git=False)
+    st.store("stocktwits-preopen-2025-W44", "data", [{"value": {"day": d}} for d in ("2025-10-27", "2025-10-28")], recipe="r",
+             tags=["partial"], in_git=False)
+    other.store("finra-short-interest-2018-01-12", "data", [{"v": 2}], recipe="r", tags=["complete"], in_git=False)
+    chk = ph.index_check(st, before)
+    # Archive._reload_index now lets the INDEX on disk win under the store lock, so the interleaving that used to write back
+    # the stale 1-row entry leaves the INDEX in agreement with the files (the checker's reproduction is the regression test)
+    assert chk["ok"] is True, chk
+    import json as _json
+    idx = _json.loads((root / "INDEX.json").read_text())["bundles"]
+    idx["stocktwits-preopen-2025-W44"]["rows"] = 1                                # a stale entry written by hand is still caught
+    (root / "INDEX.json").write_text(_json.dumps({"bundles": idx}))
+    chk = ph.index_check(st, before)                                             # this process's view vs the INDEX on disk
+    assert chk["ok"] is False and chk["mismatched"][0]["bundle"] == "stocktwits-preopen-2025-W44"
+    assert chk["mismatched"][0]["index_rows"] == 1 and chk["mismatched"][0]["stored_rows"] == 2
+    idx["stocktwits-preopen-2025-W44"]["rows"] = 2
+    (root / "INDEX.json").write_text(_json.dumps({"bundles": idx}))
+    fresh = Archive(root=root, ledger=Ledger(tmp_path / "l.jsonl"))
+    assert ph.index_check(fresh, {}) == {"ok": True, "bundles": 3}                   # a fresh view (all 3 bundles) agrees with disk
+
+
+def test_fetch_all_misc_reports_index_check(archive):
+    rep = ph.fetch_all_misc(archive, sources=["treasury"], limit=0)                    # limit 0: no request, no store
+    assert rep["_index_check"] == {"ok": True, "bundles": 0}
+
+
+def test_main_single_source_takes_the_lock(tmp_path, capsys):
+    root = tmp_path / "run"
+    store = ph._root_archive(root)
+    fh = _hold_lock(store.root, "public_history.run.lock")
+    try:
+        assert ph.main(["treasury", "--root", str(root)]) == 2                      # refused before any request
+        assert ph.main(["all", "--sources", "cftc", "--root", str(root)]) == 2
+        assert ph.main(["treasury", "--dry-run", "--root", str(root)]) == 0         # a plan needs no lock
+    finally:
+        fh.close()
+    assert "refused: another writer holds" in capsys.readouterr().err
+
+
+def test_merge_archive_from_a_separate_root(tmp_path, archive):
+    src = ph._root_archive(tmp_path / "st")
+    week = [{"key": f"SPY:{i}", "value": {"day": "2025-10-27", "stream": "SPY"}} for i in range(3)]
+    src.store("stocktwits-preopen-2025-W44", "data", week, recipe="st recipe", tags=["complete", "T-414"], schema="s", in_git=False)
+    src.store("stocktwits-anchors", "data", [{"value": {"target": "2025-10-27T13:00:00+00:00", "id": 5}}], recipe="a", in_git=False)
+    archive.store("stocktwits-anchors", "data", [{"value": {"target": "2025-10-20T13:00:00+00:00", "id": 3}}], recipe="a", in_git=False)
+    src.store("unrelated-bundle", "data", [{"v": 1}], recipe="x")
+    rep = ph.merge_archive(tmp_path / "st", archive)
+    e = archive.get("stocktwits-preopen-2025-W44")
+    assert e.rows == 3 and e.recipe == "st recipe" and e.in_git is False and e.tags == ["T-414", "complete"] and archive.verify(e.name)
+    assert [r["value"]["id"] for r in _rows(archive, "stocktwits-anchors")] == [3, 5]               # union by target
+    assert "unrelated-bundle" not in rep and rep["_index_check"]["ok"]
+    rep = ph.merge_archive(tmp_path / "st", archive)
+    assert rep["stocktwits-preopen-2025-W44"] == {"skipped": "identical"}
+    archive.store("stocktwits-preopen-2025-W44", "data", week + week[:1], recipe="newer", tags=["complete"], in_git=False)
+    rep = ph.merge_archive(tmp_path / "st", archive)
+    assert "conflict" in rep["stocktwits-preopen-2025-W44"] and archive.get("stocktwits-preopen-2025-W44").rows == 4
+    with pytest.raises(FileNotFoundError):
+        ph.merge_archive(tmp_path / "nothing-here", archive)
+
+
+def test_finra_calendar_and_dry_run_counts_stored_dates(archive, monkeypatch):
+    def boom(*a, **k):
+        raise AssertionError("a dry run opened a client")
+    monkeypatch.setattr(httpx, "Client", boom)
+    assert ph.finra_si_calendar(today="2018-03-01") == ["2017-12-29", "2018-01-12", "2018-01-31", "2018-02-15"]   # MLK -> 01-12
+    cal = ph.finra_si_calendar(today="2026-10-15")
+    assert len(cal) == 211 and cal[-1] == "2026-09-30" and "2026-03-13" in cal                  # 2026-03-15 is a Sunday
+    for d in ("2017-12-29", "2018-01-12", "2026-09-30"):                                         # regression: stored dates count
+        archive.store(f"finra-short-interest-{d}", "data", [{"v": 1}], recipe="t", tags=["complete", "short-interest"], in_git=False)
+    rep = ph.fetch_finra_short_interest(archive, dry_run=True)
+    assert rep["_dry_run"] == {"dates": 211, "already_stored": 3, "to_fetch": 208}
+    stored = [p for p in rep["_plan"] if p["already_stored"]]
+    assert {p["name"] for p in stored} == {f"finra-short-interest-{d}" for d in ("2017-12-29", "2018-01-12", "2026-09-30")}
+    assert all(p["calls"] == 0 for p in stored) and sum(p["calls"] for p in rep["_plan"]) < 211 * 5
+    assert rep["finra-short-interest-2018-01-12"] == {"skipped": "stored"}
+    assert len([p for p in ph.fetch_finra_short_interest(archive, dry_run=True, limit=1)["_plan"] if not p["already_stored"]]) == 1
+
+
+def test_stocktwits_plan_uses_the_remeasured_estimates(archive):
+    rep = ph.fetch_stocktwits_preopen(archive, first="2026-10-13", last="2026-10-13", dry_run=True)       # a Tuesday
+    p = rep["_plan"][0]
+    assert sum(ph.ST_PAGES_EST.values()) == 167 and ph.ST_ANCHOR_CALLS == 9
+    assert p["calls"] == 167 + 9 and p["minutes"] == round(176 * 1.95 / 60, 2)
+    mon = ph.fetch_stocktwits_preopen(archive, first="2026-10-12", last="2026-10-12", dry_run=True)["_plan"][0]
+    assert mon["calls"] == math.ceil(167 * ph.ST_MONDAY_FACTOR + 9)
+    full = ph.fetch_stocktwits_preopen(archive, dry_run=True)["_plan"]
+    assert 50_000 < sum(x["calls"] for x in full) < 65_000 and 1_650 < sum(x["minutes"] for x in full) < 2_100   # ~30 h

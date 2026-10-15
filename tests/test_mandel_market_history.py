@@ -498,3 +498,203 @@ def test_command_line_preview_writes_a_scratch_archive(tmp_path, monkeypatch, ca
     out = json.loads(capsys.readouterr().out)
     assert out["plan_bundles"] == 2 and out["results"]["daily-history-EEM"]["stored"]["rows"] == 6
     assert json.loads((tmp_path / "pv" / "daily.report.json").read_text())["_plan"][0]["name"] == "daily-history-EEM"
+
+
+# ------------------------------------------------------------------------- checker regressions (2026-10-15) --
+
+def test_t467_tsx_legs_map_cni_to_cnr_and_never_plan_cni_to():
+    need = m.THEORY_NEEDS["T-467"]["hourly"]
+    assert m.TSX["CNI"] == "CNR.TO" and "CNR.TO" in need and "CNI.TO" not in need and "CNI.TO" not in m.HOURLY_SYMBOLS
+    assert len(need) == 21 and sum(1 for s in need if s.endswith(".TO")) == 10 and "CAD=X" in need
+    assert all(us in need and m.TSX[us] in need for us in m.CANADA)           # all 10 declared pairs
+    assert {m.INTERLISTED[s] for s in need if s.endswith(".TO")} == set(m.CANADA)
+    assert all(m.TSX[us] == f"{us}.TO" for us in m.CANADA if us != "CNI")
+    plan = m.fetch_hourly_histories(None, dry_run=True)["_plan"]
+    names = {p["name"] for p in plan}
+    assert {"hourly-CNR.TO", "hourly-CNI"} <= names and "hourly-CNI.TO" not in names
+    block = m.gitignore_block(plan).splitlines()
+    assert "mandel/archive/data/hourly-CNR.TO.jsonl.gz" in block and not any("CNI.TO" in x for x in block)
+
+
+def test_every_hourly_symbol_in_theory_needs_resolved_and_pairs_name_the_same_company():
+    assert set(m.HOURLY_SYMBOLS) == set(m.HOURLY_VERIFIED)                  # each one was seen to resolve live
+    for tsx, us in m.INTERLISTED.items():
+        assert m.HOURLY_VERIFIED[tsx][0] == m.HOURLY_VERIFIED[us][0], (tsx, us)
+        assert m.HOURLY_VERIFIED[tsx][1:] == ("TOR", "CAD") and m.HOURLY_VERIFIED[us][2] == "USD"
+    assert m.HOURLY_VERIFIED["CNR.TO"][0] == "Canadian National Railway Company"
+
+
+def named(sym, name, exch, cur):
+    js = hourly_chart(sym, [T0 + i * 3600 for i in range(3)])
+    js["chart"]["result"][0]["meta"].update(longName=name, exchangeName=exch, currency=cur)
+    return ok(js)
+
+
+def test_check_symbols_flags_unresolved_symbols_and_mismatched_pairs():
+    net = FakeNet()
+    for s, (name, exch, cur) in m.HOURLY_VERIFIED.items():
+        net.yahoo[s] = [named(s, name, exch, cur)]
+    with net.client() as c:
+        rep = m.check_symbols(m.HOURLY_SYMBOLS + ["CNI.TO"], min_interval=0, client=c)
+    assert rep["_unresolved"] == ["CNI.TO"] and rep["_pair_mismatch"] == [] and rep["_unverified"] == []
+    assert "delisted" in rep["CNI.TO"]["error"] and rep["CNR.TO"]["name"] == "Canadian National Railway Company"
+    assert all(r.url.params["range"] == "5d" for r in net.calls) and len(net.calls) == len(m.HOURLY_SYMBOLS) + 1
+    net.yahoo["CNR.TO"] = [named("CNR.TO", "Another Company Inc.", "TOR", "CAD")]
+    with net.client() as c:
+        rep = m.check_symbols(["CNI", "CNR.TO"], min_interval=0, client=c)
+    assert rep["_pair_mismatch"] == ["CNI/CNR.TO"] and rep["_unverified"] == ["CNR.TO"]
+
+
+def test_cnr_to_recipe_records_the_cni_cnr_pairing(tmp_path):
+    net = FakeNet()
+    net.yahoo["CNR.TO"] = [named("CNR.TO", "Canadian National Railway Company", "TOR", "CAD")]
+    a = _arch(tmp_path)
+    with net.client() as c:
+        rep = m.fetch_hourly_histories(a, ["CNR.TO"], min_interval=0, client=c)
+    r = a.get("hourly-CNR.TO").recipe
+    assert "CNI on the NYSE" in r and "CNR.TO on the TSX" in r and '"longName": "Canadian National Railway Company"' in r
+    assert rep["hourly-CNR.TO"]["name"] == "Canadian National Railway Company" and a.get("hourly-CNR.TO").in_git is False
+    assert "CNR.TO on the TSX" in m.hourly_recipe("CNI") and m.pair_note("TQQQ") == ""
+
+
+def session_chart(sym, days, print_on=None, itype="ETF", end=None):
+    """Regular-session 1h bars 13:30..19:30 UTC on each day start (unix midnight); with print_on, Yahoo's zero-volume
+    20:00 close print on that day; meta carries currentTradingPeriod.regular.end and regularMarketTime."""
+    ts, vol = [], []
+    for d in days:
+        for h in range(7):
+            ts.append(d + 13 * 3600 + 1800 + h * 3600)
+            vol.append(5000 + h)
+    if print_on is not None:
+        ts.append(print_on + 20 * 3600)
+        vol.append(0)
+    js = chart(sym, ts, adj=False, gran="1h")
+    res = js["chart"]["result"][0]
+    res["indicators"]["quote"][0]["volume"] = vol
+    end = end if end is not None else (print_on if print_on is not None else days[-1]) + 20 * 3600
+    res["meta"].update(instrumentType=itype, regularMarketTime=end,
+                       currentTradingPeriod={"regular": {"start": end - 23400, "end": end, "timezone": "EDT", "gmtoffset": -14400}})
+    return js
+
+
+def test_close_print_is_not_stored_and_every_session_ends_on_its_last_regular_bar(tmp_path):
+    d1 = T0 - 48600                                  # unix midnight
+    d2, d3 = d1 + DAY, d1 + 2 * DAY
+    net = FakeNet()
+    net.yahoo["TQQQ"] = [ok(session_chart("TQQQ", [d1, d2], print_on=d2))]
+    a = _arch(tmp_path)
+    with net.client() as c:
+        rep = m.fetch_hourly_histories(a, ["TQQQ"], min_interval=0, client=c)
+    rows = list(a.load("hourly-TQQQ"))
+    assert len(rows) == 14 and all(r["value"]["t"] % 3600 == 1800 for r in rows)
+    assert rows[-1]["value"]["t"] == d2 + 19 * 3600 + 1800
+    assert rep["hourly-TQQQ"]["close_prints_dropped"] == [{"t": m.iso(d2 + 20 * 3600), "close": 114.0, "volume": 0}]
+    assert "close print" in a.get("hourly-TQQQ").recipe and a.get("hourly-TQQQ").schema == m.HOURLY_SCHEMA
+    # an earlier capture (e.g. the fetch_hourly recipe) left d2's print in the stored bundle: the merge removes it
+    stale = {int(r["value"]["t"]): r["value"] for r in rows}
+    stale[d2 + 20 * 3600] = {"symbol": "TQQQ", "t": d2 + 20 * 3600, "open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0, "volume": 0}
+    a.store("hourly-TQQQ", "data", m.hourly_rows(stale), recipe="earlier capture", tags=m.HOURLY_TAGS, schema=m.HOURLY_SCHEMA, in_git=False)
+    net.yahoo["TQQQ"] = [ok(session_chart("TQQQ", [d2, d3], print_on=d3))]
+    with net.client() as c:
+        rep = m.fetch_hourly_histories(a, ["TQQQ"], min_interval=0, client=c, refresh=True)
+    rows = list(a.load("hourly-TQQQ"))
+    last = {}
+    for r in rows:
+        last[r["observed_at"][:10]] = r["observed_at"][11:16]
+    assert len(rows) == 21 and set(last.values()) == {"19:30"} and rep["hourly-TQQQ"]["stored_close_prints_removed"] == 1
+
+
+def test_close_print_rule_spares_round_the_clock_instruments_and_other_sessions():
+    d1 = T0 - 48600
+    fx = {d1 + h * 3600: {"t": d1 + h * 3600, "close": 1.4, "volume": 0} for h in range(24)}
+    meta_fx = {"instrumentType": "CURRENCY", "regularMarketTime": d1 + 20 * 3600, "currentTradingPeriod": {"regular": {"end": d1 + 20 * 3600}}}
+    assert m.close_prints(meta_fx, fx) == set()                              # CAD=X bars start on the hour, volume 0
+    assert m.close_prints({**meta_fx, "instrumentType": "CRYPTOCURRENCY"}, fx) == set()
+    js = session_chart("RY.TO", [d1, d1 + DAY], itype="EQUITY", end=d1 + 20 * 3600)     # stale meta: yesterday's session end
+    vals = m.parse_hourly(js["chart"]["result"][0], "RY.TO")
+    assert m.close_prints(js["chart"]["result"][0]["meta"], vals) == set()   # no bar in [end, end + 1h): nothing dropped
+    vals[d1 + DAY + 20 * 3600] = {"t": d1 + DAY + 20 * 3600, "close": 1.0, "volume": 0}
+    assert m.close_prints(js["chart"]["result"][0]["meta"], vals) == {d1 + DAY + 20 * 3600}     # off the :30 grid, zero volume
+    # TSX early close (Dec 24, 13:00 ET = 18:00 UTC): Yahoo's last bar starts at the close and carries volume. Kept, also
+    # when the fetch runs that afternoon (meta end = 18:00), so the day looks the same as in later captures' history.
+    d2 = d1 + DAY
+    half = {d2 + 14 * 3600 + 1800 + h * 3600: {"t": d2 + 14 * 3600 + 1800 + h * 3600, "close": 1.0, "volume": 900 + h} for h in range(3)}
+    half[d2 + 18 * 3600] = {"t": d2 + 18 * 3600, "close": 1.0, "volume": 368826}
+    meta_half = {"instrumentType": "EQUITY", "regularMarketTime": d2 + 18 * 3600, "currentTradingPeriod": {"regular": {"end": d2 + 18 * 3600}}}
+    assert m.close_prints(meta_half, {**vals, **half}) == {d1 + DAY + 20 * 3600}
+
+
+def test_fred_values_match_alfred_at_alfred_precision():
+    assert m._decimals("7.052381") == 6 and m._decimals("6.8961905") == 7 and m._decimals("12") == 0 and m._decimals("1e-5") is None
+    assert m.alfred_matches(7.05238095238095, 7.052381, 6) and m.alfred_matches(6.89619047619048, 6.8961905, 7)
+    assert m.alfred_matches(7.05238095238095, 7.052381)                        # decimals from the float's repr
+    assert m.alfred_matches(1.67566666666667, 1.6756667) and m.alfred_matches(4.4, 4.4, 1)
+    assert not m.alfred_matches(7.0524, 7.052381, 6) and not m.alfred_matches(4.43, 4.4, 1)     # real differences stay capture
+    assert not m.alfred_matches(4.4000031, 4.4, 1)                             # a short print never widens past 5e-7 relative
+
+
+OECD = "IRLTLT01DEM156N"
+
+
+def _oecd_net():
+    net = FakeNet()
+    net.fred_csv[OECD] = (f"observation_date,{OECD}\n1994-06-01,7.05238095238095\n1994-07-01,6.89619047619048\n"
+                          "2026-08-01,2.63\n2026-09-01,2.7\n")
+    net.fred_page[OECD] = fred_page("#copyright-citation-required", "Organization for Economic Co-operation and Development", "Monthly")
+    net.alfred_page[OECD] = alfred_page(["2013-06-03", "2026-09-15"], "1994-06-01", "2026-08-01")
+    net.alfred_zip[OECD] = alfred_zip(OECD, ["1994-06-01,7.0523810,2013-06-03,2026-09-14", "1994-06-01,7.052381,2026-09-15,",
+                                            "1994-07-01,6.8961905,2026-09-15,", "2026-08-01,2.63,2026-09-15,"])
+    return net
+
+
+def test_oecd_monthly_averages_get_their_alfred_release_not_the_capture_time(tmp_path):
+    net = _oecd_net()
+    a = _arch(tmp_path)
+    with net.client() as c:
+        rep = m.fetch_fred_series(a, [OECD], min_interval=0, client=c)
+    rows = {r["value"]["day"]: r for r in a.load(f"fred-{OECD}")}
+    assert rows["1994-06-01"]["available_at"] == "2026-09-15T23:59:59+00:00"
+    assert rows["1994-06-01"]["value"]["available_basis"] == "alfred-current-vintage" and rows["1994-06-01"]["value"]["value"] == 7.05238095238095
+    assert rows["1994-07-01"]["value"]["realtime_start"] == "2026-09-15"
+    assert rows["2026-09-01"]["value"]["available_basis"] == "capture"                    # ALFRED truly lacks it
+    assert rep[f"fred-{OECD}"]["capture_stamped"] == 1 and a.get(f"fred-{OECD}").in_git is False
+    assert "decimals" not in next(iter(a.load(f"alfred-{OECD}")))["value"]             # internal only, not stored
+
+
+def test_capture_stamps_from_a_strict_match_are_repaired_offline_on_resume(tmp_path, monkeypatch):
+    net = _oecd_net()
+    a = _arch(tmp_path)
+    with monkeypatch.context() as mp:                     # the old 1e-9 rule, as the first preview stored it
+        mp.setattr(m, "alfred_matches", lambda f, al, d=None: abs(f - al) <= 1e-9 * max(1.0, abs(f)))
+        with net.client() as c:
+            rep = m.fetch_fred_series(a, [OECD], min_interval=0, client=c)
+    assert rep[f"fred-{OECD}"]["capture_stamped"] == 3
+    before = a.get(f"fred-{OECD}")
+    n = len(net.calls)
+    assert m.fetch_fred_series(a, [OECD], dry_run=True)[f"fred-{OECD}"] == {"skipped": "stored", "would_repair": 2}
+    assert a.get(f"fred-{OECD}").sha256 == before.sha256                                  # the dry run wrote nothing
+    with net.client() as c:
+        rep = m.fetch_fred_series(a, [OECD], min_interval=0, client=c)
+    assert len(net.calls) == n and rep[f"fred-{OECD}"] == {"skipped": "stored", "repaired_capture_stamps": 2}
+    rows = {r["value"]["day"]: r for r in a.load(f"fred-{OECD}")}
+    assert rows["1994-06-01"]["available_at"] == "2026-09-15T23:59:59+00:00" and rows["1994-06-01"]["value"]["realtime_start"] == "2026-09-15"
+    assert rows["2026-09-01"]["value"]["available_basis"] == "capture"
+    after = a.get(f"fred-{OECD}")
+    assert (after.recipe, after.tags, after.schema, after.in_git) == (before.recipe, before.tags, before.schema, before.in_git)
+    assert m.repair_capture_stamps(a, OECD) == 0                                          # idempotent
+
+
+def test_months_per_period_from_gaps_when_the_page_gives_no_frequency():
+    annual = [{"day": f"{y}-01-01", "value": 1.0} for y in range(2000, 2025)]
+    quarterly = [{"day": f"{y}-{mo:02d}-01", "value": 1.0} for y in range(2018, 2025) for mo in (1, 4, 7, 10)]
+    monthly = [{"day": f"2024-{mo:02d}-01", "value": 1.0} for mo in range(1, 13)]
+    assert m._months_per_period({}, annual) == 12 and m._months_per_period({}, quarterly) == 3 and m._months_per_period({}, monthly) == 1
+    assert m.lag_rule_at("UNRATE", "2020-01-01", m._months_per_period({}, annual)) == "2021-02-04T23:59:59+00:00"   # year end + 35 days
+
+
+def test_estimates_use_yahoo_first_trade_dates():
+    for s in ["BRK-A", "BRK-B", "BF-A", "BF-B", "LEN", "LEN-B", "HEI", "HEI-A", "MDY", "DIA", "IYR", "NVDA", "AAPL", "GME", "AMZN"]:
+        assert s in m.FIRST_TRADE
+    assert set(m.DAILY_SYMBOLS) <= set(m.FIRST_TRADE)                        # no symbol falls back to the 2000-01-03 default
+    assert m.FIRST_TRADE["BF-A"] == "1973-05-03" and m.estimate_daily_rows("BF-A") > 13000 and m.estimate_daily_rows("BRK-A") > 11500
+    assert m.FRED_ROWS_EST["CPIAUCSL"] == (956, 3400)

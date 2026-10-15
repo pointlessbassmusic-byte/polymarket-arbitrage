@@ -14,7 +14,10 @@ Sources (keyless; probed 2026-10-15 from this host):
     at most 7-8 days per request. Anything older is unreachable from Yahoo. CAD=X 1h starts only 2023-12-29.
     Delisted tickers answer 404 'No data found, symbol may be delisted' (CELG); a reused ticker can resolve to another
     instrument (FB is now a Cboe ETF); LBRDK returns a single bar (Yahoo's history starts 2026-07-17), so it is
-    reported as too short and not stored (DoltHub post-no-preference/stocks has it; another source group).
+    reported as too short and not stored (DoltHub post-no-preference/stocks has it; another source group). TSX
+    listings are ``<SYM>.TO`` except Canadian National Railway, which is CNI on the NYSE and CNR.TO on the TSX
+    (``TSX``; CNI.TO answers 404). ``HOURLY_VERIFIED`` records how every hourly symbol resolved on 2026-10-15;
+    ``check_symbols`` (``python3 -m mandel.data.market_history check``) re-verifies names and pairs live.
   * FRED graph CSV ``https://fred.stlouisfed.org/graph/fredgraph.csv?id=<SID>`` (the latest vintage; the fred-DTB3
     recipe, parsed by ``mandel.data.options.fred_series``) and the series page ``https://fred.stlouisfed.org/series/
     <SID>``, whose schema.org block states the licence (``#copyright-public-domain``, ``#copyright-citation-required``,
@@ -37,15 +40,24 @@ Bundles (``mandel/archive/data/<name>.jsonl.gz``; ``^`` and ``=`` become ``-`` a
     zero-row bundle records that the history was checked and carries none).
   * ``hourly-<SYM>``: exactly the rows ``mandel.data.unlocks.fetch_hourly`` writes (kind bar1h, available_at = bar start
     + 1 h), merged with what is stored so history accumulates past Yahoo's 730-day window; a bar still in progress is
-    not stored.
+    not stored. For EQUITY/ETF listings Yahoo's zero-volume close print is not a bar and is dropped (``close_prints``):
+    after the close Yahoo appends a zero-volume bar at the regular-session end (16:00 ET) for the current session only,
+    so keeping it would leave one off-grid row per capture and make "the last bar of the day" differ between sessions.
+    Stored close prints from earlier captures are removed on merge; a bar with volume is never dropped. Early-close days
+    still differ by venue (Yahoo's own layout): US listings end on the 12:30 ET bar, TSX listings on a bar that starts
+    at the 13:00 ET close and holds the closing volume; harnesses that align session closes should skip early-close days.
+    (Archived ``fetch_hourly`` bundles such as hourly-SPY still end on a close print; they are not this module's.)
   * ``fred-<SID>``: the fred-DTB3 row shape (source fred, kind series, value {day, value}, observed_at = day 00:00 UTC).
     DAILY series keep the house rule exactly: available_at = day 20:00 UTC (note: Treasury posts the CMT curve in the
     evening, so this is up to a few hours early; it is the archived convention, kept so old and new series line up).
     NON-DAILY series are revised and published weeks after the period, so day 20:00 would leak: their rows hold the
     LATEST vintage and available_at = the publication time of that exact value (its ALFRED realtime_start, at the
     release time of day), with value.realtime_start and value.available_basis ``alfred-current-vintage``; a value
-    ALFRED does not carry yet is stamped with the capture time (``capture``). Pre-ALFRED history therefore counts from
-    the first ALFRED vintage that holds it: honest, but late. Use ``alfred-<SID>`` for forecasting.
+    ALFRED does not carry yet is stamped with the capture time (``capture``). The FRED and ALFRED values are matched at
+    ALFRED's printed precision (``alfred_matches``: fredgraph.csv prints 7.05238095238095 where ALFRED prints
+    7.052381), and a stored bundle with capture stamps that the stored ALFRED bundle can resolve is repaired offline
+    on resume (``repair_capture_stamps``). Pre-ALFRED history therefore counts from the first ALFRED vintage that
+    holds it: honest, but late. Use ``alfred-<SID>`` for forecasting.
   * ``alfred-<SID>``: every real-time period of every observation (kind vintage, value {day, value, realtime_start,
     realtime_end, first_release, first_vintage, lag_rule_at}), available_at = realtime_start at the release time of day
     (BLS 08:30 ET, Michigan 10:00 ET, Z.1 12:00 ET, otherwise the end of the UTC day). ``first_release`` marks the
@@ -129,7 +141,11 @@ ETF60_EXTRA = COUNTRY21 + ["EEM", "GDX", "IJH", "MDY", "DIA", "LQD", "TIP", "SHY
 DUAL_CLASS = ["GOOG", "GOOGL", "BRK-A", "BRK-B", "BF-A", "BF-B", "LEN", "LEN-B", "HEI", "HEI-A", "ZG", "Z", "NWSA", "NWS",
               "UA", "UAA", "FOXA", "FOX", "LBRDA", "LBRDK"]
 SECTORS = ["XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY"]
-CANADA = ["RY", "TD", "BNS", "BMO", "ENB", "CNQ", "SU", "CP", "CNI", "SHOP"]
+CANADA = ["RY", "TD", "BNS", "BMO", "ENB", "CNQ", "SU", "CP", "CNI", "SHOP"]          # the US lines (NYSE; SHOP on Nasdaq)
+# The TSX line of each company, mapped explicitly: Canadian National Railway is CNI on the NYSE but CNR on the TSX (Yahoo
+# has no CNI.TO: 404 'symbol may be delisted' on query1 and query2, 2026-10-15); every other name keeps its ticker.
+TSX = {s: f"{s}.TO" for s in CANADA} | {"CNI": "CNR.TO"}
+INTERLISTED = {tsx: us for us, tsx in TSX.items()}      # TSX symbol -> US symbol (T-467 pairs)
 IRLTLT01 = [f"IRLTLT01{cc}M156N" for cc in ("US", "DE", "GB", "JP", "CA", "AU", "CH", "SE", "NO", "NZ")]
 
 # What each theory needs from these hosts (triage6c final entries and the theories' trial.data). "stocks" names a
@@ -179,7 +195,7 @@ THEORY_NEEDS: dict[str, dict] = {
     "T-377": {"daily": ["SGOV", "BIL"]},
     "T-404": {"daily": ["IAU", "GLDM"], "fred": ["DFII10"]},
     "T-430": {"daily": ["LQD", "SGOV", "BIL", "HYG", "IEI"], "fred": ["BAA10Y"]},
-    "T-467": {"hourly": CANADA + [f"{s}.TO" for s in CANADA] + ["CAD=X"]},
+    "T-467": {"hourly": CANADA + [TSX[s] for s in CANADA] + ["CAD=X"]},
     "T-474": {"daily": ["SHY", "IEI", "TLH"], "fred": ["DGS5"]},
     "T-378": {"daily": ["BOXX"]},
 }
@@ -201,6 +217,40 @@ FRED_SERIES = _union("fred")
 
 def theories_for(kind: str, item: str) -> list[str]:
     return sorted(t for t, need in THEORY_NEEDS.items() if item in need.get(kind, []))
+
+
+# Every hourly symbol as Yahoo resolved it live on 2026-10-15 (range=5d&interval=1h on query1 and query2): longName,
+# exchangeName, currency. A symbol that is not here has not been seen to resolve; ``check_symbols`` re-verifies live.
+HOURLY_VERIFIED: dict[str, tuple[str, str, str]] = {
+    "TQQQ": ("ProShares UltraPro QQQ", "NGM", "USD"), "SQQQ": ("ProShares UltraPro Short QQQ", "NGM", "USD"),
+    "IBIT": ("iShares Bitcoin Trust ETF", "NGM", "USD"), "FBTC": ("Fidelity Wise Origin Bitcoin Fund", "BTS", "USD"),
+    "SOL-USD": ("Solana USD", "CCC", "USD"), "DOGE-USD": ("Dogecoin USD", "CCC", "USD"),
+    "AAPL": ("Apple Inc.", "NMS", "USD"), "AMZN": ("Amazon.com, Inc.", "NMS", "USD"), "GOOG": ("Alphabet Inc.", "NMS", "USD"),
+    "GOOGL": ("Alphabet Inc.", "NMS", "USD"), "USO": ("United States Oil Fund, LP", "PCX", "USD"),
+    "EEM": ("iShares MSCI Emerging Markets ETF", "PCX", "USD"),
+    **{s: (f"State Street {n} Select Sector SPDR ETF", "PCX", "USD") for s, n in
+       (("XLB", "Materials"), ("XLE", "Energy"), ("XLF", "Financial"), ("XLI", "Industrial"), ("XLK", "Technology"),
+        ("XLP", "Consumer Staples"), ("XLU", "Utilities"), ("XLV", "Health Care"), ("XLY", "Consumer Discretionary"))},
+    **{us: (name, "NMS" if us == "SHOP" else "NYQ", "USD") for us, name in
+       (("RY", "Royal Bank of Canada"), ("TD", "The Toronto-Dominion Bank"), ("BNS", "The Bank of Nova Scotia"), ("BMO", "Bank of Montreal"),
+        ("ENB", "Enbridge Inc."), ("CNQ", "Canadian Natural Resources Limited"), ("SU", "Suncor Energy Inc."),
+        ("CP", "Canadian Pacific Kansas City Limited"), ("CNI", "Canadian National Railway Company"), ("SHOP", "Shopify Inc."))},
+    "CAD=X": ("USD/CAD", "CCY", "CAD"),
+}
+HOURLY_VERIFIED.update({TSX[us]: (HOURLY_VERIFIED[us][0], "TOR", "CAD") for us in CANADA})
+
+
+def pair_note(sym: str) -> str:
+    """The interlisted pairing for a T-467 leg (recorded in the recipe), else ''."""
+    if sym in INTERLISTED:
+        us = INTERLISTED[sym]
+    elif sym in TSX:
+        us = sym
+    else:
+        return ""
+    name = HOURLY_VERIFIED.get(us, ("",))[0]
+    return (f"interlisted pair (T-467): {name} = {us} on the {'Nasdaq' if us == 'SHOP' else 'NYSE'} (USD) and {TSX[us]} on the TSX (CAD)"
+            + (" - the TSX ticker is CNR, not CNI" if us == "CNI" else "") + "; ")
 
 
 # ---------------------------------------------------------------------------------------------- FRED metadata --
@@ -447,6 +497,40 @@ def parse_hourly(res: dict, sym: str) -> dict[int, dict]:
         return {}
 
 
+CLOSE_PRINT_TYPES = ("EQUITY", "ETF")          # session-traded listings; CURRENCY and CRYPTOCURRENCY bars run round the clock
+
+
+def close_prints(meta: Optional[dict], values: dict[int, dict]) -> set[int]:
+    """Bar starts that are Yahoo's close print rather than hourly bars, for EQUITY/ETF listings only. After the close Yahoo
+    appends a zero-volume bar at the regular-session end (16:00 ET = 20:00 UTC in summer) for the current session only;
+    earlier sessions end on their 15:30 ET bar (US early-close days keep a zero-volume 13:00 ET print in the history).
+    Dropped, always with volume 0: (1) a bar starting in the hour after meta.currentTradingPeriod.regular.end (the
+    one-hour bound keeps a stale meta from touching another session), (2) a bar at meta.regularMarketTime, (3) a bar off
+    the session's bar grid (start minute other than the one the traded bars use: :30 for NYSE/Nasdaq/TSX), which also
+    removes close prints that earlier captures merged into a stored bundle. A bar that carries volume is never dropped:
+    on TSX early-close days (Dec 24) Yahoo's last bar starts at the 13:00 ET close and holds the last half hour's and
+    the closing auction's volume, in the history as on the day itself."""
+    meta = meta or {}
+    if meta.get("instrumentType") not in CLOSE_PRINT_TYPES or not values:
+        return set()
+    end = ((meta.get("currentTradingPeriod") or {}).get("regular") or {}).get("end")
+    rmt = meta.get("regularMarketTime")
+    out: set[int] = set()
+    for t, v in values.items():
+        if v.get("volume") != 0:
+            continue
+        if (isinstance(end, (int, float)) and end <= t < end + 3600) or (rmt is not None and t == rmt):
+            out.add(t)
+    offsets: dict[int, int] = {}
+    for t, v in values.items():
+        if v.get("volume"):
+            offsets[t % 3600] = offsets.get(t % 3600, 0) + 1
+    if sum(offsets.values()) >= 10:
+        grid = max(offsets, key=offsets.get)
+        out |= {t for t, v in values.items() if v.get("volume") == 0 and t % 3600 != grid}
+    return out
+
+
 def parse_events(res: dict) -> dict[str, list[dict]]:
     ev = res.get("events") or {}
     divs, splits = [], []
@@ -487,7 +571,7 @@ def hourly_rows(values: dict[int, dict]) -> list[dict]:
 
 
 def _meta_text(meta: Optional[dict]) -> str:
-    m = {k: (meta or {}).get(k) for k in ("currency", "exchangeName", "instrumentType", "firstTradeDate", "exchangeTimezoneName")}
+    m = {k: (meta or {}).get(k) for k in ("longName", "currency", "exchangeName", "instrumentType", "firstTradeDate", "exchangeTimezoneName")}
     return json.dumps({k: v for k, v in m.items() if v is not None}, sort_keys=True)
 
 
@@ -505,8 +589,10 @@ def events_recipe(sym: str, meta: Optional[dict] = None) -> str:
 
 def hourly_recipe(sym: str, meta: Optional[dict] = None) -> str:
     return (f"yahoo /v8/finance/chart/{sym}?range=730d&interval=1h, merged with earlier captures (bar time = bar start); via "
-            f"mandel.data.market_history.fetch_hourly_histories; a bar still in progress at the fetch is left out; Yahoo serves 1h bars "
-            f"for about 730 sessions only (730 calendar days for crypto); meta {_meta_text(meta)}. {YAHOO_LICENCE}")
+            f"mandel.data.market_history.fetch_hourly_histories; a bar still in progress at the fetch is left out; for EQUITY/ETF "
+            f"listings Yahoo's zero-volume close print (a bar at the regular-session end, 16:00 ET, served for the current session "
+            f"only) is dropped, so every session ends on its last regular hourly bar (15:30 ET); Yahoo serves 1h bars "
+            f"for about 730 sessions only (730 calendar days for crypto); {pair_note(sym)}meta {_meta_text(meta)}. {YAHOO_LICENCE}")
 
 
 # ------------------------------------------------------------------------------------------------ estimates --
@@ -525,16 +611,21 @@ FIRST_TRADE = {"EEM": "2003-04-14", "SSO": "2006-06-21", "SDS": "2006-07-13", "U
                "GOOG": "2004-08-19", "GOOGL": "2004-08-19", "ZG": "2011-07-20", "Z": "2015-08-03", "NWSA": "2013-06-19", "NWS": "2013-06-19",
                "UA": "2016-04-08", "UAA": "2005-11-18", "FOXA": "2019-03-12", "FOX": "2019-03-12", "LBRDA": "2014-11-05", "LBRDK": "2026-08-19",
                "PLTR": "2020-09-30", "COIN": "2021-04-14", "TSLA": "2010-06-29", "MSTR": "1998-06-11", "AMC": "2013-12-18", "IBIT": "2024-01-11",
-               "TQQQ": "2010-02-11", "SQQQ": "2010-02-11"}
+               "TQQQ": "2010-02-11", "SQQQ": "2010-02-11",
+               # Yahoo meta firstTradeDate (range=5d, 2026-10-15) for the names the 2000-01-03 default undercounted
+               "BRK-A": "1980-03-17", "BRK-B": "1996-05-09", "BF-A": "1973-05-03", "BF-B": "1980-03-17", "LEN": "1980-03-17",
+               "LEN-B": "2003-04-23", "HEI": "1980-03-17", "HEI-A": "1998-04-27", "MDY": "1995-05-04", "DIA": "1998-01-20",
+               "IYR": "2000-06-19", "NVDA": "1999-01-22", "AAPL": "1980-12-12", "GME": "2002-02-13", "AMZN": "1997-05-15"}
 for _s in COUNTRY21:
     FIRST_TRADE.setdefault(_s, "1996-03-18")
 for _s in ISHARES_SECTORS:
     FIRST_TRADE.setdefault(_s, "2000-06-16")
 GZ_BYTES = {"daily": 40, "events": 25, "hourly": 38, "fred": 10, "alfred": 15}      # measured on archived bundles and the 2026-10-15 preview
 # (fred-<SID> rows, alfred-<SID> rows): measured on the 2026-10-15 preview for DGS20, DFII10, BAA10Y, UMCSENT, USREC,
-# BOGZ1FA653064100Q and IRLTLT01USM156N (UNRATE's ALFRED count from the probe); the others are extrapolated
+# BOGZ1FA653064100Q and IRLTLT01USM156N and on the checker's live CPIAUCSL fetch (956 + 3,363); UNRATE's ALFRED count from
+# the probe; the others are extrapolated
 FRED_ROWS_EST = {"DGS20": (14491, 0), "DGS7": (14300, 0), "DGS5": (16200, 0), "DGS3": (16200, 0), "DGS1": (16200, 0), "DFII10": (5950, 0),
-                 "BAA10Y": (10195, 0), "UMCSENT": (676, 1083), "UNRATE": (945, 2200), "CPIAUCSL": (945, 12000),
+                 "BAA10Y": (10195, 0), "UMCSENT": (676, 1083), "UNRATE": (945, 2200), "CPIAUCSL": (956, 3400),
                  "BOGZ1FA653064100Q": (304, 690), "BOGZ1LM893064105Q": (324, 720), "USREC": (2062, 2079),
                  **{s: (700, 2000) for s in IRLTLT01}, "IRLTLT01USM156N": (881, 2082)}
 
@@ -704,22 +795,35 @@ def fetch_hourly_histories(store=None, symbols: Optional[Iterable[str]] = None, 
             cutoff = time.time()
             if res is None:
                 rep[name] = info
+                if log:
+                    log(f"{s}: {info.get('error')} (stored bundle, if any, left as it was)")
                 continue
-            new = {t: v for t, v in parse_hourly(res, s).items() if t + 3600 <= cutoff}
+            meta = res.get("meta") or {}
+            parsed = parse_hourly(res, s)
+            prints = close_prints(meta, parsed)
+            new = {t: v for t, v in parsed.items() if t + 3600 <= cutoff and t not in prints}
             if not new:
                 info["error"] = "no complete 1h bar: not stored"
                 rep[name] = info
                 continue
             fresh = len(new)
-            for row in _load(archive, name) if archive is not None else []:
-                new.setdefault(int(row["value"]["t"]), row["value"])
+            stored = {int(row["value"]["t"]): row["value"] for row in (_load(archive, name) if archive is not None else [])}
+            for t, v in stored.items():
+                new.setdefault(t, v)
+            stale = close_prints(meta, new) & set(stored)          # close prints an earlier capture merged in
+            for t in stale:
+                new.pop(t, None)
             rows = hourly_rows(new)
             info.update(fresh_bars=fresh, rows=len(rows), first=rows[0]["observed_at"][:10], last=rows[-1]["observed_at"][:10],
-                        currency=(res.get("meta") or {}).get("currency"))
+                        currency=meta.get("currency"), name=meta.get("longName"), instrument=meta.get("instrumentType"))
+            if prints:
+                info["close_prints_dropped"] = [{"t": iso(t), "close": parsed[t]["close"], "volume": parsed[t]["volume"]} for t in sorted(prints)]
+            if stale:
+                info["stored_close_prints_removed"] = len(stale)
             if archive is None:
                 info["rows"] = rows
             else:
-                e = _store(archive, name, rows, hourly_recipe(s, res.get("meta")), HOURLY_TAGS, HOURLY_SCHEMA, in_git=False)
+                e = _store(archive, name, rows, hourly_recipe(s, meta), HOURLY_TAGS, HOURLY_SCHEMA, in_git=False)
                 info["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}
             rep[name] = info
             if log:
@@ -727,6 +831,38 @@ def fetch_hourly_histories(store=None, symbols: Optional[Iterable[str]] = None, 
     finally:
         if own:
             c.close()
+    return rep
+
+
+def check_symbols(symbols: Optional[Iterable[str]] = None, interval: str = "1h", min_interval: float = YAHOO_INTERVAL,
+                  retries: int = 4, backoff: float = 2.0, client: Optional[httpx.Client] = None, log=None) -> dict:
+    """Live preflight, one small call per symbol (``range=5d``): does Yahoo resolve it, to what (longName, exchange,
+    currency, instrumentType), and does each interlisted TSX leg name the same company as its US leg. Stores nothing.
+    Returns {symbol: info, '_unresolved': [...], '_pair_mismatch': [...], '_unverified': [...] (resolved but not in
+    HOURLY_VERIFIED, or resolved to another name than recorded)}."""
+    syms = list(dict.fromkeys(yahoo_symbol(s) for s in (symbols if symbols is not None else HOURLY_SYMBOLS)))
+    own = client is None
+    c = client or _client(timeout=60)
+    th = Throttle(min_interval)
+    rep: dict = {}
+    try:
+        for s in syms:
+            res, info = yahoo_chart(s, {"range": "5d", "interval": interval}, c, th, retries=retries, backoff=backoff)
+            if res is not None:
+                meta = res.get("meta") or {}
+                info.update(name=meta.get("longName") or meta.get("shortName"), exchange=meta.get("exchangeName"),
+                            currency=meta.get("currency"), instrument=meta.get("instrumentType"), bars=len(res.get("timestamp") or []))
+            rep[s] = info
+            if log:
+                log(f"{s}: {info.get('name') or info.get('error')}")
+    finally:
+        if own:
+            c.close()
+    ok_ = {s for s, i in rep.items() if i.get("name")}
+    rep["_unresolved"] = [s for s in syms if s not in ok_]
+    rep["_pair_mismatch"] = [f"{INTERLISTED[s]}/{s}" for s in syms if s in INTERLISTED and s in ok_ and INTERLISTED[s] in ok_
+                             and rep[s]["name"] != rep[INTERLISTED[s]]["name"]]
+    rep["_unverified"] = [s for s in syms if s in ok_ and HOURLY_VERIFIED.get(s, (None,))[0] != rep[s]["name"]]
     return rep
 
 
@@ -802,7 +938,7 @@ def _months_per_period(meta: dict, rows: list[dict]) -> int:
     days = [date.fromisoformat(r["day"]) for r in rows[-24:]]
     gaps = sorted((b - a).days for a, b in zip(days, days[1:]))
     g = gaps[len(gaps) // 2] if gaps else 31
-    return 3 if g > 80 else 12 if g > 300 else 1
+    return 12 if g > 300 else 3 if g > 80 else 1          # largest gap first: an annual series also has gaps > 80 days
 
 
 def alfred_realtime(sid: str, client: httpx.Client, throttle: Throttle, retries: int = 4, backoff: float = 2.0) -> tuple[list[dict], dict]:
@@ -851,8 +987,31 @@ def parse_alfred_csv(text: str, sid: str) -> list[dict]:
             val = float(v) if v not in (None, "", ".") else None
         except ValueError:
             val = None
-        out.append({"day": day, "value": val, "realtime_start": rs, "realtime_end": row.get("realtime_end_date") or None})
+        out.append({"day": day, "value": val, "realtime_start": rs, "realtime_end": row.get("realtime_end_date") or None,
+                    "decimals": _decimals(v) if val is not None else None})
     return out
+
+
+def _decimals(text) -> Optional[int]:
+    """Digits after the decimal point as printed ('6.8961905' -> 7, '4.4' -> 1, '12' -> 0); None for exponent forms."""
+    s = str(text).strip()
+    if not s or "e" in s.lower():
+        return None
+    return len(s.split(".", 1)[1]) if "." in s else 0
+
+
+def alfred_matches(fred_value: float, alfred_value: float, decimals: Optional[int] = None) -> bool:
+    """True when the fredgraph.csv value is ALFRED's value at ALFRED's printed precision. fredgraph.csv prints 14-15
+    significant digits (7.05238095238095) while ALFRED rounds to 7 decimals and trims trailing zeros (7.052381 =
+    7.0523810), so the two differ by up to half a unit of ALFRED's last digit. The tolerance is that half unit (from the
+    printed string; from repr when only the float is known), capped at 5e-7 relative so a trimmed short print such as
+    '4.4' never widens it to 0.05, plus float noise."""
+    if fred_value is None or alfred_value is None:
+        return False
+    d = decimals if decimals is not None else _decimals(repr(float(alfred_value)))
+    scale = max(1.0, abs(alfred_value))
+    tol = 5e-7 * scale if d is None else min(0.5 * 10.0 ** -d, 5e-7 * scale)
+    return abs(fred_value - alfred_value) <= tol + 1e-12 * scale
 
 
 def alfred_rows(sid: str, periods: list[dict], months: int) -> list[dict]:
@@ -880,17 +1039,51 @@ def fred_daily_rows(sid: str, rows: list[dict]) -> list[dict]:
 
 
 def fred_revised_rows(sid: str, rows: list[dict], periods: list[dict], captured: str) -> list[dict]:
+    """fred-<SID> rows of a revised series: each latest-vintage value stamped with its ALFRED publication (realtime_start of
+    the current ALFRED period, matched at ALFRED's precision); 'capture' only when ALFRED has no current value that matches."""
     current = {p["day"]: p for p in periods if p["realtime_end"] is None and p["value"] is not None}
     out = []
     for r in rows:
         p = current.get(r["day"])
-        if p is not None and abs(p["value"] - r["value"]) <= 1e-9 * max(1.0, abs(r["value"])):
+        if p is not None and alfred_matches(r["value"], p["value"], p.get("decimals")):
             avail, basis, rs = release_at(sid, p["realtime_start"]), "alfred-current-vintage", p["realtime_start"]
         else:
             avail, basis, rs = captured, "capture", None
         out.append(Observation("fred", "series", sid, observed_at=r["day"] + "T00:00:00+00:00", available_at=avail,
                                value={**r, "realtime_start": rs, "available_basis": basis}).row())
     return out
+
+
+def repair_capture_stamps(store, sid: str, dry_run: bool = False) -> int:
+    """Offline repair of a stored revised ``fred-<SID>``: capture-stamped rows whose value the stored ``alfred-<SID>``
+    carries as the current vintage (at ALFRED's precision) get that publication's available_at. Re-stores the bundle with
+    its recipe, tags, schema and in_git unchanged; no request. Returns the number of rows repaired (to repair, when dry_run)."""
+    archive = _archive(store)
+    fname, aname = fred_bundle(sid), alfred_bundle(sid)
+    if not (_stored_here(archive, fname) and _stored_here(archive, aname)):
+        return 0
+    frows = _load(archive, fname)
+    if not any((r.get("value") or {}).get("available_basis") == "capture" for r in frows):
+        return 0
+    current = {}
+    for r in _load(archive, aname):
+        v = r.get("value") or {}
+        if v.get("realtime_end") is None and v.get("value") is not None:
+            current[v["day"]] = v
+    fixed = 0
+    out = []
+    for r in frows:
+        v = r.get("value") or {}
+        p = current.get(v.get("day"))
+        if v.get("available_basis") == "capture" and p is not None and alfred_matches(v.get("value"), p["value"]):
+            r = {**r, "available_at": release_at(sid, p["realtime_start"]),
+                 "value": {**v, "realtime_start": p["realtime_start"], "available_basis": "alfred-current-vintage"}}
+            fixed += 1
+        out.append(r)
+    if fixed and not dry_run:
+        e = archive.get(fname)
+        _store(archive, fname, out, e.recipe, list(e.tags), e.schema, in_git=e.in_git)
+    return fixed
 
 
 def _fred_recipe(sid: str, meta: dict, daily: bool) -> str:
@@ -932,6 +1125,10 @@ def fetch_fred_series(store=None, series: Optional[Iterable[str]] = None, dry_ru
         have_f, have_a = _stored_here(archive, fred_bundle(sid)), _stored_here(archive, alfred_bundle(sid))
         if skip_stored and not refresh and have_f and (daily_expected or not alfred or have_a):
             rep[fred_bundle(sid)] = {"skipped": "stored"}
+            if have_a and not daily_expected:                     # earlier captures matched ALFRED too strictly: repair offline
+                n_fix = repair_capture_stamps(archive, sid, dry_run=dry_run)
+                if n_fix:
+                    rep[fred_bundle(sid)]["would_repair" if dry_run else "repaired_capture_stamps"] = n_fix
             continue
         todo.append((sid, daily_expected))
     if limit is not None:
@@ -1033,7 +1230,8 @@ def gitignore_block(plan: list[dict]) -> str:
 def main(argv: Optional[list[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="python3 -m mandel.data.market_history",
                                 description="Yahoo daily/hourly histories and FRED/ALFRED series for the batch-6c underlying claims.")
-    p.add_argument("source", choices=["all", "daily", "hourly", "fred"])
+    p.add_argument("source", choices=["all", "daily", "hourly", "fred", "check"],
+                   help="check: live preflight of the hourly symbols (or --symbols): resolution, names, interlisted pairs; stores nothing")
     p.add_argument("--dry-run", action="store_true", help="no request: print the plan (calls, rows, gzip MB, minutes) and the .gitignore lines")
     p.add_argument("--preview", metavar="DIR", help="store into a scratch archive under DIR (DIR/archive, DIR/ledger.jsonl), not the real one")
     p.add_argument("--limit", type=int, help="first N bundles per source")
@@ -1044,6 +1242,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--yahoo-interval", type=float, default=YAHOO_INTERVAL)
     p.add_argument("--fred-interval", type=float, default=FRED_INTERVAL)
     a = p.parse_args(argv)
+    if a.source == "check":
+        rep = check_symbols([x.strip() for x in a.symbols.split(",")] if a.symbols else None, min_interval=a.yahoo_interval,
+                            log=lambda s: print(s, file=sys.stderr, flush=True))
+        print(json.dumps(rep, indent=1, default=str))
+        return 1 if rep["_unresolved"] or rep["_pair_mismatch"] else 0
     from mandel.archive import Archive
     if a.preview:
         from mandel.ledger import Ledger

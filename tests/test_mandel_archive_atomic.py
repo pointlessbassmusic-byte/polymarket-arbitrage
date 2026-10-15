@@ -37,3 +37,17 @@ def test_rewrite_can_stream_from_the_stored_bundle(tmp_path):
     a.store("b", kind="data", rows=({**r, "value": {**r["value"], "tag": "x"}} for r in a.load("b")), recipe="r", in_git=False)
     assert [r["value"] for r in a.load("b")] == [{"i": i, "tag": "x"} for i in range(4)]
     assert a.verify("b")
+
+
+def test_concurrent_writer_does_not_write_back_a_stale_entry(tmp_path):
+    """Two Archive objects on one root (two processes): B re-stores a bundle A loaded earlier; A then stores another bundle.
+    The INDEX must keep B's entry for the re-stored bundle, matching the file on disk."""
+    root, led = tmp_path / "archive", Ledger(tmp_path / "ledger.jsonl")
+    a = Archive(root=root, ledger=led)
+    a.store("x", kind="data", rows=_rows(2), recipe="r", in_git=False)
+    b = Archive(root=root, ledger=led)
+    eb = b.store("x", kind="data", rows=_rows(7, "b"), recipe="r", in_git=False)
+    a.store("y", kind="data", rows=_rows(1), recipe="r", in_git=False)
+    fresh = Archive(root=root, ledger=led)
+    assert fresh.get("x").sha256 == eb.sha256 and fresh.get("x").rows == 7 and fresh.verify("x")
+    assert a.get("x").sha256 == eb.sha256 and fresh.get("y").rows == 1

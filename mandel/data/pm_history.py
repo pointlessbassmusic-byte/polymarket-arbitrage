@@ -9,8 +9,10 @@ Which claims need what (batch-6c triage ``final`` entries whose fetch text names
          point-in-time volume rank (Gamma volume is end-of-life)                        polymarket-price-history-daily-<M>,
                                                                                          polymarket-volume-hourly-<M>
   T-31   >= 500 markets with price, days to close and point-in-time log volume       -> same three families
-  T-32   >= 50 distinct-event markets alive together for T >= 100 days               -> closed-markets (events[].id) +
-                                                                                         daily (every market living >= 100 d)
+  T-32   >= 50 distinct-event markets alive together for T >= 100 days, also the     -> closed-markets (events[].id) +
+         markets still open (triage: "also fetch the active markets")                   daily (every market living >= 100 d)
+                                                                                         + polymarket-open-markets,
+                                                                                         polymarket-open-price-history-daily
   T-359  ~4,500+ resolved markets with daily history (9% qualify); Kalshi arm        -> closed-markets + daily; Kalshi
                                                                                          hourly candles (end - k days)
   T-378  >= 500 markets: Polymarket daily + Kalshi settled markets with daily        -> closed-markets + daily;
@@ -25,7 +27,7 @@ Which claims need what (batch-6c triage ``final`` entries whose fetch text names
          events with hourly prices                                                      polymarket-price-history-hourly-<M>
   T-336  hand-auditable Polymarket-Kalshi pairs (FOMC, CPI, BTC thresholds) with     -> pm-kalshi-pairs,
          hourly prices on both venues                                                   polymarket-price-history-hourly-<M>,
-                                                                                         kalshi-candles-hourly-<S>
+                                                                                         kalshi-candles-hourly-<S> (every leg)
   T-409  >= 40 pairs (FOMC, CPI, 2024 election, BTC) with hourly prices and hourly   -> the T-336 families +
          Polymarket volume to pick the leader                                           polymarket-volume-hourly-<M>
   T-408  non-combo settled Kalshi markets with hourly bid/ask across many series;    -> kalshi-candles-hourly-<S>;
@@ -50,9 +52,10 @@ Polymarket (keyless; paced at 0.5 s per request, 429 / 5xx retried with backoff 
    under 2 days: crypto up/down, single games, useless at daily horizons), volumeNum >= $10k (end-of-life volume: a
    selection on Gamma's final metadata, stated). Markets ending before 2023 are AMM-era: the CLOB has no history for
    them (probed: 2022-06 .. 2023-01 markets answer an empty history), so the window starts 2023-01. Measured sizes
-   (volume >= $10k, no lifetime filter): 2023-03: 50 markets; 2024-03: 292; 2024-09: 1,168; 2025-03: 2,191;
-   2025-09: ~7,500; 2026-09: > 15,000 at >= $50k. A month is complete once every day was fetched and 45 days have
-   passed since month end (late resolutions); open months are stored with tag ``partial`` and fetched again.
+   (volume >= $10k, no lifetime filter): 2023-03: 50 markets; 2024-03: 292; 2024-09: 1,168; 2025-03: 2,191; with the
+   module's filter, keyset day counts 2025-12-10: 273, 2026-05-13: 335, 2026-09-02/16/27: 496 / 476 / 896 (8-18k a
+   month in 2025-10 .. 2026-10). A month is complete once every day was fetched and 45 days have passed since month end
+   (late resolutions); open months are stored with tag ``partial`` and fetched again.
 2. ``polymarket-price-history-daily-<M>`` (same schema as ``polymarket-price-history-daily``: value = {market_id, token,
    p, t}, observed_at = available_at = t). ``GET {CLOB}/prices-history?market=<YES token>&interval=max&fidelity=1440``
    (one call per market; startTs/endTs spans of ~90 days at fidelity 1440 answer 400 'interval is too long'). Probed:
@@ -60,20 +63,37 @@ Polymarket (keyless; paced at 0.5 s per request, 429 / 5xx retried with backoff 
    the next daily point, so a point is the price prevailing AT t (a snapshot), not an aggregate of the day after it:
    available_at = t is point in time. Which markets: per month, every binary market of a scheduled-event family (FOMC,
    CPI / inflation, payrolls, GDP, US elections: T-358 and the pairs) and every market living >= 100 days (T-32), plus a
-   deterministic hash sample (sha256 of the market id) of ``per_month`` (default 200) of the others. The hash sample
-   does not depend on volume, price or outcome. ``polymarket-fetch-log`` records each market's selection reason and the
-   month's sample rate (for reweighting); a harness wanting an unbiased population uses reason ``sample``.
+   deterministic hash sample (sha256 of the market id) of ``per_month`` (default 200) of the others, drawn only once the
+   month's closed-markets bundle is complete (a partial month gets its priority markets only: sampling a partial month
+   and again later would leave picks of both draws in the bundle). The hash sample does not depend on volume, price or
+   outcome. ``polymarket-fetch-log`` records each market's selection reason and the month's sample rate (for
+   reweighting); a harness wanting an unbiased population uses reason ``sample``.
+2b. ``polymarket-open-markets`` (value = raw Gamma row, observed_at = available_at = fetch time) and
+   ``polymarket-open-price-history-daily`` (as 2.) for T-32: ``GET {GAMMA}/markets/keyset?closed=false&limit=100
+   &volume_num_min=10000&start_date_max=<today - 100 days>&after_cursor=<c>`` (3,956 markets in 1,427 events on
+   2026-10-15, 40 pages), and the daily history of one hash-chosen market per event (``per_event``; T-32's same-event
+   control). Both are a snapshot as of the fetch date (survival to the snapshot is a selection: stated in the recipe).
 3. ``polymarket-events-btc-above`` and ``polymarket-events-macro`` (kind ``event``, value = the raw Gamma event with its
-   nested markets, observed_at = endDate, available_at = fetch time). ``GET {GAMMA}/public-search?q=<q>&events_status=
-   closed&limit_per_type=50&page=<n>`` while pagination.hasMore ("bitcoin above": 5,521 events on 2026-10-15, hourly-ET
-   variants such as bitcoin-above-on-april-6-2026-9pm-et included; macro: "fed decision", "fed interest rates",
-   "inflation", "cpi", kept when the slug is a US FOMC / CPI template) and ``GET {GAMMA}/events?slug=<slug>`` for the two
-   2024 election events (presidential-election-winner-2024, presidential-election-popular-vote-winner-2024).
+   nested markets, observed_at = endDate, available_at = fetch time). Gamma public-search refuses pages above 100 (422)
+   and serves 50 events a page, so at most 5,000 of the 5,525 "bitcoin above" results are reachable, and it silently
+   missed CPI events that exist; both sets are listed by ``GET {GAMMA}/events/keyset?closed=true&tag_slug=<tag>
+   &end_date_min=<month start>&end_date_max=<next month start>&limit=100&after_cursor=<c>`` instead (``event_windows``):
+   BTC: tag bitcoin minus tags 1H (102175) and up-or-down (102127) per endDate month from 2024-01 (the daily and
+   weekly events; the tag is 99% up/down and hourly variants: 448 events, 4.6 MB a day in 2026-09 without the
+   exclusions, 4 events, 139 KB with them), plus a two-second endDate window at 17:00 ET of every day from 2026-03-01
+   (the 5 pm ET hourly variant, which pairs with Kalshi's 17:00 KXBTCD event; hourly variants start 2026-03-17..24).
+   Live 2026-10-15: 276 requests, 84 MB, 687 events (491 daily / weekly, 196 at 5 pm ET). Macro: tags fed-rates, fed,
+   inflation, cpi per month from 2022-01, union the public-search queries "fed decision", "fed interest rates",
+   "inflation", "cpi" (a query reaching page 100 with hasMore is logged incomplete, not a failure), kept when the slug is
+   a US FOMC / CPI template, plus ``GET {GAMMA}/events?slug=<slug>`` for the two 2024 election events. Live: 247 requests,
+   105 events (the search alone: 102, missing january-inflation-us-monthly, february-inflation-us-annual,
+   february-inflation-us-monthly-231). Events are kept only when ``closed`` (events_status=closed still returned 7 open
+   events). Each set is resumable by window (polymarket-fetch-log 'events:<set>:<window>', partial stores).
 4. ``polymarket-price-history-hourly-<M>`` (value = {market_id, token, p, t}, available_at = t). ``GET {CLOB}/
    prices-history?market=<YES token>&startTs=<s>&endTs=<e>&fidelity=60`` in windows of 14 days (probed: 14 days -> 335
    points; 21 and 30 days -> 400 'interval is too long'; interval=max at fidelity 60 is empty for resolved markets).
-   Targets: (a) the BTC-above daily and weekly markets (T-337; hourly-ET variants excluded, they live one day),
-   (b) every Polymarket leg of ``pm-kalshi-pairs`` (T-336 / T-409), (c) the 399 markets of the legacy
+   Targets: (a) the BTC-above daily and weekly markets (T-337; hourly-ET variants excluded, they live one day; 4,533
+   markets live), (b) every Polymarket leg of ``pm-kalshi-pairs`` (T-336 / T-409), (c) the 399 markets of the legacy
    polymarket-price-history-daily, last 56 days before close (T-408 replication).
 5. ``polymarket-volume-hourly-<M>`` (kind ``volume``; value = {market_id, condition_id, t (hour start), n, shares, usd,
    o0, o1} with per-outcome-index {n_buy, n_sell, buy, sell, buy_usd, sell_usd, last_p}; observed_at = t, available_at
@@ -85,11 +105,15 @@ Polymarket (keyless; paced at 0.5 s per request, 429 / 5xx retried with backoff 
    (~0.9 KB each); ``offset`` is capped at 10,000 but ``end`` paging is not. Point-in-time volume at a decision time t =
    sum of shares over hours ending <= t (or volumeNum minus the shares after t, exact because volumeNum is the taker
    sum). A market capped by ``max_pages`` is paged newest first, so its hours from ``complete_from`` on are complete
-   (the fetch log says so) and the subtraction route still works for horizons after that. data-api has no trades for
-   2023 markets (triage probe), so targets end 2024-01-01 or later: the pair legs plus a hash sample (default 1,500)
-   of the daily-history ``sample`` markets.
+   (the fetch log says so) and the subtraction route still works for horizons after that. A market whose paging ended
+   but whose taker sum is off volumeNum by more than 1% (data-api holds part of its history: 251953 has 0.047) is
+   logged complete False, complete_from None, ``history_short``, and its month bundle is tagged partial and
+   history-short. data-api has no trades for 2023 markets (triage probe), so targets end 2024-01-01 or later: the pair
+   legs plus, per complete closed-markets month, the first ``trades_quota`` (n_markets / months) markets of the daily
+   ``sample`` in hash order (quota and rate logged as 'trades-sample:<M>' and reused).
 
-Kalshi (keyless; paced at 1.0 s per request because shared-host probes met 429 too_many_requests; Retry-After honoured)
+Kalshi (keyless; paced at 1.0 s per request because shared-host probes met 429 too_many_requests; Retry-After honoured;
+measured 1.34 s per request including retries)
 -----------------------------------------------------------------------------------------------------------------------
 ``GET {KALSHI}/historical/cutoff`` gives the split between the historical and live stores (market_settled_ts and
 trades_created_ts = 2026-08-16 on 2026-10-15); the historical routes serve what settled or traded before it.
@@ -97,11 +121,11 @@ trades_created_ts = 2026-08-16 on 2026-10-15); the historical routes serve what 
    settlement_ts (else close_time), available_at = fetch time). ``GET {KALSHI}/historical/markets?series_ticker=<S>
    &limit=1000&cursor=<c>`` plus ``GET {KALSHI}/markets?series_ticker=<S>&status=settled&limit=1000&cursor=<c>``,
    de-duplicated by ticker. Pre-2024 markets sit inside the KX series under legacy tickers (CPI-21JUN, FED-21JUL,
-   FEDDECISION-23JUN, PROLLS-23SEP). KXMVE* combos are never fetched. KXBTCD is listed by event instead (the series has
-   an event every hour with up to 188 strikes, most never traded, each living one hour): the daily 17:00 ET event
-   ``KXBTCD-<YY><MON><DD>17`` (lives 25 h in 2024-11, 168 h in 2025-03) for every day from 2025-01-01, via
-   ``/historical/markets?event_ticker=`` (or ``/markets?event_ticker=`` after the cutoff); only strikes with
-   volume > 0 are kept, in monthly bundles ``kalshi-settled-markets-KXBTCD-<M>``.
+   FEDDECISION-23JUN, FEDDECISION-24JAN31, PROLLS-23SEP). KXMVE* combos are never fetched. KXBTCD is listed by event
+   instead (the series has an event every hour with up to 188 strikes, most never traded, each living one hour): the
+   daily 17:00 ET event ``KXBTCD-<YY><MON><DD>17`` (lives 25 h in 2024-11, 168 h in 2025-03) for every day from
+   2025-01-01, via ``/historical/markets?event_ticker=`` (or ``/markets?event_ticker=`` after the cutoff); only strikes
+   with volume > 0 are kept, in monthly bundles ``kalshi-settled-markets-KXBTCD-<M>``.
 7. ``kalshi-candles-daily-<S>`` / ``kalshi-candles-hourly-<S>`` (same row schema as ``kalshi-candles``: value =
    {ticker, period, candle (raw: end_period_ts, yes_bid / yes_ask OHLC, price OHLC + mean, volume, open_interest)},
    observed_at = available_at = end_period_ts: a candle is known once its period has closed). ``GET {KALSHI}/historical/
@@ -113,40 +137,53 @@ trades_created_ts = 2026-08-16 on 2026-10-15); the historical routes serve what 
    Hourly bars skip hours with no activity: forward-fill quotes in the harness. Illiquid hours quote bid 0 /
    ask 1: filter by spread. Daily candles: every traded market of KXCPI, KXFED, KXFEDDECISION, KXPAYROLLS (T-358,
    T-378, T-316). Hourly: every traded market of the macro and election series, a hash sample of 150 markets with
-   volume >= 1,000 contracts per sports / weather series, and the 4 most traded strikes of each KXBTCD 17:00 event.
+   volume >= 1,000 contracts per sports / weather series, the 4 most traded strikes of each KXBTCD 17:00 event, and
+   every Kalshi leg of ``pm-kalshi-pairs`` (Polymarket's $200 BTC grid meets Kalshi's $250 grid off the most traded
+   strikes: live, 410 of the 555 BTC legs are outside the 4; reason 'pair' in kalshi-fetch-log).
 8. ``kalshi-trades-<S>`` (kind ``trade``, value = the raw trade {trade_id, ticker, created_time, yes_price_dollars,
    no_price_dollars, count_fp, taker_side, taker_outcome_side, taker_book_side, is_block_trade}, observed_at =
    available_at = created_time: a print is public at execution). ``GET {KALSHI}/historical/trades?ticker=<T>&limit=1000
-   &cursor=<c>`` before the cutoff and ``GET {KALSHI}/markets/trades?ticker=<T>`` after it (both when a market spans
-   it), newest first. Markets: the first 60 (macro) / 100 (others) of the hourly-candle hash order with volume >= 1,000
-   contracts, so every traded market also has its candles; KXBTCD 10 per month. Pages are capped (``max_pages``, 15 =
-   15,000 trades); a capped market is complete from ``complete_from`` on (fetch log).
+   &cursor=<c>`` before the cutoff and ``GET {KALSHI}/markets/trades?ticker=<T>`` after it, newest first. A market
+   spanning the cutoff reads the live route first and the historical route only when the live one ended before its page
+   cap (else the older prints would hide a hole after the cutoff); complete_from = the oldest print of the capped route
+   + 1 s, and the fetch log keeps per-route coverage [oldest, newest]. Markets: the first 60 (macro) / 100 (others) of
+   the hourly-candle hash order with volume >= 1,000 contracts, so every traded market also has its candles; KXBTCD 10
+   per month. Pages are capped (``max_pages``, 15 = 15,000 trades per route).
 
 Cross-venue pairs (no request: built from the stored listings) -> ``pm-kalshi-pairs``
 --------------------------------------------------------------------------------------
 Matching is templated and uses only fields fixed when the markets were listed (tickers, strikes, outcome labels, slugs,
-end dates), never prices, volumes or outcomes, and the table is stored before any pair-leg price is fetched
-(``frozen_at``), as T-409 requires. A pair is a linear relation: sum(sign x p_pm) = const + sum(sign x p_kalshi).
+end and close dates), never prices, volumes or outcomes. ``build_pairs`` waits (stores nothing) until both event sets
+are complete, the Kalshi series are listed and the KXBTCD months of the latest 150 Polymarket 5 pm ET events are listed;
+``fetch_all_pm`` runs it between the listings and the prices, and the recipe records how many price bundles of this
+module were stored at freeze time (0 in that order), as T-409 requires. A pair is a linear relation:
+sum(sign x p_pm) = const + sum(sign x p_kalshi).
   * FOMC: Polymarket fed-decision-in-<month> / fed-interest-rates-<month>-<year> events against Kalshi KXFEDDECISION
-    (legacy FEDDECISION) events of the same meeting month. Each outcome label maps to a set of move sizes (atoms
-    -100+, -75, -50, -25, 0, +25, +50, +75, +100+ bps; '50+ bps decrease' = {-50, -75, -100+}, 'Cut >25bps' = the same,
-    '25+ bps increase' = {+25 .. +100+}); a pair is a connected group of markets whose atom unions agree on both sides
-    with no overlap within a side (e.g. PM '50 bps decrease' + '75+ bps decrease' = Kalshi 'Cut >25bps').
+    (legacy FEDDECISION) events of the same meeting month; event tickers end in <YY><MON> or <YY><MON><DD>
+    (FEDDECISION-24MAR20), and when several share the month the one whose close_time is nearest the Polymarket endDate
+    is used (FEDDECISION-24JAN31, not the untraded FEDDECISION-24JAN that closed 2024-01-26). Each outcome label maps to
+    a set of move sizes (atoms -100+, -75, -50, -25, 0, +25, +50, +75, +100+ bps; '50+ bps decrease' = {-50, -75, -100+},
+    'Cut >25bps' = the same, '25+ bps increase' = {+25 .. +100+}); a pair is a connected group of markets whose atom
+    unions agree on both sides with no overlap within a side (e.g. PM '50 bps decrease' + '75+ bps decrease' = Kalshi
+    'Cut >25bps').
   * CPI: Polymarket <month>-inflation-us-monthly / -annual (2025: <month>-inflation-monthly / -annual) and
     core-cpi-mom / core-cpi-yoy-<month> bucket markets against Kalshi KXCPI / KXCPIYOY / KXCPICORE / KXCPICOREYOY
     'above x%' strikes of the same reference month (the release prints one decimal): '>= a' = K(above a - 0.1),
-    '<= b' = 1 - K(above b), '= c' = K(above c - 0.1) - K(above c); the 2023 single markets 'US inflation >x% from
-    <m1> to <m2> <year>' = K(above x). Events must name the BLS. Reference year = the slug's year, else the endDate year
-    (previous year when the month name is not before the endDate month).
+    '<= b' = 1 - K(above b), '= c' = K(above c - 0.1) - K(above c). Events must name the BLS. Reference year = the slug's
+    year, else the endDate year (previous year when the month name is not before the endDate month). The 2023-24 single
+    markets 'US inflation >x% from <m1> to <m2> <year>' = K(above x) of the reference month = endDate (release) month
+    minus one: the text is wrong for some ('from Jan to Feb 2024' resolved on the January print, 2024-02-13); a
+    disagreement is noted in basis_note.
   * BTC: Polymarket bitcoin-above-on-<month>-<day>[-<year>]-5pm-et events against the Kalshi KXBTCD 17:00 ET event of
     that date, strike X = Kalshi floor_strike + 0.01. The resolution sources differ (Binance BTCUSDT candle close vs the
     CF Benchmarks BRTI 60-second average) and are flagged in ``basis_note``.
   * 2024 election: presidential-election-winner-2024 = PRES-2024 and presidential-election-popular-vote-winner-2024 =
     POPVOTE-24, by candidate name.
 Point in time: available_at = the latest listing time of the legs (Polymarket startDate / createdAt, Kalshi open_time):
-the relation exists once both venues list the contracts. Every pair is ``audited: False``: the hand audit of resolution
-source, timing and strike wording (``pm_rules`` / ``kalshi_rules`` / ``timing_gap_hours`` are carried for it) is the
-harness author's job.
+the relation exists once both venues list the contracts. |timing_gap_hours| > 168 is flagged ``timing_suspect``. Every
+pair is ``audited: False``: the hand audit of resolution source, timing and strike wording (``pm_rules`` /
+``kalshi_rules`` / ``timing_gap_hours`` are carried for it) is the harness author's job. Live 2026-10-15: 1,025 pairs
+(FOMC 110, CPI MoM 126, CPI YoY 156, core YoY 46, core MoM 27, BTC 555, election 5; 15 timing_suspect).
 
 Licences. Polymarket and Kalshi publish no open data licence (their terms grant no redistribution right) and the repo
 is public, so every bundle here, the pairs table and both fetch logs included, is local disk only (``in_git=False``,
@@ -154,32 +191,43 @@ always); ``GITIGNORE_LINES`` lists the .gitignore lines (bundles are stored as m
 ``gitignore_line(name)`` maps a bundle to its line. (The legacy polymarket-* / kalshi-* bundles from mandel.data.fetch
 are in git; that is the lead's call and is not changed here.)
 
-Resumability. Listing bundles (closed-markets months, Kalshi series, events, pairs) are skipped when stored complete
-unless ``refresh``. Per-market products (daily, hourly, volume, candles, trades) skip every market already in the stored
-bundle or recorded done in the fetch log (a market with no points is logged so it is not asked again), then store the
-bundle whole (stored rows + new rows); a market whose request failed is not logged and is tried again next run. A
-bundle cut short by ``max_calls`` (a preview) is never stored. A run can be interrupted anywhere: what was stored stays.
+Run order and resumability. ``fetch_all_pm`` runs PHASES: listings (Polymarket markets and events | Kalshi listings),
+then the pairs table, then prices (Polymarket daily, open, hourly, trades | Kalshi candles and trades); within a phase
+the Polymarket and Kalshi groups run in two threads of one process that share one Archive (every store holds a lock),
+so INDEX.json stays consistent. While build_pairs would still wait after the listings (a listing that failed past its
+retries is not stored), the listing phase runs again (LISTING_RETRIES, 120 s apart; stored bundles are skipped) before
+the table is frozen. Do not run two processes on one archive: Archive._reload_index keeps each process's
+stale copy of a bundle the other stores again (the fetch logs), and the last writer leaves a wrong INDEX entry. Listing
+bundles (closed-markets months, Kalshi series, events, pairs) are skipped when stored complete unless ``refresh``.
+Per-market products (daily, hourly, volume, candles, trades) skip every market already in the stored bundle or recorded
+done in the fetch log (a market with no points is logged so it is not asked again), then store the bundle whole (stored
+rows + new rows); a market whose request failed is not logged and is tried again next run. The event sets and the open
+daily bundle are stored partial along the way. A bundle cut short by ``max_calls`` (a preview) is never stored. A run
+can be interrupted anywhere (Ctrl-C stops both threads at their next request): what was stored stays.
 
-Budget (``fetch_all_pm(store, dry_run=True)``; paces 0.5 s Polymarket, 1.0 s Kalshi; estimates where listings are not stored):
-  * Uncapped, the claims' universe would be ~88k resolved Polymarket markets 2023-01 .. 2026-10 (daily history ~12 h,
-    trade paging for the 2024+ ones ~57 h and ~300 GB of downloads) and ~52k traded Kalshi markets in these series (hourly
-    candles plus trades ~70 h): far beyond 6 hours, so the defaults are a cap.
-  * Default (capped) pull, ~50k requests: Polymarket hosts ~5.6 h (closed markets 2,278 calls / 34 min, events 130 / 4 min,
-    daily ~12k / 1.7 h, hourly ~11.3k / 1.6 h, trades ~3,850 pages / 1.7 h and ~16 GB downloaded), Kalshi ~5.2 h (listings
-    770 / 12 min, daily candles 1,513 / 25 min, hourly candles ~8.9k / 2.5 h, trades ~7.4k pages / 2.1 h); ~690 MB gzip on
-    disk. Run the two host groups as two processes (``--sources polymarket`` and ``--sources kalshi``): ~6 h wall time.
+Budget (``fetch_all_pm(store, dry_run=True)`` on an empty archive, 2026-10-15; paces 0.5 s Polymarket, 1.35 s Kalshi
+including retries; estimates where listings are not stored):
+  * Uncapped, the claims' universe would be ~157k resolved Polymarket markets 2023-01 .. 2026-10 (daily history ~22 h,
+    trade paging for the 2024+ ones ~80 h and ~500 GB of downloads) and ~150k Kalshi markets in these series (hourly
+    candles ~56 h plus trades ~220 h): far beyond a day, so the defaults are a cap.
+  * Default (capped) pull, ~53.5k requests, ~510 MB gzip on disk: Polymarket ~6.5 h of requests (closed markets 2,966 /
+    45 min, events 529 / 13 min, daily ~16.7k / 2.3 h, open 1,471 / 13 min, hourly ~8.9k / 1.2 h, trades ~3.9k pages /
+    1.7 h and ~12 GB downloaded), Kalshi ~7.2 h (listings 806 / 17 min, daily candles 1,513 / 34 min, hourly candles
+    ~9.3k / 3.5 h, trades ~7.4k pages / 2.8 h). Wall time with the two threads ~7.8 h (listings ~58 min, prices
+    ~6.9 h, bounded by Kalshi).
   * What the cap trims, and the claims it touches: the daily sample (``per_month`` 200 + every event-family and long-lived
-    market, ~11.6k histories: T-12, T-31, T-316, T-359, T-378; T-32's long-lived and T-358's event markets are complete);
-    the universe floor (volumeNum >= $10k, lifetime >= 3 days: T-378, T-359 lose one- and two-day markets); trade paging
-    (1,500 sampled markets + every pair leg, 5 pages = 50k trades each: T-12, T-31, T-409, T-463); Kalshi samples (150
-    hourly / 60-100 trade markets per non-macro series, 4 strikes per KXBTCD event, 15 trade pages: T-408, T-411, T-463,
-    T-359's Kalshi arm); BTC pairs (latest 150 events: T-336, T-409). Each knob is a keyword (``options`` in fetch_all_pm).
+    market: T-12, T-31, T-316, T-359, T-378; T-32's long-lived and T-358's event markets are complete); the universe
+    floor (volumeNum >= $10k, lifetime >= 3 days: T-378, T-359 lose one- and two-day markets); trade paging (1,500
+    sampled markets + every pair leg, 5 pages = 50k trades each: T-12, T-31, T-409, T-463); Kalshi samples (150 hourly /
+    60-100 trade markets per non-macro series, 4 strikes per KXBTCD event plus every pair leg, 15 trade pages: T-408,
+    T-411, T-463, T-359's Kalshi arm); BTC pairs (latest 150 events: T-336, T-409); open markets (one per event: T-32).
+    Each knob is a keyword (``options`` in fetch_all_pm).
 
 Every ``fetch_*`` takes ``store`` (an Archive, an ObservationStore whose ``.archive`` is used, or None to store nothing),
 ``limit`` (bundles), ``dry_run`` (no request: the plan with calls, rows, gzip MB and minutes goes in ``report['_plan']``),
 ``skip_stored``, ``refresh``, ``max_calls`` (requests per bundle, previews), ``min_interval``, ``report``, ``rows_out``
-(receives each bundle's rows) and ``log``. ``fetch_all_pm`` runs them in dependency order. Command line:
-``python3 -m mandel.data.pm_history [--dry-run] [--preview DIR] [--sources a,b] [--limit N] [--max-calls N] [--refresh]``.
+(receives each bundle's rows) and ``log``. Command line: ``python3 -m mandel.data.pm_history [--dry-run] [--preview DIR]
+[--sources a,b | polymarket | kalshi] [--limit N] [--max-calls N] [--refresh] [--sequential]``.
 """
 
 from __future__ import annotations
@@ -191,11 +239,13 @@ import math
 import os
 import re
 import sys
+import threading
 import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from fnmatch import fnmatch
 from typing import Callable, Iterable, Optional
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -204,10 +254,30 @@ from mandel.data.options_misc import _archive, _get
 from mandel.data.options_misc import _client as _om_client
 
 UTC = timezone.utc
+ET = ZoneInfo("America/New_York")
 DAY = 86_400
 HOUR = 3_600
 DATA = "https://data-api.polymarket.com"
 _sleep = time.sleep                                   # patched in tests (HTTP backoff sleeps live in options_misc._sleep)
+# One Archive object is shared by the Polymarket and Kalshi worker threads of fetch_all_pm (parallel=True): every archive
+# access in this module holds this lock, so the in-memory index is never iterated while the other thread stores, and the
+# INDEX.json written by the single process stays consistent (two processes on one archive do not: Archive._reload_index
+# keeps each process's stale copy of the bundles the other one stores again, e.g. the fetch logs).
+_ALOCK = threading.RLock()
+_STOP = threading.Event()                             # set by fetch_all_pm on Ctrl-C: every worker stops at its next request
+
+
+class _Stopped(KeyboardInterrupt):
+    """Raised inside a worker thread at its next request once fetch_all_pm was interrupted."""
+
+
+class _Pace(Throttle):
+    """mandel.data.fetch.Throttle that also stops the worker when fetch_all_pm is interrupted."""
+
+    def wait(self) -> None:
+        if _STOP.is_set():
+            raise _Stopped("fetch_all_pm interrupted")
+        super().wait()
 
 
 def _now_s() -> int:                                  # patched in tests
@@ -317,10 +387,11 @@ def _failure(info: dict) -> dict:
 
 
 def _stored_entry(archive, name: str):
-    try:
-        return archive.get(name)
-    except (KeyError, AttributeError):
-        return None
+    with _ALOCK:
+        try:
+            return archive.get(name)
+        except (KeyError, AttributeError):
+            return None
 
 
 def _stored_complete(archive, name: str) -> bool:
@@ -331,16 +402,25 @@ def _stored_complete(archive, name: str) -> bool:
 def _stored_rows(archive, name: str) -> list[dict]:
     if archive is None or _stored_entry(archive, name) is None:
         return []
-    try:
-        return list(archive.load(name))
-    except (KeyError, FileNotFoundError, OSError, ValueError):
+    with _ALOCK:
+        try:
+            return list(archive.load(name))
+        except (KeyError, FileNotFoundError, OSError, ValueError):
+            return []
+
+
+def _entry_names(archive) -> list[str]:
+    if archive is None:
         return []
+    with _ALOCK:
+        return [e.name for e in archive.entries()]
 
 
 def _put(archive, name: str, rows: list[dict], recipe: str, tags: Iterable[str], schema: str, complete: bool):
     """Store a whole bundle, always local disk only; tag ``complete`` or ``partial`` drives skip_stored."""
     tg = sorted(set(tags) | {"complete" if complete else "partial"})
-    return archive.store(name, kind="data", rows=rows, recipe=recipe, tags=tg, schema=schema, in_git=False)
+    with _ALOCK:
+        return archive.store(name, kind="data", rows=rows, recipe=recipe, tags=tg, schema=schema, in_git=False)
 
 
 def _setup(store, report: Optional[dict], client: Optional[httpx.Client], min_interval: float):
@@ -348,7 +428,7 @@ def _setup(store, report: Optional[dict], client: Optional[httpx.Client], min_in
     rep = report if report is not None else {}
     own = client is None
     c = client or _client()
-    return archive, rep, c, own, Throttle(min_interval)
+    return archive, rep, c, own, _Pace(min_interval)
 
 
 def _emit(rows_out: Optional[dict], name: str, rows: list[dict]) -> None:
@@ -366,10 +446,10 @@ def _merge(stored: list[dict], new: list[dict], field: str) -> list[dict]:
 
 PM_LOG = "polymarket-fetch-log"
 K_LOG = "kalshi-fetch-log"
-LOG_SCHEMA = ("kind fetch: key = <product>:<id>; value = {product (daily | hourly | trades | daily-sample | candles-60 | "
-              "candles-1440 | trades), id, month / series, reason, points / n, calls, complete, complete_from?, ...}: fetch "
-              "metadata (selection reason, sample rates, completeness), not market information; observed_at = available_at "
-              "= fetch time")
+LOG_SCHEMA = ("kind fetch: key = <product>:<id>; value = {product (daily | daily-sample | daily-open | hourly | trades | "
+              "trades-sample | events-window | candles-60 | candles-1440 | trades), id, month / series, reason, points / n, calls, "
+              "complete, complete_from?, ...}: fetch metadata (selection reason, sample rates, completeness), not market "
+              "information; observed_at = available_at = fetch time")
 
 
 def _log_load(archive, name: str) -> dict[str, dict]:
@@ -380,8 +460,9 @@ def _log_store(archive, name: str, entries: dict[str, dict], source: str) -> Non
     if archive is None:
         return
     rows = [_row(source, "fetch", k, v.get("fetched_at") or now_iso(), v.get("fetched_at") or now_iso(), v) for k, v in sorted(entries.items())]
-    archive.store(name, kind="data", rows=rows, recipe=f"mandel.data.pm_history fetch log ({source}): one row per market and product",
-                  tags=[source, "fetch-log", "complete"], schema=LOG_SCHEMA, in_git=False)
+    with _ALOCK:
+        archive.store(name, kind="data", rows=rows, recipe=f"mandel.data.pm_history fetch log ({source}): one row per market and product",
+                      tags=[source, "fetch-log", "complete"], schema=LOG_SCHEMA, in_git=False)
 
 
 # ============================================================================================ licences, families ==
@@ -404,6 +485,8 @@ FAMILIES = [
     ("polymarket-events-macro", "polymarket", "fetch_pm_events", ["T-336", "T-409", "T-358"], "fetch time (end-of-life snapshot)"),
     ("polymarket-price-history-hourly-*", "polymarket", "fetch_pm_hourly", ["T-337", "T-336", "T-409", "T-408"], "t (the price prevailing at t)"),
     ("polymarket-volume-hourly-*", "polymarket", "fetch_pm_trades", ["T-12", "T-31", "T-409", "T-463"], "hour end (trades public at execution)"),
+    ("polymarket-open-markets", "polymarket", "fetch_pm_open", ["T-32"], "fetch time (snapshot of the open markets)"),
+    ("polymarket-open-price-history-daily", "polymarket", "fetch_pm_open", ["T-32"], "t (the price prevailing at t)"),
     ("polymarket-fetch-log", "polymarket", "(every polymarket fetcher)", ["T-12", "T-31", "T-359", "T-409"], "fetch time (fetch metadata)"),
     ("pm-kalshi-pairs", "both", "build_pairs", ["T-336", "T-409"], "latest listing time of the legs"),
     ("kalshi-settled-markets-*", "kalshi", "fetch_kalshi_markets", ["T-358", "T-360", "T-378", "T-316", "T-359", "T-408", "T-411", "T-463", "T-336", "T-409"],
@@ -435,29 +518,36 @@ def _recipe(core: str, licence: str) -> str:
 # ============================================================================================== estimates ==
 
 PACE = {"gamma": 0.5, "clob": 0.5, "data": 0.5, "kalshi": 1.0}
-# seconds per request including transfer (2026-10-15 probes: a 100-row keyset page is ~520 KB; a 10k-trade page ~8.9 MB)
-LATENCY = {"gamma": 0.9, "clob": 0.3, "data": 1.6, "kalshi": 0.4}
-# gzip bytes per stored row (legacy bundles: closed markets 984, daily prices 14, Kalshi markets 272, candles 53)
-ROW_GZ = {"pm_market": 984, "pm_price": 14, "pm_event": 6000, "pm_volume": 70, "pair": 450, "k_market": 272, "k_candle": 53,
-          "k_trade": 75, "log": 60}
+# seconds per request including transfer and retries (2026-10-15 probes: a 100-row keyset page is ~520 KB; a 10k-trade page
+# ~8.9 MB; Kalshi measured 1.34 s per request including 429 retries: 189 requests for 139 KXFEDDECISION daily candles in 253 s)
+LATENCY = {"gamma": 0.9, "clob": 0.3, "data": 1.6, "kalshi": 1.35}
+# gzip bytes per stored row (measured on the module's own bundles 2026-10-15: closed markets 458-581, events 2,506-4,187,
+# pairs 168, Kalshi markets 39-77, candles 23-27, trades 45-48; legacy daily prices 14)
+ROW_GZ = {"pm_market": 580, "pm_price": 14, "pm_event": 4200, "pm_volume": 70, "pair": 170, "k_market": 60, "k_candle": 27,
+          "k_trade": 48, "log": 60}
 # Polymarket resolved markets per endDate month with volumeNum >= $10k and a lifetime >= 3 days; anchors interpolated
 # linearly (dry-run estimate only): counts measured 2026-10-15 without the lifetime filter (2023-03: 50, 2024-03: 292,
-# 2024-09: 1,168, 2025-03: 2,191, 2025-09 ~7,500) times the measured share living >= 3 days (~45%), and day samples
-# with the filter (2026-03-10: 73; 2026-09-02: 504).
+# 2024-09: 1,168, 2025-03: 2,191) times the measured share living >= 3 days (~45%), and keyset day counts under the
+# module's filter x 30 (2025-09-10: 101; 2025-12-10: 273; 2026-05-13: 335; 2026-08-12: 459; 2026-09-02/16/27: 496 / 476 /
+# 896; 2026-10-07: 330).
 PM_MONTH_ANCHORS = [("2023-01", 35), ("2023-12", 60), ("2024-03", 200), ("2024-09", 700), ("2025-03", 1300), ("2025-09", 3400),
-                    ("2026-03", 3000), ("2026-09", 8000), ("2026-12", 8000)]
+                    ("2025-12", 8200), ("2026-03", 9000), ("2026-05", 10000), ("2026-08", 14000), ("2026-09", 18000),
+                    ("2026-10", 10000), ("2026-12", 10000)]
 PM_PRIORITY_SHARE = 0.06          # share of eligible markets in an event family or living >= 100 days (estimate)
 PM_DAILY_POINTS = 25              # mean daily points per market of the sample (estimate)
-BTC_ABOVE_EVENTS_EST = 5521       # public-search totalResults for "bitcoin above", closed, 2026-10-15
-BTC_ABOVE_MARKETS_EST = 6200      # markets of the daily (noon) and weekly events, hourly-ET variants excluded (estimate)
-PAIR_LEG_CALLS_EST = 3500         # 14-day windows over the Polymarket pair legs (FOMC ~120 legs x 8, CPI ~450 x 3, BTC 5pm)
+BTC_ABOVE_MARKETS_EST = 4600      # markets of the daily (noon) and weekly events, hourly-ET variants excluded (listed live
+                                  # 2026-10-15: 491 events, 4,533 markets, 4,558 hourly windows)
+PAIR_LEG_CALLS_EST = 2700         # 14-day windows over the Polymarket pair legs (live pairs table 2026-10-15: 1,025 pairs)
+PAIR_K_LEG_CALLS_EST = 450        # hourly-candle calls for the Kalshi pair legs outside kalshi_select (live: 410 of 555 BTC legs)
+PM_OPEN_EST = 1430                # open markets alive >= 100 days with volumeNum >= $10k: 3,956 in 1,427 events (2026-10-15)
+PM_OPEN_POINTS = 280              # mean daily points per open long-lived market (live preview of 60: 283)
 PM_TRADES_PER_MARKET = 4000       # mean taker trades per sampled market (estimate; 516852 had 502, 508190 3,841)
 PAIR_LEG_TRADE_PAGES_EST = 2050   # data-api pages over the ~1,200 pair legs: FOMC ~120 x 5 (capped), CPI ~340 x 2, BTC ~750 x 1
 TRADE_KB = 0.9                    # KB downloaded per trade (the rows carry wallet profiles; probed)
 KALSHI_EST = {"KXFEDDECISION": 145, "KXFED": 450, "KXCPI": 522, "KXCPIYOY": 671, "KXCPICORE": 467, "KXCPICOREYOY": 656,
               "KXPAYROLLS": 396, "KXU3": 300, "KXGDP": 120, "PRES": 8, "POPVOTE": 2}     # settled markets per series (listed 2026-10-15;
                                                                                          # KXFED, KXU3, KXGDP estimated)
-KALSHI_EST_OTHER = 4000           # markets per sports / weather series (estimate)
+KALSHI_EST_OTHER = 10000          # markets per sports / weather series (counted: KXHIGHNY 9,778, KXATPMATCH 10,018, KXMLBGAME 9,510)
 KALSHI_BTC_KEPT = 35              # KXBTCD 17:00 strikes with volume > 0 per event (2025-03: ~15 of 50; 2026-09-28..30: 160 in 3 events)
 KALSHI_HOURLY_CANDLES = 300       # mean hourly candles per market (estimate; bars skip quiet hours)
 KALSHI_DAILY_CANDLES = 40
@@ -605,11 +695,9 @@ def fetch_pm_markets(store=None, first: str = PM_FIRST_DAY, last: Optional[str] 
             c.close()
 
 
-def stored_pm_months(archive) -> list[str]:
-    if archive is None:
-        return []
-    return sorted({e.name[len("polymarket-closed-markets-"):] for e in archive.entries()
-                   if re.fullmatch(r"polymarket-closed-markets-\d{4}-\d{2}", e.name)})
+def stored_pm_months(archive, complete_only: bool = False) -> list[str]:
+    out = sorted({n[len("polymarket-closed-markets-"):] for n in _entry_names(archive) if re.fullmatch(r"polymarket-closed-markets-\d{4}-\d{2}", n)})
+    return [M for M in out if _stored_complete(archive, f"polymarket-closed-markets-{M}")] if complete_only else out
 
 
 # ========================================================================= 2. Polymarket daily price histories ==
@@ -688,18 +776,18 @@ def fetch_pm_daily(store=None, months: Optional[Iterable[str]] = None, per_month
                    min_interval: float = PACE["clob"], retries: int = 4, backoff: float = 1.0, report: Optional[dict] = None,
                    rows_out: Optional[dict] = None, client: Optional[httpx.Client] = None, log: Optional[Callable] = None, **_) -> dict:
     """``polymarket-price-history-daily-<M>`` for each stored closed-markets month (or ``months``): the ``select_daily``
-    markets, one CLOB call each. Markets already stored or logged are skipped; the month is stored whole."""
+    markets, one CLOB call each. Markets already stored or logged are skipped; the month is stored whole. The hash sample
+    of a month is drawn only once its closed-markets bundle is complete (a partial month gets its priority markets only),
+    so the sample is a prefix of the hash order of the whole month and the logged sample rate holds for every pick. A dry
+    run plans every month of the window: stored months from their listing, the others from PM_MONTH_ANCHORS."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
-        ms = sorted(months) if months is not None else stored_pm_months(archive)
-        if not ms and dry_run:
-            items = []
-            for M in _months(PM_FIRST_DAY, _yesterday()):
-                n = pm_month_estimate(M)
-                k = min(n, per_month) + PM_PRIORITY_SHARE * n
-                items.append(_item(f"polymarket-price-history-daily-{M}", "clob", k, k * PM_DAILY_POINTS, "pm_price", min_interval))
-            rep["_plan"] = _total(items[:limit] if limit else items, note="closed-markets months not stored yet: estimate")
-            return rep
+        if months is not None:
+            ms = sorted(months)
+        elif dry_run:
+            ms = _months(PM_FIRST_DAY, _yesterday())
+        else:
+            ms = stored_pm_months(archive)
         todo = [M for M in ms if refresh or not skip_stored or archive is None or not _stored_complete(archive, f"polymarket-price-history-daily-{M}")]
         rep["_already_stored"] = len(ms) - len(todo)
         if limit is not None:
@@ -708,18 +796,28 @@ def fetch_pm_daily(store=None, months: Optional[Iterable[str]] = None, per_month
         items = []
         for M in todo:
             name, src = f"polymarket-price-history-daily-{M}", f"polymarket-closed-markets-{M}"
-            mrows = _stored_rows(archive, src)
-            if not mrows and _stored_entry(archive, src) is None:
-                rep[name] = {"skipped": f"{src} not stored"}
+            if _stored_entry(archive, src) is None:
+                if dry_run:
+                    n = pm_month_estimate(M)
+                    k = min(n, per_month) + PM_PRIORITY_SHARE * n
+                    items.append({**_item(name, "clob", k, k * PM_DAILY_POINTS, "pm_price", min_interval), "estimate": True})
+                else:
+                    rep[name] = {"skipped": f"{src} not stored"}
                 continue
-            sel, stats = select_daily((r["value"] for r in mrows), per_month)
+            mrows = _stored_rows(archive, src)
+            src_complete = _stored_complete(archive, src)
+            sel, stats = select_daily((r["value"] for r in mrows), per_month if src_complete else 0)
+            stats["per_month_requested"] = per_month
+            if not src_complete:
+                stats["sample_deferred"] = f"{src} is partial: the hash sample is drawn once, when the month is complete"
             stored = [] if refresh else _stored_rows(archive, name)
             have = {str(r["value"]["market_id"]) for r in stored}
             if not refresh:
                 have |= {v["id"] for k, v in plog.items() if v.get("product") == "daily" and v.get("complete") and v.get("month") == M}
             work = [(m, why) for m, why in sel if str(m.get("id")) not in have]
             if dry_run:
-                items.append(_item(name, "clob", len(work), len(work) * PM_DAILY_POINTS, "pm_price", min_interval))
+                k = len(work) + (0 if src_complete else min(per_month, stats["candidates"]))
+                items.append(_item(name, "clob", k, k * PM_DAILY_POINTS, "pm_price", min_interval))
                 continue
             new, failed, calls, cut, done = [], [], 0, False, 0
             fetched_at = now_iso()
@@ -752,14 +850,182 @@ def fetch_pm_daily(store=None, months: Optional[Iterable[str]] = None, per_month
                      _recipe(f"GET {CLOB}/prices-history?market=<YES token>&interval=max&fidelity=1440 for the markets of "
                              f"polymarket-closed-markets-{M} chosen by mandel.data.pm_history.select_daily(per_month={per_month}): every binary "
                              f"market of an event family (FOMC, CPI, payrolls, GDP, US elections) or living >= {PM_LONG_LIVED_DAYS} days, plus a "
-                             f"sha256 hash sample of the rest (rate in polymarket-fetch-log 'daily-sample:{M}'; reasons per market). "
+                             f"sha256 hash sample of the rest, drawn once the month's closed-markets bundle is complete (rate in "
+                             f"polymarket-fetch-log 'daily-sample:{M}'; reasons per market). "
                              "Points are snapshots (the daily point at t equals the hourly point at t): available_at = t.", "polymarket"),
                      ["polymarket", "prices", "daily", "history", M], PRICE_SCHEMA, complete)
                 _log_store(archive, PM_LOG, plog, "polymarket")
             if log:
                 log(f"pm daily {M}: {rep[name]}")
         if dry_run:
-            rep["_plan"] = _total(items, note="from the stored closed-markets months")
+            rep["_plan"] = _total(items, note="stored closed-markets months from their listing; unstored months from PM_MONTH_ANCHORS (estimate)")
+        return rep
+    finally:
+        if own:
+            c.close()
+
+
+# ================================================================== 2b. Polymarket open long-lived markets (T-32) ==
+
+PM_OPEN = "polymarket-open-markets"
+PM_OPEN_DAILY = "polymarket-open-price-history-daily"
+PM_OPEN_PER_EVENT = 1               # markets per event (T-32's control: one market per event)
+PM_OPEN_FLUSH_EVERY = 300           # markets between partial stores of the open daily bundle (resume point)
+GAMMA_MAX_OPEN_PAGES = 500
+OPEN_MARKET_SCHEMA = ("value = raw Gamma market row of a market open at fetch time (closed=false); observed_at = available_at = fetch "
+                      "time (a snapshot: volumeNum, outcomePrices and endDate are as of then)")
+
+
+def gamma_open(client: httpx.Client, th: Throttle, volume_min: float = PM_VOLUME_MIN, min_life_days: float = PM_LONG_LIVED_DAYS,
+               retries: int = 4, backoff: float = 1.0, max_calls: Optional[int] = None) -> tuple[Optional[list[dict]], int, dict]:
+    """Every open market (closed=false) with volumeNum >= ``volume_min`` listed at least ``min_life_days`` before today
+    (start_date_max), via /markets/keyset. (rows or None when a page failed or the paging was cut, calls, info)."""
+    d0 = _day_ts(_day(_now_s()))
+    params = {"closed": "false", "limit": 100, "volume_num_min": volume_min, "start_date_max": _iso_z(d0 - min_life_days * DAY)}
+    out: dict[str, dict] = {}
+    cur, calls, info = None, 0, {}
+    while calls < GAMMA_MAX_OPEN_PAGES:
+        if max_calls is not None and calls >= max_calls:
+            return None, calls, {**info, "cut": "max_calls"}
+        p = dict(params)
+        if cur:
+            p["after_cursor"] = cur
+        r, info = _get(client, f"{GAMMA}/markets/keyset", th, params=p, retries=retries, backoff=backoff)
+        calls += 1
+        j = _json(r, info)
+        if not isinstance(j, dict):
+            return None, calls, info
+        ms = j.get("markets") or []
+        for m in ms:
+            if m.get("id") is not None and not m.get("closed"):
+                out[str(m["id"])] = m
+        cur = j.get("next_cursor")
+        if not cur or not ms:
+            return list(out.values()), calls, {**info, "params": params}
+    return None, calls, {**info, "error": f"more than {GAMMA_MAX_OPEN_PAGES} pages"}
+
+
+def select_open(markets: Iterable[dict], per_event: int = PM_OPEN_PER_EVENT) -> list[tuple[dict, str]]:
+    """[(market, 'open-long-lived')]: per event (events[0].id, else the market), the first ``per_event`` binary markets in
+    sha256 hash order of the market id (never volume, price or outcome)."""
+    by_ev: dict[str, list[dict]] = defaultdict(list)
+    for m in markets:
+        if len(_tokens(m)) != 2 or m.get("closed"):
+            continue
+        ev = ((m.get("events") or [{}])[0] or {}).get("id")
+        by_ev[str(ev) if ev is not None else f"m{m.get('id')}"].append(m)
+    out = []
+    for ev in sorted(by_ev):
+        ms = sorted(by_ev[ev], key=lambda m: (_hash01(f"pm-open:{m.get('id')}"), str(m.get("id"))))
+        out += [(m, "open-long-lived") for m in ms[:max(0, per_event)]]
+    return out
+
+
+def fetch_pm_open(store=None, volume_min: float = PM_VOLUME_MIN, min_life_days: float = PM_LONG_LIVED_DAYS, per_event: int = PM_OPEN_PER_EVENT,
+                  limit: Optional[int] = None, dry_run: bool = False, skip_stored: bool = True, refresh: bool = False,
+                  max_calls: Optional[int] = None, min_interval: float = PACE["clob"], retries: int = 4, backoff: float = 1.0,
+                  report: Optional[dict] = None, rows_out: Optional[dict] = None, client: Optional[httpx.Client] = None,
+                  log: Optional[Callable] = None, **_) -> dict:
+    """T-32 (markets alive together for >= 100 days, up to the present): ``polymarket-open-markets``, a snapshot of the open
+    markets with volumeNum >= $10k listed at least ``min_life_days`` ago, and ``polymarket-open-price-history-daily``, the
+    CLOB daily history (interval=max, fidelity=1440, as for the resolved months) of ``per_event`` hash-chosen markets per
+    event. Both are as of the snapshot date; ``refresh`` takes a new snapshot and fetches the histories again. The daily
+    bundle is stored partial every PM_OPEN_FLUSH_EVERY markets (resume point) and complete at the end."""
+    archive, rep, c, own, th = _setup(store, report, client, min_interval)
+    try:
+        snap_done = archive is not None and skip_stored and not refresh and _stored_complete(archive, PM_OPEN)
+        daily_done = archive is not None and skip_stored and not refresh and _stored_complete(archive, PM_OPEN_DAILY)
+        if dry_run:
+            items = []
+            if not snap_done:
+                items.append({**_item(PM_OPEN, "gamma", PM_OPEN_EST * 2.8 / 100, PM_OPEN_EST * 2.8, "pm_market", min_interval), "estimate": True})
+            if not daily_done:
+                n = len(select_open((r["value"] for r in _stored_rows(archive, PM_OPEN)), per_event)) if snap_done else PM_OPEN_EST
+                items.append({**_item(PM_OPEN_DAILY, "clob", n, n * PM_OPEN_POINTS, "pm_price", min_interval), "estimate": not snap_done})
+            rep["_plan"] = _total(items, note="open markets: 3,956 in 1,427 events on 2026-10-15 (one market per event by default)")
+            return rep
+        if limit is not None and limit <= 0:
+            return rep
+        fresh_snapshot = False
+        if not snap_done:
+            ms, k, info = gamma_open(c, th, volume_min, min_life_days, retries, backoff, max_calls)
+            rep[PM_OPEN] = {"calls": k}
+            if ms is None:
+                rep[PM_OPEN].update(_error={**_failure(info), **({"cut": info["cut"]} if "cut" in info else {})}, stored=False)
+                return rep
+            fetched_at = now_iso()
+            rows = [_row("polymarket", "market", str(m.get("id")), fetched_at, fetched_at, m)
+                    for m in sorted(ms, key=lambda m: (str((((m.get("events") or [{}])[0]) or {}).get("id")), str(m.get("id"))))]
+            _emit(rows_out, PM_OPEN, rows)
+            rep[PM_OPEN].update(markets=len(rows), events=len({str((((m.get("events") or [{}])[0]) or {}).get("id")) for m in ms}))
+            if archive is not None:
+                _put(archive, PM_OPEN, rows,
+                     _recipe(f"GET {GAMMA}/markets/keyset?closed=false&limit=100&volume_num_min={volume_min:g}&start_date_max=<today - "
+                             f"{min_life_days:g} days>&after_cursor=<next_cursor> (as of {fetched_at[:10]}); via mandel.data.pm_history.fetch_pm_open. "
+                             "Markets still open at the snapshot: a harness using them for windows ending before the snapshot selects on "
+                             "survival to the snapshot (state it).", "polymarket"),
+                     ["polymarket", "markets", "open", "snapshot", fetched_at[:10]], OPEN_MARKET_SCHEMA, True)
+            fresh_snapshot = True
+            snap_rows = rows
+        else:
+            snap_rows = _stored_rows(archive, PM_OPEN)
+            rep[PM_OPEN] = {"skipped": "stored (snapshot); refresh=True takes a new one"}
+        if daily_done and not fresh_snapshot:
+            rep[PM_OPEN_DAILY] = {"skipped": "stored complete"}
+            return rep
+        snap_date = (snap_rows[0]["available_at"][:10] if snap_rows else _day(_now_s()))
+        sel = select_open((r["value"] for r in snap_rows), per_event)
+        plog = _log_load(archive, PM_LOG) if archive is not None else {}
+        restart = refresh or fresh_snapshot
+        stored = [] if restart else _stored_rows(archive, PM_OPEN_DAILY)
+        have = {str(r["value"]["market_id"]) for r in stored}
+        if not restart:
+            have |= {v["id"] for v in plog.values() if v.get("product") == "daily-open" and v.get("complete") and v.get("snapshot") == snap_date}
+        work = [(m, why) for m, why in sel if str(m.get("id")) not in have]
+        new, failed, calls, cut, done = [], [], 0, False, 0
+        fetched_at = now_iso()
+
+        def flush(complete: bool):
+            rows = sorted(_merge(stored, new, "market_id"), key=_price_sort)
+            _emit(rows_out, PM_OPEN_DAILY, rows)
+            if archive is not None:
+                _put(archive, PM_OPEN_DAILY, rows,
+                     _recipe(f"GET {CLOB}/prices-history?market=<YES token>&interval=max&fidelity=1440 for the markets of {PM_OPEN} (snapshot "
+                             f"{snap_date}) chosen by mandel.data.pm_history.select_open(per_event={per_event}): per event the first markets in "
+                             "sha256 hash order. Points are snapshots: available_at = t (the last point is the price at fetch time).", "polymarket"),
+                     ["polymarket", "prices", "daily", "open", snap_date], PRICE_SCHEMA, complete)
+                _log_store(archive, PM_LOG, plog, "polymarket")
+            return rows
+
+        for i, (m, why) in enumerate(work):
+            if max_calls is not None and calls >= max_calls:
+                cut = True
+                break
+            mid, tok = str(m["id"]), _tokens(m)[0]
+            r, info = _get(c, f"{CLOB}/prices-history", th, params={"market": tok, "interval": "max", "fidelity": 1440}, retries=retries, backoff=backoff)
+            calls += 1
+            j = _json(r, info)
+            if not isinstance(j, dict) or "history" not in j:
+                failed.append({"market_id": mid, **_failure(info)})
+                continue
+            pts = _price_rows(mid, tok, j.get("history") or [])
+            new += pts
+            done += 1
+            plog[f"daily-open:{mid}"] = {"product": "daily-open", "id": mid, "snapshot": snap_date, "token": tok, "reason": why,
+                                         "event_id": (((m.get("events") or [{}])[0]) or {}).get("id"), "points": len(pts), "calls": 1,
+                                         "complete": True, "fetched_at": fetched_at}
+            if max_calls is None and (i + 1) % PM_OPEN_FLUSH_EVERY == 0 and i + 1 < len(work):
+                flush(False)
+            if log and (i + 1) % 500 == 0:
+                log(f"pm open daily: {i + 1}/{len(work)}")
+        plog[f"daily-open-sample:{snap_date}"] = {"product": "daily-open-sample", "id": snap_date, "snapshot": snap_date, "per_event": per_event,
+                                                  "markets": len(snap_rows), "selected": len(sel), "complete": True, "fetched_at": fetched_at}
+        rep[PM_OPEN_DAILY] = {"selected": len(sel), "todo": len(work), "fetched": done, "calls": calls,
+                              **({"cut": "max_calls (not stored)"} if cut else {}), **({"failed": failed[:5], "n_failed": len(failed)} if failed else {})}
+        if not cut:
+            rep[PM_OPEN_DAILY]["rows"] = len(flush(not failed))
+        else:
+            _emit(rows_out, PM_OPEN_DAILY, sorted(_merge(stored, new, "market_id"), key=_price_sort))
         return rep
     finally:
         if own:
@@ -768,24 +1034,35 @@ def fetch_pm_daily(store=None, months: Optional[Iterable[str]] = None, per_month
 
 # ===================================================================================== 3. Polymarket events ==
 
-BTC_QUERY = "bitcoin above"
-BTC_SLUG = re.compile(r"^bitcoin-above-")
+BTC_SLUG = re.compile(r"^(bitcoin|btc)-above-")      # 2024: bitcoin-above-70000-on-friday, btc-above-70000-next-friday
 BTC_HOURLY_ET = re.compile(r"-(\d{1,2})(am|pm)-et(?:-\d+)?$")
+BTC_TAG = "bitcoin"
+BTC_EXCLUDE_TAG_IDS = ("102175", "102127")            # Gamma tags 1H and up-or-down (GET /tags/slug/1h, /tags/slug/up-or-down)
+BTC_FIRST_MONTH = "2024-01"
+BTC_HOURLY_ET_FIRST_DAY = "2026-03-01"                # hourly-ET variants start between 2026-03-17 and 2026-03-24 (probed)
+MACRO_TAGS = ("fed-rates", "fed", "inflation", "cpi")
+MACRO_FIRST_MONTH = "2022-01"
 MACRO_QUERIES = ("fed decision", "fed interest rates", "inflation", "cpi")
 MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
 _MON = "|".join(MONTHS)
 MACRO_SLUG = re.compile(rf"^(fed-decision-in-({_MON})|fed-interest-rates-({_MON})|({_MON})-inflation-(us-)?(monthly|annual)|"
                         rf"core-cpi-(ex-food-and-energy-)?(mom|yoy)-|us-inflation-)")
 ELECTION_EVENTS = {"presidential-election-winner-2024": "PRES-2024", "presidential-election-popular-vote-winner-2024": "POPVOTE-24"}
-SEARCH_MAX_PAGES = 200
+EVENT_SETS = {"btc_above": "polymarket-events-btc-above", "macro": "polymarket-events-macro"}
+SEARCH_MAX_PAGES = 100              # public-search answers 422 above page 100 and serves at most 50 events per page (probed)
+EVENTS_MAX_PAGES = 100              # keyset pages per window (a 2026 BTC month holds 2, a macro tag-month 1)
+EVENTS_FLUSH_EVERY = 12             # windows between partial stores of an event set (resume point)
 SEARCH_PAGE_SECONDS = 2.0           # a 50-event search page with nested markets is ~2.6 MB (probed)
+EVENT_PAGE_SECONDS = 1.5            # a keyset page: 2026 BTC month pages ~2.3 MB, macro tag-months ~0.4 MB, 5 pm windows ~85 KB
 EVENT_SCHEMA = ("value = raw Gamma event with nested markets (clobTokenIds, outcomePrices, groupItemTitle, startDate, endDate, "
                 "closedTime, description); observed_at = endDate; available_at = fetch time (end-of-life snapshot)")
 
 
 def pm_search(client: httpx.Client, th: Throttle, q: str, status: str = "closed", per_page: int = 50, retries: int = 4,
               backoff: float = 1.0, max_calls: Optional[int] = None) -> tuple[Optional[list[dict]], int, dict]:
-    """Every event of Gamma public-search for ``q`` (pages while pagination.hasMore). (events, calls, info)."""
+    """Every event Gamma public-search reaches for ``q`` (pages while pagination.hasMore). The API refuses pages above
+    SEARCH_MAX_PAGES (422), so at most 5,000 results are reachable: hitting the cap with hasMore returns what was read with
+    info['incomplete'] set (not a failure). (events or None on a failed page, calls, info)."""
     out: dict[str, dict] = {}
     page, calls, info = 1, 0, {}
     while page <= SEARCH_MAX_PAGES:
@@ -801,10 +1078,41 @@ def pm_search(client: httpx.Client, th: Throttle, q: str, status: str = "closed"
         for e in evs:
             if e.get("id") is not None:
                 out[str(e["id"])] = e
-        if not (j.get("pagination") or {}).get("hasMore") or not evs:
+        pg = j.get("pagination") or {}
+        if not pg.get("hasMore") or not evs:
             return list(out.values()), calls, info
+        if page == SEARCH_MAX_PAGES:
+            return list(out.values()), calls, {**info, "incomplete": f"page cap {SEARCH_MAX_PAGES} reached with hasMore "
+                                                                     f"(totalResults {pg.get('totalResults')})"}
         page += 1
     return list(out.values()), calls, info
+
+
+def pm_events_keyset(client: httpx.Client, th: Throttle, params: dict, max_pages: int = EVENTS_MAX_PAGES, retries: int = 4,
+                     backoff: float = 1.0, max_calls: Optional[int] = None) -> tuple[Optional[list[dict]], int, dict]:
+    """Every event of ``GET {GAMMA}/events/keyset`` for ``params`` (closed, tag_slug, exclude_tag_id, end_date_min / max,
+    limit), paged with after_cursor. (events or None when a page failed or the paging was cut, calls, info)."""
+    out: dict[str, dict] = {}
+    cur, calls, info = None, 0, {}
+    while calls < max_pages:
+        if max_calls is not None and calls >= max_calls:
+            return None, calls, {**info, "cut": "max_calls"}
+        p = dict(params)
+        if cur:
+            p["after_cursor"] = cur
+        r, info = _get(client, f"{GAMMA}/events/keyset", th, params=p, retries=retries, backoff=backoff)
+        calls += 1
+        j = _json(r, info)
+        if not isinstance(j, dict):
+            return None, calls, info
+        evs = j.get("events") or []
+        for e in evs:
+            if e.get("id") is not None:
+                out[str(e["id"])] = e
+        cur = j.get("next_cursor")
+        if not cur or not evs:
+            return list(out.values()), calls, info
+    return None, calls, {**info, "error": f"more than {max_pages} keyset pages"}
 
 
 def pm_event_by_slug(client: httpx.Client, th: Throttle, slug: str, retries: int = 4, backoff: float = 1.0) -> tuple[Optional[list[dict]], int, dict]:
@@ -827,77 +1135,182 @@ def hourly_et_hour(slug: str) -> Optional[int]:
     return int(mm.group(1)) % 12 + (12 if mm.group(2) == "pm" else 0) if mm else None
 
 
-def fetch_pm_events(store=None, sets: Iterable[str] = ("btc_above", "macro"), btc_hours: Iterable[int] = (17,), limit: Optional[int] = None,
-                    dry_run: bool = False,
+def et_hour_ts(day: str, hour: int) -> int:
+    """Unix seconds of ``hour``:00 America/New_York on ``day`` (EDT / EST aware)."""
+    d = date.fromisoformat(day[:10])
+    return int(datetime(d.year, d.month, d.day, hour, tzinfo=ET).timestamp())
+
+
+def _month_window(M: str) -> tuple[str, str]:
+    """(month start, next month start) as Gamma end_date_min / end_date_max (inclusive: duplicates are merged by id)."""
+    return f"{M}-01T00:00:00Z", (date.fromisoformat(_month_end(M)) + timedelta(days=1)).isoformat() + "T00:00:00Z"
+
+
+def event_windows(s: str, last_day: str, btc_hours: Iterable[int] = (17,), btc_first_month: str = BTC_FIRST_MONTH,
+                  hourly_first_day: str = BTC_HOURLY_ET_FIRST_DAY, macro_first_month: str = MACRO_FIRST_MONTH) -> list[dict]:
+    """The requests that list an event set: {key, route (keyset | search | slug), params / q / slug, end (unix: the window's
+    end_date_max, None for search and slug)}. btc_above: one keyset walk per endDate month of tag 'bitcoin' without the 1H
+    and up-or-down tags (daily and weekly 'bitcoin above' events; up/down events and the hourly-ET variants are 99% of
+    the tag), plus a two-second endDate window at each ``btc_hours`` ET hour of every day from ``hourly_first_day`` (the
+    5 pm ET variant that pairs with Kalshi's 17:00 KXBTCD event). macro: one keyset walk per month and MACRO_TAGS tag, the
+    MACRO_QUERIES searches (union) and the two 2024 election slugs."""
+    out = []
+    if s == "btc_above":
+        for M in _months(btc_first_month + "-01", last_day):
+            lo, hi = _month_window(M)
+            out.append({"key": f"month:{M}", "route": "keyset", "end": _ts(hi),
+                        "params": {"closed": "true", "tag_slug": BTC_TAG, "exclude_tag_id": list(BTC_EXCLUDE_TAG_IDS), "end_date_min": lo,
+                                   "end_date_max": hi, "limit": 100}})
+        d, end = date.fromisoformat(hourly_first_day), date.fromisoformat(last_day[:10])
+        while d <= end:
+            for h in sorted(set(btc_hours)):
+                t = et_hour_ts(d.isoformat(), h)
+                out.append({"key": f"hour:{d.isoformat()}T{h:02d}ET", "route": "keyset", "end": t + 1,
+                            "params": {"closed": "true", "tag_slug": BTC_TAG, "end_date_min": _iso_z(t - 1), "end_date_max": _iso_z(t + 1), "limit": 100}})
+            d += timedelta(days=1)
+    elif s == "macro":
+        for M in _months(macro_first_month + "-01", last_day):
+            lo, hi = _month_window(M)
+            for tag in MACRO_TAGS:
+                out.append({"key": f"month:{M}:{tag}", "route": "keyset", "end": _ts(hi),
+                            "params": {"closed": "true", "tag_slug": tag, "end_date_min": lo, "end_date_max": hi, "limit": 100}})
+        out += [{"key": f"search:{q}", "route": "search", "q": q, "end": None} for q in MACRO_QUERIES]
+        out += [{"key": f"slug:{x}", "route": "slug", "slug": x, "end": None} for x in ELECTION_EVENTS]
+    else:
+        raise ValueError(f"unknown event set {s!r}; known: {sorted(EVENT_SETS)}")
+    return out
+
+
+def keep_event(s: str, e: dict, btc_hours: Iterable[int] = (17,)) -> bool:
+    """Whether an event listed for set ``s`` belongs in its bundle: closed (public-search's events_status=closed still
+    returns open events), and a BTC-above slug (hourly-ET variants only at ``btc_hours``) or a US FOMC / CPI template
+    (macro; the election events come by slug)."""
+    if not e.get("closed") or e.get("id") is None:
+        return False
+    slug = e.get("slug") or ""
+    if s == "btc_above":
+        return bool(BTC_SLUG.search(slug)) and (not is_hourly_et(slug) or hourly_et_hour(slug) in set(btc_hours))
+    return bool(MACRO_SLUG.search(slug)) or slug in ELECTION_EVENTS
+
+
+def fetch_pm_events(store=None, sets: Iterable[str] = ("btc_above", "macro"), btc_hours: Iterable[int] = (17,), last: Optional[str] = None,
+                    btc_first_month: str = BTC_FIRST_MONTH, hourly_first_day: str = BTC_HOURLY_ET_FIRST_DAY,
+                    macro_first_month: str = MACRO_FIRST_MONTH, limit: Optional[int] = None, dry_run: bool = False,
                     skip_stored: bool = True, refresh: bool = False, max_calls: Optional[int] = None, min_interval: float = PACE["gamma"],
                     retries: int = 4, backoff: float = 1.0, report: Optional[dict] = None, rows_out: Optional[dict] = None,
                     client: Optional[httpx.Client] = None, log: Optional[Callable] = None, **_) -> dict:
     """``polymarket-events-btc-above`` (T-337 and the BTC pairs) and ``polymarket-events-macro`` (US FOMC / CPI templates and
-    the two 2024 election events). Stored once (as of the fetch); ``refresh`` fetches them again. Of the hourly-ET BTC
-    variants (24 a day since 2026-03, ~15 strikes each, about 90% of the 5,521 search results) only the ``btc_hours`` (ET)
-    ones are kept: the 17:00 ET event pairs with Kalshi's daily KXBTCD 17:00 event; the others are not used."""
+    the two 2024 election events), listed by the ``event_windows`` requests (Gamma /events/keyset by tag and endDate
+    window; public-search cannot reach past 5,000 results). Each set is one bundle, a snapshot as of the run: windows are
+    logged in polymarket-fetch-log ('events:<set>:<window>') and the bundle is stored partial every EVENTS_FLUSH_EVERY
+    windows, so an interrupted run resumes at the first window not done (windows ending within MONTH_COMPLETE_LAG_DAYS of
+    now are asked again); a failed window stops the set, which is stored partial and resumed next run. Complete once every
+    window succeeded; then skipped unless ``refresh``."""
     sets = list(sets)
-    btc_hours = set(btc_hours)
+    btc_hours = sorted(set(btc_hours))
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
-        names = {"btc_above": "polymarket-events-btc-above", "macro": "polymarket-events-macro"}
-        todo = [s for s in sets if refresh or not skip_stored or archive is None or not _stored_complete(archive, names[s])]
+        last_day = min(last or _yesterday(), _yesterday())
+        todo = [s for s in sets if refresh or not skip_stored or archive is None or not _stored_complete(archive, EVENT_SETS[s])]
         rep["_already_stored"] = len(sets) - len(todo)
         if limit is not None:
             todo = todo[:limit]
+        wins = {s: event_windows(s, last_day, btc_hours, btc_first_month, hourly_first_day, macro_first_month) for s in todo}
         if dry_run:
             items = []
             for s in todo:
-                if s == "btc_above":
-                    kept = BTC_ABOVE_EVENTS_EST // 10 + len(btc_hours) * BTC_ABOVE_EVENTS_EST // 24 // 10
-                    items.append(_item(names[s], "gamma", BTC_ABOVE_EVENTS_EST / 50 + 1, kept, "pm_event", SEARCH_PAGE_SECONDS))
-                else:
-                    items.append(_item(names[s], "gamma", 4 * 4 + len(ELECTION_EVENTS), 250, "pm_event", SEARCH_PAGE_SECONDS))
-            rep["_plan"] = _total(items)
+                ws = wins[s]
+                if s == "btc_above":                  # live 2026-10-15: 276 requests, 84 MB, 687 events (491 daily / weekly)
+                    months = [w for w in ws if w["key"].startswith("month:")]
+                    calls = sum(2 if w["key"] >= "month:2025-06" else 1 for w in months) + (len(ws) - len(months))
+                    rows = sum(20 if w["key"] >= "month:2025-01" else 3 for w in months) + (len(ws) - len(months))
+                else:                                 # live: 247 requests, 33 MB, 105 events
+                    calls = sum(1 for w in ws if w["route"] != "search") + 4 * len(MACRO_QUERIES)
+                    rows = 110
+                items.append(_item(EVENT_SETS[s], "gamma", calls, rows, "pm_event", EVENT_PAGE_SECONDS))
+            rep["_plan"] = _total(items, note="one keyset walk per window (event_windows); rows estimated")
             return rep
+        plog = _log_load(archive, PM_LOG) if archive is not None else {}
+        now = _now_s()
         for s in todo:
-            name = names[s]
-            fetched_at = now_iso()
-            evs: dict[str, dict] = {}
-            calls, failed = 0, None
-            queries = [BTC_QUERY] if s == "btc_above" else list(MACRO_QUERIES)
-            for q in queries:
-                got, k, info = pm_search(c, th, q, retries=retries, backoff=backoff, max_calls=None if max_calls is None else max_calls - calls)
-                calls += k
-                if got is None or "cut" in info:
-                    failed = {"query": q, **_failure(info), **({"cut": info["cut"]} if "cut" in info else {})}
-                for e in got or []:
-                    slug = e.get("slug") or ""
-                    if s == "btc_above" and BTC_SLUG.search(slug) and (not is_hourly_et(slug) or hourly_et_hour(slug) in btc_hours):
-                        evs[str(e["id"])] = e
-                    elif s == "macro" and MACRO_SLUG.search(slug):
-                        evs[str(e["id"])] = e
-                if failed is not None:
+            name = EVENT_SETS[s]
+            fresh = refresh or not skip_stored
+            evs: dict[str, dict] = {} if fresh else {str(r["value"].get("id")): r["value"] for r in _stored_rows(archive, name)}
+            done = set() if fresh else {v["id"] for v in plog.values() if v.get("product") == "events-window" and v.get("set") == s
+                                        and v.get("final") and v.get("complete")}
+            ws = [w for w in wins[s] if w["key"] not in done]
+            calls, failed, incomplete, n_done, dropped_open = 0, None, [], 0, 0
+            stats = {"windows": len(wins[s]), "windows_done_before": len(wins[s]) - len(ws)}
+
+            def flush(complete: bool):
+                fetched_at = now_iso()
+                rows = [_event_row(e, fetched_at) for e in sorted(evs.values(), key=lambda e: (_ts(e.get("endDate")) or 0, str(e.get("id"))))]
+                _emit(rows_out, name, rows)
+                if archive is None:
+                    return rows
+                if s == "btc_above":
+                    core = (f"GET {GAMMA}/events/keyset?closed=true&tag_slug={BTC_TAG}&exclude_tag_id={'&exclude_tag_id='.join(BTC_EXCLUDE_TAG_IDS)}"
+                            f" (tags 1H, up-or-down)&end_date_min=<month start>&end_date_max=<next month start>&limit=100&after_cursor="
+                            f"<next_cursor> for every endDate month {btc_first_month}..{last_day[:7]}, plus GET {GAMMA}/events/keyset?closed=true"
+                            f"&tag_slug={BTC_TAG}&end_date_min=<H - 1 s>&end_date_max=<H + 1 s> at H = {btc_hours} h ET of every day "
+                            f"{hourly_first_day}..{last_day}; events kept when closed and the slug matches {BTC_SLUG.pattern} (hourly-ET "
+                            f"variants only at {btc_hours} ET)")
+                else:
+                    core = (f"GET {GAMMA}/events/keyset?closed=true&tag_slug=<{'|'.join(MACRO_TAGS)}>&end_date_min=<month start>&end_date_max="
+                            f"<next month start>&limit=100&after_cursor=<next_cursor> for every month {macro_first_month}..{last_day[:7]}, union "
+                            f"GET {GAMMA}/public-search?q=<{'|'.join(MACRO_QUERIES)}>&events_status=closed&limit_per_type=50&page=<n <= "
+                            f"{SEARCH_MAX_PAGES}>; events kept when closed and the slug matches {MACRO_SLUG.pattern}; plus GET {GAMMA}/events?"
+                            f"slug=<{', '.join(ELECTION_EVENTS)}>")
+                _put(archive, name, rows, _recipe(f"{core} (as of {fetched_at[:10]}; windows in polymarket-fetch-log 'events:{s}:<window>'); "
+                                                  "via mandel.data.pm_history.fetch_pm_events.", "polymarket"),
+                     ["polymarket", "events", s.replace("_", "-")], EVENT_SCHEMA, complete)
+                _log_store(archive, PM_LOG, plog, "polymarket")
+                return rows
+
+            for i, w in enumerate(ws):
+                left = None if max_calls is None else max_calls - calls
+                if left is not None and left <= 0:
+                    failed = {"window": w["key"], "cut": "max_calls"}
                     break
-            if s == "macro" and failed is None:
-                for slug in ELECTION_EVENTS:
-                    got, k, info = pm_event_by_slug(c, th, slug, retries, backoff)
-                    calls += k
-                    if got is None:
-                        failed = {"slug": slug, **_failure(info)}
-                        break
-                    for e in got:
-                        evs[str(e["id"])] = e
-            rows = [_event_row(e, fetched_at) for e in sorted(evs.values(), key=lambda e: (_ts(e.get("endDate")) or 0, str(e.get("id"))))]
-            _emit(rows_out, name, rows)
-            rep[name] = {"events": len(rows), "calls": calls,
-                         **({"hourly_et": sum(is_hourly_et(r["value"].get("slug")) for r in rows)} if s == "btc_above" else {})}
+                if w["route"] == "keyset":
+                    got, k, info = pm_events_keyset(c, th, w["params"], retries=retries, backoff=backoff, max_calls=left)
+                elif w["route"] == "search":
+                    got, k, info = pm_search(c, th, w["q"], retries=retries, backoff=backoff, max_calls=left)
+                    if "cut" in info:
+                        got = None
+                else:
+                    got, k, info = pm_event_by_slug(c, th, w["slug"], retries, backoff)
+                calls += k
+                if got is None:
+                    failed = {"window": w["key"], **_failure(info), **({"cut": info["cut"]} if "cut" in info else {})}
+                    break
+                kept = [e for e in got if keep_event(s, e, btc_hours)]
+                dropped_open += sum(1 for e in got if not e.get("closed"))
+                for e in kept:
+                    evs[str(e["id"])] = e
+                if info.get("incomplete"):
+                    incomplete.append({"window": w["key"], "note": info["incomplete"]})
+                final = w["end"] is not None and w["end"] + MONTH_COMPLETE_LAG_DAYS * DAY <= now
+                plog[f"events:{s}:{w['key']}"] = {"product": "events-window", "id": w["key"], "set": s, "route": w["route"], "seen": len(got),
+                                                  "kept": len(kept), "calls": k, "final": final, "complete": True, "fetched_at": now_iso(),
+                                                  **({"incomplete": info["incomplete"]} if info.get("incomplete") else {})}
+                n_done += 1
+                if max_calls is None and (i + 1) % EVENTS_FLUSH_EVERY == 0 and i + 1 < len(ws):
+                    flush(False)
+                if log and (i + 1) % 50 == 0:
+                    log(f"pm events {s}: {i + 1}/{len(ws)} windows, {len(evs)} events")
+            rep[name] = {"events": len(evs), "calls": calls, **stats, "windows_fetched": n_done, "open_dropped": dropped_open,
+                         **({"incomplete": incomplete} if incomplete else {}),
+                         **({"hourly_et": sum(is_hourly_et(e.get("slug")) for e in evs.values())} if s == "btc_above" else {})}
             if failed is not None:
-                rep[name].update(_error=failed, stored=False)
+                rep[name]["_error"] = failed
+                rep[name]["stored"] = False
+                if "cut" not in failed and max_calls is None and n_done:
+                    flush(False)                      # progress kept: the next run resumes at the failed window
+                    rep[name]["stored"] = "partial"
                 continue
-            if archive is not None:
-                q = " | ".join(f"q={x}" for x in queries)
-                _put(archive, name, rows,
-                     _recipe(f"GET {GAMMA}/public-search?{q}&events_status=closed&limit_per_type=50&page=<n> while pagination.hasMore"
-                             + (f", slug ^bitcoin-above-, hourly-ET variants only at {sorted(btc_hours)} ET" if s == "btc_above" else
-                                f", slug matching {MACRO_SLUG.pattern}; plus GET {GAMMA}/events?slug=<{', '.join(ELECTION_EVENTS)}>")
-                             + f" (as of {fetched_at[:10]}); via mandel.data.pm_history.fetch_pm_events.", "polymarket"),
-                     ["polymarket", "events", s.replace("_", "-")], EVENT_SCHEMA, True)
+            rows = flush(True)
+            rep[name]["stored"] = len(rows) if archive is not None else False
         return rep
     finally:
         if own:
@@ -1011,12 +1424,15 @@ def fetch_pm_hourly(store=None, sets: Iterable[str] = ("btc_above", "pairs", "to
     Tokens already stored or logged are skipped; each month with new tokens is stored whole."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
-        targets = hourly_targets(archive, sets, top_days) if archive is not None else {}
-        if not targets and dry_run:
-            calls = BTC_ABOVE_MARKETS_EST * ("btc_above" in sets) + PAIR_LEG_CALLS_EST * ("pairs" in sets) + 399 * math.ceil(top_days / HOURLY_WINDOW_DAYS) * ("top" in sets)
-            rep["_plan"] = _total([_item("polymarket-price-history-hourly-<~22 months>", "clob", calls, calls * 160, "pm_price", min_interval)],
-                                  note="events / pairs not stored yet: estimate")
-            return rep
+        sets = tuple(sets)
+        est = []
+        if dry_run:                                   # sets whose source bundle is not stored yet are planned from estimates
+            src_ok = {"btc_above": _stored_complete(archive, "polymarket-events-btc-above"), "pairs": _stored_entry(archive, PAIRS) is not None,
+                      "top": _stored_entry(archive, LEGACY_DAILY) is not None}
+            per = {"btc_above": BTC_ABOVE_MARKETS_EST, "pairs": PAIR_LEG_CALLS_EST, "top": 399 * math.ceil(top_days / HOURLY_WINDOW_DAYS)}
+            est = [s for s in sets if not src_ok.get(s)]
+            sets = tuple(s for s in sets if src_ok.get(s))
+        targets = hourly_targets(archive, sets, top_days) if archive is not None and sets else {}
         plog = _log_load(archive, PM_LOG) if archive is not None else {}
         months = sorted(targets)
         if limit is not None:
@@ -1080,7 +1496,10 @@ def fetch_pm_hourly(store=None, sets: Iterable[str] = ("btc_above", "pairs", "to
             if log:
                 log(f"pm hourly {M}: {rep[name]}")
         if dry_run:
-            rep["_plan"] = _total(items, note="from the stored events, pairs and legacy bundles")
+            for s in est:
+                items.append({**_item(f"polymarket-price-history-hourly-<months> ({s})", "clob", per[s], per[s] * 160, "pm_price", min_interval),
+                              "estimate": True})
+            rep["_plan"] = _total(items, note="stored events / pairs / legacy targets per month; sets not stored yet estimated")
         return rep
     finally:
         if own:
@@ -1093,6 +1512,7 @@ PM_TRADES_FIRST_DAY = "2024-01-01"     # data-api has no trades for 2023 markets
 PM_TRADES_MARKETS = 1500
 PM_TRADE_PAGE = 10_000                 # data-api serves at most 10,000 trades per request (probed)
 PM_TRADE_MAX_PAGES = 5
+PM_SHARES_TOL = 0.01                  # |taker shares / volumeNum - 1| above this: history short (data-api holds part of it)
 VOLUME_SCHEMA = ("kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = "
                  "Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker "
                  "shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours "
@@ -1170,12 +1590,22 @@ def hourly_volume(trades: Iterable[dict], market_id: str, condition_id: str, fro
     return rows
 
 
+def trades_quota(n_markets: int = PM_TRADES_MARKETS, first_day: str = PM_TRADES_FIRST_DAY, last_day: Optional[str] = None) -> int:
+    """Sampled trade markets per month: n_markets spread over the months first_day .. last_day (default yesterday)."""
+    return math.ceil(n_markets / max(1, len(_months(first_day, last_day or _yesterday()))))
+
+
 def trade_targets(archive, n_markets: int = PM_TRADES_MARKETS, first_day: str = PM_TRADES_FIRST_DAY,
-                  per_month: int = PM_DAILY_PER_MONTH) -> dict[str, dict[str, dict]]:
+                  per_month: int = PM_DAILY_PER_MONTH, plog: Optional[dict] = None,
+                  samples_out: Optional[dict] = None) -> dict[str, dict[str, dict]]:
     """{month: {market_id: {market_id, condition_id, volumeNum, reason}}}: every Polymarket pair leg ending on or after
-    ``first_day`` plus, per stored closed-markets month from ``first_day``, the first ceil(n_markets / months) markets of the
-    daily ``sample`` in hash order (so each has its daily history too)."""
+    ``first_day`` plus, per COMPLETE closed-markets month from ``first_day``, the first ``quota`` markets of the month's
+    daily ``sample`` in hash order (so each has its daily history too). A partial month gets no sample yet (its hash order
+    would shift as markets are added). The quota of a month is the one logged when it was first sampled ('trades-sample:<M>'
+    in ``plog``), else ``trades_quota``; ``samples_out`` receives {month: {quota, candidates, sampled, sample_rate}} (the
+    rate within the daily sample: multiply by the daily 'daily-sample:<M>' rate for the month's population)."""
     out: dict[str, dict[str, dict]] = defaultdict(dict)
+    plog = plog or {}
     f0 = _day_ts(first_day)
     for r in _stored_rows(archive, PAIRS):
         for leg in (r.get("value") or {}).get("pm") or []:
@@ -1183,14 +1613,22 @@ def trade_targets(archive, n_markets: int = PM_TRADES_MARKETS, first_day: str = 
             if leg.get("condition_id") and e is not None and e >= f0:
                 out[_month_of(e)][str(leg["market_id"])] = {"market_id": str(leg["market_id"]), "condition_id": leg["condition_id"],
                                                             "volumeNum": leg.get("volumeNum"), "reason": "pair"}
-    months = [M for M in stored_pm_months(archive) if M >= first_day[:7]]
-    quota = math.ceil(n_markets / len(months)) if months else 0
-    for M in months:
+    default_quota = trades_quota(n_markets, first_day)
+    for M in stored_pm_months(archive, complete_only=True):
+        if M < first_day[:7]:
+            continue
+        quota = int((plog.get(f"trades-sample:{M}") or {}).get("quota", default_quota))
         sel, _ = select_daily((r["value"] for r in _stored_rows(archive, f"polymarket-closed-markets-{M}")), per_month)
-        for m, why in [x for x in sel if x[1] == "sample"][:quota]:
+        pool = [m for m, why in sel if why == "sample"]
+        picked = 0
+        for m in pool[:quota]:
             if m.get("conditionId") and str(m["id"]) not in out[M]:
                 out[M][str(m["id"])] = {"market_id": str(m["id"]), "condition_id": m["conditionId"], "volumeNum": _f(m.get("volumeNum")),
                                         "reason": "sample"}
+                picked += 1
+        if samples_out is not None:
+            samples_out[M] = {"quota": quota, "candidates": len(pool), "sampled": picked,
+                              "sample_rate": round(min(quota, len(pool)) / len(pool), 6) if pool else 1.0}
     return dict(out)
 
 
@@ -1207,15 +1645,22 @@ def fetch_pm_trades(store=None, n_markets: int = PM_TRADES_MARKETS, max_pages: i
     hours. Markets already stored or logged are skipped; each month with new markets is stored whole."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
-        targets = trade_targets(archive, n_markets, first_day, per_month) if archive is not None else {}
-        if not targets and dry_run:
-            pages = n_markets * 1.2 + PAIR_LEG_TRADE_PAGES_EST
-            gb = round((n_markets * PM_TRADES_PER_MARKET + PAIR_LEG_TRADE_PAGES_EST * 6000) * TRADE_KB / 1e6, 1)
-            rep["_plan"] = _total([_item("polymarket-volume-hourly-<~34 months>", "data", pages, (n_markets + 1200) * 300, "pm_volume", min_interval)],
-                                  note=f"{n_markets} sampled markets + ~1,200 pair legs (estimate); ~{gb} GB downloaded "
-                                       f"(~{TRADE_KB} KB per trade, max_pages={max_pages} x {PM_TRADE_PAGE} trades per market)", download_gb=gb)
-            return rep
         plog = _log_load(archive, PM_LOG) if archive is not None else {}
+        samples: dict[str, dict] = {}
+        targets = trade_targets(archive, n_markets, first_day, per_month, plog, samples) if archive is not None else {}
+        if dry_run:                                   # pair legs / months not stored yet are planned from estimates
+            pages = 0.0
+            if _stored_entry(archive, PAIRS) is None:
+                pages += PAIR_LEG_TRADE_PAGES_EST
+            sampled_months = set(samples)
+            unsampled = [M for M in _months(first_day, _yesterday()) if M not in sampled_months]
+            pages += len(unsampled) * trades_quota(n_markets, first_day) * 1.2
+            if pages:
+                gb = round(pages / 1.2 * PM_TRADES_PER_MARKET * TRADE_KB / 1e6, 1)
+                est_item = {**_item(f"polymarket-volume-hourly-<{len(unsampled)} months>", "data", pages, pages / 1.2 * 300, "pm_volume", min_interval),
+                            "estimate": True, "download_gb": gb}
+            else:
+                est_item = None
         months = sorted(targets)
         if limit is not None:
             months = months[:limit]
@@ -1234,7 +1679,7 @@ def fetch_pm_trades(store=None, n_markets: int = PM_TRADES_MARKETS, max_pages: i
                 items.append(_item(name, "data", len(work) * min(max_pages, max(1, math.ceil(PM_TRADES_PER_MARKET / PM_TRADE_PAGE))),
                                    len(work) * 300, "pm_volume", min_interval))
                 continue
-            new, failed, calls, cut, done = [], [], 0, False, 0
+            new, failed, calls, cut, done, n_short = [], [], 0, False, 0, 0
             fetched_at = now_iso()
             for t in work:
                 if max_calls is not None and calls + max_pages > max_calls:
@@ -1246,37 +1691,56 @@ def fetch_pm_trades(store=None, n_markets: int = PM_TRADES_MARKETS, max_pages: i
                     failed.append({"market_id": t["market_id"], **meta})
                     continue
                 cf = meta.get("complete_from")
+                shares = round(sum(x["size"] for x in trades), 6)
+                vn = t.get("volumeNum")
+                ratio = shares / vn if vn else None
+                complete = bool(meta.get("complete"))
+                short = complete and ratio is not None and abs(ratio - 1) > PM_SHARES_TOL
+                if short:                             # paging ended, but data-api holds only part of the market's history
+                    complete, cf = False, None
                 from_h = (-(-cf // HOUR)) * HOUR if cf is not None else None      # the first full hour at or after complete_from
                 rows = hourly_volume(trades, t["market_id"], t["condition_id"], from_h)
                 new += rows
                 done += 1
-                shares = round(sum(x["size"] for x in trades), 6)
-                vn = t.get("volumeNum")
+                n_short += short
                 plog[f"trades:{t['market_id']}"] = {
                     "product": "trades", "id": t["market_id"], "condition_id": t["condition_id"], "month": M, "reason": t["reason"],
                     "n_trades": len(trades), "shares": shares, "volumeNum": vn,
-                    "shares_over_volumeNum": round(shares / vn, 6) if vn else None,
+                    "shares_over_volumeNum": round(ratio, 6) if ratio is not None else None,
                     "first_ts": min((x["ts"] for x in trades), default=None), "last_ts": max((x["ts"] for x in trades), default=None),
-                    "calls": meta["calls"], "complete": bool(meta.get("complete")), "complete_from": cf,
-                    "complete_from_hour": from_h, "fetched_at": fetched_at}
+                    "calls": meta["calls"], "complete": complete, "complete_from": cf, "complete_from_hour": from_h,
+                    **({"history_short": f"taker shares {shares:g} vs volumeNum {vn:g}: data-api holds part of the history; drop or "
+                                         "flag this market (no complete hours, and the subtraction route does not apply)"} if short else {}),
+                    **({"volume_unverified": "no volumeNum to check the taker sum against"} if ratio is None and meta.get("complete") else {}),
+                    "fetched_at": fetched_at}
+            if M in samples:
+                plog[f"trades-sample:{M}"] = {"product": "trades-sample", "id": M, "month": M, **samples[M], "complete": True, "fetched_at": fetched_at}
             rows = sorted(_merge(stored, new, "market_id"), key=_volume_sort)
             _emit(rows_out, name, rows)
             rep[name] = {"targets": len(targets[M]), "todo": len(work), "fetched": done, "calls": calls, "rows": len(rows),
+                         **({"history_short": n_short} if n_short else {}),
                          **({"cut": "max_calls (not stored)"} if cut else {}), **({"failed": failed[:5], "n_failed": len(failed)} if failed else {})}
+            month_short = any(v.get("history_short") for v in plog.values() if v.get("product") == "trades" and v.get("month") == M)
             if archive is not None and not cut and new:
                 _put(archive, name, rows,
                      _recipe(f"GET {DATA}/trades?market=<conditionId>&limit={PM_TRADE_PAGE}&takerOnly=true&end=<oldest timestamp seen> "
                              f"(newest first, at most {max_pages} pages per market) for mandel.data.pm_history.trade_targets(n_markets="
                              f"{n_markets}, first_day={first_day}): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily "
-                             "'sample' markets; aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's "
-                             "volumeNum (probed), and they carry the aggressor side.", "polymarket"),
-                     ["polymarket", "trades", "volume", "hourly", M], VOLUME_SCHEMA, not failed)
+                             "'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated "
+                             "to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry "
+                             f"the aggressor side. A market whose taker sum is off volumeNum by more than {PM_SHARES_TOL:.0%} is logged "
+                             "complete False with history_short (data-api holds part of its history) and tags the month partial.", "polymarket"),
+                     ["polymarket", "trades", "volume", "hourly", M] + (["history-short"] if month_short else []), VOLUME_SCHEMA,
+                     not failed and not month_short)
             if archive is not None and not cut:
                 _log_store(archive, PM_LOG, plog, "polymarket")
             if log:
                 log(f"pm trades {M}: {rep[name]}")
         if dry_run:
-            rep["_plan"] = _total(items, note="from the stored pairs and closed-markets months")
+            if est_item:
+                items.append(est_item)
+            rep["_plan"] = _total(items, note="stored pairs and complete closed-markets months; the rest estimated "
+                                              f"(~{TRADE_KB} KB downloaded per trade, max_pages={max_pages} x {PM_TRADE_PAGE} trades per market)")
         return rep
     finally:
         if own:
@@ -1409,8 +1873,8 @@ def fetch_kalshi_markets(store=None, series: Iterable[str] = KALSHI_SERIES, cryp
             items = []
             for kind, s, name, extra in todo:
                 if kind == "series":
-                    n = KALSHI_EST.get(s, KALSHI_EST_OTHER)
-                    items.append(_item(name, "kalshi", 2 * max(1, math.ceil(n / 1000)), n, "k_market", min_interval))
+                    n = KALSHI_EST.get(s, KALSHI_EST_OTHER)       # historical pages of 1,000 plus the live settled page(s)
+                    items.append(_item(name, "kalshi", max(1, math.ceil(n / 1000)) + 1, n, "k_market", min_interval))
                 else:
                     days = len(_month_days(extra[0], crypto_first, last_day))
                     items.append(_item(name, "kalshi", days, days * KALSHI_BTC_KEPT, "k_market", min_interval))
@@ -1492,9 +1956,7 @@ def fetch_kalshi_markets(store=None, series: Iterable[str] = KALSHI_SERIES, cryp
 
 def stored_kalshi_listings(archive) -> list[str]:
     """Names of the stored kalshi-settled-markets-<S>[-<M>] bundles (the legacy kalshi-settled-markets excluded)."""
-    if archive is None:
-        return []
-    return sorted(e.name for e in archive.entries() if e.name.startswith("kalshi-settled-markets-"))
+    return sorted(n for n in _entry_names(archive) if n.startswith("kalshi-settled-markets-"))
 
 
 def _listing_series(name: str) -> tuple[str, Optional[str]]:
@@ -1577,41 +2039,56 @@ def kalshi_candles(client: httpx.Client, th: Throttle, m: dict, series: str, per
     return None, {"calls": calls, "error": _failure(last_info)}
 
 
+def pair_kalshi_tickers(archive) -> set[str]:
+    """Tickers of every Kalshi leg of the stored pm-kalshi-pairs table (read only)."""
+    return {str(leg.get("ticker")) for r in _stored_rows(archive, PAIRS) for leg in (r.get("value") or {}).get("kalshi") or [] if leg.get("ticker")}
+
+
 def fetch_kalshi_candles(store=None, period: int = 60, series: Optional[Iterable[str]] = None, limit: Optional[int] = None,
                          dry_run: bool = False, skip_stored: bool = True, refresh: bool = False, max_calls: Optional[int] = None,
                          min_interval: float = PACE["kalshi"], retries: int = KALSHI_RETRIES, backoff: float = KALSHI_BACKOFF,
                          report: Optional[dict] = None, rows_out: Optional[dict] = None, client: Optional[httpx.Client] = None,
                          log: Optional[Callable] = None, **_) -> dict:
     """``kalshi-candles-hourly-<S>`` (period 60) or ``kalshi-candles-daily-<S>`` (period 1440) for the ``kalshi_select``
-    markets of every stored kalshi-settled-markets-<S>[-<M>] listing (or ``series``). Markets already stored or logged are
-    skipped; each bundle with new markets is stored whole."""
+    markets of every stored kalshi-settled-markets-<S>[-<M>] listing (or ``series``), plus (hourly) every Kalshi leg of the
+    stored pm-kalshi-pairs table (BTC pair strikes sit on Polymarket's grid, mostly outside the 4 most traded strikes).
+    Markets already stored or logged are skipped; each bundle with new markets is stored whole, so a pass after the pairs
+    table exists adds its legs. A dry run plans unstored listings (and the pair legs, before the table exists) from estimates."""
     if period not in (60, 1440):
         raise ValueError("period must be 60 or 1440")
     tag = "hourly" if period == 60 else "daily"
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         listings = stored_kalshi_listings(archive)
-        if series is not None:
-            want = set(series)
+        want = set(series) if series is not None else None
+        if want is not None:
             listings = [n for n in listings if _listing_series(n)[0] in want]
-        if not listings and dry_run:
-            items = []
+        est_items = []
+        if dry_run:                                   # series / months not listed yet (and the pair legs) from estimates
+            have_series = {_listing_series(n)[0] for n in listings}
             for s in (DAILY_SERIES if period == 1440 else KALSHI_SERIES):
+                if s in have_series or (want is not None and s not in want):
+                    continue
                 n = KALSHI_EST.get(s, KALSHI_EST_OTHER)
                 k = n if _series_kind(s) in ("macro", "election") else KALSHI_HOURLY_CAP
-                if period == 1440 and s not in DAILY_SERIES:
-                    continue
-                items.append(_item(f"kalshi-candles-{tag}-{s}", "kalshi", k * (1.2 if period == 60 and _series_kind(s) == "macro" else 1),
-                                   k * (KALSHI_HOURLY_CANDLES if period == 60 else KALSHI_DAILY_CANDLES), "k_candle", min_interval))
-            if period == 60:
-                days = (_day_ts(_yesterday()) - _day_ts(CRYPTO_FIRST_DAY)) // DAY + 1
-                k = days * KALSHI_BTC_HOURLY_PER_EVENT
-                items.append(_item("kalshi-candles-hourly-KXBTCD-<months>", "kalshi", k, k * 60, "k_candle", min_interval))
-            rep["_plan"] = _total(items, note="listings not stored yet: estimate")
-            return rep
+                est_items.append({**_item(f"kalshi-candles-{tag}-{s}", "kalshi", k * (1.2 if period == 60 and _series_kind(s) == "macro" else 1),
+                                          k * (KALSHI_HOURLY_CANDLES if period == 60 else KALSHI_DAILY_CANDLES), "k_candle", min_interval),
+                                  "estimate": True})
+            if period == 60 and (want is None or "KXBTCD" in want):
+                listed = set(listings)
+                days = sum(len(_month_days(M, CRYPTO_FIRST_DAY, _yesterday())) for M in _months(CRYPTO_FIRST_DAY, _yesterday())
+                           if f"kalshi-settled-markets-KXBTCD-{M}" not in listed)
+                if days:
+                    k = days * KALSHI_BTC_HOURLY_PER_EVENT
+                    est_items.append({**_item("kalshi-candles-hourly-KXBTCD-<months not listed>", "kalshi", k, k * 60, "k_candle", min_interval),
+                                      "estimate": True})
+            if period == 60 and _stored_entry(archive, PAIRS) is None:
+                est_items.append({**_item("kalshi-candles-hourly-<pair legs>", "kalshi", PAIR_K_LEG_CALLS_EST, PAIR_K_LEG_CALLS_EST * 100, "k_candle",
+                                          min_interval), "estimate": True})
         if limit is not None:
             listings = listings[:limit]
         klog = _log_load(archive, K_LOG)
+        pair_k = pair_kalshi_tickers(archive) if period == 60 else set()
         cutoff = kalshi_cutoff(c, th, retries, backoff) if not dry_run else KALSHI_CUTOFF_FALLBACK
         cut_s = _ts(cutoff["market_settled_ts"]) or 0
         items = []
@@ -1620,6 +2097,10 @@ def fetch_kalshi_candles(store=None, period: int = 60, series: Optional[Iterable
             name = f"kalshi-candles-{tag}-{s}" + (f"-{M}" if M else "")
             markets = [r["value"] for r in _stored_rows(archive, src)]
             sel = kalshi_select(markets, s, period)
+            picked = {m["ticker"] for m in sel}
+            legs = [m for m in markets if m.get("ticker") in pair_k and m["ticker"] not in picked and m.get("open_time") and m.get("close_time")]
+            why = {**{m["ticker"]: "select" for m in sel}, **{m["ticker"]: "pair" for m in legs}}
+            sel = sel + legs
             if not sel:
                 continue
             stored = [] if refresh else _stored_rows(archive, name)
@@ -1650,25 +2131,28 @@ def fetch_kalshi_candles(store=None, period: int = 60, series: Optional[Iterable
                     new.append(_row("kalshi", "candle", m["ticker"], _iso_s(ts), _iso_s(ts), {"ticker": m["ticker"], "period": period, "candle": k}))
                 done += 1
                 klog[f"candles-{period}:{m['ticker']}"] = {"product": f"candles-{period}", "id": m["ticker"], "series": s, "month": M,
+                                                         "reason": why.get(m["ticker"], "select"), "pair_leg": m["ticker"] in pair_k,
                                                          "candles": len(cs), "route": meta.get("route"), "calls": meta["calls"],
                                                          "complete": True, "fetched_at": fetched_at}
             rows = sorted(_merge(stored, new, "ticker"), key=lambda r: (r["value"]["ticker"], int(r["value"]["candle"]["end_period_ts"])))
             _emit(rows_out, name, rows)
-            rep[name] = {"selected": len(sel), "todo": len(work), "fetched": done, "calls": calls, "rows": len(rows),
+            rep[name] = {"selected": len(sel), **({"pair_legs_added": len(legs)} if legs else {}), "todo": len(work), "fetched": done,
+                         "calls": calls, "rows": len(rows),
                          **({"cut": "max_calls (not stored)"} if cut else {}), **({"failed": failed[:5], "n_failed": len(failed)} if failed else {})}
             if archive is not None and not cut:
                 _put(archive, name, rows,
                      _recipe(f"GET {KALSHI}/historical/markets/<T>/candlesticks?start_ts&end_ts&period_interval={period} for markets settled "
                              f"before the historical cutoff ({cutoff['market_settled_ts']}), else GET {KALSHI}/series/{s}/markets/<T>/candlesticks "
                              f"(the other route when the first is empty), windows of {CANDLES_PER_CALL} periods over [open_time, close_time], for "
-                             f"the markets of {src} chosen by mandel.data.pm_history.kalshi_select(period={period}). Same row schema as kalshi-candles.",
-                             "kalshi"),
+                             f"the markets of {src} chosen by mandel.data.pm_history.kalshi_select(period={period})"
+                             + (" plus every Kalshi leg of pm-kalshi-pairs listed there (kalshi-fetch-log reason 'pair')" if period == 60 else "")
+                             + ". Same row schema as kalshi-candles.", "kalshi"),
                      ["kalshi", "candles", tag, "history", s] + ([M] if M else []), K_CANDLE_SCHEMA, not failed and _stored_complete(archive, src))
                 _log_store(archive, K_LOG, klog, "kalshi")
             if log:
                 log(f"kalshi candles {period} {name}: {rep[name]}")
         if dry_run:
-            rep["_plan"] = _total(items, note="from the stored listings")
+            rep["_plan"] = _total(items + est_items, note="stored listings (and pair legs); unstored listings estimated")
         return rep
     finally:
         if own:
@@ -1678,23 +2162,33 @@ def fetch_kalshi_candles(store=None, period: int = 60, series: Optional[Iterable
 def kalshi_trades(client: httpx.Client, th: Throttle, m: dict, cut_s: int, max_pages: int = KALSHI_MAX_PAGES, retries: int = KALSHI_RETRIES,
                   backoff: float = KALSHI_BACKOFF) -> tuple[Optional[list[dict]], dict]:
     """Every print of a market (historical store before the trades cutoff, live after; both when it spans it), newest
-    first, at most ``max_pages`` pages per route. (trades or None, meta {calls, complete, complete_from})."""
+    first, at most ``max_pages`` pages per route. The routes are read newest first (live, then historical), and when a
+    route stops at the page cap the older route is not read: its prints would leave a hole between the cutoff and the
+    oldest print of the capped route. complete_from = the oldest print of the capped route + 1 s (every print from then
+    on is held). (trades or None, meta {calls, complete, complete_from, routes (read), coverage [{route, n, oldest,
+    newest, complete}]})."""
     open_s, settled = _ts(m.get("open_time")) or 0, _ts(m.get("settlement_ts") or m.get("close_time")) or 0
     routes = (["/historical/trades"] if settled < cut_s else ["/markets/trades"] if open_s >= cut_s else ["/markets/trades", "/historical/trades"])
     got: dict[str, dict] = {}
-    calls, complete = 0, True
+    calls, complete, cf, cover = 0, True, None, []
     for path in routes:
         ts, meta = kalshi_pages(client, th, path, {"ticker": m["ticker"], "limit": 1000}, "trades", max_pages=max_pages, retries=retries, backoff=backoff)
         calls += meta["calls"]
         if ts is None:
             return None, {"calls": calls, "error": meta.get("error")}
-        complete = complete and bool(meta.get("complete"))
+        times = [x for x in (_ts(t.get("created_time")) for t in ts) if x is not None]
+        cover.append({"route": path, "n": len(ts), "oldest": _iso_s(min(times)) if times else None,
+                      "newest": _iso_s(max(times)) if times else None, "complete": bool(meta.get("complete"))})
         for t in ts:
             if t.get("trade_id"):
                 got[t["trade_id"]] = t
+        if not meta.get("complete"):
+            complete = False
+            cf = _iso_s(min(times) + 1) if times else None
+            break
     out = sorted(got.values(), key=lambda t: (_ts(t.get("created_time")) or 0, t["trade_id"]))
-    cf = None if complete or not out else _iso_s((_ts(out[0].get("created_time")) or 0) + 1)
-    return out, {"calls": calls, "complete": complete, "complete_from": cf, "routes": routes}
+    return out, {"calls": calls, "complete": complete, "complete_from": cf, "routes": [x["route"] for x in cover], "coverage": cover,
+                 **({"routes_skipped": routes[len(cover):]} if len(cover) < len(routes) else {})}
 
 
 def fetch_kalshi_trades(store=None, series: Optional[Iterable[str]] = None, max_pages: int = KALSHI_MAX_PAGES, limit: Optional[int] = None,
@@ -1707,20 +2201,26 @@ def fetch_kalshi_trades(store=None, series: Optional[Iterable[str]] = None, max_
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         listings = stored_kalshi_listings(archive)
-        if series is not None:
-            want = set(series)
+        want = set(series) if series is not None else None
+        if want is not None:
             listings = [n for n in listings if _listing_series(n)[0] in want]
-        if not listings and dry_run:
-            items = []
+        est_items = []
+        if dry_run:                                   # series / months not listed yet from estimates
+            have_series = {_listing_series(n)[0] for n in listings}
             for s in KALSHI_SERIES:
+                if s in have_series or (want is not None and s not in want):
+                    continue
                 kind = _series_kind(s)
                 n = KALSHI_EST.get(s, 0) if kind == "election" else KALSHI_TRADES_CAP["macro" if kind == "macro" else "other"]
-                items.append(_item(f"kalshi-trades-{s}", "kalshi", n * KALSHI_TRADE_PAGES, n * KALSHI_TRADE_PAGES * 700, "k_trade", min_interval))
-            months = len(_months(CRYPTO_FIRST_DAY, _yesterday()))
-            n = months * KALSHI_TRADES_CAP["crypto_month"]
-            items.append(_item("kalshi-trades-KXBTCD-<months>", "kalshi", n * 2, n * 1500, "k_trade", min_interval))
-            rep["_plan"] = _total(items, note="listings not stored yet: estimate")
-            return rep
+                est_items.append({**_item(f"kalshi-trades-{s}", "kalshi", n * KALSHI_TRADE_PAGES, n * KALSHI_TRADE_PAGES * 700, "k_trade", min_interval),
+                                  "estimate": True})
+            if want is None or "KXBTCD" in want:
+                listed = set(listings)
+                months = sum(1 for M in _months(CRYPTO_FIRST_DAY, _yesterday()) if f"kalshi-settled-markets-KXBTCD-{M}" not in listed)
+                n = months * KALSHI_TRADES_CAP["crypto_month"]
+                if n:
+                    est_items.append({**_item("kalshi-trades-KXBTCD-<months not listed>", "kalshi", n * 2, n * 1500, "k_trade", min_interval),
+                                      "estimate": True})
         if limit is not None:
             listings = listings[:limit]
         klog = _log_load(archive, K_LOG)
@@ -1761,7 +2261,9 @@ def fetch_kalshi_trades(store=None, series: Optional[Iterable[str]] = None, max_
                 done += 1
                 klog[f"trades:{m['ticker']}"] = {"product": "trades", "id": m["ticker"], "series": s, "month": M, "n": len(ts),
                                                  "volume_fp": _kvol(m), "calls": meta["calls"], "complete": bool(meta["complete"]),
-                                                 "complete_from": meta["complete_from"], "routes": meta["routes"], "fetched_at": fetched_at}
+                                                 "complete_from": meta["complete_from"], "routes": meta["routes"], "coverage": meta["coverage"],
+                                                 **({"routes_skipped": meta["routes_skipped"]} if meta.get("routes_skipped") else {}),
+                                                 "fetched_at": fetched_at}
             rows = sorted(_merge(stored, new, "ticker"), key=lambda r: (str(r["value"].get("ticker")), r["observed_at"], r["key"]))
             _emit(rows_out, name, rows)
             rep[name] = {"selected": len(sel), "todo": len(work), "fetched": done, "calls": calls, "rows": len(rows),
@@ -1770,14 +2272,15 @@ def fetch_kalshi_trades(store=None, series: Optional[Iterable[str]] = None, max_
                 _put(archive, name, rows,
                      _recipe(f"GET {KALSHI}/historical/trades?ticker=<T>&limit=1000&cursor=<c> for prints before the trades cutoff "
                              f"({cutoff['trades_created_ts']}) and GET {KALSHI}/markets/trades?ticker=<T> after it (both when a market spans it), "
-                             f"at most {max_pages} pages per route, for the markets of {src} chosen by mandel.data.pm_history.kalshi_trade_select "
+                             f"at most {max_pages} pages per route, read newest first (the historical route only when the live route ended before its cap), "
+                             f"for the markets of {src} chosen by mandel.data.pm_history.kalshi_trade_select "
                              "(a capped market is complete from complete_from on: kalshi-fetch-log).", "kalshi"),
                      ["kalshi", "trades", "history", s] + ([M] if M else []), K_TRADE_SCHEMA, not failed and _stored_complete(archive, src))
                 _log_store(archive, K_LOG, klog, "kalshi")
             if log:
                 log(f"kalshi trades {name}: {rep[name]}")
         if dry_run:
-            rep["_plan"] = _total(items, note="from the stored listings")
+            rep["_plan"] = _total(items + est_items, note="stored listings; unstored listings estimated")
         return rep
     finally:
         if own:
@@ -1790,13 +2293,16 @@ FOMC_SIZES = (25, 50, 75, 100)        # 100 = 100 bps or more
 PAIR_SCHEMA = ("kind pair: value = {pair_id, family (fomc | cpi_mom | cpi_yoy | core_cpi_mom | core_cpi_yoy | btc | election), key, "
                "template, relation 'sum(sign*p_pm) = const + sum(sign*p_kalshi)', const, pm [{market_id, condition_id, yes_token, label, "
                "sign, start, end, volumeNum (end-of-life, proxy only)}], kalshi [{ticker, event_ticker, series, label, sign, open_time, "
-               "close_time, settlement_ts}], pm_rules, kalshi_rules, timing_gap_hours (PM endDate - Kalshi close_time), basis_note, "
+               "close_time, settlement_ts}], pm_rules, kalshi_rules, timing_gap_hours (PM endDate - Kalshi close_time), timing_suspect (|gap| > 7 d), basis_note, "
                "audited (False: the hand audit is the harness's job), frozen_at}; observed_at = frozen_at; available_at = the latest "
                "listing time of the legs")
 CPI_FAMILIES = {"cpi_mom": "KXCPI", "cpi_yoy": "KXCPIYOY", "core_cpi_mom": "KXCPICORE", "core_cpi_yoy": "KXCPICOREYOY"}
 PAIR_KALSHI = ("KXFEDDECISION", "KXCPI", "KXCPIYOY", "KXCPICORE", "KXCPICOREYOY", "PRES", "POPVOTE")
 BTC_PAIR_HOUR = 17
 BTC_MAX_EVENTS = 150
+PAIR_GAP_SUSPECT_HOURS = 168          # |PM endDate - Kalshi close_time| above a week: flagged timing_suspect (likely a different print)
+PRICE_BUNDLE_PATTERNS = ("polymarket-price-history-daily-*", "polymarket-price-history-hourly-*", "polymarket-volume-hourly-*",
+                         "polymarket-open-price-history-daily", "kalshi-candles-daily-*", "kalshi-candles-hourly-*", "kalshi-trades-*")
 
 
 def fomc_atoms(label: str) -> Optional[frozenset]:
@@ -1853,7 +2359,9 @@ def kalshi_strike(m: dict) -> Optional[float]:
 
 
 def _event_month(event_ticker: str) -> Optional[tuple[int, int]]:
-    m = re.search(r"-(\d{2})([A-Z]{3})$", event_ticker or "")
+    """(year, month) of a Kalshi event ticker ending in <YY><MON> or <YY><MON><DD> (KXCPI-25FEB, FEDDECISION-24JAN31,
+    FEDDECISION-24MAR20); None otherwise (KXBTCD-25MAR1417 ends in day + hour)."""
+    m = re.search(r"-(\d{2})([A-Z]{3})(\d{2})?$", event_ticker or "")
     return (2000 + int(m.group(1)), MON3.index(m.group(2)) + 1) if m and m.group(2) in MON3 else None
 
 
@@ -1881,10 +2389,11 @@ def _pair(family: str, key: str, template: str, pm: list[dict], km: list[dict], 
     k_close = max((_ts(l["close_time"]) or 0) for l in km)
     listed = [_ts(l["start"]) for l in pm] + [_ts(l["open_time"]) for l in km]
     av = _iso_s(max(x for x in listed if x is not None)) if any(x is not None for x in listed) else frozen_at
+    gap = round((pm_end - k_close) / HOUR, 2) if pm_end and k_close else None
     v = {"pair_id": f"{family}:{key}:{n}", "family": family, "key": key, "template": template,
          "relation": "sum(sign*p_pm) = const + sum(sign*p_kalshi)", "const": const, "pm": pm, "kalshi": km,
          "pm_rules": (pm_rules or "")[:600], "kalshi_rules": (k_rules or "")[:600],
-         "timing_gap_hours": round((pm_end - k_close) / HOUR, 2) if pm_end and k_close else None, "basis_note": basis,
+         "timing_gap_hours": gap, "timing_suspect": gap is not None and abs(gap) > PAIR_GAP_SUSPECT_HOURS, "basis_note": basis,
          "audited": False, "frozen_at": frozen_at}
     return _row("mandel", "pair", v["pair_id"], frozen_at, min(av, frozen_at, key=_ts), v)
 
@@ -1931,6 +2440,30 @@ def _pm_ref_month(slug: str, end: Optional[str], mon: str) -> Optional[tuple[int
     return (ed.year if mi < ed.month else ed.year - 1), mi
 
 
+def btc_pair_events(btc_events: Iterable[dict], btc_hour: int = BTC_PAIR_HOUR, btc_max_events: int = BTC_MAX_EVENTS) -> list[tuple[date, dict]]:
+    """[(ET date, event)] of the Polymarket bitcoin-above-on-<month>-<day>[-<year>]-<h>pm-et events at ``btc_hour``, the
+    latest ``btc_max_events`` first (the BTC pair candidates)."""
+    btc_rx = re.compile(rf"^bitcoin-above-on-({_MON})-(\d{{1,2}})(?:-(20\d\d))?-(\d{{1,2}})(am|pm)-et(?:-\d+)?$")
+    cands = []
+    for ev in btc_events:
+        mm = btc_rx.match(ev.get("slug") or "")
+        if not mm:
+            continue
+        h = int(mm.group(4)) % 12 + (12 if mm.group(5) == "pm" else 0)
+        if h != btc_hour:
+            continue
+        e = _ts(ev.get("endDate"))
+        year = int(mm.group(3)) if mm.group(3) else (datetime.fromtimestamp(e, UTC).year if e else None)
+        if year is None:
+            continue
+        try:
+            d = date(year, MONTHS.index(mm.group(1)) + 1, int(mm.group(2)))
+        except ValueError:
+            continue
+        cands.append((d, ev))
+    return sorted(cands, key=lambda x: (x[0], str(x[1].get("id"))), reverse=True)[:btc_max_events]
+
+
 def match_pairs(pm_events: Iterable[dict], kalshi_markets: Iterable[dict], btc_events: Iterable[dict] = (), frozen_at: Optional[str] = None,
                 btc_hour: int = BTC_PAIR_HOUR, btc_max_events: int = BTC_MAX_EVENTS) -> list[dict]:
     """Templated Polymarket-Kalshi pairs (module docstring) from listing fields only. Returns pair rows."""
@@ -1941,13 +2474,19 @@ def match_pairs(pm_events: Iterable[dict], kalshi_markets: Iterable[dict], btc_e
         k_by_event[m.get("event_ticker")].append(m)
     out, n = [], 0
 
-    def k_events(series_prefixes: tuple, ym: tuple[int, int]) -> list[dict]:
-        res = []
-        for ev, ms in k_by_event.items():
-            base = (ev or "").split("-")[0]
-            if base in series_prefixes and _event_month(ev or "") == ym:
-                res += ms
-        return res
+    def k_events(series_prefixes: tuple, ym: tuple[int, int], near: Optional[int] = None, one: bool = False) -> list[dict]:
+        """Markets of the Kalshi events of ``series_prefixes`` in month ``ym``. Several events can share a month (legacy
+        FEDDECISION-24JAN closed 2024-01-26 untraded beside FEDDECISION-24JAN31): ordered by |max close_time - near|,
+        the nearest last (it wins duplicate strikes); ``one`` keeps only the nearest event. close_time is a listing field."""
+        evs = [(ev, ms) for ev, ms in k_by_event.items() if (ev or "").split("-")[0] in series_prefixes and _event_month(ev or "") == ym]
+        if near is not None and len(evs) > 1:
+            def dist(item):
+                closes = [x for x in (_ts(m.get("close_time")) for m in item[1]) if x is not None]
+                return abs(max(closes) - near) if closes else float("inf")
+            evs.sort(key=lambda it: (-dist(it), str(it[0])))
+            if one:
+                evs = evs[-1:]
+        return [m for _, ms in evs for m in ms]
 
     fomc_rx = re.compile(rf"^fed-(?:decision-in|interest-rates)-({_MON})(?:-|$)")
     cpi_rx = [("cpi_mom", re.compile(rf"^({_MON})-inflation-(?:us-)?monthly")), ("cpi_yoy", re.compile(rf"^({_MON})-inflation-(?:us-)?annual")),
@@ -1967,7 +2506,7 @@ def match_pairs(pm_events: Iterable[dict], kalshi_markets: Iterable[dict], btc_e
                 continue
             ed = datetime.fromtimestamp(e, UTC)
             ym = (ed.year, MONTHS.index(mf.group(1)) + 1)
-            kk = k_events(("KXFEDDECISION", "FEDDECISION"), ym)
+            kk = k_events(("KXFEDDECISION", "FEDDECISION"), ym, near=e, one=True)
             pm_items = [(m, a) for m in markets if (a := fomc_atoms(m.get("groupItemTitle") or m.get("question") or ""))]
             k_items = [(m, a) for m in kk if (a := fomc_atoms(m.get("yes_sub_title") or m.get("subtitle") or ""))]
             for ps, ks in _components(pm_items, k_items):
@@ -1990,19 +2529,29 @@ def match_pairs(pm_events: Iterable[dict], kalshi_markets: Iterable[dict], btc_e
                 fam = "cpi_mom"
         if fam is None or not re.search(r"bureau of labor statistics|\bbls\b", desc, re.I):
             continue
+        basis_cpi = "same BLS print (one decimal); check revisions and release-delay clauses"
         if single:
+            # The release month of the print the market resolved on is fixed by its endDate (the release date): the
+            # reference month is the month before. The text is wrong for some 2024 singles ('from Jan to Feb 2024',
+            # endDate 2024-02-13, resolved on the January print), so it is only checked against.
+            es = _ts(ev.get("endDate") or markets[0].get("endDate"))
+            if es is None:
+                continue
+            ed = datetime.fromtimestamp(es, UTC)
+            ym = (ed.year, ed.month - 1) if ed.month > 1 else (ed.year - 1, 12)
             m3 = single.group(3).lower()
             mi = next((i for i, x in enumerate(MONTHS) if x.startswith(m3)), None)
-            if mi is None:
-                continue
-            ym = (int(single.group(4)), mi + 1)
+            text_ym = (int(single.group(4)), mi + 1) if mi is not None else None
+            basis_cpi += ("; reference month = endDate (release) month - 1" +
+                          (f"; the market text names {text_ym[0]}-{text_ym[1]:02d} instead" if text_ym and text_ym != ym else ""))
         else:
             ym = _pm_ref_month(slug, ev.get("endDate") or markets[0].get("endDate"), mon)
             if ym is None:
                 continue
         series = CPI_FAMILIES[fam]
         strikes = {}
-        for m in k_events((series, series.replace("KX", "", 1)), ym):
+        near = _ts(ev.get("endDate") or markets[0].get("endDate"))
+        for m in k_events((series, series.replace("KX", "", 1)), ym, near=near):
             x = kalshi_strike(m)
             if x is not None:
                 strikes[_k1(x)] = m
@@ -2027,28 +2576,9 @@ def match_pairs(pm_events: Iterable[dict], kalshi_markets: Iterable[dict], btc_e
             n += 1
             kl = [_k_leg(strikes[k], sg) for k, sg in need]
             out.append(_pair(fam, f"{ym[0]}-{ym[1]:02d}", f"CPI bucket {kind} {x:.1f} = {const:g} + " + " ".join(f"{'+' if sg > 0 else '-'}K(above {k})" for k, sg in need),
-                             [_pm_leg(m, 1, lab, ev)], kl, const, desc, strikes[need[0][0]].get("rules_primary"),
-                             "same BLS print (one decimal); check revisions and release-delay clauses", frozen_at, n))
+                             [_pm_leg(m, 1, lab, ev)], kl, const, desc, strikes[need[0][0]].get("rules_primary"), basis_cpi, frozen_at, n))
     # BTC: Polymarket <date>-<h>pm-et events at btc_hour vs Kalshi KXBTCD <date><hour>
-    btc_rx = re.compile(rf"^bitcoin-above-on-({_MON})-(\d{{1,2}})(?:-(20\d\d))?-(\d{{1,2}})(am|pm)-et(?:-\d+)?$")
-    cands = []
-    for ev in btc_events:
-        mm = btc_rx.match(ev.get("slug") or "")
-        if not mm:
-            continue
-        h = int(mm.group(4)) % 12 + (12 if mm.group(5) == "pm" else 0)
-        if h != btc_hour:
-            continue
-        e = _ts(ev.get("endDate"))
-        year = int(mm.group(3)) if mm.group(3) else (datetime.fromtimestamp(e, UTC).year if e else None)
-        if year is None:
-            continue
-        try:
-            d = date(year, MONTHS.index(mm.group(1)) + 1, int(mm.group(2)))
-        except ValueError:
-            continue
-        cands.append((d, ev))
-    for d, ev in sorted(cands, key=lambda x: x[0], reverse=True)[:btc_max_events]:
+    for d, ev in btc_pair_events(btc_events, btc_hour, btc_max_events):
         kk = {}
         for m in k_by_event.get(kxbtcd_event(d.isoformat(), btc_hour), []):
             x = _f(m.get("floor_strike"))
@@ -2087,15 +2617,39 @@ def match_pairs(pm_events: Iterable[dict], kalshi_markets: Iterable[dict], btc_e
     return out
 
 
-def build_pairs(store=None, btc_hour: int = BTC_PAIR_HOUR, btc_max_events: int = BTC_MAX_EVENTS, limit: Optional[int] = None,
+def _pairs_inputs(archive, btc: bool = True, btc_hour: int = BTC_PAIR_HOUR, btc_max_events: int = BTC_MAX_EVENTS) -> tuple[list[str], list[dict], list[str]]:
+    """(missing listing bundles, BTC events, KXBTCD months) for build_pairs: both event sets complete, the PAIR_KALSHI
+    series listed, and the KXBTCD months of the latest ``btc_max_events`` 5 pm ET events listed."""
+    if hasattr(archive, "_reload_index"):
+        with _ALOCK:
+            archive._reload_index()                   # listings stored meanwhile by another process
+    events = ["polymarket-events-macro"] + (["polymarket-events-btc-above"] if btc else [])
+    series = [f"kalshi-settled-markets-{s}" for s in PAIR_KALSHI]
+    missing = [n for n in events if not _stored_complete(archive, n)] + [n for n in series if _stored_entry(archive, n) is None]
+    btc_events = [r["value"] for r in _stored_rows(archive, "polymarket-events-btc-above")] if btc and not missing else []
+    btc_months = sorted({d.isoformat()[:7] for d, _ in btc_pair_events(btc_events, btc_hour, btc_max_events)})
+    missing += [f"kalshi-settled-markets-KXBTCD-{M}" for M in btc_months if _stored_entry(archive, f"kalshi-settled-markets-KXBTCD-{M}") is None]
+    return missing, btc_events, btc_months
+
+
+def pairs_waiting(store, btc: bool = True, btc_hour: int = BTC_PAIR_HOUR, btc_max_events: int = BTC_MAX_EVENTS, **_) -> list[str]:
+    """The listing bundles build_pairs still waits for (empty: it can freeze the table)."""
+    archive = _archive(store)
+    return [] if archive is None else _pairs_inputs(archive, btc, btc_hour, btc_max_events)[0]
+
+
+def build_pairs(store=None, btc_hour: int = BTC_PAIR_HOUR, btc_max_events: int = BTC_MAX_EVENTS, btc: bool = True, limit: Optional[int] = None,
                 dry_run: bool = False, skip_stored: bool = True, refresh: bool = False, report: Optional[dict] = None,
                 rows_out: Optional[dict] = None, log: Optional[Callable] = None, **_) -> dict:
-    """``pm-kalshi-pairs`` from the stored events and Kalshi listings (no request). Waits (stores nothing) until every
-    needed listing is stored; kept frozen once stored (``refresh`` rebuilds it)."""
+    """``pm-kalshi-pairs`` from the stored events and Kalshi listings (no request). Waits (stores nothing, reports
+    'waiting') until every listing it reads is in: both event sets complete (``btc=False`` drops the BTC family), the
+    Kalshi series listings, and the kalshi-settled-markets-KXBTCD-<M> months of the latest ``btc_max_events`` Polymarket
+    5 pm ET events. Kept frozen once stored (``refresh`` rebuilds it). The recipe records how many price bundles of this
+    module were already stored at freeze time (fetch_all_pm runs listings, then pairs, then prices: 0)."""
     archive = _archive(store)
     rep = report if report is not None else {}
     if dry_run:
-        rep["_plan"] = _total([{"bundle": PAIRS, "calls": 0, "rows": 1000, "gz_mb": round(1000 * ROW_GZ["pair"] / 1e6, 2), "minutes": 0.1}])
+        rep["_plan"] = _total([{"bundle": PAIRS, "calls": 0, "rows": 1050, "gz_mb": round(1050 * ROW_GZ["pair"] / 1e6, 2), "minutes": 0.1}])
         return rep
     if archive is None:
         rep["skipped"] = "no archive"
@@ -2103,30 +2657,33 @@ def build_pairs(store=None, btc_hour: int = BTC_PAIR_HOUR, btc_max_events: int =
     if skip_stored and not refresh and _stored_complete(archive, PAIRS):
         rep[PAIRS] = {"skipped": "stored (frozen); refresh=True rebuilds it"}
         return rep
-    if hasattr(archive, "_reload_index"):
-        archive._reload_index()                       # listings stored meanwhile by a parallel Kalshi process
-    need = ["polymarket-events-macro"] + [f"kalshi-settled-markets-{s}" for s in PAIR_KALSHI]
-    missing = [n for n in need if _stored_entry(archive, n) is None]
+    missing, btc_events, btc_months = _pairs_inputs(archive, btc, btc_hour, btc_max_events)
     if missing:
         rep[PAIRS] = {"waiting": missing}
         return rep
+    series = [f"kalshi-settled-markets-{s}" for s in PAIR_KALSHI]
     pm_events = [r["value"] for r in _stored_rows(archive, "polymarket-events-macro")]
-    btc_events = [r["value"] for r in _stored_rows(archive, "polymarket-events-btc-above")]
     kms = []
-    for name in need[1:] + [n for n in stored_kalshi_listings(archive) if n.startswith("kalshi-settled-markets-KXBTCD-")]:
+    for name in series + [f"kalshi-settled-markets-KXBTCD-{M}" for M in btc_months]:
         kms += [r["value"] for r in _stored_rows(archive, name)]
     frozen = now_iso()
+    priced = sorted(n for n in _entry_names(archive) if any(fnmatch(n, pat) for pat in PRICE_BUNDLE_PATTERNS))
     rows = match_pairs(pm_events, kms, btc_events, frozen_at=frozen, btc_hour=btc_hour, btc_max_events=btc_max_events)
     by = defaultdict(int)
     for r in rows:
         by[r["value"]["family"]] += 1
     _emit(rows_out, PAIRS, rows)
-    rep[PAIRS] = {"pairs": len(rows), "by_family": dict(by)}
+    rep[PAIRS] = {"pairs": len(rows), "by_family": dict(by), "price_bundles_at_freeze": len(priced),
+                  "timing_suspect": sum(1 for r in rows if r["value"].get("timing_suspect"))}
+    when = ("before any price bundle of this module was stored" if not priced else
+            f"when {len(priced)} price bundles of this module were already stored (e.g. {', '.join(priced[:3])}); matching reads "
+            "listing fields only, never prices")
     _put(archive, PAIRS, rows,
          _recipe("mandel.data.pm_history.match_pairs over polymarket-events-macro, polymarket-events-btc-above and "
-                 f"kalshi-settled-markets-{{{','.join(PAIR_KALSHI)}}} plus kalshi-settled-markets-KXBTCD-<M> (no request): templated FOMC, CPI, "
-                 f"BTC ({btc_hour}:00 ET, latest {btc_max_events} events) and 2024-election pairs from listing fields only (never prices, "
-                 f"volumes or outcomes), frozen at {frozen} before any pair-leg price fetch. Not hand-audited.", "both"),
+                 f"kalshi-settled-markets-{{{','.join(PAIR_KALSHI)}}} plus kalshi-settled-markets-KXBTCD-<{', '.join(btc_months) or 'none'}> "
+                 f"(no request): templated FOMC, CPI, BTC ({btc_hour}:00 ET, latest {btc_max_events} events) and 2024-election pairs from "
+                 f"listing fields only (never prices, volumes or outcomes), frozen at {frozen} {when}. |timing_gap_hours| > "
+                 f"{PAIR_GAP_SUSPECT_HOURS} is flagged timing_suspect. Not hand-audited.", "both"),
          ["pairs", "polymarket", "kalshi", "cross-venue"], PAIR_SCHEMA, True)
     return rep
 
@@ -2144,10 +2701,12 @@ def load_pm_markets(archive, legacy: bool = True) -> list[dict]:
     return list(out.values())
 
 
-def load_pm_daily(archive, legacy: bool = True) -> list[dict]:
-    """Daily price rows from every polymarket-price-history-daily-<M> (and the legacy bundle), one per (token, t). Read only."""
+def load_pm_daily(archive, legacy: bool = True, include_open: bool = False) -> list[dict]:
+    """Daily price rows from every polymarket-price-history-daily-<M> (and the legacy bundle; with ``include_open`` also
+    polymarket-open-price-history-daily, markets still open at its snapshot: T-32), one per (token, t). Read only."""
     out: dict[tuple, dict] = {}
-    names = ([LEGACY_DAILY] if legacy else []) + sorted(e.name for e in archive.entries() if re.fullmatch(r"polymarket-price-history-daily-\d{4}-\d{2}", e.name))
+    names = (([LEGACY_DAILY] if legacy else []) + sorted(n for n in _entry_names(archive) if re.fullmatch(r"polymarket-price-history-daily-\d{4}-\d{2}", n))
+             + ([PM_OPEN_DAILY] if include_open else []))
     for n in names:
         for r in _stored_rows(archive, n):
             out[(str(r["value"]["token"]), int(r["value"]["t"]))] = r
@@ -2166,53 +2725,130 @@ def _candles_hourly(store=None, **kw):
 
 SOURCES: dict[str, Callable] = {
     "pm_markets": fetch_pm_markets, "pm_events": fetch_pm_events, "kalshi_markets": fetch_kalshi_markets, "pairs": build_pairs,
-    "pm_daily": fetch_pm_daily, "pm_hourly": fetch_pm_hourly, "kalshi_candles_daily": _candles_daily,
-    "kalshi_candles_hourly": _candles_hourly, "pm_trades": fetch_pm_trades, "kalshi_trades": fetch_kalshi_trades,
+    "pm_daily": fetch_pm_daily, "pm_open": fetch_pm_open, "pm_hourly": fetch_pm_hourly, "pm_trades": fetch_pm_trades,
+    "kalshi_candles_daily": _candles_daily, "kalshi_candles_hourly": _candles_hourly, "kalshi_trades": fetch_kalshi_trades,
 }
-DEFAULT_SOURCES = tuple(SOURCES)
-PM_SOURCES = ("pm_markets", "pm_events", "pm_daily", "pairs", "pm_hourly", "pm_trades")         # Polymarket hosts (+ pairs)
+DEFAULT_SOURCES = tuple(SOURCES)                     # canonical order: listings, then the pairs table, then prices
+# Phases of fetch_all_pm: within a phase the Polymarket and Kalshi groups run in two threads (different hosts, one
+# shared Archive object); the next phase starts when both are done. Listings -> pairs -> prices, so the pairs table is
+# frozen before any price of this module is fetched.
+PHASES = (("listings", {"polymarket": ("pm_markets", "pm_events"), "kalshi": ("kalshi_markets",)}),
+          ("pairs", {"pairs": ("pairs",)}),
+          ("prices", {"polymarket": ("pm_daily", "pm_open", "pm_hourly", "pm_trades"),
+                      "kalshi": ("kalshi_candles_daily", "kalshi_candles_hourly", "kalshi_trades")}))
+PM_SOURCES = ("pm_markets", "pm_events", "pairs", "pm_daily", "pm_open", "pm_hourly", "pm_trades")       # Polymarket hosts (+ pairs)
+LISTING_RETRIES = 2                 # listing passes again before the pairs phase while build_pairs would wait
+LISTING_RETRY_PAUSE = 120.0         # seconds between them (Kalshi 429 bursts on the shared host clear within minutes)
 KALSHI_SOURCES = ("kalshi_markets", "kalshi_candles_daily", "kalshi_candles_hourly", "kalshi_trades")
+
+
+def _run_source(n: str, store, out: dict, dry_run: bool, limit, refresh: bool, rows_out, log, max_calls, min_interval, opts: dict) -> None:
+    rep: dict = {}
+    kw = {"dry_run": dry_run, "limit": limit, "refresh": refresh, "rows_out": rows_out, "log": log, **opts.get(n, {})}
+    if n != "pairs":
+        kw.setdefault("max_calls", max_calls)
+        if min_interval is not None:
+            kw["min_interval"] = min_interval
+    t0 = time.time()
+    out[n] = rep
+    try:
+        SOURCES[n](store, report=rep, **kw)
+    except KeyboardInterrupt:
+        rep["_interrupted"] = True
+        raise
+    rep["_seconds"] = round(time.time() - t0, 1)
+    if log:
+        log(f"{n}: done in {rep['_seconds']} s")
+
+
+def _run_groups(groups: dict[str, list[str]], parallel: bool, run: Callable[[str], None]) -> None:
+    """Run each group's sources in order; groups in parallel threads when ``parallel`` and more than one is non-empty.
+    Ctrl-C stops every worker at its next request (what was stored stays); an exception in a worker is raised here once
+    every group of the phase has finished."""
+    live = {g: ns for g, ns in groups.items() if ns}
+    if not parallel or len(live) < 2:
+        for ns in live.values():
+            for n in ns:
+                run(n)
+        return
+    errors: dict[str, BaseException] = {}
+
+    def work(g: str, ns: list[str]) -> None:
+        try:
+            for n in ns:
+                run(n)
+        except BaseException as e:                    # noqa: BLE001 - re-raised in the main thread
+            errors[g] = e
+    threads = [threading.Thread(target=work, args=(g, ns), name=f"pm_history-{g}", daemon=True) for g, ns in live.items()]
+    for t in threads:
+        t.start()
+    try:
+        while any(t.is_alive() for t in threads):
+            for t in threads:
+                t.join(0.5)
+    except KeyboardInterrupt:
+        _STOP.set()
+        for t in threads:
+            t.join()
+        _STOP.clear()
+        raise
+    for g in live:
+        if g in errors:
+            raise errors[g]
 
 
 def fetch_all_pm(store, dry_run: bool = False, limit: Optional[int] = None, sources: Optional[Iterable[str]] = None,
                  max_calls: Optional[int] = None, refresh: bool = False, report: Optional[dict] = None, rows_out: Optional[dict] = None,
-                 log: Optional[Callable] = None, min_interval: Optional[float] = None, options: Optional[dict] = None) -> dict:
-    """Run the prediction-market fetchers in dependency order (listings first, then the pairs table, then per-market
-    products). ``limit`` caps bundles per source; ``max_calls`` requests per bundle (previews: never stored); ``options``
-    = {source: {kwarg: value}}; ``min_interval`` overrides every source's pace. ``dry_run`` makes no request. Polymarket
-    and Kalshi are different hosts: run ``--sources`` PM_SOURCES and KALSHI_SOURCES as two processes to halve the wall
-    time (pairs waits for the Kalshi listings and stores nothing until they exist). Returns {source: report} plus
-    '_total' (dry run) and '_gitignore'."""
+                 log: Optional[Callable] = None, min_interval: Optional[float] = None, options: Optional[dict] = None,
+                 parallel: bool = True) -> dict:
+    """Run the prediction-market fetchers in PHASES order whatever the order of ``sources``: listings (Polymarket markets
+    and events | Kalshi listings), then the pairs table, then the prices (Polymarket daily, open, hourly, trades | Kalshi
+    candles and trades). With ``parallel`` (default) the Polymarket and Kalshi groups of a phase run in two threads of this
+    one process, sharing one Archive (stores serialised by a lock, so INDEX.json stays consistent; do not run two
+    processes on one archive). ``limit`` caps bundles per source; ``max_calls`` requests per bundle (previews: never
+    stored); ``options`` = {source: {kwarg: value}}; ``min_interval`` overrides every source's pace. ``dry_run`` makes no
+    request (sequential). Returns {source: report} plus '_total' (dry run) and '_gitignore'."""
     names = list(sources) if sources is not None else list(DEFAULT_SOURCES)
     unknown = [n for n in names if n not in SOURCES]
     if unknown:
         raise ValueError(f"unknown sources: {unknown}; known: {sorted(SOURCES)}")
     out = report if report is not None else {}
     opts = options or {}
-    for n in names:
-        rep: dict = {}
-        kw = {"dry_run": dry_run, "limit": limit, "refresh": refresh, "rows_out": rows_out, "log": log, **opts.get(n, {})}
-        if n != "pairs":
-            kw["max_calls"] = max_calls
-            if min_interval is not None:
-                kw["min_interval"] = min_interval
-        t0 = time.time()
-        try:
-            SOURCES[n](store, report=rep, **kw)
-        except KeyboardInterrupt:
-            out[n] = {**rep, "_interrupted": True}
-            raise
-        rep["_seconds"] = round(time.time() - t0, 1)
-        out[n] = rep
-        if log:
-            log(f"{n}: done in {rep['_seconds']} s")
+    want = set(names)
+    _STOP.clear()
+
+    def run(n: str) -> None:
+        _run_source(n, store, out, dry_run, limit, refresh, rows_out, log, max_calls, min_interval, opts)
+    for phase, groups in PHASES:
+        sel = {g: [n for n in ns if n in want] for g, ns in groups.items()}
+        if log and any(sel.values()):
+            log(f"phase {phase}: {sel}")
+        _run_groups(sel, parallel and not dry_run, run)
+        # A listing that failed (e.g. a burst of Kalshi 429s past every retry) is not stored and would leave the pairs
+        # table waiting while the prices phase runs: list again (stored bundles are skipped) before freezing it.
+        tries = 0
+        while (phase == "listings" and not dry_run and "pairs" in want and any(sel.values()) and tries < LISTING_RETRIES
+               and pairs_waiting(store, **opts.get("pairs", {}))):
+            tries += 1
+            miss = pairs_waiting(store, **opts.get("pairs", {}))
+            if log:
+                log(f"pairs waits for {miss}: listing again in {LISTING_RETRY_PAUSE:g} s (attempt {tries + 1})")
+            out.setdefault("_listing_retries", []).append({"waiting": miss, **{n: out.pop(n) for g in sel.values() for n in g if n in out}})
+            _sleep(LISTING_RETRY_PAUSE)
+            _run_groups(sel, parallel, run)
     if dry_run:
-        plans = [out[n]["_plan"] for n in names if "_plan" in out.get(n, {})]
+        plans = [out[n]["_plan"] for n in DEFAULT_SOURCES if n in want and "_plan" in out.get(n, {})]
+        by = {"polymarket": PM_SOURCES, "kalshi": KALSHI_SOURCES}
+        mins = {g: round(sum(out[n]["_plan"]["minutes"] for n in ns if n in want and "_plan" in out.get(n, {})), 1) for g, ns in by.items()}
+        phase_min = []
+        for phase, groups in PHASES:
+            per = [sum(out[n]["_plan"]["minutes"] for n in ns if n in want and "_plan" in out.get(n, {})) for ns in groups.values()]
+            phase_min.append(max(per) if per else 0.0)
         out["_total"] = {"calls": sum(p["calls"] for p in plans), "rows": sum(p["rows"] for p in plans),
                          "gz_mb": round(sum(p["gz_mb"] for p in plans), 1), "minutes": round(sum(p["minutes"] for p in plans), 1),
-                         "minutes_by_host_group": {
-                             "polymarket": round(sum(out[n]["_plan"]["minutes"] for n in names if n in PM_SOURCES and "_plan" in out.get(n, {})), 1),
-                             "kalshi": round(sum(out[n]["_plan"]["minutes"] for n in names if n in KALSHI_SOURCES and "_plan" in out.get(n, {})), 1)}}
+                         "minutes_by_host_group": mins,
+                         "wall_minutes_parallel": round(sum(phase_min), 1),
+                         "wall_minutes_by_phase": {ph: round(m, 1) for (ph, _), m in zip(PHASES, phase_min)}}
     out["_gitignore"] = GITIGNORE_LINES
     return out
 
@@ -2251,6 +2887,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--refresh", action="store_true", help="fetch again what is already stored")
     p.add_argument("--min-interval", type=float, help="seconds between requests for every source (default: PACE per host)")
     p.add_argument("--options", help='JSON {source: {kwarg: value}}, e.g. {"pm_daily": {"per_month": 50}}')
+    p.add_argument("--sequential", action="store_true", help="run every source in this thread (default: Polymarket and Kalshi groups "
+                                                             "of each phase in two threads)")
     a = p.parse_args(argv)
     from mandel.archive import Archive
     if a.preview:
@@ -2265,7 +2903,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     rows_out: Optional[dict] = {} if a.preview else None
     log = (lambda s: print(s, file=sys.stderr, flush=True))
     rep = fetch_all_pm(store, dry_run=a.dry_run, limit=a.limit, sources=srcs, max_calls=a.max_calls, refresh=a.refresh, rows_out=rows_out,
-                       log=log, min_interval=a.min_interval, options=json.loads(a.options) if a.options else None)
+                       log=log, min_interval=a.min_interval, options=json.loads(a.options) if a.options else None, parallel=not a.sequential)
     if a.dry_run:
         rep["_families"] = family_table(rep)
     if a.preview:

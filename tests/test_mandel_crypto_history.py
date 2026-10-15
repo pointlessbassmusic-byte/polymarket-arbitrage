@@ -123,13 +123,15 @@ class Fake:
         if path.endswith("/listings/historical"):
             day, lim = q["date"], int(q["limit"])
             coins = []
-            for i in range(1, min(lim, 8) + 1):
+            hot = self.cfg.get("cmc_hot", {})                              # {rank: volume24h}: high-volume small caps
+            untagged = day < self.cfg.get("cmc_untagged_before", "")       # early snapshots carry no tags
+            for i in range(1, min(lim, self.cfg.get("cmc_n", 8)) + 1):
                 coins.append({"id": i, "name": f"Coin{i}", "symbol": f"C{i}", "slug": f"coin{i}", "cmcRank": i,
                               "circulatingSupply": 1000.0 * i, "totalSupply": 2000.0 * i, "maxSupply": None,
                               "lastUpdated": f"{day}T00:00:00.000Z", "dateAdded": "2013-04-28T00:00:00.000Z",
-                              "tags": ["stablecoin", "usd-stablecoin", "mineable"] if i == 2 else ["mineable", "pow"],
+                              "tags": None if untagged else (["stablecoin", "usd-stablecoin", "mineable"] if i == 2 else ["mineable", "pow"]),
                               "platform": {"name": "Ethereum", "symbol": "ETH"} if i == 3 else None,
-                              "quotes": [{"name": "2781", "price": 1.5 * i, "volume24h": 1000.0 / i, "marketCap": 1e6 / i,
+                              "quotes": [{"name": "2781", "price": 1.5 * i, "volume24h": hot.get(i, 1000.0 / i), "marketCap": 1e6 / i,
                                           "percentChange24h": 0.1, "percentChange7d": -0.2}]})
             return httpx.Response(200, json={"status": {"error_code": "0", "error_message": "SUCCESS"}, "data": coins})
         cid, s, e = int(q["id"]), int(q["timeStart"]), int(q["timeEnd"])
@@ -203,7 +205,8 @@ def _assert_local_only(arc):
 
 # ============================================================================================== Coinbase ==
 
-def test_coinbase_daily_windows_and_daily_history_convention(fake, tmp_path):
+def test_coinbase_daily_windows_and_daily_history_convention(fake, tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "CB_FIRST_DAY", "2025-01-01")             # the family default first, so the bundle is complete
     f = fake()
     arc = _archive(tmp_path)
     rep = m.fetch_coinbase_daily(arc, products=["BTC-USD"], first="2025-01-01", min_interval=0)
@@ -233,7 +236,8 @@ def test_coinbase_daily_windows_and_daily_history_convention(fake, tmp_path):
     _assert_local_only(arc)
 
 
-def test_coinbase_failures_are_never_stored_but_unknown_products_are(fake, tmp_path):
+def test_coinbase_failures_are_never_stored_but_unknown_products_are(fake, tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "CB_FIRST_DAY", "2026-01-01")
     f = fake(cb_broken=("BAD-USD",), cb_missing=("GONE-USD",))
     arc = _archive(tmp_path)
     rep = m.fetch_coinbase_daily(arc, products=["BAD-USD", "GONE-USD"], first="2026-01-01", min_interval=0)
@@ -260,16 +264,17 @@ def test_coinbase_1m_month_chunks_and_open_month(fake, tmp_path, monkeypatch):
     monkeypatch.setattr(m, "_now_s", lambda: now)
     f = fake()
     arc = _archive(tmp_path)
-    m.fetch_coinbase_1m(arc, first="2026-09-30", min_interval=0)
+    m.fetch_coinbase_1m(arc, first="2026-09-01", min_interval=0)
     sep, octo = arc.get("coinbase-1m-BTC-USD-2026-09"), arc.get("coinbase-1m-BTC-USD-2026-10")
     assert "complete" in sep.tags and "partial" in octo.tags
     o = _rows(arc, "coinbase-1m-BTC-USD-2026-10")
     assert o[-1]["value"]["t"] == m._ts("2026-10-01") + 2 * 3600 - 60  # the 02:00 minute is still open
     assert o[0]["available_at"] == datetime.fromtimestamp(o[0]["value"]["t"] + 60, UTC).isoformat()
     s = _rows(arc, "coinbase-1m-BTC-USD-2026-09")
-    assert s[0]["value"]["t"] == m._ts("2026-09-30") and s[-1]["value"]["t"] <= m._ts("2026-10-01") - 60
+    assert s[0]["value"]["t"] == m._ts("2026-09-01") and s[-1]["value"]["t"] <= m._ts("2026-10-01") - 60
+    assert "span:2026-09-01..2026-09-30" in sep.tags
     n = len(f.calls)
-    m.fetch_coinbase_1m(arc, first="2026-09-30", min_interval=0)
+    m.fetch_coinbase_1m(arc, first="2026-09-01", min_interval=0)
     assert f.calls[n:] and all(_iso(q["start"]) >= m._ts("2026-10-01") for h, p, q in f.calls[n:])   # only the open month again
     _assert_local_only(arc)
 
@@ -353,7 +358,7 @@ def test_coinbase_trades_bisect_window_and_aggressor_side(fake, tmp_path):
     assert v["n"] == 119                                               # ids 1..119 (id 120 is at 00:00:00)
     assert v["buy_vol"] == pytest.approx(0.1 * 60) and v["sell_vol"] == pytest.approx(0.1 * 59)   # maker 'sell' = aggressor buy
     assert v["ticks"] and v["mkt_vol"] is None
-    assert "complete" in arc.get(name).tags and rep[name]["complete"]
+    assert "partial" in arc.get(name).tags and not rep[name]["complete"]   # one day of January, not the whole month
 
 
 # ========================================================================================= 1-minute bars ==
@@ -385,23 +390,23 @@ def test_kraken_month_paging_since_cursor_and_rate_retry(fake, tmp_path, monkeyp
     n = int((now - 3600 - t0) / dt)                                    # the tape ends an hour before now
     f = fake(kraken_t0=t0, kraken_dt=dt, kraken_n=n, kraken_errors=["EGeneral:Too many requests"])
     arc = _archive(tmp_path)
-    rep = m.fetch_kraken_trades_1m(arc, first="2026-09-30", min_interval=0)
+    rep = m.fetch_kraken_trades_1m(arc, first="2026-09-01", min_interval=0)
     kr = [q for h, p, q in f.calls if h == "api.kraken.com"]
-    assert int(kr[0]["since"]) == m._ts("2026-09-30") * 10**9 and kr[1]["since"] == kr[0]["since"]   # retried after the rate error
+    assert int(kr[0]["since"]) == m._ts("2026-09-01") * 10**9 - 1 and kr[1]["since"] == kr[0]["since"]   # retried after the rate error
     sep, octo = "kraken-trades-1m-XBTUSD-2026-09", "kraken-trades-1m-XBTUSD-2026-10"
     assert "complete" in arc.get(sep).tags and "partial" in arc.get(octo).tags
     trades = [(t0 + i * dt, i) for i in range(n)]
-    want = sum(1 for ts, _ in trades if m._ts("2026-09-30") <= ts < m._ts("2026-10-01"))
+    want = sum(1 for ts, _ in trades if m._ts("2026-09-01") <= ts < m._ts("2026-10-01"))
     s = _rows(arc, sep)
     assert sum(r["value"]["n"] for r in s) == want and rep[sep]["trades"] == want
-    assert all(m._ts("2026-09-30") <= r["value"]["t"] < m._ts("2026-10-01") for r in s)
+    assert all(m._ts("2026-09-01") <= r["value"]["t"] < m._ts("2026-10-01") for r in s)
     one = next(r["value"] for r in s if r["value"]["n"] == 1)
     i = next(i for ts, i in trades if int(ts // 60) * 60 == one["t"])
     assert one["close"] == 100 + i % 11 and (one["buy_vol"] > 0) == bool(i % 3) and one["last_id"] == 1000 + i
     assert sum(r["value"]["n"] for r in _rows(arc, octo)) == sum(1 for ts, _ in trades if ts >= m._ts("2026-10-01"))
     k = len(f.calls)
-    m.fetch_kraken_trades_1m(arc, first="2026-09-30", min_interval=0)
-    assert all(int(q["since"]) >= m._ts("2026-10-01") * 10**9 for h, p, q in f.calls[k:])   # only the open month again
+    m.fetch_kraken_trades_1m(arc, first="2026-09-01", min_interval=0)
+    assert all(int(q["since"]) >= m._ts("2026-10-01") * 10**9 - 1 for h, p, q in f.calls[k:])   # only the open month again
     _assert_local_only(arc)
 
 
@@ -414,7 +419,9 @@ def test_kraken_episode_windows_merge_and_resume(fake, tmp_path):
     rows = _rows(arc, m.EPISODE_BUNDLE)
     win = [r for r in rows if r["kind"] == "episode-window"]
     assert [w["key"] for w in win] == ["USDC:2020-03-17"]              # the failed window is not stored
-    assert win[0]["available_at"] == "2020-03-18T00:00:00+00:00"       # the signal close is known the next day
+    assert win[0]["available_at"] == win[0]["observed_at"] == "2020-03-24T00:00:00+00:00"   # counts: known at the window end
+    sig = [r for r in rows if r["kind"] == "episode-signal"]
+    assert [r["available_at"] for r in sig] == ["2020-03-18T00:00:00+00:00"]               # the signal close: the next day
     tr = [r for r in rows if r["kind"] == "trade"]
     assert tr and all(m._ts("2020-03-16") <= r["value"]["time"] < m._ts("2020-03-24") for r in tr)
     assert all(r["available_at"] == r["observed_at"] for r in tr)
@@ -459,7 +466,7 @@ def test_cmc_daily_year_bundles_and_abort(fake, tmp_path):
     f = fake()
     arc = _archive(tmp_path)
     m.fetch_cmc_daily_listings(arc, first="2025-12-30", last="2026-01-02", min_interval=0)
-    assert all(q["limit"] == "200" for h, p, q in f.calls) and len(f.calls) == 4
+    assert all(q["limit"] == "500" for h, p, q in f.calls) and len(f.calls) == 4
     assert [r["key"] for r in _rows(arc, "cmc-daily-listings-2025") if r["kind"] == "snapshot"] == ["2025-12-30", "2025-12-31"]
     assert [r["key"] for r in _rows(arc, "cmc-daily-listings-2026") if r["kind"] == "snapshot"] == ["2026-01-01", "2026-01-02"]
     f2 = fake(cmc_down=True)
@@ -532,8 +539,10 @@ def _ishares_page(days, values, nav_as_of=20250703, nav=55.5):
                      "sharesOutstanding": {"visible": True, "label": "Shares Outstanding", "formattedValue": "1,422,080,000",
                                            "formattedAsOfDate": "Jul 03, 2025"},
                      "closingPrice": {"visible": True, "label": "Closing Price", "formattedValue": "55.52", "formattedAsOfDate": "Jul 03, 2025"}},
-           "g": {"performanceData": {"name": "performanceData", "asOfDate": [20231231, 20240131], "value": ["10000.0", "12000.5"]},
-                 "benchmarkData": {"name": "benchmarkData", "asOfDate": [20231231, 20240131], "value": ["10000.0", "12001.0"]}}}
+           "g": {"performanceData": {"name": "performanceData", "asOfDate": [20231231, 20240131, 20240229],
+                                     "value": ["10000.0", "10000.0", "14484.2"]},
+                 "benchmarkData": {"name": "benchmarkData", "asOfDate": [20231231, 20240131, 20240229],
+                                   "value": ["10000.0", "10000.0", "14501.0"]}}}
     return f'<html><body><div componentprops="{html.escape(json.dumps(obj), quote=True)}"></div></body></html>'
 
 
@@ -545,7 +554,7 @@ def test_ishares_parse_available_at_and_accumulating_merge(fake, tmp_path, monke
     s = p["snapshot"]
     assert s["nav"] == 55.5 and s["nav_as_of"] == "2025-07-03" and s["shares_outstanding"] == 1422080000.0
     assert s["btc_per_share"] == pytest.approx(22.64 / 40000) and s["basket_shares"] == 40000
-    assert p["growth"] == [("2023-12-31", 10000.0, 10000.0), ("2024-01-31", 12000.5, 12001.0)]
+    assert p["growth"] == [("2023-12-31", 10000.0, 10000.0), ("2024-01-31", 10000.0, 10000.0), ("2024-02-29", 14484.2, 14501.0)]
     f = fake(ishares_page=page)
     arc = _archive(tmp_path)
     m.fetch_ishares_ibit(arc, min_interval=0)
@@ -608,3 +617,210 @@ def test_gitignore_lines_cover_every_family_and_licences():
     assert m.gitignore_line("defillama-yields") == "mandel/archive/data/defillama-yields.jsonl.gz"
     assert m.gitignore_line("daily-history-BTC-USD") is None
     assert "CC BY-NC 4.0" in m.LICENCE["coinmetrics"] and all(m.LICENCE[f[1]] for f in m.FAMILIES)
+
+
+# ======================================================================== regressions (batch-6c checker) ==
+
+def _top_by_volume(rows, n):
+    vol = {}
+    for r in rows:
+        if r["kind"] == "listing":
+            vol[r["value"]["id"]] = vol.get(r["value"]["id"], 0.0) + (r["value"]["volume24h"] or 0.0)
+    return [i for i, _ in sorted(vol.items(), key=lambda kv: -kv[1])[:n]]
+
+
+def test_cmc_daily_depth_500_keeps_high_volume_small_caps_and_refetches_shallow_dates(fake, tmp_path):
+    # problem 1: at depth 200 a coin ranked 310 by market cap but #1 by volume never appeared in the volume ranking
+    assert m.CMC_DAILY_LIMIT == 500 == m.CMC_WEEKLY_LIMIT
+    f = fake(cmc_n=600, cmc_hot={310: 5e9, 254: 4e9})
+    arc = _archive(tmp_path)
+    m.fetch_cmc_daily_listings(arc, first="2026-10-10", last="2026-10-11", depth=200, min_interval=0)   # the old depth
+    assert 310 not in _top_by_volume(_rows(arc, "cmc-daily-listings-2026"), 20)
+    n = len(f.calls)
+    rep = m.fetch_cmc_daily_listings(arc, first="2026-10-10", last="2026-10-11", min_interval=0)          # the default
+    assert [q["limit"] for h, p, q in f.calls[n:]] == ["500", "500"]   # dates stored at depth 200 are fetched again
+    rows = _rows(arc, "cmc-daily-listings-2026")
+    assert _top_by_volume(rows, 2) == [310, 254]
+    assert [r["value"]["limit"] for r in rows if r["kind"] == "snapshot"] == [500, 500]
+    assert len(rows) == len({r["key"] for r in rows}) == 2 * 501       # the merge replaced the shallow dates, no duplicates
+    assert rep["cmc-daily-listings-2026"]["dates"] == 2
+    k = len(f.calls)
+    m.fetch_cmc_daily_listings(arc, first="2026-10-10", last="2026-10-11", min_interval=0)
+    assert len(f.calls) == k                                            # depth-500 dates are stored: no request
+    plan = m.fetch_cmc_daily_listings(_archive(tmp_path / "p"), first="2017-11-01", last="2026-10-14", dry_run=True)["_plan"]
+    assert plan["calls"] == 3270 and plan["rows"] == 3270 * 501 and 160 < plan["gz_mb"] < 170
+    assert "MARKET CAP" in m.CMC_SCHEMA and "wash-traded" in m.CMC_SCHEMA
+
+
+def test_a_second_storing_run_on_one_archive_is_refused(fake, tmp_path):
+    # problem 2: two writer processes leave stale INDEX entries, so the module refuses a concurrent second run
+    fake()
+    arc = _archive(tmp_path)
+    assert "ONE WRITER AT A TIME" in m.__doc__ and "next to the rest" not in m.__doc__
+    with m.run_lock(arc) as path:
+        assert path.name == m.RUN_LOCK and fnmatch(f"mandel/archive/{path.name}", "mandel/*/*.lock")   # gitignored lock
+        other = _archive(tmp_path)                                      # another process on the same archive root
+        with pytest.raises(RuntimeError, match="one process at a time"):
+            m.fetch_all_crypto(other, sources=["btc_hashrate"], min_interval=0)
+        assert other.entries() == []
+        m.fetch_all_crypto(other, sources=["btc_hashrate"], dry_run=True)   # a dry run writes nothing and needs no lock
+    rep = m.fetch_all_crypto(arc, sources=["btc_hashrate"], min_interval=0)
+    assert rep["_index_check"] == {"ok": True, "bundles": 1}
+
+
+def test_index_check_reports_an_entry_a_concurrent_writer_reverted(fake, tmp_path, monkeypatch):
+    # problem 2 reproduction: B has seen the first merge of cmc-historical-listings and writes it back after A's second
+    monkeypatch.setattr(m, "CMC_CHUNK", 1)
+    fake()
+    arc = _archive(tmp_path)
+    b = {}
+
+    def log(msg):
+        if msg.startswith(m.CMC_WEEKLY_BUNDLE):
+            if "arc" not in b:
+                b["arc"] = Archive(root=arc.root, ledger=arc.ledger)
+            else:
+                b["arc"].store("kraken-trades-1m-XBTUSD-2022-01", "data", [], recipe="process B", in_git=False)
+    rep = m.fetch_all_crypto(arc, sources=["cmc_weekly"], limit=2, min_interval=0, log=log)   # two dates, one merge each
+    # Archive._reload_index now lets the INDEX on disk win under the store lock, so B's late write no longer reverts A's
+    # entry: the reproduction is the regression test, and the INDEX agrees with the file
+    assert rep["_index_check"]["ok"] is True, rep["_index_check"]
+    fresh = Archive(root=arc.root, ledger=arc.ledger)
+    assert fresh.verify(m.CMC_WEEKLY_BUNDLE) is True
+    import json as _json                                                # a stale entry written by hand is still caught
+    ip = arc.root / "INDEX.json"
+    idx = _json.loads(ip.read_text())["bundles"]
+    idx[m.CMC_WEEKLY_BUNDLE]["rows"] -= 1
+    ip.write_text(_json.dumps({"bundles": idx}))
+    chk = m.index_check(arc, {})
+    assert chk["ok"] is False and [x["bundle"] for x in chk["mismatched"]] == [m.CMC_WEEKLY_BUNDLE]
+    assert chk["mismatched"][0]["index_rows"] < chk["mismatched"][0]["stored_rows"]
+
+
+def test_narrow_spans_are_partial_and_the_default_run_fetches_them_again(fake, tmp_path):
+    # problem 3: a narrower first/last stored 'complete' and every later default run skipped the truncated bundle
+    f = fake()
+    arc = _archive(tmp_path)
+    m.fetch_coinbase_1m(arc, first="2023-03-30", last="2023-03-31", min_interval=0)
+    e = arc.get("coinbase-1m-BTC-USD-2023-03")
+    assert "partial" in e.tags and "complete" not in e.tags and "span:2023-03-30..2023-03-31" in e.tags
+    n = len(f.calls)
+    rep = m.fetch_coinbase_1m(arc, first="2023-03-01", last="2023-03-31", min_interval=0)
+    assert rep["_already_stored"] == 0 and len(f.calls) - n == 31 * 1440 // 300 + 1
+    e = arc.get("coinbase-1m-BTC-USD-2023-03")
+    want = sum(1 for t in range(m._ts("2023-03-01"), m._ts("2023-04-01"), 60) if (t // 60) % 13 != 5)
+    assert "complete" in e.tags and e.rows == want
+    n = len(f.calls)
+    assert m.fetch_coinbase_1m(arc, first="2023-03-30", last="2023-03-31", min_interval=0)["_already_stored"] == 1
+    assert len(f.calls) == n                                            # a narrower request is covered by the whole month
+
+    m.fetch_coinbase_daily(arc, products=["CBETH-ETH"], first="2026-09-01", min_interval=0)
+    assert "partial" in arc.get("coinbase-daily-CBETH-ETH").tags
+    n = len(f.calls)
+    rep = m.fetch_coinbase_daily(arc, products=["CBETH-ETH"], min_interval=0)          # the default first, 2015-07-20
+    assert rep["_already_stored"] == 0 and len(f.calls) - n == 14
+    rows = _rows(arc, "coinbase-daily-CBETH-ETH")
+    assert "complete" in arc.get("coinbase-daily-CBETH-ETH").tags and rows[0]["value"]["t"] < m._ts("2015-08-01")
+    n = len(f.calls)
+    m.fetch_coinbase_daily(arc, products=["CBETH-ETH"], first="2026-09-01", min_interval=0)
+    assert len(f.calls) == n                                            # covered: skipped
+    rep = m.fetch_coinbase_daily(arc, products=["CBETH-ETH"], first="2014-01-01", dry_run=True)
+    assert rep["_already_stored"] == 0                                  # a wider request than the stored span is fetched again
+    m.fetch_coinbase_daily(arc, products=["BTC-USD"], last="2026-10-01", first="2026-09-20", min_interval=0)
+    assert "partial" in arc.get("coinbase-daily-BTC-USD").tags          # a narrower last too
+
+    m.fetch_coinbase_hourly(arc, products=["ETH-USD"], first="2026-10-05", min_interval=0)
+    assert "partial" in arc.get("coinbase-hourly-ETH-USD").tags
+    assert m.fetch_coinbase_hourly(arc, products=["ETH-USD"], dry_run=True)["_already_stored"] == 0
+
+
+def test_narrow_kraken_coin_metric_pool_and_window_requests_do_not_hide_the_default(fake, tmp_path, monkeypatch):
+    now = m._ts("2026-10-03")
+    monkeypatch.setattr(m, "_now_s", lambda: now)
+    f = fake(kraken_t0=m._ts("2026-09-01"), kraken_dt=600.0, kraken_n=4000, cmc_coin_first=m._ts("2026-01-01"), cm_days=12)
+    arc = _archive(tmp_path)
+    m.fetch_kraken_trades_1m(arc, first="2026-09-15", last="2026-09-30", min_interval=0)
+    assert "partial" in arc.get("kraken-trades-1m-XBTUSD-2026-09").tags
+    rep = m.fetch_kraken_trades_1m(arc, first="2026-09-01", last="2026-09-30", min_interval=0)
+    assert rep["_already_stored"] == 0 and "complete" in arc.get("kraken-trades-1m-XBTUSD-2026-09").tags
+    assert _rows(arc, "kraken-trades-1m-XBTUSD-2026-09")[0]["value"]["t"] == m._ts("2026-09-01")
+
+    m.fetch_cmc_coin_history(arc, ids=[1], first="2026-06-01", min_interval=0)
+    assert "partial" in arc.get("cmc-coin-daily-1").tags
+    assert m.fetch_cmc_coin_history(arc, ids=[1], dry_run=True)["_plan"]["bundles"] == 1   # the default run fetches it again
+
+    m.fetch_coinmetrics(arc, assets={"btc": ["PriceUSD"]}, min_interval=0)
+    e = arc.get("coinmetrics-btc-daily")
+    assert "complete" in e.tags and "has:PriceUSD" in e.tags
+    n = len(f.calls)
+    m.fetch_coinmetrics(arc, assets={"btc": ["PriceUSD", "CapMVRVCur"]}, min_interval=0)  # more metrics than stored
+    assert len(f.calls) > n and "has:CapMVRVCur" in arc.get("coinmetrics-btc-daily").tags
+    m.fetch_coinmetrics(arc, assets={"eth": ["PriceUSD"]}, first="2020-01-01", min_interval=0)
+    assert "partial" in arc.get("coinmetrics-eth-daily").tags          # a later first than CM_FIRST
+
+    one = dict(list(m.LLAMA_POOLS.items())[:1])
+    m.fetch_defillama_yields(arc, pools=one, min_interval=0)
+    assert "partial" in arc.get("defillama-yields").tags
+    n = len(f.calls)
+    m.fetch_defillama_yields(arc, min_interval=0)
+    assert sum(1 for h, p, q in f.calls[n:] if p.startswith("/chart/")) == len(m.LLAMA_POOLS)
+    assert "complete" in arc.get("defillama-yields").tags and all(f"has:{p}" in arc.get("defillama-yields").tags for p in m.LLAMA_POOLS)
+
+    f2 = fake(kraken_t0=m._ts("2020-03-01"), kraken_dt=900.0, kraken_n=8000)
+    eps = [("USDC", "USDCUSD", "2020-03-17")]
+    m.fetch_kraken_stablecoin_episodes(arc, episodes=eps, after_days=2, min_interval=0)
+    rep = m.fetch_kraken_stablecoin_episodes(arc, episodes=eps, min_interval=0)       # the default window is wider
+    assert rep["_already_stored"] == 0 and rep["USDC:2020-03-17"]["complete"]
+    win = [r for r in _rows(arc, m.EPISODE_BUNDLE) if r["kind"] == "episode-window"]
+    assert len(win) == 1 and win[0]["value"]["end"] == "2020-03-24T00:00:00+00:00"
+    k = len(f2.calls)
+    assert m.fetch_kraken_stablecoin_episodes(arc, episodes=eps, after_days=2, min_interval=0)["_already_stored"] == 1
+    assert len(f2.calls) == k
+
+
+def test_episode_rows_never_precede_their_observation_and_hide_window_counts(fake, tmp_path):
+    # problem 4: the window row (counts through signal + 7 d) was available at signal + 1 d, before its observed_at
+    fake(kraken_t0=m._ts("2019-08-15"), kraken_dt=600.0, kraken_n=3000)
+    arc = _archive(tmp_path)
+    m.fetch_kraken_stablecoin_episodes(arc, episodes=[("USDT", "USDTZUSD", "2019-08-21")], min_interval=0)
+    rows = _rows(arc, m.EPISODE_BUNDLE)
+    assert all(datetime.fromisoformat(r["available_at"]) >= datetime.fromisoformat(r["observed_at"]) for r in rows)
+    sig = next(r for r in rows if r["kind"] == "episode-signal")
+    win = next(r for r in rows if r["kind"] == "episode-window")
+    assert (sig["observed_at"], sig["available_at"]) == ("2019-08-21T00:00:00+00:00", "2019-08-22T00:00:00+00:00")
+    assert "trades" not in sig["value"] and sig["value"]["end"] == "2019-08-28T00:00:00+00:00"
+    assert win["available_at"] == win["observed_at"] == win["value"]["end"] and win["value"]["trades"] > 0
+    pit = [r for r in rows if r["available_at"] <= "2019-08-22T00:00:00+00:00"]
+    assert pit and not any("trades" in r["value"] or "complete" in r["value"] for r in pit)   # no look-ahead at signal + 1 d
+    assert max(r["value"]["time"] for r in pit if r["kind"] == "trade") <= m._ts("2019-08-22")
+
+
+def test_ishares_growth_is_based_at_2024_01_31_without_the_placeholder(fake, tmp_path):
+    # problem 5: the 2023-12-31 point (10,000 before the 2024-01-11 launch) was stored and the schema claimed that base
+    arc = _archive(tmp_path)
+    legacy = {"source": "ishares", "kind": "growth-10k", "key": "2023-12-31", "observed_at": "2024-01-01T05:00:00+00:00",
+              "available_at": "2024-01-15T14:30:00+00:00", "value": {"month_end": "2023-12-31", "growth_10k_nav": 10000.0}}
+    arc.store(m.ISH_PREMIUM, "data", [legacy], recipe="an earlier run", in_git=False)
+    fake(ishares_page=_ishares_page([20250702], [0.1]))
+    rep = m.fetch_ishares_ibit(arc, min_interval=0)
+    g = [r for r in _rows(arc, m.ISH_PREMIUM) if r["kind"] == "growth-10k"]
+    assert [r["key"] for r in g] == ["2024-01-31", "2024-02-29"]       # the stored placeholder is gone too
+    assert g[0]["value"]["growth_10k_nav"] == 10000.0 and all(r["value"]["base_month_end"] == "2024-01-31" for r in g)
+    assert g[1]["value"]["growth_10k_nav"] / g[0]["value"]["growth_10k_nav"] == pytest.approx(1.44842)
+    assert rep[m.ISH_PREMIUM]["growth_base"] == "2024-01-31" and rep[m.ISH_PREMIUM]["growth_placeholders_dropped"] == ["2023-12-31"]
+    sch = arc.get(m.ISH_PREMIUM).schema
+    assert "BASED AT 2024-01-31" in sch and "since 2023-12-31" not in sch and "m0 >= base_month_end" in sch
+
+
+def test_cmc_flags_are_snapshot_dated_and_flags_latest_is_labelled(fake, tmp_path):
+    # problem 6: early snapshots carry no tags, so flags cannot drive exclusions; the latest tags only draft a declared list
+    fake(cmc_untagged_before="2018-01-01")
+    arc = _archive(tmp_path)
+    m.fetch_cmc_weekly_listings(arc, first="2017-12-03", last="2017-12-03", min_interval=0)
+    m.fetch_cmc_weekly_listings(arc, first="2026-10-11", last="2026-10-11", min_interval=0)
+    rows = {r["key"]: r["value"] for r in _rows(arc, m.CMC_WEEKLY_BUNDLE)}
+    assert rows["2017-12-03:2"]["flags"] == [] and rows["2026-10-11:2"]["flags"] == ["stablecoin", "usd-stablecoin"]
+    latest = m.cmc_flags_latest(arc)
+    assert latest[2] == {"symbol": "C2", "name": "Coin2", "flags": ["stablecoin", "usd-stablecoin"], "date": "2026-10-11"}
+    assert "SNAPSHOT-DATED" in m.CMC_SCHEMA and "declared list of CMC ids" in m.CMC_SCHEMA
+    assert "NOT point in time" in m.cmc_flags_latest.__doc__

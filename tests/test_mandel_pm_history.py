@@ -1,15 +1,19 @@
 """mandel.data.pm_history on mocked HTTP only (httpx.MockTransport; no network): Gamma keyset day windows (lifetime filter,
 inclusive end bound, month complete / partial, resume, failures never stored), the volume- and outcome-blind daily
-selection, legacy row schemas (market_calibration runs on them), CLOB hourly windows (14 days, split on 'interval is too
-long'), data-api end-paging (inclusive boundary de-duplicated, page cap, complete_from) and hourly taker volume, event
-search paging, the templated FOMC / CPI / BTC / election pair matcher (listing fields only, point in time), Kalshi
-listings (historical + live, KXBTCD daily events), Retry-After, candle and trade routing around the historical cutoff,
-candle chunking, dry runs that make no request, licences (in_git False) and .gitignore lines."""
+selection (sampled only once a month is complete), legacy row schemas (market_calibration runs on them), CLOB hourly
+windows (14 days, split on 'interval is too long'), data-api end-paging (inclusive boundary de-duplicated, page cap,
+complete_from, short histories), hourly taker volume, event listing by keyset windows (BTC tag exclusions, 5 pm ET
+windows, macro tags, search page cap, closed filter, resume), the templated FOMC / CPI / BTC / election pair matcher
+(listing fields only, point in time, day-suffixed Kalshi events, CPI singles by release date), Kalshi listings
+(historical + live, KXBTCD daily events), Retry-After, candle and trade routing around the historical cutoff (capped live
+route), pair legs in the hourly candles, candle chunking, the open long-lived markets (T-32), the phased two-thread run
+(one consistent INDEX), dry runs that make no request, licences (in_git False) and .gitignore lines."""
 
 import json
+from collections import defaultdict
 from datetime import datetime, timezone
 from fnmatch import fnmatch
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qs, parse_qsl, urlparse
 
 import httpx
 import pytest
@@ -62,10 +66,11 @@ class Fake:
         if self.cfg.get("forbid"):
             raise AssertionError(f"unexpected request {req.url}")
         q = dict(parse_qsl(urlparse(str(req.url)).query))
+        qm = parse_qs(urlparse(str(req.url)).query)
         host, path = req.url.host, req.url.path
         self.calls.append((host, path, q))
         if host == "gamma-api.polymarket.com":
-            return self.gamma(path, q)
+            return self.gamma(path, q, qm)
         if host == "clob.polymarket.com":
             return self.clob(q)
         if host == "data-api.polymarket.com":
@@ -78,7 +83,24 @@ class Fake:
         return sum(1 for h, p, _ in self.calls if h == host and (path is None or p == path))
 
     # -- Gamma
-    def gamma(self, path, q):
+    def gamma(self, path, q, qm):
+        if path == "/markets/keyset" and q.get("closed") == "false":
+            rows = [x for x in self.cfg.get("open_markets", []) if float(x["volumeNum"]) >= float(q["volume_num_min"])
+                    and ts(x["startDate"]) <= ts(q["start_date_max"])]
+            i = int(q.get("after_cursor") or 0)
+            return httpx.Response(200, json={"markets": rows[i:i + 2], "next_cursor": str(i + 2) if i + 2 < len(rows) else None})
+        if path == "/events/keyset":
+            lo, hi = ts(q["end_date_min"]), ts(q["end_date_max"])
+            if hi <= lo:
+                return httpx.Response(422, json={"error": "invalid time range"})
+            if q["end_date_min"] in self.cfg.get("events_fail", ()):
+                return httpx.Response(500, json={"error": "boom"})
+            excl = set(qm.get("exclude_tag_id", []))
+            rows = [e for e in self.cfg.get("events", []) if lo <= ts(e["endDate"]) <= hi and q["tag_slug"] in [t["slug"] for t in e.get("tags", [])]
+                    and not excl & {t["id"] for t in e.get("tags", [])}]        # closed=true is not trusted: the module filters
+            rows.sort(key=lambda e: int(e["id"]))
+            i = int(q.get("after_cursor") or 0)
+            return httpx.Response(200, json={"events": rows[i:i + 2], **({"next_cursor": str(i + 2)} if i + 2 < len(rows) else {})})
         if path == "/markets/keyset":
             lo, hi = ts(q["end_date_min"]), ts(q["end_date_max"])
             if self.cfg.get("gamma_fail_day") == q["end_date_min"][:10]:
@@ -93,6 +115,8 @@ class Fake:
         if path == "/public-search":
             evs = [e for e in self.cfg.get("search", {}).get(q["q"], [])]
             per, p = int(q["limit_per_type"]), int(q["page"])
+            if p > 100:
+                return httpx.Response(422, json={"error": 'query argument "page": must be less than or equal to 100'})
             chunk = evs[(p - 1) * 2:(p - 1) * 2 + 2]          # 2 per page
             return httpx.Response(200, json={"events": chunk, "pagination": {"hasMore": (p * 2) < len(evs), "totalResults": len(evs)}})
         if path == "/events":
@@ -128,6 +152,10 @@ class Fake:
         if path == "/trade-api/v2/historical/cutoff":
             return httpx.Response(200, json={"market_settled_ts": "2026-08-16T00:00:00Z", "trades_created_ts": "2026-08-16T00:00:00Z"})
         if path in ("/trade-api/v2/historical/markets", "/trade-api/v2/markets"):
+            fails = self.cfg.setdefault("k_fail_series", {})
+            if fails.get(q.get("series_ticker"), 0) > 0:
+                fails[q["series_ticker"]] -= 1
+                return httpx.Response(500, json={"error": "boom"})
             src = self.cfg.get("k_hist" if "historical" in path else "k_live", [])
             if "series_ticker" in q:
                 rows = [x for x in src if x["event_ticker"].split("-")[0] in (q["series_ticker"], q["series_ticker"].replace("KX", "", 1))
@@ -288,33 +316,104 @@ def test_pm_daily_legacy_schema_resume_failures_and_calibration(fake, tmp_path):
 
 # ============================================================================================ events, hourly ==
 
-def _btc_event(eid, slug, end, strikes=(70000, 72000), start=None):
+BTC_TAGS = [{"id": "235", "slug": "bitcoin"}, {"id": "1312", "slug": "crypto-prices"}]
+H1 = {"id": "102175", "slug": "1h"}
+UPDOWN = {"id": "102127", "slug": "up-or-down"}
+
+
+def _btc_event(eid, slug, end, strikes=(70000, 72000), start=None, tags=None, closed=True):
     ms = [pm_market(f"{eid}{i}", end, start or "2025-03-10T16:00:00Z", q=f"Will the price of Bitcoin be above ${s:,} on March 14?")
           | {"groupItemTitle": f"{s:,}"} for i, s in enumerate(strikes)]
     return {"id": str(eid), "slug": slug, "title": "Bitcoin above ___?", "endDate": end, "startDate": start or "2025-03-10T16:00:00Z",
-            "description": "Binance BTC/USDT", "markets": ms}
+            "description": "Binance BTC/USDT", "markets": ms, "closed": closed, "tags": tags if tags is not None else BTC_TAGS}
 
 
-def test_events_search_paging_filters_and_hourly_et(fake, tmp_path):
-    btc = [_btc_event(1, "bitcoin-above-on-march-14", "2025-03-14T16:00:00Z"), _btc_event(2, "bitcoin-above-on-march-14-2025-5pm-et", "2025-03-14T21:00:00Z"),
-           _btc_event(5, "bitcoin-above-on-march-14-2025-9pm-et", "2025-03-15T01:00:00Z"),                # hourly-ET, not 17:00: dropped
-           {"id": "3", "slug": "will-bitcoin-reach-100k", "endDate": "2025-03-31T00:00:00Z", "markets": []},
-           _btc_event(4, "bitcoin-above-on-march-15", "2025-03-15T16:00:00Z")]
-    fed = {"id": "9", "slug": "fed-decision-in-march", "endDate": "2025-03-19T18:00:00Z", "markets": []}
-    other = {"id": "8", "slug": "october-inflation-china-annual", "endDate": "2026-11-09T00:00:00Z", "markets": []}
-    pres = {"id": "7", "slug": "presidential-election-winner-2024", "endDate": "2024-11-05T00:00:00Z", "markets": []}
-    f = fake(search={"bitcoin above": btc, "fed decision": [fed, other], "fed interest rates": [], "inflation": [other], "cpi": []},
+def _btc_world():
+    return [_btc_event(1, "bitcoin-above-70000-on-friday", "2024-03-22T07:00:00Z", strikes=(70000,), start="2024-03-17T21:14:27Z"),
+            _btc_event(2, "btc-above-70000-next-friday", "2024-03-15T00:00:00Z", strikes=(70000,), start="2024-03-08T22:24:56Z"),
+            _btc_event(3, "bitcoin-above-on-september-2-2026", "2026-09-02T16:00:00Z", start="2026-08-26T16:00:00Z"),
+            _btc_event(4, "bitcoin-above-on-september-2-2026-5pm-et", "2026-09-02T21:00:00Z", tags=BTC_TAGS + [H1], start="2026-09-01T21:00:00Z"),
+            _btc_event(5, "bitcoin-above-on-september-2-2026-9pm-et", "2026-09-03T01:00:00Z", tags=BTC_TAGS + [H1]),   # not 17:00 ET
+            _btc_event(6, "bitcoin-up-or-down-on-september-2-2026", "2026-09-02T16:00:00Z", tags=BTC_TAGS + [UPDOWN]),
+            _btc_event(7, "bitcoin-above-on-october-14-2026", "2026-10-14T16:00:00Z", closed=False),                     # still open
+            {**_btc_event(8, "will-bitcoin-reach-100k", "2026-09-30T00:00:00Z"), "markets": []}]
+
+
+def test_events_btc_keyset_windows_exclusions_5pm_and_closed_filter(fake, tmp_path):
+    """Regression (blocking): public-search refuses page > 100, so 'bitcoin above' could never be stored; the BTC set is
+    now listed by keyset windows (tag bitcoin minus 1H / up-or-down per month, plus a 2-second window at 17:00 ET a day)."""
+    f = fake(events=_btc_world())
+    a = _archive(tmp_path)
+    rep = m.fetch_pm_events(a, sets=["btc_above"], btc_first_month="2024-03", hourly_first_day="2026-08-30", **FAST)
+    r = rep["polymarket-events-btc-above"]
+    kept = {x["value"]["slug"] for x in a.load("polymarket-events-btc-above")}
+    assert kept == {"bitcoin-above-70000-on-friday", "btc-above-70000-next-friday", "bitcoin-above-on-september-2-2026",
+                    "bitcoin-above-on-september-2-2026-5pm-et"}
+    assert r["hourly_et"] == 1 and r["open_dropped"] >= 1 and "complete" in a.get("polymarket-events-btc-above").tags
+    g = [q for h, p, q in f.calls if p == "/events/keyset"]
+    assert not [1 for h, p, q in f.calls if p == "/public-search"]
+    months = [q for q in g if q["end_date_min"].endswith("-01T00:00:00Z") and q["end_date_max"].endswith("-01T00:00:00Z")]
+    assert months[0]["end_date_min"] == "2024-03-01T00:00:00Z" and months[0]["end_date_max"] == "2024-04-01T00:00:00Z"
+    assert {months[-1]["end_date_min"][:7]} == {"2026-10"} and len(months) == 32
+    sep2 = [q for q in g if q["end_date_min"].startswith("2026-09-02T20")]
+    assert sep2 and sep2[0]["end_date_min"] == "2026-09-02T20:59:59Z" and sep2[0]["end_date_max"] == "2026-09-02T21:00:01Z"
+    assert m.et_hour_ts("2025-12-15", 17) == ts("2025-12-15T22:00:00Z") and m.et_hour_ts("2026-09-02", 17) == ts("2026-09-02T21:00:00Z")
+    win = m.event_windows("btc_above", "2026-09-02", hourly_first_day="2026-09-02")
+    assert win[0]["params"]["exclude_tag_id"] == ["102175", "102127"]
+    log = m._log_load(a, m.PM_LOG)
+    assert log["events:btc_above:month:2024-03"]["final"] is True and log["events:btc_above:month:2026-10"]["final"] is False
+    n0 = len(f.calls)
+    m.fetch_pm_events(a, sets=["btc_above"], btc_first_month="2024-03", hourly_first_day="2026-08-30", **FAST)
+    assert len(f.calls) == n0                                                   # complete: skipped until refresh
+    t = m.hourly_targets(a, sets=("btc_above",))
+    assert {x["market_id"] for M in t for x in t[M].values()} == {"10", "20", "30", "31"}         # 5 pm variant: a pair leg, not here
+
+
+def test_events_resume_after_failed_window(fake, tmp_path):
+    f = fake(events=_btc_world(), events_fail={"2024-06-01T00:00:00Z"})
+    a = _archive(tmp_path)
+    rep = m.fetch_pm_events(a, sets=["btc_above"], btc_first_month="2024-03", hourly_first_day="2026-10-14", backoff=0.0, **FAST)
+    r = rep["polymarket-events-btc-above"]
+    assert r["_error"]["window"] == "month:2024-06" and r["stored"] == "partial"
+    e = a.get("polymarket-events-btc-above")
+    assert "partial" in e.tags and {x["value"]["slug"] for x in a.load("polymarket-events-btc-above")} == {
+        "bitcoin-above-70000-on-friday", "btc-above-70000-next-friday"}
+    assert m.build_pairs(a)[m.PAIRS]["waiting"]                                 # a partial event set never feeds the frozen table
+    f.cfg["events_fail"] = set()
+    n0 = len(f.calls)
+    m.fetch_pm_events(a, sets=["btc_above"], btc_first_month="2024-03", hourly_first_day="2026-10-14", **FAST)
+    again = [q["end_date_min"][:7] for h, p, q in f.calls[n0:] if p == "/events/keyset"]
+    assert "2024-03" not in again and "2024-05" not in again and again[0] == "2024-06"        # resumes at the failed window
+    assert "complete" in a.get("polymarket-events-btc-above").tags and a.get("polymarket-events-btc-above").rows == 3     # no 5 pm windows asked
+
+
+def test_events_macro_keyset_union_search_cap_and_closed_filter(fake, tmp_path):
+    """Regression (minor): public-search missed january-inflation-us-monthly / february-inflation-us-annual; the macro set
+    is the union of keyset tag-months and the searches. A search hitting the 100-page cap is incomplete, not a failure."""
+    infl = [{"id": str(60 + i), "slug": s, "endDate": end, "closed": True, "tags": [{"id": "702", "slug": "inflation"}], "markets": []}
+            for i, (s, end) in enumerate([("january-inflation-us-monthly", "2026-02-11T12:30:00Z"),
+                                          ("february-inflation-us-annual", "2026-03-11T12:30:00Z"),
+                                          ("february-inflation-us-monthly-231", "2026-03-11T12:30:00Z"),
+                                          ("october-inflation-china-annual", "2026-03-11T12:30:00Z")])]
+    fed = {"id": "9", "slug": "fed-decision-in-march", "endDate": "2025-03-19T18:00:00Z", "closed": True, "markets": [],
+           "tags": [{"id": "100196", "slug": "fed-rates"}]}
+    open_fed = {**fed, "id": "10", "slug": "fed-decision-in-december", "endDate": "2026-12-09T19:00:00Z", "closed": False}
+    pres = {"id": "7", "slug": "presidential-election-winner-2024", "endDate": "2024-11-05T00:00:00Z", "closed": True, "markets": []}
+    junk = [{"id": str(1000 + i), "slug": f"inflation-junk-{i}", "endDate": "2025-01-01T00:00:00Z", "closed": True, "markets": []} for i in range(205)]
+    f = fake(events=infl + [fed], search={"fed decision": [fed, open_fed], "fed interest rates": [], "inflation": junk, "cpi": []},
              events_by_slug=[pres])
     a = _archive(tmp_path)
-    rep = m.fetch_pm_events(a, **FAST)
-    assert rep["polymarket-events-btc-above"]["events"] == 3 and rep["polymarket-events-btc-above"]["hourly_et"] == 1
-    assert {r["value"]["slug"] for r in a.load("polymarket-events-macro")} == {"fed-decision-in-march", "presidential-election-winner-2024"}
-    assert [q.get("page") for h, p, q in f.calls if q.get("q") == "bitcoin above"] == ["1", "2", "3"]
-    assert m.is_hourly_et("bitcoin-above-on-april-6-2026-9pm-et") and not m.is_hourly_et("bitcoin-above-on-april-8")
-    assert m.hourly_et_hour("bitcoin-above-on-april-6-2026-9pm-et") == 21 and m.hourly_et_hour("x-12am-et") == 0
-    n0 = len(f.calls)
-    m.fetch_pm_events(a, **FAST)
-    assert len(f.calls) == n0                                                   # stored: skipped until refresh
+    rep = m.fetch_pm_events(a, sets=["macro"], macro_first_month="2025-01", **FAST)
+    r = rep["polymarket-events-macro"]
+    assert {x["value"]["slug"] for x in a.load("polymarket-events-macro")} == {
+        "january-inflation-us-monthly", "february-inflation-us-annual", "february-inflation-us-monthly-231", "fed-decision-in-march",
+        "presidential-election-winner-2024"}                                  # open and non-US events dropped
+    assert r["incomplete"][0]["window"] == "search:inflation" and "page cap 100" in r["incomplete"][0]["note"]
+    assert max(int(q["page"]) for h, p, q in f.calls if p == "/public-search") == 100      # page 101 is never asked
+    assert "complete" in a.get("polymarket-events-macro").tags
+    with m._client() as c:
+        got, k, info = m.pm_search(c, m.Throttle(0), "inflation")
+    assert got is not None and len(got) == 200 and k == 100 and info["incomplete"]
 
 
 def test_pm_hourly_14_day_windows_split_and_resume(fake, tmp_path):
@@ -372,15 +471,85 @@ def test_fetch_pm_trades_targets_log_and_resume(fake, tmp_path):
     f = fake(trades={f"0xc{i}": _trades(f"0xc{i}", 25, t0 + i * 7200) for i in range(1, 4)})
     a = _archive(tmp_path)
     _stored_month(a, mk)
-    rep = m.fetch_pm_trades(a, n_markets=2, **FAST)
+    rep = m.fetch_pm_trades(a, n_markets=68, **FAST)                          # 68 over the 34 months 2024-01..2026-10: 2 a month
     name = "polymarket-volume-hourly-2025-03"
     assert rep[name]["fetched"] == 2 and a.get(name).in_git is False
     log = m._log_load(a, m.PM_LOG)
     ent = [v for v in log.values() if v.get("product") == "trades"]
     assert len(ent) == 2 and all(v["shares"] == 50.0 and v["shares_over_volumeNum"] == 1.0 and v["complete"] for v in ent)
+    assert log["trades-sample:2025-03"]["quota"] == 2 and log["trades-sample:2025-03"]["candidates"] == 3
     n0 = f.n("data-api.polymarket.com")
-    m.fetch_pm_trades(a, n_markets=2, **FAST)
+    m.fetch_pm_trades(a, n_markets=68, **FAST)
     assert f.n("data-api.polymarket.com") == n0
+
+
+def test_pm_trades_short_history_is_not_complete(fake, tmp_path):
+    """Regression (minor): a market whose data-api history is partial (taker shares 0.047 x volumeNum, 2023-era) was logged
+    complete after one short page; complete now needs |shares / volumeNum - 1| <= 1%."""
+    mk = [pm_market(1, "2025-03-20T00:00:00Z", "2025-03-01T00:00:00Z", vol=50.0), pm_market(2, "2025-03-20T00:00:00Z", "2025-03-01T00:00:00Z", vol=1000.0)]
+    t0 = ts("2025-03-10T00:00:00Z")
+    fake(trades={"0xc1": _trades("0xc1", 25, t0), "0xc2": _trades("0xc2", 25, t0)})              # both sum to 50 shares
+    a = _archive(tmp_path)
+    _stored_month(a, mk)
+    rep = m.fetch_pm_trades(a, n_markets=68, **FAST)
+    log = m._log_load(a, m.PM_LOG)
+    assert log["trades:1"]["complete"] is True and "history_short" not in log["trades:1"]
+    assert log["trades:2"]["complete"] is False and log["trades:2"]["complete_from"] is None and log["trades:2"]["history_short"]
+    assert log["trades:2"]["shares_over_volumeNum"] == 0.05 and rep["polymarket-volume-hourly-2025-03"]["history_short"] == 1
+    e = a.get("polymarket-volume-hourly-2025-03")
+    assert "partial" in e.tags and "history-short" in e.tags
+
+
+def test_daily_sample_waits_for_a_complete_month(fake, tmp_path):
+    """Regression (minor): a partial month was sampled from the markets known so far, and a later run with more markets
+    picked a new top set while the earlier picks stayed (6 'sample' markets against a logged rate of 3 / 20)."""
+    end = ts("2026-10-03T00:00:00Z")
+    mk = [pm_market(i, "2026-10-03T00:00:00Z", "2026-09-20T00:00:00Z") for i in range(1, 21)]
+    f = fake(histories={f"tok{i}y": [(end - k * DAY, 0.5) for k in range(5, 0, -1)] for i in range(1, 21)})
+    a = _archive(tmp_path)
+    rows = [m._pm_market_row(x, "2026-10-15T00:00:00+00:00") for x in mk[:6]]
+    a.store("polymarket-closed-markets-2026-10", "data", rows, recipe="t", tags=["partial"], in_git=False)
+    m.fetch_pm_daily(a, per_month=3, **FAST)
+    log = m._log_load(a, m.PM_LOG)
+    assert log["daily-sample:2026-10"]["sampled"] == 0 and log["daily-sample:2026-10"]["sample_deferred"]
+    assert not f.n("clob.polymarket.com")                                       # no priority market among the six, no sample yet
+    assert m.trade_targets(a, n_markets=68) == {}                              # nor trade targets from a partial month
+    a.store("polymarket-closed-markets-2026-10", "data", [m._pm_market_row(x, "2026-10-15T00:00:00+00:00") for x in mk], recipe="t",
+            tags=["complete"], in_git=False)
+    m.fetch_pm_daily(a, per_month=3, **FAST)
+    log = m._log_load(a, m.PM_LOG)
+    st = log["daily-sample:2026-10"]
+    picked = {v["id"] for v in log.values() if v.get("product") == "daily" and v.get("month") == "2026-10" and v.get("reason") == "sample"}
+    assert st["candidates"] == 20 and st["sampled"] == 3 and st["sample_rate"] == 0.15 and len(picked) == 3
+    assert {str(r["value"]["market_id"]) for r in a.load("polymarket-price-history-daily-2026-10")} == picked
+    want = [x["id"] for x, _ in m.select_daily(mk, per_month=3)[0]]
+    assert sorted(picked) == sorted(want)                                       # the prefix of the whole month's hash order
+    samples = {}
+    t = m.trade_targets(a, n_markets=68, per_month=3, samples_out=samples)
+    assert len(t["2026-10"]) == 2 and samples["2026-10"]["quota"] == 2 and samples["2026-10"]["candidates"] == 3
+    assert set(t["2026-10"]) <= picked                                          # trade markets are a prefix of the daily sample
+    t2 = m.trade_targets(a, n_markets=10, per_month=3, plog={"trades-sample:2026-10": {"quota": 2}})
+    assert len(t2["2026-10"]) == 2                                              # a logged quota is kept when n_markets / months shift
+
+
+def test_open_long_lived_markets_snapshot_and_daily(fake, tmp_path):
+    """T-32 (missing coverage): markets still open and alive >= 100 days, one per event, with their daily history."""
+    om_ = [pm_market(100 + i, "2027-06-30T00:00:00Z", "2026-03-01T00:00:00Z", ev=f"E{i // 2}") | {"closed": False} for i in range(6)]
+    om_.append(pm_market(200, "2027-06-30T00:00:00Z", "2026-09-01T00:00:00Z") | {"closed": False})                 # 44 days: too young
+    hist = {f"tok{100 + i}y": [(ts("2026-03-02T00:00:00Z") + k * DAY, 0.5) for k in range(200)] for i in range(6)}
+    f = fake(open_markets=om_, histories=hist)
+    a = _archive(tmp_path)
+    rep = m.fetch_pm_open(a, **FAST)
+    assert rep[m.PM_OPEN]["markets"] == 6 and rep[m.PM_OPEN]["events"] == 3
+    q = [q for h, p, q in f.calls if p == "/markets/keyset"][0]
+    assert q["closed"] == "false" and q["start_date_max"] == "2026-07-07T00:00:00Z" and q["volume_num_min"] == "10000"
+    rows = list(a.load(m.PM_OPEN_DAILY))
+    assert len({r["value"]["market_id"] for r in rows}) == 3 and a.get(m.PM_OPEN_DAILY).in_git is False   # one per event
+    assert "complete" in a.get(m.PM_OPEN_DAILY).tags and rows[0]["available_at"] == rows[0]["observed_at"]
+    assert len(m.load_pm_daily(a, legacy=False, include_open=True)) == len(rows) and m.load_pm_daily(a, legacy=False) == []
+    n0 = len(f.calls)
+    assert m.fetch_pm_open(a, **FAST)[m.PM_OPEN]["skipped"] and len(f.calls) == n0
+    assert m.gitignore_line(m.PM_OPEN) and m.gitignore_line(m.PM_OPEN_DAILY) and m._family(m.PM_OPEN_DAILY)[3] == ["T-32"]
 
 
 # ================================================================================================== pairs ==
@@ -452,20 +621,104 @@ def test_cpi_bucket_and_ref_month():
     assert m._pm_ref_month("core-cpi-mom-july-2026-20260705181328287", "2026-08-12T12:30:00Z", "july") == (2026, 7)
 
 
+def _store_events(a, name, evs, complete=True):
+    a.store(name, "data", [m._event_row(e, "2026-10-15T00:00:00+00:00") for e in evs], recipe="t", tags=["complete" if complete else "partial"],
+            in_git=False)
+
+
 def test_build_pairs_waits_for_listings_then_freezes(fake, tmp_path):
     a = _archive(tmp_path)
     ev, ks = _fomc_world()
-    a.store("polymarket-events-macro", "data", [m._event_row(ev, "2026-10-15T00:00:00+00:00")], recipe="t", tags=["complete"], in_git=False)
+    _store_events(a, "polymarket-events-macro", [ev])
     rep = m.build_pairs(a)
     assert rep[m.PAIRS]["waiting"] and "kalshi-settled-markets-KXFEDDECISION" in rep[m.PAIRS]["waiting"]
     for s in m.PAIR_KALSHI:
         rows = [m._k_market_row(x, "2026-10-15T00:00:00+00:00") for x in ks] if s == "KXFEDDECISION" else []
         a.store(f"kalshi-settled-markets-{s}", "data", rows, recipe="t", tags=["complete"], in_git=False)
+    assert m.build_pairs(a)[m.PAIRS]["waiting"] == ["polymarket-events-btc-above"]
+    _store_events(a, "polymarket-events-btc-above", [])
     rep = m.build_pairs(a)
-    assert rep[m.PAIRS]["pairs"] == 4 and a.get(m.PAIRS).in_git is False
+    assert rep[m.PAIRS]["pairs"] == 4 and a.get(m.PAIRS).in_git is False and rep[m.PAIRS]["price_bundles_at_freeze"] == 0
+    assert "before any price bundle of this module was stored" in a.get(m.PAIRS).recipe
     assert m.build_pairs(a)[m.PAIRS]["skipped"].startswith("stored (frozen)")
     t = m.hourly_targets(a, sets=("pairs",))
     assert {x["market_id"] for x in t["2024-12"].values()} == {"500", "501", "502", "503", "504"}
+
+
+def test_build_pairs_waits_for_btc_events_and_kxbtcd_months(tmp_path):
+    """Regression (blocking): pairs no longer freezes without the BTC family: it waits for a complete
+    polymarket-events-btc-above and for the KXBTCD months of its latest 5 pm ET events."""
+    a = _archive(tmp_path)
+    ev, ks = _fomc_world()
+    _store_events(a, "polymarket-events-macro", [ev])
+    for s in m.PAIR_KALSHI:
+        rows = [m._k_market_row(x, "2026-10-15T00:00:00+00:00") for x in ks] if s == "KXFEDDECISION" else []
+        a.store(f"kalshi-settled-markets-{s}", "data", rows, recipe="t", tags=["complete"], in_git=False)
+    btc = _btc_event(4, "bitcoin-above-on-september-2-2026-5pm-et", "2026-09-02T21:00:00Z", strikes=(84000, 85000), start="2026-09-01T21:00:00Z")
+    _store_events(a, "polymarket-events-btc-above", [btc], complete=False)              # partial: still being listed
+    assert m.build_pairs(a)[m.PAIRS]["waiting"] == ["polymarket-events-btc-above"]
+    _store_events(a, "polymarket-events-btc-above", [btc])
+    assert m.build_pairs(a)[m.PAIRS]["waiting"] == ["kalshi-settled-markets-KXBTCD-2026-09"]
+    kb = [k_market("KXBTCD-26SEP0217-T83999.99", "KXBTCD-26SEP0217", "2026-08-26T21:00:00Z", "2026-09-02T21:00:00Z", floor=83999.99)]
+    a.store("kalshi-settled-markets-KXBTCD-2026-09", "data", [m._k_market_row(x, "2026-10-15T00:00:00+00:00") for x in kb], recipe="t",
+            tags=["complete"], in_git=False)
+    rep = m.build_pairs(a)
+    assert rep[m.PAIRS]["by_family"] == {"fomc": 4, "btc": 1}
+    assert "kalshi-settled-markets-KXBTCD-<2026-09>" in a.get(m.PAIRS).recipe
+    assert m.pair_kalshi_tickers(a) >= {"KXBTCD-26SEP0217-T83999.99"}
+    b = Archive(root=tmp_path / "other", ledger=Ledger(tmp_path / "l2.jsonl"))       # btc=False: the BTC family is not awaited
+    _store_events(b, "polymarket-events-macro", [ev])
+    for s in m.PAIR_KALSHI:
+        b.store(f"kalshi-settled-markets-{s}", "data", [m._k_market_row(x, "2026-10-15T00:00:00+00:00") for x in ks] if s == "KXFEDDECISION" else [],
+                recipe="t", tags=["complete"], in_git=False)
+    assert m.build_pairs(b, btc=False)[m.PAIRS]["by_family"] == {"fomc": 4}
+
+
+def test_event_month_day_suffix_and_nearest_kalshi_event():
+    """Regression (data-wrong): FEDDECISION-24JAN31 / -24MAR20 were not parsed, so 2024-03 had no pair and 2024-01 paired
+    with the untraded legacy FEDDECISION-24JAN (closed 2024-01-26)."""
+    assert m._event_month("FEDDECISION-24JAN31") == (2024, 1) and m._event_month("FEDDECISION-24MAR20") == (2024, 3)
+    assert m._event_month("KXCPI-25FEB") == (2025, 2) and m._event_month("KXBTCD-25MAR1417") is None
+    def kev(ev, open_t, close_t, vol):
+        return [k_market(f"{ev}-{s}", ev, open_t, close_t, vol=vol, sub=sub, strike_type=None)
+                for s, sub in [("H0", "Hike 0bps"), ("C25", "Cut 25bps"), ("H25", "Hike 25bps"), ("C26", "Cut >25bps")]]
+    ks = (kev("FEDDECISION-24JAN", "2023-12-13T18:00:00Z", "2024-01-26T18:55:00Z", "0.00")
+          + kev("FEDDECISION-24JAN31", "2023-12-13T19:05:00Z", "2024-01-31T18:55:00Z", "102686.00")
+          + kev("FEDDECISION-24MAR20", "2024-01-31T19:05:00Z", "2024-03-20T17:55:00Z", "133511.00"))
+    jan = {"id": "1", "slug": "fed-interest-rates-january-2024", "endDate": "2024-01-31T00:00:00Z", "description": "FOMC",
+           "markets": [pm_market(10 + i, "2024-01-31T00:00:00Z", "2023-12-14T00:00:00Z") | {"groupItemTitle": g}
+                       for i, g in enumerate(["0 bps increase?", "25 bps decrease?", "25 bps increase?"])]}
+    mar = {"id": "2", "slug": "fed-interest-rates-march-2024", "endDate": "2024-03-20T00:00:00Z", "description": "FOMC",
+           "markets": [pm_market(20 + i, "2024-03-18T00:00:00Z", "2024-02-01T00:00:00Z") | {"groupItemTitle": g}
+                       for i, g in enumerate(["50+ bps decrease", "25 bps decrease", "No change", "25+ bps increase"])]}
+    rows = m.match_pairs([jan, mar], ks, frozen_at="2026-10-15T00:00:00+00:00")
+    by = defaultdict(set)
+    for r in rows:
+        by[r["value"]["key"]] |= {l["event_ticker"] for l in r["value"]["kalshi"]}
+    assert by == {"2024-01": {"FEDDECISION-24JAN31"}, "2024-03": {"FEDDECISION-24MAR20"}}
+    assert all(abs(r["value"]["timing_gap_hours"]) < 24 and not r["value"]["timing_suspect"] for r in rows)
+    # listing fields only: zeroing every volume does not change the choice (close_time decides)
+    zero = [x | {"volume_fp": "0.00"} for x in ks]
+    assert [r["value"]["pair_id"] for r in m.match_pairs([jan, mar], zero, frozen_at="2026-10-15T00:00:00+00:00")] == [r["value"]["pair_id"] for r in rows]
+
+
+def test_cpi_single_reference_month_from_release_date_and_timing_flag():
+    """Regression (minor): 'US inflation >0.1% from Jan to Feb 2024?' resolved on the January print (endDate 2024-02-13);
+    it was paired by its text with CPI-24FEB (gap -684 h)."""
+    def single(eid, q, end):
+        return {"id": eid, "slug": f"us-inflation-{eid}", "endDate": end, "description": "Bureau of Labor Statistics CPI",
+                "markets": [pm_market(int(eid), end, "2024-01-20T00:00:00Z", q=q)]}
+    evs = [single("31", "US inflation >0.1% from Jan to Feb 2024?", "2024-02-13T00:00:00Z"),
+           single("32", "US inflation >0.2% from Nov to Dec 2023?", "2024-01-11T00:00:00Z")]
+    ks = [k_market(f"CPI-{e}-T{x}", f"CPI-{e}", "2023-12-01T00:00:00Z", c, floor=x) for e, c in
+          [("23DEC", "2024-01-11T13:25:00Z"), ("24JAN", "2024-02-13T13:25:00Z"), ("24FEB", "2024-03-12T12:25:00Z")] for x in (0.1, 0.2)]
+    rows = {r["value"]["pm"][0]["market_id"]: r["value"] for r in m.match_pairs(evs, ks, frozen_at="2026-10-15T00:00:00+00:00")}
+    assert rows["31"]["kalshi"][0]["ticker"] == "CPI-24JAN-T0.1" and rows["31"]["key"] == "2024-01"
+    assert "text names 2024-02" in rows["31"]["basis_note"] and abs(rows["31"]["timing_gap_hours"]) < 24
+    assert rows["32"]["kalshi"][0]["ticker"] == "CPI-23DEC-T0.2" and "text names" not in rows["32"]["basis_note"]
+    far = m._pair("cpi_mom", "2024-02", "t", [m._pm_leg(evs[0]["markets"][0], 1, "x", evs[0])],
+                  [m._k_leg(ks[-1], 1)], 0.0, "", "", "", "2026-10-15T00:00:00+00:00", 1)
+    assert far["value"]["timing_suspect"] is True and far["value"]["timing_gap_hours"] < -168
 
 
 # ================================================================================================== Kalshi ==
@@ -561,6 +814,62 @@ def test_kalshi_trades_routes_cap_and_complete_from(fake, tmp_path, monkeypatch)
     assert rep["kalshi-trades-KXCPI"]["fetched"] == 2
 
 
+def _trs(tk, n, t0, pre="L"):
+    return [{"trade_id": f"{tk}-{pre}{i}", "ticker": tk, "created_time": z(t0 - i * 60), "count_fp": "1.00", "yes_price_dollars": "0.40",
+             "taker_side": "yes", "taker_outcome_side": "yes"} for i in range(n)]
+
+
+def test_kalshi_trades_capped_live_route_never_reads_the_older_route(fake, tmp_path):
+    """Regression (data-wrong): a market spanning the trades cutoff whose live route hit max_pages also read the historical
+    route, and complete_from came from the oldest historical print, hiding the gap between the cutoff and the oldest live
+    print fetched."""
+    span = k_market("KXFEDDECISION-26SEP-H0", "KXFEDDECISION-26SEP", "2026-07-30T18:00:00Z", "2026-09-16T17:59:00Z", vol="48300000.00")
+    live = _trs(span["ticker"], 7, ts("2026-09-16T17:58:59Z"))
+    f = fake(k_trades={("live", span["ticker"]): live, ("hist", span["ticker"]): _trs(span["ticker"], 4, ts("2026-08-15T23:54:13Z"), "H")})
+    with m._client() as c:
+        got, meta = m.kalshi_trades(c, m.Throttle(0), span, ts("2026-08-16T00:00:00Z"), max_pages=3)
+    assert not [1 for h, p, q in f.calls if p.endswith("/historical/trades")]
+    oldest_live = min(ts(t["created_time"]) for t in live[:6])
+    assert meta["complete"] is False and meta["complete_from"] == datetime.fromtimestamp(oldest_live + 1, UTC).isoformat()
+    assert meta["routes"] == ["/markets/trades"] and meta["routes_skipped"] == ["/historical/trades"] and len(got) == 6
+    assert meta["coverage"][0]["complete"] is False and meta["coverage"][0]["n"] == 6
+    with m._client() as c:                                                      # live complete -> historical read; capped there
+        got2, meta2 = m.kalshi_trades(c, m.Throttle(0), span, ts("2026-08-16T00:00:00Z"), max_pages=4)
+    assert meta2["routes"] == ["/markets/trades", "/historical/trades"] and meta2["complete"] is True and len(got2) == 11
+    f.cfg["k_trades"][("hist", span["ticker"])] = _trs(span["ticker"], 9, ts("2026-08-15T23:54:13Z"), "H")
+    with m._client() as c:
+        got4, meta4 = m.kalshi_trades(c, m.Throttle(0), span, ts("2026-08-16T00:00:00Z"), max_pages=4)
+    oldest_hist = min(ts(t["created_time"]) for t in f.cfg["k_trades"][("hist", span["ticker"])][:8])
+    assert meta4["complete"] is False and meta4["complete_from"] == datetime.fromtimestamp(oldest_hist + 1, UTC).isoformat()
+
+
+def test_hourly_candles_add_every_kalshi_pair_leg(fake, tmp_path):
+    """Regression (data-wrong): kalshi_select keeps the 4 most traded strikes of a KXBTCD event; the BTC pair legs (on
+    Polymarket's grid) got no hourly candles. Pair legs are now added, also by a pass after the table exists."""
+    ev = "KXBTCD-26SEP0217"
+    ks = [k_market(f"{ev}-T{x - 0.01:.2f}", ev, "2026-08-26T21:00:00Z", "2026-09-02T21:00:00Z", vol=f"{v}.00", floor=x - 0.01)
+          for x, v in [(84000, 9000), (84250, 8000), (84500, 7000), (84750, 6000), (85000, 50), (86000, 10)]]
+    cs = {("live", k["ticker"]): [{"end_period_ts": ts("2026-09-02T00:00:00Z") + h * 3600, "yes_bid": {"close_dollars": "0.4"}} for h in range(3)]
+          for k in ks}
+    f = fake(k_candles=cs)
+    a = _archive(tmp_path)
+    a.store("kalshi-settled-markets-KXBTCD-2026-09", "data", [m._k_market_row(x, "2026-10-15T00:00:00+00:00") for x in ks], recipe="t",
+            tags=["complete"], in_git=False)
+    m.fetch_kalshi_candles(a, period=60, **FAST)
+    name = "kalshi-candles-hourly-KXBTCD-2026-09"
+    assert {r["value"]["ticker"] for r in a.load(name)} == {k["ticker"] for k in ks[:4]}
+    pairs = [m._pair("btc", "2026-09-02T17ET", "t", [{"market_id": "1", "start": "2026-08-26T21:00:00Z", "end_date": "2026-09-02T21:00:00Z"}],
+                     [m._k_leg(ks[i], 1)], 0.0, "", "", "", "2026-10-15T00:00:00+00:00", i) for i in (0, 4, 5)]
+    a.store(m.PAIRS, "data", pairs, recipe="t", tags=["complete"], in_git=False)
+    n0 = len(f.calls)
+    rep = m.fetch_kalshi_candles(a, period=60, **FAST)
+    asked = {p.split("/")[-2] for h, p, q in f.calls[n0:] if p.endswith("/candlesticks")}
+    assert asked == {ks[4]["ticker"], ks[5]["ticker"]} and rep[name]["pair_legs_added"] == 2
+    assert {r["value"]["ticker"] for r in a.load(name)} == {k["ticker"] for k in ks}
+    log = m._log_load(a, m.K_LOG)
+    assert log[f"candles-60:{ks[5]['ticker']}"]["reason"] == "pair" and log[f"candles-60:{ks[0]['ticker']}"]["reason"] == "select"
+
+
 # ============================================================================================ plans, licences ==
 
 def test_dry_run_makes_no_request_and_plans_every_source(fake, tmp_path):
@@ -580,7 +889,9 @@ def test_gitignore_lines_cover_every_bundle_name_and_spare_legacy():
     names = ["polymarket-closed-markets-2025-03", "polymarket-price-history-daily-2025-03", "polymarket-price-history-hourly-2025-03",
              "polymarket-volume-hourly-2025-03", "polymarket-events-btc-above", "polymarket-events-macro", "polymarket-fetch-log",
              "pm-kalshi-pairs", "kalshi-settled-markets-KXCPI", "kalshi-settled-markets-KXBTCD-2025-03", "kalshi-candles-daily-KXCPI",
-             "kalshi-candles-hourly-KXBTCD-2025-03", "kalshi-trades-KXCPI", "kalshi-fetch-log"]
+             "kalshi-candles-hourly-KXBTCD-2025-03", "kalshi-trades-KXCPI", "kalshi-fetch-log", "polymarket-open-markets",
+             "polymarket-open-price-history-daily"]
+    assert len(m.GITIGNORE_LINES) == 15
     for n in names:
         line = m.gitignore_line(n)
         assert line and fnmatch(f"mandel/archive/data/{n}.jsonl.gz", line), n
@@ -594,10 +905,46 @@ def test_fetch_all_rejects_unknown_sources_and_orders_dependencies():
     order = list(m.SOURCES)
     assert order.index("kalshi_markets") < order.index("pairs") < order.index("pm_hourly") < order.index("pm_trades")
     assert order.index("pm_markets") < order.index("pm_daily")
+    phases = [set(n for ns in g.values() for n in ns) for _, g in m.PHASES]
+    assert phases[0] == {"pm_markets", "pm_events", "kalshi_markets"} and phases[1] == {"pairs"}
+    assert set(m.SOURCES) == set().union(*phases)
+    assert m.PM_SOURCES.index("pairs") < m.PM_SOURCES.index("pm_daily")         # listings, then pairs, then prices
 
 
-def test_fetch_all_pm_chain_then_rerun_is_cheap_and_every_bundle_local_only(fake, tmp_path):
+def test_stop_event_stops_workers_at_their_next_request():
+    th = m._Pace(0.0)
+    th.wait()
+    m._STOP.set()
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            th.wait()
+    finally:
+        m._STOP.clear()
+
+
+def test_dry_run_on_a_partly_filled_archive_plans_unstored_months(fake, tmp_path):
+    """Regression (minor): with one closed-markets month stored, the pm_daily plan covered that month only."""
+    fake(forbid=True)
+    a = _archive(tmp_path)
+    _stored_month(a, [pm_market(i, "2025-03-20T00:00:00Z", "2025-01-01T00:00:00Z") for i in range(1, 6)])
+    a.store("kalshi-settled-markets-KXCPI", "data", [m._k_market_row(k_market("KXCPI-25JAN-T0.2", "KXCPI-25JAN", "2025-01-01T00:00:00Z",
+                                                                             "2025-02-12T13:25:00Z"), "2026-10-15T00:00:00+00:00")],
+            recipe="t", tags=["complete"], in_git=False)
+    rep = m.fetch_all_pm(a, dry_run=True)
+    daily = {i["bundle"]: i for i in rep["pm_daily"]["_plan"]["per_bundle"]}
+    assert len(daily) == len(m._months(m.PM_FIRST_DAY, "2026-10-14")) and daily["polymarket-price-history-daily-2025-03"]["calls"] == 5
+    assert daily["polymarket-price-history-daily-2026-09"].get("estimate") and daily["polymarket-price-history-daily-2026-09"]["calls"] > 1000
+    cand = {i["bundle"] for i in rep["kalshi_candles_hourly"]["_plan"]["per_bundle"]}
+    assert "kalshi-candles-hourly-KXCPI" in cand and "kalshi-candles-hourly-KXFEDDECISION" in cand and "kalshi-candles-hourly-<pair legs>" in cand
+    assert {i["bundle"] for i in rep["kalshi_trades"]["_plan"]["per_bundle"]} >= {"kalshi-trades-KXCPI", "kalshi-trades-KXFED"}
+    t = rep["_total"]
+    assert t["wall_minutes_parallel"] < t["minutes"] and set(t["wall_minutes_by_phase"]) == {"listings", "pairs", "prices"}
+    assert m.LATENCY["kalshi"] >= 1.34 and m.KALSHI_EST_OTHER >= 9500 and m.pm_month_estimate("2026-09") >= 15000
+
+
+def _chain_world():
     ev, ks = _fomc_world()
+    ev = {**ev, "closed": True, "tags": [{"id": "100196", "slug": "fed-rates"}]}
     mk = [x for x in ev["markets"]]
     hist = {json.loads(x["clobTokenIds"])[0]: [(ts("2024-12-01T00:00:00Z") + h * 3600, 0.3) for h in range(24 * 17)] for x in mk}
     trades = {x["conditionId"]: _trades(x["conditionId"], 6, ts("2024-12-10T00:00:00Z")) for x in mk}
@@ -605,13 +952,20 @@ def test_fetch_all_pm_chain_then_rerun_is_cheap_and_every_bundle_local_only(fake
                                   for h in range(10)] for k in ks}
     kt = {("hist", k["ticker"]): [{"trade_id": f"{k['ticker']}-{i}", "ticker": k["ticker"], "created_time": z(ts("2024-12-10T00:00:00Z") - i * 60),
                                    "count_fp": "1.00"} for i in range(3)] for k in ks}
-    f = fake(markets=mk, histories=hist, trades=trades, k_hist=ks, k_candles=kc, k_trades=kt,
-             search={"fed decision": [ev], "fed interest rates": [], "inflation": [], "cpi": [], "bitcoin above": []}, events_by_slug=[])
-    a = _archive(tmp_path)
+    cfg = dict(markets=mk, histories=hist, trades=trades, k_hist=ks, k_candles=kc, k_trades=kt, events=[ev],
+               search={"fed decision": [ev], "fed interest rates": [], "inflation": [], "cpi": []}, events_by_slug=[])
     opts = {"pm_markets": {"first": "2024-12-18", "last": "2024-12-18"}, "kalshi_markets": {"series": m.PAIR_KALSHI, "crypto": {}},
+            "pm_events": {"btc_first_month": "2026-10", "hourly_first_day": "2026-10-14", "macro_first_month": "2024-12"},
             "pm_hourly": {"sets": ("pairs",)}, "pm_trades": {"n_markets": 2}}
+    return cfg, opts
+
+
+def test_fetch_all_pm_chain_then_rerun_is_cheap_and_every_bundle_local_only(fake, tmp_path):
+    cfg, opts = _chain_world()
+    f = fake(**cfg)
+    a = _archive(tmp_path)
     rep = m.fetch_all_pm(a, options=opts, min_interval=0.0)
-    assert rep["pairs"][m.PAIRS]["pairs"] == 4
+    assert rep["pairs"][m.PAIRS]["pairs"] == 4 and rep["pairs"][m.PAIRS]["price_bundles_at_freeze"] == 0
     assert a.get("polymarket-price-history-daily-2024-12").rows == 6 * 24 * 17                 # all six markets (long-lived: priority)
     assert a.get("polymarket-price-history-hourly-2024-12").rows == 5 * 24 * 17                # five pair legs, windows de-duplicated
     assert a.get("polymarket-volume-hourly-2024-12").rows > 0 and a.get("kalshi-candles-hourly-KXFEDDECISION").rows == 50
@@ -625,3 +979,37 @@ def test_fetch_all_pm_chain_then_rerun_is_cheap_and_every_bundle_local_only(fake
     assert g and all(p == "/markets/keyset" and q["end_date_min"].startswith("2024-12-18") for p, q in g)   # the open (partial) month only
     for e in a.entries():
         assert e.in_git is False and m.gitignore_line(e.name), e.name
+
+
+def test_parallel_run_one_process_consistent_index_and_phase_order(fake, tmp_path):
+    """Regression (minor, problems 9-10): the two-process plan left a stale fetch-log INDEX entry (verify False) and fetched
+    pair-leg prices before the pairs table was frozen. One process, two threads, one Archive; listings -> pairs -> prices."""
+    cfg, opts = _chain_world()
+    fake(**cfg)
+    a = _archive(tmp_path)
+    m.fetch_all_pm(a, options=opts, min_interval=0.0, parallel=True)
+    fresh = Archive(root=tmp_path / "archive", ledger=Ledger(tmp_path / "ledger.jsonl"))
+    for e in fresh.entries():
+        assert fresh.verify(e.name), e.name
+        assert e.rows == sum(1 for _ in fresh.load(e.name)), e.name
+    assert {"polymarket-fetch-log", "kalshi-fetch-log"} <= {e.name for e in fresh.entries()}
+    frozen = fresh.get(m.PAIRS).created_at
+    priced = [e for e in fresh.entries() if any(fnmatch(e.name, p) for p in m.PRICE_BUNDLE_PATTERNS)]
+    assert priced and all(e.created_at > frozen for e in priced)
+    listings = [e for e in fresh.entries() if e.name.startswith(("polymarket-closed-markets-", "polymarket-events-", "kalshi-settled-markets-"))]
+    assert all(e.created_at < frozen for e in listings)
+
+
+
+
+def test_fetch_all_lists_again_before_freezing_when_a_listing_failed(fake, tmp_path):
+    """A Kalshi listing that failed past every retry (429 burst, seen live 2026-10-15) is listed again before the pairs
+    phase, so the table is not left waiting while the prices run."""
+    cfg, opts = _chain_world()
+    f = fake(**cfg, k_fail_series={"KXCPI": m.KALSHI_RETRIES})
+    a = _archive(tmp_path)
+    rep = m.fetch_all_pm(a, options=opts, min_interval=0.0)
+    assert rep["_listing_retries"][0]["waiting"] == ["kalshi-settled-markets-KXCPI"]
+    assert rep["_listing_retries"][0]["kalshi_markets"]["kalshi-settled-markets-KXCPI"]["stored"] is False
+    assert rep["pairs"][m.PAIRS]["pairs"] == 4 and rep["pairs"][m.PAIRS]["price_bundles_at_freeze"] == 0
+    assert m.LISTING_RETRY_PAUSE in f.sleeps and a.get("kalshi-candles-hourly-KXFEDDECISION").rows == 50

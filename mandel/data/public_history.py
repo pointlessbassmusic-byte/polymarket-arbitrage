@@ -14,11 +14,18 @@ archive rows {source, kind, key, observed_at, available_at, value}: ``observed_a
      ``yw9f-hn96`` / ``gpe5-46if`` for CME bitcoin 133741 (2018-04..; BTC is not in the disaggregated report). Positions
      are as of Tuesday; the report is released at 15:30 ET, usually on Friday. ``available_at``: Socrata's row
      ``:created_at`` (the live publication, verified for every report since 2022-07: Fri 19:30/20:30 UTC = 15:30 ET, the
-     2023 ION delays and the 2025 shutdown catch-up dates), never earlier than that Friday 15:30 ET; rows from the
-     2022-08 bulk load use the release rule (Friday 15:30 ET, one business day later for each federal closure on the
-     Wednesday-Friday of that week: the CFTC's 2008-2026 holiday notices and 2026 schedule), the 2019 catch-up schedule
-     of CFTC press release 7864-19 and conservative bounds for the 1995-96 and 2013 shutdowns. US federal data, public
-     domain: in git.
+     2023 ION delays and the 2025 shutdown catch-up dates), never earlier than the regular Friday 15:30 ET; rows from the
+     2022 bulk loads use the CFTC publication schedule of their era (``cot_release_rule``): monthly until 1990 (end of
+     the 12th of the following month; the semi-monthly rows of 1986-89 had no real-time mid-month publication: pit
+     ``not_realtime``), 1990 the same bound, 1991-92 the 6th federal business day, 1992-10..2000 biweekly (two weekly
+     reports every other Friday: the following week's release day), from 2001 Friday 15:30 ET (the next week's Friday
+     for a Thursday/Friday as-of date, one business day later for each federal closure on the Wednesday-Friday of the
+     release week, never before the 3rd federal business day), the 2013 and 2019 catch-up schedules (CFTC 6745-13 and
+     notices; 7864-19) and a conservative bound for the 1995-96 shutdowns. Backcasts: disaggregated rows before
+     2009-09-01 (released as history on 2009-10-20) and TFF rows before 2010-07-20 (history of December 2010) are
+     available at that release (pit ``backcast``; the schedule time stays in ``release_rule``). Gold and silver were in
+     the first disaggregated report (2009-09-01); CME bitcoin is in the TFF report from its first row (2018-04-10).
+     available_at is never before observed_at (guard). US federal data, public domain: in git.
   2. Treasury auctions (T-442), ``api.fiscaldata.treasury.gov`` ``auctions_query`` for every Note and Bond since
      1979 (nominal, TIPS and FRN rows; filter ``inflation_index_security`` = No and ``floating_rate`` = No for the
      nominal 10/30-year set including the 9-Year x-Month / 29-Year x-Month reopenings). Two kinds per auction:
@@ -96,13 +103,22 @@ re-fetches), stores a chunk as soon as it is complete (tag ``complete``; a cut-s
 fetched again), never stores a failed or empty answer, and ``dry_run`` makes no request and returns the plan with
 per-bundle estimates (calls, rows, gzip MB, minutes). ``limit`` caps the bundles (chunks) fetched per fetcher.
 Entry point ``fetch_all_misc(store, dry_run=False, limit=None)``; command line ``python3 -m mandel.data.public_history
-all [--dry-run] [--limit N] [--preview DIR]``. Local-only bundles need the ``.gitignore`` lines from ``gitignore_lines()``.
+all [--dry-run] [--limit N] [--preview DIR | --root DIR]``. Local-only bundles need the ``.gitignore`` lines from
+``gitignore_lines()``.
+
+ONE WRITER AT A TIME (see ``RUN_LOCKS``): ``Archive`` re-reads INDEX.json with ``setdefault``, so two processes storing
+into one archive leave stale INDEX entries. A storing run (``fetch_all_misc``, a single source or ``merge`` from the
+command line) holds ``<archive root>/public_history.run.lock`` and ``crypto_history.run.lock`` (a second writer of
+either module is refused) and ends with ``_index_check`` (the command line exits 1 on a mismatch). To run StockTwits
+(about 38 hours) next to the rest, store it under its own ``--root DIR`` and ``merge --from DIR`` afterwards.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
+import fcntl
 import html as htmlmod
 import io
 import json
@@ -115,7 +131,7 @@ from datetime import date, datetime, timedelta, timezone
 from fnmatch import fnmatch
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Callable, Iterable, Optional
+from typing import Iterable, Optional
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -127,8 +143,8 @@ from mandel.data.deribit_history import (DAILY_ROW_GZ_BYTES, DAILY_WINDOW_TRADES
                                          daily_window)
 from mandel.data.dolt_options import _last_weekday, _nth_weekday, is_trading_day, prev_session
 from mandel.data.fetch import Throttle
-from mandel.data.market_history import ARCHIVE_DATA_PREFIX, _et_to_utc, _load, _stored_here, safe_name
-from mandel.data.options_misc import (PAGE_SECONDS, RETRY_STATUS, UA, _archive, _client, _end_of_day, _get, _retry_after,
+from mandel.data.market_history import ARCHIVE_DATA_PREFIX, _et_to_utc, _load, _stored_here
+from mandel.data.options_misc import (RETRY_STATUS, _archive, _client, _end_of_day, _get, _retry_after,
                                       trades_in_window)
 
 UTC = timezone.utc
@@ -307,7 +323,7 @@ FAMILIES: dict[str, tuple] = {
     "sec_facts": ("sec-companyfacts-*", "fetch_sec_companyfacts", ["T-451", "T-393", "T-375"], False, "sec",
                   "min(acceptance of the fact's accession, filed date 22:00 ET)", 22, 0.7),
     "st_preopen": ("stocktwits-preopen-*", "fetch_stocktwits_preopen", ["T-414"], False, "stocktwits",
-                   "message: created_at; window row: window end (09:00 ET)", 32, 1.85),
+                   "message: created_at; window row: window end (09:00 ET)", 32, 1.95),
     "st_intensity": ("stocktwits-intensity-*", "fetch_stocktwits_intensity", ["T-415"], False, "stocktwits",
                      "the sample time (only messages created before it)", 120, 1.25),
     "st_anchors": ("stocktwits-anchors", "fetch_stocktwits_preopen", ["T-414", "T-415"], False, "stocktwits",
@@ -340,7 +356,7 @@ def _plan(fam: str, name: str, calls: float, rows: float, stored: bool = False, 
     calls = 0 if stored else int(math.ceil(calls))
     return {"name": name, "function": fn, "theories": theories, "in_git": in_git, "licence": LICENCE[lic],
             "gitignore_line": "" if in_git else f"{ARCHIVE_DATA_PREFIX}{pat}.jsonl.gz", "calls": calls, "rows": int(rows),
-            "gz_mb": round(rows * gz_row / 1e6, 3), "minutes": round(calls * sec / 60, 1), "available_at_rule": rule,
+            "gz_mb": round(rows * gz_row / 1e6, 3), "minutes": round(calls * sec / 60, 2), "available_at_rule": rule,
             "already_stored": stored, **extra}
 
 
@@ -413,73 +429,200 @@ COT_ROWS_EST = {("disagg", "088691"): 1061, ("disagg", "084691"): 1061, ("legacy
                 ("legacy-fo", "088691"): 1600, ("legacy-fo", "084691"): 1600, ("tff", "133741"): 444}
 COT_PAGE = 5000
 COT_LIVE_MAX_DAYS = 60                   # a :created_at this close after the report date is the live publication
+# Publication history. CFTC 'About the COT Reports' (read 2026-10-15; fetch6c/misc/check/h.html): until 1990 the reports
+# were 'compiled on an end-of-month basis and published on the 11th or 12th calendar day of the following month'; then
+# 'published more often - switching to mid-month and month-end in 1990, to every two weeks in 1992, and to weekly in 2000'
+# and 'moving the publication to the sixth business day after the "as of" date in 1990 and then to the third business
+# day after the "as of" date in 1992'. CSI Data's COT manual (csidata.com, read 2026-10-15): '2 weekly reports have been
+# issued on alternate Fridays since 10-6-92' (each release carried the latest week and the week before). Socrata's legacy
+# rows are semi-monthly (15th and month-end, any weekday) until 1992-09-30 and weekly (Tuesday) from 1992-10-06.
+COT_MONTHLY_BEFORE = "1990-01-01"        # monthly publication: mid-month rows before this were not published in real time
+COT_SEMI_MONTHLY_FROM = "1991-01-01"     # the 1990 switch month is not stated: 1990 rows keep the (later) monthly schedule
+COT_BIWEEKLY_FROM = "1992-10-01"         # weekly as-of dates, two published together every other Friday
+COT_WEEKLY_FROM = "2001-01-01"           # weekly 'in 2000' (month not stated): all of 2000 keeps the biweekly bound
+COT_MONTHLY_DAY = 12                     # 'the 11th or 12th calendar day of the following month' (the later one)
+COT_SEMI_MONTHLY_BDAYS = 6               # 1990-92: 'the sixth business day after the as-of date'
+COT_MIN_BDAYS = 3                        # 1992-: 'the third business day after the as-of date' (Tuesday -> Friday)
 # CFTC press release 7864-19 (read 2026-10-15): the report of Mon 2018-12-24 on Fri 2019-02-01, then one report on Tuesday
 # and one on Friday each week in chronological order until current (the 2019-03-05 report on its normal Friday, 03-08).
 COT_2019_CATCHUP = {"2018-12-24": "2019-02-01", "2018-12-31": "2019-02-05", "2019-01-08": "2019-02-08", "2019-01-15": "2019-02-12",
                     "2019-01-22": "2019-02-15", "2019-01-29": "2019-02-19", "2019-02-05": "2019-02-22", "2019-02-12": "2019-02-26",
                     "2019-02-19": "2019-03-01", "2019-02-26": "2019-03-05"}
-# Shutdowns whose catch-up schedule was not read: every report dated in [first, last] counts from the bound (conservative).
-COT_SHUTDOWN_BOUNDS = (("1995-11-14", "1996-01-23", "1996-02-29", "1995-96 government shutdowns (catch-up schedule not read)"),
-                       ("2013-10-01", "2013-11-12", "2013-11-29", "October 2013 shutdown (catch-up schedule not read)"))
+# October 2013 shutdown. CFTC release 6745-13 (2013-10-23): the first delayed report (as of 10-01, due 10-04) on 2013-10-25,
+# two more in the week of 10-28, at least two more in the week of 11-04, and the normal schedule by the 11-08 release. CFTC
+# 'COT reports update' notices (relayed by Mondo Visione): 'the current reports for the week of October 29, 2013 are now
+# available' on 2013-11-06 and 'for the week of November 5, 2013' on 2013-11-08 (the normal Friday). Days are known by date
+# only: end of that day (UTC). The 10-08..10-29 reports count from 11-06, the first day all of them are known to be out.
+COT_2013_CATCHUP = {"2013-10-01": "2013-10-25", "2013-10-08": "2013-11-06", "2013-10-15": "2013-11-06", "2013-10-22": "2013-11-06",
+                    "2013-10-29": "2013-11-06"}
+# Shutdowns whose catch-up schedule was not found: every report dated in [first, last] counts from the bound (conservative).
+COT_SHUTDOWN_BOUNDS = (("1995-11-14", "1996-01-23", "1996-02-29", "1995-96 government shutdowns and January 1996 closures "
+                                                                  "(catch-up schedule not found)"),)
+# Reports whose history was released after the report began: rows dated before ``live_from`` became public at ``history``.
+# Disaggregated (Disaggregated Explanatory Notes, fetch6c/misc/check/cftc_disagg_expl.html): first published 2009-09-04 for
+# 22 markets, the remaining physical markets from 2009-12-04; 'On October 20, 2009, CFTC made available ... historical
+# disaggregated data ... dated back to June 13, 2006', classified with current trader categories (a backcast). COMEX gold
+# 088691 and silver 084691 (and copper 085692, lumber 058643) are in the first report: the CFTC archive page
+# cotarchives/2009/futures/other_lf090109.htm 'Positions as of September 1, 2009' lists them; platinum and palladium appear
+# first on the 2009-12-01 page (fetch6c/misc/probes2/). Markets not known to be in the first 22 count from 2009-12-04.
+# TFF: first report as of 2010-07-20 (cotarchives/2010/futures/financial_lf072010.htm; none for 07-13; CFTC release
+# 5857-10 of 2010-07-22), four years of history made available in December 2010 (Hedgeweek, 2010-12-07). CME bitcoin
+# 133741 first appears in the TFF report of 2018-04-10 (financial_lf041018.htm; absent on 04-03), so its rows are live.
+COT_BACKCAST = {
+    "disagg": {"live_from": "2009-09-01", "history": "2009-10-20", "first_codes": frozenset({"088691", "084691", "085692", "058643"}),
+               "added": ("2009-12-01", "2009-12-04"),
+               "why": "CFTC historical disaggregated release 2009-10-20 (backcast with current trader classifications)"},
+    "tff": {"live_from": "2010-07-20", "history": "2010-12-07", "first_codes": None, "added": None,
+            "why": "CFTC Traders in Financial Futures history release, December 2010 (backcast; Hedgeweek 2010-12-07)"},
+}
+COT_PIT = ("live", "schedule", "bound", "backcast", "not_realtime")
 COT_SCHEMA = ("kind cot: value = the raw Socrata row (strings, every column of the report) + {report_date, dataset, report, "
-              "created_at, updated_at (Socrata row metadata), release_rule (rule-derived release, ISO UTC), available_basis}; "
-              "observed_at = report date 17:00 ET (positions as of that close); available_at as in the recipe")
+              "created_at, updated_at (Socrata row metadata), release_rule (the publication schedule's release for this as-of "
+              "date, ISO UTC), available_basis, pit (live = Socrata publication time; schedule = documented schedule; bound = "
+              "conservative bound where the schedule is not fully documented; backcast = history released later than the "
+              "schedule, available_at = that release; not_realtime = not published in real time, available_at is only a "
+              "lower bound: exclude from point-in-time tests)}; observed_at = report date 17:00 ET (positions as of that "
+              "close); available_at as in the recipe, never before observed_at")
 
 
 def cot_bundle(report: str, code: str) -> str:
     return f"cftc-cot-{report}-{code}"
 
 
-def cot_release_rule(report_date: str) -> tuple[str, str]:
-    """(ISO UTC release time, basis) by rule: 15:30 ET on the Friday of the report week, moved one federal business day
-    later for each federal closure on the Wednesday, Thursday or Friday of that week (CFTC: 'Federal holidays may delay
-    release by one or two days'; a Monday or Tuesday holiday does not move it); the 2019 catch-up dates; shutdown bounds."""
-    r = date.fromisoformat(report_date[:10])
-    if report_date[:10] in COT_2019_CATCHUP:
-        return _et(COT_2019_CATCHUP[report_date[:10]], "15:30"), "CFTC press release 7864-19 catch-up schedule (2019 shutdown)"
+def _add_fed_bdays(d: date, n: int) -> date:
+    """The n-th federal business day after ``d``."""
+    for _ in range(n):
+        d += timedelta(days=1)
+        while not _federal_business_day(d):
+            d += timedelta(days=1)
+    return d
+
+
+def _cot_regular_friday(r: date) -> date:
+    """The release Friday of the weekly schedule before holiday shifts: the as-of week's Friday for a Monday-Wednesday
+    as-of date, the next week's Friday for a Thursday or Friday as-of date (holiday weeks: never the as-of day itself)."""
     fri = r + timedelta(days=(4 - r.weekday()) % 7)
-    closed = sum(1 for k in (2, 3, 4) if (fri - timedelta(days=4 - k)) > r and (fri - timedelta(days=4 - k)) in federal_closures(fri.year))
-    rel = fri
-    for _ in range(closed):
-        rel += timedelta(days=1)
-        while not _federal_business_day(rel):
-            rel += timedelta(days=1)
-    out, basis = _et(rel.isoformat(), "15:30"), ("rule: Friday 15:30 ET" if not closed else
-                                                f"rule: Friday 15:30 ET + {closed} business day(s) for federal closures that week")
+    return fri + timedelta(days=7) if r.weekday() in (3, 4) else fri
+
+
+def _cot_weekly_day(r: date) -> tuple[date, int]:
+    """(release day, closures that moved it) under the weekly schedule: the regular Friday, one federal business day later
+    per federal closure on the Wednesday-Friday of that week after the as-of date (CFTC: 'Federal holidays may delay
+    release by one or two days'; a Monday or Tuesday holiday does not move it), never before the third federal business
+    day after the as-of date."""
+    fri = _cot_regular_friday(r)
+    closed = sum(1 for k in (2, 3, 4) for d in [fri - timedelta(days=4 - k)] if d > r and not _federal_business_day(d))
+    rel = _add_fed_bdays(fri, closed) if closed else fri
+    return max(rel, _add_fed_bdays(r, COT_MIN_BDAYS)), closed
+
+
+def cot_release_rule(report_date: str) -> tuple[str, str, str]:
+    """(ISO UTC release, basis, pit) by the CFTC's publication schedule for this as-of date (any report):
+      * before 1990 (monthly publication): end of the 12th calendar day of the following month (next federal business
+        day); mid-month rows were not part of that publication (pit not_realtime), month-end rows are a bound;
+      * 1990 (the switch month to semi-monthly is not stated): the same, later, monthly schedule (bound);
+      * 1991 .. 1992-09 (semi-monthly): end of the 6th federal business day after the as-of date (schedule);
+      * 1992-10 .. 2000 (weekly data, two weeks published every other Friday): the release day the FOLLOWING week's
+        report would have, end of day (bound: which week of a pair was the latest is not documented);
+      * 2001 on (weekly): 15:30 ET on the regular Friday with holiday shifts and the 3-business-day minimum
+        (``_cot_weekly_day``); the 2013 and 2019 shutdown catch-up schedules (schedule);
+      * the 1995-96 shutdown bound."""
+    rd = report_date[:10]
+    r = date.fromisoformat(rd)
+    if rd in COT_2019_CATCHUP:
+        return _et(COT_2019_CATCHUP[rd], "15:30"), "CFTC press release 7864-19 catch-up schedule (2019 shutdown)", "schedule"
+    if rd in COT_2013_CATCHUP:
+        return (_end_of_day(COT_2013_CATCHUP[rd]), "CFTC release 6745-13 and 2013-11-06 notice: 2013 shutdown catch-up "
+                f"(out by {COT_2013_CATCHUP[rd]}, end of day)", "schedule")
+    if rd < COT_SEMI_MONTHLY_FROM:
+        nm = date(r.year + (r.month == 12), r.month % 12 + 1, COT_MONTHLY_DAY)
+        while not _federal_business_day(nm):
+            nm += timedelta(days=1)
+        mid = r.day <= 20
+        if rd < COT_MONTHLY_BEFORE:
+            basis = ("monthly publication until 1990 ('11th or 12th calendar day of the following month'): end of the "
+                     f"{COT_MONTHLY_DAY}th (next federal business day)")
+            if mid:
+                return (_end_of_day(nm.isoformat()), basis + "; a mid-month row was not in the monthly publication (not real "
+                        "time; lower bound only)", "not_realtime")
+            return _end_of_day(nm.isoformat()), basis, "bound"
+        return (_end_of_day(nm.isoformat()), "1990: semi-monthly publication on the 6th business day began during 1990 (month "
+                f"not stated): the later monthly schedule, end of the {COT_MONTHLY_DAY}th of the following month", "bound")
+    if rd < COT_BIWEEKLY_FROM:
+        return (_end_of_day(_add_fed_bdays(r, COT_SEMI_MONTHLY_BDAYS).isoformat()),
+                f"1990-92 semi-monthly schedule: end of the {COT_SEMI_MONTHLY_BDAYS}th federal business day after the as-of date",
+                "schedule")
+    if rd < COT_WEEKLY_FROM:
+        d, _ = _cot_weekly_day(r + timedelta(days=7))
+        out, basis, pit = (_end_of_day(d.isoformat()), "1992-2000 biweekly publication (two weekly reports every other Friday): "
+                           "bound = the following week's release day, end of day", "bound")
+    else:
+        d, closed = _cot_weekly_day(r)
+        out, pit = _et(d.isoformat(), "15:30"), "schedule"
+        basis = ("rule: Friday 15:30 ET" if not closed else f"rule: Friday 15:30 ET + {closed} business day(s) for federal closures "
+                 "that week")
+        if r.weekday() in (3, 4):
+            basis = "rule: the next week's Friday 15:30 ET (Thursday/Friday as-of date)" + (f" + {closed} business day(s)" if closed else "")
     for first, last, bound, why in COT_SHUTDOWN_BOUNDS:
-        if first <= report_date[:10] <= last:
-            b = _et(bound, "15:30")
-            if _parse_iso(b) > _parse_iso(out):
-                out, basis = b, f"conservative bound: {why}"
-    return out, basis
+        if first <= rd <= last and _parse_iso(_end_of_day(bound)) > _parse_iso(out):
+            out, basis, pit = _end_of_day(bound), f"conservative bound: {why}", "bound"
+    return out, basis, pit
 
 
-def cot_available_at(report_date: str, created_at: Optional[str]) -> tuple[str, str, str]:
-    """(available_at, basis, rule release). A live Socrata creation time wins (never before the week's Friday 15:30 ET)."""
-    rule, basis = cot_release_rule(report_date)
+def cot_backcast(report: Optional[str], code: Optional[str], report_date: str) -> Optional[tuple[str, str]]:
+    """(history release, basis) when this report's row was released only as history (``COT_BACKCAST``), else None."""
+    fam = COT_BACKCAST.get(str(report or "").split("-")[0])
+    if not fam:
+        return None
+    rd = report_date[:10]
+    if fam["first_codes"] is not None and code not in fam["first_codes"] and fam["added"] and rd < fam["added"][0]:
+        return (_end_of_day(fam["added"][1]), f"market not known to be in the first {report} report: added {fam['added'][1]} "
+                f"(rows before {fam['added'][0]} count from then; backcast)")
+    if rd < fam["live_from"]:
+        return _end_of_day(fam["history"]), fam["why"]
+    return None
+
+
+def cot_available_at(report_date: str, created_at: Optional[str], report: Optional[str] = None,
+                     code: Optional[str] = None) -> tuple[str, str, str, str]:
+    """(available_at, basis, schedule release, pit). A live Socrata creation time wins, never before the regular release
+    (15:30 ET on the regular Friday); a backcast row counts from its history release, never before the schedule."""
+    rule, basis, pit = cot_release_rule(report_date)
     r = date.fromisoformat(report_date[:10])
-    floor = _et((r + timedelta(days=(4 - r.weekday()) % 7)).isoformat(), "15:30")
-    if created_at:
+    bc = cot_backcast(report, code, report_date)
+    if bc:
+        return max(rule, bc[0], key=_parse_iso), bc[1], rule, "backcast"
+    if created_at and report_date[:10] >= COT_WEEKLY_FROM:
         ca = _parse_iso(created_at)
         lag = (ca.date() - r).days
         if 2 <= lag <= COT_LIVE_MAX_DAYS:
-            return max(_iso_ceil(ca), floor, key=_parse_iso), "Socrata :created_at (live publication)", rule
-    return rule, basis, rule
+            floor = _et(_cot_regular_friday(r).isoformat(), "15:30")
+            return max(_iso_ceil(ca), floor, key=_parse_iso), "Socrata :created_at (live publication)", rule, "live"
+    return rule, basis, rule, pit
 
 
-def parse_cot_rows(raw: list[dict], report: str, code: str, fetched: str) -> list[dict]:
+def parse_cot_rows(raw: list[dict], report: str, code: str, fetched: str, stats: Optional[dict] = None) -> list[dict]:
+    """Archive rows of one COT series. Guard: available_at is never before observed_at (raised and counted in
+    ``stats['raised_to_observed']``; the schedules above never need it)."""
     ds = COT_DATASETS[report][0]
     out, seen = [], set()
+    st = stats if stats is not None else {}
     for x in raw:
         rd = str(x.get("report_date_as_yyyy_mm_dd") or "")[:10]
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", rd) or rd in seen:
             continue
         seen.add(rd)
         ca, ua = x.get(":created_at"), x.get(":updated_at")
-        av, basis, rule = cot_available_at(rd, ca)
+        av, basis, rule, pit = cot_available_at(rd, ca, report, code)
+        obs = _et(rd, "17:00")
+        if _parse_iso(av) < _parse_iso(obs):
+            av, basis = obs, basis + "; raised to observed_at (guard)"
+            st["raised_to_observed"] = st.get("raised_to_observed", 0) + 1
+        st[pit] = st.get(pit, 0) + 1
         v = {k: val for k, val in x.items() if not k.startswith(":")}
-        v.update(report_date=rd, dataset=ds, report=report, created_at=ca, updated_at=ua, release_rule=rule, available_basis=basis)
-        out.append(_row("cftc", "cot", f"{report}:{code}:{rd}", _et(rd, "17:00"), _not_after(av, fetched), v))
+        v.update(report_date=rd, dataset=ds, report=report, created_at=ca, updated_at=ua, release_rule=rule, available_basis=basis,
+                 pit=pit)
+        out.append(_row("cftc", "cot", f"{report}:{code}:{rd}", obs, _not_after(av, fetched), v))
     return sorted(out, key=lambda r: r["value"]["report_date"])
 
 
@@ -533,23 +676,33 @@ def fetch_cftc_cot(store=None, series: Iterable[tuple[str, str]] = COT_SERIES, d
             if r is None or not raw:
                 rep[name] = {"error": _fail(info) or "no rows"}
                 continue
-            rows = parse_cot_rows(raw, rpt, code, fetched)
-            live = sum(1 for x in rows if x["value"]["available_basis"].startswith("Socrata"))
-            rep[name] = {"rows": len(rows), "first": rows[0]["value"]["report_date"], "last": rows[-1]["value"]["report_date"], "live_rows": live}
+            stats: dict = {}
+            rows = parse_cot_rows(raw, rpt, code, fetched, stats)
+            live = stats.get("live", 0)
+            rep[name] = {"rows": len(rows), "first": rows[0]["value"]["report_date"], "last": rows[-1]["value"]["report_date"],
+                         "live_rows": live, "pit": {k: stats[k] for k in COT_PIT if stats.get(k)},
+                         "raised_to_observed": stats.get("raised_to_observed", 0)}
             if archive is None:
                 rep[name]["rows"] = rows
                 continue
+            pit_txt = ", ".join(f"{k} {n}" for k, n in rep[name]["pit"].items())
             e = _put(archive, name, rows, _recipe(
                 f"GET {CFTC_BASE}{ds}.json?$select=*,:created_at,:updated_at&cftc_contract_market_code={code}&$order="
                 f"report_date_as_yyyy_mm_dd,id&$limit={COT_PAGE}&$offset=<k> ({title}; {COT_CODES.get(code, code)}) via "
                 f"mandel.data.public_history.fetch_cftc_cot; {min_interval}s pacing, {retries} tries with backoff on 429/5xx. "
                 f"available_at: the row's Socrata :created_at when within {COT_LIVE_MAX_DAYS} days of the report date (the live "
-                f"publication; {live} rows), never before the report week's Friday 15:30 ET; other rows (bulk load of 2022) use "
-                "the release rule: Friday 15:30 ET plus one federal business day per federal closure on the Wednesday-Friday of "
-                "the report week (federal holidays, executive-order closures, Inauguration Day), the CFTC press release 7864-19 "
-                "catch-up schedule for the 2018-19 shutdown, and conservative bounds for the 1995-96 and 2013 shutdowns. "
-                "Disaggregated categories were first published 2009-09-04; earlier rows are the CFTC's later reconstruction.",
-                "cftc", True), ["cot", "cftc", "positioning", "weekly", rpt, code, "T-405"], COT_SCHEMA, in_git=True)
+                f"publication, 2022-07 on), never before the regular Friday 15:30 ET; other rows (bulk load of 2022) use the CFTC "
+                "publication schedule of their era (cot_release_rule): before 1990 monthly (end of the 12th of the following "
+                "month; mid-month rows were not published in real time: pit not_realtime), 1990 the same later bound, 1991-92 "
+                "the 6th federal business day, 1992-10..2000 biweekly (two weekly reports every other Friday: the following "
+                "week's release day, end of day), from 2001 Friday 15:30 ET (the next week's Friday for a Thursday/Friday as-of "
+                "date) plus one federal business day per federal closure on the Wednesday-Friday of the release week and never "
+                "before the 3rd federal business day; the 2013 (CFTC 6745-13 and notices) and 2018-19 (7864-19) catch-up "
+                "schedules; a conservative bound for the 1995-96 shutdowns. Backcasts: disaggregated rows before 2009-09-01 "
+                "were released as history on 2009-10-20 and TFF rows before 2010-07-20 in December 2010: available_at = that "
+                "release (pit backcast; the schedule time stays in value.release_rule). available_at is never before "
+                f"observed_at. Rows by pit: {pit_txt}.", "cftc", True),
+                ["cot", "cftc", "positioning", "weekly", rpt, code, "T-405"], COT_SCHEMA, in_git=True)
             rep[name]["stored"] = _stored_info(e)
             if log:
                 log(f"cftc {name}: {len(rows)} weeks")
@@ -1568,8 +1721,6 @@ FINRA_LISTED = ("NNM", "NYSE", "ARCA", "SC", "BZX", "AMEX", "TXSE", "IEXG", "NGM
 FINRA_PAGE = 5000
 FINRA_FIRST = "2017-12-29"
 FINRA_PUBLISH_BDAYS = 8
-FINRA_LISTED_PER_DATE = 10600            # mean listed rows per date: 8,326 on 2017-12-29, about 12,900 on 2026-09-30; estimate
-FINRA_CALLS_PER_DATE = 4.6               # 2 counts + 2-3 pages of 5,000
 FINRA_SI_SCHEMA = ("kind short-interest: value = the FINRA row {symbolCode, issueName, marketClassCode, settlementDate, "
                    "currentShortPositionQuantity, previousShortPositionQuantity, changePreviousNumber, changePercent, "
                    "averageDailyVolumeQuantity, daysToCoverQuantity, stockSplitFlag, revisionFlag, issuerServicesGroupExchangeCode} "
@@ -1588,6 +1739,35 @@ def nth_business_day(day: str, n: int) -> str:
 
 def finra_si_available(settlement: str) -> str:
     return _end_of_day(nth_business_day(settlement, FINRA_PUBLISH_BDAYS))
+
+
+def finra_si_rows_est(day: str) -> int:
+    """Listed rows of one settlement date, interpolated between the measured 8,326 (2017-12-29) and 12,900 (2026-09-30)."""
+    a, b = date(2017, 12, 29), date(2026, 9, 30)
+    f = min(max((date.fromisoformat(day[:10]) - a).days / (b - a).days, 0.0), 1.2)
+    return int(8326 + (12900 - 8326) * f)
+
+
+def _prev_trading_day_or_same(d: date) -> date:
+    while not is_trading_day(d):
+        d -= timedelta(days=1)
+    return d
+
+
+def finra_si_calendar(first: str = FINRA_FIRST, today: Optional[str] = None) -> list[str]:
+    """Settlement dates by FINRA's rule (mid-month: the 15th, or the business day before it when the 15th is not one;
+    month-end: the last business day), from ``first`` to the last one published by ``today`` (7 NYSE business days after
+    settlement). The dry-run plan uses it (no request); a real run lists the dates from the API. It reproduces the API's
+    211 dates 2017-12-29..2026-09-30 (fetch6c/misc/probes/finra_aapl_dates.json)."""
+    today = today or _today()
+    out, d = [], date.fromisoformat(first[:10]).replace(day=1)
+    while d.isoformat() <= today:
+        nxt = date(d.year + (d.month == 12), d.month % 12 + 1, 1)
+        for s in (_prev_trading_day_or_same(d.replace(day=15)), _prev_trading_day_or_same(nxt - timedelta(days=1))):
+            if s.isoformat() >= first[:10] and nth_business_day(s.isoformat(), FINRA_PUBLISH_BDAYS - 1) <= today:
+                out.append(s.isoformat())
+        d = nxt
+    return out
 
 
 def _finra_query(c, th, body: dict, retries: int, backoff: float) -> tuple[Optional[list], Optional[int], dict]:
@@ -1633,11 +1813,22 @@ def fetch_finra_short_interest(store=None, dates: Optional[Iterable[str]] = None
     counts). Settlement dates come from the AAPL and SPY histories (one call each) unless ``dates`` is given."""
     archive = _archive(store)
     rep = report if report is not None else {}
-    if dry_run:
-        n_est = len(dates) if dates is not None else 2 * 12 * 8 + 19          # 2017-12-29 .. 2026-09-30: 211 dates
-        k = n_est if limit is None else min(limit, n_est)
-        rep["_plan"] = [_plan("finra_si", "finra-short-interest-<settlement>", k * FINRA_CALLS_PER_DATE + 2, FINRA_LISTED_PER_DATE * k,
-                              bundles=k)]
+    if dry_run:                          # no request: the rule's calendar stands in for the API's date list
+        ds = sorted(dates) if dates is not None else finra_si_calendar()
+        todo, plan = [], []
+        for d in ds:
+            name = f"finra-short-interest-{d}"
+            if _have(archive, name) and skip_stored and not refresh:
+                rep[name] = {"skipped": "stored"}
+                plan.append(_plan("finra_si", name, 0, finra_si_rows_est(d), stored=True))
+            else:
+                todo.append(d)
+        todo = todo[:limit] if limit is not None else todo
+        for i, d in enumerate(todo):
+            n = finra_si_rows_est(d)
+            plan.append(_plan("finra_si", f"finra-short-interest-{d}", 2 + math.ceil(n / FINRA_PAGE) + (2 if i == 0 and dates is None else 0), n))
+        rep["_plan"] = plan              # (+2 on the first: the AAPL and SPY date-listing calls)
+        rep["_dry_run"] = {"dates": len(ds), "already_stored": sum(1 for p in plan if p["already_stored"]), "to_fetch": len(todo)}
         return rep
     archive, rep, c, own, th = _setup(store, rep, client, min_interval)
     try:
@@ -1650,7 +1841,8 @@ def fetch_finra_short_interest(store=None, dates: Optional[Iterable[str]] = None
             else:
                 todo.append(d)
         todo = todo[:limit] if limit is not None else todo
-        rep["_plan"] = [_plan("finra_si", f"finra-short-interest-{d}", FINRA_CALLS_PER_DATE, FINRA_LISTED_PER_DATE) for d in todo]
+        rep["_plan"] = [_plan("finra_si", f"finra-short-interest-{d}", 2 + math.ceil(finra_si_rows_est(d) / FINRA_PAGE),
+                              finra_si_rows_est(d)) for d in todo]
         for d in todo:
             name = f"finra-short-interest-{d}"
             eq = {"compareType": "EQUAL", "fieldName": "settlementDate", "fieldValue": d}
@@ -2309,12 +2501,16 @@ ST_ANCHOR_SYMBOL = "SPY"
 ST_RETENTION_DAYS = 360                  # max=632,500,000 answered 2025-10-15 messages on 2026-10-15: about a rolling year
 ST_SEED = ((632_500_000, "2025-10-15T23:18:17+00:00"), (640_000_000, "2025-12-23T18:29:25+00:00"))
 ST_MAX_PAGES = 400
-# Pages per pre-open window, measured on Tuesday 2025-10-21 (133 pages, 3,593 messages, every window complete); Monday windows
-# span the weekend (64 hours) and are estimated at ST_MONDAY_FACTOR times a weekday.
-ST_PAGES_EST = {"SPY": 39, "QQQ": 13, "TSLA": 10, "NVDA": 10, "GME": 8, "AMC": 4, "AAPL": 6, "PLTR": 3, "MSTR": 3, "COIN": 1,
-                "BTC.X": 23, "ETH.X": 7, "SOL.X": 3, "DOGE.X": 3}
+# Pages per weekday pre-open window. Measured on Tuesday 2025-10-21 (133 pages for the 14 streams); the checker re-measured
+# 2025-10-29 (229 pages, 448 s) and the four heaviest streams on 2026-02-11, 2026-06-16 and 2026-09-22 (SPY 39-56, mean 47;
+# BTC.X 17-47, mean 28; NVDA 8-64; TSLA 6-16): about 1.3x the first measurement. SPY, BTC.X, NVDA and TSLA use those means
+# (NVDA without its 64-page event day), the other streams 1.3x their 2025-10-21 count. Monday windows span the weekend
+# (64 hours) and are estimated at ST_MONDAY_FACTOR times a weekday.
+ST_PAGES_EST = {"SPY": 48, "QQQ": 17, "TSLA": 11, "NVDA": 13, "GME": 10, "AMC": 5, "AAPL": 8, "PLTR": 4, "MSTR": 4, "COIN": 2,
+                "BTC.X": 28, "ETH.X": 9, "SOL.X": 4, "DOGE.X": 4}
 ST_MONDAY_FACTOR = 2.5
-ST_ANCHOR_CALLS = 6                      # secant-search calls per anchor (7 and 16/3 in the preview)
+ST_ANCHOR_CALLS = 9                      # secant-search calls per anchor (5-7 in the preview, 7-14 in the checker's runs)
+# Seconds per call for the plan: 1.95 (FAMILIES['st_preopen']; measured 1.85 s on 2025-10-21, 1.92 s on 2025-10-29).
 ST_MSGS_SCHEMA = ("kind message: value = {stream, id, created_at, sentiment (Bullish|Bearish|None), user_id, followers, symbols, likes, "
                   "body_len} (bodies not stored); available_at = created_at | kind window: value = {stream, day, window_start, "
                   "window_end, anchor_id, pages, messages, tagged, bullish, bearish, complete}; available_at = window end")
@@ -2449,7 +2645,7 @@ def _anchors(archive, c, th, targets: list[str], known: list, cache: dict, retri
 
 
 def _store_anchors(archive, cache: dict) -> None:
-    """Store the anchor cache merged with what is on disk (the pre-open and intensity runs may write it from two processes)."""
+    """Store the anchor cache merged with what is on disk (anchors of earlier runs; one writer per archive, see run_lock)."""
     if archive is None or not cache:
         return
     for r in _load(archive, "stocktwits-anchors"):
@@ -2807,26 +3003,109 @@ SOURCES = {
     "sec_companyfacts": fetch_sec_companyfacts, "stocktwits_preopen": fetch_stocktwits_preopen,
     "stocktwits_intensity": fetch_stocktwits_intensity, "deribit_near": fetch_deribit_near_trades,
 }
-DEFAULT_ORDER = ("wikipedia", "fja", "treasury", "cftc", "clevelandfed", "clevelandfed_snapshot", "spdr", "sprott", "ssga",
-                 "sec_tickers", "sec_lookup", "finra_si", "finra_cnms", "sec_submissions", "sec_companyfacts", "deribit_near",
-                 "stocktwits_preopen", "stocktwits_intensity")
+# StockTwits first: its rolling one-year retention loses the oldest day every day, and nothing else here erodes. The
+# intensity samples (~7 h) go before the pre-open windows (~30 h): the pre-open start then slips 7 hours instead of the
+# intensity start slipping 30. Then dependencies first (the membership lists before CNMS; FINRA and the SEC maps before
+# the SEC buckets).
+DEFAULT_ORDER = ("stocktwits_intensity", "stocktwits_preopen", "wikipedia", "fja", "treasury", "cftc", "clevelandfed",
+                 "clevelandfed_snapshot", "spdr", "sprott", "ssga", "sec_tickers", "sec_lookup", "finra_si", "finra_cnms",
+                 "sec_submissions", "sec_companyfacts", "deribit_near")
+# ONE WRITER AT A TIME. ``Archive`` keeps an in-memory index and re-reads INDEX.json with ``setdefault`` on every store,
+# so a second process storing into the same archive writes back its own stale entry for every bundle it has seen
+# (reproduced by the checker: a StockTwits week indexed at 1 row while its file held 2; ``verify`` fails). Storing runs
+# therefore hold an exclusive, non-blocking lock in the archive root: ``public_history.run.lock`` and also
+# ``crypto_history.run.lock`` (the sibling module's lock, so a crypto_history run and a public_history run refuse each
+# other); both are gitignored by ``mandel/**/*.lock``. To run StockTwits in parallel with the rest, give it its own
+# archive root (``--root DIR``) and ``merge`` it into the real archive afterwards.
+RUN_LOCKS = ("public_history.run.lock", "crypto_history.run.lock")
+
+
+@contextlib.contextmanager
+def run_lock(archive, names: Iterable[str] = RUN_LOCKS):
+    """Exclusive, non-blocking locks ``<archive root>/<name>`` for one storing run: a second writer on the same archive
+    raises RuntimeError at once instead of interleaving its INDEX writes (see ONE WRITER AT A TIME). No-op without an
+    archive root (store=None)."""
+    root = getattr(archive, "root", None)
+    if root is None:
+        yield None
+        return
+    held = []
+    try:
+        for n in names:
+            path = Path(root) / n
+            fh = open(path, "a+", encoding="utf-8")
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                fh.close()
+                raise RuntimeError(f"another writer holds {path}: run one storing process per archive (two writers leave stale "
+                                   "INDEX.json entries); run StockTwits under its own --root and merge afterwards") from None
+            held.append(fh)
+        yield [Path(root) / n for n in names]
+    finally:
+        for fh in reversed(held):
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            fh.close()
+
+
+def index_check(archive, before: dict[str, str]) -> dict:
+    """Compare this process's index entry of every bundle of this module it stored (sha256 changed since ``before``) with
+    a fresh read of INDEX.json. A mismatch means another process wrote INDEX.json from a stale view during the run."""
+    stored = {e.name: e for e in archive.entries() if before.get(e.name) != e.sha256 and _family(e.name)}
+    if not stored:
+        return {"ok": True, "bundles": 0}
+    disk = type(archive)(root=archive.root, ledger=archive.ledger)
+    bad = []
+    for n, e in sorted(stored.items()):
+        try:
+            d = disk.get(n)
+        except KeyError:
+            bad.append({"bundle": n, "index": None, "stored_rows": e.rows})
+            continue
+        if (d.sha256, d.rows, d.bytes) != (e.sha256, e.rows, e.bytes):
+            bad.append({"bundle": n, "index_rows": d.rows, "index_created_at": d.created_at, "stored_rows": e.rows,
+                        "stored_created_at": e.created_at})
+    out = {"ok": not bad, "bundles": len(stored)}
+    if bad:
+        out["mismatched"] = bad
+        out["hint"] = ("another process wrote INDEX.json from a stale view during this run; when nothing else is writing, "
+                       "re-run these bundles' sources with --refresh and check Archive().verify(name)")
+    return out
+
+
+@contextlib.contextmanager
+def _single_writer(store, rep: dict, dry_run: bool, log=None):
+    """run_lock + index_check around a storing run (nothing for a dry run or store=None)."""
+    archive = _archive(store)
+    if dry_run or archive is None or getattr(archive, "root", None) is None:
+        yield
+        return
+    with run_lock(archive):
+        before = {e.name: e.sha256 for e in archive.entries()}
+        try:
+            yield
+        finally:
+            rep["_index_check"] = index_check(archive, before)
+            if log and not rep["_index_check"]["ok"]:
+                log(f"INDEX CHECK FAILED: {json.dumps(rep['_index_check'], default=str)[:2000]}")
 
 
 def fetch_all_misc(store, dry_run: bool = False, limit: Optional[int] = None, sources: Optional[Iterable[str]] = None,
                    refresh: bool = False, report: Optional[dict] = None, log=None) -> dict:
-    """Every bundle of the misc source group, resumable (bundles stored complete on this machine are skipped). Sources run
-    in ``DEFAULT_ORDER``: dependencies first (the membership lists before CNMS; FINRA and the SEC maps before the SEC buckets),
-    StockTwits last (about 30 hours; the rest take about 6, which costs under one day of its rolling retention; or run it in
-    its own process with ``sources``). Returns {source: report, '_plan': [...], '_totals': {...}}."""
+    """Every bundle of the misc source group in ONE storing process, resumable (bundles stored complete on this machine are
+    skipped). Sources run in ``DEFAULT_ORDER`` (StockTwits first, then dependencies first). A storing run holds the archive's
+    run locks (a second writer raises RuntimeError) and reports '_index_check'. Returns {source: report, '_plan': [...],
+    '_totals': {...}, '_index_check': {...}}."""
     rep = report if report is not None else {}
     chosen = [s for s in DEFAULT_ORDER if sources is None or s in set(sources)]
-    for s in chosen:
-        try:
-            rep[s] = SOURCES[s](store, dry_run=dry_run, limit=limit, refresh=refresh, log=log)
-        except Exception as e:                             # one source failing never stops the others
-            rep[s] = {"_error": repr(e)[:300]}
-            if log:
-                log(f"{s}: {e!r}")
+    with _single_writer(store, rep, dry_run, log):
+        for s in chosen:
+            try:
+                rep[s] = SOURCES[s](store, dry_run=dry_run, limit=limit, refresh=refresh, log=log)
+            except Exception as e:                             # one source failing never stops the others
+                rep[s] = {"_error": repr(e)[:300]}
+                if log:
+                    log(f"{s}: {e!r}")
     plan = [p for s in chosen for p in (rep.get(s) or {}).get("_plan", [])]
     rep["_plan"] = plan
     rep["_totals"] = {"bundles": len(plan), "calls": sum(p["calls"] for p in plan), "rows": sum(p["rows"] for p in plan),
@@ -2835,13 +3114,66 @@ def fetch_all_misc(store, dry_run: bool = False, limit: Optional[int] = None, so
     return rep
 
 
+def _root_archive(root):
+    """The scratch archive of ``--root DIR`` / ``--preview DIR``: DIR/archive with its own ledger DIR/ledger.jsonl."""
+    from mandel.archive import Archive
+    from mandel.ledger import Ledger
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    return Archive(root=root / "archive", ledger=Ledger(root / "ledger.jsonl"))
+
+
+def merge_archive(src_root, store, pattern: str = "*", report: Optional[dict] = None, log=None) -> dict:
+    """Copy this module's bundles matching ``pattern`` from the archive of ``src_root`` (the DIR of a ``--root DIR`` run:
+    DIR/archive, DIR/ledger.jsonl) into
+    ``store``, under the run locks, with an index check. A bundle missing from ``store`` or with different content is
+    stored (recipe, tags, schema and in_git kept) unless the target already holds more rows (reported as a conflict, not
+    overwritten); identical bundles are skipped. ``stocktwits-anchors`` is merged as the union of both by target time."""
+    if not (Path(src_root) / "archive" / "INDEX.json").exists():
+        raise FileNotFoundError(f"no archive under {src_root} (expected {Path(src_root) / 'archive' / 'INDEX.json'})")
+    src = _root_archive(src_root)
+    dst = _archive(store)
+    rep = report if report is not None else {}
+    with _single_writer(dst, rep, False, log):
+        for e in sorted(src.entries(kind="data"), key=lambda x: x.name):
+            if not fnmatch(e.name, pattern) or _family(e.name) is None:
+                continue
+            try:
+                d = dst.get(e.name)
+            except KeyError:
+                d = None
+            if d is not None and d.sha256 == e.sha256:
+                rep[e.name] = {"skipped": "identical"}
+                continue
+            if e.name == "stocktwits-anchors":
+                byt = {r["value"]["target"]: r for r in (_load(dst, e.name) if d is not None else [])}
+                byt.update({r["value"]["target"]: r for r in src.load(e.name)})
+                rows = [byt[k] for k in sorted(byt)]
+            elif d is not None and d.rows > e.rows:
+                rep[e.name] = {"conflict": f"target holds {d.rows} rows, source {e.rows}: not overwritten"}
+                continue
+            else:
+                rows = src.load(e.name)
+            ent = dst.store(e.name, kind=e.kind, rows=rows, recipe=e.recipe, tags=e.tags, parked_reason=e.parked_reason,
+                            schema=e.schema, in_git=e.in_git)
+            rep[e.name] = {"stored": _stored_info(ent), "replaced": d is not None}
+            if log:
+                log(f"merged {e.name}: {ent.rows} rows")
+    return rep
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="python3 -m mandel.data.public_history",
                                 description="CFTC, Treasury, Cleveland Fed, SPDR, Sprott, SSGA, Wikipedia, fja05680, FINRA, SEC, StockTwits "
                                             "and Deribit near-expiry histories for the batch-6c underlying claims.")
-    p.add_argument("source", choices=["all"] + list(SOURCES))
+    p.add_argument("source", choices=["all", "merge"] + list(SOURCES),
+                   help="'all' (DEFAULT_ORDER, one process), one source, or 'merge' (copy a --root run into the archive)")
     p.add_argument("--dry-run", action="store_true", help="no request: print the plan (calls, rows, gzip MB, minutes)")
     p.add_argument("--preview", metavar="DIR", help="store into a scratch archive under DIR (DIR/archive, DIR/ledger.jsonl), not the real one")
+    p.add_argument("--root", metavar="DIR", help="store into the archive DIR/archive (ledger DIR/ledger.jsonl) instead of the real one, "
+                                                 "e.g. StockTwits in parallel with the rest; then 'merge --from DIR'")
+    p.add_argument("--from", dest="src", metavar="DIR", help="with 'merge': the DIR of a --root run")
+    p.add_argument("--pattern", default="*", help="with 'merge': bundle name pattern (default every bundle of this module)")
     p.add_argument("--limit", type=int, help="bundles (chunks) per fetcher")
     p.add_argument("--max-days", type=int, help="StockTwits / Deribit: days per run (a preview)")
     p.add_argument("--refresh", action="store_true", help="re-fetch stored bundles")
@@ -2850,29 +3182,35 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--last", help="last day (StockTwits, CNMS, Deribit)")
     a = p.parse_args(argv)
     from mandel.archive import Archive
-    if a.preview:
-        from mandel.ledger import Ledger
-        root = Path(a.preview)
-        root.mkdir(parents=True, exist_ok=True)
-        store = Archive(root=root / "archive", ledger=Ledger(root / "ledger.jsonl"))
-    else:
-        store = Archive()
+    if a.preview and a.root:
+        p.error("--preview and --root are exclusive")
+    store = _root_archive(a.preview or a.root) if (a.preview or a.root) else Archive()
     log = (lambda s: print(s, file=sys.stderr, flush=True))
-    if a.source == "all":
-        srcs = [x.strip() for x in a.sources.split(",")] if a.sources else None
-        unknown = sorted(set(srcs or ()) - set(SOURCES))
-        if unknown:
-            p.error(f"unknown sources {unknown}; choose from {sorted(SOURCES)}")
-        rep = fetch_all_misc(store, dry_run=a.dry_run, limit=a.limit, sources=srcs, refresh=a.refresh, log=log)
-    else:
-        kw = {}
-        if a.max_days is not None and a.source in ("stocktwits_preopen", "stocktwits_intensity", "deribit_near"):
-            kw["max_days"] = a.max_days
-        if a.first and a.source in ("stocktwits_preopen", "stocktwits_intensity", "deribit_near", "finra_cnms"):
-            kw["first"] = a.first
-        if a.last and a.source in ("stocktwits_preopen", "stocktwits_intensity", "deribit_near", "finra_cnms"):
-            kw["last"] = a.last
-        rep = SOURCES[a.source](store, dry_run=a.dry_run, limit=a.limit, refresh=a.refresh, log=log, **kw)
+    try:
+        if a.source == "merge":
+            if not a.src:
+                p.error("merge needs --from DIR (the DIR of a --root run)")
+            rep = merge_archive(a.src, store, pattern=a.pattern, log=log)
+        elif a.source == "all":
+            srcs = [x.strip() for x in a.sources.split(",")] if a.sources else None
+            unknown = sorted(set(srcs or ()) - set(SOURCES))
+            if unknown:
+                p.error(f"unknown sources {unknown}; choose from {sorted(SOURCES)}")
+            rep = fetch_all_misc(store, dry_run=a.dry_run, limit=a.limit, sources=srcs, refresh=a.refresh, log=log)
+        else:
+            kw = {}
+            if a.max_days is not None and a.source in ("stocktwits_preopen", "stocktwits_intensity", "deribit_near"):
+                kw["max_days"] = a.max_days
+            if a.first and a.source in ("stocktwits_preopen", "stocktwits_intensity", "deribit_near", "finra_cnms"):
+                kw["first"] = a.first
+            if a.last and a.source in ("stocktwits_preopen", "stocktwits_intensity", "deribit_near", "finra_cnms"):
+                kw["last"] = a.last
+            rep = {}
+            with _single_writer(store, rep, a.dry_run, log):         # the single-source path: same lock and index check
+                rep.update(SOURCES[a.source](store, dry_run=a.dry_run, limit=a.limit, refresh=a.refresh, log=log, **kw))
+    except RuntimeError as e:                                            # another writer holds the run lock
+        print(f"refused: {e}", file=sys.stderr)
+        return 2
     if a.preview:
         (Path(a.preview) / f"{a.source}.report.json").write_text(json.dumps(rep, indent=1, default=str)[:5_000_000], encoding="utf-8")
     summary = {k: v for k, v in rep.items() if k.startswith("_") and k != "_plan"}
@@ -2882,7 +3220,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(json.dumps(summary, indent=1, default=str)[:30000])
     if a.dry_run:
         print("\n".join(gitignore_lines()))
-    return 0
+    return 1 if not (rep.get("_index_check") or {"ok": True})["ok"] else 0
 
 
 if __name__ == "__main__":

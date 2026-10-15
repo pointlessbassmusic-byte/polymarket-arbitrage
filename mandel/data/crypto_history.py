@@ -21,7 +21,7 @@ theory's ``trial.data`` in mandel/theories/registry.json):
          into 1-minute bars with exact aggressor-side volume
   T-459  (optional replication) Coinbase BTC-USD trades -> 1-minute signed volume    -> coinbase-trades-1m-BTC-USD-<YYYY-MM>
   T-314  CMC historical listings every Sunday and Monday 2017-12-03 .., top 500      -> cmc-historical-listings
-  T-420, T-462 (and T-311's crypto variant)  CMC daily listings 2017-11 .., top 200  -> cmc-daily-listings-<YYYY>
+  T-420, T-462 (and T-311's crypto variant)  CMC daily listings 2017-11 .., top 500  -> cmc-daily-listings-<YYYY>
          (trailing 30-day dollar volume, point-in-time, dead coins included); per-coin daily OHLCV is optional
                                                                                       -> cmc-coin-daily-<id> (optional)
   T-400  CoinMetrics btc / eth CapMVRVCur, PriceUSD from 2010-07                     -> coinmetrics-<asset>-daily
@@ -58,15 +58,23 @@ Sources, endpoints and point-in-time rules (every row: {source, kind, key, obser
    last_id}; the minute before each hour mark (HH:59) also carries ``ticks`` = every trade [time, price, volume,
    side, ordertype, trade_id] so the last trade at or before mark - s (0 < s <= 60, T-331's staleness null) is exact.
    available_at = minute end; trades are public at execution. Stablecoin episodes keep raw trades (kind ``trade``,
-   available_at = execution time) plus one ``episode-window`` row per window (available_at = the day after the signal
-   day, when the Yahoo signal close is known).
+   available_at = execution time), one ``episode-signal`` row per window (the signal only; observed_at = signal day
+   00:00 UTC, available_at = the next day 00:00 UTC, when the Yahoo signal close is known, as in daily-history-<SYM>)
+   and one ``episode-window`` row (trade and page counts and ``complete`` for the whole window; observed_at =
+   available_at = the window end, so a point-in-time read before the window closes never sees them).
 3. CoinMarketCap data-api (keyless, undocumented; PUBLIC: answered 200 without a key on 2026-10-15):
    ``https://api.coinmarketcap.com/data-api/v3/cryptocurrency/listings/historical?date=YYYY-MM-DD&start=1&limit=<n>
    &convertId=2781``: the point-in-time ranking for that date, dead coins included (BitConnect id 1513 on
-   2018-01-07); limit=500 answered 500 rows. Rows: kind ``listing`` value = {date, id, symbol, slug, name, cmcRank,
-   price, volume24h, marketCap, circulatingSupply, totalSupply, maxSupply, percentChange24h, percentChange7d,
-   dateAdded, lastUpdated, platform, flags (the coin's tags that mark stablecoins / wrapped / tokenized / bridged /
-   liquid-staking assets, for the declared exclusion lists)}, plus one kind ``snapshot`` row per date (n coins, depth).
+   2018-01-07); limit=500 answered 500 rows in one call. The ranking is by cmcRank (market cap), so both the weekly and
+   the daily bundles go 500 deep: at depth 200 the trailing 30-day dollar-volume top 20 lost 3 members on 2026-10-11
+   (DGAI rank 310, a second 'SOL' rank 283, vBNB rank 254) and 3 on 2024-03-31 (BTCB 205, vBTC 250, vBNB 212). Rows:
+   kind ``listing`` value = {date, id, symbol, slug, name, cmcRank, price, volume24h, marketCap, circulatingSupply,
+   totalSupply, maxSupply, percentChange24h, percentChange7d, dateAdded, lastUpdated, platform, flags (the snapshot's
+   own tags that mark stablecoins / wrapped / tokenized / bridged / liquid-staking assets)}, plus one kind
+   ``snapshot`` row per date (n coins, depth). ``flags`` are SNAPSHOT-DATED and cannot drive exclusions: CMC tagged
+   106 of 500 coins on 2018-06-10 (USDT and TUSD untagged, so flags = []), 441 of 500 on 2021-05-16 (WBTC tagged
+   'stablecoin') and all 500 on 2026-10-11. Exclude stablecoins and wrapped assets with a declared list of CMC ids;
+   ``cmc_flags_latest`` (each id's tags in the newest stored snapshot that lists it, NOT point in time) helps draft it.
    The snapshot price for date D is D's close (it equals CMC's daily OHLC close; checked on 2026-10-10..12), so
    observed_at = D 23:59:59 UTC and available_at = D + 1 day 00:00 UTC.
    CMC prices are cross-exchange VWAPs and volume24h includes wash trades; CMC can revise history (exchange
@@ -94,8 +102,10 @@ Sources, endpoints and point-in-time rules (every row: {source, kind, key, obser
    percent, previous calendar year + year to date (2025-01-02 .. 2026-10-14, 447 days), so NAV = close /
    (1 + pct/100) with the archived daily-history-IBIT close; (b) the current NAV, closing price, shares outstanding
    and the Basket Bitcoin Amount (BTC per 40,000-share basket = the published bitcoin per share x 40,000);
-   (c) ``performanceData``: month-end growth of $10,000 at NAV since 2023-12-31, so month-end NAVs back to 2024-01
-   follow from one known NAV. Each run merges into the stored bundles, so the daily history accumulates.
+   (c) ``performanceData``: month-end growth of $10,000 at NAV, based at 2024-01-31 = 10,000 (the fund launched on
+   2024-01-11; the page's 2023-12-31 point, also 10,000, is a pre-launch placeholder and is not stored: 2024-01-31 is
+   10,000 too and 2024-02-29 / 2024-01-31 = 1.448 is BTC's February move), so month-end NAVs from 2024-01-31 on follow
+   from one known NAV. Each run merges into the stored bundles, so the daily history accumulates.
    available_at: premium/discount for day D = 09:30 ET on the next NYSE session (sponsors post the prior day's
    premium/discount before the open; IBIT is a '33 Act trust, so this is sponsor practice, not a legal duty);
    growth-10k month ends = month end + 15 days; the current snapshot = min(fetch time, that next-session rule).
@@ -106,27 +116,45 @@ redistribution right, and Coin Metrics community data is CC BY-NC 4.0 (non-comme
 local disk only (``in_git=False``, always); ``GITIGNORE_LINES`` lists the .gitignore lines (bundles are stored as
 ``mandel/archive/data/<name>.jsonl.gz``) and ``gitignore_line(name)`` maps a bundle to its line.
 
-Resumability. Every fetcher skips bundles already stored complete (tag ``complete``) unless ``refresh=True``.
-Month-chunked bundles are complete once their month has closed and every page succeeded; the open month is stored
-with tag ``partial`` and fetched again on the next run. A bundle whose paging failed, or that a preview cut short
-(``max_calls``), is never stored. Snapshot bundles (CMC, Kraken episodes, iShares) merge new dates into the stored
-bundle with ``mandel.data.deribit_history._merge_store`` (streamed) and skip dates already stored. A long run can be
-interrupted at any point: what was stored stays, and the next run continues.
+Resumability. Every fetcher skips bundles already stored complete (tag ``complete``) unless ``refresh=True``, and
+``complete`` means the bundle covers its family default, never just the span a call asked for: a month chunk is
+complete only when it holds the whole UTC month (first <= the month start) and the month has closed; a daily, hourly,
+coin or Coin Metrics bundle only when first <= the family default first (CB_FIRST_DAY, CB_HOURLY_FIRST,
+CMC_COIN_FIRST, CM_FIRST) and last is the last closed bar. Anything narrower is stored with tag ``partial`` and
+fetched again by the next default run. Each range bundle also carries ``span:<first>..<last>`` (the span asked for),
+and a stored bundle is skipped only when that span starts at or before the requested first (a call asking for a
+wider span fetches again; a bundle without a span tag is fetched again). Set-valued parameters are covered the same
+way: Coin Metrics metrics (tags ``has:<metric>``), DefiLlama pools (``has:<pool>``), CMC depth (a stored date is
+skipped only when its snapshot ``limit`` >= the requested depth) and Kraken episode windows (only when the stored
+window covers the requested one). A bundle whose paging failed, or that a preview cut short (``max_calls``), is never
+stored. Snapshot bundles (CMC, Kraken episodes, iShares) merge new dates into the stored bundle with
+``mandel.data.deribit_history._merge_store`` (streamed) and skip dates already stored. A long run can be interrupted
+at any point: what was stored stays, and the next run continues.
+
+ONE WRITER AT A TIME. ``Archive`` keeps an in-memory index and, on every store, re-reads INDEX.json with
+``setdefault``, so a process writes back its own stale entry for every bundle it has already seen. Two processes
+storing into one archive at once (two crypto_history runs, or this module next to any other fetcher) leave INDEX
+entries whose rows, bytes and sha256 describe an older file (reproduced: cmc-historical-listings indexed at 60 rows
+while the file held 926; ``verify`` fails). So run the sources in ONE process (the default, about 22 hours), or
+start ``--sources kraken_1m`` only after everything else has finished. ``fetch_all_crypto`` takes an exclusive,
+non-blocking run lock (``<archive root>/crypto_history.run.lock``, gitignored by ``mandel/**/*.lock``) and refuses
+to start a second run on the same archive; it cannot see other modules' writers. At the end it compares this
+process's index entry of every bundle it stored with a fresh read of INDEX.json and reports any mismatch in
+``_index_check`` (and the command line exits 1), so a concurrent writer cannot corrupt the index silently.
 
 Estimates (``dry_run``, 2026-10-15; gzip bytes per row measured on the live previews in fetch6c/crypto; minutes at ``PACE``):
   * coinbase-daily-*: ~493 bundles (492 USD products + CBETH-ETH), 6.9k calls, ~0.57M rows, ~16 MB, ~29 min.
   * coinbase-hourly-*: ~110 bundles (depends on the candidate ranking), ~12.5k calls, ~3.4M rows, ~125 MB, ~52 min.
   * coinbase-1m-BTC-USD-*: 58 bundles, 8.4k calls, 2.5M rows, ~83 MB, ~35 min.
   * kraken-trades-1m-XBTUSD-*: 58 bundles, ~67k calls, 2.5M rows, ~250 MB, ~18.6 h at 1 call/s (busy days page 4x more:
-    2026-10-15 printed 166k trades in 19 hours). Run it as its own process next to the rest: the hosts differ and the
-    archive serialises concurrent writers.
+    2026-10-15 printed 166k trades in 19 hours). It runs last in the same process (see ONE WRITER AT A TIME).
   * kraken-trades-stablecoin-episodes: ~200 calls, ~0.19M rows, ~6 MB, ~4 min (the 2023-03-11 USDC window pages more).
-  * cmc-historical-listings: 926 calls, 0.46M rows, ~42 MB, ~19 min; cmc-daily-listings-*: 3,270 calls, 0.66M rows, ~68 MB,
-    ~65 min.
+  * cmc-historical-listings: 926 calls, 0.46M rows, ~42 MB, ~19 min; cmc-daily-listings-* (depth 500, one call per date):
+    3,270 calls, 1.64M rows, ~165 MB (101 B/row measured on 30-day depth-500 bundles), ~65 min.
   * coinmetrics-*-daily: 7 calls, 25k rows, ~1 MB; btc-hashrate-daily: 1 call, 6.5k rows; defillama: 5 calls (the /pools
     snapshot is 11.5 MB raw, 2.5 MB stored); ishares: 1 call.
-  * Default total: ~99k calls, ~10.3M rows, ~595 MB gzip, ~22 hours (18.6 of them Kraken). Optional: cmc-coin-daily-*
-    ~2.7k calls, ~41 MB, ~54 min; coinbase-trades-1m-BTC-USD-2025-01 ~14k calls, ~58 min.
+  * Default total: ~99k calls, ~11.3M rows, ~690 MB gzip, ~22 hours (18.6 of them Kraken), one process. Optional:
+    cmc-coin-daily-* ~2.7k calls, ~41 MB, ~54 min; coinbase-trades-1m-BTC-USD-2025-01 ~14k calls, ~58 min.
 
 Every ``fetch_*`` takes ``store`` (an Archive, an ObservationStore whose ``.archive`` is used, or None to store
 nothing), ``limit`` (bundles, or snapshot dates for CMC), ``dry_run`` (no request: the plan with calls, rows, gzip MB
@@ -139,6 +167,8 @@ them in order. Command line: ``python3 -m mandel.data.crypto_history [--dry-run]
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import gzip
 import html
 import json
@@ -150,6 +180,7 @@ import time
 from bisect import bisect_left
 from datetime import date, datetime, timedelta, timezone
 from fnmatch import fnmatch
+from pathlib import Path
 from typing import Callable, Iterable, Optional
 from zoneinfo import ZoneInfo
 
@@ -222,28 +253,46 @@ def _months(first: str, last_s: int) -> list[tuple[str, int, int]]:
     return out
 
 
-def _stored_complete(archive, name: str) -> bool:
+def _span_tag(first: str, last: str) -> str:
+    """The span a range bundle was asked for, as a tag (``span:<first day>..<last day>``)."""
+    return f"span:{first[:10]}..{last[:10]}"
+
+
+def _stored_complete(archive, name: str, first: Optional[str] = None, need: Iterable[str] = ()) -> bool:
+    """True when ``name`` is stored with tag ``complete`` and covers the request: with ``first``, its ``span:`` tag must
+    start at or before ``first`` (a bundle without one does not cover); every item of ``need`` must be tagged
+    ``has:<item>``. Skip-stored decisions use this, so a narrow earlier call can never hide a wider request."""
     try:
-        return "complete" in (archive.get(name).tags or [])
+        tags = archive.get(name).tags or []
     except (KeyError, AttributeError):
         return False
+    if "complete" not in tags:
+        return False
+    if first is not None:
+        span = next((t[5:] for t in tags if t.startswith("span:")), None)
+        if span is None or span.split("..")[0] > first[:10]:
+            return False
+    return all(f"has:{x}" in tags for x in need)
 
 
 def _put(archive, name: str, rows: Iterable[dict], recipe: str, tags: Iterable[str], schema: str, complete: bool):
-    """Store a whole bundle, always local disk only; tag ``complete`` or ``partial`` drives skip_stored."""
+    """Store a whole bundle, always local disk only; tag ``complete`` (the bundle covers its family default) or
+    ``partial`` (anything narrower, or a month still open) drives skip_stored."""
     tg = sorted(set(tags) | {"crypto", "complete" if complete else "partial"})
     return archive.store(name, kind="data", rows=rows, recipe=recipe, tags=tg, schema=schema, in_git=False)
 
 
-def _stored_groups(archive, name: str, kind: str, group: Callable[[dict], str], need_complete: bool = False) -> set[str]:
-    """Groups (dates, windows) of the stored rows of ``kind`` (one streamed pass; empty when nothing is stored)."""
+def _stored_groups(archive, name: str, kind: str, group: Callable[[dict], str], need_complete: bool = False,
+                   keep: Optional[Callable[[dict], bool]] = None) -> set[str]:
+    """Groups (dates, windows) of the stored rows of ``kind`` (one streamed pass; empty when nothing is stored), only
+    those whose row passes ``keep`` when given (e.g. a snapshot at least as deep as the request)."""
     out: set[str] = set()
     if archive is None:
         return out
     try:
         archive.get(name)
         for r in archive.load(name):
-            if r.get("kind") == kind and (not need_complete or (r.get("value") or {}).get("complete", True)):
+            if r.get("kind") == kind and (not need_complete or (r.get("value") or {}).get("complete", True)) and (keep is None or keep(r)):
                 out.add(group(r))
     except (KeyError, FileNotFoundError, OSError, ValueError, AttributeError):
         pass
@@ -322,7 +371,7 @@ def _recipe(core: str, licence: str) -> str:
 PACE = {"coinbase": 0.25, "kraken": 1.0, "cmc": 1.2, "coinmetrics": 0.7, "blockchain": 1.0, "llama": 0.5, "ishares": 2.0}
 LATENCY = {"coinbase": 0.2, "kraken": 0.32, "cmc": 0.6, "coinmetrics": 0.6, "blockchain": 0.8, "llama": 1.2, "ishares": 0.9}
 # gzip bytes per stored row (compresslevel 9), measured on the 2026-10-15 previews (fetch6c/crypto)
-ROW_GZ = {"cb_daily": 28, "cb_hourly": 37, "cb_1m": 33, "kraken_1m": 100, "kraken_trade": 30, "cmc_weekly": 91, "cmc_daily": 104,
+ROW_GZ = {"cb_daily": 28, "cb_hourly": 37, "cb_1m": 33, "kraken_1m": 100, "kraken_trade": 30, "cmc_weekly": 91, "cmc_daily": 101,
           "cm": 40, "hash": 25, "llama_chart": 33, "llama_pool": 148, "ishares": 25, "products": 19, "cmc_coin": 91}
 CB_USD_PRODUCTS = 492               # USD-quoted products on 2026-10-15 (online + delisted); dry-run estimate only
 CB_DAILY_ROWS_AVG = 1150            # mean daily bars per USD product (listing to delisting); dry-run estimate only
@@ -441,13 +490,16 @@ def cb_row(product: str, b: list, granularity: int) -> dict:
                  "close": float(b[4]), "volume": float(b[5])})
 
 
-def _cb_series(archive, name: str, product: str, first_s: int, last_s: int, granularity: int, closed: bool, recipe: str,
-               schema: str, tags: list[str], client, th, max_calls, retries, backoff, rep: dict, rows_out: Optional[dict]) -> dict:
+def _cb_series(archive, name: str, product: str, first_s: int, last_s: int, granularity: int, complete: bool, recipe: str,
+               schema: str, tags: list[str], client, th, max_calls, retries, backoff, rep: dict, rows_out: Optional[dict],
+               span: Optional[str] = None) -> dict:
+    """Fetch and store one candle bundle. ``complete`` = the span covers the family default (and has closed); ``span`` =
+    the requested first..last tag (defaults to first_s..last_s)."""
     bars, st = cb_walk(product, first_s, last_s, granularity, client, th, max_calls=max_calls, retries=retries, backoff=backoff)
     rows = [cb_row(product, bars[t], granularity) for t in sorted(bars)]
     ok = not st["failed"] and not st["truncated"] and not st.get("aborted")
     info = {"calls": st["calls"], "rows": len(rows), "first": rows[0]["observed_at"][:16] if rows else None,
-            "last": rows[-1]["observed_at"][:16] if rows else None, "complete": ok and closed}
+            "last": rows[-1]["observed_at"][:16] if rows else None, "complete": ok and complete}
     for k in ("failed", "aborted", "not_found", "truncated"):
         if st.get(k):
             info[k] = st[k]
@@ -455,7 +507,8 @@ def _cb_series(archive, name: str, product: str, first_s: int, last_s: int, gran
         rows_out[name] = rows
     if archive is not None and ok:
         note = " The product answered 404 NotFound (stored empty)." if st["not_found"] else ""
-        e = _put(archive, name, rows, recipe + note, tags, schema, complete=closed)
+        e = _put(archive, name, rows, recipe + note, list(tags) + [span or _span_tag(_day(first_s), _day(last_s))], schema,
+                 complete=complete)
         info["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}
     elif archive is not None:
         info["not_stored"] = "truncated preview" if st["truncated"] else "a page failed; fetched again on the next run"
@@ -533,7 +586,8 @@ def fetch_coinbase_daily(store=None, products: Optional[Iterable[str]] = None, f
                          log: Optional[Callable] = None, **_) -> dict:
     """``coinbase-daily-<PID>``: daily candles first..last (default: the last closed day) for every USD product plus
     CBETH-ETH, or for ``products``. The whole range is scanned for every product (a delisted or halted product's candles
-    sit anywhere in it: XRP-USD halted 2021-01 .. 2023-07), 14 requests per product."""
+    sit anywhere in it: XRP-USD halted 2021-01 .. 2023-07), 14 requests per product. Tagged ``complete`` only when
+    first <= CB_FIRST_DAY and last is the last closed day; a narrower call stores ``partial`` (fetched again by default)."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         pl = product_list if product_list is not None else _stored_products(archive)
@@ -545,6 +599,7 @@ def fetch_coinbase_daily(store=None, products: Optional[Iterable[str]] = None, f
         pids = list(products) if products is not None else (daily_products(pl) if pl is not None else None)
         last_s = min(_ts(last), _last_closed(DAY)) if last else _last_closed(DAY)
         first_s = _ts(first)
+        full = first[:10] <= CB_FIRST_DAY and last_s >= _last_closed(DAY)      # covers the family default: else 'partial'
         n_days = (last_s - first_s) // DAY + 1
         calls_each = math.ceil(n_days / CB_MAX)
         if pids is None:                                    # dry run without a product list: family estimate
@@ -552,7 +607,8 @@ def fetch_coinbase_daily(store=None, products: Optional[Iterable[str]] = None, f
             rep["_plan"] = _total([_item(f"coinbase-daily-<{n} products>", "coinbase", calls_each * n, CB_DAILY_ROWS_AVG * n, "cb_daily",
                                          min_interval)], note=f"{n} bundles of {calls_each} requests each; product list not known yet")
             return rep
-        todo = [p for p in pids if refresh or not skip_stored or archive is None or not _stored_complete(archive, f"coinbase-daily-{p}")]
+        todo = [p for p in pids if refresh or not skip_stored or archive is None
+                or not _stored_complete(archive, f"coinbase-daily-{p}", first=first)]
         rep["_already_stored"] = len(pids) - len(todo)
         if limit is not None:
             todo = todo[:limit]
@@ -561,7 +617,7 @@ def fetch_coinbase_daily(store=None, products: Optional[Iterable[str]] = None, f
                                          n_days if p == "BTC-USD" else min(n_days, CB_DAILY_ROWS_AVG), "cb_daily", min_interval) for p in todo])
             return rep
         for i, p in enumerate(todo):
-            _cb_series(archive, f"coinbase-daily-{p}", p, first_s, last_s, DAY, True,
+            _cb_series(archive, f"coinbase-daily-{p}", p, first_s, last_s, DAY, full,
                        _recipe(f"GET {CB}/products/{p}/candles?granularity=86400&start=<ISO>&end=<ISO> in windows of 300 days, "
                                f"{_day(first_s)}..{_day(last_s)} (the whole range scanned); via mandel.data.crypto_history.fetch_coinbase_daily.",
                                "coinbase"),
@@ -638,11 +694,12 @@ def fetch_coinbase_hourly(store=None, products: Optional[Iterable[str]] = None, 
     """``coinbase-hourly-<PID>``: hourly candles from max(first, the product's first daily bar) to the last closed hour, or
     to its last daily bar + 1 day when that bar is more than 7 days older than the daily bundle (delisted or halted).
     Without ``products``: CB_ALWAYS_HOURLY plus ``hourly_candidates`` computed from the stored coinbase-daily-* bundles
-    (fetch those first)."""
+    (fetch those first). Tagged ``complete`` only when first <= CB_HOURLY_FIRST and last is the last closed hour."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         last_s = min(_ts(last) + DAY - 3600, _last_closed(3600)) if last else _last_closed(3600)
         last_day = _day(last_s)
+        full = first[:10] <= CB_HOURLY_FIRST and last_s >= _last_closed(3600)  # covers the family default: else 'partial'
         spans: dict[str, tuple[int, int]] = {}
         if products is None:
             daily: dict[str, dict] = {}
@@ -673,7 +730,8 @@ def fetch_coinbase_hourly(store=None, products: Optional[Iterable[str]] = None, 
         else:
             pids = list(products)
         family_estimate = products is None and archive is None or (products is None and not spans and dry_run)
-        todo = [p for p in pids if refresh or not skip_stored or archive is None or not _stored_complete(archive, f"coinbase-hourly-{p}")]
+        todo = [p for p in pids if refresh or not skip_stored or archive is None
+                or not _stored_complete(archive, f"coinbase-hourly-{p}", first=first)]
         rep["_already_stored"] = len(pids) - len(todo)
         if limit is not None:
             todo = todo[:limit]
@@ -700,12 +758,13 @@ def fetch_coinbase_hourly(store=None, products: Optional[Iterable[str]] = None, 
             if b < a:
                 rep[f"coinbase-hourly-{p}"] = {"skipped": "no daily bars inside the hourly window"}
                 continue
-            _cb_series(archive, f"coinbase-hourly-{p}", p, a, b, 3600, True,
+            _cb_series(archive, f"coinbase-hourly-{p}", p, a, b, 3600, full,
                        _recipe(f"GET {CB}/products/{p}/candles?granularity=3600&start=<ISO>&end=<ISO> in windows of 300 hours, "
                                f"{_iso_z(a)}..{_iso_z(b)}; candidates = {', '.join(CB_ALWAYS_HOURLY)} plus every USD product in the top "
                                f"{top_k} by trailing {RANK_WINDOW_DAYS}-day dollar volume (coinbase-daily-*, stablecoins excluded) on any "
                                f"day from {first}; via mandel.data.crypto_history.fetch_coinbase_hourly.", "coinbase"),
-                       CB_HOURLY_SCHEMA, ["coinbase", "prices", "hourly", "history"], c, th, max_calls, retries, backoff, rep, rows_out)
+                       CB_HOURLY_SCHEMA, ["coinbase", "prices", "hourly", "history"], c, th, max_calls, retries, backoff, rep, rows_out,
+                       span=_span_tag(first, _day(b)))
             if log and (i + 1) % 10 == 0:
                 log(f"coinbase hourly: {i + 1}/{len(todo)} products")
         return rep
@@ -719,13 +778,14 @@ def fetch_coinbase_1m(store=None, product: str = "BTC-USD", first: str = CB_1M_F
                       max_calls: Optional[int] = None, min_interval: float = PACE["coinbase"], retries: int = 4, backoff: float = 1.0,
                       report: Optional[dict] = None, rows_out: Optional[dict] = None, client: Optional[httpx.Client] = None,
                       log: Optional[Callable] = None, **_) -> dict:
-    """``coinbase-1m-<PID>-<YYYY-MM>``: 1-minute candles, one bundle per UTC month, first .. the last closed minute."""
+    """``coinbase-1m-<PID>-<YYYY-MM>``: 1-minute candles, one bundle per UTC month, first .. the last closed minute. A month
+    is tagged ``complete`` only when it holds the whole closed month (a mid-month first or last stores ``partial``)."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         last_s = min(_ts(last) + DAY - 60, _last_closed(60)) if last else _last_closed(60)
         months = _months(first, last_s)
         todo = [m for m in months if refresh or not skip_stored or archive is None
-                or not _stored_complete(archive, f"coinbase-1m-{product}-{m[0]}")]
+                or not _stored_complete(archive, f"coinbase-1m-{product}-{m[0]}", first=_day(m[1]))]
         rep["_already_stored"] = len(months) - len(todo)
         if limit is not None:
             todo = todo[:limit]
@@ -738,7 +798,8 @@ def fetch_coinbase_1m(store=None, product: str = "BTC-USD", first: str = CB_1M_F
             return rep
         for ym, a, b in todo:
             end = min(b - 60, last_s)
-            _cb_series(archive, f"coinbase-1m-{product}-{ym}", product, max(a, _ts(first)), end, 60, b - 60 <= last_s,
+            whole = _ts(first) <= a and b - 60 <= last_s                    # the whole UTC month, and it has closed
+            _cb_series(archive, f"coinbase-1m-{product}-{ym}", product, max(a, _ts(first)), end, 60, whole,
                        _recipe(f"GET {CB}/products/{product}/candles?granularity=60&start=<ISO>&end=<ISO> in windows of 300 minutes "
                                f"over {ym} (UTC); via mandel.data.crypto_history.fetch_coinbase_1m.", "coinbase"),
                        CB_1M_SCHEMA, ["coinbase", "prices", "1m", "history", ym], c, th, max_calls, retries, backoff, rep, rows_out)
@@ -868,13 +929,13 @@ def fetch_coinbase_trades_1m(store=None, product: str = "BTC-USD", first: str = 
                              client: Optional[httpx.Client] = None, log: Optional[Callable] = None, **_) -> dict:
     """Optional (T-459 cross-venue replication): ``coinbase-trades-1m-<PID>-<YYYY-MM>``, Coinbase trades over
     [first, last] aggregated with ``MinuteAgg`` (aggressor = the opposite of Coinbase's maker ``side``). A full 2023-26
-    pull is about 700k pages, so the default is one month."""
+    pull is about 700k pages, so the default is one month. A month is ``complete`` only when it holds the whole month."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         last_s = min(_ts(last) + DAY, _last_closed(60) + 60)
         months = [m for m in _months(first, last_s - 1)]
         todo = [m for m in months if refresh or not skip_stored or archive is None
-                or not _stored_complete(archive, f"coinbase-trades-1m-{product}-{m[0]}")]
+                or not _stored_complete(archive, f"coinbase-trades-1m-{product}-{m[0]}", first=_day(m[1]))]
         if limit is not None:
             todo = todo[:limit]
         if dry_run:
@@ -888,7 +949,7 @@ def fetch_coinbase_trades_1m(store=None, product: str = "BTC-USD", first: str = 
         for ym, ms, me in todo:
             name = f"coinbase-trades-1m-{product}-{ym}"
             a, b = max(ms, _ts(first)), min(me, last_s)
-            closed = me <= last_s
+            closed = me <= last_s and _ts(first) <= ms                     # the whole UTC month, and it has closed
             st: dict = {"calls": 0}
             agg = MinuteAgg(product)
             stop_id = cb_trade_id_at(product, a, c, th, retries, backoff, st)
@@ -926,7 +987,7 @@ def fetch_coinbase_trades_1m(store=None, product: str = "BTC-USD", first: str = 
                                                       f"the first trade at or after {_iso_z(b)} to the first at or after {_iso_z(a)} "
                                                       "(ids found by bisection); aggressor side = opposite of the maker side; aggregated "
                                                       "with mandel.data.crypto_history.MinuteAgg via fetch_coinbase_trades_1m.", "coinbase"),
-                         ["coinbase", "trades", "1m", "signed-volume", ym], TRADE_1M_SCHEMA, complete=closed)
+                         ["coinbase", "trades", "1m", "signed-volume", ym, _span_tag(_day(a), _day(b - 1))], TRADE_1M_SCHEMA, complete=closed)
                 info["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}
             rep[name] = info
         return rep
@@ -984,7 +1045,7 @@ def kraken_walk(pair: str, start_ns: int, end_ns: int, client: httpx.Client, thr
     when ``end_ns`` is in the past (nothing traded between the last trade and the window end)."""
     now_ns = (_now_s() * 10**9) if now_ns is None else now_ns
     st = {"calls": 0, "trades": 0, "complete": False, "caught_up": False, "truncated": False}
-    since, max_id = start_ns, -1
+    since, max_id = start_ns - 1, -1                    # 'since' is exclusive: a trade exactly at start_ns belongs here
     while True:
         if max_calls is not None and st["calls"] >= max_calls:
             st["truncated"] = True
@@ -1034,14 +1095,14 @@ def fetch_kraken_trades_1m(store=None, pair: str = "XBTUSD", first: str = KRAKEN
                            log: Optional[Callable] = None, **_) -> dict:
     """``kraken-trades-1m-<PAIR>-<YYYY-MM>``: Kraken public trades paged by ``since`` (ns) over each UTC month, rebuilt into
     1-minute bars with exact aggressor-side volume (``MinuteAgg``). About 67k pages for XBTUSD 2022-01 .. 2026-10 at about
-    1 page/s: run it last, it resumes month by month."""
+    1 page/s: run it last, it resumes month by month. A month is ``complete`` only when it holds the whole closed month."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         now = _now_s()
         last_s = min(_ts(last) + DAY, now) if last else now
         months = _months(first, last_s - 1)
         todo = [m for m in months if refresh or not skip_stored or archive is None
-                or not _stored_complete(archive, f"kraken-trades-1m-{pair}-{m[0]}")]
+                or not _stored_complete(archive, f"kraken-trades-1m-{pair}-{m[0]}", first=_day(m[1]))]
         rep["_already_stored"] = len(months) - len(todo)
         if limit is not None:
             todo = todo[:limit]
@@ -1061,7 +1122,7 @@ def fetch_kraken_trades_1m(store=None, pair: str = "XBTUSD", first: str = KRAKEN
             st = kraken_walk(pair, a * 10**9, b * 10**9, c, th, lambda batch, agg=agg: _kraken_add(agg, batch),
                              max_calls=max_calls, retries=retries, backoff=backoff, now_ns=now * 10**9)
             rows = agg.rows("kraken")
-            closed = me <= last_s and st["complete"]
+            closed = me <= last_s and st["complete"] and _ts(first) <= ms   # the whole UTC month, closed and fully paged
             info = {"calls": st["calls"], "trades": st["trades"], "rows": len(rows), "complete": closed}
             for k in ("error", "truncated", "caught_up"):
                 if st.get(k):
@@ -1074,7 +1135,7 @@ def fetch_kraken_trades_1m(store=None, pair: str = "XBTUSD", first: str = KRAKEN
                                                       "trade id and aggregated with mandel.data.crypto_history.MinuteAgg via "
                                                       "fetch_kraken_trades_1m (Kraken's OHLC endpoint keeps only 720 bars, so history comes "
                                                       "from Trades).", "kraken"),
-                         ["kraken", "trades", "1m", "signed-volume", ym], TRADE_1M_SCHEMA, complete=closed)
+                         ["kraken", "trades", "1m", "signed-volume", ym, _span_tag(_day(a), _day(b - 1))], TRADE_1M_SCHEMA, complete=closed)
                 info["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}
             elif archive is not None:
                 info["not_stored"] = "truncated preview" if st["truncated"] else "paging failed; fetched again on the next run"
@@ -1100,10 +1161,13 @@ EPISODE_PAIRS = {"USDT": "USDTZUSD", "USDC": "USDCUSD"}
 EPISODE_BUNDLE = "kraken-trades-stablecoin-episodes"
 EPISODE_TRADES_PER_DAY = {"USDT": 2000, "USDC": 1900}         # 2018 / 2020 probes (1,000 trades per 12-13 h); estimate only
 EPISODE_SCHEMA = ("kind trade: value = {coin, pair, signal_day, price, volume, time (unix s), side (b = buyer-initiated), ordertype, "
-                  "misc, trade_id}; available_at = execution time | kind episode-window: value = {coin, pair, signal_day, start, end, "
-                  "trades, pages, complete, pre_window (signal before 2018), source ('triage' = frozen list, 'detected' = the rule on "
-                  "the archived Yahoo closes)}; available_at = the day after the signal day 00:00 UTC (the signal close is known then). "
-                  "Rebuild the 00:00 UTC executable closes from the last trade before each midnight")
+                  "misc, trade_id}; observed_at = available_at = execution time | kind episode-signal: value = {coin, pair, signal_day, "
+                  "start, end, pre_window (signal before 2018), source ('triage' = frozen list, 'detected' = the rule on the archived "
+                  "Yahoo closes)}; observed_at = signal day 00:00 UTC, available_at = the next day 00:00 UTC (the signal close is known "
+                  "then, as in daily-history-<SYM>) | kind episode-window: value = {coin, pair, signal_day, start, end, trades, pages, "
+                  "complete, fetched_at, pre_window, source} (counts over the whole window); observed_at = available_at = the window "
+                  "end, so a point-in-time read inside the window never sees them. Rebuild the 00:00 UTC executable closes from the "
+                  "last trade before each midnight")
 
 
 def peg_episodes(closes: dict[str, float], below: float = 0.995, at_or_above: float = 0.998, run: int = 5) -> list[str]:
@@ -1151,13 +1215,18 @@ def fetch_kraken_stablecoin_episodes(store=None, episodes: Optional[Iterable[tup
                                      backoff: float = 1.0, report: Optional[dict] = None, rows_out: Optional[dict] = None,
                                      client: Optional[httpx.Client] = None, log: Optional[Callable] = None, **_) -> dict:
     """``kraken-trades-stablecoin-episodes`` (T-330): raw Kraken trades of USDTZUSD / USDCUSD in each episode window,
-    merged window by window into one bundle (complete windows only)."""
+    merged window by window into one bundle (complete windows only; a stored window is skipped only when it covers the
+    requested [signal - before_days, signal + after_days + 1) window)."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         wins = episode_windows(archive, episodes, before_days, after_days)
         group = lambda r: f"{r['value']['coin']}:{r['value']['signal_day']}"
-        have = _stored_groups(archive, EPISODE_BUNDLE, "episode-window", group, need_complete=True) if (skip_stored and not refresh) else set()
-        todo = [w for w in wins if f"{w['coin']}:{w['signal_day']}" not in have]
+        stored = _stored_windows(archive) if (skip_stored and not refresh) else {}
+
+        def covered(w: dict) -> bool:                           # a stored narrower window is fetched again
+            se = stored.get(f"{w['coin']}:{w['signal_day']}")
+            return se is not None and se[0] <= iso(w["start_s"]) and se[1] >= iso(w["end_s"])
+        todo = [w for w in wins if not covered(w)]
         rep["_already_stored"] = len(wins) - len(todo)
         if limit is not None:
             todo = todo[:limit]
@@ -1182,10 +1251,11 @@ def fetch_kraken_stablecoin_episodes(store=None, episodes: Optional[Iterable[tup
                                   {"coin": w["coin"], "pair": w["pair"], "signal_day": w["signal_day"], "price": float(tr[0]),
                                    "volume": float(tr[1]), "time": ts, "side": tr[3], "ordertype": tr[4] if len(tr) > 4 else None,
                                    "misc": tr[5] if len(tr) > 5 else None, "trade_id": tid}))
-            fresh.append(_row("kraken", "episode-window", key, obs, iso(_ts(w["signal_day"]) + DAY),
-                              {"coin": w["coin"], "pair": w["pair"], "signal_day": w["signal_day"], "start": iso(w["start_s"]),
-                               "end": iso(w["end_s"]), "trades": len(got), "pages": st["calls"], "complete": st["complete"],
-                               "pre_window": w["pre_window"], "source": w["source"]}))
+            sig = {"coin": w["coin"], "pair": w["pair"], "signal_day": w["signal_day"], "start": iso(w["start_s"]), "end": iso(w["end_s"]),
+                   "pre_window": w["pre_window"], "source": w["source"]}
+            fresh.append(_row("kraken", "episode-signal", key, iso(_ts(w["signal_day"])), iso(_ts(w["signal_day"]) + DAY), sig))
+            fresh.append(_row("kraken", "episode-window", key, iso(w["end_s"]), iso(w["end_s"]),     # counts known at the window end
+                              {**sig, "trades": len(got), "pages": st["calls"], "complete": st["complete"], "fetched_at": obs}))
             rep[key] = {"pages": st["calls"], "trades": len(got), "complete": st["complete"], **({"error": st["error"]} if st.get("error") else {})}
             if st["complete"]:
                 done.add(key)
@@ -1208,9 +1278,28 @@ def fetch_kraken_stablecoin_episodes(store=None, episodes: Optional[Iterable[tup
             c.close()
 
 
+_EPISODE_KIND_ORDER = {"episode-signal": 0, "episode-window": 1}
+
+
 def _episode_sort(r: dict) -> tuple:
     v = r["value"]
-    return (v["signal_day"], v["coin"], r["kind"] != "episode-window", v.get("time") or 0.0, v.get("trade_id") or 0)
+    return (v["signal_day"], v["coin"], _EPISODE_KIND_ORDER.get(r["kind"], 2), v.get("time") or 0.0, v.get("trade_id") or 0)
+
+
+def _stored_windows(archive) -> dict[str, tuple[str, str]]:
+    """{coin:signal_day: (start, end)} of the complete episode windows stored in EPISODE_BUNDLE."""
+    out: dict[str, tuple[str, str]] = {}
+    if archive is None:
+        return out
+    try:
+        archive.get(EPISODE_BUNDLE)
+        for r in archive.load(EPISODE_BUNDLE):
+            v = r.get("value") or {}
+            if r.get("kind") == "episode-window" and v.get("complete"):
+                out[f"{v['coin']}:{v['signal_day']}"] = (v["start"], v["end"])
+    except (KeyError, FileNotFoundError, OSError, ValueError, AttributeError):
+        pass
+    return out
 
 
 # ======================================================================================== 3. CoinMarketCap ==
@@ -1222,18 +1311,24 @@ CMC_WEEKLY_BUNDLE = "cmc-historical-listings"
 CMC_WEEKLY_FIRST = "2017-12-03"                  # T-314: every Sunday (formation) and Monday (execution) from 2017-12-03
 CMC_WEEKLY_LIMIT = 500
 CMC_DAILY_FIRST = "2017-11-01"                   # T-420 / T-462: 30 days of volume before the first 2017-12 formation
-CMC_DAILY_LIMIT = 200
+CMC_DAILY_LIMIT = 500                            # the weekly depth: at 200 the 30-day volume top 20 lost coins ranked 205-310
 CMC_CHUNK = 60                                   # snapshot dates per merge
 CMC_COIN_FIRST = "2017-11-01"
 CMC_COIN_DAYS = 400                              # the v3.1 historical route returns at most the latest 400 days of a range
 _CMC_FLAG = re.compile(r"stablecoin|wrapped|tokeni[sz]ed|pegged|bridged|liquid-staking|restaking", re.I)
 CMC_SCHEMA = ("kind listing: value = {date (snapshot day), id, symbol, slug, name, cmcRank, price, volume24h, marketCap (USD), "
               "circulatingSupply, totalSupply, maxSupply, percentChange24h, percentChange7d, dateAdded, lastUpdated, platform (the "
-              "token's chain, or None), flags (CMC tags marking stablecoins, wrapped, tokenized, staked or bridged assets)}; dead coins "
-              "included (point-in-time ranking); price = the day's close (it equals CMC's daily OHLC close for the date; lastUpdated "
-              "reads 23:59 UTC in 2017-2019 snapshots and 00:00 of the date in 2026 ones, a label quirk); observed_at = the date 23:59:59 "
-              "UTC; available_at = the next day 00:00 UTC | kind snapshot: value = {date, n, limit}, one per date. CMC prices are cross-exchange VWAPs, "
-              "volume24h includes wash trades, and CMC can revise history: near point in time, not vintage-stamped")
+              "token's chain, or None), flags (that snapshot's CMC tags marking stablecoins, wrapped, tokenized, staked or bridged "
+              "assets)}; dead coins included (point-in-time ranking); price = the day's close (it equals CMC's daily OHLC close for the "
+              "date; lastUpdated reads 23:59 UTC in 2017-2019 snapshots and 00:00 of the date in 2026 ones, a label quirk); observed_at = "
+              "the date 23:59:59 UTC; available_at = the next day 00:00 UTC | kind snapshot: value = {date, n, limit}, one per date. "
+              "Each date holds the top `limit` by cmcRank (MARKET CAP), not by volume: a volume ranking built from it can still miss "
+              "very small-cap, wash-traded coins below that market-cap depth, and a coin that drops below the depth has no row (no "
+              "exit price) that day (use cmc-coin-daily-<id> for it). FLAGS ARE SNAPSHOT-DATED and mostly empty before about 2020 "
+              "(2018-06-10: 106 of 500 coins tagged, USDT and TUSD flags = []; 2021-05-16: WBTC tagged stablecoin), so exclusions "
+              "must use a declared list of CMC ids (cmc_flags_latest drafts one from the newest tags; not point in time). CMC "
+              "prices are cross-exchange VWAPs, volume24h includes wash trades, and CMC can revise history: near point in time, "
+              "not vintage-stamped")
 
 
 def cmc_listing(day: str, limit: int, client: httpx.Client, throttle: Throttle, retries: int = 4, backoff: float = 1.0) -> tuple[Optional[list], dict]:
@@ -1275,6 +1370,12 @@ def _cmc_sort(r: dict) -> tuple:
 
 def _cmc_group(r: dict) -> str:
     return r["value"]["date"]
+
+
+def _deep_enough(depth: int) -> Callable[[dict], bool]:
+    """A stored snapshot date counts as stored only when it was fetched at least ``depth`` deep (a shallower date,
+    e.g. one stored at the old depth 200, is fetched again and replaced by the merge)."""
+    return lambda r: int((r.get("value") or {}).get("limit") or 0) >= depth
 
 
 def weekly_days(first: str, last: str) -> list[str]:
@@ -1344,7 +1445,8 @@ def fetch_cmc_weekly_listings(store=None, first: str = CMC_WEEKLY_FIRST, last: O
     try:
         last = last or _day(_now_s() - DAY)
         days = weekly_days(first, last)
-        have = _stored_groups(archive, CMC_WEEKLY_BUNDLE, "snapshot", _cmc_group) if (skip_stored and not refresh) else set()
+        have = (_stored_groups(archive, CMC_WEEKLY_BUNDLE, "snapshot", _cmc_group, keep=_deep_enough(depth))
+                if (skip_stored and not refresh) else set())
         todo = [d for d in days if d not in have]
         rep["_already_stored"] = len(days) - len(todo)
         if limit is not None:
@@ -1372,8 +1474,9 @@ def fetch_cmc_daily_listings(store=None, first: str = CMC_DAILY_FIRST, last: Opt
                              max_calls: Optional[int] = None, min_interval: float = PACE["cmc"], retries: int = 4, backoff: float = 2.0,
                              report: Optional[dict] = None, rows_out: Optional[dict] = None, client: Optional[httpx.Client] = None,
                              log: Optional[Callable] = None, **_) -> dict:
-    """``cmc-daily-listings-<YYYY>``: the top ``depth`` coins of every daily snapshot first .. last (default yesterday), one
-    bundle per year (T-420 / T-462: trailing 30-day dollar volume and month-end prices of a point-in-time universe)."""
+    """``cmc-daily-listings-<YYYY>``: the top ``depth`` (default 500, one call per date) coins by market cap of every daily
+    snapshot first .. last (default yesterday), one bundle per year (T-420 / T-462: trailing 30-day dollar volume and
+    month-end prices of a point-in-time universe). Dates stored shallower than ``depth`` are fetched again."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         last = last or _day(_now_s() - DAY)
@@ -1384,7 +1487,7 @@ def fetch_cmc_daily_listings(store=None, first: str = CMC_DAILY_FIRST, last: Opt
         work = []
         for y, days in sorted(by_year.items()):
             name = f"cmc-daily-listings-{y}"
-            have = _stored_groups(archive, name, "snapshot", _cmc_group) if (skip_stored and not refresh) else set()
+            have = _stored_groups(archive, name, "snapshot", _cmc_group, keep=_deep_enough(depth)) if (skip_stored and not refresh) else set()
             todo = [d for d in days if d not in have]
             if left is not None:
                 todo = todo[:left]
@@ -1432,6 +1535,30 @@ def cmc_candidate_ids(archive, top: int = 30) -> list[int]:
     return sorted(best, key=lambda k: (best[k], k))
 
 
+def cmc_flags_latest(archive) -> dict[int, dict]:
+    """{id: {symbol, name, flags, date}}: each coin's CMC tags (``flags``) in the newest stored snapshot that lists it,
+    over every cmc-daily-listings-* bundle and cmc-historical-listings. These are the LATEST tags, NOT point in time
+    (snapshot flags are sparse before about 2020 and sometimes wrong): use them only to draft the declared exclusion
+    list of CMC ids that a harness writes down before it sees returns. Reads the stored bundles; stores nothing."""
+    out: dict[int, dict] = {}
+    try:
+        names = [e.name for e in archive.entries(kind="data") if e.name.startswith("cmc-daily-listings-") or e.name == CMC_WEEKLY_BUNDLE]
+    except AttributeError:
+        return out
+    for n in names:
+        try:
+            for r in archive.load(n):
+                v = r.get("value") or {}
+                if r.get("kind") != "listing" or v.get("id") is None:
+                    continue
+                o = out.get(v["id"])
+                if o is None or v["date"] >= o["date"]:
+                    out[v["id"]] = {"symbol": v.get("symbol"), "name": v.get("name"), "flags": list(v.get("flags") or []), "date": v["date"]}
+        except (KeyError, FileNotFoundError, OSError, ValueError):
+            continue
+    return out
+
+
 def fetch_cmc_coin_history(store=None, ids: Optional[Iterable[int]] = None, first: str = CMC_COIN_FIRST, last: Optional[str] = None,
                            limit: Optional[int] = None, dry_run: bool = False, skip_stored: bool = True, refresh: bool = False,
                            max_calls: Optional[int] = None, min_interval: float = PACE["cmc"], retries: int = 4, backoff: float = 2.0,
@@ -1443,8 +1570,10 @@ def fetch_cmc_coin_history(store=None, ids: Optional[Iterable[int]] = None, firs
     try:
         last_s = min(_ts(last) + DAY - 1, _last_closed(DAY) + DAY - 1) if last else _last_closed(DAY) + DAY - 1
         first_s = _ts(first)
+        full = first[:10] <= CMC_COIN_FIRST and last_s >= _last_closed(DAY) + DAY - 1   # covers the family default: else 'partial'
         cids = list(ids) if ids is not None else (cmc_candidate_ids(archive) if archive is not None else [])
-        todo = [i for i in cids if refresh or not skip_stored or archive is None or not _stored_complete(archive, f"cmc-coin-daily-{i}")]
+        todo = [i for i in cids if refresh or not skip_stored or archive is None
+                or not _stored_complete(archive, f"cmc-coin-daily-{i}", first=first)]
         if limit is not None:
             todo = todo[:limit]
         calls_each = math.ceil((last_s - first_s) / DAY / CMC_COIN_DAYS)
@@ -1496,9 +1625,10 @@ def fetch_cmc_coin_history(store=None, ids: Optional[Iterable[int]] = None, firs
                 e = _put(archive, name, rows, _recipe(f"GET {CMC_COIN}?id={cid}&convertId={CMC_USD}&timeStart=<s>&timeEnd=<s>&interval=daily, "
                                                       f"paged backward {CMC_COIN_DAYS} days at a time from {_iso_z(last_s)} to {first}; via "
                                                       "mandel.data.crypto_history.fetch_cmc_coin_history.", "cmc"),
-                         ["coinmarketcap", "ohlcv", "daily", "history"], "value = {id, symbol, name, day, open, high, low, close, volume, "
+                         ["coinmarketcap", "ohlcv", "daily", "history", _span_tag(first, _day(last_s))],
+                         "value = {id, symbol, name, day, open, high, low, close, volume, "
                          "marketCap, circulatingSupply, timeHigh, timeLow} (USD, CMC cross-exchange VWAP); observed_at = day 00:00 UTC; "
-                         "available_at = day end (next day 00:00 UTC); empty for some dead coins", complete=True)
+                         "available_at = day end (next day 00:00 UTC); empty for some dead coins", complete=full)
                 rep[name]["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}
         return rep
     finally:
@@ -1548,11 +1678,15 @@ def fetch_coinmetrics(store=None, assets: Optional[dict[str, list[str]]] = None,
                       min_interval: float = PACE["coinmetrics"], retries: int = 4, backoff: float = 1.0, report: Optional[dict] = None,
                       rows_out: Optional[dict] = None, client: Optional[httpx.Client] = None, log: Optional[Callable] = None, **_) -> dict:
     """``coinmetrics-<asset>-daily``: Coin Metrics community daily metrics per asset (all of an asset's metrics in one
-    bundle). A 403 (a metric the community tier refuses) falls back to one request per metric."""
+    bundle). A 403 (a metric the community tier refuses) falls back to one request per metric. The bundle is tagged
+    ``has:<metric>`` per requested metric and ``complete`` only when first <= CM_FIRST; a stored bundle is skipped only
+    when it holds every requested metric from at or before ``first``."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         assets = assets or CM_ASSETS
-        todo = [a for a in assets if refresh or not skip_stored or archive is None or not _stored_complete(archive, f"coinmetrics-{a}-daily")]
+        full = first[:10] <= CM_FIRST                       # covers the family default start: else 'partial'
+        todo = [a for a in assets if refresh or not skip_stored or archive is None
+                or not _stored_complete(archive, f"coinmetrics-{a}-daily", first=first, need=assets[a])]
         if limit is not None:
             todo = todo[:limit]
         if dry_run:
@@ -1598,10 +1732,11 @@ def fetch_coinmetrics(store=None, assets: Optional[dict[str, list[str]]] = None,
                                                       f"next_page_url (one request per metric after a 403); fetched {fetched} (current "
                                                       "vintage: Coin Metrics recomputes realised cap and hash rate without vintages); via "
                                                       "mandel.data.crypto_history.fetch_coinmetrics.", "coinmetrics"),
-                         ["coinmetrics", "onchain", "daily", "history", "cc-by-nc-4.0"],
+                         ["coinmetrics", "onchain", "daily", "history", "cc-by-nc-4.0", _span_tag(first, _day(_now_s()))]
+                         + [f"has:{x}" for x in assets[a]],
                          f"value = {{asset, day, {', '.join(assets[a])} (floats; a metric absent on a day is left out)}}; observed_at = day "
                          "00:00 UTC; available_at = day + 1 (the metric covers the UTC day); current vintage, not point-in-time vintages"
-                         + (f"; forbidden on the community tier: {', '.join(forbidden)}" if forbidden else ""), complete=True)
+                         + (f"; forbidden on the community tier: {', '.join(forbidden)}" if forbidden else ""), complete=full)
                 rep[name]["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}
         return rep
     finally:
@@ -1681,14 +1816,15 @@ def fetch_defillama_yields(store=None, pools: Optional[dict[str, str]] = None, d
                            backoff: float = 1.0, report: Optional[dict] = None, rows_out: Optional[dict] = None,
                            client: Optional[httpx.Client] = None, limit: Optional[int] = None, max_calls: Optional[int] = None, **_) -> dict:
     """``defillama-yields-pools-<day>`` (the dated /pools snapshot) and ``defillama-yields`` (the /chart history of each
-    pre-registered pool plus that pool's snapshot row)."""
+    pre-registered pool plus that pool's snapshot row; tagged ``has:<pool>`` per pool, ``complete`` only when it holds
+    every LLAMA_POOLS pool, and skipped only when it holds every requested pool)."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         pools = pools or LLAMA_POOLS
         day = day or _day(_now_s())
         snap = f"defillama-yields-pools-{day}"
         skip_snap = archive is not None and skip_stored and not refresh and _stored_complete(archive, snap)
-        skip_chart = archive is not None and skip_stored and not refresh and _stored_complete(archive, LLAMA_BUNDLE)
+        skip_chart = archive is not None and skip_stored and not refresh and _stored_complete(archive, LLAMA_BUNDLE, need=pools)
         if dry_run:
             items = ([] if skip_snap else [_item(snap, "llama", 1, 16800, "llama_pool", min_interval)])
             items += [] if skip_chart else [_item(LLAMA_BUNDLE, "llama", len(pools), sum(LLAMA_CHART_ROWS.get(p, 400) for p in pools) + len(pools),
@@ -1757,10 +1893,10 @@ def fetch_defillama_yields(store=None, pools: Optional[dict[str, str]] = None, d
             e = _put(archive, LLAMA_BUNDLE, rows, _recipe(f"GET {LLAMA}/chart/<pool> for the pre-registered pools "
                                                           f"{', '.join(f'{k} ({v})' for k, v in pools.items())}, plus each pool's row of the "
                                                           f"{snap} snapshot; via mandel.data.crypto_history.fetch_defillama_yields.", "llama"),
-                     ["defillama", "yields", "carry", "stablecoin", "T-367"],
+                     ["defillama", "yields", "carry", "stablecoin", "T-367"] + [f"has:{p}" for p in pools],
                      "kind chart: value = {pool, label, project, chain, symbol, timestamp, tvlUsd, apy, apyBase, apyReward, il7d, apyBase7d, "
                      "pricePerShare} (APY in percent; one point a day, about 23:01 UTC); observed_at = available_at = timestamp | kind pool: "
-                     "the pool's snapshot row; observed_at = available_at = fetch time", complete=True)
+                     "the pool's snapshot row; observed_at = available_at = fetch time", complete=set(LLAMA_POOLS) <= set(pools))
             rep[LLAMA_BUNDLE]["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}
         return rep
     finally:
@@ -1774,6 +1910,7 @@ ISHARES_IBIT = "https://www.ishares.com/us/products/333011/ishares-bitcoin-trust
 ISH_PREMIUM = "ishares-ibit-premium-discount"
 ISH_SNAP = "ishares-ibit-snapshots"
 ISH_BASKET_SHARES = 40_000
+ISH_IBIT_LAUNCH = "2024-01-11"                       # IBIT's first trading day: earlier growth-of-$10k points are placeholders
 
 
 def _ish_obj(text: str, name: str, need: Optional[str] = None) -> Optional[dict]:
@@ -1855,7 +1992,7 @@ def _ish_avail(day: str) -> str:
 def fetch_ishares_ibit(store=None, dry_run: bool = False, skip_stored: bool = True, refresh: bool = False,
                        min_interval: float = PACE["ishares"], retries: int = 4, backoff: float = 2.0, report: Optional[dict] = None,
                        rows_out: Optional[dict] = None, client: Optional[httpx.Client] = None, limit: Optional[int] = None, **_) -> dict:
-    """``ishares-ibit-premium-discount`` (daily official premium/discount, month-end growth of $10k) and
+    """``ishares-ibit-premium-discount`` (daily official premium/discount, month-end growth of $10k based at 2024-01-31) and
     ``ishares-ibit-snapshots`` (NAV, closing price, shares outstanding, basket bitcoin amount -> bitcoin per share), merged
     into the stored bundles by day, so a daily run accumulates history. One request; skipped when today's fetch is stored."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
@@ -1876,18 +2013,22 @@ def fetch_ishares_ibit(store=None, dry_run: bool = False, skip_stored: bool = Tr
             return rep
         p = parse_ishares(r.text)
         fetched = now_iso()
+        growth = [x for x in p["growth"] if x[0] >= ISH_IBIT_LAUNCH]
+        placeholders = [x[0] for x in p["growth"] if x[0] < ISH_IBIT_LAUNCH]   # 2023-12-31 = 10,000 before the launch
+        base = growth[0][0] if growth else None                             # 2024-01-31 = 10,000 on the 2026-10-15 page
         prem = [_row("ishares", "premium-discount", d, _et_iso(d, 16, 0), _ish_avail(d),
                      {"day": d, "premium_discount_pct": x, "basis": "closing price vs NAV, percent of NAV (premiumDiscountChartData)"})
                 for d, x in p["premium"]]
         prem += [_row("ishares", "growth-10k", m, _et_iso(m, 16, 0), _et_iso((date.fromisoformat(m) + timedelta(days=15)).isoformat(), 9, 30),
-                      {"month_end": m, "growth_10k_nav": g, "growth_10k_benchmark": b}) for m, g, b in p["growth"]]
+                      {"month_end": m, "growth_10k_nav": g, "growth_10k_benchmark": b, "base_month_end": base}) for m, g, b in growth]
         s = p["snapshot"]
         snaps = []
         if s.get("nav_as_of"):
             snaps.append(_row("ishares", "snapshot", s["nav_as_of"], _et_iso(s["nav_as_of"], 16, 0),
                               min(_ish_avail(s["nav_as_of"]), fetched, key=lambda x: datetime.fromisoformat(x)),
                               {**s, "fetched_at": fetched, "fetched_day": today}))
-        rep[ISH_PREMIUM] = {"calls": 1, "rows": len(prem), "premium_days": len(p["premium"]), "growth_months": len(p["growth"]),
+        rep[ISH_PREMIUM] = {"calls": 1, "rows": len(prem), "premium_days": len(p["premium"]), "growth_months": len(growth),
+                            "growth_base": base, "growth_placeholders_dropped": placeholders,
                             "first": p["premium"][0][0] if p["premium"] else None, "last": p["premium"][-1][0] if p["premium"] else None}
         rep[ISH_SNAP] = {"rows": len(snaps), "snapshot": s}
         if rows_out is not None:
@@ -1896,16 +2037,20 @@ def fetch_ishares_ibit(store=None, dry_run: bool = False, skip_stored: bool = Tr
             grp = lambda r: f"{r['kind']}:{r['key']}"
             srt = lambda r: (r["kind"], r["key"])
             if prem:
-                e = _merge_store(archive, ISH_PREMIUM, sorted(prem, key=srt), {grp(r) for r in prem}, grp, srt,
+                done = {grp(r) for r in prem} | {f"growth-10k:{d}" for d in placeholders}   # also drops a stored placeholder
+                e = _merge_store(archive, ISH_PREMIUM, sorted(prem, key=srt), done, grp, srt,
                                  _recipe(f"GET {ISHARES_IBIT} (HTML; JSON HTML-escaped): premiumDiscountChartData (previous year + YTD, "
                                          "official closing-price premium/discount to NAV) and performanceData/benchmarkData (month-end growth "
-                                         "of $10,000), merged by day with earlier fetches via mandel.data.crypto_history.fetch_ishares_ibit. "
+                                         f"of $10,000; points before the {ISH_IBIT_LAUNCH} launch are placeholders and are not stored), merged "
+                                         "by day with earlier fetches via mandel.data.crypto_history.fetch_ishares_ibit. "
                                          "The historical NAV xls and holdings CSV answer the HTML page (no NAV history download).", "ishares"),
                                  ["crypto", "ishares", "ibit", "etf", "premium", "nav", "T-328"],
                                  "kind premium-discount: value = {day, premium_discount_pct (closing price / NAV - 1, percent), basis}; NAV = "
                                  "close / (1 + pct/100) with daily-history-IBIT; observed_at = day 16:00 ET; available_at = 09:30 ET on the next "
-                                 "NYSE session | kind growth-10k: value = {month_end, growth_10k_nav, growth_10k_benchmark} (NAV total return "
-                                 "since 2023-12-31; month-end NAV(m) = NAV(m0) x g(m) / g(m0)); available_at = month end + 15 days 09:30 ET")
+                                 "NYSE session | kind growth-10k: value = {month_end, growth_10k_nav, growth_10k_benchmark, base_month_end} "
+                                 "(growth of $10,000 at NAV, BASED AT 2024-01-31 = 10,000, the first month end after the 2024-01-11 launch; "
+                                 "the page's 2023-12-31 placeholder is not stored and g says nothing about January 2024; month-end NAV(m) = "
+                                 "NAV(m0) x g(m) / g(m0) holds only for m0 >= base_month_end); available_at = month end + 15 days 09:30 ET")
                 rep[ISH_PREMIUM]["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}
             if snaps:
                 e = _merge_store(archive, ISH_SNAP, snaps, {grp(r) for r in snaps}, grp, srt,
@@ -1946,20 +2091,84 @@ SOURCES = {
 DEFAULT_SOURCES = ("coinbase_products", "coinbase_daily", "coinbase_hourly", "coinbase_1m", "kraken_episodes", "coinmetrics",
                    "btc_hashrate", "defillama", "ishares", "cmc_weekly", "cmc_daily", "kraken_1m")
 OPTIONAL_SOURCES = ("cmc_coins", "coinbase_trades")
+RUN_LOCK = "crypto_history.run.lock"                     # in the archive root; gitignored by mandel/**/*.lock
+
+
+@contextlib.contextmanager
+def run_lock(archive):
+    """Exclusive, non-blocking lock ``<archive root>/crypto_history.run.lock`` for one storing run: a second run on the
+    same archive raises RuntimeError at once instead of interleaving its INDEX writes (see ONE WRITER AT A TIME). No-op
+    without an archive root."""
+    root = getattr(archive, "root", None)
+    if root is None:
+        yield None
+        return
+    path = Path(root) / RUN_LOCK
+    with open(path, "a+", encoding="utf-8") as fh:
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise RuntimeError(f"another crypto_history run holds {path}: run one process at a time per archive (two writers leave "
+                               "stale INDEX.json entries); start --sources kraken_1m only after the other sources have finished") from None
+        try:
+            yield path
+        finally:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+
+
+def index_check(archive, before: dict[str, str]) -> dict:
+    """Compare this process's index entry of every bundle it stored (sha256 changed since ``before``) with a fresh read of
+    INDEX.json. A mismatch means another process wrote INDEX.json from a stale view during the run."""
+    stored = {e.name: e for e in archive.entries() if before.get(e.name) != e.sha256 and _family(e.name)}
+    if not stored:
+        return {"ok": True, "bundles": 0}
+    disk = type(archive)(root=archive.root, ledger=archive.ledger)
+    bad = []
+    for n, e in sorted(stored.items()):
+        try:
+            d = disk.get(n)
+        except KeyError:
+            bad.append({"bundle": n, "index": None, "stored_rows": e.rows})
+            continue
+        if (d.sha256, d.rows, d.bytes) != (e.sha256, e.rows, e.bytes):
+            bad.append({"bundle": n, "index_rows": d.rows, "index_created_at": d.created_at, "stored_rows": e.rows,
+                        "stored_created_at": e.created_at})
+    out = {"ok": not bad, "bundles": len(stored)}
+    if bad:
+        out["mismatched"] = bad
+        out["hint"] = ("another process wrote INDEX.json from a stale view during this run; when nothing else is writing, "
+                       "re-run these bundles' sources with refresh=True (--refresh) and check Archive().verify(name)")
+    return out
 
 
 def fetch_all_crypto(store, dry_run: bool = False, limit: Optional[int] = None, sources: Optional[Iterable[str]] = None,
                      include_optional: bool = False, max_calls: Optional[int] = None, refresh: bool = False,
                      report: Optional[dict] = None, rows_out: Optional[dict] = None, log: Optional[Callable] = None,
                      min_interval: Optional[float] = None) -> dict:
-    """Run every crypto fetcher in order (cheap and dependency-first, the ~19-hour Kraken paging last). ``limit`` caps
-    bundles (CMC: snapshot dates) per source; ``dry_run`` makes no request and returns per-source plans plus a total;
-    ``min_interval`` (seconds between requests) overrides every source's default pace (``PACE``) when given.
-    Returns {source: report}, with '_total' (dry run) and '_gitignore' (the .gitignore lines of every family)."""
+    """Run every crypto fetcher in order (cheap and dependency-first, the ~19-hour Kraken paging last) in THIS process:
+    never run two storing processes on one archive at once (see ONE WRITER AT A TIME; a second run raises RuntimeError).
+    ``limit`` caps bundles (CMC: snapshot dates) per source; ``dry_run`` makes no request and returns per-source plans
+    plus a total; ``min_interval`` (seconds between requests) overrides every source's default pace (``PACE``) when
+    given. Returns {source: report}, with '_total' (dry run), '_index_check' (storing runs: this process's index entries
+    against a fresh read of INDEX.json) and '_gitignore' (the .gitignore lines of every family)."""
     names = list(sources) if sources is not None else list(DEFAULT_SOURCES) + (list(OPTIONAL_SOURCES) if include_optional else [])
     unknown = [n for n in names if n not in SOURCES]
     if unknown:
         raise ValueError(f"unknown sources: {unknown}; known: {sorted(SOURCES)}")
+    archive = _archive(store)
+    if dry_run or archive is None:
+        return _fetch_all(store, names, dry_run, limit, max_calls, refresh, report, rows_out, log, min_interval)
+    with run_lock(archive):
+        before = {e.name: e.sha256 for e in archive.entries()}
+        out = _fetch_all(store, names, dry_run, limit, max_calls, refresh, report, rows_out, log, min_interval)
+        if hasattr(archive, "root"):
+            out["_index_check"] = index_check(archive, before)
+            if log and not out["_index_check"]["ok"]:
+                log(f"INDEX CHECK FAILED: {json.dumps(out['_index_check'], default=str)[:2000]}")
+        return out
+
+
+def _fetch_all(store, names: list[str], dry_run: bool, limit, max_calls, refresh, report, rows_out, log, min_interval) -> dict:
     out = report if report is not None else {}
     kw = {"dry_run": dry_run, "limit": limit, "max_calls": max_calls, "refresh": refresh, "rows_out": rows_out, "log": log}
     if min_interval is not None:
@@ -2036,6 +2245,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     rep = fetch_all_crypto(store, dry_run=a.dry_run, limit=a.limit, sources=a.sources.split(",") if a.sources else None,
                            include_optional=a.optional, max_calls=a.max_calls, refresh=a.refresh, rows_out=rows_out, log=log,
                            min_interval=a.min_interval)
+    bad_index = not (rep.get("_index_check") or {"ok": True})["ok"]
     if a.preview:
         os.makedirs(a.preview, exist_ok=True)
         for name, rows in (rows_out or {}).items():
@@ -2047,7 +2257,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if a.dry_run:
         rep["_families"] = family_table(rep)
     print(json.dumps(rep if a.dry_run else {k: v for k, v in rep.items() if k != "_gitignore"}, indent=1, default=str)[:200000])
-    return 0
+    return 1 if bad_index else 0
 
 
 if __name__ == "__main__":
