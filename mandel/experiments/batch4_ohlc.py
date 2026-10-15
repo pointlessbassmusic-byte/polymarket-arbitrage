@@ -1,0 +1,1095 @@
+"""
+Batch 4, daily OHLC claims (group ``ohlc``)
+==========================================
+
+Seven library claims tested on archived Yahoo daily bars (open, high, low, close, adjclose): T-216 (opex pin, a
+MODEL-PRICED 1-day SPY straddle), T-304 (55-day Donchian breakout with a 10-ATR trailing stop vs matched random
+entries), T-324 (SPY/IVV twin z-score), T-332 (IBS < 0.2 next-day reversal), T-333 (overnight gap fade),
+T-348 (overnight vs intraday) and T-421 (Corwin-Schultz spread shocks). Each claim is tested as worded: its window,
+its pass rule and the costs it names.
+
+Data conventions
+----------------
+* Bars come from ``daily-history-<SYM>``; a bar is used only if its ``available_at`` is not after the bundle's
+  capture time (the same rule as ``underlying2.load_series``). The trading day is the UTC date of the bar time.
+* ``close`` is split-adjusted only (the traded price for SPY, which never split); ``adjclose`` is also
+  dividend-adjusted. Yahoo multiplies every close before an ex-date by (1 - D/C_{t-1}), so the cash dividend is
+  recovered exactly as D_t = C_{t-1} (1 - f_{t-1}/f_t) with f = adjclose/close. Ratio moves under 1e-4 are float32
+  rounding (about 1e-6) and are ignored. On SPY this finds 4 ex-dates a year, on quarterly third Fridays.
+* Where a claim works on dividend-adjusted OHLC (T-304), open/high/low are multiplied by f of the same day.
+
+Statistics
+----------
+* "95% CI" and "95% lower bound" are the ends of a two-sided 95% bootstrap interval (2.5% / 97.5% quantiles), the
+  conservative reading of a one-sided bound. Circular block bootstrap unless the trial names another scheme
+  (T-332: stationary bootstrap with mean block 20; T-304: cluster bootstrap by asset x entry year; T-324: cluster
+  bootstrap by entry month).
+* p-values test the null the trial states. Where the claim also names a magnitude ("at least 3 bps", "at least 1
+  point") the point estimate must clear it and the p-value against the magnitude itself is reported as a
+  diagnostic. Bootstrap p-values are studentized (``block_bootstrap_pvalue``) for means and centred percentile
+  for regression coefficients and clustered means.
+* DSR is ``deflated_sharpe_ratio`` with the trial count the claim states; the variance of trial Sharpes is that of
+  the variants the archive supports (when there are at least two), floored at the zero-skill variance 1/(T-1).
+* Annualisation: 252 trading days for US-listed instruments, 365 for crypto.
+* ``_verdict`` from underlying2 decides: an implemented criterion that fails -> not_supported; a criterion that
+  cannot be implemented (None) -> at best inconclusive. A sample below the trial's min_n -> inconclusive.
+
+Model pricing (T-216) is Black-Scholes with sigma = VIX/100, T = 1/252, r = 0 and labelled MODEL-PRICED: a flat
+30-day index cannot see any expiry-specific premium that traded weekly options carry.
+"""
+
+from __future__ import annotations
+
+import math
+from datetime import date, datetime, timedelta, timezone
+from typing import NamedTuple, Optional, Sequence
+
+import numpy as np
+
+from mandel.experiments.overfit import pbo_cscv
+from mandel.experiments.underlying2 import _mean_ci, _sharpe_diff_lower, _sr, _verdict
+from mandel.experiments.volatility import index_closes
+from mandel.options import bs
+from mandel.validation.backtest_eval import block_bootstrap_pvalue, deflated_sharpe_ratio, sharpe_ratio, skewness, walk_forward_splits
+
+EQ_PPY = 252
+CRYPTO_PPY = 365
+DSR_PASS = 0.95
+DIV_TOL = 1e-4
+
+
+# ================================================================================================ data access ==
+
+class Bars(NamedTuple):
+    days: list
+    open: np.ndarray
+    high: np.ndarray
+    low: np.ndarray
+    close: np.ndarray
+    adj: np.ndarray
+
+
+def bars_from_rows(rows, captured_at: Optional[str] = None) -> Bars:
+    """Daily bars from ``daily-history-*`` rows (or bare value dicts), one per UTC day, dropping rows that were not
+    yet available at ``captured_at`` and bars with a missing or non-positive price. ``adj`` falls back to close."""
+    by = {}
+    for r in rows:
+        if captured_at and r.get("available_at") and r["available_at"] > captured_at:
+            continue
+        v = r.get("value", r)
+        px = [v.get(k) for k in ("open", "high", "low", "close")]
+        if any(x is None for x in px):
+            continue
+        o, h, l, c = (float(x) for x in px)
+        if not all(math.isfinite(x) and x > 0 for x in (o, h, l, c)):
+            continue
+        a = v.get("adjclose")
+        a = float(a) if a is not None and math.isfinite(float(a)) and float(a) > 0 else c
+        by[datetime.fromtimestamp(float(v["t"]), tz=timezone.utc).strftime("%Y-%m-%d")] = (o, h, l, c, a)
+    days = sorted(by)
+    arr = np.array([by[d] for d in days], dtype=float).reshape(-1, 5)
+    return Bars(days, arr[:, 0], arr[:, 1], arr[:, 2], arr[:, 3], arr[:, 4])
+
+
+def ex_dividends(close: np.ndarray, adj: np.ndarray, tol: float = DIV_TOL) -> np.ndarray:
+    """Cash dividend per share on each ex-date (0 elsewhere), inferred from the adjclose/close factor."""
+    c = np.asarray(close, dtype=float); f = np.asarray(adj, dtype=float) / c
+    out = np.zeros(len(c))
+    if len(c) > 1:
+        jump = 1.0 - f[:-1] / f[1:]
+        out[1:] = np.where(jump > tol, c[:-1] * jump, 0.0)
+    return out
+
+
+def adjusted_ohlc(b: Bars) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Dividend-adjusted (open, high, low, close): each price times that day's adjclose/close."""
+    f = b.adj / b.close
+    return b.open * f, b.high * f, b.low * f, b.adj.copy()
+
+
+_CACHE: dict = {}
+
+
+def _cached(archive, key, fn):
+    slot = _CACHE.get(id(archive))
+    if slot is None or slot[0] is not archive:
+        _CACHE.clear()
+        slot = (archive, {})
+        _CACHE[id(archive)] = slot
+    if key not in slot[1]:
+        slot[1][key] = fn()
+    return slot[1][key]
+
+
+def _has(archive, name: str) -> bool:
+    try:
+        archive.get(name)
+        return True
+    except KeyError:
+        return False
+
+
+def _bundle(symbol: str) -> str:
+    return "daily-history-" + "".join(c if c.isalnum() or c in "-_." else "-" for c in symbol)
+
+
+def _bars(archive, symbol: str) -> Bars:
+    name = _bundle(symbol)
+    return _cached(archive, ("bars", symbol), lambda: bars_from_rows(archive.load(name), archive.get(name).created_at))
+
+
+def _index(archive, name: str) -> dict:
+    def load():
+        cap = archive.get(name).created_at
+        return index_closes(r for r in archive.load(name) if not (cap and r.get("available_at") and r["available_at"] > cap))
+    return _cached(archive, ("index", name), load)
+
+
+def _fomc_days(archive) -> set:
+    def load():
+        return {r["value"]["decision_day"] for r in archive.load("fomc-meetings") if r["value"].get("scheduled")}
+    return _cached(archive, ("fomc",), load)
+
+
+def _missing(archive, names: Sequence[str]):
+    miss = [n for n in names if not _has(archive, n)]
+    if miss:
+        return {"missing_bundles": miss}, 0, "inconclusive", f"missing data bundles {miss}: the claim cannot be tested until they are archived"
+    return None
+
+
+def _clean(x):
+    if isinstance(x, dict):
+        return {str(k): _clean(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_clean(v) for v in x]
+    if isinstance(x, np.ndarray):
+        return [_clean(v) for v in x.tolist()]
+    if isinstance(x, np.bool_):
+        return bool(x)
+    if isinstance(x, np.integer):
+        return int(x)
+    if isinstance(x, (np.floating, float)):
+        f = float(x)
+        return f if math.isfinite(f) else None
+    return x
+
+
+def _wrap(rep: dict):
+    rep = _clean(rep)
+    return rep, int(rep.get("n") or 0), rep["verdict"], rep["reason"]
+
+
+# ============================================================================================ statistics core ==
+
+def _range_mask(ds: np.ndarray, start: Optional[str], end: Optional[str]) -> np.ndarray:
+    m = np.ones(len(ds), dtype=bool)
+    if start:
+        m &= ds >= start
+    if end:
+        m &= ds <= end
+    return m
+
+
+def _circ_idx(n: int, block: int, rng) -> np.ndarray:
+    nb = math.ceil(n / block)
+    return ((rng.integers(0, n, nb)[:, None] + np.arange(block)[None, :]).ravel()[:n]) % n
+
+
+def stationary_idx(n: int, mean_block: float, rng) -> np.ndarray:
+    """Politis-Romano stationary bootstrap indices: blocks of geometric length with mean ``mean_block``, wrapping."""
+    new = rng.random(n) < 1.0 / mean_block
+    new[0] = True
+    last = np.maximum.accumulate(np.where(new, np.arange(n), 0))
+    starts = rng.integers(0, n, n)
+    return (starts[last] + np.arange(n) - last) % n
+
+
+def _p_boot(boot: np.ndarray, obs: float, null: float = 0.0) -> float:
+    """One-sided centred-bootstrap p for H0: theta <= null (share of resamples with theta* - obs >= obs - null)."""
+    b = np.asarray(boot, dtype=float); b = b[np.isfinite(b)]
+    if b.size == 0 or not math.isfinite(obs):
+        return float("nan")
+    return float((np.sum(b - obs >= obs - null) + 1) / (b.size + 1))
+
+
+def _dsr(r: np.ndarray, n_trials: int, trial_sharpes: Optional[Sequence[float]] = None) -> float:
+    """Deflated Sharpe of ``r`` against the best of ``n_trials``. The variance of trial Sharpes is the variance of the
+    supplied variants' per-period Sharpes (>= 2 of them) floored at the zero-skill variance 1/(T-1); without
+    variants it is that floor."""
+    r = np.asarray(r, dtype=float)
+    floor = 1.0 / max(1, r.size - 1)
+    ts = [float(s) for s in (trial_sharpes or []) if s is not None and math.isfinite(float(s))]
+    var = max(float(np.var(ts, ddof=1)), floor) if len(ts) >= 2 else floor
+    return float(deflated_sharpe_ratio(r, n_trials=n_trials, var_trials_sr=var))
+
+
+def flag_diff_series(x: np.ndarray, flag: np.ndarray) -> np.ndarray:
+    """Series whose mean is mean(x[flag]) - mean(x[~flag]) and whose block-resampled mean has the within-group
+    sampling spread of that difference: d_t = diff + w_t (x_t - m_g(t)), w = 1/p on flagged, -1/(1-p) elsewhere."""
+    x = np.asarray(x, dtype=float); f = np.asarray(flag, dtype=bool)
+    p = f.mean(); me, mo = x[f].mean(), x[~f].mean()
+    w = np.where(f, 1.0 / p, -1.0 / (1.0 - p))
+    return (me - mo) + w * (x - np.where(f, me, mo))
+
+
+def group_diff(x: np.ndarray, flag: np.ndarray, block: int, n_boot: int = 4000, seed: int = 0) -> dict:
+    """Flagged-minus-other difference in means: two-sided 95% circular-block CI and studentized one-sided p
+    (H0: diff <= 0)."""
+    x = np.asarray(x, dtype=float); f = np.asarray(flag, dtype=bool)
+    ne, no = int(f.sum()), int((~f).sum())
+    out = {"n_flag": ne, "n_other": no, "mean_flag": float(x[f].mean()) if ne else None, "mean_other": float(x[~f].mean()) if no else None,
+           "diff": None, "ci": [None, None], "p": None}
+    if ne < 2 or no < 2 or len(x) < 8:
+        return out
+    d = flag_diff_series(x, f)
+    lo, hi = _mean_ci(d, block, n_boot, seed)
+    out.update(diff=float(d.mean()), ci=[lo, hi], p=float(block_bootstrap_pvalue(d, np.zeros_like(d), n_boot=n_boot, block_len=block, seed=seed)))
+    return out
+
+
+def _decide(crit: list, n: int, min_n: int, unit: str) -> tuple[str, str]:
+    if n < min_n:
+        return "inconclusive", f"data cannot support the claim: {n} {unit}, below the trial's min_n {min_n}"
+    return _verdict([(f">= {min_n} {unit}", True)] + crit)
+
+
+def _trailing_z(x: np.ndarray, window: int, include_current: bool = False) -> np.ndarray:
+    """z_t = (x_t - mean)/sd (ddof=1) over the ``window`` values ending at t-1 (or at t when include_current)."""
+    x = np.asarray(x, dtype=float); n = len(x); z = np.full(n, np.nan)
+    if n <= window:
+        return z
+    W = np.lib.stride_tricks.sliding_window_view(x, window)          # row j covers x[j .. j+window-1]
+    mu, sd = W.mean(axis=1), W.std(axis=1, ddof=1)
+    if include_current:
+        t = np.arange(window - 1, n); row = t - window + 1
+    else:
+        t = np.arange(window, n); row = t - window
+    with np.errstate(invalid="ignore", divide="ignore"):
+        z[t] = np.where(sd[row] > 0, (x[t] - mu[row]) / sd[row], np.nan)
+    return z
+
+
+def _rolling_mean(x: np.ndarray, window: int) -> np.ndarray:
+    x = np.asarray(x, dtype=float); out = np.full(len(x), np.nan)
+    if len(x) >= window:
+        out[window - 1:] = np.lib.stride_tricks.sliding_window_view(x, window).mean(axis=1)
+    return out
+
+
+def _rolling_sd(x: np.ndarray, window: int) -> np.ndarray:
+    x = np.asarray(x, dtype=float); out = np.full(len(x), np.nan)
+    if len(x) >= window:
+        out[window - 1:] = np.lib.stride_tricks.sliding_window_view(x, window).std(axis=1, ddof=1)
+    return out
+
+
+# =================================================================== T-348 overnight vs intraday (night effect) ==
+
+def overnight_intraday(days: Sequence[str], opens, closes, divs=None, adj=None, start: Optional[str] = None, end: Optional[str] = None,
+                       split: str = "2010-01-01", min_gap: float = 0.0003, block: int = 10, n_boot: int = 2000, min_n: int = 3000,
+                       cost_rt: float = 0.0001, seed: int = 0) -> dict:
+    """T-348: r_night = open_t/close_{t-1} - 1 + D_t/close_{t-1}; r_day = close_t/open_t - 1. Pass: mean(r_night -
+    r_day) > 3 bps/day, studentized block-10 bootstrap p < 0.05 against equal means, gap positive in both halves.
+    Secondary (not in the pass): Sharpe of the overnight series net of a 1 bp round trip (2 bp sensitivity) vs
+    buy-and-hold."""
+    O = np.asarray(opens, dtype=float); C = np.asarray(closes, dtype=float)
+    D = np.zeros(len(C)) if divs is None else np.asarray(divs, dtype=float)
+    ds = np.array(days[1:])
+    night = O[1:] / C[:-1] - 1 + D[1:] / C[:-1]
+    dayr = C[1:] / O[1:] - 1
+    bh = (np.asarray(adj, dtype=float)[1:] / np.asarray(adj, dtype=float)[:-1] - 1) if adj is not None else (C[1:] + D[1:]) / C[:-1] - 1
+    m = _range_mask(ds, start, end)
+    ds, night, dayr, bh = ds[m], night[m], dayr[m], bh[m]
+    flat_open = float(np.mean(O[1:][m] == C[1:][m])) if m.any() else None
+    n = len(ds)
+    rep = {"n": n, "first": ds[0] if n else None, "last": ds[-1] if n else None, "n_ex_dividend_days": int(np.sum(D[1:][m] > 0)),
+           "open_equals_close_share": flat_open}
+    if n < min_n:
+        v, why = _decide([], n, min_n, "trading days")
+        rep.update(verdict=v, reason=f"SPY overnight vs intraday: {n} days — {why}")
+        return rep
+    d = night - dayr
+    gap = float(d.mean())
+    lo, hi = _mean_ci(d, block, n_boot, seed)
+    p_eq = float(block_bootstrap_pvalue(d, np.zeros(n), n_boot=n_boot, block_len=block, seed=seed))
+    p_thr = float(block_bootstrap_pvalue(d, np.full(n, min_gap), n_boot=n_boot, block_len=block, seed=seed))
+    early = ds < split
+    halves = [float(d[early].mean()) if early.any() else float("nan"), float(d[~early].mean()) if (~early).any() else float("nan")]
+    halves_n = [int(early.sum()), int((~early).sum())]
+    sr_night1, sr_night2 = _sr(night - cost_rt, EQ_PPY), _sr(night - 2 * cost_rt, EQ_PPY)
+    sr_day, sr_bh = _sr(dayr, EQ_PPY), _sr(bh, EQ_PPY)
+    crit = [(f"gap > {min_gap * 1e4:.0f} bps/day", gap > min_gap),
+            ("p < 0.05 vs equal means (studentized block-10 bootstrap)", p_eq < 0.05),
+            ("gap positive in both halves", all(math.isfinite(h) and h > 0 for h in halves))]
+    v, why = _decide(crit, n, min_n, "trading days")
+    rep.update(mean_night_bps=float(night.mean() * 1e4), mean_day_bps=float(dayr.mean() * 1e4), gap_bps=gap * 1e4,
+               gap_ci_bps=[lo * 1e4, hi * 1e4], p_equal_means=p_eq, p_gap_le_threshold=p_thr, halves_gap_bps=[h * 1e4 for h in halves],
+               halves_n=halves_n, split=split, sharpe_overnight_net_1bp=sr_night1, sharpe_overnight_net_2bp=sr_night2,
+               sharpe_intraday=sr_day, sharpe_buy_hold=sr_bh, verdict=v,
+               reason=(f"SPY {rep['first']}..{rep['last']} ({n} days, {rep['n_ex_dividend_days']} ex-dividend nights with D/C added back): "
+                       f"overnight {night.mean() * 1e4:+.2f} vs intraday {dayr.mean() * 1e4:+.2f} bps/day, gap {gap * 1e4:+.2f} bps "
+                       f"(95% CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}; threshold 3 bps), p={p_eq:.4f} vs equal means "
+                       f"(p={p_thr:.3f} vs gap <= 3 bps, diagnostic); halves <{split} {halves[0] * 1e4:+.2f} / >={split} {halves[1] * 1e4:+.2f} bps; "
+                       f"secondary Sharpe overnight net 1 bp {sr_night1:.2f} (2 bp {sr_night2:.2f}) vs buy-hold {sr_bh:.2f}; "
+                       f"open==close on {flat_open * 100:.1f}% of days (flagged) — {why}"))
+    return rep
+
+
+# ============================================================================== T-333 overnight gap fade ==
+
+def gap_fade_series(opens, closes, thr: float = 0.005, cost_rt: float = 0.0002):
+    """(o, i, side, daily net) aligned to days[1:]: o = gap, i = open-to-close, side = +1 after o < -thr (buy the open),
+    -1 after o > +thr (short the open), daily net = side*i - cost on trade days and 0 otherwise."""
+    O = np.asarray(opens, dtype=float); C = np.asarray(closes, dtype=float)
+    o = O[1:] / C[:-1] - 1; i = C[1:] / O[1:] - 1
+    side = np.where(o < -thr, 1.0, np.where(o > thr, -1.0, 0.0))
+    daily = np.where(side != 0, side * i - cost_rt, 0.0)
+    return o, i, side, daily
+
+
+def gap_fade(days: Sequence[str], opens, closes, start: Optional[str] = "2000-01-01", end: Optional[str] = "2026-09-30", thr: float = 0.005,
+             cost_rt: float = 0.0002, split: str = "2013-01-01", block: int = 20, n_boot: int = 2000, seed: int = 0, min_n: int = 500,
+             variant_sharpes: Optional[Sequence[float]] = None, n_trials: int = 6) -> dict:
+    """T-333: fade overnight gaps beyond +-0.5% from the open to the close. Pass: 95% lower bound of the mean net
+    return per trade > 0 (block-20 bootstrap over trades in time order, 2,000 resamples) AND the same sign in the two
+    halves AND DSR > 0.95 over the ``n_trials`` variants (daily series, zero on non-trade days). The DSR is None
+    (not implemented) when no variant Sharpes are supplied."""
+    ds = np.array(days[1:])
+    o, i, side, daily = gap_fade_series(opens, closes, thr, cost_rt)
+    m = _range_mask(ds, start, end)
+    ds, o, i, side, daily = ds[m], o[m], i[m], side[m], daily[m]
+    tr = side != 0
+    net = daily[tr]; tdays = ds[tr]
+    n = int(tr.sum())
+    rep = {"n": n, "n_days": int(len(ds)), "first": ds[0] if len(ds) else None, "last": ds[-1] if len(ds) else None,
+           "n_long": int(np.sum(side > 0)), "n_short": int(np.sum(side < 0))}
+    if n < min_n:
+        v, why = _decide([], n, min_n, "gap trades")
+        rep.update(verdict=v, reason=f"gap fade: {n} trades — {why}")
+        return rep
+    mean = float(net.mean())
+    lo, hi = _mean_ci(net, block, n_boot, seed)
+    early = tdays < split
+    halves = [float(net[early].mean()) if early.any() else float("nan"), float(net[~early].mean()) if (~early).any() else float("nan")]
+    same_sign = all(math.isfinite(h) for h in halves) and np.sign(halves[0]) == np.sign(halves[1]) and halves[0] != 0
+    dsr = _dsr(daily, n_trials, variant_sharpes) if variant_sharpes is not None else None
+    corr = float(np.corrcoef(o, i)[0, 1])
+    rng = np.random.default_rng(seed); cb = np.empty(n_boot)
+    for k in range(n_boot):
+        j = _circ_idx(len(o), block, rng); cb[k] = np.corrcoef(o[j], i[j])[0, 1]
+    corr_ci = [float(np.quantile(cb, 0.025)), float(np.quantile(cb, 0.975))]
+    dec = {}
+    for d0 in sorted({x[:3] for x in tdays}):
+        mm = np.array([x[:3] == d0 for x in tdays])
+        dec[d0 + "0s"] = {"n": int(mm.sum()), "mean_net_bps": float(net[mm].mean() * 1e4)}
+    by_side = {"long_after_gap_down_bps": float(net[side[tr] > 0].mean() * 1e4) if np.any(side[tr] > 0) else None,
+               "short_after_gap_up_bps": float(net[side[tr] < 0].mean() * 1e4) if np.any(side[tr] < 0) else None}
+    crit = [("95% lower bound of mean net per trade > 0", lo > 0), (f"same sign in <{split} and >={split}", bool(same_sign)),
+            (f"DSR > 0.95 over {n_trials} variants", None if dsr is None else dsr > DSR_PASS)]
+    v, why = _decide(crit, n, min_n, "gap trades")
+    rep.update(mean_net_bps=mean * 1e4, ci_bps=[lo * 1e4, hi * 1e4], halves_bps=[h * 1e4 for h in halves], dsr=dsr, n_trials=n_trials,
+               corr_o_i=corr, corr_ci=corr_ci, by_decade=dec, by_side=by_side, threshold=thr, cost_rt=cost_rt, verdict=v,
+               reason=(f"{n} gap trades |o|>{thr * 100:.2f}% {rep['first']}..{rep['last']} ({rep['n_long']} long, {rep['n_short']} short): "
+                       f"mean net {mean * 1e4:+.2f} bps after {cost_rt * 1e4:.0f} bps RT (95% CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}); "
+                       f"halves <{split} {halves[0] * 1e4:+.2f} / >={split} {halves[1] * 1e4:+.2f} bps; "
+                       f"DSR {'n/a' if dsr is None else f'{dsr:.3f}'} over {n_trials} variants; diagnostic corr(o,i) {corr:+.3f} "
+                       f"(95% CI {corr_ci[0]:+.3f}..{corr_ci[1]:+.3f}) — {why}"))
+    return rep
+
+
+# ================================================================================ T-332 IBS daily reversal ==
+
+def ibs(high, low, close) -> np.ndarray:
+    """Internal bar strength (close - low)/(high - low); NaN when high == low."""
+    H, L, C = (np.asarray(a, dtype=float) for a in (high, low, close))
+    rngs = H - L
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(rngs > 0, (C - L) / np.where(rngs > 0, rngs, 1.0), np.nan)
+
+
+def rsi_wilder(c, n: int = 2) -> np.ndarray:
+    c = np.asarray(c, dtype=float); out = np.full(len(c), np.nan)
+    if len(c) <= n:
+        return out
+    dlt = np.diff(c); g = np.maximum(dlt, 0); l = np.maximum(-dlt, 0)
+    ag, al = g[:n].mean(), l[:n].mean()
+    for t in range(n, len(c)):
+        if t > n:
+            ag += (g[t - 1] - ag) / n; al += (l[t - 1] - al) / n
+        out[t] = 100.0 if al == 0 else 100.0 - 100.0 / (1.0 + ag / al)
+    return out
+
+
+def reversal_rule_positions(high, low, close, adj) -> dict:
+    """Positions held from close t to close t+1 for the declared 6-rule grid of the library entry: RSI(2) < 10;
+    close below the 20-day 2-sd Bollinger band, held until the close is at or above the 20-day mean; IBS < 0.2;
+    IBS long-short (< 0.2 long, > 0.8 short); three down closes, held until the first up close; IBS < 0.2 only when
+    the close is above its 200-day mean. Indicators on adjusted closes, IBS on the day's own high/low/close."""
+    a = np.asarray(adj, dtype=float); n = len(a)
+    x = ibs(high, low, close)
+    rsi = rsi_wilder(a, 2)
+    ma20, sd20, ma200 = _rolling_mean(a, 20), _rolling_sd(a, 20), _rolling_mean(a, 200)
+    boll = np.zeros(n); on = False
+    for t in range(n):
+        if not on and math.isfinite(ma20[t]) and a[t] < ma20[t] - 2 * sd20[t]:
+            on = True
+        elif on and a[t] >= ma20[t]:
+            on = False
+        boll[t] = on
+    down3 = np.zeros(n); on = False
+    for t in range(3, n):
+        if not on and a[t] < a[t - 1] and a[t - 1] < a[t - 2] and a[t - 2] < a[t - 3]:
+            on = True
+        elif on and a[t] > a[t - 1]:
+            on = False
+        down3[t] = on
+    with np.errstate(invalid="ignore"):
+        return {"rsi2_lt10": (rsi < 10).astype(float), "bollinger_lower": boll, "ibs_lt02": (x < 0.2).astype(float),
+                "ibs_long_short": np.where(x < 0.2, 1.0, np.where(x > 0.8, -1.0, 0.0)), "down3": down3,
+                "ibs_lt02_above_ma200": ((x < 0.2) & (a > ma200)).astype(float)}
+
+
+def rule_daily_net(pos: np.ndarray, adj, cost_side: float = 0.0001) -> np.ndarray:
+    """Net daily return of a position held from close t to close t+1 (aligned to days[:-1]), 1 bp per side on changes."""
+    a = np.asarray(adj, dtype=float); p = np.asarray(pos, dtype=float)[:-1]
+    r = a[1:] / a[:-1] - 1
+    turn = np.abs(np.diff(np.concatenate([[0.0], p])))
+    return p * r - cost_side * turn
+
+
+def ibs_reversal(days: Sequence[str], highs, lows, closes, adj, opens=None, start: str = "2000-01-01", end: str = "2026-09-30",
+                 thr: float = 0.2, split: str = "2013-01-01", min_gap: float = 0.0002, mean_block: int = 20, n_boot: int = 2000,
+                 seed: int = 0, min_n: int = 2000, grid_sharpes: Optional[Sequence[float]] = None, n_trials: int = 12,
+                 cost_side: float = 0.0001) -> dict:
+    """T-332: mean next-day close-to-close return after IBS < 0.2 minus the unconditional mean. Pass: 95% lower bound
+    (stationary bootstrap, mean block 20, 2,000 resamples of the paired signal/return series) > 2 bps AND the same sign
+    in both halves AND DSR > 0.95 of the IBS rule's net daily series over 12 trials (None without grid Sharpes).
+    Diagnostics: block-shifted signal null p, next-open and next-close execution."""
+    H, L, C, A = (np.asarray(x, dtype=float) for x in (highs, lows, closes, adj))
+    nall = len(A)
+    x = ibs(H, L, C)
+    sd = np.array(days[:-1]); nd = np.array(days[1:])
+    r = A[1:] / A[:-1] - 1
+    m = (sd >= start) & (nd <= end) & np.isfinite(x[:-1])
+    idx = np.where(m)[0]
+    r_w = r[idx]; f = x[idx] < thr; sdays = sd[idx]
+    n = len(idx)
+    rep = {"n": n, "first": sdays[0] if n else None, "last": sdays[-1] if n else None, "n_signal": int(f.sum())}
+    if n < min_n:
+        v, why = _decide([], n, min_n, "signal days")
+        rep.update(verdict=v, reason=f"IBS reversal: {n} days, {int(f.sum())} signals — {why}")
+        return rep
+    if f.sum() < 2 or (~f).sum() < 2:
+        rep.update(verdict="inconclusive", reason=f"IBS reversal: {int(f.sum())} IBS<{thr} days of {n}, too few to compare — data cannot support the claim")
+        return rep
+    diff = float(r_w[f].mean() - r_w.mean())
+    rng = np.random.default_rng(seed); bd = np.empty(n_boot)
+    for k in range(n_boot):
+        j = stationary_idx(n, mean_block, rng); fj = f[j]
+        bd[k] = r_w[j][fj].mean() - r_w[j].mean() if fj.any() else np.nan
+    bd = bd[np.isfinite(bd)]
+    lo, hi = float(np.quantile(bd, 0.025)), float(np.quantile(bd, 0.975))
+    sh = rng.integers(mean_block, n - mean_block, n_boot)
+    null = np.array([r_w[np.roll(f, s)].mean() - r_w.mean() for s in sh])
+    p_shift = float((np.sum(null >= diff) + 1) / (len(null) + 1))
+    early = sdays < split
+    halves = []
+    for g in (early, ~early):
+        halves.append(float(r_w[g & f].mean() - r_w[g].mean()) if (g & f).any() else float("nan"))
+    same_sign = all(math.isfinite(h) for h in halves) and np.sign(halves[0]) == np.sign(halves[1]) and halves[0] != 0
+    pos = np.zeros(nall); pos[idx] = f
+    daily = rule_daily_net(pos, A, cost_side)[idx]
+    dsr = _dsr(daily, n_trials, grid_sharpes) if grid_sharpes is not None else None
+    diag = {}
+    if opens is not None:
+        O = np.asarray(opens, dtype=float)
+        i_next = C[idx + 1] / O[idx + 1] - 1
+        diag["next_open_to_close_diff_bps"] = float((i_next[f].mean() - i_next.mean()) * 1e4)
+    ok2 = idx + 2 < nall
+    r2 = A[idx[ok2] + 2] / A[idx[ok2] + 1] - 1
+    diag["next_close_entry_diff_bps"] = float((r2[f[ok2]].mean() - r2.mean()) * 1e4)
+    crit = [(f"95% lower bound of the difference > {min_gap * 1e4:.0f} bps", lo > min_gap),
+            (f"same sign in <{split} and >={split}", bool(same_sign)),
+            (f"DSR > 0.95 over {n_trials} trials", None if dsr is None else dsr > DSR_PASS)]
+    v, why = _decide(crit, n, min_n, "signal days")
+    rep.update(mean_after_signal_bps=float(r_w[f].mean() * 1e4), mean_unconditional_bps=float(r_w.mean() * 1e4), diff_bps=diff * 1e4,
+               ci_bps=[lo * 1e4, hi * 1e4], p_block_shift=p_shift, halves_bps=[h * 1e4 for h in halves], dsr=dsr, n_trials=n_trials,
+               rule_sharpe_net=_sr(daily, EQ_PPY), execution=diag, verdict=v,
+               reason=(f"SPY IBS<{thr} on {int(f.sum())} of {n} days {rep['first']}..{rep['last']}: next-day {r_w[f].mean() * 1e4:+.2f} vs "
+                       f"unconditional {r_w.mean() * 1e4:+.2f} bps, difference {diff * 1e4:+.2f} bps (95% stationary-bootstrap CI "
+                       f"{lo * 1e4:+.2f}..{hi * 1e4:+.2f}; needs lower > {min_gap * 1e4:.0f}); block-shift p={p_shift:.4f}; halves "
+                       f"{halves[0] * 1e4:+.2f} / {halves[1] * 1e4:+.2f} bps; DSR {'n/a' if dsr is None else f'{dsr:.3f}'} over {n_trials} trials; "
+                       f"execution diagnostics: next-open-to-close {diag.get('next_open_to_close_diff_bps', float('nan')):+.2f} bps, "
+                       f"next-close entry {diag['next_close_entry_diff_bps']:+.2f} bps — {why}"))
+    return rep
+
+
+# ==================================================================== T-421 Corwin-Schultz spread shocks ==
+
+def corwin_schultz(high, low, close) -> np.ndarray:
+    """Corwin-Schultz (2012) two-day high-low spread for the pair (t-1, t), with the paper's overnight adjustment
+    (day t's range is shifted by any gap beyond the t-1 close) and negative estimates set to 0. S[0] is NaN."""
+    H, L, C = (np.asarray(a, dtype=float) for a in (high, low, close))
+    n = len(H); out = np.full(n, np.nan)
+    if n < 2:
+        return out
+    h1, l1, c0 = H[1:].copy(), L[1:].copy(), C[:-1]
+    up = l1 > c0
+    h1[up] -= (l1[up] - c0[up]); l1[up] = c0[up]
+    dn = h1 < c0
+    l1[dn] += (c0[dn] - h1[dn]); h1[dn] = c0[dn]
+    beta = np.log(h1 / l1) ** 2 + np.log(H[:-1] / L[:-1]) ** 2
+    gamma = np.log(np.maximum(h1, H[:-1]) / np.minimum(l1, L[:-1])) ** 2
+    k = 3.0 - 2.0 * math.sqrt(2.0)
+    alpha = (np.sqrt(2.0 * beta) - np.sqrt(beta)) / k - np.sqrt(gamma / k)
+    s = 2.0 * (np.exp(alpha) - 1.0) / (1.0 + np.exp(alpha))
+    out[1:] = np.maximum(s, 0.0)
+    return out
+
+
+def _hold_positions(n: int, signal_idx: Sequence[int], horizon: int) -> np.ndarray:
+    """pos over return intervals k (close k-1 -> close k): bought at the close after the signal day s and held
+    ``horizon`` days, i.e. pos[k] = 1 for k in [s+2, s+1+horizon]."""
+    diff = np.zeros(n + 2)
+    for s in signal_idx:
+        a, b = s + 2, min(s + 1 + horizon, n - 1)
+        if a <= b:
+            diff[a] += 1; diff[b + 1] -= 1
+    return (np.cumsum(diff)[:n] > 0).astype(float)
+
+
+def _hold_net(pos: np.ndarray, adj: np.ndarray, cost_side: float) -> np.ndarray:
+    r = np.zeros(len(adj)); r[1:] = adj[1:] / adj[:-1] - 1
+    turn = np.abs(np.diff(np.concatenate([[0.0], pos])))
+    return pos * r - cost_side * turn
+
+
+def _ols(X: np.ndarray, y: np.ndarray) -> np.ndarray:
+    return np.linalg.lstsq(X, y, rcond=None)[0]
+
+
+def spread_shock(days: Sequence[str], highs, lows, closes, adj, vix: dict, start: str = "2000-01-01", end: str = "2026-12-31",
+                 window: int = 60, z_thr: float = 2.0, horizon: int = 20, min_coef: float = 0.01, block: int = 20, n_boot: int = 2000,
+                 seed: int = 0, min_events: int = 60, n_trials: int = 32, cost_side: float = 0.0001,
+                 exclude_years: Sequence[str] = ("2008", "2020")) -> dict:
+    """T-421: regress the 20-day forward return (bought at the close after day t, R = A[t+21]/A[t+1] - 1) on a +2 sigma
+    Corwin-Schultz shock indicator (spread vs its trailing 60 days) and the same-day VIX point change. Pass: >= 60
+    non-overlapping shock events AND shock coefficient >= 1 point with p < 0.05 (H0 coefficient <= 0; 20-day circular
+    block bootstrap) AND DSR >= 0.95 of the rule over 32 cells (zero-skill variance floor) AND the rule beats a
+    VIX-only rule out of sample (walk-forward test windows, one-sided 95% lower bound of the Sharpe difference > 0).
+    VIX-only rule: same holding after the same-day VIX change exceeds +2 sigma of its trailing 60 days."""
+    H, L, C, A = (np.asarray(x, dtype=float) for x in (highs, lows, closes, adj))
+    n = len(A); ds = np.array(days)
+    S = corwin_schultz(H, L, C)
+    z = _trailing_z(S, window)
+    vd = sorted(vix); vv = np.array([vix[d] for d in vd], dtype=float)
+    j = np.searchsorted(vd, list(days), side="right") - 1          # last VIX close on or before each SPY day
+    v = np.where(j >= 0, vv[np.maximum(j, 0)], np.nan) if len(vd) else np.full(n, np.nan)
+    dv = np.full(n, np.nan); dv[1:] = v[1:] - v[:-1]
+    R = np.full(n, np.nan)
+    if n > horizon + 1:
+        R[: n - horizon - 1] = A[horizon + 1:] / A[1: n - horizon] - 1
+    m = np.isfinite(z) & np.isfinite(dv) & np.isfinite(R) & _range_mask(ds, start, end)
+    idx = np.where(m)[0]
+    shock = z[idx] > z_thr
+    ev, last = [], -10 ** 9
+    for t in idx[shock]:
+        if t - last >= horizon:
+            ev.append(int(t)); last = t
+    n_ev = len(ev)
+    rep = {"n": n_ev, "n_rows": int(len(idx)), "n_shock_days": int(shock.sum()), "first": ds[idx[0]] if len(idx) else None,
+           "last": ds[idx[-1]] if len(idx) else None}
+    if n_ev < min_events or shock.sum() < 2:
+        v_, why = _decide([], n_ev, min_events, "non-overlapping shock events")
+        rep.update(verdict=v_, reason=f"CS spread shock: {n_ev} non-overlapping events — {why}")
+        return rep
+    y = R[idx]; X = np.column_stack([np.ones(len(idx)), shock.astype(float), dv[idx]])
+    coef = _ols(X, y); b = float(coef[1])
+    rng = np.random.default_rng(seed); bb = np.full(n_boot, np.nan)
+    for k in range(n_boot):
+        j = _circ_idx(len(y), block, rng)
+        if X[j, 1].sum() >= 2:
+            bb[k] = _ols(X[j], y[j])[1]
+    lo, hi = float(np.nanquantile(bb, 0.025)), float(np.nanquantile(bb, 0.975))
+    p0, p1 = _p_boot(bb, b, 0.0), _p_boot(bb, b, min_coef)
+    yrs = np.array([d[:4] for d in ds[idx]])
+    keep = ~np.isin(yrs, list(exclude_years))
+    b_ex = float(_ols(X[keep], y[keep])[1]) if X[keep, 1].sum() >= 2 else float("nan")
+    uncond = float(y[shock].mean() - y.mean())
+    # rules on the daily calendar of the window
+    sig_all = np.where(np.isfinite(z) & (z > z_thr))[0]
+    zv = _trailing_z(dv, window)
+    sig_vix = np.where(np.isfinite(zv) & (zv > z_thr))[0]
+    w = np.where(_range_mask(ds, start, end) & (np.arange(n) >= window + 1))[0]
+    cs_net = _hold_net(_hold_positions(n, sig_all, horizon), A, cost_side)[w]
+    vx_net = _hold_net(_hold_positions(n, sig_vix, horizon), A, cost_side)[w]
+    dsr = _dsr(cs_net, n_trials)
+    test = np.concatenate([te for _, te in walk_forward_splits(len(w), n_splits=4, min_train=len(w) // 3, embargo=horizon)])
+    sd_obs, sd_lo = _sharpe_diff_lower(cs_net[test], vx_net[test], EQ_PPY, block, n_boot=n_boot, seed=seed, q=0.05)
+    beats = bool(sd_obs > 0 and sd_lo > 0)
+    crit = [(f">= {min_events} non-overlapping events", True), (f"shock coefficient >= {min_coef * 100:.0f} point", b >= min_coef),
+            ("p < 0.05 (H0 coefficient <= 0)", p0 < 0.05), (f"DSR >= 0.95 over {n_trials} cells", dsr >= DSR_PASS),
+            ("beats the VIX-only rule out of sample", beats)]
+    v_, why = _decide(crit[1:], n_ev, min_events, "non-overlapping shock events")
+    rep.update(coef_shock=b, coef_ci=[lo, hi], p_coef_le0=p0, p_coef_le_1pt=p1, coef_vix_change=float(coef[2]),
+               coef_shock_ex_years=b_ex, excluded_years=list(exclude_years), shock_minus_unconditional=uncond, dsr=dsr, n_trials=n_trials,
+               rule_sharpe=_sr(cs_net, EQ_PPY), vix_rule_sharpe=_sr(vx_net, EQ_PPY), oos_sharpe_diff=sd_obs, oos_sharpe_diff_lower95=sd_lo,
+               oos_days=int(len(test)), mean_spread_bps=float(np.nanmean(S[idx]) * 1e4), verdict=v_,
+               reason=(f"SPY {rep['first']}..{rep['last']}: {int(shock.sum())} shock days (CS spread > +{z_thr:g} sd of trailing {window}), "
+                       f"{n_ev} non-overlapping events (need {min_events}); 20-day forward-return coefficient {b * 100:+.2f} points "
+                       f"(95% CI {lo * 100:+.2f}..{hi * 100:+.2f}; need >= {min_coef * 100:.0f}) with p={p0:.3f} vs <= 0 (p={p1:.3f} vs <= 1 point), "
+                       f"controlling for the VIX change; excluding {'/'.join(exclude_years)} {b_ex * 100:+.2f} points; rule DSR {dsr:.3f} "
+                       f"over {n_trials} cells; out-of-sample Sharpe vs VIX-only rule {sd_obs:+.2f} (one-sided 95% lower {sd_lo:+.2f}) — {why}"))
+    return rep
+
+
+# ======================================================== T-304 Donchian breakout with ATR trailing stop ==
+
+def atr_wilder(high, low, close, n: int = 20) -> np.ndarray:
+    """Wilder ATR: TR_t = max(H-L, |H-C_{t-1}|, |L-C_{t-1}|); seeded with the mean of the first n TRs."""
+    H, L, C = (np.asarray(a, dtype=float) for a in (high, low, close))
+    N = len(C); tr = np.full(N, np.nan); atr = np.full(N, np.nan)
+    if N < 2:
+        return atr
+    tr[1:] = np.maximum(H[1:] - L[1:], np.maximum(np.abs(H[1:] - C[:-1]), np.abs(L[1:] - C[:-1])))
+    if N > n:
+        atr[n] = tr[1:n + 1].mean()
+        for t in range(n + 1, N):
+            atr[t] = atr[t - 1] + (tr[t] - atr[t - 1]) / n
+    return atr
+
+
+def donchian_atr_trades(high, low, close, n: int = 55, atr_n: int = 20, mult: float = 10.0, exit_n: Optional[int] = None):
+    """Long-only N-day breakout. Signal at close t if close_t >= max(close_{t-N..t-1}); filled at close t+1. Exit signal
+    at close s if close_s < min(close_{s-floor(N/4)..s-1}) or close_s < (highest close since entry) - mult x ATR_s;
+    filled at close s+1. Returns (closed trades [(entry_idx, exit_idx)], open entry index or None)."""
+    C = np.asarray(close, dtype=float); N = len(C)
+    exit_n = exit_n or n // 4
+    atr = atr_wilder(high, low, close, atr_n)
+    trades = []; t = max(n, atr_n)
+    while t < N - 1:
+        if C[t] >= C[t - n:t].max():
+            e = t + 1; peak = C[e]; s = e; x = None
+            while s < N - 1:
+                peak = max(peak, C[s])
+                if C[s] < C[s - exit_n:s].min() or (math.isfinite(atr[s]) and C[s] < peak - mult * atr[s]):
+                    x = s + 1
+                    break
+                s += 1
+            if x is None:
+                return trades, e
+            trades.append((e, x)); t = x
+            continue
+        t += 1
+    return trades, None
+
+
+def breakout_vs_random(assets: dict, n: int = 55, atr_n: int = 20, mult: float = 10.0, n_random: int = 1000, n_boot: int = 5000,
+                       seed: int = 0, min_n: int = 150, n_trials: int = 60, vix: Optional[dict] = None) -> dict:
+    """T-304. ``assets``: name -> {days, high, low, close (dividend-adjusted OHLC), cost (per side), ppy}. For every rule
+    trade draw ``n_random`` entries on the same asset with the same holding length (entries after the rule's warm-up,
+    same cost); per-trade difference = rule net return - mean random net return. Pass: >= 150 pooled trades AND the
+    asset x entry-year cluster-bootstrap 95% CI (5,000 draws) of the mean difference above 0 AND survives the
+    60-trial correction: DSR > 0.95 on the rule's trade-return series or Holm-adjusted p < 0.05 (decided True when
+    DSR passes or 60 p < 0.05, False when DSR fails and p >= 0.05, None when only the full 60-trial Holm ranking could
+    decide). Fills at the close after the signal already carry any gap through the stop, so no extra slippage term."""
+    rng = np.random.default_rng(seed)
+    rows = []; per_asset = {}; open_trades = 0
+    for name, a in assets.items():
+        C = np.asarray(a["close"], dtype=float); Nn = len(C); cost = float(a["cost"]); days = a["days"]
+        trades, open_e = donchian_atr_trades(a["high"], a["low"], C, n, atr_n, mult)
+        open_trades += open_e is not None
+        lo_e = max(n, atr_n) + 1
+        nets = []
+        pos = np.zeros(Nn)
+        for e, x in trades:
+            h = x - e
+            net = C[x] / C[e] - 1 - 2 * cost
+            hi_e = Nn - 1 - h
+            if hi_e < lo_e:
+                continue
+            es = rng.integers(lo_e, hi_e + 1, n_random)
+            rand = C[es + h] / C[es] - 1 - 2 * cost
+            rows.append((name, days[e - 1], int(days[e][:4]), h, net, float(rand.mean()), float(rand.mean() + 2 * cost)))
+            nets.append(net); pos[e + 1: x + 1] = 1.0
+        r = np.zeros(Nn); r[1:] = C[1:] / C[:-1] - 1
+        turn = np.abs(np.diff(np.concatenate([[0.0], pos])))
+        live = slice(lo_e, Nn)
+        rule_daily = (pos * r - cost * turn)[live]
+        per_asset[name] = {"n_trades": len(nets), "mean_net": float(np.mean(nets)) if nets else None,
+                           "rule_sharpe": _sr(rule_daily, a.get("ppy", EQ_PPY)), "buy_hold_sharpe": _sr(r[live], a.get("ppy", EQ_PPY)),
+                           "first_day": days[lo_e] if Nn > lo_e else None}
+    nt = len(rows)
+    rep = {"n": nt, "assets": list(assets), "open_trades_dropped": int(open_trades), "per_asset": per_asset}
+    if nt < min_n:
+        v, why = _decide([], nt, min_n, "pooled trades")
+        rep.update(verdict=v, reason=f"Donchian {n}/ATR x{mult:g}: {nt} pooled trades — {why}")
+        return rep
+    net = np.array([r_[4] for r_ in rows]); rnd = np.array([r_[5] for r_ in rows]); rnd_gross = np.array([r_[6] for r_ in rows])
+    diff = net - rnd
+    obs = float(diff.mean())
+    keys = [(r_[0], r_[2]) for r_ in rows]
+    uniq = {k: i for i, k in enumerate(sorted(set(keys)))}
+    cid = np.array([uniq[k] for k in keys]); K = len(uniq)
+    S = np.bincount(cid, weights=diff, minlength=K); Nk = np.bincount(cid, minlength=K).astype(float)
+    draw = rng.integers(0, K, (n_boot, K))
+    boot = S[draw].sum(axis=1) / Nk[draw].sum(axis=1)
+    lo, hi = float(np.quantile(boot, 0.025)), float(np.quantile(boot, 0.975))
+    p = _p_boot(boot, obs)
+    dsr = _dsr(net, n_trials)
+    bonf = min(1.0, n_trials * p)
+    if dsr > DSR_PASS or bonf < 0.05:
+        survive = True
+    elif p >= 0.05:
+        survive = False
+    else:
+        survive = None
+    dec = {}
+    for r_, d_ in zip(rows, diff):
+        k = f"{str(r_[2])[:3]}0s"
+        dec.setdefault(k, []).append(d_)
+    dec = {k: {"n": len(v), "mean_diff": float(np.mean(v))} for k, v in sorted(dec.items())}
+    terc = None
+    if vix:
+        vd = sorted(vix); vv = np.array([vix[d] for d in vd])
+        lvl = []
+        for r_ in rows:
+            j = np.searchsorted(vd, r_[1], side="right") - 1
+            lvl.append(vv[j] if j >= 0 else np.nan)
+        lvl = np.array(lvl); ok = np.isfinite(lvl)
+        if ok.sum() >= 6:
+            q1, q2 = np.quantile(lvl[ok], [1 / 3, 2 / 3])
+            terc = {nm: float(diff[ok & msk].mean()) if np.any(ok & msk) else None
+                    for nm, msk in (("low", lvl <= q1), ("mid", (lvl > q1) & (lvl <= q2)), ("high", lvl > q2))}
+    crit = [("mean difference > 0 with cluster-bootstrap 95% CI excluding 0", lo > 0),
+            (f"survives the {n_trials}-trial correction (DSR > 0.95 or Holm p < 0.05)", survive)]
+    v, why = _decide(crit, nt, min_n, "pooled trades")
+    rep.update(mean_rule_net=float(net.mean()), mean_random_net=float(rnd.mean()), mean_diff=obs, ci=[lo, hi], p=p, p_bonferroni=bonf,
+               dsr=dsr, n_trials=n_trials, n_clusters=K, mean_diff_vs_gross_random=float((net - rnd_gross).mean()),
+               trade_skew=float(skewness(net)), mean_hold_days=float(np.mean([r_[3] for r_ in rows])), by_decade=dec, by_vix_tercile=terc,
+               verdict=v,
+               reason=(f"{nt} closed trades across {len(assets)} assets ({K} asset-year clusters): rule mean net {net.mean() * 100:+.2f}% vs matched "
+                       f"random entries {rnd.mean() * 100:+.2f}% (same costs), difference {obs * 100:+.2f}% (cluster 95% CI {lo * 100:+.2f}..{hi * 100:+.2f}, "
+                       f"p={p:.4f}, 60-trial Bonferroni {bonf:.3f}); trade-return DSR {dsr:.3f} over {n_trials}; vs cost-free random "
+                       f"{(net - rnd_gross).mean() * 100:+.2f}%; trade skew {skewness(net):+.2f} — {why}"))
+    return rep
+
+
+# ========================================================================= T-324 SPY/IVV twin reversion ==
+
+def twin_trades(z: np.ndarray, first: int, last: int, entry_z: float = 2.0, max_hold: int = 5) -> list:
+    """Signals on closes first..last: |z_t| > entry_z -> position at close t+1 (side -1 = short A / long B when z > 0).
+    Exit at the close after z crosses 0 (sign flips or hits 0), or at the close ``max_hold`` days after entry,
+    whichever is first. One position at a time. Returns [(entry_idx, exit_idx, side)]."""
+    N = len(z); out = []; t = first
+    while t <= last and t < N - 1:
+        if math.isfinite(z[t]) and abs(z[t]) > entry_z:
+            sgn = 1.0 if z[t] > 0 else -1.0
+            e = t + 1; cap = e + max_hold; x = None
+            for s in range(e, min(cap, N - 1) + 1):
+                if s == cap:
+                    x = cap
+                    break
+                if math.isfinite(z[s]) and z[s] * sgn <= 0:
+                    x = min(s + 1, cap)
+                    break
+            if x is None or x > N - 1:
+                break
+            out.append((e, x, -sgn)); t = x
+            continue
+        t += 1
+    return out
+
+
+def twin_reversion(days: Sequence[str], a, b, start: str = "2010-01-01", end: str = "2026-09-30", window: int = 60, entry_z: float = 2.0,
+                   max_hold: int = 5, cost_rt: float = 0.0008, n_boot: int = 5000, seed: int = 0, min_n: int = 1000, n_trials: int = 5,
+                   trial_sharpes: Optional[Sequence[float]] = None) -> dict:
+    """T-324 on aligned adjusted closes of twins A and B: x = ln(A/B), z over the trailing 60 days (including t). Net
+    return per trade = side x (A leg return - B leg return) - 8 bps (2 bps per leg per transaction, equal dollars).
+    Pass: 95% lower bound of the mean net return per trade > 0 (bootstrap clustered by entry month) AND DSR > 0.95
+    of the trade-return series across ``n_trials`` twin variants. min_n counts daily observations of x in the window."""
+    A = np.asarray(a, dtype=float); B = np.asarray(b, dtype=float); ds = np.array(days)
+    x = np.log(A / B)
+    z = _trailing_z(x, window, include_current=True)
+    inw = _range_mask(ds, start, end) & np.isfinite(z)
+    n_days = int(inw.sum())
+    rep = {"n": n_days, "first": ds[inw][0] if n_days else None, "last": ds[inw][-1] if n_days else None}
+    if n_days < min_n:
+        v, why = _decide([], n_days, min_n, "daily observations of the spread")
+        rep.update(verdict=v, reason=f"twin spread: {n_days} days — {why}")
+        return rep
+    w = np.where(inw)[0]
+    trades = twin_trades(z, int(w[0]), int(w[-1]), entry_z, max_hold)
+    if len(trades) < 2:
+        crit = [("at least 2 trades for a bootstrap interval", False)]
+        v, why = _decide(crit, n_days, min_n, "daily observations of the spread")
+        rep.update(n_trades=len(trades), verdict=v, reason=f"twin spread: only {len(trades)} trades on {n_days} days — {why}")
+        return rep
+    e_i = np.array([t[0] for t in trades]); x_i = np.array([t[1] for t in trades]); side = np.array([t[2] for t in trades])
+    gross = side * ((A[x_i] / A[e_i] - 1) - (B[x_i] / B[e_i] - 1))
+    net = gross - cost_rt
+    mean = float(net.mean())
+    months = np.array([ds[i - 1][:7] for i in e_i])
+    uniq = {m_: k for k, m_ in enumerate(sorted(set(months)))}
+    cid = np.array([uniq[m_] for m_ in months]); K = len(uniq)
+    S = np.bincount(cid, weights=net, minlength=K); Nk = np.bincount(cid, minlength=K).astype(float)
+    rng = np.random.default_rng(seed); draw = rng.integers(0, K, (n_boot, K))
+    boot = S[draw].sum(axis=1) / Nk[draw].sum(axis=1)
+    lo, hi = float(np.quantile(boot, 0.025)), float(np.quantile(boot, 0.975))
+    dsr = _dsr(net, n_trials, trial_sharpes)
+    xw = x[w]
+    phi = float(np.polyfit(xw[:-1], xw[1:], 1)[0]) if len(xw) > 2 else float("nan")
+    half_life = float(-math.log(2) / math.log(phi)) if 0 < phi < 1 else None
+    mu60 = _rolling_mean(x, window)
+    exc = np.abs(x[e_i - 1] - mu60[e_i - 1])
+    mar20 = months == "2020-03"
+    crit = [("95% lower bound of mean net return per trade > 0", lo > 0), (f"DSR > 0.95 across {n_trials} twin variants", dsr > DSR_PASS)]
+    v, why = _decide(crit, n_days, min_n, "daily observations of the spread")
+    rep.update(n_trades=len(trades), mean_gross_bps=float(gross.mean() * 1e4), mean_net_bps=mean * 1e4, ci_bps=[lo * 1e4, hi * 1e4],
+               dsr=dsr, n_trials=n_trials, n_month_clusters=K, ar1_phi=phi, half_life_days=half_life,
+               share_signals_excursion_gt_cost=float(np.mean(exc > cost_rt)), mean_hold_days=float(np.mean(x_i - e_i)),
+               march_2020={"n": int(mar20.sum()), "mean_net_bps": float(net[mar20].mean() * 1e4) if mar20.any() else None},
+               ex_march_2020_mean_net_bps=float(net[~mar20].mean() * 1e4) if (~mar20).any() else None, verdict=v,
+               reason=(f"SPY/IVV {rep['first']}..{rep['last']} ({n_days} days): {len(trades)} trades at |z|>{entry_z:g}, mean gross "
+                       f"{gross.mean() * 1e4:+.2f} bps, net {mean * 1e4:+.2f} bps after {cost_rt * 1e4:.0f} bps RT (month-clustered 95% CI "
+                       f"{lo * 1e4:+.2f}..{hi * 1e4:+.2f}); DSR {dsr:.3f} across {n_trials} twins (variance of trial Sharpes "
+                       f"{'from variants' if trial_sharpes and len(trial_sharpes) >= 2 else 'zero-skill floor: VOO, IAU, QQQM, FBTC not archived'}); "
+                       f"AR(1) phi {phi:.3f}, half-life {'n/a' if half_life is None else f'{half_life:.1f}'} days; "
+                       f"{np.mean(exc > cost_rt) * 100:.0f}% of signals with excursion > cost; March 2020 {int(mar20.sum())} trades; "
+                       f"min_n read as daily observations of x — {why}"))
+    return rep
+
+
+# ===================================================================== T-216 opex pin, MODEL-PRICED straddle ==
+
+def third_friday(y: int, m: int) -> date:
+    d = date(y, m, 1)
+    d += timedelta(days=(4 - d.weekday()) % 7)
+    return d + timedelta(days=14)
+
+
+def thu_fri_straddles(days: Sequence[str], closes, vix: dict, divs=None, settle_with_dividend: bool = True, T: float = 1.0 / EQ_PPY):
+    """One row per Friday whose previous trading day is the calendar Thursday and has a VIX close: (friday, pnl, raw
+    pnl, premium) in fraction of spot for a short ATM straddle sold at Thursday's close (K = S_thu, sigma = VIX/100,
+    r = 0) and settled at Friday's close. With ``settle_with_dividend`` an ex-dividend Friday settles at C_fri + D
+    (the strike is at the 1-day forward; SPY declares the amount before the ex-date, so this is known at the sale),
+    otherwise at the raw close."""
+    C = np.asarray(closes, dtype=float); D = np.zeros(len(C)) if divs is None else np.asarray(divs, dtype=float)
+    fri, K, sig, sett, raw = [], [], [], [], []
+    for i in range(1, len(days)):
+        df, dt = date.fromisoformat(days[i]), date.fromisoformat(days[i - 1])
+        if df.weekday() != 4 or (df - dt).days != 1 or days[i - 1] not in vix:
+            continue
+        fri.append(days[i]); K.append(C[i - 1]); sig.append(vix[days[i - 1]] / 100.0)
+        sett.append(C[i] + (D[i] if settle_with_dividend else 0.0)); raw.append(C[i])
+    if not fri:
+        return [], np.array([]), np.array([]), np.array([])
+    K, sig, sett, raw = (np.array(x, dtype=float) for x in (K, sig, sett, raw))
+    prem = bs.price(K, K, T, 0.0, sig, "call") + bs.price(K, K, T, 0.0, sig, "put")
+    pnl = (prem - np.abs(sett - K)) / K
+    pnl_raw = (prem - np.abs(raw - K)) / K
+    return fri, pnl, pnl_raw, prem / K
+
+
+def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: Optional[set] = None, start: Optional[str] = None,
+                  end: Optional[str] = None, block: int = 8, n_boot: int = 4000, seed: int = 0, min_n: int = 300, n_perm: int = 5000,
+                  split: str = "2010-01-01") -> dict:
+    """T-216 (MODEL-PRICED): mean short-straddle P&L on monthly third-Friday expirations minus other Fridays. Pass:
+    difference > 0 with the two-sided 95% block-bootstrap CI (block of ``block`` Fridays) excluding 0, over >= 300
+    opex Fridays. Secondary: distance of the Friday close to the nearest $1 strike, opex vs other (permutation test).
+    Controls: FOMC-day exclusion, quarterly vs other opex, pre/post-2010, raw-close settlement."""
+    fri, pnl, pnl_raw, prem = thu_fri_straddles(days, closes, vix, divs, True)
+    fr = np.array(fri)
+    m = _range_mask(fr, start, end) if len(fr) else np.zeros(0, dtype=bool)
+    fr, pnl, pnl_raw, prem = fr[m], pnl[m], pnl_raw[m], prem[m]
+    tf = {third_friday(int(d[:4]), int(d[5:7])).isoformat() for d in fr}
+    ox = np.array([d in tf for d in fr], dtype=bool)
+    n = int(ox.sum())
+    rep = {"n": n, "n_other": int((~ox).sum()), "first": fr[0] if len(fr) else None, "last": fr[-1] if len(fr) else None,
+           "label": "MODEL-PRICED"}
+    if n < min_n or (~ox).sum() < 2:
+        v, why = _decide([], n, min_n, "opex Fridays")
+        rep.update(verdict=v, reason=f"MODEL-PRICED opex straddle: {n} opex Fridays — {why}")
+        return rep
+    g = group_diff(pnl, ox, block, n_boot, seed)
+    g_raw = group_diff(pnl_raw, ox, block, n_boot, seed)
+    dmap = {} if divs is None else {d: float(x) for d, x in zip(days, np.asarray(divs, dtype=float))}
+    exd = np.array([dmap.get(d, 0.0) > 0 for d in fr], dtype=bool)
+    g_nodiv = group_diff(pnl[~exd], ox[~exd], block, n_boot, seed) if exd.any() else g
+    quarterly = np.array([int(d[5:7]) in (3, 6, 9, 12) for d in fr])
+    ctrl = {"quarterly_opex_minus_other_bps": float((pnl[ox & quarterly].mean() - pnl[~ox].mean()) * 1e4) if np.any(ox & quarterly) else None,
+            "monthly_only_opex_minus_other_bps": float((pnl[ox & ~quarterly].mean() - pnl[~ox].mean()) * 1e4) if np.any(ox & ~quarterly) else None}
+    for nm, msk in (("pre_" + split[:4], fr < split), ("post_" + split[:4], fr >= split)):
+        ctrl[nm + "_diff_bps"] = float((pnl[msk & ox].mean() - pnl[msk & ~ox].mean()) * 1e4) if np.any(msk & ox) and np.any(msk & ~ox) else None
+    if fomc_days:
+        di = {d: i for i, d in enumerate(days)}
+        near = np.array([d in fomc_days or days[di[d] - 1] in fomc_days for d in fr])
+        k = ~(near & ox)
+        ctrl["ex_fomc_opex_diff_bps"] = float((pnl[k & ox].mean() - pnl[k & ~ox].mean()) * 1e4)
+        ctrl["n_opex_fomc_excluded"] = int((near & ox).sum())
+    ctrl["cpi_exclusion"] = "not implemented: no CPI release calendar in the archive"
+    C = np.asarray(closes, dtype=float)
+    fri_i = [i for i, d in enumerate(days) if date.fromisoformat(d).weekday() == 4 and (not start or d >= start) and (not end or d <= end)]
+    dist = np.array([abs(C[i] - round(C[i])) for i in fri_i])
+    oxa = np.array([days[i] == third_friday(int(days[i][:4]), int(days[i][5:7])).isoformat() for i in fri_i], dtype=bool)
+    pin = {}
+    if oxa.any() and (~oxa).any():
+        obs = float(dist[oxa].mean() - dist[~oxa].mean())
+        rng = np.random.default_rng(seed); perm = np.empty(n_perm)
+        for k in range(n_perm):
+            s = rng.permutation(oxa); perm[k] = dist[s].mean() - dist[~s].mean()
+        pin = {"opex_mean_distance": float(dist[oxa].mean()), "other_mean_distance": float(dist[~oxa].mean()), "diff": obs,
+               "p_opex_closer": float((np.sum(perm <= obs) + 1) / (n_perm + 1))}
+    lo, hi = g["ci"]
+    crit = [("difference > 0", g["diff"] > 0), ("95% CI excludes 0", lo > 0)]
+    v, why = _decide(crit, n, min_n, "opex Fridays")
+    rep.update(mean_opex_bps=g["mean_flag"] * 1e4, mean_other_bps=g["mean_other"] * 1e4, diff_bps=g["diff"] * 1e4,
+               ci_bps=[lo * 1e4, hi * 1e4], p=g["p"], mean_premium_bps=float(prem.mean() * 1e4),
+               raw_close_settlement={"diff_bps": g_raw["diff"] * 1e4, "ci_bps": [g_raw["ci"][0] * 1e4, g_raw["ci"][1] * 1e4]},
+               ex_dividend_fridays_excluded={"n_excluded": int(exd.sum()), "n_opex": g_nodiv["n_flag"], "diff_bps": g_nodiv["diff"] * 1e4,
+                                             "ci_bps": [g_nodiv["ci"][0] * 1e4, g_nodiv["ci"][1] * 1e4]},
+               controls=ctrl, strike_pin=pin, verdict=v,
+               reason=(f"MODEL-PRICED (BS, sigma = Thursday VIX, T=1/252): {n} opex vs {int((~ox).sum())} other Fridays "
+                       f"{rep['first']}..{rep['last']}; short-straddle P&L {g['mean_flag'] * 1e4:+.2f} vs {g['mean_other'] * 1e4:+.2f} bps of spot, "
+                       f"difference {g['diff'] * 1e4:+.2f} bps (95% block-{block} CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}, p={g['p']:.3f}); "
+                       f"settled at the ex-dividend-neutral close (raw close: {g_raw['diff'] * 1e4:+.2f}, CI {g_raw['ci'][0] * 1e4:+.2f}.."
+                       f"{g_raw['ci'][1] * 1e4:+.2f}; with all {int(exd.sum())} ex-dividend Fridays dropped: {g_nodiv['diff'] * 1e4:+.2f}, CI "
+                       f"{g_nodiv['ci'][0] * 1e4:+.2f}..{g_nodiv['ci'][1] * 1e4:+.2f}); $1-strike distance opex {pin.get('opex_mean_distance', float('nan')):.3f} vs "
+                       f"{pin.get('other_mean_distance', float('nan')):.3f} (perm p={pin.get('p_opex_closer', float('nan')):.3f}) — {why}"))
+    return rep
+
+
+# ===================================================================================================== harnesses ==
+
+def ohlc_opex_pin_straddle(archive):
+    """T-216: MODEL-PRICED 1-day SPY short straddle, opex Fridays minus other Fridays, 1993-2026."""
+    miss = _missing(archive, ["daily-history-SPY", "cboe-VIX-history"])
+    if miss:
+        return miss
+    b = _bars(archive, "SPY")
+    fomc = _fomc_days(archive) if _has(archive, "fomc-meetings") else None
+    return _wrap(opex_straddle(b.days, b.close, _index(archive, "cboe-VIX-history"), ex_dividends(b.close, b.adj), fomc_days=fomc))
+
+
+DONCHIAN_ASSETS = {"SPY": 0.0005, "QQQ": 0.0005, "GLD": 0.0005, "SLV": 0.0005, "XLK": 0.0005, "XLE": 0.0005,
+                   "BTC-USD": 0.0035, "ETH-USD": 0.0035}
+
+
+def ohlc_donchian_atr_breakout(archive):
+    """T-304: pooled 55-day breakout / 10-ATR trailing stop trades vs matched random entries (8 ETFs and crypto pairs)."""
+    miss = _missing(archive, [_bundle(s) for s in DONCHIAN_ASSETS])
+    if miss:
+        return miss
+    assets = {}
+    for s, cost in DONCHIAN_ASSETS.items():
+        b = _bars(archive, s)
+        _, h, l, c = adjusted_ohlc(b)
+        assets[s] = {"days": b.days, "high": h, "low": l, "close": c, "cost": cost, "ppy": CRYPTO_PPY if s.endswith("-USD") else EQ_PPY}
+    vix = _index(archive, "cboe-VIX-history") if _has(archive, "cboe-VIX-history") else None
+    return _wrap(breakout_vs_random(assets, vix=vix))
+
+
+def ohlc_spy_ivv_twin(archive):
+    """T-324: SPY/IVV 60-day z-score twin rule, 2010-01..2026-09, 8 bps per round trip of both legs."""
+    miss = _missing(archive, ["daily-history-SPY", "daily-history-IVV"])
+    if miss:
+        return miss
+    sa, sb = _bars(archive, "SPY"), _bars(archive, "IVV")
+    pa = dict(zip(sa.days, sa.adj)); pb = dict(zip(sb.days, sb.adj))
+    days = sorted(set(pa) & set(pb))
+    rep = twin_reversion(days, [pa[d] for d in days], [pb[d] for d in days])
+    rep["missing_twins"] = ["SPY/VOO", "GLD/IAU", "QQQ/QQQM", "IBIT/FBTC"]
+    return _wrap(rep)
+
+
+def ohlc_ibs_reversal(archive):
+    """T-332: SPY next-day return after IBS < 0.2 minus unconditional, 2000-01..2026-09, DSR over 6 rules x SPY/QQQ."""
+    miss = _missing(archive, ["daily-history-SPY"])
+    if miss:
+        return miss
+    b = _bars(archive, "SPY")
+    sharpes = []
+    for sym in ("SPY", "QQQ"):
+        if not _has(archive, _bundle(sym)):
+            continue
+        bb = _bars(archive, sym); ds = np.array(bb.days[:-1]); nd = np.array(bb.days[1:])
+        w = (ds >= "2000-01-01") & (nd <= "2026-09-30")
+        for pos in reversal_rule_positions(bb.high, bb.low, bb.close, bb.adj).values():
+            sharpes.append(sharpe_ratio(rule_daily_net(pos, bb.adj)[w]))
+    rep = ibs_reversal(b.days, b.high, b.low, b.close, b.adj, opens=b.open, grid_sharpes=sharpes)
+    rep["n_grid_variants_archived"] = len(sharpes)
+    try:
+        grid = []
+        bb = b; ds = np.array(bb.days[:-1]); nd = np.array(bb.days[1:]); w = (ds >= "2000-01-01") & (nd <= "2026-09-30")
+        for pos in reversal_rule_positions(bb.high, bb.low, bb.close, bb.adj).values():
+            grid.append(rule_daily_net(pos, bb.adj)[w])
+        rep["pbo_spy_6_rules"] = pbo_cscv(np.column_stack(grid), n_partitions=8)["pbo"]
+    except Exception as exc:                       # diagnostic only
+        rep["pbo_spy_6_rules"] = f"n/a ({exc})"
+    return _wrap(rep)
+
+
+def ohlc_gap_fade(archive):
+    """T-333: SPY gap fade (|gap| > 0.5%, open to close, 2 bps RT), 2000-01..2026-09; DSR over SPY/QQQ x 3 thresholds;
+    IBIT control reported."""
+    miss = _missing(archive, ["daily-history-SPY"])
+    if miss:
+        return miss
+    b = _bars(archive, "SPY")
+    sharpes = []
+    for sym in ("SPY", "QQQ"):
+        if not _has(archive, _bundle(sym)):
+            continue
+        bb = _bars(archive, sym); ds = np.array(bb.days[1:]); w = (ds >= "2000-01-01") & (ds <= "2026-09-30")
+        for thr in (0.0025, 0.005, 0.01):
+            sharpes.append(sharpe_ratio(gap_fade_series(bb.open, bb.close, thr, 0.0002)[3][w]))
+    rep = gap_fade(b.days, b.open, b.close, variant_sharpes=sharpes)
+    rep["variants"] = "SPY, QQQ x |gap| > 0.25%, 0.5%, 1.0%"
+    if _has(archive, "daily-history-IBIT"):
+        ib = _bars(archive, "IBIT")
+        ctl = gap_fade(ib.days, ib.open, ib.close, start="2024-01-01", end="2026-09-30", min_n=1)
+        rep["ibit_control"] = {k: ctl.get(k) for k in ("n", "first", "mean_net_bps", "ci_bps")}
+        if ctl.get("mean_net_bps") is not None:
+            head, sep, tail = rep["reason"].rpartition(" — ")
+            rep["reason"] = f"{head}; IBIT control (expected no edge) {ctl['n']} trades, mean {ctl['mean_net_bps']:+.1f} bps{sep}{tail}"
+    return _wrap(rep)
+
+
+def ohlc_overnight_vs_intraday(archive):
+    """T-348: SPY close-to-open (dividends added back on ex-dates) minus open-to-close, 1993-2026."""
+    miss = _missing(archive, ["daily-history-SPY"])
+    if miss:
+        return miss
+    b = _bars(archive, "SPY")
+    return _wrap(overnight_intraday(b.days, b.open, b.close, ex_dividends(b.close, b.adj), adj=b.adj, start="1993-01-01", end="2026-12-31"))
+
+
+def ohlc_cs_spread_shock(archive):
+    """T-421: SPY Corwin-Schultz +2 sigma spread shocks and the 20-day forward return, 2000-2026, VIX-change control."""
+    miss = _missing(archive, ["daily-history-SPY", "cboe-VIX-history"])
+    if miss:
+        return miss
+    b = _bars(archive, "SPY")
+    return _wrap(spread_shock(b.days, b.high, b.low, b.close, b.adj, _index(archive, "cboe-VIX-history")))
+
+
+HARNESSES = {
+    "ohlc_opex_pin_straddle": ohlc_opex_pin_straddle,
+    "ohlc_donchian_atr_breakout": ohlc_donchian_atr_breakout,
+    "ohlc_spy_ivv_twin": ohlc_spy_ivv_twin,
+    "ohlc_ibs_reversal": ohlc_ibs_reversal,
+    "ohlc_gap_fade": ohlc_gap_fade,
+    "ohlc_overnight_vs_intraday": ohlc_overnight_vs_intraday,
+    "ohlc_cs_spread_shock": ohlc_cs_spread_shock,
+}
+
+THEORY_MAP = {
+    "T-216": "ohlc_opex_pin_straddle",
+    "T-304": "ohlc_donchian_atr_breakout",
+    "T-324": "ohlc_spy_ivv_twin",
+    "T-332": "ohlc_ibs_reversal",
+    "T-333": "ohlc_gap_fade",
+    "T-348": "ohlc_overnight_vs_intraday",
+    "T-421": "ohlc_cs_spread_shock",
+}
