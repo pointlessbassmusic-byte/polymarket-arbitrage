@@ -818,7 +818,7 @@ def _hold_lock(root, name):
 
 def test_run_lock_refuses_a_second_writer(archive, tmp_path):
     with ph.run_lock(archive) as paths:
-        assert [p.name for p in paths] == ["public_history.run.lock", "crypto_history.run.lock"]
+        assert [p.name for p in paths] == ["public_history.run.lock"]
         other = Archive(root=archive.root, ledger=archive.ledger)
         with pytest.raises(RuntimeError, match="another writer"):
             with ph.run_lock(other):
@@ -827,11 +827,12 @@ def test_run_lock_refuses_a_second_writer(archive, tmp_path):
             ph.fetch_all_misc(other, sources=["treasury"])
     with ph.run_lock(archive):                                                        # released on exit
         pass
-    # a crypto_history run holding its own lock also blocks this module (and the lock is released after the refusal)
+    # a crypto_history run holding its own lock no longer blocks this module: Archive lets the INDEX on disk win under its
+    # store lock, so different fetcher modules may store side by side
     fh = _hold_lock(archive.root, "crypto_history.run.lock")
     try:
-        with pytest.raises(RuntimeError, match="crypto_history.run.lock"):
-            ph.fetch_all_misc(archive, sources=["treasury"])
+        with ph.run_lock(archive) as paths:
+            assert [p.name for p in paths] == ["public_history.run.lock"]
     finally:
         fh.close()
     with ph.run_lock(archive):

@@ -106,10 +106,10 @@ Entry point ``fetch_all_misc(store, dry_run=False, limit=None)``; command line `
 all [--dry-run] [--limit N] [--preview DIR | --root DIR]``. Local-only bundles need the ``.gitignore`` lines from
 ``gitignore_lines()``.
 
-ONE WRITER AT A TIME (see ``RUN_LOCKS``): ``Archive`` re-reads INDEX.json with ``setdefault``, so two processes storing
-into one archive leave stale INDEX entries. A storing run (``fetch_all_misc``, a single source or ``merge`` from the
-command line) holds ``<archive root>/public_history.run.lock`` and ``crypto_history.run.lock`` (a second writer of
-either module is refused) and ends with ``_index_check`` (the command line exits 1 on a mismatch). To run StockTwits
+ONE RUN OF THIS MODULE AT A TIME (see ``RUN_LOCKS``): a storing run (``fetch_all_misc``, a single source or ``merge``
+from the command line) holds ``<archive root>/public_history.run.lock`` (a second run of this module is refused; other
+fetcher modules may store side by side since ``Archive`` lets the INDEX on disk win under its store lock) and ends with
+``_index_check`` (the command line exits 1 on a mismatch). To run StockTwits
 (about 38 hours) next to the rest, store it under its own ``--root DIR`` and ``merge --from DIR`` afterwards.
 """
 
@@ -3010,14 +3010,13 @@ SOURCES = {
 DEFAULT_ORDER = ("stocktwits_intensity", "stocktwits_preopen", "wikipedia", "fja", "treasury", "cftc", "clevelandfed",
                  "clevelandfed_snapshot", "spdr", "sprott", "ssga", "sec_tickers", "sec_lookup", "finra_si", "finra_cnms",
                  "sec_submissions", "sec_companyfacts", "deribit_near")
-# ONE WRITER AT A TIME. ``Archive`` keeps an in-memory index and re-reads INDEX.json with ``setdefault`` on every store,
-# so a second process storing into the same archive writes back its own stale entry for every bundle it has seen
-# (reproduced by the checker: a StockTwits week indexed at 1 row while its file held 2; ``verify`` fails). Storing runs
-# therefore hold an exclusive, non-blocking lock in the archive root: ``public_history.run.lock`` and also
-# ``crypto_history.run.lock`` (the sibling module's lock, so a crypto_history run and a public_history run refuse each
-# other); both are gitignored by ``mandel/**/*.lock``. To run StockTwits in parallel with the rest, give it its own
-# archive root (``--root DIR``) and ``merge`` it into the real archive afterwards.
-RUN_LOCKS = ("public_history.run.lock", "crypto_history.run.lock")
+# ONE RUN OF THIS MODULE AT A TIME. Archive.store re-reads INDEX.json under the store lock and lets the disk copy win
+# (it used ``setdefault`` until 2026-10-15, when the checker reproduced a second process writing back a stale entry), so
+# processes of different fetcher modules may store into one archive side by side. Two runs of this module would still
+# fetch and merge the same bundles, so a storing run holds an exclusive, non-blocking ``public_history.run.lock`` in the
+# archive root (gitignored by ``mandel/**/*.lock``). To run StockTwits next to the other sources, give it its own archive
+# root (``--root DIR``) and ``merge`` it into the real archive afterwards.
+RUN_LOCKS = ("public_history.run.lock",)
 
 
 @contextlib.contextmanager
