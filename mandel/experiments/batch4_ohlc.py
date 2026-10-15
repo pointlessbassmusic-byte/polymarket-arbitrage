@@ -55,13 +55,14 @@ Statistics
   signal-driven rules whose trades do not depend on the scan's first day beyond the warm-up trade.
 
 Model pricing (T-216) is Black-Scholes with sigma = VIX/100, T = 1/252, r = 0 and labelled MODEL-PRICED: a flat
-30-day index cannot see any expiry-specific premium that traded weekly options carry. The straddle settles on the
-raw closes, |SPY_Fri - SPY_Thu|, as the procedure states; on an ex-dividend Friday the known cash dividend (declared
-before the ex-date) is priced into the forward, S_thu - D. The r = q = 0 price without the dividend is reported as
-the as-worded sensitivity. Its "exclude opex days with FOMC/CPI" control reads CPI release days from
-``macro-release-cpi`` (ALFRED vintage dates of CPIAUCSL, 08:30 ET, revision-only vintages dropped by
-``batch5_macro.release_days_from_rows``); the bundle is loaded only for that control, and without it the CPI part is
-listed under ``not_run``.
+30-day index cannot see any expiry-specific premium that traded weekly options carry; as house rule 8 requires, the
+report gives the headline difference with every sigma scaled by 0.81, 0.90, 1.1 and 1.2 (``iv_scale_sensitivity``,
+report only, never a criterion). The straddle settles on the raw closes, |SPY_Fri - SPY_Thu|, as the procedure states;
+on an ex-dividend Friday the known cash dividend (declared before the ex-date) is priced into the forward, S_thu - D.
+The r = q = 0 price without the dividend is reported as the as-worded sensitivity. Its "exclude opex days with FOMC/CPI"
+control reads CPI release days from ``macro-release-cpi`` (ALFRED vintage dates of CPIAUCSL, 08:30 ET, revision-only
+vintages dropped by ``batch5_macro.release_days_from_rows``); the bundle is loaded only for that control, and without
+it the CPI part is listed under ``not_run``.
 """
 
 from __future__ import annotations
@@ -1159,13 +1160,18 @@ def third_friday(y: int, m: int) -> date:
     return d + timedelta(days=14)
 
 
-def thu_fri_straddles(days: Sequence[str], closes, vix: dict, divs=None, T: float = 1.0 / EQ_PPY):
+IV_SCALES = (0.81, 0.90, 1.1, 1.2)   # T-216 IV-scale sensitivities, report only (never criteria): every sigma x s; 0.81 and 0.90
+                                     # are batch6_dir's SCALES (0.81 the captured SPY ATM IV / VIX ratio), 1.1 and 1.2 the other side
+
+
+def thu_fri_straddles(days: Sequence[str], closes, vix: dict, divs=None, T: float = 1.0 / EQ_PPY, iv_scale: float = 1.0):
     """One row per Friday whose previous trading day is the calendar Thursday and has a VIX close: (friday, pnl,
     as-worded pnl, premium) in fraction of spot for a short ATM straddle sold at Thursday's close (K = S_thu,
-    sigma = VIX/100, r = 0) and settled on the raw closes, |S_fri - S_thu|, as the procedure states. ``pnl`` prices
-    the straddle on the forward S_thu - D, with D the cash dividend going ex on that Friday (SPY declares it before
-    the ex-date, so it is known at the sale); ``premium`` is that price. The as-worded pnl prices at r = q = 0 with no
-    dividend (the two agree on Fridays without a dividend)."""
+    sigma = iv_scale x VIX/100, r = 0) and settled on the raw closes, |S_fri - S_thu|, as the procedure states. ``pnl``
+    prices the straddle on the forward S_thu - D, with D the cash dividend going ex on that Friday (SPY declares it
+    before the ex-date, so it is known at the sale); ``premium`` is that price. The as-worded pnl prices at r = q = 0
+    with no dividend (the two agree on Fridays without a dividend). ``iv_scale`` != 1 is the IV-scale sensitivity
+    (house rule 8); the rows returned do not depend on it."""
     C = np.asarray(closes, dtype=float); D = np.zeros(len(C)) if divs is None else np.asarray(divs, dtype=float)
     fri, K, sig, dv, raw = [], [], [], [], []
     for i in range(1, len(days)):
@@ -1176,6 +1182,7 @@ def thu_fri_straddles(days: Sequence[str], closes, vix: dict, divs=None, T: floa
     if not fri:
         return [], np.array([]), np.array([]), np.array([])
     K, sig, dv, raw = (np.array(x, dtype=float) for x in (K, sig, dv, raw))
+    sig = sig * float(iv_scale)
     F = K - dv
     prem = bs.price(F, K, T, 0.0, sig, "call") + bs.price(F, K, T, 0.0, sig, "put")
     prem0 = bs.price(K, K, T, 0.0, sig, "call") + bs.price(K, K, T, 0.0, sig, "put")
@@ -1186,7 +1193,7 @@ def thu_fri_straddles(days: Sequence[str], closes, vix: dict, divs=None, T: floa
 
 def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: Optional[set] = None, start: Optional[str] = None,
                   end: Optional[str] = None, block: int = 8, n_boot: int = 4000, seed: int = 0, min_n: int = 300, n_perm: int = 5000,
-                  split: str = "2010-01-01", cpi_days: Optional[Sequence[str]] = None) -> dict:
+                  split: str = "2010-01-01", cpi_days: Optional[Sequence[str]] = None, iv_scales: Sequence[float] = IV_SCALES) -> dict:
     """T-216 (MODEL-PRICED): mean short-straddle P&L on monthly third-Friday expirations minus other Fridays. Pass:
     difference > 0 with the two-sided 95% block-bootstrap CI (block of ``block`` Fridays) excluding 0, over >= 300
     opex Fridays. Settlement on the raw closes |SPY_Fri - SPY_Thu|; the known ex-date dividend is priced into the
@@ -1196,7 +1203,9 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
     falls inside the Thursday-close-to-Friday-close window, or when it or its Thursday is a scheduled FOMC decision day;
     reported with a block-bootstrap CI, with the same Fridays also out of the non-opex group, and with Thursday CPI
     releases, which come before the sale, also dropped), quarterly vs other opex, pre/post-2010. Sensitivities: the
-    as-worded r = q = 0 price that ignores the dividend, and all ex-dividend Fridays dropped."""
+    as-worded r = q = 0 price that ignores the dividend, all ex-dividend Fridays dropped, and (house rule 8, report only,
+    never a criterion) the headline difference with every sigma multiplied by each of ``iv_scales``
+    (``iv_scale_sensitivity``: diff_bps, ci_bps and p from the same block bootstrap and seed)."""
     fri, pnl, pnl_raw, prem = thu_fri_straddles(days, closes, vix, divs)
     fr = np.array(fri)
     m = _range_mask(fr, start, end) if len(fr) else np.zeros(0, dtype=bool)
@@ -1216,6 +1225,13 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
         return rep
     g = group_diff(pnl, ox, block, n_boot, seed)
     g_raw = group_diff(pnl_raw, ox, block, n_boot, seed)
+    iv_sens = {}                                                       # house rule 8: reported, never a criterion
+    for s_ in iv_scales:
+        g_s = group_diff(thu_fri_straddles(days, closes, vix, divs, iv_scale=s_)[1][m], ox, block, n_boot, seed)
+        iv_sens[f"{s_:.2f}"] = {"diff_bps": None if g_s["diff"] is None else g_s["diff"] * 1e4,
+                                "ci_bps": [None if c_ is None else c_ * 1e4 for c_ in g_s["ci"]], "p": g_s["p"]}
+    iv_txt = ", ".join(f"s={k_} " + (f"{r_['diff_bps']:+.2f} (CI {r_['ci_bps'][0]:+.2f}..{r_['ci_bps'][1]:+.2f})"
+                                     if r_["diff_bps"] is not None else "n/a") for k_, r_ in iv_sens.items())
     dmap = {} if divs is None else {d: float(x) for d, x in zip(days, np.asarray(divs, dtype=float))}
     exd = np.array([dmap.get(d, 0.0) > 0 for d in fr], dtype=bool)
     g_nodiv = group_diff(pnl[~exd], ox[~exd], block, n_boot, seed) if exd.any() else g
@@ -1300,7 +1316,7 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
                ex_dividend_fridays_excluded={"n_excluded": int(exd.sum()), "n_opex": g_nodiv["n_flag"],
                                              "diff_bps": g_nodiv["diff"] * 1e4 if nd_ok else None,
                                              "ci_bps": [g_nodiv["ci"][0] * 1e4, g_nodiv["ci"][1] * 1e4] if nd_ok else [None, None]},
-               controls=ctrl, not_run=not_run, strike_pin=pin, verdict=v,
+               iv_scale_sensitivity=iv_sens, controls=ctrl, not_run=not_run, strike_pin=pin, verdict=v,
                reason=(f"MODEL-PRICED (BS, sigma = Thursday VIX, T=1/252): {n} opex vs {int((~ox).sum())} other Fridays "
                        f"{rep['first']}..{rep['last']}; short-straddle P&L {g['mean_flag'] * 1e4:+.2f} vs {g['mean_other'] * 1e4:+.2f} bps of spot, "
                        f"difference {g['diff'] * 1e4:+.2f} bps (95% block-{block} CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}, p={g['p']:.3f}); "
@@ -1308,7 +1324,9 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
                        f"{int(exd.sum())} ex-dividend Fridays ({n_exd_opex} of them opex); as-worded sensitivity at r = q = 0 ignoring the dividend: "
                        f"{g_raw['diff'] * 1e4:+.2f}, CI {g_raw['ci'][0] * 1e4:+.2f}..{g_raw['ci'][1] * 1e4:+.2f} ({v_raw.replace('_', ' ')}"
                        f"{', so the verdict depends on how the dividend is treated' if v_raw != v else ''}); with all ex-dividend Fridays dropped: "
-                       f"{nd_txt}{macro_txt}; $1-strike distance opex {pin.get('opex_mean_distance', float('nan')):.3f} vs "
+                       f"{nd_txt}{macro_txt}"
+                       f"{'; IV-scale sensitivity (report only, not a criterion; every sigma x s): ' + iv_txt + ' bps' if iv_sens else ''}"
+                       f"; $1-strike distance opex {pin.get('opex_mean_distance', float('nan')):.3f} vs "
                        f"{pin.get('other_mean_distance', float('nan')):.3f} (perm p={pin.get('p_opex_closer', float('nan')):.3f}) — {why}"))
     return rep
 

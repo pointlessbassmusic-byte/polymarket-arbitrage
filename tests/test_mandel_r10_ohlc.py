@@ -9,7 +9,11 @@ At or above min_n the reports carry no new keys.
 Rule 10: no harness in the module rests on a non-overlapping grid with an arbitrary start. T-216 is a calendar event study
 (third Fridays vs other Fridays), T-332/T-333/T-348 are daily series, T-421's regression uses every overlapping daily row
 and its event count is the maximal non-overlapping set, and T-304/T-324 trade a signal-driven rule whose trades do not
-depend on the day the scan starts. The last tests pin those invariances."""
+depend on the day the scan starts. The rule-10 tests pin those invariances.
+
+Rule 8 (model-priced results report their IV-scale sensitivity): T-216's report carries ``iv_scale_sensitivity``, the
+headline opex-minus-other difference with every sigma x s for s in IV_SCALES, from the same block bootstrap and seed.
+It is reporting only: it never enters the criteria or the verdict, and s = 1 reproduces the headline exactly."""
 
 import math
 
@@ -18,7 +22,7 @@ import numpy as np
 from mandel.experiments import batch4_ohlc as ob
 from mandel.validation.backtest_eval import block_bootstrap_pvalue
 
-from tests.test_mandel_batch4_ohlc import _days, _path, _shock_bars, _trend_assets, _twins
+from tests.test_mandel_batch4_ohlc import _days, _opex_closes, _path, _shock_bars, _trend_assets, _twins
 from tests.test_mandel_rule5_r5d import _revert_assets
 
 P_ROW = "p < 0.05 vs gap <= 3 bps (studentized block-10 bootstrap)"
@@ -184,3 +188,60 @@ def test_spread_shock_event_count_is_the_maximal_non_overlapping_set():
     shock_rows = np.where(m & (np.nan_to_num(z) > 2.0))[0]
     assert rep["n_shock_days"] == len(shock_rows) > rep["n"]
     assert rep["n"] == _max_spaced(shock_rows, 20)                  # n_ev is a property of the shock set, not of a start phase
+
+
+# ----------------------------------------------------------------------- rule 8: T-216 IV-scale sensitivity --
+
+def _opex_varying_vix(seed=4):
+    """Planted pin with a VIX that varies by day, so the scaled premia do not cancel in the opex-minus-other difference."""
+    days, C, _ = _opex_closes(0.004, seed=seed)
+    rng = np.random.default_rng(seed)
+    return days, C, {d: float(v) for d, v in zip(days, rng.uniform(10.0, 30.0, len(days)))}
+
+
+def test_thu_fri_straddles_scales_sigma_only():
+    """iv_scale multiplies sigma = VIX/100 and nothing else: the same as a VIX dict scaled by s, the same rows."""
+    days, C, vix = _opex_varying_vix()
+    D = np.zeros(len(days)); D[::63] = 0.4
+    base = ob.thu_fri_straddles(days, C, vix, D)
+    one = ob.thu_fri_straddles(days, C, vix, D, iv_scale=1.0)
+    assert base[0] == one[0] and all(np.array_equal(x, y) for x, y in zip(base[1:], one[1:]))
+    for s in ob.IV_SCALES:
+        got = ob.thu_fri_straddles(days, C, vix, D, iv_scale=s)
+        ref = ob.thu_fri_straddles(days, C, {d: v * s for d, v in vix.items()}, D)
+        assert got[0] == base[0]
+        for x, y in zip(got[1:], ref[1:]):
+            assert np.allclose(x, y, rtol=0, atol=1e-12)
+        assert not np.allclose(got[3], base[3])                    # the premium does move with the scale
+
+
+def test_opex_reports_iv_scale_sensitivity_as_reporting_only():
+    days, C, vix = _opex_varying_vix()
+    rep = ob.opex_straddle(days, C, vix, n_boot=500, n_perm=50)
+    assert rep["label"] == "MODEL-PRICED" and rep["n"] >= 300
+    sens = rep["iv_scale_sensitivity"]
+    assert list(sens) == [f"{s:.2f}" for s in ob.IV_SCALES] == ["0.81", "0.90", "1.10", "1.20"]
+    for s, r in sens.items():
+        assert set(r) == {"diff_bps", "ci_bps", "p"} and r["ci_bps"][0] < r["diff_bps"] < r["ci_bps"][1], (s, r)
+        assert r["diff_bps"] != rep["diff_bps"]
+    assert "IV-scale sensitivity (report only, not a criterion" in rep["reason"] and "s=0.81 " in rep["reason"]
+    bare = ob.opex_straddle(days, C, vix, n_boot=500, n_perm=50, iv_scales=())
+    assert bare["iv_scale_sensitivity"] == {} and "IV-scale" not in bare["reason"]
+    assert bare["verdict"] == rep["verdict"] and bare["diff_bps"] == rep["diff_bps"] and bare["ci_bps"] == rep["ci_bps"]
+    assert bare["reason"].split(" — ")[-1] == rep["reason"].split(" — ")[-1]   # never a criterion: same decision text
+
+
+def test_opex_iv_scale_one_reproduces_the_headline():
+    days, C, vix = _opex_varying_vix()
+    rep = ob.opex_straddle(days, C, vix, n_boot=500, n_perm=50, iv_scales=(1.0, 0.81))
+    one = rep["iv_scale_sensitivity"]["1.00"]
+    assert one["diff_bps"] == rep["diff_bps"] and one["ci_bps"] == rep["ci_bps"] and one["p"] == rep["p"]
+    assert rep["iv_scale_sensitivity"]["0.81"]["diff_bps"] != rep["diff_bps"]
+
+
+def test_opex_below_min_n_carries_the_sensitivity_and_keeps_rule5():
+    days, C, vix = _opex_varying_vix()
+    rep = ob.opex_straddle(days, C, vix, start="2012-01-01", n_boot=400, n_perm=50)
+    assert rep["n"] < 300 and "rule5" in rep and rep["verdict"] != "supported"
+    assert set(rep["iv_scale_sensitivity"]) == {"0.81", "0.90", "1.10", "1.20"}
+    assert not any("IV" in name for name, _ in rep["rule5"]["criteria"])

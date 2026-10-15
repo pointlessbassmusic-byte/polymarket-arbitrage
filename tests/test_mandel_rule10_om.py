@@ -3,7 +3,9 @@
 No claim in this module names an entry or expiry calendar for its cycles. The claims tested on non-overlapping h-day cycles (T-148's
 sign test, T-231, T-232, T-238, T-243, T-530, T-533, T-534, T-536) are now decided on every start of the h-day grid pooled
 (overlapping entries, block bootstrap with blocks of at least 2h), each start's own grid reported; an effect planted on one grid start
-must not pass. The spike claims (T-241, T-535) name their entries (the first event, then the first event after each 21-day hold):
+must not pass. That includes the 9-day claims T-232 and T-533: a 9-day window is not phase-invariant, because with a trend in realised
+variance (trailing RV above forward RV every day) the VIX9D level alone can put a positive premium on one grid's entries and a negative
+one on every other day. The spike claims (T-241, T-535) name their entries (the first event, then the first event after each 21-day hold):
 those entries do not depend on where the data starts, and the pooled all-event-day frequency is reported beside them.
 """
 
@@ -296,6 +298,62 @@ def test_t533_pools_every_signal_day_and_counts_non_overlapping_windows():
     assert rep["n_signals"] < rep["n_entries"] / 6 and "18-entry blocks" in rep["reason"]
     none = om.vix9d_v2(*_vix9d_world(30.0))                                      # VIX9D never below trailing realised
     assert none["verdict"] == "inconclusive" and none["n_signals"] == 0
+
+
+def _declining_world(n=2000):
+    """Alternating +-a returns with annualised variance 0.09 exp(-0.0005 t): realised variance falls smoothly (no periodic pattern), so
+    the trailing 10-day RV exceeds the forward RV on every day. Returns the days, the returns the harness sees and the SPY rows."""
+    days = _days(n, "2011-01-04")
+    closes = _closes(0.09 * np.exp(-0.0005 * np.arange(n - 1)), alternating=True)
+    return days, np.diff(np.log(closes)), _px(days, closes)
+
+
+def _rv(r, a, b):
+    return float(np.sum(r[a:b] ** 2) * 252 / (b - a))
+
+
+def test_t232_premium_planted_on_one_grid_start_does_not_pass():
+    """A 9-day window is not phase-invariant: the VIX9D level can plant the premium on one start of the 9-day grid. With eps = (trailing
+    RV - next-9d RV) / 2 > 0, VIX9D^2 = RV_fwd - eps on days t % 9 == 1 (the old harness's non-overlapping entries 10, 19, 28, ...) and
+    RV_fwd + eps on every other day: VIX9D sits below trailing realised every day (the signal always fires), but the premium RV^2 - VIX9D^2
+    is +eps on the day-1 grid only and -eps on the other eight starts. The old harness saw 100% wins (data part passes, p 0.0005)."""
+    days, r, spy = _declining_world()
+    n = len(days); v9 = np.full(n, 30.0)
+    for t in range(10, n - 10):
+        fw = _rv(r, t, t + 9); eps = (_rv(r, t - 10, t) - fw) / 2
+        assert eps > 0
+        v9[t] = 100 * math.sqrt(fw - eps if t % 9 == 1 else fw + eps)
+    rep = om.short_horizon_conditional(_idx(days, v9), spy)
+    assert rep["verdict"] == "not_supported" and rep["mean_rv2_minus_iv2"] < 0 and rep["p_value"] > 0.5
+    assert rep["win_rate"] < 0.2 and "data part passes" not in rep["reason"]
+    assert rep["grid_starts"]["passing_starts"] == [1]                                      # the planted grid alone passes
+    assert rep["n_entries"] == n - 20 and rep["n_signals"] == len(range(10, n - 10, 9))       # every day signals; n = the old entries
+
+
+def test_t533_premium_planted_on_the_old_lockout_entries_does_not_pass():
+    """T-533's windows are 9 calendar days, so the old harness's entries are its earliest-first lockout (t = 10, then the first session
+    after each window closes). Same declining-variance world: VIX9D^2 = RV_fwd - eps on those entries and RV_fwd + eps on every other day.
+    The old harness: 100% wins, supported (p 0.0005); pooled over every signal day the premium is negative."""
+    days, r, spy = _declining_world()
+    dts = [date.fromisoformat(d) for d in days]
+
+    def end_of(t):
+        end = t
+        while end + 1 < len(dts) and (dts[end + 1] - dts[t]).days <= 9:
+            end += 1
+        return end
+    old, t = [], 10
+    while t < len(r) - 8:
+        old.append(t); t = end_of(t) + 1
+    v9 = np.full(len(days), 30.0)
+    for t in range(10, len(r) - 8):
+        fw = _rv(r, t, end_of(t)); eps = (_rv(r, t - 10, t) - fw) / 2
+        assert eps > 0
+        v9[t] = 100 * math.sqrt(fw - eps if t in old else fw + eps)
+    assert all(_rv(r, t, end_of(t)) > (v9[t] / 100) ** 2 for t in old)                   # the old entries: a win every window
+    rep = om.vix9d_v2(_idx(days, v9), spy)
+    assert rep["verdict"] == "not_supported" and rep["mean"] < 0 and rep["p"] > 0.5
+    assert rep["n_entries"] == len(r) - 18 and rep["n_signals"] == len(old)                  # every day signals; n = the old entries
 
 
 # ------------------------------------------------------------- T-241 / T-535: event entries named by the claim --

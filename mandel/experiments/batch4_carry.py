@@ -79,8 +79,12 @@ and both criteria are judged on that pooled all-start set (overlapping windows; 
 starts in blocks of 180 days, twice the hold). The 90 per-offset grids are reported (ranges, how many offsets pass), and
 n stays in windows: the number of non-overlapping windows the sample holds. T-364's weekly observations name no
 weekday, so its five weekday phases (each ISO week's first ok session on or after Monday, ..., Friday) are pooled, each
-labelled from its own trailing 52 observations, with the permutation and bootstrap in blocks of 8 weeks of pooled
-entries. The per-phase results are reported and n stays in weeks. The other six need no change. T-258 is a
+labelled from its own trailing 52 observations, with the permutation and bootstrap in blocks of 9 weeks = 45 pooled
+entries, >= 2 x the 30-day horizon (the trial's 8 weeks, 56 days, is shorter than twice the 30-day forward drawdown and
+the timing rule's 30-day flat hold; a single phase keeps the trial's 8 weeks). The pooled episode count is the most
+non-overlapping top-decile episodes any single phase holds, never a greedy count over the union of the phases' top-decile
+days, which is at least the largest phase's and can turn "insufficient events" into a pass. The per-phase results are
+reported and n stays in weeks. The other six need no change. T-258 is a
 calendar-month statistic (entry on day 1 of each month). T-362 follows the CME monthly contract calendar (decision on
 the first session after the previous expiry, held to expiry). T-303 and T-363 are daily series. T-329 enters on its own
 signal days (event-driven, no grid; its block-shifted signal null is a reported diagnostic). T-423 is a daily event
@@ -1379,14 +1383,19 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
     week) and ``more_phases`` the other phases as (days, basis) pairs (the harness passes Tuesday to Friday from
     ``weekly_phase``). Each phase is labelled from its own trailing 52 observations. Every criterion is judged on the
     pooled set, all phases' labelled observations ordered by ISO week and phase: the pooled gap; the block permutation
-    and the block bootstrap in blocks of 8 weeks of pooled entries (8 x the phase count); the halves' pooled gaps; and
-    the non-overlapping episodes among the pooled top-decile days. n, in weeks (the claim's unit), counts the ISO weeks
-    with a labelled observation. Each phase's gap, p-value, halves and episodes, their ranges and how many phases pass
-    are reported, never judged. The timing rule (a control) gives each phase an equal share of capital. With a single
-    phase (no ``more_phases``) the test is that phase's alone.
+    and the block bootstrap in blocks of max(``block``, ceil(2 x ``horizon`` / 7)) = 9 weeks of pooled entries (9 x the
+    phase count = 45 entries, 63 days, >= 2 x the 30-day horizon: the overlapping pooled entries carry a 30-day forward
+    drawdown and the timing rule holds flat for 30 days, so the trial's 8 weeks, 56 days, is too short for them); the
+    halves' pooled gaps; and the episodes, the most non-overlapping top-decile episodes any single phase holds (never a
+    greedy count over the union of the phases' top-decile days, which is always at least the largest phase's count and
+    would overstate a count criterion in the claim's units). n, in weeks (the claim's unit), counts the ISO weeks with a
+    labelled observation. Each phase's gap, p-value (in the trial's 8-week blocks), halves and episodes, their ranges and
+    how many phases pass are reported, never judged. The timing rule (a control) gives each phase an equal share of
+    capital. With a single phase (no ``more_phases``) the test is that phase's alone, in the trial's 8-week blocks.
 
     Below min_n weeks (house rule 5) each criterion fails decisively at the confidence of its pass, from block-bootstrap
-    draws of the pooled gap (8 weeks of entries): the gap (a point estimate >= 10 pp) when its two-sided 95% interval
+    draws of the pooled gap (in the same blocks as the permutation: 9 weeks = 45 pooled entries, or the trial's 8 weeks
+    for a single phase): the gap (a point estimate >= 10 pp) when its two-sided 95% interval
     lies wholly below 10 pp, the one-sided 5% permutation test (p < 0.05) when the gap's one-sided 95% upper bound (the
     95% quantile) is at or below 0, and the halves (point estimates > 0) when either half's two-sided 95% interval lies
     wholly at or below 0. Each needs an interval of positive width; the episode count never decides there."""
@@ -1421,7 +1430,9 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
     dep = np.array([per[p][1][j] for _, p, j in ent], dtype=float)
     wk = [per[p][2][j] for _, p, j in ent]
     n = len({e[0] for e in ent})                          # ISO weeks with a labelled observation (the claim's unit)
-    bl = block * P                                        # 8 weeks of pooled entries
+    # house rule 10: pooled blocks span >= 2 x the 30-day horizon (9 weeks = 45 entries); one phase keeps the trial's 8
+    wk_block = max(block, math.ceil(2 * horizon / 7)) if P > 1 else block
+    bl = wk_block * P
     covered = bool(wk) and wk[0] <= (_d(start) + timedelta(days=14)).isoformat()
 
     def gap(L: np.ndarray, D: np.ndarray) -> Optional[float]:
@@ -1454,6 +1465,9 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
 
     S0 = summary(lab, dep, wk, bl)
     g, p, halves, hs, same, eps = S0["gap"], S0["p"], S0["halves"], S0["hs"], S0["same"], S0["episodes"]
+    if P > 1:     # the most episodes any single phase holds: a greedy count over the union of phases overstates it
+        eps = max(_episodes([_d(w).toordinal() for w, l_ in zip(wk_p, lab_p) if l_ == 2], horizon)
+                  for lab_p, _, wk_p in per)
     wka = np.array(wk, dtype=str)
     # timing rule: flat (bills) for 30 days after a top-decile week, 10 bp per switch; each phase holds 1/P of capital
     timing = None
@@ -1484,7 +1498,7 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
     gap_ci = {}
     gap_ub95 = None
 
-    def decisive():       # rule 5: block-bootstrap (8 weeks of entries) draws of the gaps, n_perm of them, at each pass's confidence
+    def decisive():       # rule 5: block-bootstrap draws (blocks of bl entries, as the permutation) of the gaps, n_perm of them
         nonlocal gap_ub95
         gap_ci["all"] = block_gap_ci(lab, dep, bl, n_perm, seed) if n else [None, None]
         gap_ub95 = block_gap_ub95(lab, dep, bl, n_perm, seed) if n else None
@@ -1512,21 +1526,24 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
             vals = [x[key] for x in pp_.values() if x[key] is not None]
             return [min(vals), max(vals)] if vals else [None, None]
 
-        r10 = {"phases": labels, "block_weeks": block, "pooled_block_entries": bl, "pooled_entries": int(len(lab)),
+        r10 = {"phases": labels, "block_weeks": block, "pooled_block_weeks": wk_block, "pooled_block_entries": bl,
+               "pooled_entries": int(len(lab)), "episodes_rule": "most in any single phase (never the union of phases)",
                "gap_range_pp": rng_("gap_pp"), "p_range": rng_("p_perm"), "episodes_range": rng_("episodes"),
                **{f"n_phases_{k}": sum(x[k] for x in pp_.values())
                   for k in ("gap_pass", "p_pass", "halves_pass", "episodes_pass", "all_pass")},
                "per_phase": pp_}
         r10_txt = (f"house rule 10: no weekday is named, so the criteria are judged on the {len(lab)} labelled "
                    f"observations pooled over the {P} weekday phases ({'/'.join(labels)}; each labelled from its own "
-                   f"trailing {trailing} observations; permutation and bootstrap in blocks of {block} weeks = {bl} pooled "
-                   f"entries). ")
+                   f"trailing {trailing} observations; permutation and bootstrap in blocks of {wk_block} weeks = {bl} pooled "
+                   f"entries, >= 2 x the {horizon}-day horizon; per phase the trial's {block} weeks; episodes are the most "
+                   f"any single phase holds, never the union of phases). ")
     ntop, nbot = int((lab == 2).sum()) if n else 0, int((lab == 0).sum()) if n else 0
     ci_txt = ""
     if r5:
         r5["gap_ci95_pp"] = gap_ci
         r5["gap_ub95_pp"] = gap_ub95
-        ci_txt = (f"; {block}-week block-bootstrap 95% CIs of the gap " + ", ".join(
+        bl_txt = f"{wk_block}-week ({bl} pooled entries, >= 2 x the {horizon}-day horizon)" if P > 1 else f"{block}-week"
+        ci_txt = (f"; {bl_txt} block-bootstrap 95% CIs of the gap " + ", ".join(
             f"{nm} [{_f(c_[0], 1)}, {_f(c_[1], 1)}] pp" for nm, c_ in gap_ci.items())
             + f"; one-sided 95% upper bound of the gap {_f(gap_ub95, 1)} pp from the same draws (decisive for the "
               f"permutation test below min_n when <= 0)")
@@ -1543,7 +1560,8 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
               f"{_f(dep[lab == 2].mean() if n and (lab == 2).any() else None, 1)}% "
               f"vs {_f(dep[lab == 0].mean() if n and (lab == 0).any() else None, 1)}%, gap {_f(g, 1)} pp (need >= {gap_pp:g}); "
               f"permutation p {_f(p, 4)} (need < 0.05); halves {_f(hs[0], 1)} / {_f(hs[1], 1)} pp (need both > 0); "
-              f"{eps} non-overlapping episodes (need >= {min_episodes}); weeks need >= {min_n}; window from {start[:7]} "
+              f"{eps} non-overlapping episodes{' in the best single phase' if P > 1 else ''} (need >= {min_episodes}); "
+              f"weeks need >= {min_n}; window from {start[:7]} "
               f"covered: {'yes' if covered else 'no (settle-synchronous spot starts 2019-05, first labelled week ' + (wk[0] if wk else 'n/a') + ')'}{ci_txt} — {why}")
     return {"n": n, "gap_pp": g, "p_perm": p, "halves": halves, "episodes": eps,
             "mean_depth_top": float(dep[lab == 2].mean()) if n and (lab == 2).any() else None,

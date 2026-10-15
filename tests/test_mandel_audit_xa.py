@@ -135,32 +135,48 @@ def _btc_data(n=700, seed=6, drift=0.004, vol=0.01, iv=80.0):
     return days, closes, {d: iv for d in days}, {d: 2.0 for d in days}
 
 
+def _grid30(days):
+    """An explicit 30-calendar-day (entry, expiry) schedule from days[0]: the same 30-day T and day +31 delivery date the XA-6 checks
+    were built on. The data are a phase-free random walk, so the schedule only fixes the arithmetic being checked; which calendar T-176
+    uses (Deribit's last Friday) is tested in test_mandel_rule10_xa.py."""
+    return [(days[i], days[i + 30]) for i in range(0, len(days) - 30, 30)]
+
+
 def test_xa6_premium_converted_at_inception_price():
+    # Guards XA-6 (premium): the BTC premium c is the USD premium / S_0 at inception, not the whole USD P&L / S_T.
     days, closes, idx, rates = _btc_data(drift=0.01)                     # S_T/S_0 ~ 1.35 per cycle: conversion date matters
-    rep = xa.inverse_covered_call_btc(days, closes, idx, rates, days[0], min_n=5)
-    res = xa._cycles(days, closes, idx, rates, [("call", "short", 1, ("delta", 0.25))], 30, 30, days[0])
+    grid = _grid30(days)
+    rep = xa.inverse_covered_call_btc(days, closes, idx, rates, days[0], calendar=grid, min_n=5)
+    res = xa._cycles(days, closes, idx, rates, [("call", "short", 1, ("delta", 0.25))], 30, 30, days[0], grid)
     K = np.array([s[0] for s in res["strikes"]]); S0 = res["spot"]; c = -res["debit"] / S0
     ST = np.array([closes[days.index(d) + 30] for d in res["day"]])
     want = c - np.maximum(ST - K, 0) / ST - 0.0006
     old = res["pnl"] / ST - 0.0006                                       # premium converted at S_T (the defect)
+    assert rep["n_cycles"] == len(grid) == len(want) and rep["dropped_no_index"] == []
     assert rep["mean_btc"] == pytest.approx(want.mean()) and abs(old.mean() - want.mean()) > 1e-3
     assert rep["mean_premium_btc"] == pytest.approx(c.mean())
 
 
 def test_xa6_delivery_settlement_and_unimplemented_criterion():
+    # Guards XA-6 (settlement): with Deribit delivery prices each cycle settles at the delivery price on the day after its last close
+    # (the expiry's 08:00 UTC print), cycles without one are dropped and counted; without them the criterion is unimplemented (None).
     days, closes, idx, rates = _btc_data(drift=0.0, vol=0.005)          # rich premium: CI of the mean > 0
-    proxy = xa.inverse_covered_call_btc(days, closes, idx, rates, days[0], min_n=5)
+    grid = _grid30(days)
+    proxy = xa.inverse_covered_call_btc(days, closes, idx, rates, days[0], calendar=grid, min_n=5)
     assert proxy["ci"][0] > 0 and proxy["verdict"] == "inconclusive" and "not implemented: settled at Deribit delivery prices" in proxy["reason"]
     rows = [{"value": {"date": (date.fromisoformat(d) + timedelta(days=1)).isoformat(), "delivery_price": float(closes[i] * 1.02)}} for i, d in enumerate(days)]
     dv = xa.delivery_prices(rows)
-    rep = xa.inverse_covered_call_btc(days, closes, idx, rates, days[0], delivery=dv, min_n=5)
-    res = xa._cycles(days, closes, idx, rates, [("call", "short", 1, ("delta", 0.25))], 30, 30, days[0])
+    del dv[(date.fromisoformat(grid[3][1]) + timedelta(days=1)).isoformat()]   # one expiry without a delivery print: dropped, not settled on spot
+    rep = xa.inverse_covered_call_btc(days, closes, idx, rates, days[0], delivery=dv, calendar=grid, min_n=5)
+    res = xa._cycles(days, closes, idx, rates, [("call", "short", 1, ("delta", 0.25))], 30, 30, days[0], grid)
     K = np.array([s[0] for s in res["strikes"]]); c = -res["debit"] / res["spot"]
     ST = np.array([dv.get((date.fromisoformat(d) + timedelta(days=31)).isoformat(), np.nan) for d in res["day"]]); ok = np.isfinite(ST)
     want = c[ok] - np.maximum(ST[ok] - K[ok], 0) / ST[ok] - 0.0006
-    assert rep["n_cycles"] == ok.sum() and rep["dropped"] == (~ok).sum()
-    assert rep["mean_btc"] == pytest.approx(want.mean()) and rep["verdict"] == "supported" and "Deribit delivery prices on day +31" in rep["reason"]
-    assert xa.inverse_covered_call_btc(days, closes, idx, rates, days[0], delivery=dv)["verdict"] == "inconclusive"   # 22 cycles < min_n 60
+    assert rep["n_cycles"] == ok.sum() == len(grid) - 1 and rep["dropped"] == (~ok).sum() == 1
+    assert rep["mean_btc"] == pytest.approx(want.mean()) and rep["verdict"] == "supported" and "Deribit delivery prices at each expiry" in rep["reason"]
+    assert "cycles without one dropped" in rep["reason"]
+    full = xa.inverse_covered_call_btc(days, closes, idx, rates, days[0], delivery=dv)      # T-176's wiring: Deribit calendar, min_n 60
+    assert full["n_cycles"] < 60 and full["verdict"] == "inconclusive" and "min_n 60" in full["reason"]
 
 
 # ------------------------------------------------- XA-7: T-266 level statistic and the unconditional comparator --
@@ -183,16 +199,27 @@ def test_xa7_level_statistic_and_unconditional_mean():
 # ----------------------------------------------- XA-8: daily-path drawdown and monthly rolls (T-267) --
 
 def test_xa8_daily_path_drawdown_and_monthly_roll():
+    # Guards XA-8: drawdowns on the daily mark-to-market path (both arms; the put marked daily at BS), not on cycle-end samples, and
+    # monthly rolls of the 90-DTE put (n counts 30-day roll periods, not 90-day hold-to-expiry cycles).
     n = 30 * 25 + 1; days = _days(n)
-    closes = 100 * (1 - 0.5 * np.sin(np.pi * (np.arange(n) % 30) / 30))     # back to 100 at every roll date, 50 mid-month
     idx = {d: 60.0 for d in days}; rates = {d: 2.0 for d in days}
+    # 30-periodic: 100 every 30 days, 50 mid-period. Sampled every 30 days at ANY phase the path is constant, so only the daily path
+    # sees the drawdown, whichever roll phase is used
+    closes = 100 * (1 - 0.5 * np.sin(np.pi * (np.arange(n) % 30) / 30))
     rep = xa.protective_put_calmar(days, closes, idx, rates, days[0])
     assert rep["n_cycles"] == 25                                             # monthly rolls (was 90-day hold-to-expiry cycles)
     assert rep["mdd_hold"] == pytest.approx(-0.5)                            # cycle-end sampling saw no drawdown at all
-    assert rep["mdd_hedged"] > rep["mdd_hold"]                               # the put cushions the intra-month dip
     assert "daily-path MDD" in rep["reason"] and "rolled every 30 days" in rep["reason"]
+    # The put cushions a crash on the daily path. One fast crash (100 -> 40 in 6 days, back by day +60) at every offset against the
+    # roll grid: every roll phase holds a put struck near 72 when it comes, so the pooled hedged MDD (mean over phases) is far
+    # shallower than holding's, wherever the crash falls (was asserted on the periodic path, where only roll phase 0 rolls at the peak)
+    crash = np.full(n, 100.0); crash[400:406] = np.linspace(100, 40, 7)[1:]; crash[406:460] = np.linspace(40, 100, 55)[1:]
+    for off in (0, 11, 23):
+        r = xa.protective_put_calmar(days, np.roll(crash, off), idx, rates, days[0])
+        assert r["mdd_hold"] == pytest.approx(-0.6) and r["mdd_hedged"] > -0.45 and r["n_cycles"] == 25
     short = xa.protective_put_calmar(days[:30 * 10 + 1], closes[:30 * 10 + 1], idx, rates, days[0])
-    # 10 identical roll periods: the bootstrap CI of the Calmar difference is a point mass wholly below 0, so house rule 5
-    # makes the failure decisive below min_n (this line used to expect the round-1 cap-everything 'inconclusive')
+    # 10 roll periods of the periodic path, on which the hedge costs premium on every phase: the bootstrap CI of the pooled Calmar
+    # difference lies wholly below 0, so house rule 5 makes the failure decisive below min_n (this line used to expect the round-1
+    # cap-everything 'inconclusive')
     assert short["n_cycles"] == 10 and short["verdict"] == "not_supported" and "min_n 20" in short["reason"]
     assert "fails decisively below min_n" in short["reason"] and short["upper"] <= 0

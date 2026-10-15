@@ -188,10 +188,16 @@ def _first(assets, k=3):
 
 
 def test_breakout_decisive_failure_below_min_n():
+    """Guards the corrected (r5d3 item 2) rule 5 on T-304: the cluster 95% CI of the difference lies wholly below 0, so
+    that row fails decisively below min_n; the 60-trial correction row does not, because its Holm route decides only at
+    its own confidence 1 - 0.05/60 (60 x p vs difference >= 0 < 0.05) and here 60 x p = 0.300 (with 1,000 draws the
+    floor is 60/1001 = 0.06), so that row is undecided. This test used to assert the over-call that counted it."""
     rep = ob.breakout_vs_random(_revert_assets(), n_random=100, n_boot=1000)
     assert rep["n"] < 150 and rep["ci"][1] <= 0
-    _decisive(rep, "mean difference > 0 with cluster-bootstrap 95% CI excluding 0",
-              "survives the 60-trial correction (DSR > 0.95 or Holm p < 0.05)")
+    _decisive(rep, "mean difference > 0 with cluster-bootstrap 95% CI excluding 0")
+    trial = [ok for name, ok in rep["rule5"]["criteria"] if name.startswith("survives the 60-trial correction")]
+    assert trial == [None], rep["rule5"]
+    assert "survives the 60-trial correction (DSR > 0.95 or Holm p < 0.05)" not in rep["rule5"]["decisive_failures"]
 
 
 def test_breakout_non_decisive_failure_below_min_n():

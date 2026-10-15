@@ -461,6 +461,71 @@ def test_soq_spread_gate_and_costs_unmeasured():
     assert rep["verdict"] == "inconclusive" and "half-spreads not measurable" in rep["reason"]
 
 
+def test_soq_spread_gate_is_point_in_time_by_default():
+    """Regression (T-220, rule 4): the default gate is VIX3M/VIX at the close BEFORE entry; the same-close gate (16:15 ET,
+    stamped available after the entry) is only a sensitivity (gate_lag=0). strike_lag=1 strikes off the previous
+    settlement while still pricing on the entry day's."""
+    w = _soq_world(40)
+    pos = {d: i for i, d in enumerate(w["tdays"])}
+    e_prev_only, e_same_only = w["expiries"][5], w["expiries"][9]
+    w["vix3m"] = dict(w["vix3m"])
+    w["vix3m"][w["tdays"][pos[e_prev_only] - 3]] = 15.5                      # entry close 1.03: shut at the same close
+    w["vix3m"][w["tdays"][pos[e_same_only] - 4]] = 15.5                      # previous close 1.03: shut point in time
+    pit = h.soq_spread_trades(hs1=0.0, hs2=0.0, **w)
+    same = h.soq_spread_trades(hs1=0.0, hs2=0.0, gate_lag=0, **w)
+    ep, es = {t["expiry"] for t in pit["trades"]}, {t["expiry"] for t in same["trades"]}
+    assert e_prev_only in ep and e_same_only not in ep
+    assert e_same_only in es and e_prev_only not in es
+    t = next(q for q in pit["trades"] if q["expiry"] == e_prev_only)
+    assert t["entry"] == w["tdays"][pos[e_prev_only] - 3] and t["gate_day"] == w["tdays"][pos[e_prev_only] - 4]
+    # strike_lag: K1 from the previous day's settlement (F - 1 there), credit on the entry day's F
+    e = w["expiries"][0]
+    d, g = w["tdays"][pos[e] - 3], w["tdays"][pos[e] - 4]
+    w["curve"][g] = dict(w["curve"].get(g, {}), **{e: w["curve"][d][e] - 1.0})
+    t0 = next(q for q in h.soq_spread_trades(hs1=0.0, hs2=0.0, **w)["trades"] if q["expiry"] == e)
+    t1 = next(q for q in h.soq_spread_trades(hs1=0.0, hs2=0.0, strike_lag=1, **w)["trades"] if q["expiry"] == e)
+    assert t0["K1"] == round(t0["F"] + 2) and t1["K1"] == round(t1["F"] - 1 + 2) and t1["F"] == t0["F"]
+
+
+def _third_wed(y, m):
+    d = date(y, m, 1)
+    return d + timedelta(days=(2 - d.weekday()) % 7 + 14)
+
+
+def test_harness_soq_exchange_calendar_and_pit_gate():
+    """Regression (T-220): the harness counts exchange sessions, not VIX rows on market-closed days (MLK Day 2023-01-16,
+    Juneteenth 2023-06-19), and gates on the previous close; the same-close gate is reported and decided over the same
+    block x seed variants."""
+    days = _bdays("2022-06-01", 300)                                          # weekdays, holidays included like the VIX file
+    exps = [_third_wed(2022 + (m > 12), (m - 1) % 12 + 1).isoformat() for m in range(7, 19)]   # 2022-07 .. 2023-06
+    from mandel.data.cboe_strategy import is_trading_day
+    sess = [d for d in days if is_trading_day(d)]
+    sp = {d: i for i, d in enumerate(sess)}
+    vix3m = {d: 17.0 for d in days}
+    e_prev_only, e_same_only = exps[3], exps[5]
+    vix3m[sess[sp[e_prev_only] - 3]] = 15.5                                   # shut only at the entry close
+    vix3m[sess[sp[e_same_only] - 4]] = 15.5                                   # shut only at the previous close
+    vx, vro = [], []
+    for k, e in enumerate(exps):
+        F = 15.0 + 0.3 * k
+        for d in sess[sp[e] - 10: sp[e] + 1]:
+            vx.append({"available_at": d + "T21:00:00+00:00", "value": {"day": d, "expiry": e, "settle": F}})
+        vro.append({"available_at": e + "T14:00:00+00:00", "value": {"day": e, "close": F - 1.0, "expiry": True, "carried": False}})
+    arch = FakeArchive({h.VX_B: vx, h.CB("VRO"): vro, h.VIX_B: _idx_rows(days, [15.0] * len(days)),
+                        h.VIX3M_B: _idx_rows(days, [vix3m[d] for d in days]), h.VVIX_B: _idx_rows(days, [100.0] * len(days)),
+                        h.DTB3_B: _fred_rows(days[::5], 4.0)})
+    stat, n, v, reason = h.HARNESSES["b6b_hedge_vix_soq_credit_spread"](arch)
+    json.dumps(stat)
+    entry = {t["expiry"]: t["entry"] for t in stat["trades"]}
+    assert entry["2023-01-18"] == "2023-01-12" and entry["2023-06-21"] == "2023-06-15"     # not 01-13 / 06-16
+    assert all(t["gate_day"] == sess[sp[t["entry"]] - 1] for t in stat["trades"])
+    assert e_prev_only in entry and e_same_only not in entry and stat["gate_lag"] == 1 and n == 11
+    lab = next(k for k in stat["variants"] if k.startswith("gate at the entry close"))
+    assert stat["variants"][lab]["n"] == 11 and stat["variants"][lab]["robustness"]["n_variants"] == 6
+    assert "at the close of the session before entry" in reason and "not point in time" in reason
+    assert v == "inconclusive" and "half-spreads not measurable" in reason          # no VIX chain captured
+
+
 def test_chain_calibration_recovers_half_spreads_and_iv():
     q, e = "2026-10-13", "2026-10-21"
     F, vv = 16.84, 180.0                                     # wide enough that the K2 bid stays positive
@@ -544,3 +609,45 @@ def test_harness_bfly_cndr_end_to_end_null():
     stat, n, v, reason = h.HARNESSES["b6b_hedge_bfly_vs_cndr_sharpe"](arch)
     json.dumps(stat)
     assert n >= 400 and v != "supported"
+    assert "one-day spike screen not run (^GSPC not archived)" in reason
+
+
+def _month_end(days, ym):
+    return max(d for d in days if d.startswith(ym))
+
+
+def test_harness_bfly_cndr_screens_month_end_spike():
+    """Regression (T-178 BFLY 2022-05-31): an unflagged month-end spike-and-revert print is dropped before the monthly
+    panel is built, and the statistic with it kept is reported."""
+    days, spx, rng = _monthly_world()
+    r = 0.0002 + 0.003 * rng.standard_normal((2, len(days) - 1))
+    bfly, cndr = (100 * np.exp(np.concatenate([[0], np.cumsum(x)])) for x in r)
+    spike = _month_end(days, "2022-05")
+    bfly[days.index(spike)] *= 1.08
+    arch = FakeArchive({h.CB("BFLY"): _idx_rows(days, bfly), h.CB("CNDR"): _idx_rows(days, cndr),
+                        h.DTB3_B: _fred_rows(days[::5], 2.0), h.GSPC_B: _px_rows(days, spx)})
+    stat, n, v, reason = h.HARNESSES["b6b_hedge_bfly_vs_cndr_sharpe"](arch)
+    json.dumps(stat)
+    assert f"BFLY {spike} (+" in reason and "spike-and-revert prints dropped" in reason
+    kept = stat["alt_panels"]["with the screened spike print(s) kept"]
+    assert kept["n"] == n and kept["diff_monthly"] != stat["diff_monthly"] and kept["robustness"]["n_variants"] == 6
+
+
+def test_harness_collar_screens_spike_and_names_stale_run():
+    """Regression (T-166 CLL 2020-02-28 and the stale January 2019 run): the month-end spike print is dropped, the
+    kept-print statistic is reported, and the stale run is named with its (absent) month-end effect."""
+    days, spy, rng = _monthly_world("2008-08-25", 4700)
+    lr = np.diff(np.log(spy))
+    cll = 100 * np.exp(np.concatenate([[0], np.cumsum(0.5 * lr + 0.002 * rng.standard_normal(lr.size))]))
+    spike = _month_end(days, "2020-02")
+    cll[days.index(spike)] *= 0.93
+    i0 = days.index("2019-01-03")
+    cll[i0:i0 + 6] = cll[i0]                                                 # 6 identical closes mid-January
+    arch = FakeArchive({h.CB("CLL"): _idx_rows(days, cll), h.SPY_B: _px_rows(days, spy), h.GSPC_B: _px_rows(days, spy),
+                        h.DTB3_B: _fred_rows(days[::5], 2.0)})
+    stat, n, v, reason = h.HARNESSES["b6b_hedge_collar_cll_vs_blend"](arch)
+    json.dumps(stat)
+    assert f"CLL {spike} (-" in reason and "spike-and-revert prints dropped" in reason
+    assert "CLL repeats one close over 2019-01-03..2019-01-10 (6 sessions)" in reason and "no month-end falls inside" in reason
+    kept = stat["alt_panels"]["with the screened spike print(s) kept"]
+    assert kept["n"] == n and kept["diff"] != stat["diff"]

@@ -210,6 +210,31 @@ def test_inverse_call_settles_each_last_friday_at_its_delivery_price():
     assert rep["calendar"].startswith("Deribit monthly expiry") and "Deribit delivery prices at each expiry" in rep["reason"]
 
 
+def test_calendar_cycle_without_an_index_value_on_entry_is_named_not_silently_dropped():
+    # GVZ has no value on 2020-10-16, the October 2020 expiry: T-270/T-279 price 202 of the calendar's 203 cycles and must say so (rule 9)
+    days = _days(1200, cal=False, start=date(2015, 1, 2)); rng = np.random.default_rng(9)
+    closes = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, len(days))))
+    cyc = [c for c in monthly_cycles(days) if c[0] >= "2015-03-01"]
+    gap, early, plain = cyc[5][0], monthly_cycles(days)[0][0], days[401]   # a missing expiry, one before start, one mid-cycle day
+    assert plain not in monthly_expiries(days)
+    idx = {d: 16.0 for d in days if d not in (gap, early, plain)}; rates = _flat(days, 2.0)
+    sp = xa.short_put_mean(days, closes, idx, rates, -0.25, 30, 21, "2015-03-01", "GVZ")
+    cc = xa.covered_call_vs_hold(days, closes, idx, rates, 0.30, 30, 21, 12, "2015-03-01", "GVZ", (0.20, 0.30, 0.40))
+    for rep in (sp, cc):
+        assert rep["n_cycles"] == len(cyc) - 1 and rep["dropped_no_index"] == [list(cyc[5])]
+        assert f", 1 calendar cycle dropped for a missing index value on entry ({gap}) — " in rep["reason"]
+    whole = xa.short_put_mean(days, closes, _flat(days, 16.0), rates, -0.25, 30, 21, "2015-03-01", "GVZ")
+    assert whole["n_cycles"] == len(cyc) and whole["dropped_no_index"] == [] and "dropped for a missing index" not in whole["reason"]
+    btc = _days(800, start=date(2021, 3, 1)); bc = 30000 * np.exp(np.cumsum(rng.normal(0, 0.02, len(btc))))
+    sess = xa._deribit_expiry_sessions(btc)
+    dvol = {d: 70.0 for d in btc if d not in (sess[2], sess[4])}
+    inv = xa.inverse_covered_call_btc(btc, bc, dvol, _flat(btc, 2.0), "2021-04-01", min_n=5)
+    assert inv["dropped_no_index"] == [[sess[2], sess[3]], [sess[4], sess[5]]] and inv["n_cycles"] == len(sess) - 1 - 1 - 2   # one before start
+    assert f"2 calendar cycles dropped for a missing index value on entry ({sess[2]}, {sess[4]})" in inv["reason"]
+    put = xa.short_put_mean(btc, bc, dvol, _flat(btc, 2.0), -0.25, 30, 30, "2021-04-01", "DVOL")
+    assert put["dropped_no_index"] == inv["dropped_no_index"] and put["n_cycles"] == inv["n_cycles"]
+
+
 # -------------------------------------------------------------------------------------- the run.py wiring --
 
 class _Arch:

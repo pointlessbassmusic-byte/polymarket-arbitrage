@@ -275,9 +275,40 @@ def test_spx_frame_dividends_and_assumed_yield():
     assert fr.q_assumed[i92] and fr.q[i92] == pytest.approx(bw.PRE_YIELD) and fr.divpts[i92] > 0
     i95 = fr.days.index("1995-06-01")
     assert not fr.q_assumed[i95] and fr.q[i95] == pytest.approx(0.02, rel=0.02)
-    ex = [i for i, d in enumerate(fr.days) if d >= "1994-01-01" and fr.divpts[i] > 0]
-    assert len(ex) >= 8 and fr.divpts[ex[0]] == pytest.approx(0.005 * 400, rel=1e-6)
+    y95 = [i for i, d in enumerate(fr.days) if "1995-01-01" <= d <= "1995-12-31"]
+    assert sum(fr.divpts[i] for i in y95) / 400 == pytest.approx(0.02, rel=0.05)   # SPY's 2%/yr, accrued over the year
     assert fr.tr[-1] > fr.tr[0]                                              # flat price, positive total return
+
+
+def _quarterly_lump_frame():
+    """Flat ^GSPC at 400, SPY at 40 paying 0.5% on each quarterly third Friday (2%/yr), from 1993-01-29."""
+    gdays = trading_days("1992-01-02", "1997-12-31")
+    g = np.full(len(gdays), 400.0)
+    sdays = [d for d in gdays if d >= "1993-01-29"]
+    close = np.full(len(sdays), 40.0)
+    f = np.ones(len(sdays))
+    for i, d in enumerate(sdays):
+        dd = date.fromisoformat(d)
+        if i and dd.month in (3, 6, 9, 12) and 15 <= dd.day <= 21 and dd.weekday() == 4:
+            f[i:] /= 1 - 0.005
+    bills = bw.Bills({"1991-12-31": 3.0})
+    return bw.spx_frame(gdays, g, {d: 20.0 for d in gdays}, None, bills, (sdays, close, close * f)), bills
+
+
+def test_spx_dividends_accrue_daily_not_in_spy_quarterly_lumps():
+    # regression (T-527/T-171/T-174 gate): SPY's quarterly ex-date lumps used to land a quarter's dividends (0.5% here)
+    # on the Mar/Jun/Sep/Dec expiry session, so one cycle in three carried D and the rest none; BXM accrues daily
+    fr, bills = _quarterly_lump_frame()
+    dt = np.diff(fr.ords)
+    want = fr.close[:-1] * (np.exp(fr.q[:-1] * dt / 365.0) - 1.0)
+    assert np.allclose(fr.divpts[1:], want, rtol=1e-12, atol=0)             # every session, at the prior close's q
+    assert (fr.divpts[1:] > 0).all() and fr.divpts.max() < 0.001 * 400       # no session carries a quarter's lump
+    C = bw.cycles(fr, bills, start="1994-03-01")
+    ratio = C["D"] / C["S0"] / C["T"]                                        # dividend yield earned in each cycle
+    assert C["n"] >= 40 and (C["D"] > 0).all()
+    assert ratio.min() > 0.017 and ratio.max() < 0.027                       # ~2%/yr in every cycle (lumps: 0 or ~6%)
+    off = [k for k, d in enumerate(C["day1"]) if int(d[5:7]) not in (3, 6, 9, 12)]
+    assert len(off) >= 25 and (C["D"][off] > 0).all()                        # cycles holding no SPY ex-date still earn D
 
 
 # ---------------------------------------------------------------------------------------------- harness plumbing --

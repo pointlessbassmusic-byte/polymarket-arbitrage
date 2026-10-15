@@ -10,7 +10,15 @@ Rule 5 residuals:
 
 Rule 10: none of the nine harnesses rests on an arbitrary-phase grid. The FX books are calendar-month books (month-end
 and first-of-month fixings), which the tests below pin: moving any fixing that is neither the first nor the last of its
-month changes nothing."""
+month changes nothing.
+
+Follow-ups (b5):
+  * Rule 8: the model-priced macro harnesses (T-224 GLD event straddle, T-219 witching straddle, T-208 IM/HM filter)
+    report their primary statistic recomputed with sigma x 0.81 and x 1.2 in ``iv_scale_sensitivity`` and one clause
+    of the reason. The tests pin the scaled numbers against an independent repricing, scale 1.00 against the primary,
+    the clause in the reason, and that the scales never touch the verdict or the criteria.
+  * The batch5_fx module docstring: the rule-5 sentences ('Under 48 months ...') close the rule-5 paragraph again and
+    the rule-10 paragraph ends at '... not a free choice.'."""
 
 from datetime import date, timedelta
 
@@ -22,6 +30,7 @@ from mandel.experiments import batch5_hourly as bh
 from mandel.experiments import batch5_macro as bm
 
 from tests.test_mandel_batch5_fx import G10_RATES, make_market
+from tests.test_mandel_batch5_macro import _ex_dividend_on_witching, _gld_world, _imhm_world, _witching_returns
 
 
 def _decisive_only(rep, *names):
@@ -197,3 +206,96 @@ def test_module_docstrings_state_the_rule10_status_per_harness():
         assert "House rule 10" in doc
         for tid in ids:
             assert tid in doc.split("House rule 10", 1)[1], (mod.__name__, tid)
+
+
+def test_fx_docstring_rule5_sentences_close_the_rule5_paragraph_not_the_rule10_one():
+    """Guards the docstring repair: the 'Under 48 months ...' sentences belong to house rule 5, and the rule-10
+    paragraph ends at '... not a free choice.' with normal wrapping."""
+    doc = fx.__doc__
+    r5 = doc.split("House rule 5", 1)[1].split("House rule 10", 1)[0]
+    r10 = doc.split("House rule 10", 1)[1]
+    assert "A zero-width interval decides nothing. Under 48 months" in " ".join(r5.split())
+    assert " ".join(r5.split()).endswith("holds the face-value criteria and the decisive failures.")
+    assert "Under 48 months" not in r10 and "min_n" not in r10
+    assert r10.strip().endswith("so the grid phase is not a free choice.")
+    assert max(len(line) for line in r10.splitlines()) <= 120
+
+
+# ------------------------------------------------------------------- rule 8: IV-scale sensitivity, report only --
+
+def _same_judgement(a, b):
+    """Same verdict and the same criteria: the IV scales changed nothing but the report."""
+    assert a["verdict"] == b["verdict"]
+    assert a["reason"].rsplit(" — ", 1)[1] == b["reason"].rsplit(" — ", 1)[1]
+
+
+def test_gld_event_straddle_reports_the_iv_scaled_difference():
+    days, c, gvz, fomc, cpi = _gld_world(0, 2.5)
+    rep = bm.gld_event_straddle(days, c, gvz, fomc, cpi, n_boot=400)
+    sens = rep["iv_scale_sensitivity"]
+    assert set(sens) == {"0.81", "1.20"}
+    # independent repricing: the premium at sigma = 0.81 x GVZ(T-1), the settlement |r| unchanged
+    P = bm.straddle_panel(days, c, gvz, start="2009-09-01")
+    f = np.isin(P["days"], sorted(set(fomc) | set(cpi)))
+    short = bm.straddle_premium(0.81 * P["sigma"]) - P["move"]
+    g = bm.group_diff(short, f, 10, 400, 0)
+    s = sens["0.81"]
+    assert s["diff"] == pytest.approx(g["diff"]) and s["ci"] == pytest.approx(g["ci"]) and s["p_less"] == pytest.approx(g["p_less"])
+    assert s["mean_event"] < rep["full"]["mean_event"] < sens["1.20"]["mean_event"]     # cheaper IV, smaller short P&L
+    assert "IV-scale sensitivity" in rep["reason"] and f"x0.81 difference {s['diff'] * 1e4:+.1f} bps" in rep["reason"]
+    one = bm.gld_event_straddle(days, c, gvz, fomc, cpi, n_boot=400, iv_scales=(1.0,))["iv_scale_sensitivity"]["1.00"]
+    assert one["diff"] == pytest.approx(rep["full"]["diff"]) and one["ci"] == pytest.approx(rep["full"]["ci"])
+
+
+def test_gld_event_straddle_iv_scales_never_change_the_verdict():
+    days, c, gvz, fomc, cpi = _gld_world(0, 2.5)
+    base = bm.gld_event_straddle(days, c, gvz, fomc, cpi, n_boot=200, iv_scales=())
+    assert base["iv_scale_sensitivity"] == {} and "IV-scale sensitivity" not in base["reason"]
+    for scales in ((0.81, 1.2), (0.3, 3.0)):
+        _same_judgement(base, bm.gld_event_straddle(days, c, gvz, fomc, cpi, n_boot=200, iv_scales=scales))
+    assert base["verdict"] == "supported"
+
+
+def test_witching_straddle_reports_the_iv_scaled_difference_on_the_dividend_forward():
+    days, r, vix = _witching_returns(0, 2.5)
+    raw, _, divs = _ex_dividend_on_witching(days, r, 0.0045)
+    rep = bm.witching_straddle(days, raw, vix, div_yield=divs, n_boot=300, n_perm=2000)
+    sens = rep["iv_scale_sensitivity"]
+    assert set(sens) == {"0.81", "1.20"}
+    P = bm.friday_panel(days, raw, vix, start="1993-01-01", div_yield=divs)
+    w = np.isin(P["days"], bm.third_fridays(1993, 2026, bm.WITCHING_MONTHS))
+    long_ = P["move"] - bm.straddle_premium(0.81 * P["sigma"], bm.TAU_1D, 1.0 - P["div"])      # same forward, K, settlement
+    g = bm.group_diff(long_, w, 4, 300, 0)
+    s = sens["0.81"]
+    assert s["diff"] == pytest.approx(g["diff"]) and s["ci"] == pytest.approx(g["ci"])
+    assert s["diff"] != pytest.approx(rep["full"]["diff"], abs=1e-7)          # the forward premium differs by group
+    assert f"x0.81 difference {s['diff'] * 1e4:+.1f} bps" in rep["reason"] and "permutation p=" in rep["reason"]
+    one = bm.witching_straddle(days, raw, vix, div_yield=divs, n_boot=300, n_perm=2000, iv_scales=(1.0,))
+    o = one["iv_scale_sensitivity"]["1.00"]
+    assert o["diff"] == pytest.approx(rep["full"]["diff"]) and o["permutation_p"] == rep["permutation_p"]   # same label draws
+    _same_judgement(rep, bm.witching_straddle(days, raw, vix, div_yield=divs, n_boot=300, n_perm=2000, iv_scales=()))
+
+
+def test_im_hm_filter_reports_the_iv_scaled_rho_and_quintiles():
+    days, c, vix, ev = _imhm_world(0, True)
+    kw = dict(n_perm=500, n_boot=200, n_placebo=0)
+    rep = bm.im_hm_filter(days, c, vix, ev, **kw)
+    sens = rep["iv_scale_sensitivity"]
+    assert set(sens) == {"0.81", "1.20"}
+    # independent repricing: IM and the long P&L at sigma = 0.81 x VIX(T-1), HM and the move unchanged
+    T = bm.event_move_table(days, c, vix, ev)
+    prem = bm.straddle_premium(0.81 * T["sigma"])
+    ratio, long_ = bm.MEDIAN_MOVE_FACTOR * prem / T["hm"], T["move"] - prem
+    is_m, oos_m = T["days"] <= "2009-12-31", T["days"] >= "2010-01-01"
+    q = np.searchsorted(np.quantile(ratio[is_m], [0.2, 0.4, 0.6, 0.8]), ratio, side="right")[oos_m]
+    y = long_[oos_m]
+    s = sens["0.81"]
+    assert s["oos_spearman_rho"] == pytest.approx(bm.spearman(ratio[oos_m], y))
+    assert s["oos_q1_minus_q5"] == pytest.approx(y[q == 0].mean() - y[q == 4].mean())
+    assert s["mean_long_pnl_oos_bps"] > rep["mean_long_pnl_oos_bps"] > sens["1.20"]["mean_long_pnl_oos_bps"]
+    assert f"x0.81 OOS rho {s['oos_spearman_rho']:+.3f}" in rep["reason"] and "IV-scale sensitivity" in rep["reason"]
+    one = bm.im_hm_filter(days, c, vix, ev, iv_scales=(1.0,), **kw)["iv_scale_sensitivity"]["1.00"]
+    assert one["oos_spearman_rho"] == pytest.approx(rep["oos_spearman_rho"]) and one["oos_perm_p"] == rep["oos_perm_p"]
+    assert one["oos_q1_minus_q5"] == pytest.approx(rep["oos_q1_minus_q5"]) and one["oos_q1_minus_q5_ci"] == pytest.approx(rep["oos_q1_minus_q5_ci"])
+    _same_judgement(rep, bm.im_hm_filter(days, c, vix, ev, iv_scales=(), **kw))
+    _same_judgement(rep, bm.im_hm_filter(days, c, vix, ev, iv_scales=(0.3, 3.0), **kw))

@@ -258,6 +258,68 @@ def test_opec_harness_verified_planted_supported_null_not():
     assert verdict == "not_supported" and n == 50
 
 
+def test_opec_calendar_fixes_documented_deviations():
+    """Regression (T-518 review): Kanzig's list is an announcement list, not the meeting calendar. Documented
+    non-meetings leave both pools; the session of the unrecorded Sunday 2023-04-02 cut leaves the non-event pool."""
+    days = trading_days("2021-06-01", "2025-06-30")
+    row = lambda d, eff: {"kind": "opec-announcement", "available_at": d + "T23:59:59+00:00",
+                          "value": {"day": d, "effective_weekday": eff, "known_since": None}}
+    rows = [row("2021-07-05", "2021-07-05"), row("2024-03-03", "2024-03-04"), row("2025-03-03", "2025-03-03"),
+            row("2023-06-04", "2023-06-05"), row("2022-12-04", "2022-12-05")]
+    ex = m.opec_calendar_fixes(m.opec_events(rows, days), days)
+    assert sorted(ex) == ["2021-07-06", "2023-04-03", "2024-03-04", "2025-03-03"]
+    assert "called off" in ex["2021-07-06"] and "2023-04-02" in ex["2023-04-03"]
+    # a session that also carries a real meeting stays an event
+    ex2 = m.opec_calendar_fixes(m.opec_events(rows + [row("2024-03-04", "2024-03-04")], days), days)
+    assert "2024-03-04" not in ex2
+    # an unrecorded date already on an event session is not excluded
+    ex3 = m.opec_calendar_fixes(m.opec_events(rows + [row("2023-04-03", "2023-04-03")], days), days)
+    assert "2023-04-03" not in ex3
+
+
+def _opec_archive_2020s(jump, seed=35):
+    """Verified (point-in-time) events 2020-2025 on regular sessions plus the three documented non-meeting dates."""
+    days = trading_days("2020-06-01", "2025-12-31")
+    n = len(days)
+    sd = 0.35 / math.sqrt(252)
+    rng = np.random.default_rng(seed)
+    lr = rng.normal(0, sd, n)
+    lr[0] = 0.0
+    skip = {"2021-07-06", "2023-04-03", "2024-03-04", "2025-03-03"}
+    sess = [i for i in np.linspace(40, n - 20, 47).astype(int) if days[i] not in skip][:45]
+    for i in sess:
+        lr[i] = (1 if rng.random() < 0.5 else -1) * jump * sd if jump else lr[i]
+    close = 50 * np.exp(np.cumsum(lr))
+    rows = []
+    for d, eff in [(days[i], days[i]) for i in sess] + [("2021-07-05", "2021-07-05"), ("2024-03-03", "2024-03-04"),
+                                                         ("2025-03-03", "2025-03-03")]:
+        av = (date.fromisoformat(d) - timedelta(days=30)).isoformat()
+        rows.append({"kind": "opec-announcement", "available_at": av + "T23:59:59+00:00",
+                     "value": {"day": d, "effective_weekday": eff, "vintage": "2025M12", "known_since": av}})
+    return FakeArchive({"opec-announcements": rows, "daily-history-USO": _yahoo(days, close, "USO"),
+                        "cboe-OVX-history": _cboe(days, [35.0] * n), "fred-DTB3": _fred(days[:1], [0.5])}), len(sess)
+
+
+def test_opec_harness_drops_documented_non_meetings_before_the_test():
+    """Regression (T-518 review): the three documented non-meeting sessions are not events (even with a verified
+    known_since) and not non-events, 2023-04-03 is not a non-event, and the reason says the list is not the calendar."""
+    arc, k = _opec_archive_2020s(3.0)
+    stat, n, verdict, reason = m.b6b_misc_opec_uso_straddle(arc)
+    json.dumps(stat, allow_nan=False)
+    assert k >= 40 and n == k and stat["n_events_pit"] == k and stat["n_events_expost"] == k and verdict == "supported"
+    assert sorted(stat["calendar_excluded"]) == ["2021-07-06", "2023-04-03", "2024-03-04", "2025-03-03"]
+    assert not set(stat["calendar_excluded"]) & set(stat["event_sessions"])
+    for t in (stat["pit_test"], stat["expost"]):
+        assert t["n_event"] == k and t["n_other"] == stat["n_sessions"] - k - 4
+    assert stat["expost_uncorrected_list"]["n_event"] == k + 3
+    assert stat["expost_uncorrected_list"]["n_other"] == stat["n_sessions"] - k - 3
+    assert "NOT the OPEC+ ministerial-meeting calendar" in reason and "misses at least the Sunday 2023-04-02" in reason
+    assert "session 2023-04-03 out of the non-event pool" in reason and "session 2021-07-06 out of both pools" in reason
+    assert "non-event days can include unrecorded OPEC+ announcements" in reason
+    _, n0, v0, _ = m.b6b_misc_opec_uso_straddle(_opec_archive_2020s(0.0, seed=36)[0])
+    assert v0 == "not_supported" and n0 == k
+
+
 # ----------------------------------------------------------------------------------- T-522 election-day move --
 
 def test_judge_election_planted_null_and_rule5():
@@ -298,6 +360,46 @@ def test_two_day_window_ratio_and_dividend_forward():
     assert w["before"] == "2020-11-02" and w["after"] == "2020-11-04"
     assert w["ratio"] == pytest.approx(0.02 / (0.18 / math.sqrt(126))) and w["div_in_window"] == 0.5
     assert m.two_day_window(pos, days, close, {"2020-11-02": 18.0}, date(2020, 11, 7)) is None    # not a session
+
+
+def test_two_day_window_names_a_closure_inside_the_window():
+    """Regression (T-522 review): 2018-12-05 was a market closure, so the window around Tuesday 2018-12-04 runs Monday to
+    Thursday; it is flagged and named, and a Monday holiday moves the before-close to the Friday."""
+    days = trading_days("2018-11-26", "2019-01-31")
+    close = np.linspace(100.0, 110.0, len(days))
+    pos = {d: i for i, d in enumerate(days)}
+    vix = {d: 20.0 for d in days}
+    w = m.two_day_window(pos, days, close, vix, date(2018, 12, 4))
+    assert (w["before"], w["after"], w["closed"]) == ("2018-12-03", "2018-12-06", ["2018-12-05"]) and not m._regular(w)
+    ok = m.two_day_window(pos, days, close, vix, date(2018, 12, 11))
+    assert ok["closed"] == [] and m._regular(ok)
+    mlk = m.two_day_window(pos, days, close, vix, date(2019, 1, 22))
+    assert (mlk["before"], mlk["closed"]) == ("2019-01-18", ["2019-01-21"])
+    rows = [{"year": 2018, "diff": 0.1, "event": ok, "before": mlk, "after": w}]
+    n_win, odd = m.window_calendar(rows)
+    assert n_win == 3 and [o["window"] for o in odd] == ["before", "after"]
+    assert "runs Friday 2019-01-18 to Wednesday 2019-01-23 because 2019-01-21 was not a session (a market closure)" \
+        in odd[0]["text"]
+    assert "runs Monday 2018-12-03 to Thursday 2018-12-06 because 2018-12-05 was not a session" in odd[1]["text"]
+
+
+def test_election_harness_names_the_2018_after_window_exception():
+    """Regression (T-522 review): the reason no longer says every matched window is Monday-to-Wednesday; it names the
+    2018 after-window and reports the variant that drops it."""
+    stat, n, verdict, reason = m.b6b_misc_election_spy_move(_spy_archive(False, seed=42))
+    json.dumps(stat, allow_nan=False)
+    assert "the same Monday-to-Wednesday windows" not in reason
+    assert "47 of 48 windows (election and matched) run Monday to Wednesday" in reason
+    assert ("the 2018 after-window runs Monday 2018-12-03 to Thursday 2018-12-06 because 2018-12-05 was not a session "
+            "(a market closure); still 2 sessions, so VIX/sqrt(126) applies") in reason
+    assert stat["n_windows"] == 48 and [(o["year"], o["window"]) for o in stat["irregular_windows"]] == [(2018, "after")]
+    r18 = next(r for r in stat["elections"] if r["year"] == 2018)
+    d18 = r18["event"]["ratio"] - r18["before"]["ratio"]                       # the 2018 matched ratio without it
+    others = [r["diff"] for r in stat["elections"] if r["year"] != 2018]
+    ro = stat["regular_only"]
+    assert ro["n"] == 16 and ro["positive"] == sum(x > 0 for x in others) + (d18 > 0)
+    assert ro["mean_diff"] == pytest.approx((sum(others) + d18) / 16)
+    assert "dropping the irregular window: " in reason
 
 
 def test_election_harness_planted_supported_null_not():

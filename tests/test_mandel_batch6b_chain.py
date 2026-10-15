@@ -160,6 +160,18 @@ def test_rates_and_bill_variants():
     assert v[1][0] == "DGS3MO 2026-10-09"
 
 
+def test_named_bills_decide_on_dgs3mo_only():
+    """T-185 / T-507 review: a DGS3MO-named claim decides on DGS3MO (archived, else DGS3MO_REF on the latest DTB3 date);
+    DTB3 is only reported, and a day with no DGS3MO print has no deciding bill."""
+    dtb3 = {"2026-10-09": 4.06, "2026-10-13": 4.09}
+    dec, rep_ = c.named_bills(dtb3, {}, "2026-10-13")
+    assert [lab for lab, _ in dec] == ["DGS3MO 2026-10-09 (ref)"] and [lab for lab, _ in rep_] == ["DTB3 2026-10-09"]
+    dec, rep_ = c.named_bills(dtb3, {"2026-10-09": 4.3}, "2026-10-13")
+    assert [lab for lab, _ in dec] == ["DGS3MO 2026-10-09"] and dec[0][1] == pytest.approx(c.bey_continuous(4.3))
+    dec, rep_ = c.named_bills({"2026-01-02": 4.0}, {}, "2026-01-05")
+    assert dec == [] and len(rep_) == 1                              # no DGS3MO print: unjudged, DTB3 shown only
+
+
 def test_dividend_schedule_and_pv():
     assert c.spy_ex_date(2026, 12) == date(2026, 12, 18)
     assert c.spy_ex_date(2027, 6) == date(2027, 6, 17)             # Juneteenth observed on the third Friday
@@ -229,13 +241,17 @@ K_GRID = np.arange(94, 106.01, 0.25)
 DTES = [3, 7, 35, 42, 49, 56]
 
 
-def _rate_days(fn, r_opt, n_days=1, extra=None):
+def _rate_days(fn, r_opt, n_days=1, extra=None, r_reported=None):
+    """Capture days priced at r_opt; the deciding variant (the trial's DGS3MO) uses the bill R; with r_reported a DTB3
+    variant at that rate is reported beside it."""
     days = []
     for i in range(n_days):
         qd = (date.fromisoformat(QD) + timedelta(days=i)).isoformat()
         by = _by(100.0, qd, DTES, K_GRID, r_opt)
         rows = fn(by, 100.0, qd, R)
-        d = {"quote_day": qd, "variants": {"close/DTB3": {"rows": rows, "r_bill": R}}, "sync": None}
+        d = {"quote_day": qd, "variants": {"close/DGS3MO": {"rows": rows, "r_bill": R}}, "sync": None}
+        if r_reported is not None:
+            d["reported"] = {"close/DTB3": {"rows": fn(by, 100.0, qd, r_reported), "r_bill": r_reported}}
         if extra:
             d.update(extra)
         days.append(d)
@@ -245,9 +261,11 @@ def _rate_days(fn, r_opt, n_days=1, extra=None):
 def test_conversion_planted_and_null():
     fn = lambda by, S, qd, r: c.conversion_pairs(by, S, qd)[0]
     days = _rate_days(fn, R - 0.01, 5)
-    assert all(x["r_exec"] < R for x in days[0]["variants"]["close/DTB3"]["rows"])
+    assert all(x["r_exec"] < R for x in days[0]["variants"]["close/DGS3MO"]["rows"])
     rep = c.conversion_claim(days)
-    assert rep["verdict"] == "supported" and rep["n"] >= 100, rep["reason"]
+    assert rep["verdict"] == "inconclusive" and rep["n"] >= 100, rep["reason"]
+    assert rep["reason"].endswith("not implemented: stock at the ask: underlying bid/ask at the option close not archived "
+                                  "(S_ask ASSUMED = spot + $0.005)") and "implemented criteria pass" in rep["reason"]
     rep1 = c.conversion_claim(days[:1])
     assert rep1["verdict"] == "inconclusive"                        # 1 day cannot show 80% of captured days
     rep0 = c.conversion_claim(_rate_days(fn, R + 0.01, 1))
@@ -264,7 +282,7 @@ def test_conversion_deep_itm_call_dropped():
 def test_synthetic_short_planted_and_null():
     fn = lambda by, S, qd, r: c.synthetic_short_pairs(by, S, qd, r)
     days = _rate_days(fn, R, 5)
-    b = [x["borrow"] * 1e4 for x in days[0]["variants"]["close/DTB3"]["rows"]]
+    b = [x["borrow"] * 1e4 for x in days[0]["variants"]["close/DGS3MO"]["rows"]]
     assert 0 < np.median(b) < 30                                    # only the spread cost: 0.02 / (K T)
     rep = c.synthetic_short_claim(days)
     assert rep["verdict"] == "supported", rep["reason"]
@@ -275,9 +293,48 @@ def test_synthetic_short_planted_and_null():
 def test_synthetic_call_planted_and_null():
     fn = lambda by, S, qd, r: c.synthetic_call_rows(by, S, qd, r)
     rep = c.synthetic_call_claim(_rate_days(fn, R + 0.01, 5))
-    assert rep["verdict"] == "supported", rep["reason"]
+    assert rep["verdict"] == "inconclusive" and "implemented criteria pass" in rep["reason"], rep["reason"]
+    assert "not implemented: stock at the ask" in rep["reason"]
     rep0 = c.synthetic_call_claim(_rate_days(fn, R - 0.01, 1))
     assert rep0["verdict"] == "not_supported"
+
+
+def test_stock_ask_assumed_caps_t182_and_t507():
+    """T-182 review: with the underlying bid/ask not archived, five passing capture days do not give 'supported'."""
+    row = {"expiry": "2026-11-20", "dte": 38, "K": 780.0, "r_exec": 0.03, "r_mid": 0.035, "deep_itm_call": False}
+    days = [{"quote_day": f"2026-10-{13 + i}", "variants": {"close/DGS3MO": {"rows": [row] * 200, "r_bill": 0.042}}, "box": None,
+             "sync": None} for i in range(5)]
+    rep = c.conversion_claim(days)
+    assert rep["verdict"] == "inconclusive" and "stock at the ask" in rep["reason"].rpartition(" — ")[2]
+    crow = {"expiry": "2026-11-20", "K": 780.0, "cheaper": True, "gap": 0.2, "cheaper_mid": True, "cheaper_box": None}
+    days = [{"quote_day": f"2026-10-{13 + i}", "variants": {"close/DGS3MO": {"rows": [crow] * 100, "r_bill": 0.042}}} for i in range(5)]
+    rep = c.synthetic_call_claim(days)
+    assert rep["verdict"] == "inconclusive" and "stock at the ask" in rep["reason"].rpartition(" — ")[2]
+    days[0]["variants"]["close/DGS3MO"]["rows"] = [dict(crow, cheaper=False)] * 100
+    assert c.synthetic_call_claim(days)["verdict"] == "not_supported"     # an implemented failure still decides
+
+
+def test_dtb3_reported_never_decides():
+    """T-185 / T-507 review: the trial's DGS3MO decides; DTB3 passing beside a failing DGS3MO does not make the day
+    MARGINAL, and a day with no DGS3MO print is unjudged whatever DTB3 shows."""
+    fn = lambda by, S, qd, r: c.synthetic_short_pairs(by, S, qd, r)
+    days = _rate_days(fn, R - 0.02, 1, r_reported=R - 0.02)          # borrow vs the deciding bill ~ 200 bp; vs DTB3 ~ 0
+    assert all(x["borrow"] * 1e4 < 50 for x in days[0]["reported"]["close/DTB3"]["rows"])
+    rep = c.synthetic_short_claim(days)
+    assert rep["verdict"] == "not_supported" and "DTB3 beside it, not deciding" in rep["reason"], rep["reason"]
+    fc = lambda by, S, qd, r: c.synthetic_call_rows(by, S, qd, r)
+    days = _rate_days(fc, R - 0.01, 1, r_reported=R - 0.02)          # cheaper vs DTB3 only
+    assert all(x["cheaper"] for x in days[0]["reported"]["close/DTB3"]["rows"])
+    assert c.synthetic_call_claim(days)["verdict"] == "not_supported"
+    days = _rate_days(fn, R - 0.02, 1, r_reported=R - 0.02)
+    days[0]["variants"] = {}                                          # no DGS3MO print for the quote day
+    rep = c.synthetic_short_claim(days)
+    assert rep["verdict"] == "inconclusive" and "no DGS3MO print" in rep["reason"], rep["reason"]
+    fl = lambda by, S, qd, r: c.synthetic_long_expiries(by, S, qd, r, None)
+    by = _by(100.0, QD, [200, 250, 300, 350], [99.0, 100.0, 101.0], R + 0.015, hs=0.01)
+    dl = [{"quote_day": QD, "variants": {"close/DGS3MO": {"rows": fl(by, 100.0, QD, R)}},
+           "reported": {"close/DTB3": {"rows": fl(by, 100.0, QD, R + 0.015)}}}]
+    assert c.synthetic_long_claim(dl)["verdict"] == "not_supported"   # 0/4 under DGS3MO, decisive; DTB3 4/4 ignored
 
 
 def test_synthetic_long_planted_and_null():
@@ -350,6 +407,17 @@ def test_early_exercise_claim_planted_and_null():
     assert rep["verdict"] == "supported", rep["reason"]
     rep0 = c.early_exercise_claim(_ee_days(_put_chain(pin_met=False), 1), min_n=20)
     assert rep0["verdict"] == "not_supported"
+
+
+def test_early_exercise_decides_on_dgs3mo_only():
+    """T-191 (named DGS3MO): a failing DGS3MO day is not rescued by a passing DTB3 report; no DGS3MO print is unjudged."""
+    good, bad = _ee_days(_put_chain(), 1)[0], _ee_days(_put_chain(pin_met=False), 1)[0]
+    day = {"quote_day": QD, "variants": {"close/DGS3MO": bad["variants"]["close/DTB3"]},
+           "reported": {"close/DTB3": good["variants"]["close/DTB3"]}}
+    rep = c.early_exercise_claim([day], min_n=20)
+    assert rep["verdict"] == "not_supported" and "DTB3 beside it, not deciding" in rep["reason"]
+    rep = c.early_exercise_claim([dict(day, variants={})], min_n=20)
+    assert rep["verdict"] == "inconclusive" and "no DGS3MO print" in rep["reason"]
 
 
 # ============================================================================================ T-500 butterflies ==
@@ -447,6 +515,16 @@ def test_vertical_width_bound_discounting():
     assert c.vertical_scan(by, QD, 0.05, european=False)["width"] == 0
 
 
+def test_vertical_claim_decides_on_dgs3mo_only():
+    """T-508 (named DGS3MO): the DGS3MO scans decide; DTB3 scans are reported; no DGS3MO print leaves the day unjudged."""
+    good, bad = _vert_scans(), _vert_scans(perturb=True)
+    rep = c.vertical_claim([{"quote_day": QD, "scans": {"DGS3MO": bad}, "reported_scans": {"DTB3": good}}], min_n=1000)
+    assert rep["verdict"] == "not_supported" and "DTB3 beside it, not deciding" in rep["reason"]
+    rep = c.vertical_claim([{"quote_day": QD, "scans": {}, "reported_scans": {"DTB3": bad}}], min_n=1000)
+    assert rep["verdict"] == "inconclusive" and "no DGS3MO print" in rep["reason"], rep["reason"]
+    json.dumps(c._clean(rep["stat"]))
+
+
 # ======================================================================================= T-103 strangle model ==
 
 def _smile_rows(r_put=1.1, r_atm=0.8, r_call=0.65):
@@ -498,30 +576,72 @@ def test_strangle_panel_prices_on_the_dividend_forward():
     assert seen_div and seen_none
 
 
-def _fake_panel(n):
-    days = _bdays("1993-02-01", n + 30)
-    return {"idx": np.arange(n), "hold": 21, "entry_days": days[:n]}
+def _fake_panel(n, hold=21, step=21):
+    days = _bdays("1993-02-01", step * n + 30)
+    idx = np.arange(n) * step
+    return {"idx": idx, "exit": idx + hold, "hold": hold, "entry_days": [days[i] for i in idx],
+            "exit_days": [days[i + hold] for i in idx], "T": np.full(n, 28 / 365)}
 
 
-def _runs(a, b):
-    r = {"strangle": a, "straddle": b, "prem_strangle": np.full(a.size, 0.01), "prem_straddle": np.full(a.size, 0.02)}
-    return {"smile": r, "flat": r, "skew": r, "iv0.9": r, "iv1.1": r}
+def _runs(a, b, flat=None, skew=None):
+    mk = lambda x, y: {"strangle": x, "straddle": y, "prem_strangle": np.full(x.size, 0.01), "prem_straddle": np.full(x.size, 0.02)}
+    r = mk(a, b)
+    return {"smile": r, "flat": mk(*flat) if flat else r, "skew": mk(*skew) if skew else r, "iv0.9": r, "iv1.1": r}
 
 
 def test_strangle_vs_straddle_planted_null_and_proxy_cap():
     rng = np.random.default_rng(3)
-    n = 21 * 400
+    n = 400                                                         # monthly-expiry cycles (the claim's min_n units)
     b = 0.02 * rng.standard_normal(n)
     a = 0.004 + 0.01 * rng.standard_normal(n)
-    rep = c.strangle_vs_straddle(_fake_panel(n), _runs(a, b), 60, n_boot=300, seeds=(0,), blocks=(42,))
+    rep = c.strangle_vs_straddle(_fake_panel(n), _runs(a, b), 60, n_boot=300, seeds=(0,), blocks=(6,))
     assert rep["verdict"] == "supported" and rep["n"] == 400, rep["reason"]
-    assert c.MP in rep["reason"] and rep["reason"].count(" — ") == 1
-    capped = c.strangle_vs_straddle(_fake_panel(n), _runs(a, b), 2, n_boot=300, seeds=(0,), blocks=(42,))
+    assert c.MP in rep["reason"] and rep["reason"].count(" — ") == 1 and "monthly expiry calendar" in rep["reason"]
+    capped = c.strangle_vs_straddle(_fake_panel(n), _runs(a, b), 2, n_boot=300, seeds=(0,), blocks=(6,))
     assert capped["verdict"] == "inconclusive" and "proxy cap" in capped["reason"]
     a0 = 0.02 * rng.standard_normal(n)
-    rep0 = c.strangle_vs_straddle(_fake_panel(n), _runs(a0, b), 60, n_boot=300, seeds=(0,), blocks=(42,))
+    rep0 = c.strangle_vs_straddle(_fake_panel(n), _runs(a0, b), 60, n_boot=300, seeds=(0,), blocks=(6,))
     assert rep0["verdict"] == "not_supported"
     json.dumps(c._clean(rep0["stat"]))
+
+
+def test_strangle_vs_straddle_flat_sign_decided_on_the_named_calendar():
+    """T-103 review: the flat-VIX sign is a criterion on the monthly-expiry cycles; a positive pooled 21-session grid
+    (the old primary) is a diagnostic and cannot rescue it, and the per-offset flat signs are reported."""
+    rng = np.random.default_rng(5)
+    n = 400
+    b = 0.02 * rng.standard_normal(n)
+    a = 0.004 + 0.01 * rng.standard_normal(n)
+    flat = (0.01 * rng.standard_normal(n), 0.003 + 0.01 * rng.standard_normal(n))     # flat VIX: straddle ahead
+    m = 21 * 300
+    gb = 0.02 * rng.standard_normal(m)
+    ga = 0.004 + 0.01 * rng.standard_normal(m)
+    gflat = (0.002 + 0.01 * rng.standard_normal(m), 0.01 * rng.standard_normal(m))
+    gpanel = _fake_panel(m, step=1)
+    grid = c.grid_diagnostics(gpanel, _runs(ga, gb, flat=gflat), blocks=(42,), n_boot=200)
+    assert grid["pooled"]["flat"]["diff"] > 0 and len(grid["per_offset"]) == 21
+    assert all(p["flat_diff"] is not None and p["skew_diff"] is not None for p in grid["per_offset"])
+    rep = c.strangle_vs_straddle(_fake_panel(n), _runs(a, b, flat=flat), 60, n_boot=300, seeds=(0,), blocks=(6,), grid=grid)
+    assert rep["verdict"] == "not_supported", rep["reason"]
+    why = rep["reason"].rpartition(" — ")[2]
+    assert why.startswith("failed: same sign under flat VIX (difference -")
+    assert "DIAGNOSTIC only" in rep["reason"] and "offsets negative" in rep["reason"]
+    json.dumps(c._clean(rep["stat"]))
+
+
+def test_monthly_cycle_pairs_follow_the_short_straddle_calendar():
+    """T-103 review: entries are overlay_backtest's monthly expiry calendar (third Friday, prior session on a holiday),
+    each settled at the next expiry with T from its own dates."""
+    days = [d for d in _bdays("2019-02-01", 120) if d != "2019-04-19"]   # Good Friday 2019 closed
+    pairs = c.monthly_cycle_pairs(days, {d: 15.0 for d in days})
+    got = [(days[i], days[j]) for i, j in pairs]
+    assert got[:3] == [("2019-02-15", "2019-03-15"), ("2019-03-15", "2019-04-18"), ("2019-04-18", "2019-05-17")]
+    close = np.linspace(100, 110, len(days))
+    panel = c.strangle_panel(days, close, close, {d: 15.0 for d in days}, {d: 2.0 for d in days}, start="2019-01-01", cycles=pairs)
+    assert panel["entry_days"][0] == "2019-02-15" and panel["exit_days"][0] == "2019-03-15"
+    assert panel["S1"][1] == pytest.approx(close[days.index("2019-04-18")]) and panel["T"][1] == pytest.approx(34 / 365)
+    vix = {d: 15.0 for d in days if d != "2019-03-15"}               # the short-straddle harness needs a VIX close
+    assert ("2019-03-14", "2019-04-18") in [(days[i], days[j]) for i, j in c.monthly_cycle_pairs(days, vix)]
 
 
 # ======================================================================================== harness wiring ==
@@ -538,11 +658,17 @@ def test_harness_missing_bundles_is_inconclusive(name):
     assert v == "inconclusive" and n == 0 and stat["missing_bundles"] and "missing data bundles" in reason
 
 
-def _spy_world(qdays, r_opt, extra_days=5):
-    """A SPY history through the quote days (flat at 100), DTB3 at 4%, and one pre-open chain capture per quote day."""
+DGS3MO_AT_R = (math.exp(R * 91 / 365) - 1) * 365 / 91 * 100      # the DGS3MO print with the same continuous rate as DTB3 4%
+
+
+def _spy_world(qdays, r_opt, extra_days=5, dgs3mo=DGS3MO_AT_R):
+    """A SPY history through the quote days (flat at 100), DTB3 at 4%, FRED DGS3MO (bond-equivalent, default: the same
+    continuous rate; None: not archived), and one pre-open chain capture per quote day."""
     days = _bdays("2025-10-01", 80 + extra_days)
     days = sorted(set(days) | set(qdays))
     b = {c.SPY_B: _px_rows(days, [100.0] * len(days)), c.DTB3_B: _fred_rows(days, 4.0)}
+    if dgs3mo is not None:
+        b[c.DGS3MO_B] = _fred_rows(days, dgs3mo)
     for qd in qdays:
         cap = days[days.index(qd) + 1]
         vals = chain_values(100.0, qd, DTES, K_GRID, r_opt)
@@ -554,10 +680,32 @@ def test_harness_conversion_end_to_end_planted_and_null():
     qdays = _bdays("2026-01-05", 5)
     stat, n, v, reason = c.HARNESSES["b6b_chain_conversion"](FakeArchive(_spy_world(qdays, R - 0.01)))
     json.dumps(stat)
-    assert v == "supported" and n >= 100, reason
-    assert "close/DTB3" in reason and "sync/DTB3" in reason and reason.count(" — ") == 1
+    assert v == "inconclusive" and n >= 100 and reason.endswith("(S_ask ASSUMED = spot + $0.005)"), reason
+    assert "implemented criteria pass" in reason and "stock at the ask" in reason
+    assert "close/DGS3MO" in reason and "sync/DGS3MO" in reason and "DTB3 beside it" in reason and reason.count(" — ") == 1
     stat, n, v, reason = c.HARNESSES["b6b_chain_conversion"](FakeArchive(_spy_world(qdays[:1], R + 0.01)))
     assert v == "not_supported", reason
+
+
+def test_harness_named_bill_end_to_end():
+    """T-185 / T-507 review, end to end: DGS3MO ~70 bp above DTB3 fails the day although DTB3 passes (was MARGINAL);
+    without fred-DGS3MO and no DGS3MO_REF print for the date, the day is unjudged."""
+    qdays = _bdays("2026-01-05", 1)
+    stat, n, v, reason = c.HARNESSES["b6b_chain_synthetic_short"](FakeArchive(_spy_world(qdays, R, dgs3mo=4.8)))
+    assert v == "not_supported" and n >= 20, reason
+    t = stat["per_day"][0]
+    assert all("DGS3MO" in lab for lab in t["tests"]) and all(x["pass"] for x in t["reported"].values())
+    assert not any(x["pass"] for x in t["tests"].values())
+    stat, n, v, reason = c.HARNESSES["b6b_chain_synthetic_call"](FakeArchive(_spy_world(qdays, R + 0.004, dgs3mo=4.8)))
+    assert v == "not_supported", reason
+    assert all(x["pass"] for x in stat["per_day"][0]["reported"].values())
+    stat, n, v, reason = c.HARNESSES["b6b_chain_synthetic_short"](FakeArchive(_spy_world(qdays, R, dgs3mo=None)))
+    assert v == "inconclusive" and "no DGS3MO print" in reason and stat["per_day"][0]["tests"] == {}, reason
+    for name in ("b6b_chain_conversion", "b6b_chain_synthetic_long", "b6b_chain_itm_put_exercise"):
+        stat, n, v, reason = c.HARNESSES[name](FakeArchive(_spy_world(qdays, R, dgs3mo=4.8)))
+        json.dumps(stat)
+        assert all("DGS3MO" in lab for lab in stat["per_day"][0]["tests"]), name
+        assert all("DTB3" in lab for lab in stat["per_day"][0]["reported"]), name
 
 
 def test_harness_jelly_roll_end_to_end_null():
@@ -598,3 +746,8 @@ def test_harness_strangle_end_to_end_small_sample():
     json.dumps(stat)
     assert v in ("inconclusive", "not_supported") and 0 < n < c.T103_MIN_N and c.MP in reason
     assert stat["sensitivities"]["skew"] is not None and stat["sensitivities"]["flat"] is not None
+    # n counts monthly-expiry cycles, entered at a third-Friday close (rule 10(a)); the 21-session grid is a diagnostic
+    want = c.monthly_cycle_pairs(days, {d: 16.0 for d in days})
+    assert n == len(want) and stat["first_entry"] == days[want[0][0]] and date.fromisoformat(stat["first_entry"]).weekday() == 4
+    assert 15 <= date.fromisoformat(stat["first_entry"]).day <= 21
+    assert stat["grid_diagnostic"] and len(stat["grid_diagnostic"]["per_offset"]) == 21

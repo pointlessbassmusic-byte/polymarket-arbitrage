@@ -33,7 +33,12 @@ means the whole interval lies on the claimed side.
 Model-priced straddles (T-208, T-224, T-219): Black-Scholes, ATM strike = the T-1 close, sigma = index(T-1)/100 (VIX for
 SPY, GVZ for GLD), T = 1/252, r = q = 0 (the rate moves a 1-day ATM straddle by under 0.1 bp; T-219 adds the ex-date
 dividend, below). Settlement is |S_T - S_T-1|. P&L is in fraction of the T-1 spot. Every such result is labelled
-MODEL-PRICED: a 30-day index cannot see the event premium that traded event-expiry options carry.
+MODEL-PRICED: a 30-day index cannot see the event premium that traded event-expiry options carry. Each also reports
+its sensitivity to the IV scale (house rule 8) in ``iv_scale_sensitivity`` and one clause of the reason: the primary
+statistic recomputed with sigma x 0.81 (``run.IV_SCALE_TODAY``, SPY's ATM IV / VIX measured 2026-10-14; GVZ's own ratio
+is not measured, so for GLD it is a stress, not an estimate) and x 1.2, repricing the premium only (T-224, T-219) or IM
+and the long P&L (T-208); the settlement is unchanged. The verdict is for the claim's own proxy (scale 1.00); the
+scaled results are reported only, never criteria.
 
 Dividends (T-219). SPY goes ex-dividend on the quarterly triple-witching Friday itself, so the raw Thursday-to-Friday
 move on those Fridays contains a known, pre-announced drop (about 44 bps). The T-219 straddle keeps K = S_Thu and the
@@ -91,6 +96,8 @@ TAU_1D = 1.0 / EQ_PPY
 MEDIAN_MOVE_FACTOR = 0.845          # median |N(0,s)| / mean |N(0,s)| = 0.6745 / 0.7979
 WITCHING_MONTHS = (3, 6, 9, 12)
 SHUTDOWN_WINDOWS = (("2013-10-01", "2013-11-30"), ("2025-10-01", "2025-12-31"))
+IV_SCALES = (0.81, 1.2)             # house rule 8 sensitivity: run.IV_SCALE_TODAY (SPY ATM IV / VIX) and a richer IV
+IV_SENS_LEAD = "IV-scale sensitivity (sigma scaled, settlement unchanged; reported only, not a criterion)"
 
 
 # ------------------------------------------------------------------------------------------------ data access --
@@ -454,6 +461,17 @@ def _subset(P: dict, m: np.ndarray) -> dict:
     return {k: v[m] for k, v in P.items()}
 
 
+def _skey(scale: float) -> str:
+    """Key of one IV scale in ``iv_scale_sensitivity`` (0.81 -> '0.81', 1.2 -> '1.20')."""
+    return f"{float(scale):.2f}"
+
+
+def scaled_long(P: dict, scale: float) -> np.ndarray:
+    """Long 1-day straddle P&L of a ``straddle_panel`` (or a subset) repriced with sigma x ``scale``: the premium is
+    recomputed on the same dividend forward, K and the settlement |S_i - S_i-1| are unchanged."""
+    return P["move"] - straddle_premium(float(scale) * P["sigma"], TAU_1D, 1.0 - P["div"])
+
+
 # ----------------------------------------------------------------------------------------------- house rule 5 --
 
 MIN_DECISIVE_EVENTS = 4     # an interval from fewer events (or fewer than 4 blocks of days) never decides below min_n
@@ -708,22 +726,50 @@ def _q_bootstrap_ci(a: np.ndarray, b: np.ndarray, n_boot: int, seed: int) -> lis
     return [float(np.quantile(bs_, 0.025)), float(np.quantile(bs_, 0.975))]
 
 
+def im_hm_oos(T: dict, is_end: str, oos_start: str, n_perm: int, n_boot: int, seed: int) -> dict:
+    """T-208's walk-forward primary statistics on an ``event_move_table``: IM/HM quintile cutoffs from the events up to
+    ``is_end``, applied from ``oos_start``; the OOS Spearman rho(IM/HM, long P&L) with its one-sided permutation p
+    (H0 rho >= 0) and the OOS Q1-minus-Q5 mean long P&L with its 95% bootstrap CI."""
+    is_m = T["days"] <= is_end; oos_m = T["days"] >= oos_start
+    cut = np.quantile(T["ratio"][is_m], [0.2, 0.4, 0.6, 0.8])
+    q = np.searchsorted(cut, T["ratio"], side="right")           # 0..4 = Q1..Q5
+    x, y = T["ratio"][oos_m], T["long"][oos_m]
+    rho = spearman(x, y); p_rho = spearman_perm_p(x, y, n_perm, seed, "less")
+    qo = q[oos_m]
+    a, b = y[qo == 0], y[qo == 4]
+    q15 = float(a.mean() - b.mean()) if len(a) and len(b) else None
+    ci = _q_bootstrap_ci(a, b, n_boot, seed)
+    return {"cut": cut, "x": x, "y": y, "qo": qo, "a": a, "b": b, "rho": rho, "p_rho": p_rho, "q15": q15, "ci": ci}
+
+
+def scaled_event_table(T: dict, scale: float) -> dict:
+    """An ``event_move_table`` repriced with sigma x ``scale``: premium, IM = 0.845 x premium, IM/HM, the long P&L and
+    the return on debit (and the close-to-open control) are recomputed; the move, HM and the event days are
+    unchanged."""
+    prem = straddle_premium(float(scale) * T["sigma"], TAU_1D)
+    im = MEDIAN_MOVE_FACTOR * prem
+    return {**T, "sigma": float(scale) * T["sigma"], "premium": prem, "im": im, "ratio": im / T["hm"],
+            "long": T["move"] - prem, "ret_on_debit": T["move"] / prem - 1, "long_open": T["long_open"] + T["premium"] - prem}
+
+
 def im_hm_filter(days: Sequence[str], closes, vix: dict, fomc_days, opens: Optional[dict] = None, start: str = "1994-01-01",
                  is_end: str = "2009-12-31", oos_start: str = "2010-01-01", end: Optional[str] = None, n_hm: int = 8,
                  rho_threshold: float = -0.1, n_perm: int = 10000, n_boot: int = 4000, n_placebo: int = 200,
-                 seed: int = 0, min_n: int = 200) -> dict:
+                 seed: int = 0, min_n: int = 200, iv_scales: Sequence[float] = IV_SCALES) -> dict:
     """T-208 (MODEL-PRICED): for each scheduled FOMC day since 1994, IM/HM with IM = 0.845 x BS 1-day ATM straddle/S at
     sigma = VIX(T-1), T = 1/252, and HM = median |SPY return| over the previous 8 FOMC days; long-straddle P&L =
     |S_T - S_T-1|/S_T-1 - straddle/S_T-1. Quintile cutoffs of IM/HM come from 1994-2009 events only and are applied to
     2010-2026. Pass (out of sample, 2010-2026): Spearman rho(IM/HM, long P&L) < -0.1 with a one-sided permutation
     p < 0.05 (H0 rho >= 0), and Q1-minus-Q5 mean long P&L > 0 with the 95% bootstrap CI excluding 0. Reported: in-sample
     and full rho, return-on-debit rho, rho partialling out the VIX level, a random non-event-day placebo, and the
-    close-to-open realised definition (the 14:00 statement is after the open, so that one is a non-event control).
-    ``min_n`` applies to the full event table. Below it house rule 5 applies: never supported, and a criterion fails
-    decisively only when it fails at the confidence of its pass (the OOS rho's two-sided 95% Fisher-z interval at or
-    above -0.1 for the rho criterion; the opposite one-sided permutation p, H0 rho <= 0 from the same draws, < 0.05 for
-    the permutation criterion; the Q1-Q5 bootstrap CI at or below 0 for both quintile criteria, with at least 4 events in
-    Q1 and in Q5)."""
+    close-to-open realised definition (the 14:00 statement is after the open, so that one is a non-event control), and
+    the IV-scale sensitivity (house rule 8, reported only): the OOS rho, its permutation p and the Q1-Q5 difference
+    with its CI recomputed with sigma x each of ``iv_scales`` (IM and the long P&L repriced, cutoffs from the scaled
+    in-sample ratios). ``min_n`` applies to the full event table. Below it house rule 5 applies: never supported, and a
+    criterion fails decisively only when it fails at the confidence of its pass (the OOS rho's two-sided 95% Fisher-z
+    interval at or above -0.1 for the rho criterion; the opposite one-sided permutation p, H0 rho <= 0 from the same
+    draws, < 0.05 for the permutation criterion; the Q1-Q5 bootstrap CI at or below 0 for both quintile criteria, with
+    at least 4 events in Q1 and in Q5)."""
     ev = sorted(e for e in fomc_days if e >= start and (end is None or e <= end))
     T = event_move_table(days, closes, vix, ev, n_hm=n_hm, opens=opens)
     n = int(len(T["days"]))
@@ -737,14 +783,9 @@ def im_hm_filter(days: Sequence[str], closes, vix: dict, fomc_days, opens: Optio
     if n_is < 5 or n_oos < 5:
         rep.update(verdict="inconclusive", reason=f"MODEL-PRICED: {n_is} in-sample and {n_oos} out-of-sample FOMC events: too few to set cutoffs or test")
         return rep
-    cut = np.quantile(T["ratio"][is_m], [0.2, 0.4, 0.6, 0.8])
-    q = np.searchsorted(cut, T["ratio"], side="right")           # 0..4 = Q1..Q5
-    x, y = T["ratio"][oos_m], T["long"][oos_m]
-    rho = spearman(x, y); p_rho = spearman_perm_p(x, y, n_perm, seed, "less")
-    qo = q[oos_m]
-    a, b = y[qo == 0], y[qo == 4]
-    q15 = float(a.mean() - b.mean()) if len(a) and len(b) else None
-    ci = _q_bootstrap_ci(a, b, n_boot, seed)
+    S = im_hm_oos(T, is_end, oos_start, n_perm, n_boot, seed)
+    cut, x, y, qo, a, b = S["cut"], S["x"], S["y"], S["qo"], S["a"], S["b"]
+    rho, p_rho, q15, ci = S["rho"], S["p_rho"], S["q15"], S["ci"]
     q_means = {f"Q{k + 1}": {"n": int((qo == k).sum()), "mean_long_pnl_bps": float(y[qo == k].mean() * 1e4) if (qo == k).any() else None} for k in range(5)}
     # controls
     rho_is = spearman(T["ratio"][is_m], T["long"][is_m]); rho_full = spearman(T["ratio"], T["long"])
@@ -770,10 +811,18 @@ def im_hm_filter(days: Sequence[str], closes, vix: dict, fomc_days, opens: Optio
     prho = np.array(prho)
     placebo = {"n_draws": int(len(prho)), "mean_rho": float(prho.mean()) if len(prho) else None,
                "share_at_or_below_observed": float((prho <= rho).mean()) if len(prho) and rho is not None else None}
+    # house rule 8: the primary statistics with sigma scaled (IM and the long P&L repriced, cutoffs from the scaled
+    # in-sample ratios); reported only, never a criterion
+    sens = {}
+    for s in iv_scales:
+        Ss = im_hm_oos(scaled_event_table(T, s), is_end, oos_start, n_perm, n_boot, seed)
+        sens[_skey(s)] = {"iv_scale": float(s), "oos_spearman_rho": Ss["rho"], "oos_perm_p": Ss["p_rho"],
+                          "oos_q1_minus_q5": Ss["q15"], "oos_q1_minus_q5_ci": Ss["ci"],
+                          "mean_long_pnl_oos_bps": float(Ss["y"].mean() * 1e4)}
     rep.update(in_sample_cutoffs=cut, oos_spearman_rho=rho, oos_perm_p=p_rho, oos_q1_minus_q5=q15, oos_q1_minus_q5_ci=ci,
                oos_quintiles=q_means, in_sample_rho=rho_is, full_rho=rho_full, oos_rho_return_on_debit=rho_debit,
                oos_rho_partial_vix=rho_partial, oos_rho_close_to_open=rho_open, placebo_random_days=placebo,
-               mean_long_pnl_oos_bps=float(y.mean() * 1e4), mean_ratio_oos=float(x.mean()))
+               mean_long_pnl_oos_bps=float(y.mean() * 1e4), mean_ratio_oos=float(x.mean()), iv_scale_sensitivity=sens)
     crit = [(f"OOS Spearman rho < {rho_threshold:g}", None if rho is None else rho < rho_threshold),
             ("OOS one-sided permutation p < 0.05", None if p_rho is None else p_rho < 0.05),
             ("OOS Q1-Q5 mean long P&L > 0", None if q15 is None else q15 > 0),
@@ -783,7 +832,11 @@ def im_hm_filter(days: Sequence[str], closes, vix: dict, fomc_days, opens: Optio
             f"(permutation p={_f(p_rho, '.4f')}); Q1-Q5 with 1994-2009 cutoffs {_bps(q15)} bps of spot (95% CI {_ci_bps(ci)}; "
             f"Q1 n={q_means['Q1']['n']}, Q5 n={q_means['Q5']['n']}); in-sample rho {_f(rho_is)}, VIX-partialled OOS rho {_f(rho_partial)}, "
             f"return-on-debit OOS rho {_f(rho_debit)}, close-to-open OOS rho {_f(rho_open)}, random-day placebo mean rho "
-            f"{_f(placebo['mean_rho'])}")
+            f"{_f(placebo['mean_rho'])}"
+            + (f"; {IV_SENS_LEAD}: " + ", ".join(
+                f"x{k} OOS rho {_f(v_['oos_spearman_rho'])} (permutation p={_f(v_['oos_perm_p'], '.4f')}), Q1-Q5 "
+                f"{_bps(v_['oos_q1_minus_q5'])} bps (95% CI {_ci_bps(v_['oos_q1_minus_q5_ci'])})" for k, v_ in sens.items())
+               if sens else ""))
     if n < min_n:
         # rule 5: rho fails decisively when its 95% interval (Fisher z) lies wholly at or above -0.1; the one-sided
         # permutation p < 0.05 criterion is mirrored at its own level by the opposite one-sided permutation test from the
@@ -822,13 +875,15 @@ def event_straddle_diff(P: dict, event_sessions: set, exclude_sessions: set = fr
 
 def gld_event_straddle(days: Sequence[str], closes, gvz: dict, fomc_days, cpi_days, es_days=(), exclude_days=(),
                        start: str = "2009-09-01", end: Optional[str] = None, spx: Optional[tuple] = None, block: int = 10,
-                       n_boot: int = 2000, seed: int = 0, min_n: int = 150) -> dict:
+                       n_boot: int = 2000, seed: int = 0, min_n: int = 150, iv_scales: Sequence[float] = IV_SCALES) -> dict:
     """T-224 (MODEL-PRICED): 1-day ATM GLD straddle, sigma = GVZ at the T-1 close, T = 1/252, sold at the T-1 close and
     settled at |GLD_T - GLD_T-1|, on scheduled FOMC decision days and CPI release days since 2009-09 vs all other days.
     Pass: event-minus-non-event mean short P&L < 0 with the 95% block-bootstrap CI excluding 0. Reported: |r|/(GVZ/sqrt252)
     by group, per type (FOMC, CPI), +/-7 calendar-day placebo, ex March 2020, GVZ terciles, non-event days without
-    Employment Situation days, and the same test on SPY with VIX (``spx`` = (days, closes, vix)). ``exclude_days``
-    (unscheduled FOMC days) leave both groups. The real-rate regime split is not run (no real-yield series archived).
+    Employment Situation days, the same test on SPY with VIX (``spx`` = (days, closes, vix)), and the IV-scale
+    sensitivity (house rule 8, reported only): the difference, its CI and one-sided p with the premium repriced at
+    sigma = GVZ x each of ``iv_scales``. ``exclude_days`` (unscheduled FOMC days) leave both groups. The real-rate
+    regime split is not run (no real-yield series archived).
     Below ``min_n`` event days house rule 5 applies: never supported, and both criteria fail decisively only when the
     difference's 95% block-bootstrap CI lies wholly at or above 0."""
     P = straddle_panel(days, closes, gvz, TAU_1D, start=start, end=end)
@@ -867,6 +922,12 @@ def gld_event_straddle(days: Sequence[str], closes, gvz: dict, fomc_days, cpi_da
             gs, _, _ = event_straddle_diff(Ps, ev_s, set(to_sessions(in_rng(exclude_days), list(sd))[0]), "short", block, n_boot, seed)
             spx_rep = {"diff_bps": None if gs["diff"] is None else gs["diff"] * 1e4, "ci_bps": [None if c_ is None else c_ * 1e4 for c_ in gs["ci"]],
                        "n_event": gs["n_event"]}
+    # house rule 8: the primary difference with the premium repriced at sigma x scale; reported only, never a criterion
+    sens = {}
+    for s in iv_scales:
+        g_s = group_diff(-scaled_long(Q, s), f, block, n_boot, seed)
+        sens[_skey(s)] = {"iv_scale": float(s), "diff": g_s["diff"], "ci": g_s["ci"], "p_less": g_s["p_less"],
+                          "mean_event": g_s["mean_event"], "mean_other": g_s["mean_other"]}
     rep = {"label": "MODEL-PRICED", "n": full["n_event"], "first_day": str(Q["days"][0]), "last_day": str(Q["days"][-1]),
            "pricing": "Black-Scholes, sigma = GVZ(T-1)/100, T = 1/252, K = GLD(T-1) close, r = q = 0; short P&L as a fraction of spot",
            "n_fomc": int(np.isin(Q["days"], fomc_s).sum()), "n_cpi": int(np.isin(Q["days"], cpi_s).sum()),
@@ -876,7 +937,8 @@ def gld_event_straddle(days: Sequence[str], closes, gvz: dict, fomc_days, cpi_da
            "abs_r_over_gvz_daily": {"event": float(ratio[f].mean()) if f.any() else None, "other": float(ratio[~f].mean())},
            "per_type": per_type, "placebo_pm7": placebo, "excluding_2020_03": excl,
            "non_event_without_jobs_days_diff_bps": None if without_es is None else without_es * 1e4, "gvz_terciles": terc,
-           "spx_comparison_model_priced": spx_rep, "not_run": ["real-rate regime split (no real-yield series such as DFII10 archived)"]}
+           "spx_comparison_model_priced": spx_rep, "iv_scale_sensitivity": sens,
+           "not_run": ["real-rate regime split (no real-yield series such as DFII10 archived)"]}
     crit = [("event-minus-non-event short-straddle P&L < 0", None if full["diff"] is None else full["diff"] < 0),
             ("95% CI excludes 0 (upper bound < 0)", None if full["ci"][1] is None else full["ci"][1] < 0)]
     ra = rep["abs_r_over_gvz_daily"]
@@ -885,7 +947,10 @@ def gld_event_straddle(days: Sequence[str], closes, gvz: dict, fomc_days, cpi_da
             f"(95% CI {_ci_bps(full['ci'])}, one-sided p={_f(full['p_less'], '.4f')}) over {full['n_event']} event days (FOMC {rep['n_fomc']}, CPI {rep['n_cpi']}) / {full['n_other']} other; "
             f"|r|/(GVZ/sqrt252) event {_f(ra['event'], '.2f')} vs other {_f(ra['other'], '.2f')}; FOMC {_bps(per_type['FOMC']['diff'])}, "
             f"CPI {_bps(per_type['CPI']['diff'])} bps; placebo +/-7d {_bps(placebo['diff'])} bps; ex Mar-2020 {_bps(excl['diff'])} bps"
-            + (f"; SPY/VIX same events {_f(spx_rep['diff_bps'], '+.1f')} bps" if spx_rep else ""))
+            + (f"; SPY/VIX same events {_f(spx_rep['diff_bps'], '+.1f')} bps" if spx_rep else "")
+            + (f"; {IV_SENS_LEAD}: " + ", ".join(
+                f"x{k} difference {_bps(v_['diff'])} bps (95% CI {_ci_bps(v_['ci'])}, one-sided p={_f(v_['p_less'], '.4f')})"
+                for k, v_ in sens.items()) if sens else ""))
     if full["n_event"] < min_n:
         # rule 5: both criteria fail decisively when the difference's 95% CI lies wholly at or above 0
         up = _decides(full, block) and _ci_above(full["ci"], 0.0)
@@ -910,7 +975,7 @@ def friday_panel(days: Sequence[str], closes, iv: dict, start: Optional[str] = N
 
 def witching_straddle(days: Sequence[str], closes, vix: dict, fomc_days=(), start: str = "1993-01-01", end: Optional[str] = None,
                       split: str = "2010-01-01", block: int = 4, n_boot: int = 2000, n_perm: int = 10000, seed: int = 0,
-                      min_n: int = 100, div_yield: Optional[dict] = None) -> dict:
+                      min_n: int = 100, div_yield: Optional[dict] = None, iv_scales: Sequence[float] = IV_SCALES) -> dict:
     """T-219 (MODEL-PRICED): long 1-day ATM SPY straddle bought at Thursday's close (sigma = VIX at Thursday's close,
     T = 1/252) and settled at |SPY_Fri - SPY_Thu| on quarterly triple-witching Fridays (third Friday of Mar/Jun/Sep/Dec)
     vs all other Fridays. ``closes`` are raw (split-adjusted, not dividend-adjusted) closes and ``div_yield`` =
@@ -919,8 +984,10 @@ def witching_straddle(days: Sequence[str], closes, vix: dict, fomc_days=(), star
     as well as the payoff. Pass: witching-minus-other mean long P&L > 0 with the 95% block-bootstrap CI (block 4 weeks)
     excluding 0 and a one-sided label-permutation p < 0.05. Reported: |r|/(VIX/sqrt252) on the dividend-neutral move,
     monthly (non-quarterly) opex Fridays as a separate control, witching Fridays in FOMC weeks excluded, pre/post-2010
-    split, witching Fridays skipped (holiday or no Thursday session), and the dividend treatment sensitivity (ignored;
-    previous ex-date yield as the forecast; dividend-adjusted closes). The 15:00-16:00 ET version is not run (needs a
+    split, witching Fridays skipped (holiday or no Thursday session), the dividend treatment sensitivity (ignored;
+    previous ex-date yield as the forecast; dividend-adjusted closes) and the IV-scale sensitivity (house rule 8,
+    reported only: the difference, its CI and the permutation p from the same label draws, with the premium repriced
+    on the same dividend forward at sigma = VIX x each of ``iv_scales``). The 15:00-16:00 ET version is not run (needs a
     15:00 ET price; hourly SPY bars start on the half hour). Below ``min_n`` witching Fridays house rule 5 applies: never
     supported; the difference and CI criteria fail decisively only when the difference's 95% CI lies wholly at or below
     0, the permutation criterion only when the opposite one-sided permutation p (H0: witching >= other, from the same
@@ -972,8 +1039,19 @@ def witching_straddle(days: Sequence[str], closes, vix: dict, fomc_days=(), star
         for lab, xs in (("ignored (q = 0, raw move)", P["move"] - atm), ("previous ex-date yield as forecast", P_pit["long"]),
                         ("dividend-adjusted closes", P["move_fwd"] / (1.0 - P["div"]) - atm)):
             dd = _point_diff(xs, w); div_sens[lab] = None if dd is None else dd * 1e4
+    # house rule 8: the primary difference with the premium repriced at sigma x scale (same dividend forward, same label
+    # draws for the permutation p); reported only, never a criterion
+    sens = {}
+    for s in iv_scales:
+        x_s = scaled_long(P, s)
+        g_s = group_diff(x_s, w, block, n_boot, seed)
+        sw_s = x_s[keys].sum(1)
+        perm_s = sw_s / nw - (x_s.sum() - sw_s) / (len(x_s) - nw)
+        sens[_skey(s)] = {"iv_scale": float(s), "diff": g_s["diff"], "ci": g_s["ci"], "p_greater": g_s["p_greater"],
+                          "permutation_p": float((np.sum(perm_s >= g_s["diff"] - 1e-15) + 1) / (n_perm + 1)),
+                          "mean_event": g_s["mean_event"], "mean_other": g_s["mean_other"]}
     nrm = P["sigma"] / math.sqrt(EQ_PPY)
-    rep.update(n_witching_skipped=len(witch_all) - nw, witching_skipped=sorted(set(witch_all) - set(P["days"].tolist())), full=g,
+    rep.update(iv_scale_sensitivity=sens, n_witching_skipped=len(witch_all) - nw, witching_skipped=sorted(set(witch_all) - set(P["days"].tolist())), full=g,
                permutation_p=p_perm, mean_premium_witching_bps=float(P["premium"][w].mean() * 1e4),
                mean_premium_other_bps=float(P["premium"][~w].mean() * 1e4),
                n_ex_dividend_witching=int((w & exd).sum()), n_ex_dividend_other=int((~w & exd).sum()),
@@ -998,7 +1076,10 @@ def witching_straddle(days: Sequence[str], closes, vix: dict, fomc_days=(), star
             f"{rep['abs_r_over_vix_daily']['other']:.2f}; vs monthly opex {_f(rep['witching_minus_monthly_opex_bps'], '+.1f')} bps; "
             f"ex FOMC weeks {_f(rep['excluding_fomc_week_witching_bps'], '+.1f')} bps; "
             + ", ".join(f"{k} {_f(v_['diff_bps'], '+.1f')} bps" for k, v_ in split_d.items())
-            + ("; difference with the dividend " + ", ".join(f"{k} {_f(v_, '+.1f')}" for k, v_ in div_sens.items()) + " bps" if div_sens else ""))
+            + ("; difference with the dividend " + ", ".join(f"{k} {_f(v_, '+.1f')}" for k, v_ in div_sens.items()) + " bps" if div_sens else "")
+            + (f"; {IV_SENS_LEAD}: " + ", ".join(
+                f"x{k} difference {_bps(v_['diff'])} bps (95% CI {_ci_bps(v_['ci'])}, permutation p={v_['permutation_p']:.4f})"
+                for k, v_ in sens.items()) if sens else ""))
     if rep["n"] < min_n:
         # rule 5: the difference and the CI criteria fail decisively when the difference's 95% CI (block 4 weeks) lies
         # wholly at or below 0; the one-sided permutation p < 0.05 criterion is mirrored at its own level by the opposite

@@ -64,15 +64,16 @@ expected best of the trials' zero-skill Sharpes, is >= 0 at any sample size, so 
 the 95% interval above (carry's Sharpe, momentum's mean) lies wholly at or below 0, a one-sided 97.5% bound on the same
 sign. The flag mirrors the pass statistic alone, the iid PSR the DSR is built on (as ``batch4_ohlc._dsr_dec`` and
 ``batch5_hourly`` do); the Newey-West t (6 lags) of the mean is reported next to the PSR in ``rule5`` and the reason, but
-it is a second statistic the pass never uses and gates nothing. A zero-width interval decides nothing.
+it is a second statistic the pass never uses and gates nothing. A zero-width interval decides nothing. Under 48 months
+(4 blocks of the 12-month bootstrap) no interval is computed, no failure can be decisive and the verdict is
+inconclusive. Any other failure below min_n is undecided (None), so the verdict is inconclusive. At or above min_n
+every criterion is judged at face value, exactly as before. Below min_n the report's ``criteria`` are the ones judged
+and ``rule5`` holds the face-value criteria and the decisive failures.
 
 House rule 10 (no arbitrary grid phase). None of the three harnesses rests on an arbitrary-start grid. Carry (T-368,
 T-431) is a monthly book ranked on calendar-month OECD averages and traded at the month-end fixing; momentum (T-478)
 names month-end FRED spot rates and holds calendar months (first fixing of H to the first fixing of H+1). These are
-calendar-month statistics: the claim names the calendar, so the grid phase is not a free choice. Under 48 months (4 blocks of the 12-month bootstrap) no interval is computed, no
-failure can be decisive and the verdict is inconclusive. Any other failure below min_n is undecided (None), so the
-verdict is inconclusive. At or above min_n every criterion is judged at face value, exactly as before. Below min_n the
-report's ``criteria`` are the ones judged and ``rule5`` holds the face-value criteria and the decisive failures.
+calendar-month statistics: the claim names the calendar, so the grid phase is not a free choice.
 """
 
 from __future__ import annotations

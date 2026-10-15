@@ -8,7 +8,8 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            95% CI excluding 0 (studentized block bootstrap, 5-day blocks), on the van Binsbergen-Diamond-Grotteria box
            rates (``box-rates-bdg``, 2004-01-02..2018-03-19) with FRED DTB3 and Cboe VIX.
   * T-518  MODEL-PRICED 1-day ATM USO straddle at OVX bought at the T-1 close: OPEC+ meeting days vs non-event days
-           since 2009-09 (difference in mean P&L > 0 with the 95% CI excluding 0).
+           since 2009-09 (difference in mean P&L > 0 with the 95% CI excluding 0). The dates are Kanzig's OPEC
+           announcement list (not the ministerial-meeting calendar) with its documented deviations corrected.
   * T-522  US federal election days since 1994: |SPY 2-day return| / (VIX/sqrt(126)) vs matched windows 4 weeks before
            and after (exact sign test p < 0.05, i.e. >= 13 of 16, and mean difference > 0); MODEL-PRICED straddle reported.
   * T-275  MODEL-PRICED 1x2 SLV call backspread (short 0.50 delta, long 2 x 0.25 delta, 90 DTE) at trailing 60-day
@@ -86,6 +87,13 @@ T188_BLOCK = 5                 # the trial's 5-day blocks
 T518_MIN_N = 40
 T518_START = "2009-09-01"      # "since 2009-09"
 T518_BLOCK = 21
+# opec-announcements is Kanzig's announcement list, not the OPEC+ ministerial-meeting calendar the claim names. The
+# deviations documented in mandel/data/options_misc.py are corrected before any test: dates that were not meetings
+# leave both pools, and an announcement missing from the vintage takes its session out of the non-event pool.
+OPEC_NOT_MEETING = {"2021-07-05": "OPEC+ meeting called off",
+                    "2024-03-03": "Sunday statement extending the voluntary cuts, not a meeting",
+                    "2025-03-03": "statement to proceed with the April increase, not a meeting"}
+OPEC_UNRECORDED = {"2023-04-02": "Sunday OPEC+ voluntary cut, missing from the 2025M12 vintage"}
 # T-522
 T522_MIN_N = 16
 T522_NEED = 13                 # ">= 13 of 16"
@@ -554,6 +562,26 @@ def opec_events(rows: list, days: list) -> list:
     return out
 
 
+def opec_calendar_fixes(events: list, days: list, not_meeting: Optional[dict] = None,
+                        unrecorded: Optional[dict] = None) -> dict:
+    """{session: note} of sessions taken out of the T-518 pools: an event session whose every listed date is a documented
+    non-meeting (``OPEC_NOT_MEETING``) leaves the event set and the non-event pool; the session of a documented OPEC+
+    announcement missing from the list (``OPEC_UNRECORDED``; a weekend or holiday on the next session) leaves the
+    non-event pool."""
+    nm = OPEC_NOT_MEETING if not_meeting is None else not_meeting
+    un = OPEC_UNRECORDED if unrecorded is None else unrecorded
+    out = {}
+    for e in events:
+        if e["days"] and all(d in nm for d in e["days"]):
+            out[e["session"]] = "; ".join(f"{d}: {nm[d]}" for d in e["days"])
+    sess = {e["session"] for e in events}
+    for d, note in sorted(un.items()):
+        j = bisect.bisect_left(days, d)
+        if 0 < j < len(days) and days[j] not in sess:
+            out[days[j]] = f"{d}: {note}"
+    return out
+
+
 def cl_last_trade(y: int, m: int) -> date:
     """NYMEX WTI (CL) contract month (y, m): trading ends 3 business days before the 25th calendar day of the prior month
     (counting from the business day before the 25th when the 25th is not a business day). Exchange holidays are the US
@@ -617,8 +645,10 @@ def uso_panel(days: list, close: np.ndarray, ovx: dict, bills: Bills, start: str
     return out
 
 
-def opec_claim(U: dict, events: list, roll: set, variants: dict, n_boot: Optional[int] = None, n_div: int = 0) -> dict:
-    """T-518 on a uso_panel and its mapped OPEC events. ``variants``: IV-scale panels (same days) for the sensitivity."""
+def opec_claim(U: dict, events: list, roll: set, variants: dict, n_boot: Optional[int] = None, n_div: int = 0,
+               excluded: Optional[dict] = None) -> dict:
+    """T-518 on a uso_panel and its mapped OPEC events. ``variants``: IV-scale panels (same days) for the sensitivity.
+    ``excluded`` ({session: note}, from ``opec_calendar_fixes``): sessions removed from both pools before any test."""
     n_boot = _nb(n_boot)
     day = U["day"]
     if not day:
@@ -626,20 +656,29 @@ def opec_claim(U: dict, events: list, roll: set, variants: dict, n_boot: Optiona
         return {"stat": {"n": 0}, "n": 0, "verdict": v, "reason": f"T-518: no USO session with an OVX print since "
                                                                    f"{T518_START} — {why}"}
     pos = {d: i for i, d in enumerate(day)}
+    excl = {s: note for s, note in (excluded or {}).items() if s in pos}
+    m_excl = np.zeros(len(day), bool)
+    for s in excl:
+        m_excl[pos[s]] = True
+    ev_raw = np.zeros(len(day), bool)                   # the uncorrected announcement list (diagnostic only)
     ev_all = np.zeros(len(day), bool)
     ev_pit = np.zeros(len(day), bool)
-    used = [e for e in events if e["session"] in pos]
+    for e in events:
+        if e["session"] in pos:
+            ev_raw[pos[e["session"]]] = True
+    used = [e for e in events if e["session"] in pos and e["session"] not in excl]
     for e in used:
         ev_all[pos[e["session"]]] = True
         ev_pit[pos[e["session"]]] = e["pit"]
     n_exp, n_pit = int(ev_all.sum()), int(ev_pit.sum())
-    other = ~ev_all
+    other = ~ev_all & ~m_excl
     pnl = U["pnl"]
     pit_test = event_diff_test(pnl, ev_pit, other, T518_BLOCK, n_boot) if n_pit else None
     verdict, why = judge_event_diff(pit_test, n_pit, True if n_pit else None)
     # ex-post diagnostics (look-ahead: event dates known only after the fact), never criteria
     xp = event_diff_test(pnl, ev_all, other, T518_BLOCK, n_boot)
-    m2020 = np.array([not d.startswith(("2020-03", "2020-04")) for d in day])
+    xp_raw = event_diff_test(pnl, ev_raw, ~ev_raw, T518_BLOCK, n_boot) if excl else xp
+    m2020 =np.array([not d.startswith(("2020-03", "2020-04")) for d in day])
     xp_ex2020 = event_diff_test(pnl, ev_all & m2020, other & m2020, T518_BLOCK, n_boot)
     mroll = np.array([d not in roll for d in day])
     xp_roll = event_diff_test(pnl, ev_all & mroll, other & mroll, T518_BLOCK, n_boot)
@@ -655,7 +694,8 @@ def opec_claim(U: dict, events: list, roll: set, variants: dict, n_boot: Optiona
             "last": day[-1], "pit_test": pit_test, "expost": xp, "expost_ex_2020_03_04": xp_ex2020,
             "expost_ex_roll_approx": xp_roll, "expost_block63": xp63, "expost_iv_scale": scales, "eia_wednesdays": eia,
             "move_over_premium": {"event": ratio_ev, "other": ratio_ot},
-            "event_sessions": [e["session"] for e in used], "n": n_pit, "min_n": T518_MIN_N}
+            "event_sessions": [e["session"] for e in used], "calendar_excluded": excl,
+            "expost_uncorrected_list": xp_raw, "n": n_pit, "min_n": T518_MIN_N}
 
     def dd(t):
         if not t or t.get("diff") is None:
@@ -667,8 +707,16 @@ def opec_claim(U: dict, events: list, roll: set, variants: dict, n_boot: Optiona
         f"1/252, r = DTB3 (rule 7, print before T-1), K = S(T-1), settled at T's raw (split-adjusted) close, P&L in % of "
         f"S(T-1); USO ex-dividend dates in the data: {n_div} (escrowed forward when one falls on T); sessions "
         f"{day[0]}..{day[-1]} (OVX starts 2009-09-18; the Kanzig vintage covers OPEC dates to its month-end). OPEC dates: "
-        f"opec-announcements (Kanzig 2021), {len(used)} event sessions in the window (weekend dates on the next Monday). "
-        f"POINT IN TIME: an event row is available at the END of its announcement day unless a verified known_since "
+        f"opec-announcements (Kanzig 2021) is a list of OPEC announcement dates, NOT the OPEC+ ministerial-meeting "
+        f"calendar the claim names: it includes non-meeting statements and a called-off meeting, and it misses at least "
+        f"the Sunday 2023-04-02 OPEC+ voluntary cut, so the event set only approximates the claim's calendar and "
+        f"non-event days can include unrecorded OPEC+ announcements. Documented corrections (mandel/data/options_misc.py), "
+        f"applied before every test: "
+        + ("; ".join(f"session {s} out of both pools ({note})" if ev_raw[pos[s]]
+                     else f"session {s} out of the non-event pool ({note})" for s, note in sorted(excl.items()))
+           if excl else "none falls in the window")
+        + f"; {len(used)} event sessions remain in the window (weekend dates on the next Monday, holidays on the next "
+        f"session). POINT IN TIME: an event row is available at the END of its announcement day unless a verified known_since "
         f"says the date was announced earlier; {n_pit} of {n_exp} event sessions have a flag available by the T-1 close "
         f"(16:00 New York)")
     if n_pit == 0:
@@ -679,7 +727,10 @@ def opec_claim(U: dict, events: list, roll: set, variants: dict, n_boot: Optiona
         reason += f"; point-in-time difference {dd(pit_test)}"
     reason += (
         f". Ex-post diagnostics (LOOK-AHEAD: event dates known only after the fact; reported, never criteria): "
-        f"event - non-event {dd(xp)} (21-session blocks; 63-session blocks CI {_ci(xp63.get('ci'), 3, True)}); excluding "
+        f"event - non-event {dd(xp)} (21-session blocks; 63-session blocks CI {_ci(xp63.get('ci'), 3, True)})"
+        + (f"; the uncorrected announcement list (every listed date an event, every other session a non-event) "
+           f"{dd(xp_raw)}" if excl else "")
+        + f"; excluding "
         f"2020-03/04 {_f(xp_ex2020.get('diff'), 3, True, True)} {_ci(xp_ex2020.get('ci'), 3, True)}; excluding the "
         f"APPROXIMATE USO roll sessions {_f(xp_roll.get('diff'), 3, True, True)} {_ci(xp_roll.get('ci'), 3, True)}; "
         f"IV-scale sensitivity " + ", ".join(f"{k} {_f(t.get('diff'), 3, True, True)} {_ci(t.get('ci'), 3, True)}"
@@ -711,7 +762,7 @@ def b6b_misc_opec_uso_straddle(archive):
     events = opec_events(orows, days)
     variants = {f"IV x{s}": uso_panel(days, close, ovx, bills, start, end, s, divs=divs) for s in (0.9, 1.1)}
     roll = uso_roll_days(start, end) if U["day"] else set()
-    rep = opec_claim(U, events, roll, variants, n_div=len(divs))
+    rep = opec_claim(U, events, roll, variants, n_div=len(divs), excluded=opec_calendar_fixes(events, days))
     if cover:
         rep["stat"]["coverage_end"] = cover
     return _out(rep)
@@ -760,7 +811,11 @@ def two_day_window(pos: dict, days: list, close: np.ndarray, vix: dict, tuesday:
     S0, S1 = float(close[a]), float(close[b])
     R = S1 / S0 - 1
     imp = v / 100.0 / math.sqrt(126.0)
-    out = {"tuesday": t, "before": days[a], "after": days[b], "ret": R, "vix": v, "implied": imp, "ratio": abs(R) / imp}
+    d0, d1 = date.fromisoformat(days[a]), date.fromisoformat(days[b])
+    closed = [x.isoformat() for x in (d0 + timedelta(days=k) for k in range(1, (d1 - d0).days))
+              if x.weekday() < 5 and x.isoformat() not in pos]       # weekdays the 2-session window steps over
+    out = {"tuesday": t, "before": days[a], "after": days[b], "ret": R, "vix": v, "implied": imp, "ratio": abs(R) / imp,
+           "closed": closed}
     if bills is not None:
         r = bills.rate(days[a])
         T = 2 / 252
@@ -855,11 +910,52 @@ def _odds_2024(archive) -> Optional[dict]:
     return {"markets": len(ids), "prices": prices}
 
 
+def _regular(w: dict) -> bool:
+    """True when the window runs from the session the day before its Tuesday to the session the day after it."""
+    t = date.fromisoformat(w["tuesday"])
+    return w["before"] == (t - timedelta(days=1)).isoformat() and w["after"] == (t + timedelta(days=1)).isoformat()
+
+
+def window_calendar(rows: list) -> tuple:
+    """(windows used, irregular windows) over the election, before- and after-windows of the tested elections. A window
+    is irregular when a closure moves its before-close off the Monday or its after-close off the Wednesday; it still
+    spans 2 sessions, so VIX/sqrt(126) applies."""
+    n, odd = 0, []
+    for r in rows:
+        if r.get("diff") is None:
+            continue
+        for kind, label in (("event", "election window"), ("before", "before-window"), ("after", "after-window")):
+            w = r.get(kind)
+            if not w:
+                continue
+            n += 1
+            if not _regular(w):
+                d0, d1 = date.fromisoformat(w["before"]), date.fromisoformat(w["after"])
+                why = (", ".join(w.get("closed") or []) or "a missing session") + " was not a session"
+                if w.get("closed") and not any(is_trading_day(date.fromisoformat(x)) for x in w["closed"]):
+                    why += " (a market closure)"
+                odd.append({"year": r["year"], "window": kind, "before": w["before"], "after": w["after"],
+                            "closed": w.get("closed") or [],
+                            "text": f"the {r['year']} {label} runs {d0:%A} {w['before']} to {d1:%A} {w['after']} because "
+                                    f"{why}; still 2 sessions, so VIX/sqrt(126) applies"})
+    return n, odd
+
+
 def election_claim(rows: list, odds: Optional[dict] = None, kalshi_rows: Optional[int] = None, n_boot: Optional[int] = None) -> dict:
     use = [r for r in rows if r.get("diff") is not None]
     diffs = np.array([r["diff"] for r in use], float)
     verdict, why, det = judge_election(diffs, n_boot=n_boot)
     n = det["n"]
+    n_win, odd = window_calendar(rows)
+    # reported variant: drop every irregular window (the matched ratio from the remaining matched window(s))
+    reg = []
+    for r in use:
+        mw = [w["ratio"] for w in (r["before"], r["after"]) if w and _regular(w)]
+        if _regular(r["event"]) and mw:
+            reg.append(r["event"]["ratio"] - float(np.mean(mw)))
+    k_reg = int(np.sum(np.array(reg) > 0))
+    regular_only = {"n": len(reg), "positive": k_reg, "p_two_sided": sign_test(k_reg, len(reg))[1],
+                    "mean_diff": float(np.mean(reg)) if reg else None}
 
     def sub(sel):
         dd = np.array([r["diff"] for r in use if sel(r)], float)
@@ -877,7 +973,8 @@ def election_claim(rows: list, odds: Optional[dict] = None, kalshi_rows: Optiona
         df = [r[f"straddle_diff_x{s}"] for r in use]
         strad[f"x{s}"] = {"election_mean": float(np.mean(ev)) if ev else None, "diff_mean": float(np.mean(df)) if df else None}
     stat = {"label": MP, "elections": rows, "n": n, "min_n": T522_MIN_N, **det, "controls": controls, "straddle": strad,
-            "odds_2024": odds, "kalshi_election_rows": kalshi_rows}
+            "odds_2024": odds, "kalshi_election_rows": kalshi_rows, "n_windows": n_win,
+            "irregular_windows": [{k: v for k, v in o.items() if k != "text"} for o in odd], "regular_only": regular_only}
     tested = [r["election"] for r in use]
     skipped = [r["election"] for r in rows if r.get("diff") is None]
     reason = (
@@ -885,7 +982,15 @@ def election_claim(rows: list, odds: Optional[dict] = None, kalshi_rows: Optiona
         f"Tuesday after the first Monday of November, fixed by law, so known in advance), n = {n} of {T522_MIN_N}"
         + (f" (no data: {skipped})" if skipped else "")
         + f". Ratio = |SPY close-after / close-before - 1| / (VIX at the close before / 100 / sqrt(126)), SPY raw closes; "
-        f"matched windows = the same Monday-to-Wednesday windows 4 weeks before and after (their mean). Election ratio "
+        f"matched windows = the 2-session windows around the Tuesdays 4 weeks before and after (close before the Tuesday "
+        f"to close after it; their mean). "
+        + (f"All {n_win} windows (election and matched) run Monday to Wednesday" if not odd else
+           f"{n_win - len(odd)} of {n_win} windows (election and matched) run Monday to Wednesday; "
+           + "; ".join(o["text"] for o in odd)
+           + f" (dropping the irregular window{'s' if len(odd) > 1 else ''}: {regular_only['positive']} of "
+           f"{regular_only['n']} positive, two-sided p {_f(regular_only['p_two_sided'], 4)}, mean difference "
+           f"{_f(regular_only['mean_diff'], 3, False, True)})")
+        + f". Election ratio "
         f"minus matched ratio positive in {det['positive']} of {n} (exact sign test two-sided p {_f(det['p_two_sided'], 4)}, "
         f"one-sided {_f(det['p_one_sided'], 4)}; pass needs >= {T522_NEED} of {T522_MIN_N}); mean difference "
         f"{_f(det['mean_diff'], 3, False, True)} (iid bootstrap 95% CI {_ci(det['mean_ci'])}); underpowered by design: "

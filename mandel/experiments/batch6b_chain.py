@@ -35,10 +35,11 @@ the missing days show (_days_share), so these claims are at best inconclusive to
 
 MODEL-PRICED:
   * T-103 30-DTE SPY short strangle at +/- 5% strikes vs the ATM short straddle, both priced with the smile-scaled VIX
-    model (sigma(K) = VIX/100 x r(K/S), r the captured spy-smile-* IV/VIX shape, structures.Smile), same entry dates,
-    1993-2026: paired Sharpe difference (strangle - straddle) of per-cycle excess returns on notional, one-sided p < 0.05,
-    with the same sign under flat VIX and the SKEW-scaled smile; the trial's proxy cap holds the verdict at inconclusive
-    until 60 capture days refit the smile ratios.
+    model (sigma(K) = VIX/100 x r(K/S), r the captured spy-smile-* IV/VIX shape, structures.Smile), on the short-straddle
+    harness's entry dates (the monthly expiry calendar), 1993-2026: paired Sharpe difference (strangle - straddle) of
+    per-cycle excess returns on notional, one-sided p < 0.05, with the same sign under flat VIX and the SKEW-scaled
+    smile; min_n 390 monthly cycles; the trial's proxy cap holds the verdict at inconclusive until 60 capture days
+    refit the smile ratios.
 
 Conventions
   * Captures and point in time. A capture's quote day comes from its CBOE timestamp (volatility._quote_day: before 13:30
@@ -55,14 +56,20 @@ Conventions
     the short-dated parity: median of K e^{-rT} + C_mid - P_mid + PV(D) over the 4 strikes nearest the close at 1-10 DTE,
     accurate to about 1 bp of spot; it differs from the close by +1.6 bp on 2026-10-13 and -7.0 bp on 2026-10-14, which
     moves a 30-64 DTE parity rate by up to 70 bp/yr). "Stock at the ask" adds an ASSUMED half-spread of $0.005 (SPY's
-    one-cent quoted spread; the underlying's bid/ask is not archived; 0.6 bp/yr at 37 DTE).
-  * Bills. The 3-month bill is FRED DTB3 (archived; a discount yield, prior print, r = -ln(1 - d/100 x 91/360)/(91/365))
-    and FRED DGS3MO, which the procedures name (a bond-equivalent yield, r = ln(1 + y/100 x 91/365)/(91/365)): the
-    archived fred-DGS3MO when present, else the two FRED prints batch-6a's xc group read on 2026-10-15 (DGS3MO_REF), used
-    only when they carry the same date as the latest DTB3 print. DGS3MO sits about 7-9 bp above DTB3.
-  * Robust decision. A day's criterion is evaluated on every (spot, bill) variant and passes only when every variant
-    passes, fails only when every variant fails, and is MARGINAL (None, so at best inconclusive) when they disagree: the
-    archive cannot say which is right. Rule 5's decisive failure (below min_n) needs every variant to fail decisively.
+    one-cent quoted spread; the underlying's bid/ask is not archived; 0.6 bp/yr at 37 DTE). T-182's data and T-507's
+    procedure name the underlying quote, so until a bid/ask at the option close is archived each carries a not-yet-
+    implementable criterion for it (rules 2 and 9): the assumed ask caps their verdict at inconclusive.
+  * Bills (house rule 1). T-182, T-184, T-185, T-191, T-507 and T-508 name FRED DGS3MO (a bond-equivalent yield,
+    r = ln(1 + y/100 x 91/365)/(91/365)), so DGS3MO alone decides them, under batch6_xc's T-199 rule: the archived
+    fred-DGS3MO print dated before the quote day when present, else the two FRED prints batch-6a's xc group read on
+    2026-10-15 (DGS3MO_REF), used only when they carry the same date as the latest DTB3 print (named_bills). FRED DTB3 (a
+    discount yield, prior print, r = -ln(1 - d/100 x 91/360)/(91/365); about 7-9 bp below DGS3MO) is computed on the
+    same pairs and reported beside the result, never deciding; a quote day with no DGS3MO print is left unjudged (a data
+    limit). T-153's trial names only "the FRED 3-month bill", so it is evaluated on both bills (bill_variants).
+  * Robust decision. A day's criterion is evaluated on every deciding (spot, bill) variant and passes only when every
+    variant passes, fails only when every variant fails, and is MARGINAL (None, so at best inconclusive) when they
+    disagree: the archive cannot say which spot is right. Rule 5's decisive failure (below min_n) needs every variant to
+    fail decisively.
   * SPY dividends: amounts from the adjclose/close ratio step; future ex-dates projected on SPY's schedule (third Friday
     of Mar/Jun/Sep/Dec, the Thursday before when Juneteenth closes that Friday): 2026-12-18 is the next one. PV(D) at the
     bill. T-153 and T-191 forecast every future dividend as the last one paid; T-184 maps the trailing four distributions
@@ -75,10 +82,15 @@ Conventions
     cluster bootstrap over expiries the trial names (the larger upper bound is used). T-191: percentile bootstrap of the
     group difference across strikes (stratified), with an expiry-cluster bootstrap reported. T-103: studentized circular
     block bootstrap of the paired per-cycle Sharpe difference (delta-method Bartlett HAC s.e., bandwidth = block).
-  * House rule 10. The captured-chain claims are statistics on fixed capture days (no cycle grid). T-103 names no expiry
-    calendar ("30-DTE"; "same entry dates as the short-straddle harness", a 21-session grid), so its grid has 21 equally
-    valid start offsets: the pooled all-start estimate (an entry at every close, overlapping 21-session holds, blocks of
-    42 and 126 entries >= 2 x hold) is primary and the per-start range is reported. n counts distinct 21-session holds.
+  * House rule 10. The captured-chain claims are statistics on fixed capture days (no cycle grid). T-103 names its entry
+    calendar: "same entry dates as the short-straddle harness", which is run.short_straddle_model ->
+    volatility.overlay_backtest(strategy='short_straddle') on its default calendar='monthly_expiry' (T-101's procedure
+    names the same function): over the sessions with a SPY and a VIX close, each cycle writes at one standard monthly
+    expiry close (third Friday, prior session on a holiday) and settles at the next (rule 10(a); monthly_cycle_pairs).
+    Every criterion is decided on those cycles (T from each cycle's own dates; non-overlapping, so studentized blocks of
+    2, 3, 6 and 12 cycles x seeds 0-2), and n counts them. The 21-session daily all-start grid (pooled estimate, blocks
+    of 42 and 126 entries, and each of the 21 start offsets with its smile, flat-VIX and SKEW-scaled differences) is
+    reported as a diagnostic only.
 
 Verdicts use ``underlying2._verdict``: any implemented criterion failing gives not_supported; any criterion not
 implemented gives at best inconclusive; supported only when every criterion is implemented and passes.
@@ -97,7 +109,7 @@ import numpy as np
 
 from mandel.experiments.structures import Smile
 from mandel.experiments.underlying2 import _verdict
-from mandel.experiments.volatility import _quote_day
+from mandel.experiments.volatility import _quote_day, monthly_expiry_sessions
 from mandel.options import bs
 from mandel.validation.backtest_eval import (_hac_var, block_bootstrap_pvalue, kurtosis, probabilistic_sharpe_ratio,
                                              skewness)
@@ -115,8 +127,8 @@ MP = "MODEL-PRICED"
 
 # FRED DGS3MO prints (percent, bond-equivalent) read once from fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO on
 # 2026-10-15 by batch-6a's xc group (batch6_xc.DGS3MO_REF; the same file's DTB3 column matches the archived fred-DTB3).
-# Used only until fred-DGS3MO is archived, only for a quote day whose latest DTB3 print carries the same date, and only
-# as one variant of the robust decision (it can make a criterion MARGINAL, never decide it alone).
+# Used only until fred-DGS3MO is archived and only for a quote day whose latest DTB3 print carries the same date
+# (batch6_xc's T-199 rule). It decides the claims whose trial names DGS3MO (named_bills); T-153 uses it as one variant.
 DGS3MO_REF = {"2026-10-09": 4.25, "2026-10-13": 4.26}
 EX_DATE = "2026-12-18"           # next SPY ex-dividend date named by T-182, T-185, T-507
 SPY_HALF_SPREAD = 0.005          # ASSUMED: SPY's one-cent quoted spread (the underlying bid/ask is not archived)
@@ -136,7 +148,8 @@ T501_MIN_N = 5000
 T507_MIN_N = 50
 T508_MIN_N = 5000
 T103_MIN_N, T103_HOLD, T103_SMILE_DAYS = 390, 21, 60
-T103_BLOCKS = (42, 126)
+T103_BLOCKS = (2, 3, 6, 12)      # monthly-expiry cycles (non-overlapping): studentized blocks in cycles, as batch6_var
+T103_GRID_BLOCKS = (42, 126)     # the 21-session daily grid diagnostic: blocks >= 2 x hold
 T103_SEEDS = (0, 1, 2)
 
 
@@ -629,6 +642,15 @@ def bill_variants(dtb3: dict, dgs3mo: dict, quote_day: str) -> list:
     return out
 
 
+def named_bills(dtb3: dict, dgs3mo: dict, quote_day: str) -> tuple:
+    """(deciding, reported) bills of a claim whose trial names FRED DGS3MO (house rule 1; batch6_xc's T-199 rule):
+    deciding = [DGS3MO] (archived prior print, else DGS3MO_REF when it carries the date of the latest DTB3 print; [] when
+    neither exists, and the day is then left unjudged as a data limit); reported = [DTB3 prior print], shown beside the
+    result and never deciding."""
+    allv = bill_variants(dtb3, dgs3mo, quote_day)
+    return [v for v in allv if v[0].startswith("DGS3MO")], [v for v in allv if v[0].startswith("DTB3")]
+
+
 # ================================================================================================ chain parsing ==
 
 _ROOT = re.compile(r"^([A-Z]+)")
@@ -832,15 +854,25 @@ def load_captures(archive, sym: str, notes: list, hist: Optional[tuple], trading
 
 
 def _variants(cap: dict, bills: list, div_amount=None, sync: bool = True, root: Optional[str] = None) -> tuple:
-    """[(label, spot, r)] over (close, sync spot) x bills, and the sync-spot record. The sync spot uses the first
-    (DTB3) bill."""
+    """[(label, spot, r)] over (close, sync spot) x bills, and the sync-spot record. The sync spot uses the first bill."""
+    var, si, _ = _named_variants(cap, bills, [], div_amount, sync, root)
+    return var, si
+
+
+def _named_variants(cap: dict, bills: list, reported: list, div_amount=None, sync: bool = True,
+                    root: Optional[str] = None) -> tuple:
+    """(deciding variants, sync-spot record, reported variants): [(label, spot, r)] over (close, sync spot) x the
+    deciding bills and x the reported (never deciding) bills, on the same spots. The sync spot uses the first deciding
+    bill, or the first reported one when no bill decides."""
     spots = [("close", cap["close"])]
     si = None
-    if sync and bills and cap["close"]:
-        si = sync_spot(cap["by"], cap["close"], cap["quote_day"], bills[0][1], div_amount, root=root)
+    r_sync = (list(bills) or list(reported) or [(None, None)])[0][1]
+    if sync and r_sync is not None and cap["close"]:
+        si = sync_spot(cap["by"], cap["close"], cap["quote_day"], r_sync, div_amount, root=root)
         if si:
             spots.append(("sync", si["spot"]))
-    return [(f"{sl}/{bl}", s, r) for sl, s in spots for bl, r in bills], si
+    return ([(f"{sl}/{bl}", s, r) for sl, s in spots for bl, r in bills], si,
+            [(f"{sl}/{bl}", s, r) for sl, s in spots for bl, r in reported])
 
 
 def _var_txt(variants: dict, fmt) -> str:
@@ -990,44 +1022,74 @@ def jelly_roll_claim(days: Sequence[dict], need: float = 0.95, min_n: int = T153
 def share_claim(days: Sequence[dict], *, need: float, kind: str, min_n: int, unit: str, label: str, n_mode: str = "day_one",
                 days_need: float = 0.80, min_days: int = MIN_DAYS, bound: bool = False) -> dict:
     """Generic 'share on day one and on >= days_need of captured days'. days (oldest first): {'quote_day', 'variants':
-    {label: {'n', 'k', optional 'extra_upper'}}}. A day passes when every variant passes (robust), fails when every
-    variant fails, else MARGINAL. Day one fails decisively (rule 5) when every variant does. n = day-one objects of the
+    {label: {'n', 'k', optional 'extra_upper'}}, optional 'reported': {label: {'n', 'k'}}}. A day passes when every
+    deciding variant passes (robust), fails when every one fails, else MARGINAL; 'reported' variants (DTB3 beside a
+    DGS3MO-named claim) are tested and shown but never decide, and a day with no deciding variant is unjudged (None: no
+    DGS3MO print, a data limit). Day one fails decisively (rule 5) when every variant does. n = day-one objects of the
     first variant (n_mode 'day_one') or the first variant's objects summed over days ('total')."""
     per = []
     for d in days:
-        tests = {lab: share_test(v["k"], v["n"], need, kind, min_n=min_n, bound=bound, extra_upper=v.get("extra_upper"))
-                 for lab, v in d["variants"].items()}
-        per.append({"quote_day": d["quote_day"], "tests": tests})
+        st = lambda v: share_test(v["k"], v["n"], need, kind, min_n=min_n, bound=bound, extra_upper=v.get("extra_upper"))
+        per.append({"quote_day": d["quote_day"], "tests": {lab: st(v) for lab, v in d["variants"].items()},
+                    "reported": {lab: st(v) for lab, v in (d.get("reported") or {}).items()}})
     if not per:
         return {"rows": [], "n": 0, "per_day": []}
-    first = lambda d: next(iter(d["tests"].values()))
+    first = lambda d: next(iter(d["tests"].values()), None) or next(iter(d["reported"].values()), {"n": 0})
     n_tot = sum(first(p)["n"] for p in per)
     n = first(per[0])["n"] if n_mode == "day_one" else n_tot
     for p in per:                           # a day's own sample (or the pooled one, n_mode 'total') is held to min_n
         p["pass"] = _robust([_eff(t, t["n"] if n_mode == "day_one" else n_tot, min_n) for t in p["tests"].values()])
         p["decisive"] = p["pass"] is False and all(t["decisive"] for t in p["tests"].values())
+        p["unjudged"] = not p["tests"]
     d0 = per[0]
-    if d0["pass"] is None and all(t["pass"] is False for t in d0["tests"].values()):
+    if d0["pass"] is None and d0["tests"] and all(t["pass"] is False for t in d0["tests"].values()):
         d0["pass"] = False                  # every variant fails, not decisively: _decide reports it as below min_n
     days_ok = _days_share([p["pass"] for p in per], days_need, min_days)
     cmp_ = ">=" if kind == "ge" else "<"
     bnd = (lambda t: f", one-sided 95% upper {_pct(t['upper'], 1)}") if kind == "ge" else (lambda t: f", one-sided 95% bounds {_pct(t['lower'], 3)} to {_pct(t['upper_used'], 3)}")
     rows = [(f"day one ({d0['quote_day']} quotes): {label} {cmp_} {need:.1%}"
              + (" with the 95% upper bound below it" if bound else "") + " ("
-             + _var_txt(d0["tests"], lambda t: f"{_pct(t['share'], 2)} of {t['n']}" + bnd(t))
-             + ")" + (" [MARGINAL: the spot/bill variants disagree]" if d0["pass"] is None and len(d0["tests"]) > 1 else ""),
+             + (_var_txt(d0["tests"], lambda t: f"{_pct(t['share'], 2)} of {t['n']}" + bnd(t)) if d0["tests"]
+                else "no DGS3MO print for this quote day: unjudged, a data limit")
+             + (("; DTB3 beside it, not deciding: " + _var_txt(d0["reported"], lambda t: f"{_pct(t['share'], 2)} of {t['n']}"))
+                if d0["reported"] else "")
+             + ")" + (" [MARGINAL: the spot variants disagree]" if d0["pass"] is None and len(d0["tests"]) > 1 else ""),
              d0["pass"], d0["decisive"]),
             (f"on >= {days_need:.0%} of captured days ({sum(1 for p in per if p['pass'])} pass, "
-             f"{sum(1 for p in per if p['pass'] is False)} fail, {sum(1 for p in per if p['pass'] is None)} undecided of {len(per)}; "
-             f"needs >= {min_days} days)", days_ok, days_ok is False)]
+             f"{sum(1 for p in per if p['pass'] is False)} fail, {sum(1 for p in per if p['pass'] is None)} undecided of {len(per)}"
+             + (f", {sum(1 for p in per if p['unjudged'])} without a DGS3MO print" if any(p["unjudged"] for p in per) else "")
+             + f"; needs >= {min_days} days)", days_ok, days_ok is False)]
     return {"rows": rows, "n": n, "per_day": per, "days_ok": days_ok}
+
+
+def _first_var(d: dict) -> tuple:
+    """(label, variant) of a day's first deciding variant, else its first reported one, else (None, None)."""
+    for key in ("variants", "reported"):
+        for lab, v in (d.get(key) or {}).items():
+            return lab, v
+    return None, None
+
+
+def _counted(d: dict, count) -> dict:
+    """A share_claim day from a rate day: count(variant) -> {'n', 'k', ...} for the deciding and the reported variants."""
+    return {"quote_day": d["quote_day"], "variants": {lab: count(v) for lab, v in d["variants"].items()},
+            "reported": {lab: count(v) for lab, v in (d.get("reported") or {}).items()}}
+
+
+# T-182's data ("CBOE delayed SPY chain with underlying bid/ask") and T-507's procedure ("SPY chain and underlying quote")
+# name a quote the archive does not hold: until one at the option close is archived the assumed ask caps the verdict.
+SASK_CRIT = (f"stock at the ask: underlying bid/ask at the option close not archived (S_ask ASSUMED = spot + ${SPY_HALF_SPREAD:.3f})",
+             None, False)
 
 
 def _finish(core: dict, min_n: int, unit: str, head: str, extra: str, stat: dict) -> dict:
     if not core["rows"]:
         return {"verdict": "inconclusive", "n": 0, "reason": head + ": no usable capture day — no data", "stat": stat}
     verdict, why = _decide(core["rows"], core["n"], min_n, unit)
-    day_txt = "; ".join(f"{p['quote_day']}: " + _var_txt(p["tests"], lambda t: f"{_pct(t['share'], 1)} of {t['n']}") + f" -> {_ok_txt(p['pass'])}"
+    day_txt = "; ".join(f"{p['quote_day']}: " + (_var_txt(p["tests"], lambda t: f"{_pct(t['share'], 1)} of {t['n']}") if p["tests"]
+                                                 else "no DGS3MO print (unjudged)") + f" -> {_ok_txt(p['pass'])}"
+                        + (" (DTB3 beside it, not deciding: " + _var_txt(p["reported"], lambda t: f"{_pct(t['share'], 1)} of {t['n']}") + ")"
+                           if p.get("reported") else "")
                         for p in core["per_day"])
     reason = f"{head}: {day_txt}{extra} — {why}"
     stat = dict(stat, per_day=core["per_day"], n=core["n"], verdict=verdict)
@@ -1094,15 +1156,17 @@ def conversion_claim(days: Sequence[dict], need: float = 0.95, min_n: int = T182
     """T-182. days: {'quote_day', 'variants': {label: {'rows', 'r_bill', 'dropped'}}, 'box': {...} or None, 'sync'}.
     The share counts pairs with r_conv_exec < r_bill among pairs whose short call is not deep ITM (the control's drop)."""
     vdays, ctl = [], []
+
+    def count(v):
+        main = [x for x in v["rows"] if not x["deep_itm_call"]]
+        return {"n": len(main), "k": sum(1 for x in main if x["r_exec"] < v["r_bill"]),
+                "all_n": len(v["rows"]), "all_k": sum(1 for x in v["rows"] if x["r_exec"] < v["r_bill"])}
     for d in days:
-        var = {}
-        for lab, v in d["variants"].items():
-            main = [x for x in v["rows"] if not x["deep_itm_call"]]
-            var[lab] = {"n": len(main), "k": sum(1 for x in main if x["r_exec"] < v["r_bill"]),
-                        "all_n": len(v["rows"]), "all_k": sum(1 for x in v["rows"] if x["r_exec"] < v["r_bill"])}
-        vdays.append({"quote_day": d["quote_day"], "variants": var})
-        lab0, v0 = next(iter(d["variants"].items()))
-        if v0["rows"]:
+        vd = _counted(d, count)
+        vdays.append(vd)
+        var = dict(vd["reported"], **vd["variants"])
+        lab0, v0 = _first_var(d)
+        if v0 and v0["rows"]:
             ex = np.array([(x["r_exec"] - v0["r_bill"]) * 1e4 for x in v0["rows"]])
             md = np.array([(x["r_mid"] - v0["r_bill"]) * 1e4 for x in v0["rows"]])
             box = d.get("box")
@@ -1112,9 +1176,11 @@ def conversion_claim(days: Sequence[dict], need: float = 0.95, min_n: int = T182
                        f"{_pct(var[lab0]['all_k'] / var[lab0]['all_n'] if var[lab0]['all_n'] else None)}"
                        + (f"; sync spot {d['sync']['spot']:.3f} ({_s(d['sync']['offset_bp'], 1)} bp vs the close)" if d.get("sync") else ""))
     core = share_claim(vdays, need=need, kind="ge", min_n=min_n, unit="pairs on day one",
-                       label="share of (K, T) pairs with r_conv_exec below the bill")
+                       label="share of (K, T) pairs with r_conv_exec below the bill (FRED DGS3MO)")
+    if core["rows"]:
+        core["rows"].append(SASK_CRIT)
     head = (f"SPY conversion lending rate ln(K/(S_ask + P_ask - C_bid))/T (S_ask = spot + ${SPY_HALF_SPREAD:.3f}, ASSUMED), "
-            f"30-64 DTE expiries before {EX_DATE}, strikes within +/- 5%, vs the 3-month bill, per (spot/bill) variant")
+            f"30-64 DTE expiries before {EX_DATE}, strikes within +/- 5%, vs the trial's 3-month bill FRED DGS3MO (continuous), per spot variant")
     return _finish(core, min_n, "pairs on day one", head, "; controls: " + "; ".join(ctl), {"controls": ctl})
 
 
@@ -1147,10 +1213,9 @@ def synthetic_short_claim(days: Sequence[dict], need: float = 0.80, min_n: int =
     """T-185. days: {'quote_day', 'variants': {label: {'rows'}}, 'box', 'sync', 'replications': {sym: (n, k, median bp)}}."""
     vdays, ctl = [], []
     for d in days:
-        var = {lab: {"n": len(v["rows"]), "k": sum(1 for x in v["rows"] if x["borrow"] * 1e4 < cap_bp)} for lab, v in d["variants"].items()}
-        vdays.append({"quote_day": d["quote_day"], "variants": var})
-        lab0, v0 = next(iter(d["variants"].items()))
-        if v0["rows"]:
+        vdays.append(_counted(d, lambda v: {"n": len(v["rows"]), "k": sum(1 for x in v["rows"] if x["borrow"] * 1e4 < cap_bp)}))
+        lab0, v0 = _first_var(d)
+        if v0 and v0["rows"]:
             b = np.array([x["borrow"] * 1e4 for x in v0["rows"]])
             bm = np.array([x["borrow_mid"] * 1e4 for x in v0["rows"]])
             box = d.get("box")
@@ -1159,7 +1224,7 @@ def synthetic_short_claim(days: Sequence[dict], need: float = 0.80, min_n: int =
                        + "".join(f"; {s} replication (no dividend, expense ratio not removed) {k}/{n} below {cap_bp:.0f} bp, median {m:+.1f} bp"
                                  for s, (n, k, m) in sorted((d.get("replications") or {}).items()) if n))
     core = share_claim(vdays, need=need, kind="ge", min_n=min_n, unit="pairs on day one",
-                       label=f"share of near-ATM pairs with r_bill - r_impl_exec < {cap_bp:.0f} bp")
+                       label=f"share of near-ATM pairs with r_bill - r_impl_exec < {cap_bp:.0f} bp (r_bill = FRED DGS3MO)")
     head = (f"SPY ATM synthetic short, r_impl from C_bid - P_ask = S - K e^-rT, 30-64 DTE before {EX_DATE}, strikes within "
             f"+/- 2% of spot, implicit borrow r_bill - r_impl")
     return _finish(core, min_n, "pairs on day one", head, "; controls: " + "; ".join(ctl) + "; stale-quote filter not implementable "
@@ -1194,10 +1259,9 @@ def synthetic_call_rows(by: dict, spot: float, quote_day: str, r: float, root: s
 def synthetic_call_claim(days: Sequence[dict], need: float = 0.60, min_n: int = T507_MIN_N) -> dict:
     vdays, ctl = [], []
     for d in days:
-        var = {lab: {"n": len(v["rows"]), "k": sum(1 for x in v["rows"] if x["cheaper"])} for lab, v in d["variants"].items()}
-        vdays.append({"quote_day": d["quote_day"], "variants": var})
-        lab0, v0 = next(iter(d["variants"].items()))
-        if v0["rows"]:
+        vdays.append(_counted(d, lambda v: {"n": len(v["rows"]), "k": sum(1 for x in v["rows"] if x["cheaper"])}))
+        lab0, v0 = _first_var(d)
+        if v0 and v0["rows"]:
             n0 = len(v0["rows"])
             mid = sum(1 for x in v0["rows"] if x["cheaper_mid"]) / n0
             bx = [x["cheaper_box"] for x in v0["rows"] if x["cheaper_box"] is not None]
@@ -1206,7 +1270,9 @@ def synthetic_call_claim(days: Sequence[dict], need: float = 0.60, min_n: int = 
                        + f", median cost gap {np.median([x['gap'] for x in v0['rows']]):+.3f}"
                        + "".join(f"; {s} replication (no dividend) {k}/{n}" for s, (n, k) in sorted((d.get("replications") or {}).items()) if n))
     core = share_claim(vdays, need=need, kind="ge", min_n=min_n, unit="strikes on day one",
-                       label="share of strikes with S_ask + P_ask < C_ask + K e^(-r_bill T)")
+                       label="share of strikes with S_ask + P_ask < C_ask + K e^(-r_bill T) (r_bill = FRED DGS3MO)")
+    if core["rows"]:
+        core["rows"].append(SASK_CRIT)
     head = (f"SPY protective put vs call + bills (S_ask = spot + ${SPY_HALF_SPREAD:.3f}, ASSUMED), 30-64 DTE before {EX_DATE}, "
             f"strikes within +/- 5%")
     return _finish(core, min_n, "strikes on day one", head, "; controls: " + "; ".join(ctl), {"controls": ctl})
@@ -1245,10 +1311,9 @@ def synthetic_long_claim(days: Sequence[dict], need: float = 0.80, min_n: int = 
     variant), 'replications'}. n counts expiry observations pooled over capture days (one day lists 4-5 such expiries)."""
     vdays, ctl = [], []
     for d in days:
-        var = {lab: {"n": len(v["rows"]), "k": sum(1 for x in v["rows"] if x["gap_bp"] < cap_bp)} for lab, v in d["variants"].items()}
-        vdays.append({"quote_day": d["quote_day"], "variants": var})
-        lab0, v0 = next(iter(d["variants"].items()))
-        if v0["rows"]:
+        vdays.append(_counted(d, lambda v: {"n": len(v["rows"]), "k": sum(1 for x in v["rows"] if x["gap_bp"] < cap_bp)}))
+        lab0, v0 = _first_var(d)
+        if v0 and v0["rows"]:
             sens = []
             for tag in ("div_lo", "div_hi"):
                 rs = d.get(tag) or []
@@ -1260,7 +1325,7 @@ def synthetic_long_claim(days: Sequence[dict], need: float = 0.80, min_n: int = 
                        + "".join(f"; {s} replication (no dividend) gaps " + ", ".join(f"{g:+.0f}" for g in gs) + " bp"
                                  for s, gs in sorted((d.get("replications") or {}).items()) if gs))
     core = share_claim(vdays, need=need, kind="ge", min_n=min_n, unit="expiry observations over capture days",
-                       label=f"share of 180-365 DTE expiries with r_impl_exec - r_bill < {cap_bp:.0f} bp", n_mode="total")
+                       label=f"share of 180-365 DTE expiries with r_impl_exec - r_bill < {cap_bp:.0f} bp (r_bill = FRED DGS3MO)", n_mode="total")
     head = ("SPY ATM synthetic long, call at ask / put at bid, PV(D) from the trailing four distributions on the projected "
             "quarterly ex-dates, r_impl_exec - bill per expiry")
     return _finish(core, min_n, "expiry observations over capture days", head, "; detail: " + "; ".join(ctl)
@@ -1314,30 +1379,38 @@ def spx_itm_control(by: dict, spot: float, quote_day: str, r: float, min_ratio: 
 
 
 def early_exercise_claim(days: Sequence[dict], margin: float = 0.30, min_n: int = T191_MIN_N, stable: int = T191_STABLE) -> dict:
-    """T-191. days: {'quote_day', 'variants': {label: {'rows', 'ci', 'cluster'}}, 'spx', 'no_zero_bid_calls'}. Day passes
-    (per variant) when diff > margin and the 95% CI lower bound > margin; fails decisively when the upper bound <
-    margin. Robust over variants. Stability: no failing day among the first ``stable`` captured days, all passing once
-    there are ``stable``."""
+    """T-191. days: {'quote_day', 'variants': {spot/DGS3MO: {'rows', 'ci', 'cluster'}}, 'reported': {spot/DTB3: ...},
+    'spx', 'no_zero_bid_calls'}. Day passes (per variant) when diff > margin and the 95% CI lower bound > margin; fails
+    decisively when the upper bound < margin. Robust over the deciding variants; the reported (DTB3) ones are shown
+    beside them and never decide; a day with no deciding variant (no DGS3MO print) is unjudged. Stability: no failing
+    day among the first ``stable`` captured days, all passing once there are ``stable``."""
     per, txt = [], []
+
+    def judge(v):
+        ci = v["ci"]
+        if ci["diff"] is None:
+            return {"pass": None, "decisive": False, **ci}
+        lo, hi = ci["ci"]
+        return {"pass": bool(ci["diff"] > margin and lo > margin), "decisive": bool(hi < margin), **ci}
     for d in days:
-        tests = {}
-        for lab, v in d["variants"].items():
-            ci = v["ci"]
-            if ci["diff"] is None:
-                tests[lab] = {"pass": None, "decisive": False, **ci}
-                continue
-            lo, hi = ci["ci"]
-            tests[lab] = {"pass": bool(ci["diff"] > margin and lo > margin), "decisive": bool(hi < margin), **ci}
+        tests = {lab: judge(v) for lab, v in d["variants"].items()}
+        reported = {lab: judge(v) for lab, v in (d.get("reported") or {}).items()}
         ok = _robust([t["pass"] for t in tests.values()])
+        lab0, v0 = _first_var(d)
         per.append({"quote_day": d["quote_day"], "pass": ok, "decisive": ok is False and all(t["decisive"] for t in tests.values()),
-                    "tests": tests, "n": len(next(iter(d["variants"].values()))["rows"])})
-        lab0, v0 = next(iter(d["variants"].items()))
+                    "tests": tests, "reported": reported, "unjudged": not tests, "n": len(v0["rows"]) if v0 else 0})
+        if v0 is None:
+            txt.append(f"{d['quote_day']}: no bill print -> undecided")
+            continue
         c0, cl = v0["ci"], v0.get("cluster") or {}
         txt.append(f"{d['quote_day']}: {per[-1]['n']} puts; criterion met {c0['n_met']} (at intrinsic {_pct(c0['share_met'])}), failed "
                    f"{c0['n_failed']} (at intrinsic {_pct(c0['share_failed'])}); difference ({lab0}) {_s(None if c0['diff'] is None else 100 * c0['diff'], 1)} pp, "
                    f"95% CI across strikes {_s(None if c0['ci'][0] is None else 100 * c0['ci'][0], 1)} to {_s(None if c0['ci'][1] is None else 100 * c0['ci'][1], 1)} pp"
                    + (f" (expiry-cluster CI {_s(100 * cl['ci'][0], 1)} to {_s(100 * cl['ci'][1], 1)} pp over {cl['n_expiries']} expiries)" if cl.get("ci", [None])[0] is not None else "")
-                   + "; by variant " + _var_txt(tests, lambda t: f"{_s(None if t['diff'] is None else 100 * t['diff'], 1)} pp")
+                   + ("; by variant " + _var_txt(tests, lambda t: f"{_s(None if t['diff'] is None else 100 * t['diff'], 1)} pp")
+                      if tests else "; no DGS3MO print for this quote day (unjudged, a data limit)")
+                   + ("; DTB3 beside it, not deciding: " + _var_txt(reported, lambda t: f"{_s(None if t['diff'] is None else 100 * t['diff'], 1)} pp")
+                      if reported else "")
                    + (f"; excluding zero-bid calls {_s(100 * d['no_zero_bid_calls']['diff'], 1)} pp" if d.get("no_zero_bid_calls") and d["no_zero_bid_calls"]["diff"] is not None else "")
                    + (f"; SPX control (European): {_pct(d['spx']['pinned'])} of {d['spx']['n']} deep ITM puts pinned at undiscounted intrinsic, "
                       f"{_pct(d['spx']['at_or_below'])} at or below discounted intrinsic" if d.get("spx") and d["spx"]["n"] else "")
@@ -1356,7 +1429,7 @@ def early_exercise_claim(days: Sequence[dict], margin: float = 0.30, min_n: int 
             (f"stable over {stable} captured days ({len(per)} so far; no failing day)", stab, stab is False)]
     verdict, why = _decide(rows, d0["n"], min_n, "puts on day one")
     reason = ("SPY puts with K/S >= 1.10 (bid > 0), at intrinsic when |P_mid - (K - S)| <= $0.01 + half-spread, grouped by "
-              "K(1 - e^-rT) > C_mid + PV(D): " + "; ".join(txt) + "; the QQQ/IWM replication is not run (their ex-dividend "
+              "K(1 - e^-rT) > C_mid + PV(D) with r the trial's FRED DGS3MO (continuous): " + "; ".join(txt) + "; the QQQ/IWM replication is not run (their ex-dividend "
               f"schedules are not archived) — {why}")
     return {"verdict": verdict, "n": d0["n"], "reason": reason, "stat": {"per_day": per, "stable": stab, "verdict": verdict}}
 
@@ -1573,35 +1646,46 @@ def vertical_scan(by: dict, quote_day: str, r: float, european: bool) -> dict:
 
 def vertical_claim(days: Sequence[dict], chains: Sequence[str] = ("SPY", "SPX", "QQQ", "GLD", "IBIT"), need: float = 0.001,
                    min_n: int = T508_MIN_N, days_need: float = 0.80, min_days: int = MIN_DAYS) -> dict:
-    """T-508. days: {'quote_day', 'scans': {bill label: {chain: vertical_scan}}}. Criteria on day one: the pooled share
-    across the named chains and each named chain's own share (house rule 1) below need; every chain captured; >= 80% of
-    captured days. Robust over the bill used to discount SPX's width bound."""
+    """T-508. days: {'quote_day', 'scans': {bill label: {chain: vertical_scan}}, optional 'reported_scans': {DTB3 label:
+    ...}}. Criteria on day one: the pooled share across the named chains and each named chain's own share (house rule 1)
+    below need; every chain captured; >= 80% of captured days. 'scans' carries the trial's DGS3MO (it discounts SPX's
+    width bound); 'reported_scans' (DTB3) are shown beside it and never decide; a day without 'scans' (no DGS3MO print)
+    is unjudged."""
     per, txt = [], []
-    for d in days:
+
+    def tests_of(scan_by_bill):
         tests = {}
-        for bl, scans in d["scans"].items():
+        for bl, scans in scan_by_bill.items():
             pooled_n = sum(s["n"] for s in scans.values())
             pooled_k = sum(s["k"] for s in scans.values())
             tests[f"{bl}/pooled"] = share_test(pooled_k, pooled_n, need, "lt", min_n=min_n)
             for ch in chains:
                 s = scans.get(ch)
                 tests[f"{bl}/{ch}"] = share_test(s["k"], s["n"], need, "lt", min_n=min_n) if s and s["n"] else {"pass": None, "decisive": False, "n": 0, "share": None}
+        return tests
+    for d in days:
+        tests, reported = tests_of(d["scans"]), tests_of(d.get("reported_scans") or {})
         by_bill = defaultdict(list)
         for lab, t in tests.items():
             by_bill[lab.rsplit("/", 1)[0]].append(_eff(t, t.get("n", 0), min_n))
         ok = _robust([_all_ok(v) for v in by_bill.values()])               # every chain and the pool, robust over bills
-        per.append({"quote_day": d["quote_day"], "tests": tests, "pass": ok})
-        bl0, sc0 = next(iter(d["scans"].items()))
-        txt.append(f"{d['quote_day']} ({bl0}): " + "; ".join(
+        per.append({"quote_day": d["quote_day"], "tests": tests, "reported": reported, "pass": ok, "unjudged": not tests})
+        bl0, sc0 = next(iter((d["scans"] or d.get("reported_scans") or {"none": {}}).items()))
+        rp = [(lab, t) for lab, t in reported.items() if lab.endswith("/pooled") or lab.endswith("/SPX")]
+        txt.append(f"{d['quote_day']} ({bl0}" + ("" if d["scans"] else ": no DGS3MO print, unjudged") + "): " + "; ".join(
             f"{ch} {sc0[ch]['k']}/{sc0[ch]['n']} ({_pct(sc0[ch]['k'] / sc0[ch]['n'], 3)}; monotonicity {sc0[ch]['mono']}, width {sc0[ch]['width']}; "
             f"mid-price violations {_pct(sc0[ch]['k_mid'] / sc0[ch]['n'], 2)}; {sc0[ch]['dropped']} dropped)"
-            if sc0.get(ch) and sc0[ch]["n"] else f"{ch} not captured" for ch in chains))
+            if sc0.get(ch) and sc0[ch]["n"] else f"{ch} not captured" for ch in chains)
+                   + ("; DTB3 beside it, not deciding: " + ", ".join(f"{lab} {_pct(t.get('share'), 3)}" for lab, t in rp) if rp else ""))
     if not per:
         return {"verdict": "inconclusive", "n": 0, "reason": "no chain capture", "stat": {}}
     d0 = per[0]
 
     def crit(key):
         ts = [t for lab, t in d0["tests"].items() if lab.endswith("/" + key)]
+        if not ts:                          # no DGS3MO print on day one: unjudged, the reported (DTB3) result shown
+            rs = [t for lab, t in d0["reported"].items() if lab.endswith("/" + key)]
+            return None, False, (rs[0] if rs else {"n": 0, "k": 0, "share": None})
         ok = _robust([t["pass"] for t in ts])
         dec = ok is False and all(t.get("decisive") for t in ts)
         return ok, dec, ts[0]
@@ -1614,7 +1698,8 @@ def vertical_claim(days: Sequence[dict], chains: Sequence[str] = ("SPY", "SPX", 
         if ok is False and t.get("n", 0) < min_n and not dec:
             name, ok = name + " [fails, not decisively, below min_n]", None
         rows.append((name, ok, dec))
-    absent = [ch for ch in chains if not any(next(iter(d["scans"].values())).get(ch, {}).get("n") for d in days)]
+    absent = [ch for ch in chains if not any(next(iter((d["scans"] or d.get("reported_scans") or {"none": {}}).values())).get(ch, {}).get("n")
+                                             for d in days)]
     rows.append(("every named chain captured" + (f" (missing {absent})" if absent else ""), None if absent else True, False))
     days_ok = _days_share([p["pass"] for p in per], days_need, min_days)
     rows.append((f"on >= {days_need:.0%} of captured days ({sum(1 for p in per if p['pass'])} of {len(per)}; needs >= {min_days} days)",
@@ -1622,10 +1707,11 @@ def vertical_claim(days: Sequence[dict], chains: Sequence[str] = ("SPY", "SPX", 
     n0 = crit("pooled")[2]["n"]
     verdict, why = _decide(rows, n0, min_n, "verticals on day one")
     reason = ("Adjacent-strike verticals at executable prices (debit < 0, or credit above the width bound: undiscounted for "
-              "American SPY/QQQ/GLD/IBIT, discounted at the bill for European SPX), both legs bid > 0 and not crossed: "
+              "American SPY/QQQ/GLD/IBIT, discounted for European SPX at the trial's FRED DGS3MO), both legs bid > 0 and not crossed: "
               + "; ".join(txt) + f" — {why}")
     return {"verdict": verdict, "n": n0, "reason": reason, "stat": {"per_day": per, "days_ok": days_ok, "verdict": verdict,
-                                                                  "scans": [d["scans"] for d in days]}}
+                                                                  "scans": [d["scans"] for d in days],
+                                                                  "reported_scans": [d.get("reported_scans") for d in days]}}
 
 
 # ============================================================================ T-103: strangle vs straddle ==
@@ -1649,19 +1735,35 @@ def projected_ex_sessions(trading: Sequence[str]) -> list:
     return sorted(set(out))
 
 
+def monthly_cycle_pairs(days: Sequence[str], vix: dict) -> list:
+    """[(entry, exit)] session indices into ``days`` of the short-straddle harness's calendar (run.short_straddle_model ->
+    volatility.overlay_backtest(calendar='monthly_expiry'), house rule 10(a)): over the sessions with a SPY and a VIX
+    close, each cycle writes at one standard monthly expiry close (third Friday, prior session on a holiday) and settles
+    at the next."""
+    days = list(days)
+    pos = {d: i for i, d in enumerate(days)}
+    vdays = [d for d in days if d in vix]
+    ex = monthly_expiry_sessions(vdays)
+    return [(pos[vdays[i]], pos[vdays[j]]) for i, j in zip(ex[:-1], ex[1:])]
+
+
 def strangle_panel(days: Sequence[str], close, adj, vix: dict, dtb3: dict, hold: int = T103_HOLD, start: str = "1993-01-01",
-                   end: str = "9999-12-31") -> dict:
-    """Daily entries (house rule 10(b)): every session from ``start`` with a VIX close and a DTB3 print before it whose
-    exit close ``hold`` sessions later is <= end. Per entry: S, S1 (raw closes), T (calendar days / 365), r (prior DTB3,
-    continuous), PV(D) of the forecast dividends (last paid at or before entry) on projected ex-dates in (entry, exit]."""
+                   end: str = "9999-12-31", cycles: Optional[Sequence[tuple]] = None) -> dict:
+    """Entries with a VIX close and a DTB3 print before them, from ``start``, whose exit close is <= end: the (entry,
+    exit) session pairs of ``cycles`` (a named calendar, house rule 10(a)), else every session held ``hold`` sessions
+    (the daily all-start grid, rule 10(b)). Per entry: S, S1 (raw closes at entry and exit), T (calendar days between
+    them / 365), r (prior DTB3, continuous), PV(D) of the forecast dividends (last paid at or before entry) on projected
+    ex-dates in (entry, exit]."""
     days = list(days)
     close = np.asarray(close, dtype=float)
     events = dividend_events(days, close, adj)
     exs = projected_ex_sessions(days)
     dk = sorted(dtb3)
-    idx, r, pvd = [], [], []
-    for i, d in enumerate(days):
-        if d < start or i + hold >= len(days) or days[i + hold] > end or d not in vix:
+    pairs = list(cycles) if cycles is not None else [(i, i + hold) for i in range(max(0, len(days) - hold))]
+    idx, out_, r, pvd = [], [], [], []
+    for i, i1 in pairs:
+        d = days[i]
+        if d < start or i1 >= len(days) or i1 <= i or days[i1] > end or d not in vix:
             continue
         j = bisect_left(dk, d) - 1
         if j < 0:
@@ -1671,17 +1773,19 @@ def strangle_panel(days: Sequence[str], close, adj, vix: dict, dtb3: dict, hold:
         pv = 0.0
         if amt:
             q = date.fromisoformat(d)
-            lo, hi = bisect_right(exs, d), bisect_right(exs, days[i + hold])
+            lo, hi = bisect_right(exs, d), bisect_right(exs, days[i1])
             for x in exs[lo:hi]:
                 pv += amt * math.exp(-rr * (date.fromisoformat(x) - q).days / 365.0)
-        idx.append(i); r.append(rr); pvd.append(pv)
-    idx = np.array(idx, dtype=np.int64)
+        idx.append(i); out_.append(i1); r.append(rr); pvd.append(pv)
+    idx, ex_ = np.array(idx, dtype=np.int64), np.array(out_, dtype=np.int64)
+    cal = "monthly_expiry" if cycles is not None else "daily_grid"
     if idx.size == 0:
-        return {"idx": idx, "days": days, "hold": hold}
+        return {"idx": idx, "exit": ex_, "days": days, "hold": hold, "calendar": cal}
     ords = np.array([date.fromisoformat(d).toordinal() for d in days], dtype=np.int64)
-    return {"idx": idx, "days": days, "hold": hold, "S": close[idx], "S1": close[idx + hold],
-            "T": (ords[idx + hold] - ords[idx]) / 365.0, "r": np.array(r), "pvd": np.array(pvd),
-            "vix": np.array([vix[days[i]] for i in idx]) / 100.0, "entry_days": [days[i] for i in idx]}
+    return {"idx": idx, "exit": ex_, "days": days, "hold": hold, "calendar": cal, "S": close[idx], "S1": close[ex_],
+            "T": (ords[ex_] - ords[idx]) / 365.0, "r": np.array(r), "pvd": np.array(pvd),
+            "vix": np.array([vix[days[i]] for i in idx]) / 100.0, "entry_days": [days[i] for i in idx],
+            "exit_days": [days[i] for i in ex_]}
 
 
 def leg_ratios(panel: dict, mode: str, smile: Optional[Smile] = None, skew: Optional[dict] = None, skew_ref: Optional[float] = None,
@@ -1755,40 +1859,31 @@ def _psr(x: np.ndarray) -> Optional[float]:
     return float(probabilistic_sharpe_ratio(float(x.mean() / x.std(ddof=1)), 0.0, int(x.size), skewness(x), kurtosis(x)))
 
 
-def n_holds(idx, hold: int) -> int:
-    idx = np.asarray(idx, dtype=np.int64)
-    return 0 if idx.size == 0 else int((idx[-1] - idx[0]) // int(hold) + 1)
+def _sr1(x: np.ndarray) -> Optional[float]:
+    return float(x.mean() / x.std()) if x.size > 2 and x.std() > 0 else None
 
 
-def strangle_vs_straddle(panel: dict, runs: dict, n_smile_days: int, min_n: int = T103_MIN_N, blocks=T103_BLOCKS,
-                         seeds=T103_SEEDS, n_boot: int = N_BOOT, smile_days_needed: int = T103_SMILE_DAYS,
-                         offset_block: int = 6) -> dict:
-    """T-103. runs: {'smile': structure_returns, 'flat': ..., 'skew': ... or None, 'iv0.9': ..., 'iv1.1': ...} on the
-    pooled daily entries of ``panel``. Primary: the smile-scaled pooled paired Sharpe difference, one-sided p < 0.05 on
-    every (block, seed) variant; flat-VIX and SKEW-scaled point differences > 0; the proxy cap (smile refit on
-    ``smile_days_needed`` capture days) as a not-yet-implementable criterion; n in distinct holds."""
-    hold = panel["hold"]
-    idx = panel["idx"]
-    n = n_holds(idx, hold)
+def _sr_diff(rr: Optional[dict], sel: Optional[np.ndarray] = None) -> Optional[dict]:
+    """Point per-cycle Sharpe difference (strangle - straddle, population sd) of one structure_returns run on ``sel``."""
+    if rr is None:
+        return None
+    m = np.isfinite(rr["strangle"]) & np.isfinite(rr["straddle"])
+    if sel is not None:
+        m &= sel
+    sa, sb = _sr1(rr["strangle"][m]), _sr1(rr["straddle"][m])
+    return {"diff": None if sa is None or sb is None else sa - sb, "n": int(m.sum()), "sr_strangle": sa, "sr_straddle": sb}
+
+
+def grid_diagnostics(panel: dict, runs: dict, blocks=T103_GRID_BLOCKS, n_boot: int = N_BOOT, offset_block: int = 6) -> dict:
+    """T-103's 21-session daily all-start grid, a DIAGNOSTIC only (the claim names its calendar, rule 10(a)): pooled
+    smile / flat-VIX / SKEW-scaled Sharpe differences with the smile one's studentized test at ``blocks`` entries (seed 0),
+    and per start offset (that offset's own non-overlapping grid) the smile difference with its one-sided p and the
+    compare_strategies mean-difference p, the flat-VIX and SKEW-scaled differences, PSR and max drawdowns."""
+    hold, idx = panel["hold"], panel["idx"]
     sm = runs["smile"]
     ok = np.isfinite(sm["strangle"]) & np.isfinite(sm["straddle"])
-    a, b = sm["strangle"][ok], sm["straddle"][ok]
-    tests = [sharpe_diff_test(a, b, blk, n_boot, sd) for blk in blocks for sd in seeds]
-    d0 = tests[0]["diff"]
-    passes = [None if t["p_gt0"] is None else bool(t["diff"] > 0 and t["p_gt0"] < 0.05) for t in tests]
-    prim = _robust(passes)
-    sign = {}
-    for key in ("flat", "skew", "iv0.9", "iv1.1"):
-        rr = runs.get(key)
-        if rr is None:
-            sign[key] = None
-            continue
-        m = np.isfinite(rr["strangle"]) & np.isfinite(rr["straddle"])
-        xa, xb = rr["strangle"][m], rr["straddle"][m]
-        sign[key] = {"diff": float(xa.mean() / xa.std() - xb.mean() / xb.std()) if xa.size > 2 else None, "n": int(m.sum()),
-                     "sr_strangle": float(xa.mean() / xa.std()) if xa.size > 2 else None,
-                     "sr_straddle": float(xb.mean() / xb.std()) if xa.size > 2 else None}
-    # per start offset (rule 10): each offset's own non-overlapping grid
+    pooled = {k: _sr_diff(runs.get(k)) for k in ("smile", "flat", "skew")}
+    tests = [sharpe_diff_test(sm["strangle"][ok], sm["straddle"][ok], blk, n_boot, 0) for blk in blocks]
     off = (idx - idx[0]) % hold
     per = []
     for o in range(hold):
@@ -1801,45 +1896,98 @@ def strangle_vs_straddle(panel: dict, runs: dict, n_smile_days: int, min_n: int 
             p_mean = float(block_bootstrap_pvalue(xa, xb, n_boot=1000, block_len=offset_block, seed=0))
         except ValueError:
             p_mean = None
+        fl, sk = _sr_diff(runs.get("flat"), off == o), _sr_diff(runs.get("skew"), off == o)
         per.append({"offset": o, "n": int(xa.size), "diff": t["diff"], "p_gt0": t["p_gt0"], "p_mean_diff": p_mean,
+                    "flat_diff": fl["diff"] if fl else None, "skew_diff": sk["diff"] if sk else None,
                     "psr_strangle": _psr(xa), "psr_straddle": _psr(xb), "mdd_strangle": _mdd(xa), "mdd_straddle": _mdd(xb)})
-    rng_ = lambda key: (min(p[key] for p in per if p[key] is not None), max(p[key] for p in per if p[key] is not None)) if any(p[key] is not None for p in per) else (None, None)
-    npass = sum(1 for p in per if p["diff"] is not None and p["diff"] > 0 and p["p_gt0"] is not None and p["p_gt0"] < 0.05)
+
+    def rng(key):
+        v = [p[key] for p in per if p[key] is not None]
+        return [min(v), max(v)] if v else [None, None]
+    keys = ("diff", "p_gt0", "p_mean_diff", "flat_diff", "skew_diff", "psr_strangle", "psr_straddle", "mdd_strangle", "mdd_straddle")
+    return {"hold": hold, "n_entries": int(idx.size), "first_entry": panel["entry_days"][0], "last_entry": panel["entry_days"][-1],
+            "pooled": pooled, "pooled_tests": tests, "per_offset": per, "ranges": {k: rng(k) for k in keys},
+            "offsets_passing": sum(1 for p in per if p["diff"] is not None and p["diff"] > 0 and p["p_gt0"] is not None and p["p_gt0"] < 0.05),
+            "negative_offsets": {k: sum(1 for p in per if p[k] is not None and p[k] < 0) for k in ("diff", "flat_diff", "skew_diff")},
+            "known_offsets": {k: sum(1 for p in per if p[k] is not None) for k in ("diff", "flat_diff", "skew_diff")}}
+
+
+def _grid_txt(g: Optional[dict]) -> str:
+    if not g:
+        return ""
+    pt, rg, ng, kn = g["pooled"], g["ranges"], g["negative_offsets"], g["known_offsets"]
+    d = lambda k: _s((pt.get(k) or {}).get("diff"), 4)
+    return (f"; DIAGNOSTIC only (not the named calendar, never a criterion): the {g['hold']}-session daily all-start grid, "
+            f"{g['n_entries']} entries {g['first_entry']}..{g['last_entry']}, pooled smile {d('smile')} (one-sided p "
+            + ", ".join(f"{_f(t['p_gt0'], 4)} at block {t['block']}" for t in g["pooled_tests"]) + f"), flat VIX {d('flat')}, "
+            f"SKEW-scaled {d('skew')}; per start offset ({len(g['per_offset'])} of {g['hold']}): smile {_s(rg['diff'][0], 4)} to "
+            f"{_s(rg['diff'][1], 4)} ({g['offsets_passing']} pass at one-sided p < 0.05, {ng['diff']} negative), flat VIX "
+            f"{_s(rg['flat_diff'][0], 4)} to {_s(rg['flat_diff'][1], 4)} ({ng['flat_diff']} of {kn['flat_diff']} offsets negative), "
+            f"SKEW-scaled {_s(rg['skew_diff'][0], 4)} to {_s(rg['skew_diff'][1], 4)} ({ng['skew_diff']} of {kn['skew_diff']} negative), "
+            f"compare_strategies mean-difference p {_f(rg['p_mean_diff'][0], 4)} to {_f(rg['p_mean_diff'][1], 4)}, max drawdown "
+            f"strangle {_pct(rg['mdd_strangle'][0])} to {_pct(rg['mdd_strangle'][1])}, straddle {_pct(rg['mdd_straddle'][0])} to "
+            f"{_pct(rg['mdd_straddle'][1])}")
+
+
+def strangle_vs_straddle(panel: dict, runs: dict, n_smile_days: int, min_n: int = T103_MIN_N, blocks=T103_BLOCKS,
+                         seeds=T103_SEEDS, n_boot: int = N_BOOT, smile_days_needed: int = T103_SMILE_DAYS,
+                         grid: Optional[dict] = None, mean_block: int = 6) -> dict:
+    """T-103 on the named calendar. panel: the short-straddle harness's monthly-expiry cycles (strangle_panel with
+    monthly_cycle_pairs: one non-overlapping entry per cycle, T from each cycle's own dates); runs: {'smile', 'flat',
+    'skew' or None, 'iv0.9', 'iv1.1'} (structure_returns on that panel). Criteria: the smile-scaled paired per-cycle
+    Sharpe difference (strangle - straddle) > 0 with one-sided p < 0.05 on every (block, seed) variant (blocks in
+    cycles); the flat-VIX and SKEW-scaled point differences > 0; the proxy cap (smile refit on ``smile_days_needed``
+    capture days) as a not-yet-implementable criterion; n = monthly cycles (the claim's min_n units). grid:
+    grid_diagnostics on the 21-session daily all-start grid, reported beside the result and never deciding."""
+    idx = panel["idx"]
+    sm = runs["smile"]
+    ok = np.isfinite(sm["strangle"]) & np.isfinite(sm["straddle"])
+    a, b = sm["strangle"][ok], sm["straddle"][ok]
+    n = int(ok.sum())
+    tests = [sharpe_diff_test(a, b, blk, n_boot, sd) for blk in blocks for sd in seeds]
+    d0 = tests[0]["diff"]
+    passes = [None if t["p_gt0"] is None else bool(t["diff"] > 0 and t["p_gt0"] < 0.05) for t in tests]
+    prim = _robust(passes)
+    sign = {key: _sr_diff(runs.get(key)) for key in ("flat", "skew", "iv0.9", "iv1.1")}
+    try:
+        p_mean = float(block_bootstrap_pvalue(a, b, n_boot=n_boot, block_len=mean_block, seed=0))
+    except ValueError:
+        p_mean = None
     fl, sk = sign.get("flat"), sign.get("skew")
-    rows = [(f"{MP} smile-scaled: pooled paired per-cycle Sharpe difference (strangle - straddle) > 0 with one-sided p < 0.05 on every "
-             f"bootstrap variant (blocks {list(blocks)} entries x seeds {list(seeds)}): difference {_s(d0, 4)}, p "
-             + ", ".join(_f(t["p_gt0"], 4) for t in tests), prim, prim is False),
+    ps = [t["p_gt0"] for t in tests if t["p_gt0"] is not None]
+    rows = [(f"{MP} smile-scaled: paired per-cycle Sharpe difference (strangle - straddle) > 0 with one-sided p < 0.05 on every "
+             f"bootstrap variant (blocks {list(blocks)} cycles x seeds {list(seeds)}): difference {_s(d0, 4)}, one-sided p "
+             f"{_f(min(ps) if ps else None, 4)} to {_f(max(ps) if ps else None, 4)}", prim, prim is False),
             (f"same sign under flat VIX (difference {_s(fl['diff'] if fl else None, 4)})", None if not fl or fl["diff"] is None else bool(fl["diff"] > 0), False),
             (f"same sign under the SKEW-scaled smile (difference {_s(sk['diff'] if sk else None, 4)})", None if not sk or sk["diff"] is None else bool(sk["diff"] > 0), False),
             (f"proxy cap: smile ratios refit on >= {smile_days_needed} capture days ({n_smile_days} so far)",
              True if n_smile_days >= smile_days_needed else None, False)]
-    verdict, why = _decide(rows, n, min_n, "21-session holds")
+    verdict, why = _decide(rows, n, min_n, "monthly-expiry cycles")
     t0 = tests[0]
-    lo_d, hi_d = rng_("diff")
-    lo_p, hi_p = rng_("p_gt0")
-    lo_pm, hi_pm = rng_("p_mean_diff")
+    sa, sb = _sr1(a), _sr1(b)
+    dte = np.rint(panel["T"][ok] * 365).astype(int) if n else np.zeros(0, dtype=int)
+    first, last = panel["entry_days"][0], panel.get("exit_days", panel["entry_days"])[-1]
     reason = (f"{MP} 30-DTE SPY short strangle (+/- 5% strikes) vs ATM short straddle, smile-scaled VIX model (captured spy-smile "
               f"IV/VIX on {n_smile_days} quote days, held fixed through history), dividend forward, DTB3, 5%-of-premium haircut on both, "
-              f"settled on raw closes, per-cycle excess return on notional; pooled over {idx.size} daily entries "
-              f"{panel['entry_days'][0]}..{panel['entry_days'][-1]} ({n} distinct holds): per-cycle Sharpe strangle "
-              f"{_f(float(a.mean() / a.std()), 4)} vs straddle {_f(float(b.mean() / b.std()), 4)} (x sqrt(12) annualised "
-              f"{_f(float(a.mean() / a.std()) * math.sqrt(12), 3)} vs {_f(float(b.mean() / b.std()) * math.sqrt(12), 3)}), difference "
+              f"settled on raw closes, per-cycle excess return on notional; on the short-straddle harness's entry dates (rule 10(a): "
+              f"overlay_backtest's monthly expiry calendar, written at one third-Friday expiry close and settled at the next): {n} cycles "
+              f"{first}..{last} ({_f(float(dte.min()) if dte.size else None, 0)}-{_f(float(dte.max()) if dte.size else None, 0)} "
+              f"calendar days): per-cycle Sharpe strangle {_f(sa, 4)} vs straddle {_f(sb, 4)} (x sqrt(12) annualised "
+              f"{_f(None if sa is None else sa * math.sqrt(12), 3)} vs {_f(None if sb is None else sb * math.sqrt(12), 3)}), difference "
               f"{_s(d0, 4)} (95% CI {_s(t0['ci'][0], 4)} to {_s(t0['ci'][1], 4)}, two-sided p {_f(t0['p_two'], 4)}; one-sided p by "
-              f"(block, seed) " + ", ".join(f"({t['block']}, {t['seed']}) {_f(t['p_gt0'], 4)}" for t in tests) + "); flat VIX "
-              f"{_s(fl['diff'] if fl else None, 4)}, SKEW-scaled {_s(sk['diff'] if sk else None, 4)}; IV scale 0.9 "
-              f"{_s((sign.get('iv0.9') or {}).get('diff'), 4)}, 1.1 {_s((sign.get('iv1.1') or {}).get('diff'), 4)}; "
-              f"skew of per-cycle returns strangle {_f(skewness(a), 2)}, straddle {_f(skewness(b), 2)}; per start offset ({len(per)} of {hold}): "
-              f"difference {_s(lo_d, 4)} to {_s(hi_d, 4)}, one-sided p {_f(lo_p, 4)} to {_f(hi_p, 4)} ({npass} pass), compare_strategies "
-              f"mean-difference p {_f(lo_pm, 4)} to {_f(hi_pm, 4)}, PSR strangle {_f(rng_('psr_strangle')[0], 3)} to "
-              f"{_f(rng_('psr_strangle')[1], 3)}, straddle {_f(rng_('psr_straddle')[0], 3)} to {_f(rng_('psr_straddle')[1], 3)}, max "
-              f"drawdown strangle {_pct(rng_('mdd_strangle')[0])} to {_pct(rng_('mdd_strangle')[1])}, straddle "
-              f"{_pct(rng_('mdd_straddle')[0])} to {_pct(rng_('mdd_straddle')[1])} — {why}")
-    stat = {"n_holds": n, "n_entries": int(idx.size), "first_entry": panel["entry_days"][0], "last_entry": panel["entry_days"][-1],
-            "sr_strangle": float(a.mean() / a.std()), "sr_straddle": float(b.mean() / b.std()), "diff": d0,
-            "tests": tests, "primary": prim, "sensitivities": sign, "per_offset": per, "offsets_passing": npass,
+              f"(block, seed) " + ", ".join(f"({t['block']}, {t['seed']}) {_f(t['p_gt0'], 4)}" for t in tests) + "); compare_strategies "
+              f"mean-difference p {_f(p_mean, 4)} (block {mean_block}); flat VIX {_s(fl['diff'] if fl else None, 4)}, SKEW-scaled "
+              f"{_s(sk['diff'] if sk else None, 4)}; IV scale 0.9 {_s((sign.get('iv0.9') or {}).get('diff'), 4)}, 1.1 "
+              f"{_s((sign.get('iv1.1') or {}).get('diff'), 4)}; PSR strangle {_f(_psr(a), 3)}, straddle {_f(_psr(b), 3)}; max drawdown "
+              f"strangle {_pct(_mdd(a))}, straddle {_pct(_mdd(b))}; skew of per-cycle returns strangle {_f(skewness(a), 2)}, straddle "
+              f"{_f(skewness(b), 2)}" + _grid_txt(grid) + f" — {why}")
+    stat = {"calendar": "monthly expiry (overlay_backtest calendar='monthly_expiry'): third-Friday expiry close to the next",
+            "n_cycles": n, "first_entry": first, "last_exit": last, "cycle_calendar_days": [int(dte.min()), int(dte.max())] if dte.size else None,
+            "sr_strangle": sa, "sr_straddle": sb, "diff": d0, "tests": tests, "primary": prim, "sensitivities": sign,
+            "p_mean_diff": p_mean, "psr_strangle": _psr(a), "psr_straddle": _psr(b), "mdd_strangle": _mdd(a), "mdd_straddle": _mdd(b),
             "n_smile_days": n_smile_days, "skew_strangle": skewness(a), "skew_straddle": skewness(b),
             "mean_prem_strangle": float(np.nanmean(sm["prem_strangle"])), "mean_prem_straddle": float(np.nanmean(sm["prem_straddle"])),
-            "label": MP, "verdict": verdict}
+            "grid_diagnostic": grid, "label": MP, "verdict": verdict}
     return {"verdict": verdict, "n": n, "reason": reason, "stat": stat}
 
 
@@ -1880,6 +2028,11 @@ def _with_notes(reason: str, notes: list) -> str:
 
 def _chain_need(archive, syms: Sequence[str]) -> list:
     return [f"{CHAIN_P}{s}-<date>" for s in syms if not _capture_names(archive, s)]
+
+
+def _named_bill_need(archive) -> list:
+    """A DGS3MO-named claim needs fred-DGS3MO, or fred-DTB3 for the DGS3MO_REF date check (batch6_xc's T-199 rule)."""
+    return [] if _has(archive, DGS3MO_B) else [DTB3_B]
 
 
 def b6b_chain_jelly_roll(archive):
@@ -1937,18 +2090,23 @@ def _t181_compare(B: dict, quote_days: Sequence[str], spx: dict) -> Optional[lis
 
 
 def _rate_days(B: dict, notes: list, fn, sync: bool = True, extra=None) -> list:
-    """Per SPY capture: {'quote_day', 'variants': {spot/bill: {'rows', 'r_bill'}}, 'sync'} with rows = fn(cap, S, r)."""
+    """Per SPY capture: {'quote_day', 'variants': {spot/DGS3MO: {'rows', 'r_bill'}}, 'reported': {spot/DTB3: ...}, 'sync'}
+    with rows = fn(cap, S, r). The trial's DGS3MO decides (named_bills); DTB3 is reported beside it; a quote day with no
+    DGS3MO print keeps only the reported variants and is unjudged."""
     out = []
     for cap in B["caps"]["SPY"]:
         qd = cap["quote_day"]
-        bills = bill_variants(B["dtb3"], B["dgs3mo"], qd)
-        if not bills:
+        bills, rep = named_bills(B["dtb3"], B["dgs3mo"], qd)
+        if not bills and not rep:
             notes.append(f"{cap['name']} skipped: no bill print before {qd}")
             continue
+        if not bills:
+            notes.append(f"{cap['name']}: no DGS3MO print before {qd} (unjudged; DTB3 shown beside it)")
         div = last_dividend(B["events"], qd)
-        var, si = _variants(cap, bills, div, sync=sync, root="SPY")
-        d = {"quote_day": qd, "variants": {lab: {"rows": fn(cap, S, r), "r_bill": r} for lab, S, r in var}, "sync": si, "cap": cap,
-             "bills": bills}
+        var, si, rvar = _named_variants(cap, bills, rep, div, sync=sync, root="SPY")
+        d = {"quote_day": qd, "variants": {lab: {"rows": fn(cap, S, r), "r_bill": r} for lab, S, r in var},
+             "reported": {lab: {"rows": fn(cap, S, r), "r_bill": r} for lab, S, r in rvar}, "sync": si, "cap": cap,
+             "bills": bills or rep}
         if extra:
             extra(d)
         d.pop("cap")
@@ -1958,7 +2116,7 @@ def _rate_days(B: dict, notes: list, fn, sync: bool = True, extra=None) -> list:
 
 def b6b_chain_conversion(archive):
     """T-182: SPY executable conversion lending rate vs the 3-month bill."""
-    miss = _missing(archive, [SPY_B, DTB3_B] + _chain_need(archive, ["SPY"]))
+    miss = _missing(archive, [SPY_B] + _named_bill_need(archive) + _chain_need(archive, ["SPY"]))
     if miss:
         return miss
     notes = []
@@ -1967,7 +2125,7 @@ def b6b_chain_conversion(archive):
     spx = {c["quote_day"]: c for c in B["caps"].get("SPX", [])}
 
     def box(d):
-        rows = next(iter(d["variants"].values()))["rows"]
+        rows = _first_var(d)[1]["rows"]
         exps = sorted({x["expiry"] for x in rows})
         d["box"] = _box_by_day(spx, d["quote_day"], exps[len(exps) // 2]) if exps else None
     days = _rate_days(B, notes, lambda cap, S, r: conversion_pairs(cap["by"], S, cap["quote_day"])[0], extra=box)
@@ -1977,7 +2135,7 @@ def b6b_chain_conversion(archive):
 
 def b6b_chain_synthetic_short(archive):
     """T-185: SPY ATM synthetic short implicit borrow cost vs 50 bp."""
-    miss = _missing(archive, [SPY_B, DTB3_B] + _chain_need(archive, ["SPY"]))
+    miss = _missing(archive, [SPY_B] + _named_bill_need(archive) + _chain_need(archive, ["SPY"]))
     if miss:
         return miss
     notes = []
@@ -1988,7 +2146,7 @@ def b6b_chain_synthetic_short(archive):
     reps = {s: {c["quote_day"]: c for c in B["caps"].get(s, [])} for s in ("GLD", "IBIT")}
 
     def extra(d):
-        rows = next(iter(d["variants"].values()))["rows"]
+        rows = _first_var(d)[1]["rows"]
         exps = sorted({x["expiry"] for x in rows})
         d["box"] = _box_by_day(spx, d["quote_day"], exps[len(exps) // 2]) if exps else None
         r0 = d["bills"][0][1]
@@ -2005,7 +2163,7 @@ def b6b_chain_synthetic_short(archive):
 
 def b6b_chain_synthetic_call(archive):
     """T-507: SPY stock + put at the ask vs call at the ask + bills."""
-    miss = _missing(archive, [SPY_B, DTB3_B] + _chain_need(archive, ["SPY"]))
+    miss = _missing(archive, [SPY_B] + _named_bill_need(archive) + _chain_need(archive, ["SPY"]))
     if miss:
         return miss
     notes = []
@@ -2035,7 +2193,7 @@ def b6b_chain_synthetic_call(archive):
 
 def b6b_chain_synthetic_long(archive):
     """T-184: SPY 180-365 DTE ATM synthetic-long financing rate vs bill + 50 bp."""
-    miss = _missing(archive, [SPY_B, DTB3_B] + _chain_need(archive, ["SPY"]))
+    miss = _missing(archive, [SPY_B] + _named_bill_need(archive) + _chain_need(archive, ["SPY"]))
     if miss:
         return miss
     notes = []
@@ -2065,7 +2223,7 @@ def b6b_chain_synthetic_long(archive):
 
 def b6b_chain_itm_put_exercise(archive):
     """T-191: deep ITM SPY puts pinned at intrinsic where early exercise for interest is optimal."""
-    miss = _missing(archive, [SPY_B, DTB3_B] + _chain_need(archive, ["SPY"]))
+    miss = _missing(archive, [SPY_B] + _named_bill_need(archive) + _chain_need(archive, ["SPY"]))
     if miss:
         return miss
     notes = []
@@ -2075,22 +2233,29 @@ def b6b_chain_itm_put_exercise(archive):
     days = []
     for cap in B["caps"]["SPY"]:
         qd = cap["quote_day"]
-        bills = bill_variants(B["dtb3"], B["dgs3mo"], qd)
-        if not bills:
+        bills, repb = named_bills(B["dtb3"], B["dgs3mo"], qd)
+        if not bills and not repb:
             notes.append(f"{cap['name']} skipped: no bill print before {qd}")
             continue
+        if not bills:
+            notes.append(f"{cap['name']}: no DGS3MO print before {qd} (unjudged; DTB3 shown beside it)")
         div = last_dividend(B["events"], qd)
-        var, si = _variants(cap, bills, div, root="SPY")
-        dv = {}
-        for lab, S, r in var:
-            rows, _ = itm_put_rows(cap["by"], S, qd, r, div)
-            dv[lab] = {"rows": rows, "ci": diff_share_ci([x["at"] for x in rows if x["met"]], [x["at"] for x in rows if not x["met"]]),
-                       "cluster": diff_share_cluster_ci(rows)}
-        rows_nz, _ = itm_put_rows(cap["by"], cap["close"], qd, bills[0][1], div, skip_zero_bid_calls=True)
+        var, si, rvar = _named_variants(cap, bills, repb, div, root="SPY")
+
+        def group(vs):
+            out = {}
+            for lab, S, r in vs:
+                rows, _ = itm_put_rows(cap["by"], S, qd, r, div)
+                out[lab] = {"rows": rows, "ci": diff_share_ci([x["at"] for x in rows if x["met"]], [x["at"] for x in rows if not x["met"]]),
+                            "cluster": diff_share_cluster_ci(rows)}
+            return out
+        dv, dr = group(var), group(rvar)
+        r0 = (bills or repb)[0][1]
+        rows_nz, _ = itm_put_rows(cap["by"], cap["close"], qd, r0, div, skip_zero_bid_calls=True)
         sc = spx.get(qd)
-        days.append({"quote_day": qd, "variants": dv, "sync": si,
+        days.append({"quote_day": qd, "variants": dv, "reported": dr, "sync": si,
                      "no_zero_bid_calls": diff_share_ci([x["at"] for x in rows_nz if x["met"]], [x["at"] for x in rows_nz if not x["met"]], n_boot=200),
-                     "spx": spx_itm_control(sc["by"], sc["close"], qd, bills[0][1]) if sc else None})
+                     "spx": spx_itm_control(sc["by"], sc["close"], qd, r0) if sc else None})
     rep = early_exercise_claim(days)
     stat = rep["stat"]
     for p in stat.get("per_day", []):
@@ -2138,7 +2303,7 @@ T508_CHAINS = ("SPY", "SPX", "QQQ", "GLD", "IBIT")
 
 def b6b_chain_vertical_bounds(archive):
     """T-508: vertical-spread monotonicity and width-bound violations on SPY, SPX, QQQ, GLD and IBIT."""
-    miss = _missing(archive, [SPY_B, DTB3_B] + _chain_need(archive, T508_CHAINS))
+    miss = _missing(archive, [SPY_B] + _named_bill_need(archive) + _chain_need(archive, T508_CHAINS))
     if miss:
         return miss
     notes = []
@@ -2149,12 +2314,14 @@ def b6b_chain_vertical_bounds(archive):
             by_day[c["quote_day"]][s] = c
     days = []
     for qd, caps in sorted(by_day.items()):
-        bills = bill_variants(B["dtb3"], B["dgs3mo"], qd)
-        if not bills:
+        bills, repb = named_bills(B["dtb3"], B["dgs3mo"], qd)
+        if not bills and not repb:
             notes.append(f"{qd} skipped: no bill print before it")
             continue
-        days.append({"quote_day": qd, "scans": {bl: {s: vertical_scan(c["by"], qd, r, european=(s == "SPX")) for s, c in caps.items()}
-                                                for bl, r in bills}})
+        if not bills:
+            notes.append(f"{qd}: no DGS3MO print before it (unjudged; DTB3 shown beside it)")
+        scan = lambda bl_r: {bl: {s: vertical_scan(c["by"], qd, r, european=(s == "SPX")) for s, c in caps.items()} for bl, r in bl_r}
+        days.append({"quote_day": qd, "scans": scan(bills), "reported_scans": scan(repb)})
     rep = vertical_claim(days)
     return _out(dict(rep["stat"], skipped=notes), rep["n"], rep["verdict"], _with_notes(rep["reason"], notes))
 
@@ -2179,17 +2346,20 @@ def b6b_chain_strangle_vs_straddle(archive):
     skew_ref = float(np.mean(ref)) if ref else None
     if skew and not ref:
         notes.append(f"no SKEW close on the smile quote days {qds}: the SKEW-scaled sensitivity is not implemented")
-    panel = strangle_panel(days, close, adj, vix, dtb3, start="1993-01-01")
+    def runs_for(panel):
+        sm_r = leg_ratios(panel, "smile", smile)
+        sk = leg_ratios(panel, "skew", smile, skew, skew_ref) if skew_ref else None
+        return {"smile": structure_returns(panel, sm_r), "flat": structure_returns(panel, leg_ratios(panel, "flat")),
+                "iv0.9": structure_returns(panel, sm_r, scale=0.9), "iv1.1": structure_returns(panel, sm_r, scale=1.1),
+                "skew": structure_returns(panel, sk) if sk is not None else None}
+    # rule 10(a): the trial's "same entry dates as the short-straddle harness" = overlay_backtest's monthly expiry calendar
+    panel = strangle_panel(days, close, adj, vix, dtb3, start="1993-01-01", cycles=monthly_cycle_pairs(days, vix))
     if panel["idx"].size < 30:
-        return _out({"n_entries": int(panel["idx"].size)}, n_holds(panel["idx"], T103_HOLD), "inconclusive",
-                    "too few SPY entries with a VIX close and a bill print — no data")
-    runs = {"smile": structure_returns(panel, leg_ratios(panel, "smile", smile)),
-            "flat": structure_returns(panel, leg_ratios(panel, "flat")),
-            "iv0.9": structure_returns(panel, leg_ratios(panel, "smile", smile), scale=0.9),
-            "iv1.1": structure_returns(panel, leg_ratios(panel, "smile", smile), scale=1.1)}
-    sk = leg_ratios(panel, "skew", smile, skew, skew_ref) if skew_ref else None
-    runs["skew"] = structure_returns(panel, sk) if sk is not None else None
-    rep = strangle_vs_straddle(panel, runs, smile.n_days)
+        return _out({"n_cycles": int(panel["idx"].size)}, int(panel["idx"].size), "inconclusive",
+                    "too few monthly-expiry cycles with a VIX close and a bill print — no data")
+    grid_panel = strangle_panel(days, close, adj, vix, dtb3, start="1993-01-01")
+    grid = grid_diagnostics(grid_panel, runs_for(grid_panel)) if grid_panel["idx"].size >= 30 * T103_HOLD else None
+    rep = strangle_vs_straddle(panel, runs_for(panel), smile.n_days, grid=grid)
     return _out(dict(rep["stat"], skipped=notes, smile_quote_days=qds, skew_ref=skew_ref), rep["n"], rep["verdict"],
                 _with_notes(rep["reason"], notes))
 

@@ -118,13 +118,18 @@ def _decay(mu, seed, **kw):
     return vx.vxx_decay(d, c, _flat_index(d, 15.0), _flat_index(d, 18.0), n_boot=400, n_place=50, **kw)
 
 
-@pytest.mark.parametrize("mu,seed", [(-0.0008, 8), (-0.0007, 4)])
+@pytest.mark.parametrize("mu,seed", [(-0.0007, 8), (-0.0007, 22)])
 def test_vxx_decay_one_sided_lower_bound_decides(mu, seed):
+    """Guards rule 5 round 2 on T-242's primary statistic, which rule 10 made the pooled all-start conditional mean
+    (studentized block-63 bootstrap): below min_n the failing one-sided 95% upper-bound pass is decided by the one-sided
+    95% lower bound from the same bootstrap-t draws, not by the two-sided 95% CI. The fixtures were re-seeded for the
+    pooled statistic: the old single-scan seeds (-0.0008, 8) and (-0.0007, 4) have pooled lower bounds of -3.1% and
+    -3.3%, below -3%, so their failure is correctly undecided (inconclusive) now."""
     rep = _decay(mu, seed)
     assert rep["n"] == 33 and rep["ub95"] >= -0.03                  # the pass fails
     assert rep["verdict"] == "not_supported", rep["reason"]
     assert rep["rule5"]["decisive_failures"] == [
-        "one-sided 95% studentized block-3 bootstrap upper bound of the conditional mean < -0.03"]
+        "one-sided 95% studentized block-63 bootstrap upper bound of the pooled conditional mean < -0.03"]
     lb = rep["rule5"]["lb95"]
     assert rep["ci95"][0] < -0.03 <= lb                              # one-sided 95% lower bound at or above -3%, 97.5% not
     assert ("fails decisively below min_n" in rep["reason"]

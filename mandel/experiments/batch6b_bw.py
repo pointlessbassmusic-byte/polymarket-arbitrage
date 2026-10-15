@@ -52,8 +52,11 @@ Conventions (house rules)
     rule 8), the VIX close of the entry session (VIX closes at 16:15 ET, the index at 16:00: a declared 15-minute
     mismatch), the bill rate known then, and a continuous dividend yield q known at
     entry (SPY's trailing-12-month dividends over its close; before SPY's first full year an ASSUMED q = 3.0%, stated ex
-    ante). The held index earns total return: SPX price plus SPY's dividend yield on each SPY ex-date (3.0%/yr accrued
-    daily before SPY exists, 1990-01..1993-01). SPY (T-128): raw closes, $1 strikes, the escrowed-dividend forward
+    ante). The held index earns total return: SPX price plus dividends accrued every session at the yield q known at the
+    prior close (the ASSUMED 3.0% until SPY's first full year, 1990-01..1994-01), as BXM and PUT accrue SPX constituent
+    dividends day by day; SPY's quarterly ex-date lumps are not used for the index, because crediting a quarter's
+    dividends on the March/June/September/December expiry session puts a timing error into the cycle returns the
+    calibration gate compares. SPY (T-128): raw closes, $1 strikes, the escrowed-dividend forward
     S - PV(D) when a projected ex-date (SPY's quarterly third-Friday schedule) falls in (entry, expiry], D = the last
     dividend gone ex at or before entry; SPY buy-and-hold is total return (adjclose). Cycles follow the standard monthly
     expiry (third Friday, the prior session on a holiday): each option is written at one expiry's close and settles at the
@@ -811,8 +814,8 @@ def _gate_txt(g: dict) -> str:
 class Frame:
     """Aligned daily arrays on one session calendar. close: raw closes; tr: total-return level; vix: VIX close as of the
     session (points); skew: SKEW as of the session (or NaN); rate: continuous bill rate known at the close; q: continuous
-    dividend yield known at the close (SPX frames; 0 for SPY); divpts: dividend points going ex on the session (SPX) or the
-    cash dividend (SPY); divfc: the last cash dividend gone ex at or before the session (SPY); q_assumed: q is PRE_YIELD."""
+    dividend yield known at the close (SPX frames; 0 for SPY); divpts: dividend points accrued on the session (SPX: the
+    prior close x q at the prior close over the calendar days elapsed) or the cash dividend going ex (SPY); divfc: the last cash dividend gone ex at or before the session (SPY); q_assumed: q is PRE_YIELD."""
     days: list
     ords: np.ndarray
     close: np.ndarray
@@ -858,8 +861,10 @@ def spx_frame(gd, gc, vix: dict, skew: Optional[dict], bills: Bills, spy: Option
               pre_yield: float = PRE_YIELD) -> Frame:
     """SPX frame on ^GSPC sessions from ``start`` (and the first VIX print). Dividends from SPY (``spy`` = (days, close,
     adj)): q = SPY's trailing-12-month cash dividends / its close, known at each session (PRE_YIELD before SPY has one full
-    year); dividend points on each SPY ex-date = SPY's dividend yield that day x the prior ^GSPC close; before SPY's first
-    session, PRE_YIELD accrued per calendar day."""
+    year). Dividend points accrue every session, G[i-1] (exp(q[i-1] days / 365) - 1), at the yield known at the prior
+    close, as the Cboe indices accrue SPX constituent dividends daily. SPY's own dividends go ex in quarterly lumps on the
+    March/June/September/December expiry session; crediting them there would put a quarter's dividends (about 0.45% of
+    the index) into one cycle in three and none into the rest."""
     first_vix = min(vix) if vix else "9999"
     keep = [i for i, d in enumerate(gd) if d >= start and d >= first_vix]
     days = [gd[i] for i in keep]
@@ -877,9 +882,6 @@ def spx_frame(gd, gc, vix: dict, skew: Optional[dict], bills: Bills, spy: Option
         D = spy_dividends(sc, sa)
         so = np.array([_ord(d) for d in sd], np.int64)
         cum = np.concatenate([[0.0], np.cumsum(D)])
-        yex = {}
-        for i in np.nonzero(D > 0)[0]:
-            yex[sd[i]] = D[i] / sc[i - 1]
         spy0 = so[0]
         for i, d in enumerate(days):
             o = ords[i]
@@ -888,17 +890,8 @@ def spx_frame(gd, gc, vix: dict, skew: Optional[dict], bills: Bills, spy: Option
                 lo = int(np.searchsorted(so, o - 365, side="right"))
                 q[i] = (cum[j + 1] - cum[lo]) / sc[j]
                 q_assumed[i] = False
-        # dividend points: each SPY ex-date maps onto the first ^GSPC session on or after it
-        for d, y in yex.items():
-            k = bisect.bisect_left(days, d)
-            if 0 < k < n:
-                divpts[k] += y * G[k - 1]
-        pre = np.array([o < spy0 for o in ords])
-    else:
-        pre = np.ones(n, bool)
-    for i in range(1, n):
-        if pre[i]:
-            divpts[i] += G[i - 1] * (math.exp(pre_yield * (ords[i] - ords[i - 1]) / 365.0) - 1.0)
+    for i in range(1, n):                       # daily accrual at the yield known at the prior close (no quarterly lumps)
+        divpts[i] = G[i - 1] * (math.exp(q[i - 1] * (ords[i] - ords[i - 1]) / 365.0) - 1.0)
     tr = np.empty(n)
     if n:
         tr[0] = 1.0
@@ -1579,7 +1572,11 @@ def _model_window(C: dict, spx: bool = True) -> str:
     dte = np.round(C["T"] * 365).astype(int)
     txt = (f"{C['n']} monthly expiry-to-expiry cycles {C['day0'][0]}..{C['day1'][-1]} (rule 10(a): the standard monthly "
            f"expiry, third Friday or the prior session; {int(dte.min())}-{int(dte.max())} calendar days)")
-    return txt + (f"; {qa} cycles price with the ASSUMED q = {PRE_YIELD:.1%} (before SPY's first full year)" if spx else "")
+    if not spx:
+        return txt
+    return txt + (f"; the held index accrues dividends every session at the q known at the prior close, as BXM and PUT "
+                  f"accrue SPX dividends daily (not in SPY's quarterly ex-date lumps); {qa} cycles price with, and accrue, "
+                  f"the ASSUMED q = {PRE_YIELD:.1%} (before SPY's first full year)")
 
 
 def b6b_bw_putwrite_vs_spy(archive):

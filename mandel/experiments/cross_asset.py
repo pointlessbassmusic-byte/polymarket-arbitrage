@@ -15,8 +15,10 @@ House rule 10 (no arbitrary grid phase). The option-writing claims name monthly 
 T-176 'the last-Friday cycle'), so their cycles follow the standard monthly expiry, written at one expiry and settled at the next:
 the third Friday (the prior session on a holiday) for GLD; Deribit's last Friday of the month (08:00 UTC) for BTC, whose daily close
 is 24:00 UTC, so the BTC cycles run between the last closes before expiry (the Thursdays) and T-176 settles at the Friday's 08:00
-delivery price. Claims on a cycle grid that names no calendar (T-245's 21-day variance cycles, T-514's 20-day samples, T-267's
-30-day put rolls, and the 21- or 30-day variance-premium cycles of T-244/T-246/T-271/T-512) take the pooled all-phase estimate as
+delivery price. A calendar cycle whose entry day has no index value cannot be priced; it is dropped and named in the reason (house
+rule 9; GVZ has no value on 2020-10-16, so T-270/T-279 lose that one cycle). Claims on a cycle grid that names no calendar (T-245's
+21-day variance cycles, T-514's 20-day samples, T-267's 30-day put rolls, and the 21- or 30-day variance-premium cycles of
+T-244/T-246/T-271/T-512) take the pooled all-phase estimate as
 the primary statistic for every criterion: an entry on every day (every phase of the grid), a circular block bootstrap with blocks
 of at least twice the hold, n and min_n in the claim's own cycles; each reason reports the per-phase range and how many of the
 phases pass on their own. Unaffected: T-175/T-177 (statistics on the daily series), and the event-triggered entries of
@@ -134,6 +136,19 @@ def _calendar_cycles(days, calendar) -> tuple[list, str]:
     if isinstance(calendar, (list, tuple)):
         return [tuple(c) for c in calendar], "explicit (entry, expiry) schedule"
     raise ValueError(f"calendar must be 'monthly', 'deribit' or a list of (entry, expiry) pairs, got {calendar!r}")
+
+
+def _no_index_cycles(sched, start, idx: dict) -> list:
+    """The calendar cycles from `start` whose entry day has no index value. run_structure cannot price them and skips them, so the
+    harness reports them (house rule 9: a data gap is named, never silently dropped)."""
+    return [list(c) for c in sched if c[0] >= start and c[0] not in idx]
+
+
+def _no_index_txt(dropped: list) -> str:
+    if not dropped:
+        return ""
+    return (f", {len(dropped)} calendar cycle{'s' if len(dropped) != 1 else ''} dropped for a missing index value on entry "
+            f"({', '.join(c[0] for c in dropped)})")
 
 
 def _asof(series: dict):
@@ -432,11 +447,13 @@ def covered_call_vs_hold(days, closes, idx, rates, delta, dte, hold, ppy_cycles,
     The claim's 'higher Sharpe' is its own criterion (difference > 0), so a CI excluding 0 on the negative side fails the claim.
     Cycles (house rule 10): the claims write monthly options, so `calendar` (default: the _TRIAL entry for the label, else 'monthly';
     see _calendar_cycles) sets them: GLD on the standard monthly expiry, BTC on Deribit's last-Friday expiry, each written at one
-    expiry and settled at the next with its own T (dte and hold are the trial's nominal 30 days / month).
+    expiry and settled at the next with its own T (dte and hold are the trial's nominal 30 days / month). A cycle whose entry day has
+    no index value cannot be priced; it is dropped and named in the reason and in 'dropped_no_index' (house rule 9).
     Below min_n cycles (default: the _TRIAL entry for the label; house rule 5) only that criterion can fail decisively, when the 95% CI of
     the difference lies wholly at or below 0; a straddling CI, a halves sign flip or a DSR shortfall there is undecided."""
     min_n = _trial("covered_call_vs_hold", label, "min_n", min_n, 0)
     sched, cal = _calendar_cycles(days, _trial("covered_call_vs_hold", label, "calendar", calendar, "monthly"))
+    gone = _no_index_cycles(sched, start, idx); gone_txt = _no_index_txt(gone)
     def run(d):
         res = _cycles(days, closes, idx, rates, [("underlying", "long", 1, None), ("call", "short", 1, ("delta", d))], dte, hold, start, sched)
         return res["pnl"] / res["spot"]
@@ -444,8 +461,8 @@ def covered_call_vs_hold(days, closes, idx, rates, delta, dte, hold, ppy_cycles,
     hold_res = _cycles(days, closes, idx, rates, [("underlying", "long", 1, None)], dte, hold, start, sched)
     bh = hold_res["pnl"] / hold_res["spot"]
     if len(cc) < 4:
-        return {"n_cycles": int(len(cc)), "calendar": cal, "verdict": "inconclusive",
-                "reason": f"MODEL-PRICED at flat {label}: only {len(cc)} cycles on the {cal} (min_n {min_n})"}
+        return {"n_cycles": int(len(cc)), "calendar": cal, "dropped_no_index": gone, "verdict": "inconclusive",
+                "reason": f"MODEL-PRICED at flat {label}: only {len(cc)} cycles on the {cal}{gone_txt} (min_n {min_n})"}
     obs, lo = _sharpe_diff_lower(cc, bh, ppy_cycles, 3, q=0.025); _, hi = _sharpe_diff_lower(cc, bh, ppy_cycles, 3, q=0.975)
     h = len(cc) // 2; halves = [_sr(cc[:h], ppy_cycles) - _sr(bh[:h], ppy_cycles), _sr(cc[h:], ppy_cycles) - _sr(bh[h:], ppy_cycles)]
     dsr = deflated_sharpe_ratio(cc - bh, n_trials=len(dsr_variants), trial_sharpes=[sharpe_ratio(run(d) - bh) for d in dsr_variants])
@@ -456,35 +473,37 @@ def covered_call_vs_hold(days, closes, idx, rates, delta, dte, hold, ppy_cycles,
                      ("sign holds in both halves", np.sign(halves[0]) == np.sign(halves[1]) == np.sign(obs), False),
                      ("deflated Sharpe > 0 (DSR probability > 0.5)", dsr > 0.5, False)],
                     len(cc), min_n, "cycles")
-    return {"n_cycles": int(len(cc)), "calendar": cal, "first_day": hold_res["day"][0], "sharpe_cc": _sr(cc, ppy_cycles), "sharpe_hold": _sr(bh, ppy_cycles), "diff": obs, "ci": [lo, hi],
-            "halves": halves, "dsr": float(dsr), "verdict": v,
+    return {"n_cycles": int(len(cc)), "calendar": cal, "dropped_no_index": gone, "first_day": hold_res["day"][0], "sharpe_cc": _sr(cc, ppy_cycles),
+            "sharpe_hold": _sr(bh, ppy_cycles), "diff": obs, "ci": [lo, hi], "halves": halves, "dsr": float(dsr), "verdict": v,
             "reason": f"MODEL-PRICED at flat {label}: {delta:.2f}-delta covered call Sharpe {_sr(cc,ppy_cycles):.2f} vs hold {_sr(bh,ppy_cycles):.2f} over {len(cc)} cycles "
                       f"from {hold_res['day'][0]} on the {cal} (diff {obs:+.2f}, 95% CI {lo:+.2f} to {hi:+.2f}; halves {halves[0]:+.2f}/{halves[1]:+.2f}), DSR probability {dsr:.2f} "
-                      f"(deflated Sharpe > 0 needs > 0.5), MDD {_mdd(cc)*100:.0f}% vs {_mdd(bh)*100:.0f}% — {why}"}
+                      f"(deflated Sharpe > 0 needs > 0.5), MDD {_mdd(cc)*100:.0f}% vs {_mdd(bh)*100:.0f}%{gone_txt} — {why}"}
 
 
 def short_put_mean(days, closes, idx, rates, delta, dte, hold, start, label, min_n: Optional[int] = None, calendar=None):
     """T-254 / T-279: monthly delta-d short put at flat index IV, P&L = (premium - payoff)/K: 95% CI of the mean > 0, positive in both halves.
     Cycles (house rule 10): monthly options, so `calendar` (default: the _TRIAL entry for the label, else 'monthly'; see
-    _calendar_cycles) sets them, each written at one expiry and settled at the next with its own T.
+    _calendar_cycles) sets them, each written at one expiry and settled at the next with its own T. A cycle whose entry day has no
+    index value cannot be priced; it is dropped and named in the reason and in 'dropped_no_index' (house rule 9).
     Below min_n cycles (default: the _TRIAL entry for the label; house rule 5) the CI criterion fails decisively only when the CI lies
     wholly at or below 0, and the halves criterion only when the first half at min_n (cycles [0, min_n // 2), already observed) is <= 0."""
     min_n = _trial("short_put_mean", label, "min_n", min_n, 0)
     sched, cal = _calendar_cycles(days, _trial("short_put_mean", label, "calendar", calendar, "monthly"))
+    gone = _no_index_cycles(sched, start, idx); gone_txt = _no_index_txt(gone)
     res = _cycles(days, closes, idx, rates, [("put", "short", 1, ("delta", delta))], dte, hold, start, sched)
     K = np.array([k[0] for k in res["strikes"]])
     x = res["pnl"] / K
     if len(x) < 4:
-        return {"n_cycles": int(len(x)), "calendar": cal, "verdict": "inconclusive",
-                "reason": f"MODEL-PRICED at flat {label}: only {len(x)} cycles on the {cal} (min_n {min_n})"}
+        return {"n_cycles": int(len(x)), "calendar": cal, "dropped_no_index": gone, "verdict": "inconclusive",
+                "reason": f"MODEL-PRICED at flat {label}: only {len(x)} cycles on the {cal}{gone_txt} (min_n {min_n})"}
     lo, hi = _mean_ci(x, 3); h = len(x) // 2
     # (name, passes, fails decisively below min_n)
     v, why = _rule5([("95% CI of the mean > 0", lo > 0, hi <= 0),
                      ("positive in both halves", x[:h].mean() > 0 and x[h:].mean() > 0, _first_half_fails_at_min_n(len(x), min_n, lambda k: x[:k].mean() > 0))],
                     len(x), min_n, "cycles")
-    return {"n_cycles": int(len(x)), "calendar": cal, "first_day": res["day"][0], "mean": float(x.mean()), "ci": [lo, hi], "verdict": v,
+    return {"n_cycles": int(len(x)), "calendar": cal, "dropped_no_index": gone, "first_day": res["day"][0], "mean": float(x.mean()), "ci": [lo, hi], "verdict": v,
             "reason": f"MODEL-PRICED at flat {label}: {abs(delta):.2f}-delta short put mean {x.mean()*100:+.2f}% of strike per cycle over {len(x)} cycles from {res['day'][0]} "
-                      f"on the {cal} (95% CI {lo*100:+.2f} to {hi*100:+.2f}), halves {x[:h].mean()*100:+.2f}/{x[h:].mean()*100:+.2f} — {why}"}
+                      f"on the {cal} (95% CI {lo*100:+.2f} to {hi*100:+.2f}), halves {x[:h].mean()*100:+.2f}/{x[h:].mean()*100:+.2f}{gone_txt} — {why}"}
 
 
 def conditional_straddle(days, closes, idx, rates, dte, hold, start, window, pct, label, report_conditional=True, min_n: Optional[int] = None, block: int = 2):
@@ -664,14 +683,17 @@ def inverse_covered_call_btc(days, closes, idx, rates, start, delivery: Optional
     cycle, so `calendar` defaults to 'deribit' (see _calendar_cycles): each call is written at the last daily close (24:00 UTC) before
     one last-Friday expiry and expires at the next, priced at its own T (28 or 35 days, from 00:00 UTC Friday to 00:00 UTC Friday).
     Settlement: `delivery` ({date: Deribit delivery price}, see delivery_prices) on the day after each cycle's last close, i.e. the
-    expiry Friday's 08:00 UTC delivery. Cycles without a delivery price are dropped. Without `delivery`, spot at that last close stands
-    in and the claim's 'settlement at Deribit delivery prices' criterion is not implemented (None), so the verdict is at best
-    inconclusive. Below min_n cycles (house rule 5) the verdict cannot be supported, and the CI criterion fails decisively only when the
-    CI lies wholly at or below 0."""
+    expiry Friday's 08:00 UTC delivery. Cycles without a delivery price are dropped ('dropped'), as are cycles whose entry day has no
+    index value, which cannot be priced ('dropped_no_index'); the reason names both (house rule 9). Without `delivery`, spot at that
+    last close stands in and the claim's 'settlement at Deribit delivery prices' criterion is not implemented (None), so the verdict is
+    at best inconclusive. Below min_n cycles (house rule 5) the verdict cannot be supported, and the CI criterion fails decisively only
+    when the CI lies wholly at or below 0."""
     sched, cal = _calendar_cycles(days, calendar)
+    gone = _no_index_cycles(sched, start, idx); gone_txt = _no_index_txt(gone)
     res = _cycles(days, closes, idx, rates, [("call", "short", 1, ("delta", 0.25))], 30, 30, start, sched)
     if not len(res["day"]):
-        return {"n_cycles": 0, "dropped": 0, "calendar": cal, "verdict": "inconclusive", "reason": f"MODEL-PRICED at flat DVOL: no cycle on the {cal} (min_n {min_n})"}
+        return {"n_cycles": 0, "dropped": 0, "dropped_no_index": gone, "calendar": cal, "verdict": "inconclusive",
+                "reason": f"MODEL-PRICED at flat DVOL: no cycle on the {cal}{gone_txt} (min_n {min_n})"}
     K = np.array([s[0] for s in res["strikes"]])
     premium_btc = -res["debit"] / res["spot"]                     # c: BTC received at inception (debit < 0 for a short call)
     if delivery is not None:
@@ -684,12 +706,14 @@ def inverse_covered_call_btc(days, closes, idx, rates, start, delivery: Optional
     ok = np.isfinite(settle); dropped = int((~ok).sum())
     x = premium_btc[ok] - np.maximum(settle[ok] - K[ok], 0) / settle[ok] - 0.0006
     if len(x) < 2:
-        return {"n_cycles": int(len(x)), "dropped": dropped, "verdict": "inconclusive", "reason": f"MODEL-PRICED at flat DVOL: only {len(x)} cycles settle on {src} (min_n {min_n})"}
+        return {"n_cycles": int(len(x)), "dropped": dropped, "dropped_no_index": gone, "calendar": cal, "verdict": "inconclusive",
+                "reason": f"MODEL-PRICED at flat DVOL: only {len(x)} cycles settle on {src}{gone_txt} (min_n {min_n})"}
     lo, hi = _mean_ci(x, 3)
     # (name, passes, fails decisively below min_n)
     v, why = _rule5([("95% CI of the mean > 0", lo > 0, hi <= 0), ("settled at Deribit delivery prices", True if delivery is not None else None, False)],
                     len(x), min_n, "monthly cycles")
-    return {"n_cycles": int(len(x)), "dropped": dropped, "calendar": cal, "first_day": res["day"][0], "mean_btc": float(x.mean()), "mean_premium_btc": float(premium_btc[ok].mean()),
-            "ci": [lo, hi], "verdict": v,
+    return {"n_cycles": int(len(x)), "dropped": dropped, "dropped_no_index": gone, "calendar": cal, "first_day": res["day"][0], "mean_btc": float(x.mean()),
+            "mean_premium_btc": float(premium_btc[ok].mean()), "ci": [lo, hi], "verdict": v,
             "reason": f"MODEL-PRICED at flat DVOL: 25-delta 30-day BTC call against 1 BTC earns {x.mean():+.4f} BTC per cycle on average (premium {premium_btc[ok].mean():.4f} BTC at S_0) "
-                      f"over {len(x)} cycles from {res['day'][0]} on the {cal} (95% CI {lo:+.4f} to {hi:+.4f}); {src}" + (f", {dropped} cycles without one dropped" if dropped else "") + f" — {why}"}
+                      f"over {len(x)} cycles from {res['day'][0]} on the {cal} (95% CI {lo:+.4f} to {hi:+.4f}); {src}" + (f", {dropped} cycles without one dropped" if dropped else "")
+                      + f"{gone_txt} — {why}"}
