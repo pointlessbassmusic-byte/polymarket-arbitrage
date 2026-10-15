@@ -433,6 +433,27 @@ def cmd_book_snapshot(args) -> int:
     return 0
 
 
+def cmd_unlock_fetch(args) -> int:
+    """Fetch the data that unblocks theories: french, fomc, deribit, vx, aqr, prices (Yahoo OHLC histories), or all."""
+    from mandel.data import unlocks as U
+    from mandel.data.store import ObservationStore
+    store = ObservationStore(Archive(ledger=Ledger()))
+    which = args.which.split(",") if args.which != "all" else ["prices", "french", "fomc", "deribit", "vx", "aqr"]
+    out = {}
+    if "prices" in which:
+        from mandel.data.social import collect_history
+        out["prices"] = collect_history(store, symbols=["^GSPC", "^RUT", "SPY", "QQQ", "IWM", "TLT", "GLD", "SLV", "USO", "IBIT", "BTC-USD", "ETH-USD", "EFA", "AGG", "SPLV", "SPHB",
+                                                        "USMV", "SVXY", "GC=F", "SI=F", "XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY", "IVV", "TQQQ", "SQQQ", "IJR", "IWD", "IWF", "QUAL", "COWZ", "PKW", "DBC", "IEF", "VNQ", "CL=F", "ES=F"])
+    for k, fn in (("french", U.fetch_french), ("fomc", U.fetch_fomc), ("deribit", U.fetch_deribit_history), ("vx", U.fetch_vx), ("aqr", U.fetch_aqr_bab)):
+        if k in which:
+            try:
+                out[k] = fn(store)
+            except Exception as e:  # one failing source must not lose the others
+                out[k] = {"error": repr(e)[:300]}
+    _print(out)
+    return 0
+
+
 def cmd_archive(args) -> int:
     a = Archive()
     for e in a.entries(kind=args.kind):
@@ -554,6 +575,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--smile", action="store_true", help="refresh VIX and write spy-smile-<quote_date> bundles for raw SPY chains on this machine")
     p = add("book-snapshot", cmd_book_snapshot, "Capture one dated snapshot of Polymarket YES/NO books (polymarket-books-<day>).")
     p.add_argument("--books", type=int, default=300)
+    p = add("unlock-fetch", cmd_unlock_fetch, "Fetch theory-unblocking data: prices (Yahoo OHLC), french, fomc, deribit, vx, aqr, or all.")
+    p.add_argument("which", nargs="?", default="all")
     p = add("archive", cmd_archive, "List cold-storage bundles (data, results, knowledge) and their rebuild recipes.")
     p.add_argument("--kind"); p.add_argument("-v", "--verbose", action="store_true")
     add("ingest", cmd_ingest, "Turn knowledge/*.md adopt / skeptical / design bullets into candidate insights (idempotent).")

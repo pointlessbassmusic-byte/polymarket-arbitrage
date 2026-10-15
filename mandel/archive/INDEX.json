@@ -202,10 +202,10 @@
    "name": "crypto-fear-greed-history",
    "kind": "data",
    "path": "mandel/archive/data/crypto-fear-greed-history.jsonl.gz",
-   "created_at": "2026-10-14T16:55:23.072977+00:00",
-   "rows": 3174,
-   "bytes": 23319,
-   "sha256": "f81c47a9de406b2d3fdfb6044d52440320f4d08aa19e948bdf7e980f5391b228",
+   "created_at": "2026-10-15T08:01:13.742855+00:00",
+   "rows": 3175,
+   "bytes": 23332,
+   "sha256": "0b75d42fb2cc816d9f3225f7b5b9aa8ccc59a397b97ef89550885e1efe253506",
    "tags": [
     "crypto",
     "history",
@@ -220,73 +220,73 @@
    "name": "daily-history-BTC-USD",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-BTC-USD.jsonl.gz",
-   "created_at": "2026-10-14T16:55:01.128829+00:00",
-   "rows": 4411,
-   "bytes": 120043,
-   "sha256": "63b243244804aebc45ff80617a2266673a244553c18fb9c872bfebd872b4c18d",
+   "created_at": "2026-10-15T08:01:29.064246+00:00",
+   "rows": 4412,
+   "bytes": 203971,
+   "sha256": "a72070c5404e4da5324092cfcff28e83283e6499a103abfbeed2bc75be30cac5",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/BTC-USD?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/BTC-USD?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-ETH-USD": {
    "name": "daily-history-ETH-USD",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-ETH-USD.jsonl.gz",
-   "created_at": "2026-10-14T16:55:02.599706+00:00",
-   "rows": 3262,
-   "bytes": 95789,
-   "sha256": "13aa7d9998be96032402a349a3f3f4cbbd88a66c3e9088b4eb6b079793454199",
+   "created_at": "2026-10-15T08:01:30.662459+00:00",
+   "rows": 3263,
+   "bytes": 170907,
+   "sha256": "40360bb8634bb99336dd26e830c18a0ed9eb403ea9e29437450293ea44464992",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/ETH-USD?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/ETH-USD?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-SPY": {
    "name": "daily-history-SPY",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-SPY.jsonl.gz",
-   "created_at": "2026-10-14T16:54:52.262506+00:00",
+   "created_at": "2026-10-15T08:01:17.256187+00:00",
    "rows": 8485,
-   "bytes": 239780,
-   "sha256": "77ff7fa74869fd437070a8d62e693771c2e89ab93c9c13b631ffdf9d5c800bba",
+   "bytes": 340161,
+   "sha256": "6438895061b57577a7ad9562ebd8478f5706e87d14fa5a3d7782bce12dbefff6",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/SPY?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/SPY?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-QQQ": {
    "name": "daily-history-QQQ",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-QQQ.jsonl.gz",
-   "created_at": "2026-10-14T16:54:53.707966+00:00",
+   "created_at": "2026-10-15T08:01:18.750032+00:00",
    "rows": 6943,
-   "bytes": 199565,
-   "sha256": "f39796e47ab73d7ffc9427504c67330c6db96e66b197df1faf5bc43c7338c362",
+   "bytes": 285013,
+   "sha256": "8ce577fa243b5cd4a95bd6bb98d44e1b5841f3270f4a073dc79f8b338865a5d8",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/QQQ?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/QQQ?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "cboe-VIX-history": {
    "name": "cboe-VIX-history",
@@ -1086,118 +1086,118 @@
    "name": "daily-history-GLD",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-GLD.jsonl.gz",
-   "created_at": "2026-10-14T16:54:58.093133+00:00",
+   "created_at": "2026-10-15T08:01:23.230571+00:00",
    "rows": 5510,
-   "bytes": 125275,
-   "sha256": "a43de09da9b9e8b6649ee3272fa6a4f2ec091fe1ad5d02780e5b3f4bded88660",
+   "bytes": 193642,
+   "sha256": "92a88d382f0696690cf968368a426a8ce6f327dce3d6dd3bd0d1c1909e5dcf9d",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/GLD?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/GLD?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-SLV": {
    "name": "daily-history-SLV",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-SLV.jsonl.gz",
-   "created_at": "2026-10-14T16:54:59.577223+00:00",
+   "created_at": "2026-10-15T08:01:24.701897+00:00",
    "rows": 5148,
-   "bytes": 115782,
-   "sha256": "bacb0788106e3934f9725def20fe9950bc4f5e7b84ddc2fed89691bf5bb6412e",
+   "bytes": 175304,
+   "sha256": "5dbdd8851137a4c2a9fd440c865d19b3b73156ea351195a066ba4b0cd3270d88",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/SLV?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/SLV?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-TLT": {
    "name": "daily-history-TLT",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-TLT.jsonl.gz",
-   "created_at": "2026-10-14T16:54:56.636659+00:00",
+   "created_at": "2026-10-15T08:01:21.751294+00:00",
    "rows": 6092,
-   "bytes": 172000,
-   "sha256": "3412f436571b8a7bd03e650ba94a4583af52eb9dc3ca7b1d87f0ff190f8e8627",
+   "bytes": 244828,
+   "sha256": "9fbdca83a91588d50411d520f677d3c4986b9f63b5ed501b487535d3bac189f1",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/TLT?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/TLT?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-IWM": {
    "name": "daily-history-IWM",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-IWM.jsonl.gz",
-   "created_at": "2026-10-14T16:54:55.190476+00:00",
+   "created_at": "2026-10-15T08:01:20.183864+00:00",
    "rows": 6635,
-   "bytes": 190879,
-   "sha256": "b1a7a791ec264cedc47f5e4f60d59cad99b382a009915e370f6df80c1000921c",
+   "bytes": 273302,
+   "sha256": "f79aa54dc96677361f6f407a36466fa6c5a98ab6e8eef278638d64ac2fcc964b",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/IWM?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/IWM?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-USO": {
    "name": "daily-history-USO",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-USO.jsonl.gz",
-   "created_at": "2026-10-14T11:16:52.638310+00:00",
-   "rows": 5160,
-   "bytes": 97709,
-   "sha256": "2d139817f3b87dcadb56dbcec3ea72180e843e8eb402b611da500fae622b744f",
+   "created_at": "2026-10-15T08:01:26.232730+00:00",
+   "rows": 5161,
+   "bytes": 175335,
+   "sha256": "0a2ac5fb7a57a9e80be3e688bc83aed799308610d6bc2c6d560e05608189ffc2",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/USO?period1=0&period2=now&interval=1d (available_at = bar time + 24h)",
+   "recipe": "yahoo /v8/finance/chart/USO?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close, volume}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-IBIT": {
    "name": "daily-history-IBIT",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-IBIT.jsonl.gz",
-   "created_at": "2026-10-14T11:16:54.026695+00:00",
-   "rows": 691,
-   "bytes": 13954,
-   "sha256": "eabdf7b1b0413551bd1aca2f444031320c1cefbc530e321488f42945c622ee3b",
+   "created_at": "2026-10-15T08:01:27.430008+00:00",
+   "rows": 692,
+   "bytes": 26521,
+   "sha256": "edf43dc799766be6a5d0f46799b5a9e312367760d502ab3d8a9a630682d7e106",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/IBIT?period1=0&period2=now&interval=1d (available_at = bar time + 24h)",
+   "recipe": "yahoo /v8/finance/chart/IBIT?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close, volume}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history--GSPC": {
    "name": "daily-history--GSPC",
    "kind": "data",
    "path": "mandel/archive/data/daily-history--GSPC.jsonl.gz",
-   "created_at": "2026-10-14T16:55:24.438061+00:00",
+   "created_at": "2026-10-15T08:01:15.271771+00:00",
    "rows": 24814,
-   "bytes": 513441,
-   "sha256": "236050c0bef7fa1386f7aef7aefb5290bab599eb3d91a566c8f9ad77b121800d",
+   "bytes": 794209,
+   "sha256": "6c345bd8c5f9e6613c2759276f2c9c14a5e603db6d92492f70390ed034c78377",
    "tags": [
     "daily",
     "history",
@@ -1206,331 +1206,331 @@
    "recipe": "yahoo /v8/finance/chart/^GSPC?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history--RUT": {
    "name": "daily-history--RUT",
    "kind": "data",
    "path": "mandel/archive/data/daily-history--RUT.jsonl.gz",
-   "created_at": "2026-10-14T16:54:25.237528+00:00",
+   "created_at": "2026-10-15T08:01:15.919628+00:00",
    "rows": 9848,
-   "bytes": 228541,
-   "sha256": "a79ad5b06271a0931d70fc4ef83ec7e4fb898386f8c9922ac3a5f76e0996ea0b",
+   "bytes": 360305,
+   "sha256": "be200bc31d000aa39a459df23714a8623cedc2c3b32a430760931af9c9db834f",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/^RUT?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/^RUT?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-EFA": {
    "name": "daily-history-EFA",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-EFA.jsonl.gz",
-   "created_at": "2026-10-14T16:54:26.638624+00:00",
+   "created_at": "2026-10-15T08:01:32.174287+00:00",
    "rows": 6320,
-   "bytes": 179749,
-   "sha256": "08c753fad15c91341ac03ea07d308bdece462a4a3a1e72e8982719888ff93651",
+   "bytes": 255590,
+   "sha256": "f86dc89f172bb48e07309f344af13009d421a66ae8e583ebcd158389bfc1f7f0",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/EFA?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/EFA?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-AGG": {
    "name": "daily-history-AGG",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-AGG.jsonl.gz",
-   "created_at": "2026-10-14T16:54:28.118016+00:00",
+   "created_at": "2026-10-15T08:01:33.661271+00:00",
    "rows": 5798,
-   "bytes": 153923,
-   "sha256": "b1e0a6c23d3f3fdce5c89d16346e0606fcc9e8692d68b1c43c040a28340d54fe",
+   "bytes": 215066,
+   "sha256": "1b9894892b6f544e4b15dd7819c8df1e4eff141a08080ea3fd33ab482986e13e",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/AGG?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/AGG?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-SPLV": {
    "name": "daily-history-SPLV",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-SPLV.jsonl.gz",
-   "created_at": "2026-10-14T16:54:29.579410+00:00",
+   "created_at": "2026-10-15T08:01:35.046582+00:00",
    "rows": 3884,
-   "bytes": 106939,
-   "sha256": "8683215d791edbb068e34f79102e1692d82f0fcb1cb837371f7938228d868046",
+   "bytes": 149096,
+   "sha256": "f610c62742b135ea938a7103c27b2837977d1f3175b66853c6b2518a2bcc36f4",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/SPLV?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/SPLV?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-SPHB": {
    "name": "daily-history-SPHB",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-SPHB.jsonl.gz",
-   "created_at": "2026-10-14T16:54:31.035528+00:00",
+   "created_at": "2026-10-15T08:01:36.573758+00:00",
    "rows": 3884,
-   "bytes": 106716,
-   "sha256": "7d0b8277cb8e5fb0ae605935f0c23aa1a06133c22d4d46a1ea4455807af89141",
+   "bytes": 152301,
+   "sha256": "331586b31aa87e7b4c5810b5286c18b8a88b4eac3f601f15d9caff1471c1b7e4",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/SPHB?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/SPHB?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-USMV": {
    "name": "daily-history-USMV",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-USMV.jsonl.gz",
-   "created_at": "2026-10-14T16:54:32.506086+00:00",
+   "created_at": "2026-10-15T08:01:38.063905+00:00",
    "rows": 3767,
-   "bytes": 102036,
-   "sha256": "f89d86626776eae1c7f73df86ae06eb721dcf385fa8e6cd47a4a05f6659a1b30",
+   "bytes": 143357,
+   "sha256": "6587a20cd082e6e01a91f4ef70a4d669e61155715af59e024cab181dede026d3",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/USMV?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/USMV?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-SVXY": {
    "name": "daily-history-SVXY",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-SVXY.jsonl.gz",
-   "created_at": "2026-10-14T16:54:34.000545+00:00",
+   "created_at": "2026-10-15T08:01:39.555946+00:00",
    "rows": 3779,
-   "bytes": 86517,
-   "sha256": "470ab2b0f9c8a2f0d14daf7d5644b23022497a99ebc66095209936b6927d1fbc",
+   "bytes": 135796,
+   "sha256": "ee58e6090b2cc3be973b220e8d0f50ebda0cdcf83e77a4eef1a3e270fed0bed3",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/SVXY?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/SVXY?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-GC-F": {
    "name": "daily-history-GC-F",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-GC-F.jsonl.gz",
-   "created_at": "2026-10-14T16:54:35.647826+00:00",
-   "rows": 6556,
-   "bytes": 132256,
-   "sha256": "e39607c6b8bf324a0d87c075e1199820ce3d1792272ab32d6b612eeedd27e0bf",
+   "created_at": "2026-10-15T08:01:41.155900+00:00",
+   "rows": 6557,
+   "bytes": 201109,
+   "sha256": "8448e610c3ae4182f78c2ae4f6aa9a2bcd264abbe5f9cf91213e5a68ba9f184c",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/GC=F?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/GC=F?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-SI-F": {
    "name": "daily-history-SI-F",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-SI-F.jsonl.gz",
-   "created_at": "2026-10-14T16:54:37.168880+00:00",
-   "rows": 6557,
-   "bytes": 151432,
-   "sha256": "fc8960801fab99a77d772cab5e197d8fc6e7a2064548a55347298b564ebcde1f",
+   "created_at": "2026-10-15T08:01:42.739431+00:00",
+   "rows": 6558,
+   "bytes": 232441,
+   "sha256": "dc6831f180e40983918c6698d463be5931b612100f3290666fb62b73c9d39f78",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/SI=F?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/SI=F?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-XLB": {
    "name": "daily-history-XLB",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-XLB.jsonl.gz",
-   "created_at": "2026-10-14T16:54:38.778719+00:00",
+   "created_at": "2026-10-15T08:01:44.193140+00:00",
    "rows": 6995,
-   "bytes": 197408,
-   "sha256": "b6dc254dff84d90ac757265426b2260b02e551d817cd15deaa28bd64a5c47a73",
+   "bytes": 279646,
+   "sha256": "2807635cb88fa383db28aff56136b4c3e9155a8e5f7f5c1a4ae07e783ac84ac8",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/XLB?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/XLB?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-XLE": {
    "name": "daily-history-XLE",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-XLE.jsonl.gz",
-   "created_at": "2026-10-14T16:54:40.276679+00:00",
+   "created_at": "2026-10-15T08:01:45.753331+00:00",
    "rows": 6995,
-   "bytes": 202662,
-   "sha256": "6d61fa02f3e1196c87b4a8258cd5b6407d8117560ec27aa97d38609e72470d2b",
+   "bytes": 287477,
+   "sha256": "e3a0a5fe2f7a711902d18c5c31c9e9bca20937f1306e1a9b9e06ad073347639f",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/XLE?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/XLE?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-XLF": {
    "name": "daily-history-XLF",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-XLF.jsonl.gz",
-   "created_at": "2026-10-14T16:54:41.750649+00:00",
+   "created_at": "2026-10-15T08:01:47.223203+00:00",
    "rows": 6995,
-   "bytes": 221128,
-   "sha256": "9b7a50c7be5a4cfcea474e76815c953e13b66ff7eca1520a5ee5d9de43f1340f",
+   "bytes": 322701,
+   "sha256": "5593b33fc94f2abc3669b3ddea36bc97ee6684e435f81cba05c944a9c3cc8fcb",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/XLF?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/XLF?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-XLI": {
    "name": "daily-history-XLI",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-XLI.jsonl.gz",
-   "created_at": "2026-10-14T16:54:43.156130+00:00",
+   "created_at": "2026-10-15T08:01:48.719940+00:00",
    "rows": 6995,
-   "bytes": 193974,
-   "sha256": "897ab89cc9e1e0d219172ba03b6dea6cfc0758d470c57f13a198af13f870882f",
+   "bytes": 272355,
+   "sha256": "08dd2fcd5650998cb33821bfc7f774cc69f8ce077d0b2651d2825c3b9aeac86e",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/XLI?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/XLI?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-XLK": {
    "name": "daily-history-XLK",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-XLK.jsonl.gz",
-   "created_at": "2026-10-14T16:54:44.676609+00:00",
+   "created_at": "2026-10-15T08:01:50.197871+00:00",
    "rows": 6995,
-   "bytes": 197899,
-   "sha256": "2979899201ddc1c8e8764896519773a69ddc03885cdd3afcb28e60f7edd68e6b",
+   "bytes": 280495,
+   "sha256": "0789b1fd9e0aa665757d859753d941f5886af019464bd93ef5660f63151733a5",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/XLK?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/XLK?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-XLP": {
    "name": "daily-history-XLP",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-XLP.jsonl.gz",
-   "created_at": "2026-10-14T16:54:46.169204+00:00",
+   "created_at": "2026-10-15T08:01:51.687646+00:00",
    "rows": 6995,
-   "bytes": 189022,
-   "sha256": "fd4a08675a30b9a01177406d6ebf16d76b8782c733a7b16f0b241e4bb5c643e4",
+   "bytes": 263250,
+   "sha256": "a8dd5244df532d98ae5baf6ad05c6a24531f6f043f5a36361eafe66ce11b5c42",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/XLP?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/XLP?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-XLU": {
    "name": "daily-history-XLU",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-XLU.jsonl.gz",
-   "created_at": "2026-10-14T16:54:47.624890+00:00",
+   "created_at": "2026-10-15T08:01:53.211663+00:00",
    "rows": 6995,
-   "bytes": 196601,
-   "sha256": "916e7ec47d70f549f04dae2138dfa4fa94d06173e3700a08dbfbdaaf06862088",
+   "bytes": 276513,
+   "sha256": "f1ed2248ba6701eafa05887c04d423f194fa7695daef33902b91ee8603653763",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/XLU?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/XLU?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-XLV": {
    "name": "daily-history-XLV",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-XLV.jsonl.gz",
-   "created_at": "2026-10-14T16:54:49.126928+00:00",
+   "created_at": "2026-10-15T08:01:54.707226+00:00",
    "rows": 6995,
-   "bytes": 191769,
-   "sha256": "72d9d89bc6c8f506c51d917df745fc03394083f3740cfe2d4619363a5bb28afc",
+   "bytes": 269401,
+   "sha256": "9730dd8d63f6aa8e5d3ebdb3ce1254232fb846380cecaea7471f93c6f2801746",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/XLV?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/XLV?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "daily-history-XLY": {
    "name": "daily-history-XLY",
    "kind": "data",
    "path": "mandel/archive/data/daily-history-XLY.jsonl.gz",
-   "created_at": "2026-10-14T16:54:50.651500+00:00",
+   "created_at": "2026-10-15T08:01:56.192094+00:00",
    "rows": 6995,
-   "bytes": 197488,
-   "sha256": "ca5bd2a43153704c5cd4eec0cd3e31e57f066444de529f02eb6b1726c8715e1d",
+   "bytes": 280951,
+   "sha256": "38c652d498d2c0ef8a697ebb56f43c80341e865ae5da11d6127ac3213a77cd13",
    "tags": [
     "daily",
     "history",
     "prices"
    ],
-   "recipe": "yahoo /v8/finance/chart/XLY?period1=0&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "recipe": "yahoo /v8/finance/chart/XLY?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
    "parked_reason": "",
    "in_git": true,
-   "schema": "value = {symbol, t, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   },
   "polymarket-books-2026-10-15": {
    "name": "polymarket-books-2026-10-15",
@@ -2038,6 +2038,438 @@
    "parked_reason": "",
    "in_git": true,
    "schema": "value = {quote_date, expiry, dte, target_dte, index_level, ratio{moneyness: IV/index}}"
+  },
+  "french-ff3-daily": {
+   "name": "french-ff3-daily",
+   "kind": "data",
+   "path": "mandel/archive/data/french-ff3-daily.jsonl.gz",
+   "created_at": "2026-10-15T07:55:37.942816+00:00",
+   "rows": 26317,
+   "bytes": 417410,
+   "sha256": "2190844f21a82191fe68073a11ff111c774a3c995bce5c9572f106dafc7d1253",
+   "tags": [
+    "factors",
+    "fama-french",
+    "history"
+   ],
+   "recipe": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_daily_CSV.zip (first daily block; percent returns; the library is revised monthly, so available_at is optimistic for recent rows)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, Mkt-RF, SMB, HML, RF} in percent"
+  },
+  "french-ff5-daily": {
+   "name": "french-ff5-daily",
+   "kind": "data",
+   "path": "mandel/archive/data/french-ff5-daily.jsonl.gz",
+   "created_at": "2026-10-15T07:55:38.559757+00:00",
+   "rows": 15897,
+   "bytes": 322611,
+   "sha256": "d7b38637df906472165e1e2d66288ff1068741287c080b54ddaf1d50ec8792a9",
+   "tags": [
+    "factors",
+    "fama-french",
+    "history"
+   ],
+   "recipe": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip (first daily block; percent returns; the library is revised monthly, so available_at is optimistic for recent rows)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, Mkt-RF, SMB, HML, RMW, CMA, RF} in percent"
+  },
+  "french-momentum-daily": {
+   "name": "french-momentum-daily",
+   "kind": "data",
+   "path": "mandel/archive/data/french-momentum-daily.jsonl.gz",
+   "created_at": "2026-10-15T07:55:39.505128+00:00",
+   "rows": 26216,
+   "bytes": 280471,
+   "sha256": "780215fa566890f00703d9a7a601b39a6094d594336ade8f2f6628bd6d41f66b",
+   "tags": [
+    "factors",
+    "fama-french",
+    "history"
+   ],
+   "recipe": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_daily_CSV.zip (first daily block; percent returns; the library is revised monthly, so available_at is optimistic for recent rows)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, Mom} in percent"
+  },
+  "french-industry49-daily": {
+   "name": "french-industry49-daily",
+   "kind": "data",
+   "path": "mandel/archive/data/french-industry49-daily.jsonl.gz",
+   "created_at": "2026-10-15T07:55:44.903649+00:00",
+   "rows": 26317,
+   "bytes": 3776307,
+   "sha256": "83e97d70e111fe21d0dff1f7634f6d6d058faa6196635b15cfc1eef79c787485",
+   "tags": [
+    "factors",
+    "fama-french",
+    "history"
+   ],
+   "recipe": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/49_Industry_Portfolios_daily_CSV.zip (first daily block; percent returns; the library is revised monthly, so available_at is optimistic for recent rows)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, Agric, Food, Soda, Beer, Smoke, Toys, Fun, Books...} in percent"
+  },
+  "fomc-meetings": {
+   "name": "fomc-meetings",
+   "kind": "data",
+   "path": "mandel/archive/data/fomc-meetings.jsonl.gz",
+   "created_at": "2026-10-15T08:01:05.420017+00:00",
+   "rows": 276,
+   "bytes": 6366,
+   "sha256": "2fcaf7268cdbd86c3644a2c8a50d6ea6c659e2ccffd5aec0354a4f58024c55fd",
+   "tags": [
+    "calendar",
+    "fomc",
+    "macro"
+   ],
+   "recipe": "federalreserve.gov fomchistorical<year>.htm h5 headings (<= 2020) + fomccalendars.htm panels (2021+); conference calls and cancelled meetings excluded",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {start, decision_day, scheduled, label, sep?, future}; available_at = meeting start for scheduled meetings (dates are announced a year ahead; conservative), decision day for unscheduled"
+  },
+  "aqr-bab-daily": {
+   "name": "aqr-bab-daily",
+   "kind": "data",
+   "path": "mandel/archive/data/aqr-bab-daily.jsonl.gz",
+   "created_at": "2026-10-15T08:00:15.648503+00:00",
+   "rows": 25369,
+   "bytes": 471265,
+   "sha256": "def617aa7cb633a2c2ac0d3a2d209500964d55cbf654f29735c4f10cd5bebf9b",
+   "tags": [
+    "aqr",
+    "factors",
+    "history"
+   ],
+   "recipe": "AQR Betting-Against-Beta-Equity-Factors-Daily.xlsx, sheet 'BAB Factors', column USA (decimal daily returns; AQR reconstructs the full history at every update, so past values are revised: not point in time)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {day, bab_usa}"
+  },
+  "deribit-funding-BTC-PERPETUAL": {
+   "name": "deribit-funding-BTC-PERPETUAL",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-funding-BTC-PERPETUAL.jsonl.gz",
+   "created_at": "2026-10-15T08:03:28.060255+00:00",
+   "rows": 65382,
+   "bytes": 2604089,
+   "sha256": "504a60b1af580d3e47872a5a9191e7a01ce88ca85b038278a7eb5ae914cdf1f8",
+   "tags": [
+    "crypto",
+    "funding",
+    "history"
+   ],
+   "recipe": "deribit /public/get_funding_rate_history BTC-PERPETUAL, 30-day pages from 2019-05",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {timestamp, index_price, prev_index_price, interest_1h, interest_8h}"
+  },
+  "deribit-delivery-prices-btc": {
+   "name": "deribit-delivery-prices-btc",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-delivery-prices-btc.jsonl.gz",
+   "created_at": "2026-10-15T08:03:34.759337+00:00",
+   "rows": 2639,
+   "bytes": 45002,
+   "sha256": "681b71d555032e87947b1a7b5cb5829e0507c4115a665cc0edb5991be2d77a06",
+   "tags": [
+    "crypto",
+    "history",
+    "settlement"
+   ],
+   "recipe": "deribit /public/get_delivery_prices index_name=btc_usd (paged); settlement = 30-minute TWAP to 08:00 UTC",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {date, delivery_price}"
+  },
+  "deribit-quarterly-futures-btc": {
+   "name": "deribit-quarterly-futures-btc",
+   "kind": "data",
+   "path": "mandel/archive/data/deribit-quarterly-futures-btc.jsonl.gz",
+   "created_at": "2026-10-15T08:03:43.687658+00:00",
+   "rows": 10255,
+   "bytes": 176794,
+   "sha256": "1ef01120c095c9909485ef6d2f5a0da11807b3d8172e599ee9e053dd49b9333b",
+   "tags": [
+    "crypto",
+    "futures",
+    "history"
+   ],
+   "recipe": "deribit /public/get_tradingview_chart_data resolution=1D for quarterly names BTC-<last Friday of Mar/Jun/Sep/Dec> since 2019",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {instrument, expiry, ts_ms (bar open), close}"
+  },
+  "cboe-vx-futures": {
+   "name": "cboe-vx-futures",
+   "kind": "data",
+   "path": "mandel/archive/data/cboe-vx-futures.jsonl.gz",
+   "created_at": "2026-10-15T08:00:08.436592+00:00",
+   "rows": 31000,
+   "bytes": 764008,
+   "sha256": "49ae83800b74773b802740059fb3620dd2c2bd9c8b7fc61fe5e252b7e5922bfc",
+   "tags": [
+    "futures",
+    "history",
+    "volatility"
+   ],
+   "recipe": "https://cdn.cboe.com/data/us/futures/market_statistics/historical_data/VX/VX_<expiry>.csv for each monthly expiry",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {expiry, day, settle, close, volume, open_interest}"
+  },
+  "daily-history-IVV": {
+   "name": "daily-history-IVV",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-IVV.jsonl.gz",
+   "created_at": "2026-10-15T08:01:57.667130+00:00",
+   "rows": 6640,
+   "bytes": 270234,
+   "sha256": "e2a9c405cc2d8506e26a407aba5f508ac2bed3be19303f7d2f65b89861049a71",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/IVV?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-TQQQ": {
+   "name": "daily-history-TQQQ",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-TQQQ.jsonl.gz",
+   "created_at": "2026-10-15T08:01:59.149151+00:00",
+   "rows": 4194,
+   "bytes": 207559,
+   "sha256": "bc579c7e1f02d86608c2cb89c622b7b00e0f1c5f8c8978427563028e06e399de",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/TQQQ?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-SQQQ": {
+   "name": "daily-history-SQQQ",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-SQQQ.jsonl.gz",
+   "created_at": "2026-10-15T08:02:00.623595+00:00",
+   "rows": 4194,
+   "bytes": 146521,
+   "sha256": "96e512b148db0bf27be974d5021a772b88ce00e651472129213739e0e0735d03",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/SQQQ?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-IJR": {
+   "name": "daily-history-IJR",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-IJR.jsonl.gz",
+   "created_at": "2026-10-15T08:02:02.365243+00:00",
+   "rows": 6635,
+   "bytes": 274235,
+   "sha256": "a4b29cefe4943224e393508d9a479aab287c9a5cfbd90c7d731552c6dd8ffc4a",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/IJR?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-IWD": {
+   "name": "daily-history-IWD",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-IWD.jsonl.gz",
+   "created_at": "2026-10-15T08:02:03.746544+00:00",
+   "rows": 6635,
+   "bytes": 262339,
+   "sha256": "c1453f776640f16614ec3a17593ed03d2fdd8912ec00fd8f0349dbb7c94aa549",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/IWD?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-IWF": {
+   "name": "daily-history-IWF",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-IWF.jsonl.gz",
+   "created_at": "2026-10-15T08:02:05.223449+00:00",
+   "rows": 6635,
+   "bytes": 278565,
+   "sha256": "2558a7be7712fd22ddc8f1b98622e2777ac5a1cb58a97f16fe29d7510b0e3653",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/IWF?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-QUAL": {
+   "name": "daily-history-QUAL",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-QUAL.jsonl.gz",
+   "created_at": "2026-10-15T08:02:06.527354+00:00",
+   "rows": 3331,
+   "bytes": 131981,
+   "sha256": "a3710b436dd631423fa154eaf29141c59d593d0314daa5fe46b6974a82d45a77",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/QUAL?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-COWZ": {
+   "name": "daily-history-COWZ",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-COWZ.jsonl.gz",
+   "created_at": "2026-10-15T08:02:08.006361+00:00",
+   "rows": 2465,
+   "bytes": 100229,
+   "sha256": "0ba4d207289d733a4b07c5e3b946f36a94776d7a1f0a6fbbaa7463b3b225cb6e",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/COWZ?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-PKW": {
+   "name": "daily-history-PKW",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-PKW.jsonl.gz",
+   "created_at": "2026-10-15T08:02:09.657647+00:00",
+   "rows": 4984,
+   "bytes": 188831,
+   "sha256": "a8caabc771fb48a01acd4e4756aa0915196372966cae5dffb3a030d344162014",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/PKW?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-DBC": {
+   "name": "daily-history-DBC",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-DBC.jsonl.gz",
+   "created_at": "2026-10-15T08:02:11.142213+00:00",
+   "rows": 5205,
+   "bytes": 191944,
+   "sha256": "c7d4cfdf792714ad845a12a6de21c12cec4806cae7fb1d0f3201f2f3c9183d3f",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/DBC?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-IEF": {
+   "name": "daily-history-IEF",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-IEF.jsonl.gz",
+   "created_at": "2026-10-15T08:02:12.702789+00:00",
+   "rows": 6092,
+   "bytes": 231050,
+   "sha256": "967e44324574a41d62e0273e7622d414e7358df7a5edc27a29cbc4a6562b8260",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/IEF?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-VNQ": {
+   "name": "daily-history-VNQ",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-VNQ.jsonl.gz",
+   "created_at": "2026-10-15T08:02:14.184084+00:00",
+   "rows": 5546,
+   "bytes": 221831,
+   "sha256": "0f85672f88707e3e56b2007e8c9a130422c17f2d97b310cde93a616218e31a81",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/VNQ?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-CL-F": {
+   "name": "daily-history-CL-F",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-CL-F.jsonl.gz",
+   "created_at": "2026-10-15T08:02:15.638983+00:00",
+   "rows": 6565,
+   "bytes": 232528,
+   "sha256": "14bc6140a02fbc82a6d5d9c81cb7df0bb26d67a7f2d40d94bf27c290ce175acf",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/CL=F?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-history-ES-F": {
+   "name": "daily-history-ES-F",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ES-F.jsonl.gz",
+   "created_at": "2026-10-15T08:02:17.135850+00:00",
+   "rows": 6584,
+   "bytes": 205438,
+   "sha256": "d1adeed89b9efe8bd03fad7a6d8023b74bd29f3a9061da8026f7c5b3e098398e",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ES=F?period1=-1400000000 (1925)&period2=now&interval=1d (available_at = bar time + 24h: a daily close is usable the next day)",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
   }
  }
 }
