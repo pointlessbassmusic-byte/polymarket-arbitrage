@@ -20,12 +20,13 @@ What the archive holds and what each claim needs
            leaves 9 windows / 7 catalysts; of those, 3 are timed from a realised block height (only a few-day estimate at
            the entry), so the primary statistic uses the 6 windows / 4 catalysts timed from a date known ex ante, against
            min_n 20 catalysts.
+  * FETCHED 2026-10-15 by ``mandel.data.deribit_history`` (local only; each request is in ``REQUESTS``): T-263
+    ``deribit-option-trades-fomc`` (38 decision windows), T-268 ``deribit-dvol-futures-trades`` (42 expired futures),
+    T-257 / T-262 ``deribit-option-trades-daily-BTC`` (07:00-09:00 UTC trades, 1,779 days, 2.47M rows; streamed).
   * DECLARED BUNDLES (not archived; harnesses run on synthetic data in the tests and return inconclusive here, naming the
-    bundle and the request that fills it, see ``REQUESTS``): T-263 ``deribit-option-trades-fomc``, T-268
-    ``deribit-dvol-futures-trades``, T-257 / T-262 ``deribit-option-trades-daily-BTC``, T-195 / T-196
-    ``deribit-book-hourly-BTC`` (the two daily ``deribit-book-BTC-<date>`` captures are used as partial evidence), T-260
-    ``deribit-box-monthly`` (fetcher ``mandel.data.options_misc.fetch_tardis_box_monthly``, blocked from this host) plus the
-    daily book captures.
+    bundle and the request that fills it, see ``REQUESTS``): T-195 / T-196 ``deribit-book-hourly-BTC`` (the two daily
+    ``deribit-book-BTC-<date>`` captures are used as partial evidence), T-260 ``deribit-box-monthly`` (fetcher
+    ``mandel.data.options_misc.fetch_tardis_box_monthly``, blocked from this host) plus the daily book captures.
 
 Conventions
   * Rows are used only when ``available_at`` is not after the bundle's capture time. Times are UTC; Deribit options and
@@ -79,6 +80,7 @@ from typing import Callable, Optional, Sequence
 
 import numpy as np
 
+from mandel.experiments.batch6b_hedge import vx_curve
 from mandel.experiments.underlying2 import _verdict
 from mandel.options import bs
 
@@ -102,7 +104,8 @@ HOURLY_B = {"BTC": "hourly-BTC-USD", "ETH": "hourly-ETH-USD"}
 BTC_DAILY_B = "daily-history-BTC-USD"
 BOOK_PREFIX = "deribit-book-BTC-"
 BOOK_FIRST_DAY = "2026-10-14"
-# declared, not yet archived
+VX_B = "cboe-vx-futures"
+# fetched 2026-10-15 by mandel.data.deribit_history (local only), except HOURLY_BOOK_B and BOX_MONTHLY_B (declared, not yet archived)
 FOMC_TRADES_B = "deribit-option-trades-fomc"
 DVOLF_B = "deribit-dvol-futures-trades"
 DAILY_TRADES_B = "deribit-option-trades-daily-BTC"
@@ -169,6 +172,9 @@ T222_MIN_N, T222_TAU = 20, 12
 REALISED_TIME = "realised (ex post)"
 T263_MIN_N = 16
 T268_MIN_N = 12
+T268_TARGET = 2.0                                     # the pass's 'target > 2 vol points' (rule 1), on the point estimate
+T268_TOLS = (6.0, 12.0, 24.0, 36.0, 48.0, None)      # 'trades nearest T-7d' sets no time tolerance; None = any lag
+T268_HEAD = 24.0                                      # headline construction
 T195_MIN_N, T195_MNY, T195_DTE = 500, 0.10, (7.0, 180.0)
 T196_MIN_N, T196_THR, T196_MNY = 200, 0.01, 0.20
 T260_MIN_N, T260_THR, T260_FRAC = 60, 0.02, 0.70
@@ -2210,6 +2216,8 @@ def dvolf_inputs(rows: Sequence[dict]) -> tuple:
     trades, settle = defaultdict(list), {}
     for r in rows:
         v = r["value"]
+        if r.get("kind") in ("future-window", "future-settlement") and v.get("instrument_name"):
+            trades.setdefault(v["instrument_name"], [])            # every archived expiry, traded or not
         if r.get("kind") == "future-trade":
             try:
                 v["_ts"] = int(v["timestamp"])
@@ -2226,18 +2234,20 @@ def dvolf_inputs(rows: Sequence[dict]) -> tuple:
     return dict(trades), settle
 
 
-def dvolf_points(trades: dict, settle: dict, lead_days: float = 7.0, tol_h: float = 24.0) -> tuple:
-    """Per expired instrument: the mark of the trade nearest expiry - 7 d (within +-24 h) minus the settlement DVOL (the
-    delivery price; else the DVOL index_price of the last trade within 6 h before expiry). Returns (points, dropped)."""
+def dvolf_points(trades: dict, settle: dict, lead_days: float = 7.0, tol_h: Optional[float] = 24.0) -> tuple:
+    """Per expired instrument: the mark of the trade nearest expiry - 7 d (within +-tol_h; None = any lag) minus the
+    settlement DVOL (the delivery price; else the DVOL index_price of the last trade within 6 h before expiry). Returns
+    (points, dropped); every instrument passed in is either a point or dropped with its reason."""
     pts, drop = [], []
     for inst, ts in sorted(trades.items()):
         if not ts:
+            drop.append((inst, "no trades in the archived window [T-8d, T]"))
             continue
         exp = _ms(ts[0]["expiry"]) if len(str(ts[0].get("expiry", ""))) > 10 else expiry_ms(str(ts[0].get("expiry")))
         tgt = exp - int(lead_days * DAY_MS)
         near = min(ts, key=lambda t: abs(t["_ts"] - tgt))
-        if abs(near["_ts"] - tgt) > tol_h * HOUR_MS:
-            drop.append((inst, "no trade within 24 h of T-7d"))
+        if tol_h is not None and abs(near["_ts"] - tgt) > tol_h * HOUR_MS:
+            drop.append((inst, f"no trade within {tol_h:g} h of T-7d"))
             continue
         s = settle.get(inst)
         how = "delivery price"
@@ -2249,29 +2259,100 @@ def dvolf_points(trades: dict, settle: dict, lead_days: float = 7.0, tol_h: floa
             drop.append((inst, "no settlement"))
             continue
         try:
-            F = float(near["mark_price"])
+            F, idx = float(near["mark_price"]), float(near.get("index_price") or float("nan"))
             pts.append({"instrument": inst, "expiry": _iso(exp), "F_T7": F, "settle": s, "diff": F - s, "settle_how": how,
-                        "lag_h": (near["_ts"] - tgt) / HOUR_MS, "index_at_T7": float(near.get("index_price") or float("nan")),
-                        "trade_minus_mark": float(near["price"]) - F})
+                        "lag_h": (near["_ts"] - tgt) / HOUR_MS, "index_at_T7": idx, "price": float(near["price"]),
+                        "trade_minus_mark": float(near["price"]) - F, "mark_is_index": abs(F - idx) < 1e-6})
         except (TypeError, ValueError, KeyError):
             drop.append((inst, "unparseable trade"))
     pts.sort(key=lambda p: p["expiry"])
     return pts, drop
 
 
-def dvolf_claim(pts: list[dict], drop: list, n_boot: Optional[int] = None) -> dict:
-    v, why, det = judge_mean_ci([p["diff"] for p in pts], T268_MIN_N, "expiries", "mean (F at T-7d - settlement DVOL)",
-                                n_boot, pct=False)
-    stat = {"n": det["n"], "min_n": T268_MIN_N, "judge": det, "points": pts, "dropped": drop,
-            "target_2_vol_points_met": bool(det.get("mean") is not None and det["mean"] > 2.0),
-            "median_abs_trade_minus_mark": float(np.median([abs(p["trade_minus_mark"]) for p in pts])) if pts else None}
+def vx_rolldown(curve: dict, expiries: Sequence[str], lead_days: int = 7) -> list[dict]:
+    """T-268's structural control on the same dates: the front VX contract alive on each expiry day E (first VX expiry
+    >= E), its settle on the last VX day <= E - 7 d minus its settle on the last VX day <= E (VIX points)."""
+    days, out = sorted(curve), []
+    for e in expiries:
+        i, j = bisect.bisect_right(days, _add(e, -lead_days)) - 1, bisect.bisect_right(days, e) - 1
+        if i < 0 or days[i] < _add(e, -lead_days - 4) or days[j] < _add(e, -4):
+            continue
+        live = [c for c in curve[days[j]] if c >= e and c in curve[days[i]]]
+        if live:
+            c = min(live)
+            out.append({"expiry": e, "vx_contract": c, "from": days[i], "to": days[j],
+                        "rolldown": curve[days[i]][c] - curve[days[j]][c]})
+    return out
+
+
+def _mci(x, n_boot: Optional[int]) -> dict:
+    """n, mean and two-sided 95% iid bootstrap CI of the finite values (a reported reading)."""
+    x = np.asarray([v for v in x if v is not None and np.isfinite(v)], float)
+    return {"n": int(x.size), "mean": float(x.mean()) if x.size else None, "ci": list(mean_ci(x, 1, n_boot))}
+
+
+def _mtxt(r: dict) -> str:
+    return f"{_f(r['mean'], 2, sign=True)} (n {r['n']}, CI {_ci(r['ci'], 2)})"
+
+
+def dvolf_claim(trades: dict, settle: dict, n_boot: Optional[int] = None, vx: Optional[dict] = None) -> dict:
+    """Both criteria of the pass (95% CI > 0; mean > 2 vol points) under every time tolerance the trial's 'trades nearest
+    T-7d' permits: a criterion passes only if it passes under all, fails only if it fails under all, else undecided.
+    The 24 h construction gives the headline numbers, the index-mark control, the decomposition and the VX control."""
+    runs = {t: dvolf_points(trades, settle, tol_h=t) for t in T268_TOLS}
+    pts, drop = runs[T268_HEAD]
+    _, _, det = judge_mean_ci([p["diff"] for p in pts], T268_MIN_N, "expiries", "mean", n_boot, pct=False)
+    cons = {}
+    for t, (p, _) in runs.items():
+        r = _mci([q["diff"] for q in p], n_boot)
+        lo, hi = r["ci"]
+        big = r["n"] >= T268_MIN_N                          # rule 5: below min_n only a decisive failure counts
+        ci_ok = None if lo is None else True if r["mean"] > 0 and lo > 0 else False if big or hi <= 0 else None
+        tg_ok = None if lo is None else True if r["mean"] > T268_TARGET else False if big or hi <= T268_TARGET else None
+        cons["no cutoff" if t is None else f"{t:g} h"] = dict(r, ci_pass=ci_ok, target_pass=tg_ok)
+
+    def crit(name, key):
+        v = [c[key] for c in cons.values()]
+        ok = True if all(x is True for x in v) else False if all(x is False for x in v) else None
+        lab = ", ".join(f"{k} {({True: 'pass', False: 'fail'}).get(c[key], 'undecided')}" for k, c in cons.items())
+        return f"{name} under every trade-time tolerance ({lab})" + (" [undecided]" if ok is None else ""), ok
+    nmin = min(c["n"] for c in cons.values())
+    v, why = _verdict([
+        crit("mean (F at T-7d - settlement DVOL) > 0 with 95% CI excluding 0", "ci_pass"),
+        crit(f"mean > {T268_TARGET:g} vol points (the pass's target, point estimate)", "target_pass"),
+        (f"n >= trial min_n under every tolerance (smallest {nmin} of {T268_MIN_N} expiries)", True if nmin >= T268_MIN_N else None)])
+    im = {"n_mark_is_index": sum(p["mark_is_index"] for p in pts), "of": len(pts),
+          "real_marks_only": _mci([p["diff"] for p in pts if not p["mark_is_index"]], n_boot),
+          "trade_price_for_index_marks": _mci([(p["price"] if p["mark_is_index"] else p["F_T7"]) - p["settle"] for p in pts], n_boot),
+          "trade_prices_throughout": _mci([p["price"] - p["settle"] for p in pts], n_boot)}
+    dec = {"basis_T7": _mci([p["F_T7"] - p["index_at_T7"] for p in pts], n_boot),
+           "spot_drift": _mci([p["index_at_T7"] - p["settle"] for p in pts], n_boot)}
+    b, d = dec["basis_T7"]["mean"], dec["spot_drift"]["mean"]
+    dec["carrier"] = None if b is None or d is None else "spot DVOL drift" if abs(d) >= abs(b) else "futures basis at T-7d"
+    vxr = None if vx is None else vx_rolldown(vx, [p["expiry"][:10] for p in pts])
+    vxc = None if vxr is None else dict(_mci([r["rolldown"] for r in vxr], n_boot), points=vxr)
+    stat = {"n": det["n"], "min_n": T268_MIN_N, "judge": det, "points": pts, "dropped": drop, "archived_expiries": len(trades),
+            "constructions": cons, "target_2_vol_points_met": bool(det.get("mean") is not None and det["mean"] > T268_TARGET),
+            "median_abs_trade_minus_mark": float(np.median([abs(p["trade_minus_mark"]) for p in pts])) if pts else None,
+            "index_mark_control": im, "decomposition": dec, "vx_control": vxc}
     reason = (
-        f"T-268 on BTCDVOL_USDC futures trades ({DVOLF_B}): mark of the trade nearest expiry - 7 d (within 24 h) minus the "
-        f"DVOL settlement, {det['n']} expiries"
+        f"T-268 on BTCDVOL_USDC futures trades ({DVOLF_B}): mark of the trade nearest expiry - 7 d minus the DVOL settlement. "
+        f"Headline (trade within 24 h of T-7d): {det['n']} expiries"
         + (f" {pts[0]['expiry'][:10]}..{pts[-1]['expiry'][:10]}" if pts else "")
-        + f"; mean {_f(det.get('mean'), 2, sign=True)} vol points (target > 2 reported: {stat['target_2_vol_points_met']}), "
-        f"95% iid bootstrap CI {_ci(det.get('ci'), 2)}, positive in {_f(det.get('hit'), 2)} of expiries; median |trade - "
-        f"mark| {_f(stat['median_abs_trade_minus_mark'], 2)}" + (f"; dropped {drop}" if drop else ""))
+        + f"; mean {_f(det.get('mean'), 2, sign=True)} vol points, 95% iid bootstrap CI {_ci(det.get('ci'), 2)}, positive in "
+        f"{_f(det.get('hit'), 2)} of expiries. The trial's 'trades nearest T-7d' sets no time tolerance, so both criteria are "
+        f"judged under each: " + "; ".join(f"{k} {_mtxt(c)}" for k, c in cons.items())
+        + f". Index-mark control (reported, not a criterion): in {im['n_mark_is_index']} of {im['of']} headline points the "
+        f"mark_price equals index_price (Deribit published the DVOL index as the futures mark); real marks only "
+        f"{_mtxt(im['real_marks_only'])}; trade price in place of an index-equal mark {_mtxt(im['trade_price_for_index_marks'])}; "
+        f"trade prices throughout {_mtxt(im['trade_prices_throughout'])}. Decomposition: futures basis at T-7d (mark - index) "
+        f"{_mtxt(dec['basis_T7'])} plus spot DVOL drift (index at T-7d - settlement) {_mtxt(dec['spot_drift'])}; the "
+        f"{dec['carrier']} carries the larger part of the mean. "
+        + ("VIX futures roll-down control not run here (cboe-vx-futures not archived). " if vxc is None else
+           f"VIX futures roll-down control (structural comparison, reported): the front VX contract alive on each expiry day, "
+           f"settle on the last VX day <= T-7d minus settle on the last VX day <= expiry day, {_mtxt(vxc)} VIX points. ")
+        + f"Median |trade - mark| {_f(stat['median_abs_trade_minus_mark'], 2)}. Archived expiries {len(trades)}: {len(pts)} "
+        f"used, dropped {drop}")
     return {"stat": stat, "n": det["n"], "verdict": v, "reason": reason + f" — {why}"}
 
 
@@ -2281,8 +2362,8 @@ def b6b_drb_dvol_futures_basis(archive):
     if miss:
         return miss
     trades, settle = dvolf_inputs(_rows(archive, DVOLF_B))
-    pts, drop = dvolf_points(trades, settle)
-    return _out(dvolf_claim(pts, drop))
+    vx = vx_curve(_rows(archive, VX_B)) if _has(archive, VX_B) else None
+    return _out(dvolf_claim(trades, settle, vx=vx))
 
 
 # ============================================================================ book snapshots (T-195/196/260) ==

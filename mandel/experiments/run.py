@@ -1109,7 +1109,7 @@ BATCH_BUNDLES = {
     "b6b_drb_calendar_inversion": ["deribit-delivery-prices-btc", "deribit-option-trades-daily-BTC"],
     "b6b_drb_catalyst_strangle": ["deribit-dvol-BTC-history", "deribit-dvol-ETH-history", "deribit-option-trades-catalysts"],
     "b6b_drb_cme_ibit_tax": ["deribit-delivery-prices-btc", "deribit-dvol-BTC-history", "deribit-funding-BTC-PERPETUAL", "deribit-quarterly-futures-btc", "fred-DTB3"],
-    "b6b_drb_dvol_futures_basis": ["deribit-dvol-futures-trades"],
+    "b6b_drb_dvol_futures_basis": ["cboe-vx-futures", "deribit-dvol-futures-trades"],
     "b6b_drb_expiry_friday_straddle": ["deribit-delivery-prices-btc", "deribit-dvol-BTC-history", "deribit-dvol-ETH-history", "deribit-funding-BTC-PERPETUAL", "fomc-meetings", "fred-DTB3", "hourly-BTC-USD", "hourly-ETH-USD", "macro-release-cpi"],
     "b6b_drb_fomc_event_straddle": ["deribit-delivery-prices-btc", "deribit-dvol-BTC-history", "deribit-option-trades-fomc", "fomc-meetings"],
     "b6b_drb_parity_violations": ["deribit-book-BTC-*", "deribit-funding-BTC-PERPETUAL", "deribit-quarterly-futures-btc"],

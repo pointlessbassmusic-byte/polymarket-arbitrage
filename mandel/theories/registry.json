@@ -6505,9 +6505,10 @@
    "status": "inconclusive",
    "blocked_on": "",
    "results": [
-    "X-8587bd48"
+    "X-8587bd48",
+    "X-f3e5922c"
    ],
-   "notes": "from the options-library library: BTC zero-cost collar / risk reversal on inventory (skew harvest); harness suggestion: Extend deribit_book capture to store 25d RR per expiry; harness on accumulated history | verifier: corrected claim/trial"
+   "notes": "from the options-library library: BTC zero-cost collar / risk reversal on inventory (skew harvest); harness suggestion: Extend deribit_book capture to store 25d RR per expiry; harness on accumulated history | verifier: corrected claim/trial | 2026-10-15 Deribit history: below min_n (24 of 40 non-overlapping entries); pooled mean +0.04% of S (CI -0.52..+0.62), hit rate 0.50 against the 55% bar; both failures are not decisive at this n, so it stays inconclusive. 257 of 262 signals sell the put wing."
   },
   {
    "id": "T-258",
@@ -6645,12 +6646,13 @@
     "b6b_drb_calendar_inversion"
    ],
    "testable_now": true,
-   "status": "inconclusive",
+   "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-ce9af676"
+    "X-ce9af676",
+    "X-550ca26f"
    ],
-   "notes": "from the options-library library: BTC IV term-structure calendar (DVOL vs long-dated IV); harness suggestion: Store ATM IV per expiry per day from deribit_book; term-slope harness mirrors the existing VIX/VIX3M one | verifier: corrected claim/trial"
+   "notes": "from the options-library library: BTC IV term-structure calendar (DVOL vs long-dated IV); harness suggestion: Store ATM IV per expiry per day from deribit_book; term-slope harness mirrors the existing VIX/VIX3M one | verifier: corrected claim/trial | 2026-10-15 Deribit history: refuted before recording: the first preview priced legs on spot instead of each expiry's own forward and pooled 110 overlapping signal days; on the trial's non-overlapping walks (rule 10) the mean is +0.93% of S, CI -0.48..+2.34, 0 of 16 start offsets pass, and one episode (2024 US election) carried 48% of the earlier P&L."
   },
   {
    "id": "T-263",
@@ -6674,12 +6676,13 @@
     "b6b_drb_fomc_event_straddle"
    ],
    "testable_now": true,
-   "status": "inconclusive",
+   "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-dbb078ec"
+    "X-dbb078ec",
+    "X-08824f68"
    ],
-   "notes": "from the options-library library: Crypto event straddle / pre-event IV crush; harness suggestion: Event-date table + straddle capture; interim DVOL pre/post FOMC t-test from existing DVOL history | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Crypto event straddle / pre-event IV crush; harness suggestion: Event-date table + straddle capture; interim DVOL pre/post FOMC t-test from existing DVOL history | verifier: corrected claim/trial | 2026-10-15 Deribit history: BTC FOMC straddle priced from Deribit trade prints in the 24 h before each decision: implied minus realised move +0.13% (CI -0.35..+0.59), hit rate 0.53 over 38 decisions; no event premium to harvest."
   },
   {
    "id": "T-264",
@@ -6823,10 +6826,12 @@
     "b6b_drb_dvol_futures_basis"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: DVOL futures vs straddle basis (vol-of-vol carry); harness suggestion: Extend deribit_book to USDC futures filtered to DVOL instruments | verifier: corrected claim/trial"
+   "results": [
+    "X-574db0ce"
+   ],
+   "notes": "from the options-library library: DVOL futures vs straddle basis (vol-of-vol carry); harness suggestion: Extend deribit_book to USDC futures filtered to DVOL instruments | verifier: corrected claim/trial | 2026-10-15 Deribit history: inconclusive: the 95% CI > 0 holds under every trade-time tolerance (6 h to no cutoff), but the pass's 'target > 2 vol points' holds at 6/12/24 h and fails at 36/48 h and with no cutoff (+1.91 to +1.93), so it is undecided. Most of the +2.14 mean is spot DVOL falling over the final week (+1.87, CI +0.57..+3.12); the futures basis at T-7d is only +0.26 (CI -0.11..+0.64), and 16 of 38 'marks' are the DVOL index itself (Deribit published no independent futures mark). Reading: a DVOL drift into expiry, not a futures term premium."
   },
   {
    "id": "T-269",

@@ -853,20 +853,29 @@ def test_fomc_harness_missing_reports_dvol_control_then_runs():
 
 # ====================================================================================== T-268 DVOL futures basis ==
 
-def _dvolf_world(diffs, noise_lag_h=2):
+def _dvolf_world(diffs, noise_lag_h=2, lags=None, idx=None, untraded=()):
+    """One expiry per diff: a trade ``lag`` h before T-7d with mark = settle + diff and a farther one (never picked);
+    ``idx(i, settle, mark)`` sets index_price (default 49); ``untraded`` instruments have window/settlement rows only."""
     rows = []
     for i, dd in enumerate(diffs):
         e = (date(2023, 1, 4) + timedelta(days=7 * i)).isoformat()
         exp = m.expiry_ms(e)
         inst = f"BTCDVOL_USDC-{i}"
         settle = 50.0 + i % 5
-        for lag, mark in ((-noise_lag_h, settle + dd), (30, settle + dd + 9)):   # the far trade must not be picked
-            t = exp - 7 * DAY + lag * HOUR
+        lag = noise_lag_h if lags is None else lags[i]
+        for lg, mark in ((-lag, settle + dd), (max(30, 2 * lag), settle + dd + 9)):   # the far trade must not be picked
+            t = exp - 7 * DAY + lg * HOUR
             rows.append({"kind": "future-trade", "available_at": _iso(t), "value": {
                 "instrument_name": inst, "expiry": m._iso(exp), "timestamp": t, "price": mark + 0.1, "mark_price": mark,
-                "index_price": 49.0, "amount": 1.0, "direction": "buy"}})
+                "index_price": 49.0 if idx is None else idx(i, settle, mark), "amount": 1.0, "direction": "buy"}})
         rows.append({"kind": "future-settlement", "available_at": _iso(exp),
                      "value": {"instrument_name": inst, "expiry": m._iso(exp), "delivery_price": settle}})
+    for inst in untraded:
+        exp = m.expiry_ms("2024-01-31")
+        rows.append({"kind": "future-window", "available_at": _iso(exp), "value": {"instrument_name": inst, "expiry": m._iso(exp),
+                                                                                 "trades_seen": 0}})
+        rows.append({"kind": "future-settlement", "available_at": _iso(exp),
+                     "value": {"instrument_name": inst, "expiry": m._iso(exp), "delivery_price": 40.0}})
     return rows
 
 
@@ -875,11 +884,63 @@ def test_dvol_futures_planted_passes_null_fails():
     tr, st = m.dvolf_inputs(_dvolf_world(3.0 + 0.5 * rng.normal(size=14)))
     pts, drop = m.dvolf_points(tr, st)
     assert len(pts) == 14 and not drop and all(abs(p["lag_h"]) <= 2 for p in pts)
-    r = m.dvolf_claim(pts, drop, n_boot=NB)
+    r = m.dvolf_claim(tr, st, n_boot=NB)
     assert r["verdict"] == "supported" and r["stat"]["target_2_vol_points_met"], r["reason"]
     tr, st = m.dvolf_inputs(_dvolf_world([2.0, -2.0] * 7))
-    r = m.dvolf_claim(*m.dvolf_points(tr, st), n_boot=NB)
+    r = m.dvolf_claim(tr, st, n_boot=NB)
     assert r["verdict"] == "not_supported", r["reason"]
+
+
+def test_dvol_futures_target_2_vol_points_is_a_criterion():
+    # rule 1: CI > 0 holds but the mean (+1) misses the pass's 'target > 2 vol points' under every tolerance
+    rng = np.random.default_rng(7)
+    tr, st = m.dvolf_inputs(_dvolf_world(1.0 + 0.2 * rng.normal(size=14)))
+    r = m.dvolf_claim(tr, st, n_boot=NB)
+    assert r["verdict"] == "not_supported" and "failed: mean > 2 vol points" in r["reason"], r["reason"]
+    assert all(c["ci_pass"] and c["target_pass"] is False for c in r["stat"]["constructions"].values())
+
+
+def test_dvol_futures_tolerances_must_agree():
+    # 14 expiries traded 2 h from T-7d (+3), 6 traded only 30 h away (-2): the 24 h target passes, 36/48 h and no cutoff fail
+    tr, st = m.dvolf_inputs(_dvolf_world([3.0] * 14 + [-2.0] * 6, lags=[2] * 14 + [30] * 6))
+    r = m.dvolf_claim(tr, st, n_boot=NB)
+    cons = r["stat"]["constructions"]
+    assert list(cons) == ["6 h", "12 h", "24 h", "36 h", "48 h", "no cutoff"]
+    assert r["n"] == 14 and cons["24 h"]["target_pass"] and cons["no cutoff"]["n"] == 20
+    assert [cons[k]["target_pass"] for k in ("36 h", "48 h", "no cutoff")] == [False] * 3
+    assert all(c["ci_pass"] for c in cons.values())
+    assert r["verdict"] == "inconclusive" and "[undecided]" in r["reason"], r["reason"]
+
+
+def test_dvol_futures_index_mark_control_reported():
+    # even expiries: Deribit's mark is the DVOL index itself; the three readings are reported, the verdict is unchanged
+    dd = [3.0 + 0.1 * i for i in range(14)]
+    tr, st = m.dvolf_inputs(_dvolf_world(dd, idx=lambda i, s, mk: mk if i % 2 == 0 else 49.0))
+    r = m.dvolf_claim(tr, st, n_boot=NB)
+    im = r["stat"]["index_mark_control"]
+    assert im["n_mark_is_index"] == 7 and im["of"] == 14 and r["verdict"] == "supported"
+    assert im["real_marks_only"]["n"] == 7 and math.isclose(im["real_marks_only"]["mean"], np.mean(dd[1::2]))
+    assert math.isclose(im["trade_price_for_index_marks"]["mean"], np.mean(dd) + 0.05)
+    assert math.isclose(im["trade_prices_throughout"]["mean"], np.mean(dd) + 0.1)
+    assert "in 7 of 14 headline points the mark_price equals index_price" in r["reason"]
+
+
+def test_dvol_futures_decomposition_names_the_carrier():
+    for drift, carrier in ((2.5, "spot DVOL drift"), (0.5, "futures basis at T-7d")):
+        tr, st = m.dvolf_inputs(_dvolf_world([3.0] * 14, idx=lambda i, s, mk: s + drift))
+        r = m.dvolf_claim(tr, st, n_boot=NB)
+        dec = r["stat"]["decomposition"]
+        assert math.isclose(dec["spot_drift"]["mean"], drift) and math.isclose(dec["basis_T7"]["mean"], 3.0 - drift)
+        assert math.isclose(dec["spot_drift"]["mean"] + dec["basis_T7"]["mean"], r["stat"]["judge"]["mean"])
+        assert dec["carrier"] == carrier and f"the {carrier} carries the larger part of the mean" in r["reason"]
+
+
+def test_dvol_futures_lists_every_archived_expiry():
+    tr, st = m.dvolf_inputs(_dvolf_world([3.0] * 13, untraded=["BTCDVOL_USDC-31JAN24"]))
+    r = m.dvolf_claim(tr, st, n_boot=NB)
+    assert r["n"] == 13 and r["stat"]["archived_expiries"] == 14
+    assert r["stat"]["dropped"] == [("BTCDVOL_USDC-31JAN24", "no trades in the archived window [T-8d, T]")]
+    assert "Archived expiries 14: 13 used" in r["reason"] and "31JAN24" in r["reason"]
 
 
 def test_dvol_futures_harness_missing_and_present():
@@ -888,6 +949,20 @@ def test_dvol_futures_harness_missing_and_present():
     rows = _dvolf_world([3.0] * 13)
     stat, n, v, reason = _check(m.b6b_drb_dvol_futures_basis(FakeArchive({m.DVOLF_B: rows})))
     assert n == 13 and v == "supported", reason
+    assert stat["vx_control"] is None and "VIX futures roll-down control not run here" in reason
+
+
+def test_dvol_futures_vx_rolldown_control():
+    # one VX contract (expiry 2023-12-20) whose settle falls 0.05 a day: the roll-down over each T-7d..T week is 0.35
+    days = _days("2022-12-01", 385)
+    vx = [{"available_at": d + "T21:30:00+00:00", "value": {"expiry": "2023-12-20", "day": d, "settle": 30.0 - 0.05 * k,
+                                                             "close": 30.0}} for k, d in enumerate(days)]
+    m._CACHE.clear()
+    stat, n, v, reason = _check(m.b6b_drb_dvol_futures_basis(FakeArchive({m.DVOLF_B: _dvolf_world([3.0] * 13), m.VX_B: vx})))
+    vc = stat["vx_control"]
+    assert v == "supported" and vc["n"] == 13 and math.isclose(vc["mean"], 0.35, abs_tol=1e-9)
+    assert all(p["vx_contract"] == "2023-12-20" and p["to"] == p["expiry"] for p in vc["points"])
+    assert "VIX futures roll-down control (structural comparison, reported)" in reason and "not run here" not in reason
 
 
 # ================================================================================== book snapshots: T-195 / 196 ==
