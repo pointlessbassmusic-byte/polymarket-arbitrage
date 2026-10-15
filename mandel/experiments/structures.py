@@ -53,7 +53,7 @@ def run_structure(days, closes, vix: dict, rates: dict, legs, dte: int, hold: in
     Returns per-cycle arrays: debit (+ paid / - received), payoff, pnl, max_loss (>0), spot, vix."""
     T = dte / 365.0
     idx = [i for i, d in enumerate(days) if d >= start and d in vix]
-    out = {k: [] for k in ("day", "debit", "payoff", "pnl", "max_loss", "spot", "vix")}
+    out = {k: [] for k in ("day", "debit", "payoff", "pnl", "max_loss", "spot", "vix", "strikes")}
     i = 0
     while i < len(idx):
         a = idx[i]
@@ -95,9 +95,9 @@ def run_structure(days, closes, vix: dict, rates: dict, legs, dte: int, hold: in
         grid = np.linspace(0.0, 2.0 * S, 801)
         pnl_grid = np.array([pay(x) for x in grid]) - debit
         out["day"].append(d); out["debit"].append(debit); out["payoff"].append(pay(S1)); out["pnl"].append(pay(S1) - debit)
-        out["max_loss"].append(max(-pnl_grid.min(), 1e-9)); out["spot"].append(S); out["vix"].append(vix[d])
+        out["max_loss"].append(max(-pnl_grid.min(), 1e-9)); out["spot"].append(S); out["vix"].append(vix[d]); out["strikes"].append(list(strikes))
         i += hold
-    return {k: (np.array(v) if k != "day" else v) for k, v in out.items()}
+    return {k: (np.array(v) if k not in ("day", "strikes") else v) for k, v in out.items()}
 
 
 def metric(res: dict, kind: str) -> np.ndarray:

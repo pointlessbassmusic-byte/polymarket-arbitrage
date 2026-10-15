@@ -3822,12 +3822,16 @@
     "pass": "Lower 95% CI of the mean gap > 5 vol points, with the same sign in both halves",
     "controls": "The same statistic for SPX (VIX vs forward RV) as the known-positive reference; crash months (May-21, Nov-22) kept in. The IBIT-vs-DVOL IV basis is measured separately from the daily IBIT chain capture."
    },
-   "experiments": [],
+   "experiments": [
+    "dvol_gap_5pts"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Covered call on IBIT / BTC ETF; harness suggestion: Already close to the BTC-VRP harness; add the conditional-on-percentile split and report expected premium capture per 30-delta covered call via Black-Scholes at DVOL. | verifier: corrected claim/trial"
+   "results": [
+    "X-f7120cfc"
+   ],
+   "notes": "from the options-library library: Covered call on IBIT / BTC ETF; harness suggestion: Already close to the BTC-VRP harness; add the conditional-on-percentile split and report expected premium capture per 30-delta covered call via Black-Scholes at DVOL. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-176",
@@ -3848,12 +3852,16 @@
     "pass": "Bootstrap 95% CI of the mean > 0",
     "controls": "ATM strike vs 25-delta; fee at 2x; USD-terms annual return vs BTC buy-and-hold reported descriptively"
    },
-   "experiments": [],
+   "experiments": [
+    "btc_inverse_covered_call"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Deribit covered call on BTC/ETH inventory (inverse options); harness suggestion: Mandel's deribit_book + DVOL fetchers already exist; add public/get_delivery_prices (free, 2,638 daily records) so expiries settle at the official TWAP rather than a close. | verifier: corrected claim/trial"
+   "results": [
+    "X-7bb88d2c"
+   ],
+   "notes": "from the options-library library: Deribit covered call on BTC/ETH inventory (inverse options); harness suggestion: Mandel's deribit_book + DVOL fetchers already exist; add public/get_delivery_prices (free, 2,638 daily records) so expiries settle at the official TWAP rather than a close. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states; spot closes stand in for Deribit delivery prices (30-minute TWAP)"
   },
   {
    "id": "T-177",
@@ -3874,12 +3882,16 @@
     "pass": "Lower 95% CI of the mean > 2 vol points, with the same sign in both halves",
     "controls": "Exclude 2011 and 2020 spikes one at a time; OVX/USO as another commodity reference"
    },
-   "experiments": [],
+   "experiments": [
+    "gvz_gap_2pts"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Covered call on gold/silver (GLD/SLV equity route; GC/SI futures-options route); harness suggestion: GVZ history is already fetched; add GLD/SLV daily closes (free) and reuse the VRP harness; GC futures closes are not free - use GLD as the proxy. | verifier: corrected claim/trial"
+   "results": [
+    "X-b7862591"
+   ],
+   "notes": "from the options-library library: Covered call on gold/silver (GLD/SLV equity route; GC/SI futures-options route); harness suggestion: GVZ history is already fetched; add GLD/SLV daily closes (free) and reuse the VRP harness; GC futures closes are not free - use GLD as the proxy. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-178",
@@ -5651,12 +5663,16 @@
     "pass": "Mean > 0 with the 95% CI excluding zero, positive in at least 2 of 3 thirds.",
     "controls": "Buy-and-hold GLD (harness_controls); shuffled-GVZ placebo; GC=F front-futures closes (archive) instead of GLD."
    },
-   "experiments": [],
+   "experiments": [
+    "gvz_var_premium_thirds"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Gold volatility premium (GVZ) via GLD straddles / GC strangles; harness suggestion: harness_vrp_gold exists; add the ratio-to-SPX comparison and a 15-delta strangle pricer; add SLV ATM IV from surface_summary for the silver twin. | verifier: corrected claim/trial"
+   "results": [
+    "X-e4186ff5"
+   ],
+   "notes": "from the options-library library: Gold volatility premium (GVZ) via GLD straddles / GC strangles; harness suggestion: harness_vrp_gold exists; add the ratio-to-SPX comparison and a 15-delta strangle pricer; add SLV ATM IV from surface_summary for the silver twin. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-245",
@@ -5677,12 +5693,16 @@
     "pass": "Sharpe difference > 0 with bootstrap p < 0.05, positive in both halves.",
     "controls": "Equal-weight buy-and-hold of the underlyings; shuffled-index placebo; drop-one-asset sensitivity."
    },
-   "experiments": [],
+   "experiments": [
+    "multi_asset_short_var"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Oil and bond volatility premium (OVX via USO, VXTLT via TLT); harness suggestion: harness_vrp_oil and harness_vrp_bonds exist; add a portfolio aggregator over the harness outputs with the correlation matrix. | verifier: corrected claim/trial"
+   "results": [
+    "X-e6c23238"
+   ],
+   "notes": "from the options-library library: Oil and bond volatility premium (OVX via USO, VXTLT via TLT); harness suggestion: harness_vrp_oil and harness_vrp_bonds exist; add a portfolio aggregator over the harness outputs with the correlation matrix. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-246",
@@ -5703,12 +5723,16 @@
     "pass": "Mean > 0 with the 95% CI excluding zero, positive in both halves.",
     "controls": "Buy-and-hold BTC; shuffled-DVOL placebo; the SPX VRP over the same dates for scale."
    },
-   "experiments": [],
+   "experiments": [
+    "dvol_var_premium"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: BTC/ETH volatility premium (DVOL vs realised) via Deribit inverse straddles; harness suggestion: harness_vrp_btc and harness_vrp_eth exist; add the worst-decile share, a funding sensitivity parameter and an inverse-payoff conversion in the payoff engine (payoff in BTC = payoff_usd / S_T). | verifier: corrected claim/trial"
+   "results": [
+    "X-b01e58de"
+   ],
+   "notes": "from the options-library library: BTC/ETH volatility premium (DVOL vs realised) via Deribit inverse straddles; harness suggestion: harness_vrp_btc and harness_vrp_eth exist; add the worst-decile share, a funding sensitivity parameter and an inverse-payoff conversion in the payoff engine (payoff in BTC = payoff_usd / S_T). | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-247",
@@ -5729,12 +5753,16 @@
     "pass": "Mean > 0 with the 95% CI excluding zero and win rate > 0.6 for GVZ/VIX; DVOL/VIX reported with its own n.",
     "controls": "Unconditional ratio drift; random-entry placebo; VIX-level stratification."
    },
-   "experiments": [],
+   "experiments": [
+    "gvz_vix_extremes"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Cross-asset implied vol ratio trades (GVZ/VIX, DVOL/VIX, OVX/VIX); harness suggestion: Combine harness_vrp_gold and harness_vrp_spx outputs into a ratio harness; the DVOL/VIX version joins harness_vrp_btc. | verifier: corrected claim/trial"
+   "results": [
+    "X-00e1fb1e"
+   ],
+   "notes": "from the options-library library: Cross-asset implied vol ratio trades (GVZ/VIX, DVOL/VIX, OVX/VIX); harness suggestion: Combine harness_vrp_gold and harness_vrp_spx outputs into a ratio harness; the DVOL/VIX version joins harness_vrp_btc. | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-248",
@@ -5885,12 +5913,16 @@
     "pass": "Pooled bootstrap 95% CI of the Sharpe difference excludes 0 and the sign holds in both walk-forward halves (about 33 cycles each, so per-half CIs are reported, not required); deflated Sharpe > 0",
     "controls": "SPY covered call with VIX as IV (model-priced; should replicate the known BXM-style result). Cost min(0.0003 BTC, 12.5% of premium) per contract + 5% of premium for bid-ask. Skew sensitivity: price the call at DVOL +/- 3 vol points."
    },
-   "experiments": [],
+   "experiments": [
+    "btc_covered_call"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: BTC covered call on coin inventory; harness suggestion: mandel.data.options.deribit_dvol_history + BTC closes -> bs.price with sigma=DVOL; payoff via Position; bootstrap from validation | verifier: corrected claim/trial"
+   "results": [
+    "X-130e1ef5"
+   ],
+   "notes": "from the options-library library: BTC covered call on coin inventory; harness suggestion: mandel.data.options.deribit_dvol_history + BTC closes -> bs.price with sigma=DVOL; payoff via Position; bootstrap from validation | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
   {
    "id": "T-254",
@@ -5911,12 +5943,17 @@
     "pass": "Pooled 95% bootstrap CI of the mean > 0 and a positive mean in both halves",
     "controls": "Fee min(0.0003 BTC, 12.5% of premium) per contract; slippage 5% of premium; repeat at DVOL - 5 vol points (the 25-delta put can trade below DVOL, which is a variance-swap index)"
    },
-   "experiments": [],
+   "experiments": [
+    "btc_short_put"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Coin-secured / cash-secured put to accumulate BTC or metal; harness suggestion: Same loop as btc-covered-call with kind='put'; reuse VRP harness | verifier: corrected claim/trial"
+   "results": [
+    "X-a9d5ba07",
+    "X-af2e1a54"
+   ],
+   "notes": "from the options-library library: Coin-secured / cash-secured put to accumulate BTC or metal; harness suggestion: Same loop as btc-covered-call with kind='put'; reuse VRP harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
   {
    "id": "T-255",
@@ -5962,12 +5999,16 @@
     "pass": "Difference CI > 0 (also report whether the conditional mean is > 0)",
     "controls": "Random entry days matched by count; SPY straddle at VIX (model-priced) as sanity check; a 30-DTE version to remove the term mismatch"
    },
-   "experiments": [],
+   "experiments": [
+    "btc_low_dvol_straddle"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: DVOL percentile vega timing (long/short vol regimes); harness suggestion: Add percentile filter to the DVOL harness; straddle P&L via Position | verifier: corrected claim/trial"
+   "results": [
+    "X-766daf94"
+   ],
+   "notes": "from the options-library library: DVOL percentile vega timing (long/short vol regimes); harness suggestion: Add percentile filter to the DVOL harness; straddle P&L via Position | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
   {
    "id": "T-257",
@@ -6218,12 +6259,17 @@
     "pass": "CI > 0; report the unconditional mean (usually negative, since DVOL carries a VRP) for comparison",
     "controls": "High-percentile mirror trade; random dates"
    },
-   "experiments": [],
+   "experiments": [
+    "eth_btc_dvol_ratio"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: ETH vs BTC relative volatility (vol pair / dispersion); harness suggestion: deribit_dvol_history('ETH') alongside BTC; ratio harness | verifier: corrected claim/trial"
+   "results": [
+    "X-7cf64c6f",
+    "X-39ddc726"
+   ],
+   "notes": "from the options-library library: ETH vs BTC relative volatility (vol pair / dispersion); harness suggestion: deribit_dvol_history('ETH') alongside BTC; ratio harness | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-267",
@@ -6243,12 +6289,16 @@
     "pass": "Bootstrap 95% CI of the Calmar difference > 0 and positive in at least 2 of 3 windows",
     "controls": "SPY/VIX (model-priced; protective puts there are known to underperform collars); collar variant as a comparator"
    },
-   "experiments": [],
+   "experiments": [
+    "btc_protective_put"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Protective put / tail hedge on BTC inventory sized by DVOL; harness suggestion: Payoff engine rolling template; reuse covered-call loop | verifier: corrected claim/trial"
+   "results": [
+    "X-a4d32b86"
+   ],
+   "notes": "from the options-library library: Protective put / tail hedge on BTC inventory sized by DVOL; harness suggestion: Payoff engine rolling template; reuse covered-call loop | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
   {
    "id": "T-268",
@@ -6319,12 +6369,16 @@
     "pass": "CI excludes 0 pooled and the sign holds in both halves; deflated Sharpe > 0",
     "controls": "SPY/VIX covered call as positive control (model-priced); slippage 2% of premium; GVZ - 1 vol point (GVZ is a variance-swap level, above the 30-delta call IV)"
    },
-   "experiments": [],
+   "experiments": [
+    "gld_covered_call"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Gold covered call (GLD / GC-OG) using GVZ as the IV reference; harness suggestion: cboe_index_history('GVZ') exists in mandel.data.options (CBOE_INDICES); add GLD to the closes feed; reuse VRP harness with GVZ | verifier: corrected claim/trial"
+   "results": [
+    "X-e5665ac0"
+   ],
+   "notes": "from the options-library library: Gold covered call (GLD / GC-OG) using GVZ as the IV reference; harness suggestion: cboe_index_history('GVZ') exists in mandel.data.options (CBOE_INDICES); add GLD to the closes feed; reuse VRP harness with GVZ | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
   {
    "id": "T-271",
@@ -6344,12 +6398,16 @@
     "pass": "CI > 0 pooled and positive mean in both halves",
     "controls": "SPY/VIX VRP as benchmark; shuffled GVZ"
    },
-   "experiments": [],
+   "experiments": [
+    "gvz_var_premium_halves"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Gold variance risk premium (delta-hedged short strangle on GLD/GC); harness suggestion: Clone the SPY/VIX VRP harness with GVZ/GLD inputs | verifier: corrected claim/trial"
+   "results": [
+    "X-c5b6056b"
+   ],
+   "notes": "from the options-library library: Gold variance risk premium (delta-hedged short strangle on GLD/GC); harness suggestion: Clone the SPY/VIX VRP harness with GVZ/GLD inputs | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-272",
@@ -6369,12 +6427,16 @@
     "pass": "Difference CI > 0 (also report whether the conditional mean is > 0)",
     "controls": "Random entry dates; VIX/SPY analogue; 30-DTE version"
    },
-   "experiments": [],
+   "experiments": [
+    "gld_low_gvz_straddle"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: GVZ low-percentile long gold vol (crisis convexity); harness suggestion: Percentile harness shared with dvol-percentile-vega | verifier: corrected claim/trial"
+   "results": [
+    "X-4d1156f7"
+   ],
+   "notes": "from the options-library library: GVZ low-percentile long gold vol (crisis convexity); harness suggestion: Percentile harness shared with dvol-percentile-vega | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
   {
    "id": "T-273",
@@ -6420,12 +6482,16 @@
     "pass": "Conditional mean < 0 at 90% confidence (few independent episodes; report the count) and hit rate > 60%",
     "controls": "Low-percentile mirror; random dates"
    },
-   "experiments": [],
+   "experiments": [
+    "gold_silver_ratio_extreme"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Gold-silver ratio options trade; harness suggestion: Underlying-ratio harness now; option overlay once SLV surface_summary history exists | verifier: corrected claim/trial"
+   "results": [
+    "X-5beb6789"
+   ],
+   "notes": "from the options-library library: Gold-silver ratio options trade; harness suggestion: Underlying-ratio harness now; option overlay once SLV surface_summary history exists | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-275",
@@ -6547,12 +6613,17 @@
     "pass": "CI > 0 pooled and positive mean in both halves",
     "controls": "SPY/VIX put-write (PUT index behaviour) as positive control; GVZ - 2 vol points sensitivity"
    },
-   "experiments": [],
+   "experiments": [
+    "gld_put_write"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Metals put-write for accumulation (GLD/SLV cash-secured; GC/SI SPAN); harness suggestion: Shares loop with gold-covered-call; kind='put' | verifier: corrected claim/trial"
+   "results": [
+    "X-70072aa5",
+    "X-460817bd"
+   ],
+   "notes": "from the options-library library: Metals put-write for accumulation (GLD/SLV cash-secured; GC/SI SPAN); harness suggestion: Shares loop with gold-covered-call; kind='put' | verifier: corrected claim/trial | tested by mandel/experiments/cross_asset.py; MODEL-PRICED at the index as a flat IV, as the claim states"
   },
   {
    "id": "T-300",
@@ -11954,12 +12025,16 @@
     "pass": "CI > 0 pooled and positive mean in both halves",
     "controls": "GVZ/GLD and VIX/SPY VRPs as comparators; shuffled OVX"
    },
-   "experiments": [],
+   "experiments": [
+    "ovx_var_premium"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Crude oil variance risk premium (OVX on USO) short strangle; harness suggestion: Clone the GVZ VRP harness with OVX/USO inputs; cboe_index_history('OVX') | added by the verifier pass"
+   "results": [
+    "X-40ab469d"
+   ],
+   "notes": "from the options-library library: Crude oil variance risk premium (OVX on USO) short strangle; harness suggestion: Clone the GVZ VRP harness with OVX/USO inputs; cboe_index_history('OVX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-513",
@@ -12006,12 +12081,16 @@
     "pass": "Slope 95% CI < 0 in both halves",
     "controls": "Shuffled-date null; the same test on log(OVX/VIX)"
    },
-   "experiments": [],
+   "experiments": [
+    "gvz_vix_zscore_slope"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Gold vs equity implied-vol spread (GVZ/VIX relative value); harness suggestion: Ratio z-score harness over cboe_index_history('GVZ') and ('VIX') | added by the verifier pass"
+   "results": [
+    "X-46f63ac4"
+   ],
+   "notes": "from the options-library library: Gold vs equity implied-vol spread (GVZ/VIX relative value); harness suggestion: Ratio z-score harness over cboe_index_history('GVZ') and ('VIX') | added by the verifier pass | tested by mandel/experiments/cross_asset.py"
   },
   {
    "id": "T-515",

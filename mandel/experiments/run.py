@@ -576,6 +576,54 @@ def _structure_harness(cid):
     return h
 
 
+def _xa():
+    from mandel.experiments import cross_asset as xa
+    return xa
+
+
+def _ix(a, name):
+    return index_closes(a.load(name))
+
+
+def _px(a, sym):
+    return u2.load_series(a, sym, adjusted=False)
+
+
+def _xh(fn, nkey="n"):
+    def h(archive):
+        rep = fn(archive); return rep, int(rep.get(nkey) or rep.get("n_cycles") or rep.get("n_entries") or rep.get("n_signals") or 0), rep["verdict"], rep["reason"]
+    return h
+
+
+XA_HARNESSES = {
+    "dvol_gap_5pts": _xh(lambda a: _xa().gap_test(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), 30, 365, 5.0, "vol", 30, label="BTC DVOL")),
+    "gvz_gap_2pts": _xh(lambda a: _xa().gap_test(*_px(a, "GLD"), _ix(a, "cboe-GVZ-history"), 21, 252, 2.0, "vol", 21, label="GVZ/GLD")),
+    "gvz_var_premium_thirds": _xh(lambda a: _xa().gap_test(*_px(a, "GLD"), _ix(a, "cboe-GVZ-history"), 21, 252, 0.0, "var", 21, thirds=True, label="GVZ^2 vs GLD")),
+    "dvol_var_premium": _xh(lambda a: _xa().gap_test(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), 30, 365, 0.0, "var", 30, label="DVOL^2 vs BTC")),
+    "gvz_var_premium_halves": _xh(lambda a: _xa().gap_test(*_px(a, "GLD"), _ix(a, "cboe-GVZ-history"), 21, 252, 0.0, "var", 21, start="2009-10-01", label="GVZ^2 vs GLD")),
+    "ovx_var_premium": _xh(lambda a: _xa().gap_test(*_px(a, "USO"), _ix(a, "cboe-OVX-history"), 21, 252, 0.0, "var", 21, start="2009-10-01", label="OVX^2 vs USO")),
+    "multi_asset_short_var": _xh(lambda a: _xa().multi_asset_short_variance({"SPX": (*_px(a, "SPY"), _ix(a, "cboe-VIX-history")), "GLD": (*_px(a, "GLD"), _ix(a, "cboe-GVZ-history")),
+                                                                            "USO": (*_px(a, "USO"), _ix(a, "cboe-OVX-history")), "TLT": (*_px(a, "TLT"), _ix(a, "cboe-VXTLT-history"))}), "n_cycles"),
+    "gvz_vix_extremes": _xh(lambda a: _xa().ratio_extremes(*_px(a, "GLD"), *_px(a, "SPY"), _ix(a, "cboe-GVZ-history"), _ix(a, "cboe-VIX-history"))),
+    "eth_btc_dvol_ratio": _xh(lambda a: _xa().ratio_extremes(*_px(a, "ETH-USD"), *_px(a, "BTC-USD"), _ix(a, "deribit-dvol-ETH-history"), _ix(a, "deribit-dvol-BTC-history"),
+                                                             n=30, ppy=365, window=365, lo_q=0.20, hi_q=None, block=2, win_req=None, label="ETH/BTC DVOL")),
+    "gold_silver_ratio_extreme": _xh(lambda a: _xa().ratio_mean_reversion_signal(*_px(a, "GLD"), *_px(a, "SLV")), "n_signals"),
+    "gvz_vix_zscore_slope": _xh(lambda a: _xa().zscore_slope(None, _ix(a, "cboe-GVZ-history"), _ix(a, "cboe-VIX-history"))),
+    "btc_covered_call": _xh(lambda a: _xa().covered_call_vs_hold(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), 0.25, 30, 30, 12, "2021-04-01", "DVOL"), "n_cycles"),
+    "btc_short_put": _xh(lambda a: _xa().short_put_mean(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), -0.25, 30, 30, "2021-04-01", "DVOL"), "n_cycles"),
+    "btc_low_dvol_straddle": _xh(lambda a: _xa().conditional_straddle(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), 60, 60, "2022-01-01", 365, 0.20, "DVOL"), "n_entries"),
+    "btc_protective_put": _xh(lambda a: _xa().protective_put_calmar(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), "2021-04-01"), "n_cycles"),
+    "btc_inverse_covered_call": _xh(lambda a: _xa().inverse_covered_call_btc(*_px(a, "BTC-USD"), _ix(a, "deribit-dvol-BTC-history"), _ix(a, "fred-DTB3"), "2021-04-01"), "n_cycles"),
+    "gld_covered_call": _xh(lambda a: _xa().covered_call_vs_hold(*_px(a, "GLD"), _ix(a, "cboe-GVZ-history"), _ix(a, "fred-DTB3"), 0.30, 30, 21, 12, "2009-10-01", "GVZ", (0.20, 0.30, 0.40)), "n_cycles"),
+    "gld_put_write": _xh(lambda a: _xa().short_put_mean(*_px(a, "GLD"), _ix(a, "cboe-GVZ-history"), _ix(a, "fred-DTB3"), -0.25, 30, 21, "2009-10-01", "GVZ"), "n_cycles"),
+    "gld_low_gvz_straddle": _xh(lambda a: _xa().conditional_straddle(*_px(a, "GLD"), _ix(a, "cboe-GVZ-history"), _ix(a, "fred-DTB3"), 90, 63, "2010-01-01", 252, 0.20, "GVZ"), "n_entries"),
+}
+XA_MAP = {"T-175": "dvol_gap_5pts", "T-177": "gvz_gap_2pts", "T-244": "gvz_var_premium_thirds", "T-246": "dvol_var_premium", "T-271": "gvz_var_premium_halves", "T-512": "ovx_var_premium",
+          "T-245": "multi_asset_short_var", "T-247": "gvz_vix_extremes", "T-266": "eth_btc_dvol_ratio", "T-274": "gold_silver_ratio_extreme", "T-514": "gvz_vix_zscore_slope",
+          "T-253": "btc_covered_call", "T-254": "btc_short_put", "T-256": "btc_low_dvol_straddle", "T-267": "btc_protective_put", "T-176": "btc_inverse_covered_call",
+          "T-270": "gld_covered_call", "T-279": "gld_put_write", "T-272": "gld_low_gvz_straddle"}
+
+
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     names = sorted(e.name for e in archive.entries())
     return [n for n in names if n.startswith(pattern[:-1])] if pattern.endswith("*") else [n for n in names if n == pattern]
@@ -626,6 +674,7 @@ HARNESSES: dict[str, Callable] = {
     "opex_pinning": harness_pinning, "btc_weekend_variance": harness_btc_weekend_var,
     **U2_HARNESSES,
     **OM2_HARNESSES,
+    **XA_HARNESSES,
     **{f"structure_{c.replace('-', '_').lower()}": _structure_harness(c) for c in ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]},
 }
 BUNDLES_NEEDED = {
@@ -656,6 +705,7 @@ BUNDLES_NEEDED = {
     "parity_forward": ["options-chain-SPY-*", "fred-DTB3"], "opex_pinning": ["daily-history-SPY"], "btc_weekend_variance": ["daily-history-BTC-USD"],
     **U2_BUNDLES,
     **OM2_BUNDLES,
+    **{k: ["daily-history-GLD", "cboe-GVZ-history", "deribit-dvol-BTC-history", "fred-DTB3"] for k in XA_HARNESSES},
     **{f"structure_{c.replace('-', '_').lower()}": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3", "spy-smile-*"] for c in ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]},
 }
 
