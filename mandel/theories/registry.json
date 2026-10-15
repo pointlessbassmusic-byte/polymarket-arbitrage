@@ -1921,7 +1921,9 @@
     "pass": "paired Sharpe difference p < 0.05 with strangle > straddle; same sign under the flat-VIX and SKEW-scaled sensitivities",
     "controls": "Width fixed at 5% before looking. The same 5%-of-premium cost haircut applies to both. Report PSR, max drawdown and skew. Proxy cap until 60 capture days refit the smile ratios."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_strangle_vs_straddle"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -2377,12 +2379,14 @@
     "pass": "upper CI < 0 at mid fills",
     "controls": "Rule fixed; credit/debit frequency reported descriptively; IBIT and GLD runs reported as cross-asset contrasts."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_dolt_backspread"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "daily chain capture: 250 entry days resolving ~60 days later",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Call Ratio Backspread; harness suggestion: harness 'backspread_credit_frequency' in options.py | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Call Ratio Backspread; harness suggestion: harness 'backspread_credit_frequency' in options.py | verifier: corrected claim/trial",
+   "unblocked_from": "daily chain capture: 250 entry days resolving ~60 days later"
   },
   {
    "id": "T-120",
@@ -2428,12 +2432,14 @@
     "pass": "lower CI > 0 at bid/ask with a stress month in the sample",
     "controls": "Rule fixed; tail absent from short samples, so the verdict is capped at inconclusive."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_dolt_put_front_ratio"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "daily chain capture: 250 entry days including a stress episode",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Front Ratio Spread (short ratio call / put spread); harness suggestion: harness 'front_ratio_skew' sharing the delta selector | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Front Ratio Spread (short ratio call / put spread); harness suggestion: harness 'front_ratio_skew' sharing the delta selector | verifier: corrected claim/trial",
+   "unblocked_from": "daily chain capture: 250 entry days including a stress episode"
   },
   {
    "id": "T-122",
@@ -2632,7 +2638,9 @@
     "pass": "p < 0.05 at both iv_scale 1.0 and 0.9, holding in both walk-forward halves",
     "controls": "Correction: VIX is usually above ATM IV, so pricing the ATM put at VIX overstates the premium and the result is optimistic, not conservative; the 0.9 x VIX run and the comparison with the real PUT index guard this. Sharpe flatters negatively skewed returns, so report skew, kurtosis and PSR. SPY is price-only unless total return is reconstructed; state the dividend convention."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_putwrite_vs_spy"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3340,7 +3348,9 @@
     "pass": "Share >= 0.95 on every capture (one failing day falsifies); confirmation at 60 captures",
     "controls": "Exclude zero-bid legs and spreads > 5% of mid. Delayed snapshots may not be synchronous across legs. Ex-dividend-spanning expiries are reported separately (that was a second claim and is now a diagnostic). Compare the SPX result with T-181 parity_check."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_jelly_roll"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3561,7 +3571,9 @@
     "pass": "Bootstrap 95% CI of annualised alpha > 0 in the full sample, with a positive point estimate in both halves",
     "controls": "Israelov & Nielsen decomposition: compare with a beta-matched SPY-TR/T-bill blend; price-only SPX as a sensitivity (it biases against SPX by ~2%/yr of dividends)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_bxm_alpha"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3587,7 +3599,9 @@
     "pass": "Bootstrap 95% CI of the Sharpe difference > 0 in the full sample, with the same sign in both halves",
     "controls": "Beta-matched SPY-TR/T-bill blend; BXMC is NOT an ATM series (it is the conditional buy-write: full unit if VIX >= 20, else half), so use it only as a separately labelled third arm"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_bxmd_vs_bxm"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3613,7 +3627,9 @@
     "pass": "95% CI of the Sharpe difference excludes 0 from below, with the same sign in both halves",
     "controls": "Beta-matched SPY-TR blend; cost sensitivity: subtract 4x roll costs at 0.05% of notional per roll"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_bxmw_vs_bxm"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3639,7 +3655,9 @@
     "pass": "Bootstrap 95% CI of the Sharpe difference > 0, with the same sign in both halves",
     "controls": "Beta-matched comparison; 0.35-0.60% fee drag applied when interpreting ETF replication; BXMC as the VIX-conditional w arm"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_bxmh_vs_bxm"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3691,7 +3709,9 @@
     "pass": "Bootstrap 95% CI of the CAGR difference entirely below 0",
     "controls": "CLL1M and CLL3M (2004-) as alternative collars; PPUT (put only) to isolate the call leg; CLLZ (1986-) as the long-history collar"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_hedge_collar_cll_vs_blend"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3743,7 +3763,9 @@
     "pass": "Bootstrap 95% CI upper bound of the Sharpe difference <= 0.05 and point estimate <= 0 (rejecting the null requires the CI to lie below a small positive margin)",
     "controls": "CLL and PPUT as full-floor comparators; price-only SPX as a sensitivity"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_hedge_cllz_sharpe"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3769,7 +3791,9 @@
     "pass": "Bootstrap 95% CI of the CAGR difference entirely below -1%/yr",
     "controls": "Exclude 2008 and 2020 one at a time; PPUT3M (2004-) as the tail variant"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_hedge_pput_vs_blend"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3795,7 +3819,9 @@
     "pass": "Bootstrap 95% CI of the Sharpe difference > 0 in the full sample, with the same sign in both halves",
     "controls": "PUTY vs BXY (both 2% OTM, 1988-) as a longer parity check"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_put_vs_bxm"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3821,7 +3847,9 @@
     "pass": "Calibration gate passed AND the 95% CI of the Sharpe difference < 0",
     "controls": "Constant-IV pricer to show sensitivity; ATM-both-phases wheel vs the actual PUT index as an external check"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_wheel_basis"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3847,7 +3875,9 @@
     "pass": "Bootstrap 95% CI of the Sharpe difference > 0, with the same sign in both halves",
     "controls": "Beta-matched SPY-TR blend (CMBO beta ~0.66); PUTY 2% OTM put-write as the put-only arm"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_cmbo_vs_bxy"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3873,12 +3903,14 @@
     "pass": "95% CI of the top-minus-bottom quartile difference > 0",
     "controls": "The same test on GLD and IBIT, where the skew sign differs"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_dolt_ratio_overlay_skew"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "daily chain capture, ~24 monthly expiry cohorts (~730 days); daily overlapping entries help but remain cohort-correlated",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Covered ratio spread / 1x2 ratio write; harness suggestion: Store 5%/10% OTM call mids and IVs at 30 DTE per capture day for SPY/GLD/IBIT to shorten the wait. | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Covered ratio spread / 1x2 ratio write; harness suggestion: Store 5%/10% OTM call mids and IVs at 30 DTE per capture day for SPY/GLD/IBIT to shorten the wait. | verifier: corrected claim/trial",
+   "unblocked_from": "daily chain capture, ~24 monthly expiry cohorts (~730 days); daily overlapping entries help but remain cohort-correlated"
   },
   {
    "id": "T-174",
@@ -3899,7 +3931,9 @@
     "pass": "Fraction of negative windows >= 0.9",
     "controls": "Short SPX alone to isolate the put income"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_covered_put"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4018,7 +4052,9 @@
     "pass": "Bootstrap 95% CI of the Sharpe difference < 0, with the same sign in both halves",
     "controls": "Relate monthly P&L to VIX minus subsequent realised vol"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_hedge_bfly_vs_cndr_sharpe"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4044,7 +4080,9 @@
     "pass": "Bootstrap 95% CI of the slope > 0, with the same sign in both halves",
     "controls": "Beta to SPX near zero (0.13 today); add SPX month return as a regressor to separate the variance premium from direction"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_hedge_cndr_vrp_gap"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4070,7 +4108,9 @@
     "pass": "R^2 > 0.95 and TE < 2%/yr for both BXM and PUT; document the shortfall for BXMD/CNDR (skew)",
     "controls": "Price-only vs total-return SPX; VWAP vs close fill assumption"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_hedge_bs_replication"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4129,7 +4169,9 @@
     "pass": ">= 95% of pairs below r_bill on day one and on >= 80% of captured days.",
     "controls": "Mid-price version should sit near the SPX box rate (bill + ~0-60 bp); drop zero-bid legs; drop pairs where the short call is deep ITM (early-exercise contamination)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_conversion"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4181,7 +4223,9 @@
     "pass": ">= 80% of expiries with r_impl_exec - r_bill < 50 bp on day one and on >= 80% of captured days.",
     "controls": "Sensitivity to +/-10% dividend forecast; mid-based rate; exclude expiries with a zero-bid leg; GLD/IBIT dividend-free replication."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_synthetic_long"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4207,7 +4251,9 @@
     "pass": "Share >= 80% on day one and on >= 80% of captured days.",
     "controls": "Mid-price version; stale-quote filter; exclude zero-bid legs; compare with the SPX box rate to separate the bill-vs-option-financing basis from borrow."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_synthetic_short"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4297,12 +4343,14 @@
     "pass": "Correlation > 0.2 with the 95% CI excluding 0.",
     "controls": "Fixed strike-pair rule; exclude < 30 DTE; mid series for the statistic, executable for P&L; check robustness to dropping FOMC days."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_misc_box_bill_vix_corr"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "daily SPX chain capture, ~120 trading days, to form a box-rate series (alternative: ingest published van Binsbergen-Diamond-Grotteria box-rate data)",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Box-vs-Treasury convenience-yield trade; harness suggestion: box.py daily series -> mandel/experiments/box_bill_spread.py joining FRED + VIX; bootstrap via existing block bootstrap. | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Box-vs-Treasury convenience-yield trade; harness suggestion: box.py daily series -> mandel/experiments/box_bill_spread.py joining FRED + VIX; bootstrap via existing block bootstrap. | verifier: corrected claim/trial",
+   "unblocked_from": "daily SPX chain capture, ~120 trading days, to form a box-rate series (alternative: ingest published van Binsbergen-Diamond-Grotteria box-rate data)"
   },
   {
    "id": "T-189",
@@ -4375,7 +4423,9 @@
     "pass": "Difference > 30 pp with the 95% CI excluding 30 pp on day one; stable over 20 captured days.",
     "controls": "SPX (European) deep ITM puts should trade at or below discounted intrinsic, never pinned at undiscounted intrinsic; exclude zero-bid quotes."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_itm_put_exercise"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4486,7 +4536,9 @@
     "pass": "Exceedance rate < 1% with the 95% upper bound < 1% and no violation persisting > 1 hour.",
     "controls": "Executable vs mid; drop zero-bid quotes; isolate the 07:00-08:30 UTC settlement window; ETH replication."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_parity_violations"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4512,7 +4564,9 @@
     "pass": "Median > 100 bp with the 95% CI excluding 100 bp.",
     "controls": "Mid vs executable; strike-pair invariance; exclude the settlement hour; ETH replication; report r_box_exec - basis separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_quarterly_box_rate"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4538,7 +4592,9 @@
     "pass": "Median > 100 bp with the 95% CI excluding 100 bp and the sign holding in a majority of calendar years.",
     "controls": "Timestamp alignment of futures and spot closes; exclude the final 7 days before each expiry; ETH replication; report 2022 separately (basis compression)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_quarterly_basis"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4674,12 +4730,14 @@
     "pass": "95% CI of the difference inside (0, 1.5) pp/yr.",
     "controls": "BXMD (OTM calls) for strike dependence; check that 2008 and 2020 drawdowns coincide; T-bill collateral yield subtracted as an explanation test."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_put_bxm_return_gap"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "Cboe PUT/BXM index CSV ingest (free, one-off download; no option-chain history needed)",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Covered call / cash-secured put equivalence (synthetic identity trade); harness suggestion: mandel/ingest cboe_index_history(PUT, BXM); experiments/putwrite_vs_buywrite.py with block bootstrap. | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Covered call / cash-secured put equivalence (synthetic identity trade); harness suggestion: mandel/ingest cboe_index_history(PUT, BXM); experiments/putwrite_vs_buywrite.py with block bootstrap. | verifier: corrected claim/trial",
+   "unblocked_from": "Cboe PUT/BXM index CSV ingest (free, one-off download; no option-chain history needed)"
   },
   {
    "id": "T-203",
@@ -5157,12 +5215,14 @@
     "pass": "Mean > 0 with 95% CI excluding 0.",
     "controls": "Backwardation subsample; non-settlement Wednesdays for the SOQ-deviation check; exclude 2008, 2018-02, 2020-03 as robustness."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_hedge_vix_soq_credit_spread"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "VIX futures settlement history (free CFE files, not wired) plus either VIX chain capture (~12+ monthly settlements) or a VVIX-based model price; VRO history (free) enables the preliminary SOQ test.",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: VIX settlement (Wednesday SOQ) trades; harness suggestion: VIX settlement calendar generator + VIX/VIX3M OHLC event harness; add VIX futures history fetch (Cboe CFE CSVs) for the futures-based version. | verifier: corrected claim/trial"
+   "notes": "from the options-library library: VIX settlement (Wednesday SOQ) trades; harness suggestion: VIX settlement calendar generator + VIX/VIX3M OHLC event harness; add VIX futures history fetch (Cboe CFE CSVs) for the futures-based version. | verifier: corrected claim/trial",
+   "unblocked_from": "VIX futures settlement history (free CFE files, not wired) plus either VIX chain capture (~12+ monthly settlements) or a VVIX-based model price; VRO history (free) enables the preliminary SOQ test."
   },
   {
    "id": "T-221",
@@ -5214,12 +5274,14 @@
     "pass": "Sign test p < 0.05 and mean > 0 with 95% CI excluding 0 once n >= 20.",
     "controls": "Non-catalyst 21-day windows; DVOL-only control; ETF-type vs protocol-type split."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_catalyst_strangle"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "Deribit expiry-level IV capture across >= 20 hard-dated catalysts (years at current frequency; partial evidence after 3-5).",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Crypto scheduled-catalyst strangle (ETF decisions, halving, protocol upgrades); harness suggestion: Catalyst calendar table joined to Deribit expiry-level IV captures and Polymarket odds; report IV ramp per event. | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Crypto scheduled-catalyst strangle (ETF decisions, halving, protocol upgrades); harness suggestion: Catalyst calendar table joined to Deribit expiry-level IV captures and Polymarket odds; report IV ramp per event. | verifier: corrected claim/trial",
+   "unblocked_from": "Deribit expiry-level IV capture across >= 20 hard-dated catalysts (years at current frequency; partial evidence after 3-5)."
   },
   {
    "id": "T-223",
@@ -5240,7 +5302,9 @@
     "pass": "Difference > 0 with 95% CI excluding 0.",
     "controls": "Weekly vs monthly split; exclude expiries coinciding with FOMC/CPI; ETH separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_expiry_friday_straddle"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -6015,12 +6079,14 @@
     "pass": "Lower 95% bound of the mean > 0.05 over at least 36 cycles; positive in > 65% of non-crisis months (reported).",
     "controls": "COR1M as an external implied-correlation check; VIX-tercile stratification; crisis months (VIX > 30) reported separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_volh_sector_corr_premium"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "daily chain capture of the 9 sector ETFs (add to CHAIN_SYMBOLS): ~60 days for a first read, ~36 monthly cycles (~3 years) for the test. The realised side can be computed now from the archived sector closes.",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Correlation trade via index vs sector/sub-basket straddles (QQQ vs XLK, SPY vs sector ETFs); harness suggestion: Same harness_dispersion as the index-vs-components entry with the sector list; implied correlation from surface_summary ATM IVs. | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Correlation trade via index vs sector/sub-basket straddles (QQQ vs XLK, SPY vs sector ETFs); harness suggestion: Same harness_dispersion as the index-vs-components entry with the sector list; implied correlation from surface_summary ATM IVs. | verifier: corrected claim/trial",
+   "unblocked_from": "daily chain capture of the 9 sector ETFs (add to CHAIN_SYMBOLS): ~60 days for a first read, ~36 monthly cycles (~3 years) for the test. The realised side can be computed now from the archived sector closes."
   },
   {
    "id": "T-251",
@@ -6213,7 +6279,9 @@
     "pass": "CI > 0 and hit rate > 55%",
     "controls": "Random entry days; fees and a 1-vol-point slippage per leg; re-run on quote captures once 120+ days accumulate"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_rr_skew_harvest"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -6293,12 +6361,14 @@
     "pass": "Fraction > 70% at mid (also report the median spread and bid/ask results)",
     "controls": "Futures-basis implied rate on the same days (also back-testable from futures trade history)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_box_rate_capture_days"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "daily synchronous Deribit book capture, 60 days (futures-basis proxy testable now)",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Deribit box spread (synthetic coin lending / implied rate); harness suggestion: Parity/box scanner over stored book snapshots; FRED via fred_series | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Deribit box spread (synthetic coin lending / implied rate); harness suggestion: Parity/box scanner over stored book snapshots; FRED via fred_series | verifier: corrected claim/trial",
+   "unblocked_from": "daily synchronous Deribit book capture, 60 days (futures-basis proxy testable now)"
   },
   {
    "id": "T-261",
@@ -6345,7 +6415,9 @@
     "pass": "CI > 0",
     "controls": "Random entry days; SPY with VIX vs VIX3M as a structural analogue (model-priced); 1 vol point slippage per leg"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_calendar_inversion"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -6370,7 +6442,9 @@
     "pass": "Mean > 0 with 95% CI excluding 0",
     "controls": "Non-event days with the same DTE as baseline; DVOL change around FOMC (also testable now)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_fomc_event_straddle"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -6512,7 +6586,9 @@
     "pass": "95% CI > 0 (report the mean, target > 2 vol points)",
     "controls": "VIX futures roll-down on the same dates as structural comparison; trade-print timing noise checked against index_price in the same records"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_dvol_futures_basis"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -6537,7 +6613,9 @@
     "pass": "Mean difference > 0 across years with bootstrap over years; sensitivity table over basis levels",
     "controls": "Zero-return year (difference ~ -basis); loss years (1256 three-year carryback)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_drb_cme_ibit_tax"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -6714,7 +6792,9 @@
     "pass": "Mean CI > 0 under RV pricing and still > 0 at RV + 5 vol points; final verdict on captured IV",
     "controls": "Same on GLD; shuffled returns (kills tail clustering)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_misc_slv_call_backspread"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12048,7 +12128,9 @@
     "pass": "Share < 0.5% with the 95% upper bound < 0.5% on day one and on >= 80% of captured days.",
     "controls": "Mid-price share should be small but non-zero; drop legs with zero bid; separate wing strikes (> 10% OTM) from the core."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_butterfly_arb"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12074,7 +12156,9 @@
     "pass": "Share < 0.1% on day one and on >= 80% of captured days.",
     "controls": "Exclude zero-bid near legs; separate deep ITM calls straddling ex-div (early-exercise value); Deribit total-variance scan as a crypto replication."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_calendar_arb"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12261,7 +12345,9 @@
     "pass": "Share >= 60% on day one and on >= 80% of captured days.",
     "controls": "Replace r_bill with the SPX box rate (the share should fall to ~50%); mid-price version; GLD/IBIT dividend-free replications."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_synthetic_call"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12287,7 +12373,9 @@
     "pass": "Share < 0.1% on day one and on >= 80% of captured days.",
     "controls": "Mid-price violation rate as a quote-quality diagnostic; exclude zero-bid legs; IBIT/GLD reported separately (wider spreads)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_chain_vertical_bounds"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12579,12 +12667,14 @@
     "pass": "Difference > 0 with 95% CI excluding 0.",
     "controls": "USO roll-date exclusion; 2020-03/04 exclusion; non-event Wednesdays for EIA."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_misc_opec_uso_straddle"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "USO closes and OVX history fetchers (both free, not in the current data list) and an OPEC+ meeting calendar.",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Crude-oil scheduled-event straddle (OPEC+ meetings / EIA inventory); harness suggestion: Add (USO, OVX) to the (underlying, vol index) event harness. | added by the verifier pass"
+   "notes": "from the options-library library: Crude-oil scheduled-event straddle (OPEC+ meetings / EIA inventory); harness suggestion: Add (USO, OVX) to the (underlying, vol index) event harness. | added by the verifier pass",
+   "unblocked_from": "USO closes and OVX history fetchers (both free, not in the current data list) and an OPEC+ meeting calendar."
   },
   {
    "id": "T-519",
@@ -12683,7 +12773,9 @@
     "pass": "Sign test p < 0.05 (>= 13 of 16) and mean difference > 0 (underpowered: report as indicative).",
     "controls": "Presidential vs midterm split; VIX regime; exclude 2008 (crisis)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_misc_election_spy_move"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12813,7 +12905,9 @@
     "pass": "Calibration gate passed AND 95% CI of the Sharpe difference > 0 in both halves",
     "controls": "SKEW-adjusted wing pricing as a sensitivity; a chain-priced re-test once ~24 monthly cohorts of SPY chain capture exist"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_bw_call_spread_overwrite"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12839,7 +12933,9 @@
     "pass": "Bootstrap 90% CI of the drawdown difference > 10 points",
     "controls": "PPUT3M (2004-) and PPUT over the same window as put-based tail hedges; CAGR cost reported alongside"
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_hedge_vxth_drawdown"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -13158,12 +13254,14 @@
     "pass": "lower CI > 0 at bid/ask with a stress month in the sample",
     "controls": "Rule fixed; verdict capped at inconclusive without a stress episode."
    },
-   "experiments": [],
+   "experiments": [
+    "b6b_dolt_put_ladder"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "daily chain capture: 250 entry days including a stress episode",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Ladder / Christmas Tree (long or short, call or put); harness suggestion: Harness 'ladder_skew' sharing the delta selector with 'front_ratio_skew'. | added by the verifier pass"
+   "notes": "from the options-library library: Ladder / Christmas Tree (long or short, call or put); harness suggestion: Harness 'ladder_skew' sharing the delta selector with 'front_ratio_skew'. | added by the verifier pass",
+   "unblocked_from": "daily chain capture: 250 entry days including a stress episode"
   },
   {
    "id": "T-540",
