@@ -155,6 +155,39 @@ def test_strategy_series_applies_flags():
     assert s["backtest"] == {"2009-10-19"}
 
 
+def test_spike_prints_flags_bad_print_not_real_moves():
+    """Regression (T-178 BFLY 2022-05-31, T-166 CLL 2020-02-28): an unflagged one-day spike-and-revert print is screened
+    against SPX and dropped like a flagged bad print; a real move that follows a big SPX move is kept."""
+    days = _bdays("2020-01-01", 12)
+    spx = dict(zip(days, [100, 100.5, 100, 99.4, 98.7, 108.6, 101.0, 101.5, 101.0, 100.6, 104.2, 104.5]))
+    idx = dict(zip(days, [100, 100.2, 100.1, 106.9, 100.6, 95.0, 99.0, 99.2, 99.1, 94.0, 105.6, 105.7]))
+    # day 3: +6.79% then -5.89% while SPX -0.6% / -0.7% -> bad print (BFLY 2022-05-31 shape)
+    # day 5: -5.6% then +4.2% while SPX +10.0% / -7.0% -> a real move on big SPX days, kept
+    # day 9: -5.1% then +12.3% while SPX -0.4% / +3.6% -> bad print (CLL 2020-02-28 shape: the rebound leg is 3.4x SPX's)
+    sp = h.spike_prints(idx, spx)
+    assert set(sp) == {days[3], days[9]} and "+6.79% then -5.89%" in sp[days[3]]
+    rng = np.random.default_rng(21)
+    noise = dict(zip(days, 100 * np.exp(np.cumsum(0.004 * rng.standard_normal(12)))))
+    assert h.spike_prints(noise, spx) == {}                                   # null: ordinary noise is never flagged
+    rows = _idx_rows(days, [idx[d] for d in days])
+    s = h.strategy_series(rows, spx)
+    assert days[3] not in s["close"] and days[3] in s["dropped"] and set(s["spikes"]) == {days[3], days[9]}
+    assert h.strategy_series(rows)["spikes"] is None and days[3] in h.strategy_series(rows)["close"]
+
+
+def test_stale_runs_and_month_end_note():
+    """Regression (T-166 CLL 2019-01-03..01-18): stale runs are named, and the note says whether a month-end is inside."""
+    days = _bdays("2019-01-01", 30)
+    close = {d: 100.0 + i for i, d in enumerate(days)}
+    for d in days[2:8]:
+        close[d] = 50.0                                                       # 6 identical closes mid-January
+    assert h.stale_runs(close) == [(days[2], days[7], 6)]
+    note = h._stale_note("CLL", close, days[0], days[-1], ["2019-01-31"])
+    assert "2019-01-03..2019-01-10 (6 sessions)" in note and "no month-end falls inside" in note
+    late = {d: (77.0 if "2019-01-28" <= d <= "2019-02-04" else 100.0 + i) for i, d in enumerate(days)}
+    assert "month-end(s) 2019-01-31 fall inside" in h._stale_note("CLL", late, days[0], days[-1], ["2019-01-31"])
+
+
 def test_monthly_panel_month_ends_bills_and_breaks():
     days = _bdays("2020-01-01", 90)
     a = {d: 100.0 * 1.001 ** i for i, d in enumerate(days)}
