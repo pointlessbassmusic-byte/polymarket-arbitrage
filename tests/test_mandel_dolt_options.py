@@ -25,6 +25,17 @@ REC_2019_02_09 = [   # a Saturday snapshot (2019 is weekly, Saturdays)
     ("2019-02-09", "SPY", "2019-03-08", "270.00", "Put", "3.63", "3.67", "0.1344", "-0.4651", "0.0402", "-0.0654", "0.2973", "-0.0813"),
 ]
 CLOSES_2019 = {"2019-02-07": 270.14, "2019-02-08": 270.47, "2019-02-11": 270.62}       # Yahoo SPY closes (archive daily-history-SPY)
+REC_2022_08_19 = [   # a Friday with large moves either side: Thursday 427.89, Friday 422.14, Monday 413.35
+    ("2022-08-19", "SPY", "2022-09-02", "414.00", "Call", "11.44", "11.49", "0.1937", "0.7106", "0.0213", "-0.2126", "0.2827", "0.1107"),
+    ("2022-08-19", "SPY", "2022-09-02", "414.00", "Put", "2.94", "2.97", "0.1931", "-0.2896", "0.0216", "-0.1891", "0.2854", "-0.0431"),
+    ("2022-08-19", "SPY", "2022-09-02", "422.00", "Call", "6.11", "6.14", "0.1780", "0.5208", "0.0271", "-0.2220", "0.3294", "0.0820"),
+    ("2022-08-19", "SPY", "2022-09-02", "422.00", "Put", "5.60", "5.64", "0.1774", "-0.4815", "0.0275", "-0.1989", "0.3293", "-0.0677"),
+    ("2022-08-19", "SPY", "2022-09-16", "414.00", "Call", "13.88", "14.05", "0.2062", "0.6390", "0.0155", "-0.1539", "0.4363", "0.1962"),
+    ("2022-08-19", "SPY", "2022-09-16", "414.00", "Put", "5.84", "5.86", "0.2008", "-0.3556", "0.0159", "-0.1594", "0.4355", "-0.1153"),
+    ("2022-08-19", "SPY", "2022-09-16", "422.00", "Call", "8.70", "8.72", "0.1882", "0.5075", "0.0181", "-0.1512", "0.4653", "0.1577"),
+    ("2022-08-19", "SPY", "2022-09-16", "422.00", "Put", "8.78", "8.82", "0.1880", "-0.4902", "0.0182", "-0.1609", "0.4653", "-0.1582"),
+]
+CLOSES_2022 = {"2022-08-18": 427.89, "2022-08-19": 422.14, "2022-08-22": 413.35}
 
 VOL_REC = {"date": "2025-01-03", "act_symbol": "SPY", "hv_current": "0.1105", "hv_week_ago": "0.1301", "hv_month_ago": "0.0890",
            "hv_year_high": "0.2251", "hv_year_high_date": "2024-08-05", "hv_year_low": "0.0675", "hv_year_low_date": "2024-01-31",
@@ -226,6 +237,19 @@ def test_fetch_stores_merges_and_dry_run(fake, tmp_path):
     stored = list(arc.load("dolt-chain-SPY"))
     assert len(stored) == len(synthetic_chain("2024-01-02", "2024-03-15", 20)) and len({r["key"] for r in stored}) == len(stored)
     assert [r["value"]["snapshot_date"] for r in stored] == sorted(r["value"]["snapshot_date"] for r in stored)
+    # a refetch whose query for 2024-02-05 keeps failing must not drop that day's stored rows
+    class FailOneDay(FakeDolt):
+        def handler(self, request):
+            if "'2024-02-05'" in request.url.params["q"]:
+                self.calls.append(request.url.params["q"])
+                return self._resp("Error", [], "query error: context deadline exceeded")
+            return super().handler(request)
+    fake(FailOneDay(chain=synthetic_chain("2024-02-01", "2024-02-09", 20)))
+    st = {}
+    m.fetch_dolt_chains(arc, "SPY", start="2024-02-01", end="2024-02-09", pace=0, with_commits=False, stats=st)
+    assert st["failed_days"] == ["2024-02-05"]
+    again = list(arc.load("dolt-chain-SPY"))
+    assert len(again) == len(stored) and sum(r["value"]["snapshot_date"] == "2024-02-05" for r in again) == 20
 
 
 def test_volhistory_reports_missing_symbols(fake, tmp_path):
@@ -239,6 +263,27 @@ def test_volhistory_reports_missing_symbols(fake, tmp_path):
     rows = m.fetch_dolt_volhistory(arc, ["SPY", "XLE", "QQQ"], start="2025-01-01", end="2025-01-10", pace=0, with_commits=False, stats=st)
     assert len(rows) == 6 and st["missing"] == ["QQQ"] and st["rows_by_symbol"]["SPY"] == 3
     assert arc.get("dolt-volhistory").rows == 6
+
+
+def test_backfilled_dates_wait_for_their_commit():
+    commits = {"2022-12-12": "2022-12-15T17:53:55+00:00", "2024-06-03": "2024-06-04T06:34:51+00:00", "2021-09-28": "2021-09-28T20:58:07+00:00"}
+    raw = dict(_raw(REC_2019_02_09[0]), date="2022-12-12")
+    r = m.chain_row(raw, "x", commits)
+    assert r["value"]["backfilled"] and r["available_at"] == "2022-12-15T17:53:55+00:00" and r["value"]["quote_date"] == "2022-12-12"
+    r = m.chain_row(dict(raw, date="2024-06-03"), "x", commits)          # published 06:34 UTC next morning: normal
+    assert not r["value"]["backfilled"] and r["available_at"] == "2024-06-03T22:00:00+00:00"
+    r = m.chain_row(dict(raw, date="2021-09-28"), "x", commits)          # published the same evening: evening rule still binds
+    assert not r["value"]["backfilled"] and r["available_at"] == "2021-09-28T22:00:00+00:00"
+    assert not m.is_backfill("2020-03-02", m.BULK_IMPORT_AT)            # the bulk import is not a backfill
+    assert m.is_backfill("2025-10-10", "2025-10-13T13:31:00+00:00") and not m.is_backfill("2025-10-10", "2025-10-13T13:29:00+00:00")
+    v = m.vol_row(dict(VOL_REC, date="2022-12-12"), "x", commits)
+    assert v["value"]["backfilled"] and v["available_at"] == "2022-12-15T17:53:55+00:00"
+
+
+def test_parity_check_on_recorded_weekday_snapshot():
+    rows = [m.chain_row(_raw(t), "x") for t in REC_2022_08_19]
+    res = m.parity_check(rows, CLOSES_2022, rate=0.026)
+    assert res[0]["best"] == "same" and res[0]["clear"] and res[0]["agrees_with_rule"] and res[0]["err"] < 0.002
 
 
 def test_parity_check_on_recorded_saturday_snapshot():

@@ -26,19 +26,25 @@ API behaviour (probed 2026-10-15):
   * the commit log (``dolt_log``) names each daily load ``option_chain <date> update``; since 2021-04-20 these land at
     about 06:35 UTC the next morning. Everything dated before 2021-04-20 arrived in one bulk import on 2021-04-20.
 
-Point in time. ``date`` is the snapshot date, not always the quote date. Put-call parity on near-ATM strikes
-(forward = K + (C_mid - P_mid) e^{rT}, carried back to spot) matched against SPY daily closes shows the chain
-quotes the close of the last NYSE trading day on or before the snapshot date:
-  * a weekday snapshot quotes that day's close;
-  * a Saturday snapshot (all of 2019) quotes Friday's close;
-  * a snapshot on a holiday (e.g. Good Friday 2020-04-10) quotes the previous session.
-So each row carries ``snapshot_date`` (DoltHub's ``date``) and ``quote_date`` (the last trading day <= snapshot_date),
-and ``available_at`` = the evening (22:00 UTC, after the 16:15 ET options close) of the snapshot date, which is never
-earlier than the evening of the quote date. ``observed_at`` is when Mandel fetched the row. ``dolt_commit_at`` is
-when DoltHub first published that date (the bulk-import time for dates before 2021-04-20), so the dataset's own
-publication lag can be checked or enforced. A few snapshots are stale (parity matches the previous session; see
-``parity_check``); stale data is older information, so it cannot leak the future, but ``quote_date`` overstates its
-freshness on those dates.
+Point in time. ``date`` is the snapshot date, not always the quote date. Measured 2026-10-15:
+  * volatility_history: ``hv_current`` equals the 30-session sample standard deviation of SPY log returns x sqrt(252)
+    ending on the last NYSE trading day on or before the snapshot date, to all 4 decimals, for 592 of 595 SPY snapshots
+    (2019-2026; every weekday and all 47 Saturdays); 2 misses match the previous session, 1 matches the next session
+    by coincidence (it was committed before that session opened).
+  * option_chain: put-call parity on near-ATM strikes (spot = (K + (C_mid - P_mid) e^{rT}) e^{-(r-q)T}, two nearest
+    expiries, DTB3 rates) against SPY closes, over 397 sampled snapshots: on the 116 dates where the neighbouring
+    sessions' closes differ from the rule's close by >= 0.5%, the rule's session is the best match for 112 (96.6%);
+    at >= 0.3% separation, 164 of 178 (92.1%). Misses are previous-session or intraday captures (e.g. 2026-03-13 and
+    2026-06-11 imply a spot between the prior close and that day's open) or noise; none is a credible later-session match.
+So ``quote_date`` = the last NYSE trading day on or before ``snapshot_date`` (a Saturday or holiday snapshot quotes the
+previous session), and ``available_at`` = 22:00 UTC (after the 16:15 ET options close) on the snapshot date, never
+earlier than the evening of the quote date. The commit log shows each date since 2021-04-20 was published before the
+next session opened, except four backfills (2021-05-26, 2022-12-12, 2024-06-11, 2025-10-12; only 2022-12-12 has SPY
+rows, and its parity spot fits no nearby close well): for those ``backfilled`` is true and ``available_at`` is the
+commit time. The 2019-2021 bulk import is not treated as a backfill: its parity and hv agreement match the live era.
+``observed_at`` is when Mandel fetched the row; ``dolt_commit_at`` is when DoltHub first published that date
+(BULK_IMPORT_AT for dates before 2021-04-20). Stale or intraday snapshots (about 2-4% of chain dates) carry older
+information, so they cannot leak the future, but ``quote_date`` overstates their freshness; ``parity_check`` flags them.
 """
 
 from __future__ import annotations
@@ -316,31 +322,50 @@ def commit_time_for(snapshot_date: str, commits: dict[str, str]) -> Optional[str
     return None
 
 
+def is_backfill(snapshot_date: str, commit_at: Optional[str]) -> bool:
+    """True when a date after the bulk import was first published after the next session opened (13:30 UTC), so its
+    content could in principle postdate the snapshot date."""
+    if not commit_at or snapshot_date < "2021-04-20":
+        return False
+    d = date.fromisoformat(snapshot_date) + timedelta(days=1)
+    while not is_trading_day(d):
+        d += timedelta(days=1)
+    return commit_at > d.isoformat() + "T13:30:00+00:00"
+
+
+def _pit(snap: str, commits: Optional[dict]) -> tuple[str, str, Optional[str], bool]:
+    q = quote_date_for(snap)
+    ca = commit_time_for(snap, commits or {})
+    back = is_backfill(snap, ca)
+    avail = available_at_for(snap, q)
+    return q, (max(avail, ca) if back else avail), ca, back
+
+
 # ------------------------------------------------------------------- row shaping --
 
 def chain_row(r: dict, fetched_at: str, commits: Optional[dict] = None) -> dict:
     """One archive row from one option_chain row. value keeps every source column (vol renamed iv, call_put -> type)."""
     snap = r["date"]
-    q = quote_date_for(snap)
+    q, avail, ca, back = _pit(snap, commits)
     cp = (r.get("call_put") or "").lower()
     v = {"symbol": r["act_symbol"], "snapshot_date": snap, "quote_date": q, "expiry": r["expiration"], "strike": _num(r["strike"]),
          "type": "call" if cp.startswith("c") else "put" if cp.startswith("p") else cp,
          "bid": _num(r.get("bid")), "ask": _num(r.get("ask")), "iv": _num(r.get("vol")),
          "delta": _num(r.get("delta")), "gamma": _num(r.get("gamma")), "theta": _num(r.get("theta")), "vega": _num(r.get("vega")), "rho": _num(r.get("rho")),
-         "dolt_commit_at": commit_time_for(snap, commits or {})}
+         "dolt_commit_at": ca, "backfilled": back}
     return {"source": "dolthub", "kind": "option", "key": f"{v['symbol']}:{snap}:{v['expiry']}:{v['type'][:1].upper()}{r['strike']}",
-            "observed_at": fetched_at, "available_at": available_at_for(snap, q), "value": v}
+            "observed_at": fetched_at, "available_at": avail, "value": v}
 
 
 def vol_row(r: dict, fetched_at: str, commits: Optional[dict] = None) -> dict:
     snap = r["date"]
-    q = quote_date_for(snap)
+    q, avail, ca, back = _pit(snap, commits)
     v = {"symbol": r["act_symbol"], "snapshot_date": snap, "quote_date": q}
     v.update({k: _num(r.get(k)) for k in VOL_NUMERIC})
     v.update({k: r.get(k) for k in VOL_DATES})
-    v["dolt_commit_at"] = commit_time_for(snap, commits or {})
+    v["dolt_commit_at"], v["backfilled"] = ca, back
     return {"source": "dolthub", "kind": "volatility", "key": f"{v['symbol']}:{snap}", "observed_at": fetched_at,
-            "available_at": available_at_for(snap, q), "value": v}
+            "available_at": avail, "value": v}
 
 
 def _sort_key(row: dict):
@@ -348,15 +373,18 @@ def _sort_key(row: dict):
     return (v["snapshot_date"], v["symbol"], v.get("expiry", ""), v.get("strike") or 0.0, v.get("type", ""))
 
 
-def _merge_store(store, name: str, new_rows: list[dict], span: tuple[str, str], symbols: set[str], **kw):
-    """Write ``name`` = existing rows outside the fetched span (or for other symbols) + the new rows, so a partial or
-    incremental fetch never truncates the one-bundle-per-symbol history."""
+def _merge_store(store, name: str, new_rows: list[dict], span: tuple[str, str], symbols: set[str],
+                 failed_days: Iterable[str] = (), **kw):
+    """Write ``name`` = existing rows outside the fetched span (or for other symbols, or on days whose query failed)
+    + the new rows, so a partial or incremental fetch never truncates the one-bundle-per-symbol history."""
     arc = getattr(store, "archive", store)
+    failed = set(failed_days)
     keep = []
     try:
         for r in arc.load(name):
             v = r.get("value", {})
-            if span[0] <= v.get("snapshot_date", "") <= span[1] and v.get("symbol") in symbols:
+            sd = v.get("snapshot_date", "")
+            if span[0] <= sd <= span[1] and v.get("symbol") in symbols and sd not in failed:
                 continue
             keep.append(r)
     except (KeyError, FileNotFoundError):
@@ -393,7 +421,7 @@ def fetch_dolt_chains(store, symbol: str, start: Optional[str] = None, end: Opti
                "last": snaps[-1] if snaps else None, "commit_dates": len(commits), "wall_seconds": round(time.time() - t0, 1)})
     if store is not None and not dry_run and rows:
         span = (start, st.get("last_day") or end)
-        e = _merge_store(store, f"dolt-chain-{sym}", rows, span, {sym},
+        e = _merge_store(store, f"dolt-chain-{sym}", rows, span, {sym}, failed_days=st.get("failed_days", ()),
                          recipe=(f"GET {DOLT}?q=SELECT * FROM option_chain WHERE act_symbol = '{sym}' AND date IN (<every calendar day of an "
                                  f"adaptive 1-31 day window>), walked {start}..{span[1]}; a window that hits the 1000-row cap or "
                                  "'context deadline exceeded' is halved; commit times from SELECT date, message FROM dolt_log LIMIT/OFFSET pages. "
@@ -401,8 +429,8 @@ def fetch_dolt_chains(store, symbol: str, start: Optional[str] = None, end: Opti
                          tags=["options", "chain", "history", "dolthub", sym.lower()],
                          schema=("value = {symbol, snapshot_date (DoltHub date), quote_date (close quoted: last NYSE trading day <= snapshot_date, "
                                  "checked by put-call parity against SPY closes), expiry, strike, type, bid, ask, iv (source column vol), delta, gamma, "
-                                 "theta, vega, rho, dolt_commit_at (first DoltHub publication; bulk import 2021-04-20 for earlier dates)}; "
-                                 "observed_at = fetch time; available_at = 22:00 UTC on the snapshot date"),
+                                 "theta, vega, rho, dolt_commit_at (first DoltHub publication; bulk import 2021-04-20 for earlier dates), backfilled}; "
+                                 "observed_at = fetch time; available_at = 22:00 UTC on the snapshot date, or the commit time for a backfilled date"),
                          in_git=in_git)
         st["bundle_rows"], st["bundle_bytes"] = e.rows, e.bytes
     return rows
@@ -434,15 +462,16 @@ def fetch_dolt_volhistory(store, symbols: Iterable[str] = VOL_SYMBOLS, start: Op
                "rows_by_symbol": {s: sum(1 for r in rows if r["value"]["symbol"] == s) for s in syms}, "wall_seconds": round(time.time() - t0, 1)})
     if store is not None and not dry_run and rows:
         span = (start, st.get("last_day") or end)
-        e = _merge_store(store, "dolt-volhistory", rows, span, set(syms),
+        e = _merge_store(store, "dolt-volhistory", rows, span, set(syms), failed_days=st.get("failed_days", ()),
                          recipe=(f"GET {DOLT}?q=SELECT * FROM volatility_history WHERE act_symbol IN ({_in(syms)}) AND date IN (<every calendar day "
                                  f"of an adaptive window, up to 92 days>), walked {start}..{span[1]}; windows halve on the 1000-row cap or "
                                  "'context deadline exceeded'. Rebuild: mandel.data.dolt_options.fetch_dolt_volhistory(store, symbols)"),
                          tags=["volatility", "history", "dolthub", "implied-vol", "realised-vol"],
                          schema=("value = {symbol, snapshot_date, quote_date (last NYSE trading day <= snapshot_date), hv_current, hv_week_ago, hv_month_ago, "
                                  "hv_year_high, hv_year_high_date, hv_year_low, hv_year_low_date, iv_current, iv_week_ago, iv_month_ago, iv_year_high, "
-                                 "iv_year_high_date, iv_year_low, iv_year_low_date (decimals, annualised), dolt_commit_at}; observed_at = fetch time; "
-                                 "available_at = 22:00 UTC on the snapshot date"))
+                                 "iv_year_high_date, iv_year_low, iv_year_low_date (decimals, annualised; hv_current = 30-session sample stdev of log "
+                                 "returns x sqrt(252) to quote_date), dolt_commit_at, backfilled}; observed_at = fetch time; "
+                                 "available_at = 22:00 UTC on the snapshot date, or the commit time for a backfilled date"))
         st["bundle_rows"], st["bundle_bytes"] = e.rows, e.bytes
     return rows
 
