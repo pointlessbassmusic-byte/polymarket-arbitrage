@@ -1664,3 +1664,30 @@ about every 30 seconds (7 changes in 157 one-second polls against
 Kalshi's 124). The gaps open when Kalshi has moved and Polymarket's
 snapshot has not. Measuring those live needs the authenticated stream
 and is a speed race near expiry, which the desk does not enter.
+
+## Addendum, 2026-10-15 (30): Kalshi's daily weather markets
+
+The crypto and equity ideas this desk can trade are live, in forward
+tests, or closed, so the next market type was one that suits a small,
+slow account: Kalshi's daily high-temperature contracts, which settle
+on the NWS climate report for one station and turn on public forecast
+information (`kalshi-weather-forecast`, pre-registered, killed).
+
+Nine US cities, 68 days each (Kalshi's history starts in August), 3,672
+settled buckets. The model is Open-Meteo's day-ahead forecast of the
+station's maximum over the climate day (local standard time), with each
+city's bias and spread learned only from earlier settled days.
+
+| decision | buckets | Brier, model | Brier, Kalshi mid | model's trades, net per $ |
+|---|---|---|---|---|
+| 20:00 ET the evening before | 2,579 | 0.144 | 0.112 | −23.3% (t −4.7) |
+| 10:00 ET on the day | 2,084 | 0.173 | 0.126 | −23.4% (t −4.5) |
+
+The free gridded forecast misses the station high by 1.9–3.5°F on
+average, with steady biases of up to +3.3°F (Austin) and +2.7°F
+(Miami). The market's evening-before price is a much better forecast;
+its traders evidently use station-level guidance (NWS, the National
+Blend of Models, HRRR). The model is also overconfident: buckets it
+rated 50–80% likely resolved 22–37% of the time. A second try would
+need NBM station forecasts (archived by the Iowa Environmental Mesonet),
+which the market already prices, so it is not scheduled.

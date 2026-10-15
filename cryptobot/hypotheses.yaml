@@ -836,12 +836,12 @@
   test: "cryptobot.weather_study: settled markets 2026-08-08 to 2026-10-14 with hourly candles; decision at 20:00 ET on the day before (the bar ending at or before it); bucket probability from Normal(forecast + bias, sd) with a half-degree continuity correction on integer degrees, where bias and sd per city come from the settled values of days before the decision day (expanding window, first 15 days per city are training only); Brier of model vs mid over every quoted bucket; trades net of the fee, t clustered by city-day, halves by date. Second decision point at 10:00 ET on the day itself with the same day-ahead forecast (market has more information then). Trials: 2 decision points."
   success: "Written before any price was pulled: CANDIDATE if at the 20:00 decision the model's Brier beats the mid and trades net >= +3% per dollar at cluster t >= 2.5 with both halves positive over >= 150 trades; then a paper rule for 30 days on the desk before real money. KILLED if the mid's Brier is lower at both decision points. Otherwise inconclusive."
   data: "scratch weather/kalshi (settled markets + hourly candles), weather/forecast (Open-Meteo previous runs)"
-  result: "PRE-REGISTERED 2026-10-15; not run"
-  verdict: inconclusive
-  regime: "pending"
+  result: "Run 2026-10-15 on 3,672 settled markets (9 cities x 68 days, 2026-08-08 to 2026-10-14) with hourly quotes. The day-ahead Open-Meteo forecast misses the station maximum by a mean 1.9-3.5 F (Denver 1.9, Boston 2.2, NYC 2.3, Austin 3.5) with persistent biases up to +3.3 F (Austin) and +2.7 F (Miami). 20:00 ET the evening before: 2,579 quoted buckets, Brier model 0.1438 vs mid 0.1117; the model's 1,832 trades over 475 city-days lose 23.3% per dollar (t -4.7, 41% hit, halves -23.8% / -22.9%). 10:00 ET on the day: Brier 0.1725 vs 0.1262, 1,635 trades lose 23.4% (t -4.5). The model is overconfident in the middle (buckets it rated 0.5-0.8 resolved 22-37%). Killed by the registered rule: the market's day-before price is a much better forecast than the free gridded model; the traders evidently use station-level guidance (NWS / National Blend of Models / HRRR). A rerun with NBM station forecasts (Iowa Environmental Mesonet archive) would be the only fair second try, and the market already prices that guidance"
+  verdict: killed
+  regime: "2026-08 to 2026-10, 9 US cities: Kalshi's daily high-temperature markets are well forecast by their traders; a free day-ahead gridded forecast loses to the mid by 0.03-0.05 Brier"
   rerun: "python -m cryptobot.weather_study --scratch <dir> --fetch"
   preregistered: true
-  trials_run: 0
+  trials_run: 2
 
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
