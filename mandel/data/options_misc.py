@@ -14,7 +14,9 @@ Options misc: four free research and history sources behind T-188, T-518, T-222 
    the landing page at fetch time (the constant below is the fallback). The file's own timestamps and the NBER w26138
    release (Aug 2019) are earlier, but nothing shows the data file itself was public then; the deposit date is the
    earliest provable one. Licence: CC BY-NC-ND 4.0 (attribution, non-commercial, no derivatives), so the bundle stays
-   out of git by default (``in_git=False``); a trading use may not count as non-commercial.
+   out of git (``in_git=False``, the lead's decision) and is rebuilt from the recipe. Calendar: the rows follow the
+   bond-market calendar (no rows on Columbus Day or Veterans Day), and three trading days are missing in the source
+   file itself (``BDG_SOURCE_GAPS``: 2011-01-31, 2017-11-07, 2018-01-17); these are not fetch failures.
 
 2. ``opec-announcements`` (T-518). Känzig (2021 AER, doi:10.1257/aer.20190964) oil supply news data vintages,
    CC BY 4.0 (cite the paper): ``https://raw.githubusercontent.com/dkaenzig/oilsupplynews/master/
@@ -22,12 +24,24 @@ Options misc: four free research and history sources behind T-188, T-518, T-222 
    dates, 1983-07-19 .. 2025-12-01 (169 dates); the other columns are the published oil futures surprises (Front,
    1M..12M) and their first principal component (PC, the oil supply surprise). The vintage 2025M12 was committed on
    2026-06-05 and corrected on 2026-06-09 (git log). Two row kinds:
-     * ``opec-announcement``: the event flag. ``available_at`` = the announcement date itself, 00:00 UTC (OPEC
-       conference dates are scheduled in advance; the file does not mark the unscheduled ones, e.g. the Sunday
-       2023-04-02 voluntary cut, so the date itself is the only rule that is safe for all of them). Weekend dates carry
-       ``effective_weekday`` (the Monday after); exchange holidays are not adjusted.
-     * ``oil-supply-surprise``: the values, ``available_at`` = when that vintage was committed to GitHub (the PC is
-       re-estimated on every vintage and differs from the pre-Covid sheet, so the values are not point in time before).
+     * ``opec-announcement``: the event flag. ``available_at`` = the END of the announcement day, 23:59:59 UTC. The
+       day's 00:00 would come before the news: OPEC releases its decisions during European daytime, and many
+       announcements in the file were not scheduled in advance (e.g. the Sunday 2024-03-03 statement extending the
+       voluntary cuts, the Monday 2025-03-03 statement to proceed with the April increase, the OPEC+ meeting called off
+       on 2021-07-05). The file does not say which meetings were scheduled. A row is dated earlier only when
+       ``OPEC_KNOWN_SINCE`` (or the ``known_since`` argument) holds a verified entry for it: the date of an earlier OPEC
+       press release that announced this exact meeting date (a rescheduled meeting counts from the release that set the
+       final date). Then ``available_at`` = the end of that release's day, and the row stores ``known_since`` and
+       ``known_since_basis``. A harness that enters at the T-1 close therefore sees, through the available_at filter,
+       only the meetings with a verified known_since; every other event row becomes visible only after its own day.
+       ``OPEC_KNOWN_SINCE`` is empty in this version: on 2026-10-15 opec.org answered 403 (Cloudflare) and
+       web.archive.org was unreachable from this host, so no press release could be read. Add entries only from a
+       release actually read. (The often-cited Sunday 2023-04-02 voluntary cut is not in this vintage: the list jumps
+       from 2022-12-04 to 2023-06-04.) Weekend dates carry ``effective_weekday`` (the Monday after); exchange holidays
+       are not adjusted.
+     * ``oil-supply-surprise``: the values, ``available_at`` = when that vintage was committed to GitHub, never before
+       the end of the event day (the PC is re-estimated on every vintage and differs from the pre-Covid sheet, so the
+       values are not point in time before). A commit time is a lower bound on when the file was pushed.
 
 3. ``deribit-option-trades-catalysts`` (T-222). Deribit's public history API (no key; per-IP rate limits):
    ``GET https://history.deribit.com/api/v2/public/get_last_trades_by_currency_and_time?currency=BTC|ETH&kind=option
@@ -43,8 +57,14 @@ Options misc: four free research and history sources behind T-188, T-518, T-222 
    already listed by the end of the entry day (event date - 21 days). Listing times are the instruments'
    ``creation_timestamp`` from ``get_instruments`` (expired=true, ~77 MB per currency, plus the live list). Trade rows:
    ``available_at`` = trade time (the tape is public on execution). One ``catalyst-window`` row per window records the
-   event, target expiry, listing time and completeness; its ``available_at`` is ``known_since`` where that date is
-   verified (statute or protocol), else the event time itself, so an unverified catalyst never looks known in advance.
+   event, target expiry, listing time and completeness. Its ``available_at`` is, where ``known_since`` is verified
+   (statute or protocol), the later of the end of the known_since day and the target expiry's listing time (the row
+   names the target expiry, which nobody could know before it was listed); otherwise it is the event time itself, so an
+   unverified catalyst never looks known in advance. For the 10 verified windows this is at or before the end of the
+   entry day except for the beacon genesis (known 7 days ahead), so 9 windows are usable at entry. ``event_time_basis``
+   says how the event time was known: block-height events (the halvings, Taproot, the PoW forks, the Merge's TTD) are
+   ``realised (ex post)``: their exact time, and so which expiry falls after the event, was not known in advance. The
+   fields trades_seen, trades_kept, pages and complete are fetch metadata, not market information.
    Entries carry ``known_since_hint`` (unverified) for the T-222 harness to check before it freezes its sample.
 
 4. ``deribit-box-monthly`` (T-260). Tardis.dev HTTP data feed, keyless only for the first day of each month
@@ -53,20 +73,27 @@ Options misc: four free research and history sources behind T-188, T-518, T-222 
    "symbols":[...]}]`` returns minute 00:00-00:01 UTC as NDJSON lines ``<local ISO timestamp> <Deribit message>``.
    Deribit sends a ticker snapshot for every subscribed instrument when Tardis resubscribes at 00:00, so the legs are
    near-synchronous (the 2024-03-01 probe had all four legs within 0.31 s). Legs per capture day: every BTC expiry 30-90
-   days out that was listed then (instrument ``creation_timestamp``), the ``n_side`` strikes at or below and above the
+   calendar days out (expiry date minus capture day, so a quarterly exactly 90 days out is included) that was listed
+   then (instrument ``creation_timestamp``), the ``n_side`` strikes at or below and above the
    spot hint (BTC-PERPETUAL 1-hour bar ending at 00:00 UTC, Deribit chart API) that have both a call and a put listed;
    any pair of those strikes forms a box. Kept per instrument: the first ticker message (the snapshot) and the last in
-   the minute, raw. ``available_at`` = Tardis's local receive timestamp. Deribit options are on Tardis from 2019-03-30,
+   the minute, raw. An empty line in the feed marks a disconnect (Tardis docs; the 2024-03-01 probe had one at about
+   00:00:29): the capture row records them and each leg row says whether its message came after a reconnect.
+   ``available_at`` = Tardis's local receive timestamp. Deribit options are on Tardis from 2019-03-30,
    so captures run 2019-04-01 onward (about 91 days to 2026-10). Licence (Tardis.dev FAQ and Terms clause 9, read
    2026-10-15): internal research use only, including free first-of-month data; no redistribution of raw data (only
    aggregates of >= 10 minutes that cannot be reverse-engineered), no use to train or evaluate general-purpose AI
    models, and external service providers (named example: a cloud AI service) must be bound in writing before they get
    the data or results derived from it. So this bundle is never in git, and the raw quotes belong in local Python
    harnesses, not in an LLM context.
-   Keyless access is also capped by a data-transfer budget per "account", which for keyless calls is the caller's IP:
-   on 2026-10-15 this host (a shared egress proxy) got HTTP 429 code 277 "This account has reached its data transfer
-   limit" with retryAfterSeconds 45818 (~12.7 h). The fetcher stops at the first such answer rather than retrying; run it
-   from a host with its own IP. A day costs about 24 ticker messages per leg per minute (about 300 KB raw, 40 KB gzip).
+   Keyless access is also capped by a data-transfer budget per "account", which for keyless calls is the caller's IP,
+   so on a shared egress host the budget is shared with everyone else behind it and is not ours to manage.
+   STATUS: BLOCKED FROM THIS HOST (``TARDIS_ACCESS``). On 2026-10-15 this host (a shared egress proxy) got HTTP 429
+   code 277 "This account has reached its data transfer limit" with retryAfterSeconds 45818 at about 12:03Z; one small
+   call got through at about 12:30Z, and the shared budget was exhausted again minutes later (retryAfterSeconds 51829).
+   The fetcher is kept as is and stops at the first such answer rather than retrying; run it from a host with its own IP
+   (e.g. the Linode). Never call ``/v1/exchanges/deribit`` (about 222 MB of metadata) from a shared host. A day costs
+   about 24 ticker messages per leg per minute (about 300 KB raw, 40 KB gzip).
 
 Deribit's API documentation states no data licence (its Terms page needs JavaScript and could not be read); its
 usage policy is fair use with per-IP limits for public calls and a special 1 request/second limit on get_instruments.
@@ -165,6 +192,12 @@ def _cap(available_at: str, observed_at: str) -> str:
     return available_at if _ms(available_at) <= _ms(observed_at) else observed_at
 
 
+def _end_of_day(day: str) -> str:
+    """The last second of a UTC day. A fact known only by its date (a press release, a statement) counts from here: its
+    time of day is not recorded, so the day's 00:00 could come before it."""
+    return day[:10] + "T23:59:59+00:00"
+
+
 def _load_existing(archive, name: str) -> list[dict]:
     try:
         archive.get(name)
@@ -183,8 +216,11 @@ BDG_DEPOSITED = "2021-11-23T13:58:00+00:00"            # landing page "Date Depo
 BDG_LICENCE = "https://creativecommons.org/licenses/by-nc-nd/4.0/"
 BDG_CITATION = ("van Binsbergen, J.H., Diamond, W. and Grotteria, M. (2021) Daily Data: Risk-free Interest Rates [Dataset], "
                 "doi:10.35065/b1dk-rp56; paper: Journal of Financial Economics 143(1), 2022, doi:10.1016/j.jfineco.2021.06.012")
+BDG_SOURCE_GAPS = ("2011-01-31", "2017-11-07", "2018-01-17")   # trading days missing in the source file itself (checked 2026-10-15)
 BOX_SCHEMA = ("value = {day, box_6m, box_12m, box_18m, gov_6m, gov_12m, gov_18m}: SPX box-implied rates and the authors' Treasury "
-              "fits, continuously compounded, annualised, percent, constant maturities; one row per trading day 2004-01-02..2018-03-19; "
+              "fits, continuously compounded, annualised, percent, constant maturities; one row per trading day 2004-01-02..2018-03-19 "
+              "on the bond-market calendar (no rows on Columbus Day or Veterans Day); the source itself has no row for "
+              f"{', '.join(BDG_SOURCE_GAPS)} (not fetch failures); a missing rate is left out of its row ('NaN' cells); "
               "available_at = the LBS deposit date for every row (published research series, not public in real time)")
 
 
@@ -246,7 +282,7 @@ def fetch_box_rates_bdg(store=None, limit: Optional[int] = None, dry_run: bool =
     ``limit`` returns only the first N days and then nothing is stored (a preview never replaces the full bundle)."""
     rep = report if report is not None else {}
     if dry_run:
-        rep["_plan"] = {"calls": 2, "urls": [BDG_PAGE, BDG_XLSX], "est_rows": 3548, "est_raw_kb": 321, "est_gz_kb": 160}
+        rep["_plan"] = {"calls": 2, "urls": [BDG_PAGE, BDG_XLSX], "est_rows": 3548, "est_raw_kb": 321, "est_gz_kb": 180}
         return []
     own = client is None
     c = client or _client()
@@ -267,8 +303,9 @@ def fetch_box_rates_bdg(store=None, limit: Optional[int] = None, dry_run: bool =
     available = meta.get("deposited") or BDG_DEPOSITED
     licence = meta.get("licence") or BDG_LICENCE
     rows = box_rate_rows(values[:limit] if limit else values, observed, available)
+    days = {v["day"] for v in values}
     rep["coverage"] = {"rows": len(values), "first": values[0]["day"] if values else None, "last": values[-1]["day"] if values else None,
-                       "available_at": available, "licence": licence}
+                       "available_at": available, "licence": licence, "source_gaps_absent": [d for d in BDG_SOURCE_GAPS if d not in days]}
     archive = _archive(store)
     if archive is not None and rows and not limit:
         e = archive.store("box-rates-bdg", kind="data", rows=rows,
@@ -276,8 +313,9 @@ def fetch_box_rates_bdg(store=None, limit: Optional[int] = None, dry_run: bool =
                                   f"mandel.data.options_misc.fetch_box_rates_bdg; httpx, {min_interval}s pacing, {retries} tries with exponential "
                                   f"backoff on 429/5xx. Published research series (file dated 2019-07-30, observations 2004-01-02..2018-03-19, "
                                   f"never updated): not public in real time, so available_at = the LBS Research Online deposit time "
-                                  f"{available} for every row; observed_at = fetch time. {BDG_CITATION}. Licence {licence} (non-commercial, "
-                                  f"no derivatives): kept out of git"),
+                                  f"{available} for every row; observed_at = fetch time. Bond-market calendar (no Columbus Day or Veterans "
+                                  f"Day rows); the source has no row for {', '.join(BDG_SOURCE_GAPS)} (source gaps, not fetch failures). "
+                                  f"{BDG_CITATION}. Licence {licence} (non-commercial, no derivatives): kept out of git, rebuild from this recipe"),
                           tags=["options", "rates", "box", "research-series", "history", "not-point-in-time", "T-188"],
                           schema=BOX_SCHEMA, in_git=in_git)
         rep["stored"] = {"rows": e.rows, "bytes": e.bytes, "in_git": e.in_git}

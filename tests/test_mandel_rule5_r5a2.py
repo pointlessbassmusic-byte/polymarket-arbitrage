@@ -91,14 +91,16 @@ def _mm_run(drift, seed, base, **kw):
 def test_monetary_momentum_permutation_row_is_decisive_by_its_lower_tail_mirror():
     rep = _mm_run(-0.0004, 1, 0.0002)
     assert rep == _mm(-0.0004, 1, 0.0002)                           # the round-1 fixture builder, unchanged
-    p_lo, cost_arm = rep["permutation_p_lower"], 2 * 2.0 / 1e4
-    assert rep["n"] == 107 and rep["permutation_p"] >= 0.05 and p_lo < 0.05
+    cost_arm = 2 * 2.0 / 1e4
+    assert rep["n"] == 107 and rep["permutation_p"] >= 0.05
     assert rep["gap_ci_net_pp"][1] / 100 + 2 * cost_arm > 0         # the gross-gap two-sided (97.5%) upper end is above 0
-    # the mirror comes from the same 1,000 permutation draws: with no ties the two tails add to (n_perm + 2) / (n_perm + 1)
-    assert rep["permutation_p"] + p_lo == pytest.approx(1002 / 1001, abs=2 / 1001)
     label, ok = _judged(rep, "permutation p < 0.05")
     assert ok is False and label.endswith("(fails decisively below min_n)")
     assert "permutation p < 0.05" in rep["rule5"]["decisive_failures"]
+    p_lo = rep["permutation_p_lower"]
+    assert p_lo < 0.05
+    # the mirror comes from the same 1,000 permutation draws: with no ties the two tails add to (n_perm + 2) / (n_perm + 1)
+    assert rep["permutation_p"] + p_lo == pytest.approx(1002 / 1001, abs=2 / 1001)
     assert rep["reason"].startswith(f"only {rep['n']} expansionary+contractionary meetings (min_n 120); lower-tail "
                                     f"permutation p (H1 gap < 0) {p_lo:.4f}")
 
@@ -119,12 +121,12 @@ def _decay(mu, seed, **kw):
 @pytest.mark.parametrize("mu,seed", [(-0.0008, 8), (-0.0007, 4)])
 def test_vxx_decay_one_sided_lower_bound_decides(mu, seed):
     rep = _decay(mu, seed)
-    lb = rep["rule5"]["lb95"]
     assert rep["n"] == 33 and rep["ub95"] >= -0.03                  # the pass fails
-    assert rep["ci95"][0] < -0.03 <= lb                              # one-sided 95% lower bound at or above -3%, 97.5% not
     assert rep["verdict"] == "not_supported", rep["reason"]
     assert rep["rule5"]["decisive_failures"] == [
         "one-sided 95% studentized block-3 bootstrap upper bound of the conditional mean < -0.03"]
+    lb = rep["rule5"]["lb95"]
+    assert rep["ci95"][0] < -0.03 <= lb                              # one-sided 95% lower bound at or above -3%, 97.5% not
     assert ("fails decisively below min_n" in rep["reason"]
             and f"its one-sided 95% lower bound ({vx._pc(lb)}, the mirror of the one-sided 95% upper-bound pass" in rep["reason"])
 

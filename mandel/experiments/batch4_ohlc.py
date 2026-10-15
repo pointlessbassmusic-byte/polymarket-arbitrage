@@ -309,7 +309,8 @@ def _upper_dec(hi, bound: float, fmt, n_obs: int, n_units: float, strict: bool =
     """Decisive failure of a 'statistic > bound' (or >= bound with ``strict``) criterion: the upper end ``hi`` of its
     ``what`` lies at or below ``bound`` (below it with ``strict``), on an interval that can decide (_resolvable)."""
     if not _resolvable(n_obs, n_units):
-        return False, f"{what} on {n_obs} observations in {n_units:.0f} resampling units, too few to decide"
+        units = math.floor(n_units) if math.isfinite(n_units) else n_units     # whole units: never rounds up past the gate
+        return False, f"{what} on {n_obs} observations in {units} resampling units, too few to decide"
     if hi is None or not math.isfinite(hi):
         return False, f"no {what}"
     dec = bool(hi < bound) if strict else bool(hi <= bound)
@@ -709,10 +710,10 @@ def ibs_reversal(days: Sequence[str], highs, lows, closes, adj, opens=None, star
         hrng = np.random.default_rng(seed + 1)
         hcis, hn, hu = [], [], []
         for lab, g_ in ((f"<{split}", early), (f">={split}", ~early)):
-            k = int((g_ & f).sum()); hn.append(k); hu.append(g_.sum() / mean_block)
+            k = int((g_ & f).sum()); hn.append(k); hu.append(int(g_.sum() // mean_block))   # whole blocks
             hcis.append((lab, *(_signal_diff_ci(r_w[g_], f[g_], mean_block, n_boot, hrng)
                                  if k >= MIN_DECISIVE_OBS and (g_ & ~f).sum() >= 2 else (None, None))))
-        r5 = [(*crit[0], *_upper_dec(hi, min_gap, bps, ns, n / mean_block, what="stationary-bootstrap 95% CI")),
+        r5 = [(*crit[0], *_upper_dec(hi, min_gap, bps, ns, int(n // mean_block), what="stationary-bootstrap 95% CI")),
                 (*crit[1], *_halves_dec(hcis, hn, hu, bps, opposite=True)),
                 (*crit[2], *((False, "") if dsr is None else _dsr_dec(daily, ns)))]
         v, why = _apply_rule5(rep, r5, n, min_n, "trading days")
@@ -807,6 +808,10 @@ def spread_shock(days: Sequence[str], highs, lows, closes, adj, vix: dict, start
            "last": ds[idx[-1]] if len(idx) else None}
     if n_ev < min_events and (shock.sum() < 2 or n_ev < 2):
         v_, why = _too_few(n_ev, min_events, "non-overlapping shock events", "the shock regression")
+        rep.update(verdict=v_, reason=f"CS spread shock: {n_ev} non-overlapping events — {why}")
+        return rep
+    if shock.sum() < 2:     # reachable only at n_ev >= min_events <= 1: the pre-rule-5 early return, unchanged
+        v_, why = _decide([], n_ev, min_events, "non-overlapping shock events")
         rep.update(verdict=v_, reason=f"CS spread shock: {n_ev} non-overlapping events — {why}")
         return rep
     y = R[idx]; X = np.column_stack([np.ones(len(idx)), shock.astype(float), dv[idx]])
@@ -1045,7 +1050,9 @@ def twin_reversion(days: Sequence[str], a, b, start: str = "2010-01-01", end: st
     return per trade = side x (A leg return - B leg return) - 8 bps (2 bps per leg per transaction, equal dollars).
     Pass: 95% lower bound of the mean net return per trade > 0 (bootstrap clustered by entry month) AND DSR > 0.95
     of the trade-return series across ``n_trials`` twin variants. min_n counts trades, the unit of the per-trade
-    statistic (as for T-304 and T-333); below it the verdict is inconclusive and the statistics are still reported."""
+    statistic (as for T-304 and T-333); below it house rule 5 applies (never supported; a decisive failure, its 95%
+    interval wholly on the wrong side of the bound, is not_supported, any other failure inconclusive) and the statistics
+    are still reported."""
     A = np.asarray(a, dtype=float); B = np.asarray(b, dtype=float); ds = np.array(days)
     x = np.log(A / B)
     z = _trailing_z(x, window, include_current=True)
