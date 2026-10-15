@@ -1,6 +1,6 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `cfc8bd186dff56f4`). 477 theories. supported 50, not_supported 190, inconclusive 36, untested 72, blocked 117, parked 12.
+Rendered from `registry.json` (hash `e689bf15c37b7eea`). 477 theories. supported 50, not_supported 190, inconclusive 36, untested 68, blocked 121, parked 12.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
@@ -4431,7 +4431,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-66a6cce7: inconclusive — COR1M averages 37.1 vs realised equal-weight average pairwise correlation of the 9 sector SPDRs (XLB/XLE/XLF/XLI/XLK/XLP/XLU/XLV/XLY) 55.7. POOLED over all 21 grid offsets (5206 daily starts 2006-01-03..2026-09-14 = 248 distinct 21-session holds; studentized circular block bootstrap, block 126 sessions): mean gap -18.6 pts (95% CI -20.8 to -16.1), halves -19.0/-18.2. Per grid offset (21 non-overlapping grids, n 247 to 248 windows, block 6): mean gap -19.4 to -17.5 pts, lower bound -21.7 to -19.8 pts, 0/21 offsets with the lower bound > 0. Proxy verdict: NOT an acceptable stand-in under the claim's wording ('the index constituents'): sector baskets diversify away idiosyncratic risk, so their pairwise correlation is far above single-stock correlation (the gap above is dominated by that bias, not by the correlation premium); XLC/XLRE and cap weights are also missing, so the verdict is capped at inconclusive — implemented criteria pass; not implemented: proxy (9 sector SPDRs) POOLED lower 95% CI bound > 0 (a sector proxy bounds the claim from one side only: sector correlations exceed constituent ones, so a proxy shortfall is not a failure); realised average correlation of the index constituents (COR1M's top-50 S&P 500 names, cap-weighted): constituent closes and weights are not archived; vega-neutral short-index / long-constituent straddle book has positive mean P&L: needs index and single-stock chain history
 - note: from the options-library library: Dispersion Trade (short index vol, long constituent vol); harness suggestion: Harness 'implied_vs_realised_correlation' in mandel/experiments/volatility.py with bundles ['cboe-COR1M-history','daily-history-XL*']. | added by the verifier pass
 
-## Untested (72)
+## Untested (68)
 
 ### T-12 · volume-improves-calibration
 
@@ -4823,32 +4823,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Inherits each sleeve's controls. Trailing-only weights. The DSR counts all sleeve variants as trials. Regime reporting by NBER recession dates (FRED USREC).
 - note: from the underlying-library library: Cross-asset carry composite (crypto basis, FX, bonds, commodities, VIX); harness suggestion: mandel/experiments/carry.py: composite(sleeve_returns) with risk parity and DSR over total trials | verifier: corrected claim/trial
 
-### T-391 · insider-cluster-buys
-
-**Claim.** Insider purchase clusters (>= 3 buyers within 30 days), bought at the close after the third filing's acceptance and held 126 trading days, earn a positive mean size-matched abnormal return over 2006-2026.
-
-- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.nber.org/papers/w16454 (fetched), https://www.sec.gov/data-research/sec-markets-data/insider-transactions-data-sets (fetched)
-- statistic: Mean 126-day abnormal return per cluster (size-matched ETF benchmark) with event-month clustered bootstrap; calendar-time FF5 alpha as secondary.
-- null: Mean abnormal return <= 0.
-- procedure: Ingest SEC Insider Transactions Data Sets (quarterly ZIPs from 2006q1, verified) and EDGAR daily index for the live tail with a User-Agent that contains a contact email (verified: 200 with email, 403 with the repo's current URL-only UA); build clusters; align on acceptance datetime; price with Yahoo; walk-forward by year (no fitted parameters) with a 6-month embargo between clusters of the same issuer.
-- data: SEC insider transactions data sets 2006q1-; EDGAR full index; Yahoo adjusted closes; Ken French FF5; shares outstanding from SEC XBRL companyfacts (dei) for size matching. · min n: 1000
-- pass: Lower 95% bound of mean abnormal return > 0 AND calendar-time alpha t >= 2.5 over >= 1000 clusters across >= 10 years.
-- controls: Look-ahead: acceptance datetime. Survivorship: Yahoo lacks delisted tickers, and small-cap cluster names delist often; flag via SEC CIK/ticker history and apply a -30% delisting return for performance delistings (Shumway) with a sensitivity band. Costs: 10 bp per side plus ADV cap. Multiple testing: 5 variants. Regime: 2008-2009 and 2020 cluster waves; report ex-crisis.
-- note: from the underlying-library library: Insider cluster buying (Form 4 open-market purchases); harness suggestion: flow_events.py event-study harness; data/edgar.py for insider data-set ZIPs and daily form.idx; cluster builder with the routine filter. | verifier: corrected claim/trial
-
-### T-392 · 13f-best-ideas-cloning
-
-**Claim.** The equal-weight union of rule-selected concentrated managers' largest active positions, bought at 13F acceptance dates and rebalanced quarterly, has positive FF5+UMD alpha over 2013 Q3 to 2026 Q2.
-
-- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets (fetched), https://data.sec.gov/submissions/CIK0000320193.json (reachable, 200)
-- statistic: Monthly calendar-time portfolio alpha against FF5+UMD (Newey-West t); bootstrap CI on annualized alpha.
-- null: Alpha <= 0 after costs and the ~45-day lag.
-- procedure: Parse SEC Form 13F data sets (2013q2 onward, verified); apply the manager-selection rule with past filings only; compute active weights; align on acceptance date; compare with the hindsight quarter-end version to quantify the lag haircut.
-- data: SEC 13F data sets; EDGAR submissions JSON (acceptance dates); SEC XBRL companyfacts (shares outstanding); Yahoo prices; Ken French factors; GVIP. · min n: 150
-- pass: Alpha t >= 2 over >= 150 monthly observations AND positive point estimate in both halves (2013-2019, 2020-2026).
-- controls: Look-ahead: acceptance date; manager list by rule, not by today's reputation (naming Berkshire/Baupost/Pershing/Greenlight is selection on known success). Survivorship: delisted holdings flagged. Costs: 5 bp per side, ~100%/yr turnover. Multiple testing: 5 variants. Regime: 2021-2022 crowded-name drawdown.
-- note: from the underlying-library library: 13F cloning of concentrated managers' best ideas; harness suggestion: data/edgar.py (13F ZIP ingest, CIK list, acceptance dates) + flow_events.py calendar-time portfolio alpha. | verifier: corrected claim/trial
-
 ### T-393 · short-interest-days-to-cover
 
 **Claim.** Among the top 1000 US stocks, the bottom days-to-cover decile outperforms the top decile over the following release period, with a positive mean long-short return after borrow costs over 2017-12 to 2026-09.
@@ -4874,19 +4848,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: Lower... upper 95% bound of mean abnormal return < 0 net of costs over >= 5000 events AND same sign in both halves (2019-2022, 2023-2026); otherwise parked as 'daily SVR not informative'.
 - controls: Look-ahead: next-day open. Survivorship: point-in-time membership. Costs: 5 bp per side; daily turnover makes costs decisive. Multiple testing: 4 trials. Regime: 2021 meme period. Definitional: off-exchange only, not total short volume.
 - note: from the underlying-library library: FINRA daily short-volume ratio; harness suggestion: data/finra.py daily file loader + the generic cross-sectional event harness; add gross-vs-net reporting since turnover is daily. | verifier: corrected claim/trial
-
-### T-395 · buyback-announcement-drift
-
-**Claim.** Firms announcing open-market repurchase authorisations >= 5% of market cap, bought at the close after the 8-K acceptance and held 12 months, earn a positive mean size-matched abnormal return over 2005-2026.
-
-- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://efts.sec.gov/LATEST/search-index?q=%22Form%204%22&forms=4 (reachable, 200; efts full-text search works from this host), https://academic.oup.com/rfs/article-abstract/22/4/1693/1570427 (Peyer-Vermaelen; fetched, text truncated)
-- statistic: Mean 12-month abnormal return per event (size-matched ETF) with event-month clustered bootstrap; calendar-time FF5 alpha as the primary robustness check (Bradford shows BHARs and alphas can disagree).
-- null: Mean abnormal return <= 0.
-- procedure: EDGAR full-text search (efts, 200 with email UA, 2001-); regex parse authorisation amounts with a hand-checked sample of 50; align on acceptance; event study; walk-forward by year.
-- data: EDGAR efts; SEC XBRL companyfacts (shares); Yahoo prices; Ken French factors; PKW. · min n: 800
-- pass: Lower 95% bound > 0 over >= 800 events AND calendar-time FF5 alpha t >= 2 AND positive in both halves (2005-2015, 2016-2026).
-- controls: Look-ahead: acceptance datetime; shares from prior filing. Survivorship: acquired/delisted firms missing from Yahoo; coverage reported. Costs: 5 bp per side. Multiple testing: 5 variants. Regime: 2008-2009 cancellations; 2023 1% buyback excise tax.
-- note: from the underlying-library library: Share buyback announcements and buyback-achiever tilt; harness suggestion: data/edgar.py full-text-search client; flow_events.py; regex parser for authorisation amounts with a manual-check sample of 50. | verifier: corrected claim/trial
 
 ### T-398 · fund-flow-dumb-money
 
@@ -5148,19 +5109,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: acceptance date; facts restricted to the filing's own accession. Survivorship: delisted names missing from Yahoo (value-distressed names delist often: strong upward bias; sensitivity with delisting returns). Costs: 10-20 bp per side. Multiple testing: 4 variants. Regime: 2020-2021 junk rally.
 - note: from the underlying-library library: Piotroski F-score within value stocks; harness suggestion: data/edgar.py fundamentals mapper (standard tag fallbacks); calendar-time harness in flow_events.py. | added by the verifier pass
 
-### T-452 · pead-xbrl-sue
-
-**Claim.** The top-minus-bottom SUE decile portfolio, formed at the close after each 10-Q/10-K acceptance and held 60 trading days, earns a positive mean return over 2011-2026.
-
-- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://cfr.ivo-welch.info/published/papers/martineau2021rest.pdf (fetched; abstract verified), https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json (200 with email UA)
-- statistic: Calendar-time monthly long-short return mean with block-bootstrap CI; FF5+UMD alpha (Newey-West).
-- null: Mean long-short return <= 0.
-- procedure: Pull XBRL companyfacts/frames (from 2009; SUE needs 8 prior seasonal differences, so signals from ~2011); align on acceptance datetime; price with Yahoo; no fitted parameters; size-split variants.
-- data: SEC XBRL companyfacts and frames (verified 200 with an email-bearing UA); EDGAR submissions JSON; Yahoo prices; Ken French factors. · min n: 150
-- pass: Lower 95% bound > 0 over >= 150 months AND FF5+UMD alpha t >= 2; size-split results reported (Martineau predicts large-cap null).
-- controls: Look-ahead: acceptance datetime; XBRL facts filtered to the filing's own accession (no later restatements). Survivorship: Yahoo lacks delisted names; flag and apply delisting-return sensitivity. Costs: 10 bp per side small caps, 3 bp large. Multiple testing: 5 variants. Regime: 2020 earnings dispersion.
-- note: from the underlying-library library: Post-earnings-announcement drift (PEAD) from SEC XBRL; harness suggestion: data/edgar.py companyfacts loader keyed by accession with available_at = acceptance; flow_events.py calendar-time portfolios. | added by the verifier pass
-
 ### T-458 · consumer-confidence-size-premium
 
 **Claim.** From 1990 to 2026, a top-tercile orthogonalised Michigan sentiment reading predicts a negative 3-month ^RUT-minus-^GSPC return, with an out-of-sample R^2 above zero.
@@ -5369,7 +5317,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: one-bar delay; survivorship: n/a; costs: 2 bps per switch SPY, 5 bps SSO, financing at T-bill + 50 bps; multiple testing: 6 trials plus T-58; regime: 2018-Q4, 2020-03 and 2022 whipsaws reported
 - note: from the underlying-library library: Leverage for the long run: 2x S&P exposure above the 200-day SMA, T-bills below; harness suggestion: underlying.py leveraged_sma(adj, dtb3, lev, length); harness leverage_long_run. | added by the verifier pass
 
-## Blocked (117)
+## Blocked (121)
 
 ### T-05 · cross-venue-arbitrage
 
@@ -6427,6 +6375,48 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: PTR PDF parsing (House PDFs reachable; some are scanned and need OCR) and a cookie-based Senate eFD scrape. The NANC/GOP ETF variant is testable now but has only ~44 monthly observations (low power; Yahoo serves GOP, not KRUZ).
 - note: from the underlying-library library: Congressional trading mimicry (House/Senate PTRs, NANC/KRUZ); harness suggestion: New experiments/flow_events.py: generic event-study harness (filing-date alignment, size-matched benchmark, clustered bootstrap, calendar-time alpha) shared by congress, insider, buyback and 13F entries; PTR PDF parser as a data/ module with a coverage report. | verifier: corrected claim/trial
 
+### T-391 · insider-cluster-buys
+
+**Claim.** Insider purchase clusters (>= 3 buyers within 30 days), bought at the close after the third filing's acceptance and held 126 trading days, earn a positive mean size-matched abnormal return over 2006-2026.
+
+- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.nber.org/papers/w16454 (fetched), https://www.sec.gov/data-research/sec-markets-data/insider-transactions-data-sets (fetched)
+- statistic: Mean 126-day abnormal return per cluster (size-matched ETF benchmark) with event-month clustered bootstrap; calendar-time FF5 alpha as secondary.
+- null: Mean abnormal return <= 0.
+- procedure: Ingest SEC Insider Transactions Data Sets (quarterly ZIPs from 2006q1, verified) and EDGAR daily index for the live tail with a User-Agent that contains a contact email (verified: 200 with email, 403 with the repo's current URL-only UA); build clusters; align on acceptance datetime; price with Yahoo; walk-forward by year (no fitted parameters) with a 6-month embargo between clusters of the same issuer.
+- data: SEC insider transactions data sets 2006q1-; EDGAR full index; Yahoo adjusted closes; Ken French FF5; shares outstanding from SEC XBRL companyfacts (dei) for size matching. · min n: 1000
+- pass: Lower 95% bound of mean abnormal return > 0 AND calendar-time alpha t >= 2.5 over >= 1000 clusters across >= 10 years.
+- controls: Look-ahead: acceptance datetime. Survivorship: Yahoo lacks delisted tickers, and small-cap cluster names delist often; flag via SEC CIK/ticker history and apply a -30% delisting return for performance delistings (Shumway) with a sensitivity band. Costs: 10 bp per side plus ADV cap. Multiple testing: 5 variants. Regime: 2008-2009 and 2020 cluster waves; report ex-crisis.
+- blocked on: survivorship-free single-stock data (delisted names, point-in-time universe) not available from a free source: A point-in-time single-stock price universe that includes delisted names. The claim needs 126-day abnormal returns for at least 1,000 insider-cluster issuers over 2006-2026. Cluster buys are concentrated in small caps that often delist (mergers, performance delistings), and Yahoo does not serve delisted tickers. No free source here provides CRSP-style delisted prices or delisting returns. The Shum
+- note: from the underlying-library library: Insider cluster buying (Form 4 open-market purchases); harness suggestion: flow_events.py event-study harness; data/edgar.py for insider data-set ZIPs and daily form.idx; cluster builder with the routine filter. | verifier: corrected claim/trial | 2026-10-15 triage: still blocked: A point-in-time single-stock price universe that includes delisted names. The claim needs 126-day abnormal returns for at least 1,000 insider-cluster issuers over 2006-2026. Cluster buys are concentrated in small caps that often delist (mergers, performance delistings), and Yahoo does not serve delisted tickers. No free source here provides CRSP-style delisted prices or delisting returns. The Shumway -30% patch needs the delisting date and the last price, which are also missing. Size matching also needs historical shares outstanding (SEC XBRL dei, blocked or contested) for names that no longer file.
+
+### T-392 · 13f-best-ideas-cloning
+
+**Claim.** The equal-weight union of rule-selected concentrated managers' largest active positions, bought at 13F acceptance dates and rebalanced quarterly, has positive FF5+UMD alpha over 2013 Q3 to 2026 Q2.
+
+- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets (fetched), https://data.sec.gov/submissions/CIK0000320193.json (reachable, 200)
+- statistic: Monthly calendar-time portfolio alpha against FF5+UMD (Newey-West t); bootstrap CI on annualized alpha.
+- null: Alpha <= 0 after costs and the ~45-day lag.
+- procedure: Parse SEC Form 13F data sets (2013q2 onward, verified); apply the manager-selection rule with past filings only; compute active weights; align on acceptance date; compare with the hindsight quarter-end version to quantify the lag haircut.
+- data: SEC 13F data sets; EDGAR submissions JSON (acceptance dates); SEC XBRL companyfacts (shares outstanding); Yahoo prices; Ken French factors; GVIP. · min n: 150
+- pass: Alpha t >= 2 over >= 150 monthly observations AND positive point estimate in both halves (2013-2019, 2020-2026).
+- controls: Look-ahead: acceptance date; manager list by rule, not by today's reputation (naming Berkshire/Baupost/Pershing/Greenlight is selection on known success). Survivorship: delisted holdings flagged. Costs: 5 bp per side, ~100%/yr turnover. Multiple testing: 5 variants. Regime: 2021-2022 crowded-name drawdown.
+- blocked on: survivorship-free single-stock data (delisted names, point-in-time universe) not available from a free source: Return histories for best-idea holdings that later delisted, merged or went bankrupt. Yahoo answers 404 'No data found, symbol may be delisted' (CELG probe), and no free source here provides point-in-time prices for delisted US stocks. Over 2013-2026 those are a large and non-random share of concentrated managers' top positions, so a survivor-only portfolio biases the FF5+UMD alpha and especially 
+- note: from the underlying-library library: 13F cloning of concentrated managers' best ideas; harness suggestion: data/edgar.py (13F ZIP ingest, CIK list, acceptance dates) + flow_events.py calendar-time portfolio alpha. | verifier: corrected claim/trial | 2026-10-15 triage: still blocked: Return histories for best-idea holdings that later delisted, merged or went bankrupt. Yahoo answers 404 'No data found, symbol may be delisted' (CELG probe), and no free source here provides point-in-time prices for delisted US stocks. Over 2013-2026 those are a large and non-random share of concentrated managers' top positions, so a survivor-only portfolio biases the FF5+UMD alpha and especially the 2013-2019 half. The active-weight denominator (each stock's share of total market cap) also needs a point-in-time cap universe that includes delisted names. A further detail: the selection rule cites 2012 filings, which predate the XML data sets (2013q2-) and would need parsing of text-format 13F-HR filings.
+
+### T-395 · buyback-announcement-drift
+
+**Claim.** Firms announcing open-market repurchase authorisations >= 5% of market cap, bought at the close after the 8-K acceptance and held 12 months, earn a positive mean size-matched abnormal return over 2005-2026.
+
+- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://efts.sec.gov/LATEST/search-index?q=%22Form%204%22&forms=4 (reachable, 200; efts full-text search works from this host), https://academic.oup.com/rfs/article-abstract/22/4/1693/1570427 (Peyer-Vermaelen; fetched, text truncated)
+- statistic: Mean 12-month abnormal return per event (size-matched ETF) with event-month clustered bootstrap; calendar-time FF5 alpha as the primary robustness check (Bradford shows BHARs and alphas can disagree).
+- null: Mean abnormal return <= 0.
+- procedure: EDGAR full-text search (efts, 200 with email UA, 2001-); regex parse authorisation amounts with a hand-checked sample of 50; align on acceptance; event study; walk-forward by year.
+- data: EDGAR efts; SEC XBRL companyfacts (shares); Yahoo prices; Ken French factors; PKW. · min n: 800
+- pass: Lower 95% bound > 0 over >= 800 events AND calendar-time FF5 alpha t >= 2 AND positive in both halves (2005-2015, 2016-2026).
+- controls: Look-ahead: acceptance datetime; shares from prior filing. Survivorship: acquired/delisted firms missing from Yahoo; coverage reported. Costs: 5 bp per side. Multiple testing: 5 variants. Regime: 2008-2009 cancellations; 2023 1% buyback excise tax.
+- blocked on: survivorship-free single-stock data (delisted names, point-in-time universe) not available from a free source: Return series for announcers that were later acquired or delisted. That needs a point-in-time security master with delisted names and delisting returns (CRSP-like), which no free source here provides. Yahoo drops dead tickers ('No data found, symbol may be delisted') and reuses symbols. Pre-2009 share counts are not in XBRL companyfacts, so 2005-2009 market caps need parsed 10-Q text.
+- note: from the underlying-library library: Share buyback announcements and buyback-achiever tilt; harness suggestion: data/edgar.py full-text-search client; flow_events.py; regex parser for authorisation amounts with a manual-check sample of 50. | verifier: corrected claim/trial | 2026-10-15 triage: still blocked: Return series for announcers that were later acquired or delisted. That needs a point-in-time security master with delisted names and delisting returns (CRSP-like), which no free source here provides. Yahoo drops dead tickers ('No data found, symbol may be delisted') and reuses symbols. Pre-2009 share counts are not in XBRL companyfacts, so 2005-2009 market caps need parsed 10-Q text.
+
 ### T-396 · analyst-revision-momentum
 
 **Claim.** S&P 500 stocks in the top decile of one-month consensus FY1 EPS revisions outperform the bottom decile over the following month after costs.
@@ -6622,6 +6612,20 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Delivery-option value; repo specialness; month-end and quarter-end effects; costs of 1-2 bp; regime (March 2020). Look-ahead: CTD chosen with same-day prices only.
 - blocked on: Individual Treasury futures contract histories and daily deliverable-note prices. Also not retail-implementable (repo financing at bank haircuts).
 - note: from the underlying-library library: Treasury cash-futures basis trade (implied repo vs repo); harness suggestion: Defer. If FedInvest prices are reachable, start a daily capture of deliverable-note prices and listed ZN/ZF settles and reuse implied_financing(). | added by the verifier pass
+
+### T-452 · pead-xbrl-sue
+
+**Claim.** The top-minus-bottom SUE decile portfolio, formed at the close after each 10-Q/10-K acceptance and held 60 trading days, earns a positive mean return over 2011-2026.
+
+- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://cfr.ivo-welch.info/published/papers/martineau2021rest.pdf (fetched; abstract verified), https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json (200 with email UA)
+- statistic: Calendar-time monthly long-short return mean with block-bootstrap CI; FF5+UMD alpha (Newey-West).
+- null: Mean long-short return <= 0.
+- procedure: Pull XBRL companyfacts/frames (from 2009; SUE needs 8 prior seasonal differences, so signals from ~2011); align on acceptance datetime; price with Yahoo; no fitted parameters; size-split variants.
+- data: SEC XBRL companyfacts and frames (verified 200 with an email-bearing UA); EDGAR submissions JSON; Yahoo prices; Ken French factors. · min n: 150
+- pass: Lower 95% bound > 0 over >= 150 months AND FF5+UMD alpha t >= 2; size-split results reported (Martineau predicts large-cap null).
+- controls: Look-ahead: acceptance datetime; XBRL facts filtered to the filing's own accession (no later restatements). Survivorship: Yahoo lacks delisted names; flag and apply delisting-return sensitivity. Costs: 10 bp per side small caps, 3 bp large. Multiple testing: 5 variants. Regime: 2020 earnings dispersion.
+- blocked on: survivorship-free single-stock data (delisted names, point-in-time universe) not available from a free source: (a) SEC XBRL companyfacts, frames and acceptance datetimes (blocked). (b) Even with XBRL, the top-3,000-by-market-cap universe for 2011-2026 needs point-in-time market caps and prices including delisted firms. Yahoo omits delisted tickers (CELG returned 'No data found'), and no free source here provides point-in-time shares or market caps with delisted names. Both the long-short portfolio and the 
+- note: from the underlying-library library: Post-earnings-announcement drift (PEAD) from SEC XBRL; harness suggestion: data/edgar.py companyfacts loader keyed by accession with available_at = acceptance; flow_events.py calendar-time portfolios. | added by the verifier pass | 2026-10-15 triage: still blocked: (a) SEC XBRL companyfacts, frames and acceptance datetimes (blocked). (b) Even with XBRL, the top-3,000-by-market-cap universe for 2011-2026 needs point-in-time market caps and prices including delisted firms. Yahoo omits delisted tickers (CELG returned 'No data found'), and no free source here provides point-in-time shares or market caps with delisted names. Both the long-short portfolio and the FF5+UMD alpha depend on that universe.
 
 ### T-453 · sp500-index-inclusion
 

@@ -9823,10 +9823,10 @@
    },
    "experiments": [],
    "testable_now": true,
-   "status": "untested",
-   "blocked_on": "",
+   "status": "blocked",
+   "blocked_on": "survivorship-free single-stock data (delisted names, point-in-time universe) not available from a free source: A point-in-time single-stock price universe that includes delisted names. The claim needs 126-day abnormal returns for at least 1,000 insider-cluster issuers over 2006-2026. Cluster buys are concentrated in small caps that often delist (mergers, performance delistings), and Yahoo does not serve delisted tickers. No free source here provides CRSP-style delisted prices or delisting returns. The Shum",
    "results": [],
-   "notes": "from the underlying-library library: Insider cluster buying (Form 4 open-market purchases); harness suggestion: flow_events.py event-study harness; data/edgar.py for insider data-set ZIPs and daily form.idx; cluster builder with the routine filter. | verifier: corrected claim/trial"
+   "notes": "from the underlying-library library: Insider cluster buying (Form 4 open-market purchases); harness suggestion: flow_events.py event-study harness; data/edgar.py for insider data-set ZIPs and daily form.idx; cluster builder with the routine filter. | verifier: corrected claim/trial | 2026-10-15 triage: still blocked: A point-in-time single-stock price universe that includes delisted names. The claim needs 126-day abnormal returns for at least 1,000 insider-cluster issuers over 2006-2026. Cluster buys are concentrated in small caps that often delist (mergers, performance delistings), and Yahoo does not serve delisted tickers. No free source here provides CRSP-style delisted prices or delisting returns. The Shumway -30% patch needs the delisting date and the last price, which are also missing. Size matching also needs historical shares outstanding (SEC XBRL dei, blocked or contested) for names that no longer file."
   },
   {
    "id": "T-392",
@@ -9849,10 +9849,10 @@
    },
    "experiments": [],
    "testable_now": true,
-   "status": "untested",
-   "blocked_on": "",
+   "status": "blocked",
+   "blocked_on": "survivorship-free single-stock data (delisted names, point-in-time universe) not available from a free source: Return histories for best-idea holdings that later delisted, merged or went bankrupt. Yahoo answers 404 'No data found, symbol may be delisted' (CELG probe), and no free source here provides point-in-time prices for delisted US stocks. Over 2013-2026 those are a large and non-random share of concentrated managers' top positions, so a survivor-only portfolio biases the FF5+UMD alpha and especially ",
    "results": [],
-   "notes": "from the underlying-library library: 13F cloning of concentrated managers' best ideas; harness suggestion: data/edgar.py (13F ZIP ingest, CIK list, acceptance dates) + flow_events.py calendar-time portfolio alpha. | verifier: corrected claim/trial"
+   "notes": "from the underlying-library library: 13F cloning of concentrated managers' best ideas; harness suggestion: data/edgar.py (13F ZIP ingest, CIK list, acceptance dates) + flow_events.py calendar-time portfolio alpha. | verifier: corrected claim/trial | 2026-10-15 triage: still blocked: Return histories for best-idea holdings that later delisted, merged or went bankrupt. Yahoo answers 404 'No data found, symbol may be delisted' (CELG probe), and no free source here provides point-in-time prices for delisted US stocks. Over 2013-2026 those are a large and non-random share of concentrated managers' top positions, so a survivor-only portfolio biases the FF5+UMD alpha and especially the 2013-2019 half. The active-weight denominator (each stock's share of total market cap) also needs a point-in-time cap universe that includes delisted names. A further detail: the selection rule cites 2012 filings, which predate the XML data sets (2013q2-) and would need parsing of text-format 13F-HR filings."
   },
   {
    "id": "T-393",
@@ -9927,10 +9927,10 @@
    },
    "experiments": [],
    "testable_now": true,
-   "status": "untested",
-   "blocked_on": "",
+   "status": "blocked",
+   "blocked_on": "survivorship-free single-stock data (delisted names, point-in-time universe) not available from a free source: Return series for announcers that were later acquired or delisted. That needs a point-in-time security master with delisted names and delisting returns (CRSP-like), which no free source here provides. Yahoo drops dead tickers ('No data found, symbol may be delisted') and reuses symbols. Pre-2009 share counts are not in XBRL companyfacts, so 2005-2009 market caps need parsed 10-Q text.",
    "results": [],
-   "notes": "from the underlying-library library: Share buyback announcements and buyback-achiever tilt; harness suggestion: data/edgar.py full-text-search client; flow_events.py; regex parser for authorisation amounts with a manual-check sample of 50. | verifier: corrected claim/trial"
+   "notes": "from the underlying-library library: Share buyback announcements and buyback-achiever tilt; harness suggestion: data/edgar.py full-text-search client; flow_events.py; regex parser for authorisation amounts with a manual-check sample of 50. | verifier: corrected claim/trial | 2026-10-15 triage: still blocked: Return series for announcers that were later acquired or delisted. That needs a point-in-time security master with delisted names and delisting returns (CRSP-like), which no free source here provides. Yahoo drops dead tickers ('No data found, symbol may be delisted') and reuses symbols. Pre-2009 share counts are not in XBRL companyfacts, so 2005-2009 market caps need parsed 10-Q text."
   },
   {
    "id": "T-396",
@@ -11534,10 +11534,10 @@
    },
    "experiments": [],
    "testable_now": true,
-   "status": "untested",
-   "blocked_on": "",
+   "status": "blocked",
+   "blocked_on": "survivorship-free single-stock data (delisted names, point-in-time universe) not available from a free source: (a) SEC XBRL companyfacts, frames and acceptance datetimes (blocked). (b) Even with XBRL, the top-3,000-by-market-cap universe for 2011-2026 needs point-in-time market caps and prices including delisted firms. Yahoo omits delisted tickers (CELG returned 'No data found'), and no free source here provides point-in-time shares or market caps with delisted names. Both the long-short portfolio and the ",
    "results": [],
-   "notes": "from the underlying-library library: Post-earnings-announcement drift (PEAD) from SEC XBRL; harness suggestion: data/edgar.py companyfacts loader keyed by accession with available_at = acceptance; flow_events.py calendar-time portfolios. | added by the verifier pass"
+   "notes": "from the underlying-library library: Post-earnings-announcement drift (PEAD) from SEC XBRL; harness suggestion: data/edgar.py companyfacts loader keyed by accession with available_at = acceptance; flow_events.py calendar-time portfolios. | added by the verifier pass | 2026-10-15 triage: still blocked: (a) SEC XBRL companyfacts, frames and acceptance datetimes (blocked). (b) Even with XBRL, the top-3,000-by-market-cap universe for 2011-2026 needs point-in-time market caps and prices including delisted firms. Yahoo omits delisted tickers (CELG returned 'No data found'), and no free source here provides point-in-time shares or market caps with delisted names. Both the long-short portfolio and the FF5+UMD alpha depend on that universe."
   },
   {
    "id": "T-453",
