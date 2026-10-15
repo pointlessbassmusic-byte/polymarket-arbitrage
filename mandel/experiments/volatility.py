@@ -12,7 +12,9 @@ Model-free tests on the free histories:
     more than when in contango? Block-shift null.
 
 Model-priced overlay backtests (``overlay_backtest``) price monthly SPY options with Black-Scholes using
-VIX as a flat implied volatility and the 3-month bill as the rate. That is a logic test, not a market
+VIX as a flat implied volatility, the 3-month bill as the rate (DTB3 is a discount yield, converted to a continuous rate; the
+last print dated before the entry, harness rules 4 and 7) and the dividend forward whenever an ex-date falls inside the option's
+life (rule 8; SPY goes ex on the quarterly third Friday, so every cycle ending on a Mar/Jun/Sep/Dec expiry). That is a logic test, not a market
 test: a flat VIX overstates OTM call premium and understates OTM put premium, so call-selling results
 are an upper bound. Every result carries ``model_priced: True``. The claims (T-54..T-57) name monthly
 options, so the cycles are the standard monthly expiries (harness rule 10), not a 21-session grid from
@@ -20,7 +22,8 @@ whichever day the data happen to start on.
 
 Rule 10 does not touch the other harnesses here: the variance premium, SKEW tail and term-structure tests
 use every day (overlapping windows, blocks of at least twice the window or a block-shift null), and the
-implied-move test pools every daily capture, so none of them rests on one phase of a cycle grid.
+implied-move test pools every daily capture (block at least twice the realised window, in captures), so none of them rests on
+one phase of a cycle grid.
 """
 
 from __future__ import annotations
@@ -82,13 +85,19 @@ def _halves_agree(x: np.ndarray, sign: int) -> bool:
 
 
 def variance_risk_premium(index_rows: Iterable[dict], price_rows: Iterable[dict], window: int = 21, symbol: Optional[str] = None,
-                          index_is_pct: bool = True, n_boot: int = 2000, seed: int = 0, periods_per_year: int = TRADING_DAYS) -> dict:
+                          index_is_pct: bool = True, n_boot: int = 2000, seed: int = 0, periods_per_year: int = TRADING_DAYS,
+                          min_n: int = 2000) -> dict:
     """Implied variance at t (annualised, from an index quoted in vol points) minus realised variance of the
-    next ``window`` daily log returns (annualised). Reports vol-point VRP as well."""
+    next ``window`` daily log returns (annualised). Reports vol-point VRP as well.
+
+    ``min_n`` is the trial's min_n in its own unit, daily windows (2000; 1000 for T-49 and T-67, whose DVOL starts 2021-03).
+    Below it (harness rules 3 and 5) the verdict is never supported, and a failure counts only when decisive: the one-sided
+    95% bound of the mean VRP lies wholly below zero (the reverse block-bootstrap p < 0.05). Anything else is inconclusive.
+    Fewer than window + 100 aligned days cannot be tested at all."""
     idx = index_closes(index_rows); px = price_closes(price_rows, symbol)
     days, iv, S = _aligned(idx, px)
     if days.__len__() < window + 100:
-        return {"n": len(days), "verdict": "inconclusive", "reason": f"only {len(days)} aligned days"}
+        return {"n": len(days), "min_n": min_n, "verdict": "inconclusive", "reason": f"only {len(days)} aligned days (min_n {min_n} daily windows)"}
     r = np.diff(np.log(S))
     n = len(r) - window
     iv_var = ((iv[:n] / (100.0 if index_is_pct else 1.0)) ** 2)
@@ -98,11 +107,20 @@ def variance_risk_premium(index_rows: Iterable[dict], price_rows: Iterable[dict]
     out = {"n": int(n), "window": window, "mean_iv_vol": float(np.sqrt(iv_var.mean())), "mean_rv_vol": float(np.sqrt(rv_var.mean())),
            "vrp_variance_points": float(d.mean()), "vrp_vol_points": float(np.sqrt(iv_var.mean()) - np.sqrt(rv_var.mean())),
            "share_positive": float((d > 0).mean()), "p_value": float(p), "halves": [float(d[:n // 2].mean()), float(d[n // 2:].mean())],
-           "first_day": days[0], "last_day": days[n - 1]}
+           "first_day": days[0], "last_day": days[n - 1], "min_n": min_n}
     ok = p < 0.05 and d.mean() > 0 and _halves_agree(d, 1)
     out["verdict"] = "supported" if ok else "not_supported"
     out["reason"] = (f"implied {out['mean_iv_vol']*100:.1f} vs realised {out['mean_rv_vol']*100:.1f} vol pts over {n} days ({days[0]}..{days[n-1]}); "
                      f"VRP positive on {out['share_positive']*100:.0f}% of days, block-bootstrap p={p:.4f}, halves {out['halves'][0]:+.4f}/{out['halves'][1]:+.4f}")
+    if n < min_n:                                                 # rules 3 and 5: below the trial's min_n
+        p_rev = float(block_bootstrap_pvalue(rv_var, iv_var, n_boot=n_boot, block_len=2 * window, seed=seed))
+        out["p_value_reverse"] = p_rev
+        if d.mean() < 0 and p_rev < 0.05:
+            out["verdict"] = "not_supported"
+            out["reason"] += f"; below min_n ({n} < {min_n} daily windows) but decisive: mean VRP < 0 at one-sided p={p_rev:.4f}"
+        else:
+            out["verdict"] = "inconclusive"
+            out["reason"] += f"; below min_n ({n} < {min_n} daily windows) and no decisive failure (reverse p={p_rev:.4f}): inconclusive"
     return out
 
 
@@ -200,6 +218,23 @@ def monthly_expiry_sessions(days: list[str]) -> list[int]:
     return out
 
 
+def _dtb3_continuous(pct: float) -> float:
+    """FRED DTB3 is a discount-basis yield on a 91-day bill (harness rule 7): price = 1 - d*91/360, continuous rate
+    -ln(price) / (91/365)."""
+    return -math.log(1 - pct / 100 * 91 / 360) / (91 / 365)
+
+
+def _ex_dividends(S: np.ndarray, A: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """(session indices, cash per share) of the ex-dividend dates read from the adjclose/close step. Yahoo scales every close
+    before an ex-date by f = 1 - D/close(ex-1), so adjclose/close jumps by 1/f on the ex-date: D = close(ex-1) * (1 - f).
+    Relative steps up to 1e-5 are rounding (about 1e-6 on SPY, whose quarterly dividends are 0.1-0.6%)."""
+    ratio = A / S
+    with np.errstate(invalid="ignore", divide="ignore"):
+        step = ratio[1:] / ratio[:-1] - 1
+    j = np.where(np.isfinite(step) & (step > 1e-5))[0] + 1
+    return j, S[j - 1] * (1 - ratio[j - 1] / ratio[j])
+
+
 def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_rows: Optional[Iterable[dict]], strategy: str, symbol: str = "SPY",
                      hold_days: int = 21, call_delta: float = 0.30, put_delta: float = -0.30, q: float = 0.0, iv_scale: float = 1.0,
                      calendar: str = "monthly_expiry", offset: int = 0) -> dict:
@@ -208,23 +243,34 @@ def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_
     strategies: covered_call, cash_secured_put, collar, short_straddle, long_straddle, buy_and_hold.
 
     Cycles (harness rule 10): the claims name monthly options, so ``calendar='monthly_expiry'`` (the default) writes each
-    option at one standard monthly expiry's close and settles it at the next (19-25 sessions, about the 21-session month the
-    trials state; T is the cycle's own session count / 252). ``calendar='grid'`` is a fixed grid of ``hold_days`` sessions
-    starting at session ``offset``: one of ``hold_days`` equally valid phases, a diagnostic, never a verdict basis on its own.
+    option at one standard monthly expiry's close and settles it at the next (17-25 sessions (fewer around holidays), about the
+    21-session month the trials state; T is the cycle's own session count / 252). ``calendar='grid'`` is a fixed grid of
+    ``hold_days`` sessions starting at session ``offset``: one of ``hold_days`` equally valid phases, a diagnostic, never a
+    verdict basis on its own.
 
-    Options are priced on the price-only close, but every stock leg (buy-and-hold, covered call, collar) also earns the
-    dividends paid over the cycle, adjclose[t1]/adjclose[t0] - close[t1]/close[t0] (zero when the rows carry no adjclose),
-    just as the cash-secured put earns bill interest on its strike. ``sharpe`` and ``benchmark_sharpe`` are Sharpe ratios
-    of returns in excess of the per-cycle bill return exp(r*T) - 1 for funded positions (stock legs, cash-secured put);
-    a straddle is unfunded, so its return is already an excess return and is not reduced by the bill."""
+    Rate (harness rules 4 and 7): FRED DTB3 is a discount yield, converted to the continuous rate -ln(1 - d*91/360)/(91/365).
+    A print dated D is published the next day, so a cycle entered at the close of day t uses the last print dated before t,
+    carried forward over missing days; a cycle with no earlier print is dropped (counted in ``cycles_without_prior_bill``).
+    ``rate_rows=None`` means no bill (r = 0).
+
+    Dividends (rule 8): options settle on the raw close, and when an ex-date falls inside the option's life (after the entry
+    session, up to and including the settlement session, the latter being where SPY goes ex every quarter) they are priced on
+    the dividend forward: the cash dividend read from the adjclose/close step (``_ex_dividends``), discounted from its ex-date,
+    enters strike and price as the equivalent continuous yield q_div = -ln(1 - PV(D)/S)/T on top of ``q`` (the same forward as
+    an escrowed-dividend spot S - PV(D)). The realised amount stands in for the expected one the market prices (SPY declares it
+    days before the ex-date). Every stock leg (buy-and-hold, covered call, collar) also earns the dividends paid over the cycle,
+    adjclose[t1]/adjclose[t0] - close[t1]/close[t0] (zero when the rows carry no adjclose), just as the cash-secured put earns
+    bill interest on its strike. ``sharpe`` and ``benchmark_sharpe`` are Sharpe ratios of returns in excess of the per-cycle
+    bill return exp(r*T) - 1 for funded positions (stock legs, cash-secured put); a straddle is unfunded, so its return is
+    already an excess return and is not reduced by the bill."""
     price_rows = list(price_rows)
     px = price_closes(price_rows, symbol); adj = adj_closes(price_rows, symbol); vx = index_closes(vix_rows)
-    rt = index_closes(rate_rows) if rate_rows is not None else {}
+    rt = index_closes(rate_rows) if rate_rows is not None else None
     days = sorted(d for d in px if d in vx)
     S = np.array([px[d] for d in days]); iv = np.array([vx[d] / 100.0 * iv_scale for d in days])
     A = np.array([adj.get(d, np.nan) for d in days])
-    rate = np.array([rt.get(d, np.nan) for d in days]) / 100.0
-    rate = np.where(np.isnan(rate), np.nanmean(rate) if np.isfinite(np.nanmean(rate)) else 0.0, rate)
+    ex_j, ex_cash = _ex_dividends(S, A) if days else (np.array([], dtype=int), np.array([]))
+    rdays = sorted(d for d, v in rt.items() if math.isfinite(v)) if rt is not None else []
     if calendar == "monthly_expiry":
         ex = monthly_expiry_sessions(days)
         cycles = list(zip(ex[:-1], ex[1:]))
@@ -238,52 +284,73 @@ def overlay_backtest(price_rows: Iterable[dict], vix_rows: Iterable[dict], rate_
         cal = f"grid: every {hold_days} sessions from session {offset} (one of {hold_days} phases; diagnostic only, rule 10)"
     else:
         raise ValueError(calendar)
-    rets, bh, bill = [], [], []
+    bill_at: dict[int, tuple[str, float]] = {}                   # entry session -> (DTB3 print day, continuous rate)
+    if rt is not None:
+        for i, _ in cycles:
+            j = bisect.bisect_left(rdays, days[i]) - 1           # last print dated strictly before the entry day
+            if j >= 0:
+                bill_at[i] = (rdays[j], _dtb3_continuous(rt[rdays[j]]))
+        n_no_bill = sum(1 for i, _ in cycles if i not in bill_at)
+        cycles = [c for c in cycles if c[0] in bill_at]
+    else:
+        n_no_bill = 0
+    rets, bh, bill, qdiv = [], [], [], []
     for i, i1 in cycles:
         T = (i1 - i) / TRADING_DAYS
-        s0, s1, sig, r = S[i], S[i1], max(iv[i], 0.02), rate[i]
+        s0, s1, sig = S[i], S[i1], max(iv[i], 0.02)
+        r = bill_at[i][1] if rt is not None else 0.0
         a0, a1 = A[i], A[i1]
         div = float(a1 / a0 - s1 / s0) if (np.isfinite(a0) and np.isfinite(a1) and a0 > 0) else 0.0   # dividend return over the cycle
         dcash = s0 * div                                                                               # per share held
+        lo, hi = bisect.bisect_right(ex_j, i), bisect.bisect_right(ex_j, i1)                          # ex-dates in (i, i1]
+        pv_div = float(sum(ex_cash[k] * math.exp(-r * (ex_j[k] - i) / TRADING_DAYS) for k in range(lo, hi)))
+        qd = -math.log(1 - pv_div / s0) / T if 0 < pv_div < s0 else 0.0
+        qq = q + qd                                                                                    # dividend forward
         if strategy == "buy_and_hold":
             pnl, notional = s1 - s0 + dcash, s0
         elif strategy == "covered_call":
-            k = bs.strike_for_delta(s0, T, r, sig, call_delta, "call", q); prem = float(bs.price(s0, k, T, r, sig, "call", q))
+            k = bs.strike_for_delta(s0, T, r, sig, call_delta, "call", qq); prem = float(bs.price(s0, k, T, r, sig, "call", qq))
             pnl, notional = (s1 - s0) + dcash + prem - max(s1 - k, 0.0), s0
         elif strategy == "cash_secured_put":
-            k = s0; prem = float(bs.price(s0, k, T, r, sig, "put", q))
+            k = s0; prem = float(bs.price(s0, k, T, r, sig, "put", qq))
             pnl, notional = prem - max(k - s1, 0.0) + k * (math.exp(r * T) - 1), k
         elif strategy == "collar":
-            kc = bs.strike_for_delta(s0, T, r, sig, call_delta, "call", q); kp = bs.strike_for_delta(s0, T, r, sig, put_delta, "put", q)
-            pc = float(bs.price(s0, kc, T, r, sig, "call", q)); pp = float(bs.price(s0, kp, T, r, sig, "put", q))
+            kc = bs.strike_for_delta(s0, T, r, sig, call_delta, "call", qq); kp = bs.strike_for_delta(s0, T, r, sig, put_delta, "put", qq)
+            pc = float(bs.price(s0, kc, T, r, sig, "call", qq)); pp = float(bs.price(s0, kp, T, r, sig, "put", qq))
             pnl, notional = (s1 - s0) + dcash + pc - pp - max(s1 - kc, 0.0) + max(kp - s1, 0.0), s0
         elif strategy in ("short_straddle", "long_straddle"):
-            k = s0; prem = float(bs.price(s0, k, T, r, sig, "call", q)) + float(bs.price(s0, k, T, r, sig, "put", q))
+            k = s0; prem = float(bs.price(s0, k, T, r, sig, "call", qq)) + float(bs.price(s0, k, T, r, sig, "put", qq))
             pay = abs(s1 - k)
             pnl = (prem - pay) if strategy == "short_straddle" else (pay - prem)
             notional = s0
         else:
             raise ValueError(strategy)
-        rets.append(pnl / notional); bh.append((s1 - s0) / s0 + div); bill.append(math.exp(r * T) - 1)
-    rets, bh, bill = np.array(rets), np.array(bh), np.array(bill)
+        rets.append(pnl / notional); bh.append((s1 - s0) / s0 + div); bill.append(math.exp(r * T) - 1); qdiv.append(qd)
+    rets, bh, bill, qdiv = np.array(rets), np.array(bh), np.array(bill), np.array(qdiv)
     funded = strategy not in ("short_straddle", "long_straddle")
     def dd(x):
         c = np.cumprod(1 + x); peak = np.maximum.accumulate(c); return float((c / peak - 1).min())
     lens = [i1 - i for i, i1 in cycles]
+    stale = [(date.fromisoformat(days[i]) - date.fromisoformat(bill_at[i][0])).days for i, _ in cycles] if rt is not None else []
     return {"strategy": strategy, "symbol": symbol, "model_priced": True, "iv_scale": iv_scale, "n_cycles": int(len(rets)),
             "first_day": days[cycles[0][0]] if cycles else (days[0] if days else None), "last_day": days[cycles[-1][1]] if cycles else (days[-1] if days else None),
             "calendar": cal, "cycle_sessions": [int(min(lens)), int(max(lens))] if lens else None,
             "mean_cycle_return": float(rets.mean()), "sharpe": float(sharpe_ratio(rets - bill if funded else rets, ppy)), "cagr": float(np.prod(1 + rets) ** (ppy / max(len(rets), 1)) - 1), "max_drawdown": dd(rets),
             "benchmark_sharpe": float(sharpe_ratio(bh - bill, ppy)), "benchmark_cagr": float(np.prod(1 + bh) ** (ppy / max(len(bh), 1)) - 1), "benchmark_max_drawdown": dd(bh),
             "sharpe_basis": ("excess of the per-cycle 3m bill" if funded else "raw (unfunded position: already an excess return)") + "; benchmark excess of the bill",
+            "rate_basis": ("DTB3 discount yield as the continuous rate -ln(1 - d*91/360)/(91/365), last print dated before the entry, carried forward"
+                           if rt is not None else "no bill rows: r = 0"),
+            "cycles_without_prior_bill": int(n_no_bill), "bill_max_staleness_days": int(max(stale)) if stale else None,
             "dividends_included": bool(np.isfinite(A).any()), "benchmark_total_return": bool(np.isfinite(A).any()),
-            "returns": rets, "benchmark": bh, "bill_returns": bill}
+            "dividend_forward_cycles": int((qdiv > 0).sum()),
+            "dividend_basis": "options on the dividend forward when an ex-date (adjclose/close step) falls in (entry, settlement]; stock legs earn the cycle's dividends",
+            "returns": rets, "benchmark": bh, "bill_returns": bill, "dividend_q": qdiv}
 
 
 def overlay_verdict(rep: dict, versus: str = "benchmark", n_boot: int = 2000, seed: int = 0) -> dict:
     """Mean-return test of the strategy against buy-and-hold (versus='benchmark') or against zero (versus='zero')."""
     rets = rep["returns"]; inc = rep["benchmark"] if versus == "benchmark" else np.zeros_like(rets)
-    arrays = ("returns", "benchmark", "bill_returns")
+    arrays = ("returns", "benchmark", "bill_returns", "dividend_q")
     if len(rets) < 24:
         return {**{k: v for k, v in rep.items() if k not in arrays}, "verdict": "inconclusive", "reason": f"only {len(rets)} cycles"}
     p = block_bootstrap_pvalue(rets, inc, n_boot=n_boot, seed=seed)
@@ -320,8 +387,9 @@ def implied_move_vs_realised(surface_rows: Iterable[dict], price_rows_by_symbol:
     ~target_dte expiry are measured from that quote day.
 
     Dependence: consecutive daily captures share all but one session of their realised windows and the symbols are
-    cross-correlated, so the test is the studentized block bootstrap of the per-day series with the block at least as long as
-    the realised window (in captures). The sample gate counts independent expiry cycles (non-overlapping captures: the next
+    cross-correlated, so the test is the studentized block bootstrap of the per-day series with the block twice the longest
+    realised window (in captures): overlapping entries pooled, blocks at least twice the hold (harness rule 10; capped at n//4 by
+    the bootstrap). The sample gate counts independent expiry cycles (non-overlapping captures: the next
     one counted starts at or after the previous one's expiry), not rows: fewer than ``min_captures`` (the trial's min_n) is
     inconclusive. Needs the expiry to have passed."""
     by_capture: dict[tuple, list[dict]] = {}
@@ -367,7 +435,8 @@ def implied_move_vs_realised(surface_rows: Iterable[dict], price_rows_by_symbol:
     for d in qdays:                                               # greedy non-overlapping captures
         if nxt is None or d >= nxt:
             n_cycles += 1; nxt = exp_of[d]
-    block_len = max([bisect.bisect_left(qdays, exp_of[d]) - i for i, d in enumerate(qdays)], default=1)   # captures sharing d's window
+    hold = max([bisect.bisect_left(qdays, exp_of[d]) - i for i, d in enumerate(qdays)], default=1)   # captures sharing d's window
+    block_len = 2 * hold                                          # rule 10: blocks at least twice the hold
     n = len(qdays)
     out = {"n_resolved_captures": n, "n_symbol_captures": len(pairs), "n_independent_cycles": n_cycles, "n_captures_total": len(by_capture),
            "min_captures": min_captures, "min_n_unit": "independent expiry cycles", "block_len": int(block_len),

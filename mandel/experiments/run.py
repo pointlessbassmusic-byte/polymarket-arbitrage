@@ -432,8 +432,9 @@ def harness_point_in_time(archive: Archive) -> tuple[dict, int, str, str]:
         f"{'verdict changed' if changed else 'no verdict change on this harness'}" + ("; d_fear sign flips (reported only)" if sign_flip else "")
 
 
-def _vrp(archive: Archive, index_bundle: str, price_bundle: str, symbol: str, window: int, ppy: int) -> tuple[dict, int, str, str]:
-    rep = variance_risk_premium(archive.load(index_bundle), archive.load(price_bundle), window=window, symbol=symbol, periods_per_year=ppy)
+def _vrp(archive: Archive, index_bundle: str, price_bundle: str, symbol: str, window: int, ppy: int, min_n: int = 2000) -> tuple[dict, int, str, str]:
+    """min_n: the trial's own, in daily windows (2000; 1000 for T-49 and T-67)."""
+    rep = variance_risk_premium(archive.load(index_bundle), archive.load(price_bundle), window=window, symbol=symbol, periods_per_year=ppy, min_n=min_n)
     return rep, rep["n"], rep["verdict"], rep["reason"]
 
 
@@ -444,7 +445,7 @@ def harness_vrp_spx(archive: Archive):
 
 def harness_vrp_btc(archive: Archive):
     """T-49: DVOL^2 exceeds realised BTC variance over the next 30 calendar days (Deribit DVOL is a 30-day index)."""
-    return _vrp(archive, "deribit-dvol-BTC-history", "daily-history-BTC-USD", "BTC-USD", 30, 365)
+    return _vrp(archive, "deribit-dvol-BTC-history", "daily-history-BTC-USD", "BTC-USD", 30, 365, min_n=1000)
 
 
 def harness_vrp_gold(archive: Archive):
@@ -474,7 +475,7 @@ def harness_vrp_russell(archive: Archive):
 
 def harness_vrp_eth(archive: Archive):
     """T-67: DVOL(ETH)^2 exceeds realised ETH variance over the next 30 days."""
-    return _vrp(archive, "deribit-dvol-ETH-history", "daily-history-ETH-USD", "ETH-USD", 30, 365)
+    return _vrp(archive, "deribit-dvol-ETH-history", "daily-history-ETH-USD", "ETH-USD", 30, 365, min_n=1000)
 
 
 def harness_implied_move(archive: Archive):

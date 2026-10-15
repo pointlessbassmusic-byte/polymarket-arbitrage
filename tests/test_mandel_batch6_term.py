@@ -302,6 +302,78 @@ def test_t155_roll():
     assert bt.judge_roll(reset + 1e-4 + rng.normal(0, 1e-5, 600), reset, 200, NB)["verdict"] == "not_supported"
 
 
+def test_t155_nearest_expiry_ties_and_dte_entries():
+    c0 = 800000.0
+    j, ok = bt.nearest_expiry([c0, c0, c0], [c0 - 3, c0 + 31, c0 + 59, c0 + 87])
+    assert ok.all() and list(j) == [2, 2, 2]                                    # 31 vs 59 days: tie to the later expiry
+    j, ok = bt.nearest_expiry([c0, c0 + 1], [c0 + 28, c0 + 63])
+    assert list(j) == [0, 1]                                                    # 28 (17 from 45) beats 63 (18); then 27 vs 62
+    j, ok = bt.nearest_expiry([c0], [c0 - 10, c0])
+    assert not ok[0]                                                            # nothing strictly after the entry
+
+
+def _t155_market(n=760, seed=4):
+    """Weekdays from 2008-01-02 without Good Friday 2008 (the March 2008 monthly expiry moves to Thursday 2008-03-20)."""
+    days = [d for d in _days(n + 1, date(2008, 1, 2)) if d != "2008-03-21"][:n]
+    rng = np.random.default_rng(seed); close = 100 * np.exp(np.cumsum(rng.normal(0, 0.012, n)))
+    m = bt.make_market(days, close, close, {"2007-12-31": 2.0})
+    return m, np.full(n, 0.2)
+
+
+def test_t155_rule10a_paths_share_the_next_monthly_expiry_and_exit():
+    """Regression (batch-6a check, rule 10a): T-155's claim names the monthly calendar ('to the next monthly'). The put sold at
+    each daily entry lives on the standard monthly expiry nearest 45 DTE (not entry + 45 days), the test is at that expiry's
+    21-DTE close, and the roll (same strike) and the reset (fresh 0.16-delta put at the test close) are both on the NEXT
+    monthly expiry and both exit at its 21-DTE close, so they share expiry, exit and days held (the old harness rolled to
+    E0 + 28 days and reset to test + 45 days: two different synthetic expiries and exits)."""
+    m, v30 = _t155_market()
+    ec = bt.expiry_ordinals(m); ecs = set(ec.tolist())
+    tf = {bt.third_friday(y, mo).toordinal() for y in (2008, 2009, 2010, 2011) for mo in range(1, 13)}
+    assert date(2008, 3, 20).toordinal() in ecs and date(2008, 3, 21).toordinal() not in ecs
+    assert ecs - {date(2008, 3, 20).toordinal()} <= tf and ec[-1] > m.cal[-1]       # projected past the data
+    a = np.arange(len(m.days))
+    res = bt.roll_vs_reset(m, v30, a, bt.Spreads.zero(), ec, tested=1.0)              # every put 'tested': check all paths
+    A, E0, E1, c, e = res["a"], res["E0"], res["E1"], res["check"], res["exit"]
+    assert A.size > 600 and res["tested"].all()
+    assert set(E0.tolist()) <= ecs and set(E1.tolist()) <= ecs
+    assert np.all(E1 == ec[np.searchsorted(ec, E0) + 1])                              # the next monthly expiry
+    dte = E0 - m.cal[A]
+    assert np.all((dte >= 27) & (dte <= 63)) and np.mean(dte != 45) > 0.9             # the calendar, not entry + 45 days
+    for i in range(A.size):                                                           # nearest 45 DTE among later expiries
+        later = ec[ec > m.cal[A[i]]]
+        assert abs(dte[i] - 45) <= np.min(np.abs(later - m.cal[A[i]] - 45))
+    assert np.all(m.cal[c] >= E0 - 21) and np.all(m.cal[c - 1] < E0 - 21)            # first close with <= 21 days left
+    assert np.all(m.cal[e] >= E1 - 21) and np.all(m.cal[e - 1] < E1 - 21)
+    assert np.all(res["days"] == m.cal[e] - m.cal[c]) and set(np.unique(res["days"]).tolist()) <= {27, 28, 29, 34, 35, 36}
+    assert set(np.unique(E1 - E0).tolist()) <= {27, 28, 29, 34, 35, 36}               # one monthly cycle (Good Friday moves)
+    assert np.all(m.cal[c] - m.cal[A] > 0)
+    # the reset strike is the 0.16-delta put on E1 at the test close; the roll keeps the entry strike
+    d_reset = np.asarray(bt.greeks_at(m, c, E1, res["K_reset"], "put", v30[c])["delta"], float)
+    assert np.allclose(d_reset, -0.16, atol=1e-3)
+    d_entry = np.asarray(bt.greeks_at(m, A, E0, res["K"], "put", v30[A])["delta"], float)
+    assert np.allclose(d_entry, -0.16, atol=1e-3)
+    # every entry mapped to one expiry shares the reset path: same decision, same strike, same P&L
+    for cyc in np.unique(res["cycle"])[:5]:
+        s = res["cycle"] == cyc
+        assert np.unique(c[s]).size == 1 and np.unique(e[s]).size == 1 and np.ptp(res["reset"][s]) == 0
+    # same exit and days: with zero costs and rates, roll - reset is the P&L of (short K, long K_reset) on E1 from c to e
+    z = bt.make_market(m.days, m.close, m.close, {"2007-12-31": 0.0}); rz = bt.roll_vs_reset(z, v30, a, bt.Spreads.zero(), ec, tested=1.0)
+    K, Ks, cz, ez, E1z = rz["K"], rz["K_reset"], rz["check"], rz["exit"], rz["E1"]
+    leg = lambda Kx, i: bt.px(z, i, E1z, Kx, "put", v30[i])
+    want = ((leg(K, cz) - leg(K, ez)) - (leg(Ks, cz) - leg(Ks, ez))) / (z.cal[ez] - z.cal[cz]) / z.close[cz]
+    assert np.allclose(rz["roll"] - rz["reset"], want, rtol=0, atol=1e-12)
+
+
+def test_t155_one_entry_about_45_dte_per_expiry():
+    m, v30 = _t155_market()
+    ec = bt.expiry_ordinals(m); a = np.arange(len(m.days))
+    e1 = bt.entries_near_dte(m, ec, a)
+    r = bt.roll_vs_reset(m, v30, e1, bt.Spreads.zero(), ec)
+    assert r["a"].size >= 30 and np.all(np.abs(r["dte_entry"] - 45) <= 3)
+    assert np.unique(r["cycle"]).size == r["a"].size                                   # one entry per monthly expiry
+    assert np.all(np.diff(r["E0"]) >= 27)
+
+
 # ------------------------------------------------------------------------------------ fake archive, end to end --
 
 class FakeArchive:
@@ -545,3 +617,16 @@ def test_rule10_calendar_harnesses_enter_on_monthly_expiries(fake):
     for h in ("b6_term_double_calendar", "b6_term_double_diagonal", "b6_term_ratio_calendar", "b6_term_calendarised_fly"):
         stat, n, verdict, reason = bt.HARNESSES[h](fake)
         assert "rule 10(b)" in reason and stat["offsets_summary"]["offsets"] in (5, 21) and stat["block"] in (20, 42)
+
+
+def test_rule10_t155_harness_on_the_monthly_calendar(fake):
+    """Regression (rule 10a/10b, T-155) end to end: tested puts live on standard monthly expiries, the pooled daily entries use
+    blocks of 2 x the longest entry-to-exit hold, and the one-entry-per-expiry 45-DTE run is reported."""
+    stat, n, verdict, reason = bt.HARNESSES["b6_term_roll_tested_put"](fake)
+    assert "rule 10(a)" in reason and "rule 10(b)" in reason and "next monthly expiry" in reason
+    assert "+28 days" not in reason and "fresh 0.16-delta 45-DTE put" not in reason
+    assert stat["tested_expiries"] and all(date.fromisoformat(d).weekday() == 4 and 15 <= int(d[8:]) <= 21 for d in stat["tested_expiries"])
+    assert stat["block"] == 2 * stat["hold_sessions"] >= stat["decision_block"] and stat["hold_sessions"] > 21
+    assert 27 <= stat["dte_entry"][0] <= stat["dte_entry"][1] == 45 <= stat["dte_entry"][2] <= 63
+    assert stat["near_45"]["n_entries"] > 0 and len(stat["near_45"]["halves"]) == 2 and stat["n_tested_cycles"] > 0
+    assert stat["offsets_summary"]["offsets"] >= 15 and n == stat["n"] > 0

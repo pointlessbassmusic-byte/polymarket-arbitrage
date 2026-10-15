@@ -1,6 +1,6 @@
 """Regression tests for the audit findings on the volatility, social and market harnesses (group 'vs'), synthetic data only.
 
-OM-2/OM-3 implied_move_vs_realised (T-66), OM-7 skew_tail (T-52), OM-16 overlay_backtest (T-54..T-57),
+OM-2/OM-3 implied_move_vs_realised (T-66), OM-7 skew_tail (T-52), OM-16 overlay_backtest (T-54..T-57) and its rule 4/7/8 follow-up,
 OM-4/OM-12 attention_vs_abs_return (T-38), OM-10/OM-11 fear_greed_forward_returns (T-41, T-19),
 OM-5 resolved_outcomes/price_at_horizons (T-01, T-02, T-13), OM-6 multiscale_edge (T-03), OM-13 bundle_arb_scan (T-04).
 """
@@ -14,7 +14,8 @@ import numpy as np
 from mandel.experiments import markets
 from mandel.experiments.markets import bundle_arb_scan, market_calibration, multiscale_edge, price_at_horizons, resolved_outcomes
 from mandel.experiments.social import attention_ticker_days, attention_vs_abs_return, close_ts, daily_closes, fear_greed_forward_returns
-from mandel.experiments.volatility import implied_move_vs_realised, overlay_backtest, overlay_verdict, skew_tail
+from mandel.experiments.volatility import implied_move_vs_realised, monthly_expiry_sessions, overlay_backtest, overlay_verdict, skew_tail
+from mandel.options import bs
 from mandel.validation.backtest_eval import sharpe_ratio
 
 UTC = timezone.utc
@@ -145,25 +146,118 @@ def _overlay_inputs(with_adj: bool):
     return px, vix, rate, closes * factor
 
 
+def _dtb3_cont(pct: float) -> float:
+    """Harness rule 7: DTB3 is a discount yield; the continuous rate is -ln(1 - d*91/360)/(91/365)."""
+    return -math.log(1 - pct / 100 * 91 / 360) / (91 / 365)
+
+
+def _covered_call_legs(s0, s1, T, r, q, sig=0.16, delta=0.30):
+    """Per-cycle (price + short 30-delta call) return of a covered call, without the dividend cash, priced at yield q."""
+    k = np.array([bs.strike_for_delta(a, t, r, sig, delta, "call", qq) for a, t, qq in zip(s0, T, q)])
+    prem = np.array([float(bs.price(a, kk, t, r, sig, "call", qq)) for a, kk, t, qq in zip(s0, k, T, q)])
+    return (s1 - s0 + prem - np.maximum(s1 - k, 0.0)) / s0
+
+
 def test_om16_stock_legs_earn_dividends_and_sharpe_is_excess_of_bills():
+    """OM-16: every stock leg earns the dividends paid over the cycle (total-return benchmark; the covered call collects them
+    too), the cash-secured put has no stock leg and earns none, and the Sharpes are of returns in excess of the per-cycle bill
+    (raw for the unfunded straddle). The old version pinned the 21-session grid from the first day; harness rule 10 puts the
+    cycles on the claims' own monthly-expiry calendar, and the rule 7/8 follow-up funds them at the DTB3 continuous rate and
+    prices the options on the dividend forward, so the covered call is checked leg by leg instead of against the price-only run."""
     px, vix, rate, total = _overlay_inputs(True)
     px0, _, _, _ = _overlay_inputs(False)
+    closes = np.array([r["value"]["close"] for r in px])
+    ex = np.array(monthly_expiry_sessions([v["value"]["day"] for v in vix]))
+    s0, s1, T, rc = closes[ex[:-1]], closes[ex[1:]], np.diff(ex) / 252, _dtb3_cont(3.0)
+    div = total[ex[1:]] / total[ex[:-1]] - s1 / s0                            # the cycle's dividend return
     bh = overlay_backtest(px, vix, rate, "buy_and_hold")
-    idx = np.arange(0, len(total) - 21, 21)
-    assert np.allclose(bh["benchmark"], total[idx + 21] / total[idx] - 1)      # total-return benchmark
-    assert np.allclose(bh["returns"], bh["benchmark"]) and bh["dividends_included"]
+    assert np.allclose(bh["benchmark"], total[ex[1:]] / total[ex[:-1]] - 1)    # total-return benchmark
+    assert np.allclose(bh["returns"], bh["benchmark"]) and bh["dividends_included"] and np.all(div > 0)
     cc, cc0 = overlay_backtest(px, vix, rate, "covered_call"), overlay_backtest(px0, vix, rate, "covered_call")
-    assert np.all(cc["returns"] - cc0["returns"] > 0)                          # covered call collects the dividend too
+    assert np.all(cc["dividend_q"] > 0) and np.all(cc0["dividend_q"] == 0)
+    assert np.allclose(cc["returns"], _covered_call_legs(s0, s1, T, rc, cc["dividend_q"]) + div)   # covered call collects the dividend too
+    assert np.allclose(cc0["returns"], _covered_call_legs(s0, s1, T, rc, np.zeros_like(T)))       # no adjclose: no dividend, no forward
     csp, csp0 = overlay_backtest(px, vix, rate, "cash_secured_put"), overlay_backtest(px0, vix, rate, "cash_secured_put")
-    assert np.allclose(csp["returns"], csp0["returns"])                        # no stock leg: unchanged
-    ppy = 252 / 21
+    put = np.array([float(bs.price(a, a, t, rc, 0.16, "put", qq)) for a, t, qq in zip(s0, T, csp["dividend_q"])])
+    assert np.allclose(csp["returns"], (put - np.maximum(s0 - s1, 0.0)) / s0 + np.exp(rc * T) - 1)  # no stock leg: no dividend cash
+    assert np.all(csp["returns"] > csp0["returns"])                            # only the put, richer on the dividend forward, differs
+    ppy = 12
     assert abs(csp["sharpe"] - sharpe_ratio(csp["returns"] - csp["bill_returns"], ppy)) < 1e-12
     assert abs(csp["benchmark_sharpe"] - sharpe_ratio(csp["benchmark"] - csp["bill_returns"], ppy)) < 1e-12
-    assert np.allclose(csp["bill_returns"], math.exp(0.03 * 21 / 252) - 1)
+    assert np.allclose(csp["bill_returns"], np.exp(rc * T) - 1)
     ss = overlay_backtest(px, vix, rate, "short_straddle")                    # unfunded: raw P&L is already an excess return
     assert abs(ss["sharpe"] - sharpe_ratio(ss["returns"], ppy)) < 1e-12
     v = overlay_verdict(csp, n_boot=200)
-    assert "bill_returns" not in v and "returns" not in v
+    assert "bill_returns" not in v and "returns" not in v and "dividend_q" not in v
+
+
+# ------------------------------------------------------------------------------- OM-16 follow-up: rules 4, 7, 8 --
+
+def test_om16_bill_is_the_dtb3_continuous_rate_printed_before_entry():
+    """Rule 7: DTB3 is a discount yield, so the bill earns -ln(1 - d*91/360)/(91/365), not d/100 as a continuous rate. Rule 4: a
+    print dated on the entry day is published the next day, so each cycle uses the last print dated before its entry, carried
+    forward over missing days (it used the same-day print and filled gaps with the full-sample mean). A cycle with no earlier
+    print is dropped and counted."""
+    px, vix, _, _ = _overlay_inputs(False)
+    days = [v["value"]["day"] for v in vix]
+    ex = monthly_expiry_sessions(days)
+    entry = {days[i] for i in ex}
+    gaps = {days[j] for n_, i in enumerate(ex) if n_ % 4 == 0 for j in range(max(i - 5, 0), i)}   # no prints in the 5 days before every 4th entry
+    prints = {d: (9.0 if d in entry else 1.0 + 0.001 * k) for k, d in enumerate(days) if d not in gaps}   # entry-day prints are look-ahead
+    rate = [{"value": {"day": d, "close": v}} for d, v in prints.items()]
+    rep = overlay_backtest(px, vix, rate, "cash_secured_put")
+    pdays = sorted(prints)
+    used = [prints[max(d for d in pdays if d < days[i])] for i in ex[:-1]]
+    T = np.diff(ex) / 252
+    assert rep["n_cycles"] == len(ex) - 1 and rep["cycles_without_prior_bill"] == 0 and rep["bill_max_staleness_days"] == 6
+    assert np.allclose(rep["bill_returns"], np.exp(np.array([_dtb3_cont(u) for u in used]) * T) - 1)
+    assert not np.allclose(rep["bill_returns"], np.exp(np.array(used) / 100 * T) - 1)               # not d/100
+    late = [r for r in rate if r["value"]["day"] >= days[ex[2]]]                                      # first print on the third entry day
+    rl = overlay_backtest(px, vix, late, "cash_secured_put")
+    assert rl["cycles_without_prior_bill"] == 3 and rl["n_cycles"] == len(ex) - 4 and rl["first_day"] == days[ex[3]]
+
+
+def test_om16_options_are_priced_on_the_dividend_forward():
+    """Rule 8: with an ex-date inside the option's life (after the entry session, up to and including the settlement session,
+    where SPY goes ex every quarter) the options are priced on the dividend forward: the cash dividend read from the
+    adjclose/close step, discounted from its ex-date, as the yield q with s0 (1 - exp(-q T)) = D exp(-r t_ex). An ex-date on the
+    entry session is not inside the life. They were priced at q = 0. The stock leg still earns the dividend; settlement is on
+    the raw close."""
+    rng = np.random.default_rng(11)
+    n = 600
+    d0 = 1_262_304_000
+    days = [datetime.fromtimestamp(d0 + 86400 * i, tz=UTC).strftime("%Y-%m-%d") for i in range(n)]
+    closes = 100 * np.exp(np.cumsum(rng.normal(0.0002, 0.01, n)))
+    ex = monthly_expiry_sessions(days)
+    D = {ex[3]: 1.5, ex[7] + 10: 0.8}                                         # one on a settlement session, one mid-cycle
+    f = np.ones(n)
+    for e, cash in D.items():                                                 # Yahoo: every close before the ex-date scaled down
+        f[:e] *= 1 - cash / closes[e - 1]
+    px = [{"value": {"symbol": "SPY", "t": d0 + 86400 * i, "close": float(c), "adjclose": float(c * g)}} for i, (c, g) in enumerate(zip(closes, f))]
+    px0 = [{"value": {"symbol": "SPY", "t": d0 + 86400 * i, "close": float(c)}} for i, c in enumerate(closes)]
+    vix = [{"value": {"day": d, "close": 16.0}} for d in days]
+    rate = [{"value": {"day": d, "close": 2.0}} for d in days]
+    rc = _dtb3_cont(2.0)
+    cc = overlay_backtest(px, vix, rate, "covered_call")
+    q = cc["dividend_q"]
+    cyc = {c: (ex[c], ex[c + 1]) for c in range(len(ex) - 1)}
+    inside = {c for c, (i, i1) in cyc.items() if any(i < e <= i1 for e in D)}
+    assert inside == {2, 7} and cc["dividend_forward_cycles"] == 2 and np.all(q[[c for c in cyc if c not in inside]] == 0)   # cycle 3 enters on the ex-date
+    for c in inside:
+        i, i1 = cyc[c]
+        (e, cash), = [(e, x) for e, x in D.items() if i < e <= i1]
+        T = (i1 - i) / 252
+        assert abs(closes[i] * (1 - math.exp(-q[c] * T)) - cash * math.exp(-rc * (e - i) / 252)) < 1e-9
+    s0, s1 = closes[ex[:-1]], closes[ex[1:]]
+    T = np.diff(ex) / 252
+    div = (f[ex[1:]] / f[ex[:-1]] - 1) * s1 / s0                               # adjclose/close step over the cycle
+    assert np.allclose(cc["returns"], _covered_call_legs(s0, s1, T, rc, q) + div)
+    ss, ss0 = overlay_backtest(px, vix, rate, "short_straddle"), overlay_backtest(px0, vix, rate, "short_straddle")
+    out = [c for c in cyc if c not in inside]
+    assert np.allclose(ss["returns"][out], ss0["returns"][out]) and not np.allclose(ss["returns"][sorted(inside)], ss0["returns"][sorted(inside)])
+    i, i1 = cyc[2]
+    call, put = (float(bs.price(closes[i], closes[i], T[2], rc, 0.16, k, q[2])) for k in ("call", "put"))
+    assert put > call and abs(ss["returns"][2] - (call + put - abs(closes[i1] - closes[i])) / closes[i]) < 1e-12   # settled on the raw close
 
 
 # ------------------------------------------------------------------------------- OM-4 (T-38): point in time --

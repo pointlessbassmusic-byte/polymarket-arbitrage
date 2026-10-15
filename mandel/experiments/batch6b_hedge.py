@@ -21,6 +21,12 @@ Data (all loaded through ``archive.load``; a bar is used only if its ``available
     row on a market-closed day or a one-day bad print is dropped; a known level step ("splice", CLL 2009-10-16: -19.8%
     while SPX fell 0.8%) is a BREAK: the one return ending on that day is excluded from EVERY leg of the paired panel
     (strategy, benchmark and bill), so nothing is compounded across it. The as-published compounding is reported.
+    Unflagged one-day bad prints are screened against SPX (^GSPC raw closes) and dropped the same way: a close whose
+    return into the day and out of it have opposite signs, are each at least 2.5% and each at least twice the SPX move
+    over the same interval (``spike_prints``; e.g. BFLY 2022-05-31 +6.81% then -5.89% while SPX -0.63% / -0.75%, CLL
+    2020-02-28 -5.35% then +12.36% while SPX -0.82% / +4.60%). A real move on a big SPX day (1987, March 2020,
+    2010-05-07) follows a large SPX move and is kept. Each reason names the prints dropped in its window, and T-166 and
+    T-178 report their statistic with them kept. Unflagged stale runs (CLL 2019-01-03..01-18) are named, not dropped.
   * BACK-TESTED HISTORY. Every Cboe index here launched after the start of its claim's window (INDEX_META, section 5 of
     each methodology): CLL 2008-09-30, VXTH 2011-07-29, CLLZ / PPUT / BFLY / CNDR / BXMD 2015-08-03, PPUT3M 2021-08-02,
     BXM 2002-04-30, PUT 2007-06-20. Rows before launch are Cboe's back-test (``backtest: true``), dated as published on
@@ -64,14 +70,19 @@ Conventions:
     R^2 (squared correlation) and TE (sd of the monthly difference x sqrt 12) are computed on both monthly calendars a
     reader could mean: roll-to-roll periods and calendar month-ends. A criterion passes when both pass, fails when both
     fail, and is undecided (None) when they disagree. IV-scale sensitivity: 0.9 and 1.1 x VIX.
-  * T-220 (MODEL-PRICED): entry at the close 3 trading days before each monthly VIX settlement (the VX futures expiry
-    dates), F = the expiring VX future's settlement that day, K1 = F + 2 rounded to the nearest 1-point strike, K2 = K1 +
-    5, Black-76 with sigma = VVIX/100 and T = (calendar days - 0.28) / 365 (16:15 ET to the 09:30 ET SOQ); the credit is
-    reduced by one half-spread per leg measured on the captured VIX chains at the same strikes relative to F (today's
-    spreads applied to history: an assumption); payoff min(max(VRO - K1, 0), 5); return = P&L / (5 - net credit). The gate
-    uses the entry day's VIX3M and VIX closes (16:15 ET, the VIX options close; the prior-day gate is reported). IV
-    scales 0.8 / 1.2 / 1.5, a chain-skew pricing (per-leg IV / VVIX measured on the captures), doubled half-spreads,
-    unrounded strikes and the trial's controls are reported.
+  * T-220 (MODEL-PRICED): entry at the close 3 exchange sessions before each monthly VIX settlement (the VX futures
+    expiry dates; sessions from mandel.data.cboe_strategy.is_trading_day, since cboe-VIX-history has rows on 34
+    market-closed days), F = the expiring VX future's settlement that day (15:00 CT), K1 = F + 2 rounded to the nearest
+    1-point strike, K2 = K1 + 5, Black-76 with sigma = the entry day's VVIX/100 (the fill's IV mark, not a signal) and T =
+    (calendar days - 0.28) / 365 (16:15 ET to the 09:30 ET SOQ); the credit is reduced by one half-spread per leg
+    measured on the captured VIX chains at the same strikes relative to F (today's spreads applied to history: an
+    assumption); payoff min(max(VRO - K1, 0), 5); return = P&L / (5 - net credit). The gate is point in time (rule 4):
+    VIX3M/VIX at the close of the session BEFORE entry, because the archive stamps the 16:15 ET VIX and VIX3M closes
+    available at 21:30Z, after the entry (batch4_vx's convention for the same gate and the same VX settlement). The
+    same-close gate (16:15 ET) and the gate-and-strikes-at-the-previous-close version are reported and run through the
+    same block x seed variants, so the reason says when the verdict would differ under them. IV scales 0.8 / 1.2 / 1.5,
+    a chain-skew pricing (per-leg IV / VVIX measured on the captures), doubled half-spreads, unrounded strikes and the
+    trial's controls are reported.
   * Seed and block robustness: no claim fixes a block length, so every CI-decided criterion is evaluated on several
     bootstrap variants (blocks 6 and 12 months x seeds 0-2; T-179 the same in rolls; T-528 seeds 0-2 at its named mean
     block of 63 days; T-220 blocks 3 and 6 trades x seeds 0-2). It passes only when every variant passes, fails when none
@@ -566,10 +577,48 @@ def index_series(rows) -> dict:
     return out
 
 
-def strategy_series(rows) -> dict:
+SPIKE_MIN = 0.025                # spike screen: each leg moves at least 2.5% ...
+SPIKE_K = 2.0                    # ... and at least twice the SPX move over the same interval
+
+
+def spike_prints(close: dict, ref: dict, min_move: float = SPIKE_MIN, k: float = SPIKE_K) -> dict:
+    """Unflagged one-day spike-and-revert prints, judged against a reference (SPX): day d (with the index's previous close
+    a and next close c, all three present in ``ref``) is a suspect print when the index return into d and out of d have
+    opposite signs, each is at least ``min_move`` in size, and each is at least ``k`` times the reference's return over
+    the same interval. A real move of a hedged or short-volatility index on a big SPX day (1987, March 2020, 2010-05-07)
+    is not flagged, because the SPX move it follows is large too. Returns {day: reason}."""
+    ds = sorted(close)
+    out = {}
+    for a, d, c in zip(ds[:-2], ds[1:-1], ds[2:]):
+        if a not in ref or d not in ref or c not in ref:
+            continue
+        r1, r2 = close[d] / close[a] - 1.0, close[c] / close[d] - 1.0
+        s1, s2 = ref[d] / ref[a] - 1.0, ref[c] / ref[d] - 1.0
+        if r1 * r2 < 0 and min(abs(r1), abs(r2)) >= min_move and abs(r1) >= k * abs(s1) and abs(r2) >= k * abs(s2):
+            out[d] = (f"one-day spike-and-revert print ({100 * r1:+.2f}% then {100 * r2:+.2f}% while SPX {100 * s1:+.2f}% / "
+                      f"{100 * s2:+.2f}%)")
+    return out
+
+
+def stale_runs(close: dict, min_len: int = 5, first: str = "", last: str = "9999") -> list:
+    """Runs of at least ``min_len`` consecutive identical closes within [first, last]: [(first day, last day, length)]."""
+    ds = [d for d in sorted(close) if first <= d <= last]
+    out, i = [], 0
+    while i < len(ds):
+        j = i
+        while j + 1 < len(ds) and close[ds[j + 1]] == close[ds[i]]:
+            j += 1
+        if j - i + 1 >= min_len:
+            out.append((ds[i], ds[j], j - i + 1))
+        i = j + 1
+    return out
+
+
+def strategy_series(rows, ref: Optional[dict] = None) -> dict:
     """A Cboe strategy index with its flags applied: {close: {day: level}, breaks: set of days whose return must not be
     compounded (a known level step / splice), dropped: {day: flag} (market-closed rows, bad prints, other flags),
-    backtest: set of back-tested days}."""
+    backtest: set of back-tested days, spikes: {day: reason} (unflagged one-day spike-and-revert prints found by
+    ``spike_prints`` against ``ref``, dropped like flagged bad prints; None when no reference was given)}."""
     close, breaks, dropped, bt = {}, set(), {}, set()
     for r in rows:
         v = r["value"]
@@ -591,7 +640,13 @@ def strategy_series(rows) -> dict:
         close[d] = c
         if v.get("backtest"):
             bt.add(d)
-    return {"close": close, "breaks": breaks, "dropped": dropped, "backtest": bt}
+    spikes = None
+    if ref:
+        spikes = {d: why for d, why in spike_prints(close, ref).items() if d not in breaks}
+        for d, why in spikes.items():
+            close.pop(d, None)
+            dropped[d] = why
+    return {"close": close, "breaks": breaks, "dropped": dropped, "backtest": bt, "spikes": spikes}
 
 
 def dtb3_continuous(d_pct: float) -> float:
@@ -672,11 +727,12 @@ def _sub(panel: dict, mask) -> dict:
 def beta_blend_claim(panel: dict, strat: str, bench: str, bound: float, min_n: int, claim_beta: float,
                      raw_panel: Optional[dict] = None, controls: Optional[dict] = None, n_boot: int = N_BOOT,
                      seed: int = 0, block: int = BLOCK_M, exclude_years: Sequence[str] = (), sym_note: str = "",
-                     live_from: Optional[str] = None) -> dict:
+                     live_from: Optional[str] = None, alt_panels: Optional[dict] = None) -> dict:
     """CAGR(strat) - CAGR(beta * bench + (1 - beta) * bill), monthly rebalanced, beta = OLS on the window (re-estimated in
     every resample). Pass: the two-sided 95% CI lies wholly below ``bound`` (0 for T-166, -0.01 for T-169).
     ``raw_panel``: the same panel compounded across breaks (as published). ``controls``: {label: panel with a 'strat'
-    series} reported only. ``exclude_years``: each calendar year dropped in turn (reported)."""
+    series} reported only. ``exclude_years``: each calendar year dropped in turn (reported). ``alt_panels``: {label:
+    panel with the same series names} reported only (e.g. the screened spike prints kept)."""
     ra, rs, rb, sp = panel["ret"].get(strat), panel["ret"].get(bench), panel["bill"], panel["span"]
     n = 0 if ra is None else int(ra.size)
     if n < 8:
@@ -712,6 +768,15 @@ def beta_blend_claim(panel: dict, strat: str, bench: str, bound: float, min_n: i
         stat["as_published"] = {"cagr_strategy": raw["cagr_a"], "diff": raw["diff"], "ci95": raw["ci"], "beta": raw["beta"]}
         extra.append(f"compounded across the excluded return(s) {panel['excluded']} as published: CAGR {_pc(raw['cagr_a'])}, "
                      f"diff {_pc(raw['diff'])} ({_ci_s(raw['ci'], 2, 100, '%')})")
+    alts = {}
+    for lab, p in (alt_panels or {}).items():
+        if p is None or p["ret"].get(strat) is None or p["ret"][strat].size < 8:
+            continue
+        r3 = cagr_vs_blend(p["ret"][strat], p["ret"][bench], p["bill"], p["span"], None, block, 0.95, n_boot, seed)
+        alts[lab] = {"n": r3["n"], "beta": r3["beta"], "cagr": r3["cagr_a"], "diff": r3["diff"], "ci95": r3["ci"]}
+        extra.append(f"{lab}: beta {_f(r3['beta'])}, CAGR {_pc(r3['cagr_a'])}, diff {_pc(r3['diff'])} ({_ci_s(r3['ci'], 2, 100, '%')})")
+    if alts:
+        stat["alt_panels"] = alts
     ex = {}
     for y in exclude_years:
         m = np.array([not mm.startswith(y) for mm in panel["months"]])
@@ -830,9 +895,12 @@ def sharpe_noworse_claim(panel: dict, strat: str, bench: str, margin: float = 0.
 
 
 def sharpe_lower_claim(panel: dict, a_name: str, b_name: str, split: str = "2008-01", min_n: int = 400,
-                       n_boot: int = N_BOOT, seed: int = 0, sym_note: str = "", live_from: Optional[str] = None) -> dict:
+                       n_boot: int = N_BOOT, seed: int = 0, sym_note: str = "", live_from: Optional[str] = None,
+                       alt_panels: Optional[dict] = None) -> dict:
     """T-178: Sharpe(a) - Sharpe(b) on monthly excess returns; pass: two-sided 95% CI upper < 0 and the point estimate
-    negative both before and from ``split`` (the trial's pre/post-2008 halves; equal-count halves reported)."""
+    negative both before and from ``split`` (the trial's pre/post-2008 halves; equal-count halves reported).
+    ``alt_panels``: {label: panel with the same series names} reported only, with the same block x seed variants (e.g.
+    the screened spike prints kept)."""
     a, b = _excess(panel, a_name), _excess(panel, b_name)
     n = int(a.size)
     t = sharpe_diff_test(a, b, BLOCK_M, 0.95, n_boot, seed)
@@ -865,6 +933,19 @@ def sharpe_lower_claim(panel: dict, a_name: str, b_name: str, split: str = "2008
             lv = sharpe_diff_test(a[lm], b[lm], BLOCK_M, 0.95, n_boot, seed)
             stat["live_only"] = {"from": live_from, "n": lv["n"], "diff_monthly": lv["diff"], "ci95": lv["ci"]}
             live = f"; live (post-launch) months only, {live_from}.. ({lv['n']}): {_s(lv['diff'], 4)} ({_ci_s(lv['ci'], 4)})"
+    alts = {}
+    for lab, p in (alt_panels or {}).items():
+        if p is None or p["ret"].get(a_name) is None or p["ret"][a_name].size < 8:
+            continue
+        xa, xb = _excess(p, a_name), _excess(p, b_name)
+        ta = sharpe_diff_test(xa, xb, BLOCK_M, 0.95, n_boot, seed)
+        ra = robust_decision(lambda bl, sd: sharpe_diff_test(xa, xb, bl, 0.95, n_boot, seed + sd)["ci"],
+                             lambda l, u: u < 0, lambda l, u: l >= 0)
+        alts[lab] = {"n": ta["n"], "diff_monthly": ta["diff"], "ci95": ta["ci"], "robustness": ra}
+        live += (f"; {lab}: {_s(ta['diff'], 4)} ({_ci_s(ta['ci'], 4)}; upper across variants "
+                 f"{min(c[1] for c in ra['cis']):+.4f} to {max(c[1] for c in ra['cis']):+.4f}, {_rob_txt(ra)})")
+    if alts:
+        stat["alt_panels"] = alts
     crit = [(f"95% CI of Sharpe({a_name}) - Sharpe({b_name}) < 0 (upper {_s(hi, 4)}; upper across variants "
              f"{min(c[1] for c in rd['cis']):+.4f} to {max(c[1] for c in rd['cis']):+.4f}; {_rob_txt(rd)})", rd["ok"], rd["decisive"]),
             (f"same (negative) sign before and from {split} ({_s(tp['diff'], 4)} / {_s(tq['diff'], 4)})", halves_ok, halves_dec)]
@@ -1462,11 +1543,14 @@ def chain_calibration(chains: list, curve: dict, vvix: dict, rates: dict, tdays:
 def soq_spread_trades(tdays: list, expiries: list, curve: dict, vix: dict, vix3m: dict, vvix: dict, vro: dict, rates: dict,
                       hs1: float, hs2: float, entry_lag: int = 3, gate: float = 1.10, otm: float = 2.0, width: float = 5.0,
                       iv_scale: float = 1.0, iv_legs: Optional[tuple] = None, round_strikes: bool = True,
-                      gate_lag: int = 0, gate_side: str = "above") -> dict:
+                      gate_lag: int = 1, gate_side: str = "above", strike_lag: int = 0) -> dict:
     """One call credit spread per monthly VIX settlement E (in ``expiries``): entry at the close ``entry_lag`` sessions
-    before E, gate VIX3M/VIX (``gate_lag`` sessions before entry) above ``gate`` (or below 1 for gate_side 'below'),
-    strikes from the expiring future's settlement, Black-76 credit at VVIX x iv_scale (or per-leg IV ratios ``iv_legs``)
-    minus the half-spreads, settled at the clean VRO print on E. Returns the trades and the skipped expiries by reason."""
+    before E (``tdays`` must be exchange sessions), gate VIX3M/VIX (``gate_lag`` sessions before entry; 1 = the previous
+    close, point in time: the VIX and VIX3M closes are stamped available after the entry) above ``gate`` (or below 1 for
+    gate_side 'below'), strikes from the expiring future's settlement ``strike_lag`` sessions before entry (0 = the
+    entry day's 15:00 CT settlement), Black-76 credit on the entry day's settlement at VVIX x iv_scale (or per-leg IV
+    ratios ``iv_legs``) minus the half-spreads, settled at the clean VRO print on E. Returns the trades and the skipped
+    expiries by reason."""
     pos = {d: i for i, d in enumerate(tdays)}
     trades, skipped = [], defaultdict(list)
     for e in expiries:
@@ -1475,12 +1559,13 @@ def soq_spread_trades(tdays: list, expiries: list, curve: dict, vix: dict, vix3m
                 skipped["settlement day not a session"].append(e)
             continue
         i = pos[e] - entry_lag
-        if i < gate_lag:
+        if i < max(gate_lag, strike_lag):
             continue
         d = tdays[i]
         g = tdays[i - gate_lag]
         F = curve.get(d, {}).get(e)
-        if F is None:
+        Fk = curve.get(tdays[i - strike_lag], {}).get(e)
+        if F is None or Fk is None:
             skipped["no VX settlement for the expiring future at entry"].append(e)
             continue
         if g not in vix or g not in vix3m or d not in vvix:
@@ -1492,7 +1577,7 @@ def soq_spread_trades(tdays: list, expiries: list, curve: dict, vix: dict, vix3m
         if e not in vro:
             skipped["no clean VRO settlement"].append(e)
             continue
-        K1 = _strike_round(F + otm) if round_strikes else F + otm
+        K1 = _strike_round(Fk + otm) if round_strikes else Fk + otm
         K2 = K1 + width
         T = (date.fromisoformat(e).toordinal() - date.fromisoformat(d).toordinal() - 0.28) / 365.0
         r0 = float(rate_known([d], rates)[0]) if rates else 0.0
@@ -1503,22 +1588,26 @@ def soq_spread_trades(tdays: list, expiries: list, curve: dict, vix: dict, vix3m
         soq = vro[e]
         pay = min(max(soq - K1, 0.0), width)
         ml = width - net
-        trades.append({"expiry": e, "entry": d, "ratio": ratio, "F": F, "K1": K1, "vvix": vvix[d], "mid_credit": mid,
+        trades.append({"expiry": e, "entry": d, "gate_day": g, "ratio": ratio, "F": F, "K1": K1, "vvix": vvix[d], "mid_credit": mid,
                        "net_credit": net, "soq": soq, "payoff": pay, "pnl": net - pay, "ret": (net - pay) / ml})
     return {"trades": trades, "skipped": {k: v for k, v in skipped.items()}}
 
 
 def soq_spread_claim(main: dict, variants: dict, prelim: Optional[dict] = None, calib: Optional[dict] = None, min_n: int = 60,
-                     n_boot: int = N_BOOT, seed: int = 0, block: int = 3, costs_measured: bool = True) -> dict:
+                     n_boot: int = N_BOOT, seed: int = 0, block: int = 3, costs_measured: bool = True,
+                     decide_variants: Sequence[str] = ()) -> dict:
     """T-220: mean return on max loss > 0 with a two-sided 95% CI excluding 0 (studentized block bootstrap, block 3
-    trades). ``variants``: {label: trades dict} reported (IV scales, chain skew, costs, strikes, gate lag, controls)."""
+    trades). ``variants``: {label: trades dict} reported (IV scales, chain skew, costs, strikes, gate timing, controls);
+    the labels in ``decide_variants`` are also run through the block x seed variants, so the reason says whether the
+    verdict would differ under them. ``main['gate_lag']`` (default 1) names the gate's timing in the reason."""
     tr = main["trades"]
     x = np.array([t["ret"] for t in tr])
     n = int(x.size)
     lo, hi = stud_ci(x, block, 0.95, n_boot, seed) if n >= 8 else (None, None)
     mean = float(x.mean()) if n else None
+    bvars = tuple((b, k) for b in (block, 2 * block) for k in range(3))
     rd = robust_decision(lambda bl, sd: stud_ci(x, bl, 0.95, n_boot, seed + sd) if n >= 8 else (None, None),
-                         lambda l, u: l > 0, lambda l, u: u <= 0, tuple((b, k) for b in (block, 2 * block) for k in range(3)))
+                         lambda l, u: l > 0, lambda l, u: u <= 0, bvars)
     if not costs_measured:
         ok, dec = None, False
         cname = "mean return on max loss > 0 with 95% CI excluding 0 NET OF HALF-SPREADS (no VIX chain captured: half-spreads not measurable)"
@@ -1531,6 +1620,9 @@ def soq_spread_claim(main: dict, variants: dict, prelim: Optional[dict] = None, 
         xv = np.array([q["ret"] for q in t["trades"]])
         lv, hv = stud_ci(xv, block, 0.95, max(1000, n_boot // 4), seed) if xv.size >= 8 else (None, None)
         rep_v[lab] = {"n": int(xv.size), "mean": float(xv.mean()) if xv.size else None, "ci95": [lv, hv]}
+        if lab in decide_variants and xv.size >= 8:
+            rep_v[lab]["robustness"] = robust_decision(lambda bl, sd: stud_ci(xv, bl, 0.95, n_boot, seed + sd),
+                                                       lambda l, u: l > 0, lambda l, u: u <= 0, bvars)
     wins = float(np.mean([t["payoff"] == 0 for t in tr])) if tr else None
     stat = {"label": MP, "n_trades": n, "mean_ret_on_max_loss": mean, "ci95": [lo, hi], "win_rate": wins,
             "mean_net_credit": float(np.mean([t["net_credit"] for t in tr])) if tr else None,
@@ -1552,13 +1644,24 @@ def soq_spread_claim(main: dict, variants: dict, prelim: Optional[dict] = None, 
         pre = (f"; preliminary SOQ check ({prelim['n_settle']} monthly settlements from {prelim['first']}): mean VRO - prior VIX "
                f"close {_s(prelim['mean_settle'])} vs mean daily VIX change on {prelim['n_other']} other Wednesdays "
                f"{_s(prelim['mean_other'])} (difference {_s(prelim['diff'])}, {_ci_s(prelim['ci95'])})")
-    reason = (f"{MP} (Black-76 at VVIX on the expiring VX future): {n} gated trades ({window}; VIX3M/VIX > 1.1 at the entry "
-              f"close 3 sessions before the monthly SOQ), mean net credit {_f(stat['mean_net_credit'], 3)} (mid "
+    gl = int(main.get("gate_lag", 1))
+    gate_txt = ("VIX3M/VIX > 1.1 at the entry close" if gl == 0 else
+                "VIX3M/VIX > 1.1 at the close of the session before entry" if gl == 1 else f"VIX3M/VIX > 1.1 {gl} sessions before entry")
+    stat["gate_lag"] = gl
+
+    def _vtxt(k, r):
+        s = f"{k}: n {r['n']}, mean {_pc(r['mean'])} ({_ci_s(r['ci95'], 2, 100, '%')}"
+        if r.get("robustness"):
+            s += f"; {_rob_txt(r['robustness'])}"
+        return s + ")"
+    reason = (f"{MP} (Black-76 at VVIX on the expiring VX future): {n} gated trades ({window}; {gate_txt}, entry at the "
+              f"close 3 exchange sessions before the monthly SOQ, strikes and credit from that day's VX settlement), mean net "
+              f"credit {_f(stat['mean_net_credit'], 3)} (mid "
               f"{_f(stat['mean_mid_credit'], 3)}, half-spreads {_f(main.get('hs1'), 3)} + {_f(main.get('hs2'), 3)} per spread "
               f"from the captured chains), win rate {_pu(wins, 1)}, {stat['max_losses']} max losses; mean return on max loss "
               f"{_pc(mean)} (95% {_ci_s((lo, hi), 2, 100, '%')}, studentized block bootstrap, block 3)"
               + (f"; skipped: " + ", ".join(f"{k} {len(v2)}" for k, v2 in main["skipped"].items()) if main["skipped"] else "")
-              + "; sensitivities: " + ", ".join(f"{k}: n {r['n']}, mean {_pc(r['mean'])} ({_ci_s(r['ci95'], 2, 100, '%')})" for k, r in rep_v.items())
+              + "; sensitivities: " + ", ".join(_vtxt(k, r) for k, r in rep_v.items())
               + cal + pre + f" — {why}")
     return {"n": n, "verdict": v, "reason": reason, "stat": stat}
 
@@ -1600,15 +1703,53 @@ def _gspc(archive) -> dict:
     return daily_from_rows(_rows(archive, GSPC_B))
 
 
-def _strat(archive, sym: str) -> dict:
-    return strategy_series(_rows(archive, CB(sym)))
+def _spx_ref(archive) -> Optional[dict]:
+    """^GSPC raw closes {day: close}, the reference of the spike screen (None when ^GSPC is not archived)."""
+    if not _has(archive, GSPC_B):
+        return None
+    g = _gspc(archive)
+    return dict(zip(g["days"], g["close"]))
 
 
-def _panel_pair(archive, strat_sym: str, bench: dict, dtb3: dict, start: str, end: str = "9999-12", breaks: bool = True) -> Optional[dict]:
+def _strat(archive, sym: str, ref: Optional[dict] = None) -> dict:
+    """A Cboe strategy index with its flags applied and, given ``ref`` (SPX closes), its unflagged one-day spike prints
+    screened out (``spike_prints``)."""
+    return strategy_series(_rows(archive, CB(sym)), ref)
+
+
+def _spike_note(series: dict, first: str, last: str, ref_ok: bool = True) -> str:
+    """Reason text naming the one-day spike prints dropped by the screen within [first, last] for {label: strategy
+    series} (empty when none)."""
+    if not ref_ok:
+        return "one-day spike screen not run (^GSPC not archived)"
+    hits = [f"{lab} {d} ({why.split('(', 1)[1]}" for lab, s in series.items() for d, why in sorted((s.get("spikes") or {}).items())
+            if first <= d <= last]
+    if not hits:
+        return ""
+    return (f"unflagged one-day spike-and-revert prints dropped like flagged bad prints (each leg >= {100 * SPIKE_MIN:.1f}% and "
+            f">= {SPIKE_K:g}x the SPX move, opposite signs): " + "; ".join(hits))
+
+
+def _panel_pair(archive, strat_sym: str, bench: dict, dtb3: dict, start: str, end: str = "9999-12", breaks: bool = True,
+                ref: Optional[dict] = None) -> Optional[dict]:
     if not _has(archive, CB(strat_sym)):
         return None
-    s = _strat(archive, strat_sym)
-    return monthly_panel({"strat": s["close"], "bench": bench}, dtb3, start, end, s["breaks"] if breaks else ())
+    s = _strat(archive, strat_sym, ref)
+    p = monthly_panel({"strat": s["close"], "bench": bench}, dtb3, start, end, s["breaks"] if breaks else ())
+    p["spikes"] = s["spikes"]
+    return p
+
+
+def _stale_note(sym: str, close: dict, first: str, last: str, month_ends: Sequence[str]) -> str:
+    """Reason text naming unflagged stale runs (>= 5 identical consecutive closes) within [first, last] and whether a
+    month-end level falls inside one (empty when none)."""
+    runs = stale_runs(close, 5, first, last)
+    if not runs:
+        return ""
+    hit = sorted(d for a, b, _ in runs for d in month_ends if a < d <= b)
+    return (f"{sym} repeats one close over " + ", ".join(f"{a}..{b} ({k} sessions)" for a, b, k in runs)
+            + " (unflagged stale runs, kept): " + (f"month-end(s) {', '.join(hit)} fall inside, so those months' returns are stale"
+                                                   if hit else "no month-end falls inside, so no monthly return is affected"))
 
 
 def b6b_hedge_collar_cll_vs_blend(archive):
@@ -1618,18 +1759,29 @@ def b6b_hedge_collar_cll_vs_blend(archive):
         return miss
     spy = _spy_tr(archive)
     dtb3 = index_series(_rows(archive, DTB3_B))
-    cll = _strat(archive, "CLL")
+    ref = _spx_ref(archive)
+    cll = _strat(archive, "CLL", ref)
     panel = monthly_panel({"CLL": cll["close"], "SPY": spy}, dtb3, "2008-08", "2026-10", cll["breaks"])
     raw = monthly_panel({"CLL": cll["close"], "SPY": spy}, dtb3, "2008-08", "2026-10", ())
     ctl = {}
     for sym in ("PPUT", "CLLZ"):
-        ctl[f"{sym} (same window)"] = _panel_pair(archive, sym, spy, dtb3, "2008-08", "2026-10")
+        ctl[f"{sym} (same window)"] = _panel_pair(archive, sym, spy, dtb3, "2008-08", "2026-10", ref=ref)
     for sym in ("CLL1M", "CLL3M"):
         if _has(archive, CB(sym)):
-            ctl[f"{sym} (same window)"] = _panel_pair(archive, sym, spy, dtb3, "2008-08", "2026-10")
-    note = _bt_note("CLL", panel["first"], panel["last"]) + "; CLL1M and CLL3M are not archived (controls not run)"
+            ctl[f"{sym} (same window)"] = _panel_pair(archive, sym, spy, dtb3, "2008-08", "2026-10", ref=ref)
+    first, last = panel["first"] or "", panel["last"] or ""
+    alt = {}
+    if any(first <= d <= last for d in (cll["spikes"] or {})):
+        c0 = _strat(archive, "CLL")
+        alt["with the screened spike print(s) kept"] = monthly_panel({"CLL": c0["close"], "SPY": spy}, dtb3, "2008-08", "2026-10", c0["breaks"])
+    common = sorted(set(cll["close"]) & set(spy))
+    month_ends = sorted({d[:7]: d for d in common}.values())
+    note = "; ".join(x for x in (
+        _bt_note("CLL", first, last), "CLL1M and CLL3M are not archived (controls not run)",
+        _spike_note({"CLL": cll, **{k.split(" ")[0]: p for k, p in ctl.items() if p is not None}}, first, last, ref is not None),
+        _stale_note("CLL", cll["close"], first, last, month_ends)) if x)
     rep = beta_blend_claim(panel, "CLL", "SPY", 0.0, 200, 0.63, raw_panel=raw, controls=ctl, sym_note=note,
-                           live_from=_live_month("CLL"))
+                           live_from=_live_month("CLL"), alt_panels=alt)
     return _wrap(rep)
 
 
@@ -1642,13 +1794,16 @@ def b6b_hedge_cllz_sharpe(archive):
     g = _gspc(archive)
     gp = dict(zip(g["days"], g["close"]))
     dtb3 = index_series(_rows(archive, DTB3_B))
-    cz = _strat(archive, "CLLZ")
+    cz = _strat(archive, "CLLZ", gp)
     panel = monthly_panel({"CLLZ": cz["close"], "SPY": spy, "SPX": gp}, dtb3, "1993-02", "2026-10", cz["breaks"])
-    ctl = {"CLL (2008-)": _panel_pair(archive, "CLL", spy, dtb3, "1993-02"),
-           "PPUT": _panel_pair(archive, "PPUT", spy, dtb3, "1993-02"),
+    ctl = {"CLL (2008-)": _panel_pair(archive, "CLL", spy, dtb3, "1993-02", ref=gp),
+           "PPUT": _panel_pair(archive, "PPUT", spy, dtb3, "1993-02", ref=gp),
            "CLLZ vs price-only SPX": monthly_panel({"strat": cz["close"], "bench": gp}, dtb3, "1993-02", "2026-10", cz["breaks"])}
+    first, last = panel["first"] or "", panel["last"] or ""
+    sp = _spike_note({"CLLZ": cz, "CLL (control)": ctl["CLL (2008-)"] or {}, "PPUT (control)": ctl["PPUT"] or {}}, first, last)
+    note = "; ".join(x for x in (_bt_note("CLLZ", first, last), sp) if x)
     rep = sharpe_noworse_claim(panel, "CLLZ", "SPY", 0.05, 380, crash=panel["ret"]["SPX"], controls=ctl,
-                               sym_note=_bt_note("CLLZ", panel["first"], panel["last"]), live_from=_live_month("CLLZ"))
+                               sym_note=note, live_from=_live_month("CLLZ"))
     return _wrap(rep)
 
 
@@ -1659,10 +1814,13 @@ def b6b_hedge_pput_vs_blend(archive):
         return miss
     spy = _spy_tr(archive)
     dtb3 = index_series(_rows(archive, DTB3_B))
-    pp = _strat(archive, "PPUT")
+    ref = _spx_ref(archive)
+    pp = _strat(archive, "PPUT", ref)
     panel = monthly_panel({"PPUT": pp["close"], "SPY": spy}, dtb3, "1993-02", "2026-10", pp["breaks"])
-    ctl = {"PPUT3M (2004-)": _panel_pair(archive, "PPUT3M", spy, dtb3, "1993-02")}
-    note = _bt_note("PPUT", panel["first"], panel["last"])
+    ctl = {"PPUT3M (2004-)": _panel_pair(archive, "PPUT3M", spy, dtb3, "1993-02", ref=ref)}
+    note = "; ".join(x for x in (_bt_note("PPUT", panel["first"], panel["last"]),
+                                 _spike_note({"PPUT": pp, "PPUT3M (control)": ctl["PPUT3M (2004-)"] or {}},
+                                             panel["first"] or "", panel["last"] or "", ref is not None)) if x)
     if _has(archive, GSPC_B) and _has(archive, VIX_B):
         g = _gspc(archive)
         vix = index_series(_rows(archive, VIX_B))
@@ -1685,10 +1843,18 @@ def b6b_hedge_bfly_vs_cndr_sharpe(archive):
     if miss:
         return miss
     dtb3 = index_series(_rows(archive, DTB3_B))
-    bf, cn = _strat(archive, "BFLY"), _strat(archive, "CNDR")
+    ref = _spx_ref(archive)
+    bf, cn = _strat(archive, "BFLY", ref), _strat(archive, "CNDR", ref)
     panel = monthly_panel({"BFLY": bf["close"], "CNDR": cn["close"]}, dtb3, "1986-06", "2026-10", bf["breaks"] | cn["breaks"])
-    rep = sharpe_lower_claim(panel, "BFLY", "CNDR", "2008-01", 400,
-                             sym_note=_bt_note("BFLY", panel["first"], panel["last"]) + " (CNDR the same)", live_from=_live_month("BFLY"))
+    first, last = panel["first"] or "", panel["last"] or ""
+    alt = {}
+    if any(first <= d <= last for s in (bf, cn) for d in (s["spikes"] or {})):
+        b0, c0 = _strat(archive, "BFLY"), _strat(archive, "CNDR")
+        alt["with the screened spike print(s) kept"] = monthly_panel({"BFLY": b0["close"], "CNDR": c0["close"]}, dtb3, "1986-06",
+                                                                      "2026-10", b0["breaks"] | c0["breaks"])
+    note = "; ".join(x for x in (_bt_note("BFLY", first, last) + " (CNDR the same)",
+                                 _spike_note({"BFLY": bf, "CNDR": cn}, first, last, ref is not None)) if x)
+    rep = sharpe_lower_claim(panel, "BFLY", "CNDR", "2008-01", 400, sym_note=note, live_from=_live_month("BFLY"), alt_panels=alt)
     return _wrap(rep)
 
 
@@ -1700,7 +1866,7 @@ def b6b_hedge_cndr_vrp_gap(archive):
     g = _gspc(archive)
     vix = index_series(_rows(archive, VIX_B))
     dtb3 = index_series(_rows(archive, DTB3_B))
-    cn = _strat(archive, "CNDR")
+    cn = _strat(archive, "CNDR", dict(zip(g["days"], g["close"])))
     rolls = roll_sessions(g["days"], "1990-01-01")
     rp = roll_panel(g["days"], g["close"], rolls, cn["close"], vix, dtb3)
     alts = {}
@@ -1710,8 +1876,9 @@ def b6b_hedge_cndr_vrp_gap(archive):
         if len(rk["day"]) == len(rp["day"]):
             alts["fed funds (DFF)"] = rk["bill"]
     alts["zero rate"] = np.zeros(len(rp["day"]))
-    rep = gap_slope_claim(rp, alts, 400, sym_note=_bt_note("CNDR", rp["day"][0] if rp["day"] else "", rp["end"][-1] if rp["end"] else ""),
-                          live_from=LAUNCH["CNDR"])
+    first, last = (rp["day"][0] if rp["day"] else ""), (rp["end"][-1] if rp["end"] else "")
+    note = "; ".join(x for x in (_bt_note("CNDR", first, last), _spike_note({"CNDR": cn}, first, last)) if x)
+    rep = gap_slope_claim(rp, alts, 400, sym_note=note, live_from=LAUNCH["CNDR"])
     return _wrap(rep)
 
 
@@ -1725,9 +1892,12 @@ def b6b_hedge_bs_replication(archive):
     vix = index_series(_rows(archive, VIX_B))
     dtb3 = index_series(_rows(archive, DTB3_B))
     fr = spx_frame(g, spy, vix, dtb3, "2001-01-01")
-    actual = {s: _strat(archive, s)["close"] for s in ("BXM", "PUT", "BXMD") if _has(archive, CB(s))}
-    cond = condor_doc(fr, _strat(archive, "CNDR")["close"]) if _has(archive, CB("CNDR")) else None
-    note = "; ".join(x for x in (_bt_note("BXM", "2002-04-19", fr["days"][-1]), _bt_note("PUT", "2007-01-19", fr["days"][-1])) if x)
+    ref = dict(zip(g["days"], g["close"]))
+    ser = {s: _strat(archive, s, ref) for s in ("BXM", "PUT", "BXMD", "CNDR") if _has(archive, CB(s))}
+    actual = {s: ser[s]["close"] for s in ("BXM", "PUT", "BXMD") if s in ser}
+    cond = condor_doc(fr, ser["CNDR"]["close"]) if "CNDR" in ser else None
+    note = "; ".join(x for x in (_bt_note("BXM", "2002-04-19", fr["days"][-1]), _bt_note("PUT", "2007-01-19", fr["days"][-1]),
+                                 _spike_note(ser, "2002-01-01", fr["days"][-1])) if x)
     rep = replication_claim(fr, actual, {"BXM": "2002-01-01", "PUT": "2007-01-01", "BXMD": "2002-01-01"}, cond, 220, sym_note=note)
     return _wrap(rep)
 
@@ -1737,17 +1907,19 @@ def b6b_hedge_vxth_drawdown(archive):
     miss = _missing(archive, [CB("VXTH"), SPY_B])
     if miss:
         return miss
-    ser = {"VXTH": _strat(archive, "VXTH")}
+    ref = _spx_ref(archive)
+    ser = {"VXTH": _strat(archive, "VXTH", ref)}
     for sym in ("PPUT3M", "PPUT"):
         if _has(archive, CB(sym)):
-            ser[sym] = _strat(archive, sym)
+            ser[sym] = _strat(archive, sym, ref)
     closes = {k: v["close"] for k, v in ser.items()}
     closes["SPY"] = _spy_tr(archive)
     brk = set().union(*[v["breaks"] for v in ser.values()])
     dp = daily_paired(closes, "2006-03-01", brk)
     if len(dp["days"]) < 3:
         return _wrap(tail_hedge_claim(dp, "VXTH", "SPY", "PPUT3M", 10.0, 2500, ()))
-    note = "; ".join(_bt_note(k, dp["days"][0], dp["days"][-1]) for k in ("VXTH", "PPUT3M") if k in closes)
+    note = "; ".join([_bt_note(k, dp["days"][0], dp["days"][-1]) for k in ("VXTH", "PPUT3M") if k in closes]
+                     + [x for x in (_spike_note(ser, dp["days"][0], dp["days"][-1], ref is not None),) if x])
     if dp["ret"]["VXTH"].size:
         eq = np.cumprod(1 + dp["ret"]["VXTH"])
         trough = int(np.argmax(1 - eq / np.maximum.accumulate(eq)))
@@ -1770,15 +1942,23 @@ def b6b_hedge_vix_soq_credit_spread(archive):
     vvix = index_series(_rows(archive, VVIX_B))
     vro = vro_clean(_rows(archive, CB("VRO")))
     dtb3 = index_series(_rows(archive, DTB3_B))
-    tdays = sorted(vix)
+    from mandel.data.cboe_strategy import is_trading_day
+    # exchange sessions only: cboe-VIX-history carries rows on market-closed days (2004-06-11, Juneteenth, ...), which
+    # would otherwise count as one of the claim's "3 trading days before settlement"
+    tdays = [d for d in sorted(vix) if is_trading_day(d)]
     chains = [_rows(archive, nm) for nm in _names(archive, VIX_CHAIN_P)]
-    calib = chain_calibration(chains, curve, vvix, dtb3, sorted(set(vix) | set(curve)))
+    calib = chain_calibration(chains, curve, vvix, dtb3, sorted(d for d in set(vix) | set(curve) if is_trading_day(d)))
     measured = calib["hs1"] is not None
     hs1, hs2 = (calib["hs1"], calib["hs2"]) if measured else (0.0, 0.0)
     kw = dict(tdays=tdays, expiries=exps, curve=curve, vix=vix, vix3m=vix3m, vvix=vvix, vro=vro, rates=dtb3)
-    main = soq_spread_trades(hs1=hs1, hs2=hs2, **kw)
-    main.update(hs1=hs1 if measured else None, hs2=hs2 if measured else None)
+    # point in time (rule 4): the gate is VIX3M/VIX at the previous close; the entry day's 16:15 ET closes are stamped
+    # available at 21:30Z, after the entry (batch4_vx's convention); strikes and credit use the entry day's VX settlement
+    main = soq_spread_trades(hs1=hs1, hs2=hs2, gate_lag=1, **kw)
+    main.update(hs1=hs1 if measured else None, hs2=hs2 if measured else None, gate_lag=1)
     var = {}
+    same_close = "gate at the entry close (16:15 ET, stamped available after the entry: not point in time)"
+    var[same_close] = soq_spread_trades(hs1=hs1, hs2=hs2, gate_lag=0, **kw)
+    var["gate and strikes at the previous close"] = soq_spread_trades(hs1=hs1, hs2=hs2, gate_lag=1, strike_lag=1, **kw)
     for s in (0.8, 1.2, 1.5):
         var[f"IV x{s}"] = soq_spread_trades(hs1=hs1, hs2=hs2, iv_scale=s, **kw)
     if calib.get("ratio1") and calib.get("ratio2"):
@@ -1786,14 +1966,14 @@ def b6b_hedge_vix_soq_credit_spread(archive):
             hs1=hs1, hs2=hs2, iv_legs=(calib["ratio1"], calib["ratio2"]), **kw)
     var["half-spreads x2"] = soq_spread_trades(hs1=2 * hs1, hs2=2 * hs2, **kw)
     var["unrounded strikes (F+2, F+7)"] = soq_spread_trades(hs1=hs1, hs2=hs2, round_strikes=False, **kw)
-    var["gate at the prior close"] = soq_spread_trades(hs1=hs1, hs2=hs2, gate_lag=1, **kw)
     var["backwardation control (VIX3M/VIX < 1)"] = soq_spread_trades(hs1=hs1, hs2=hs2, gate_side="below", **kw)
     ex = {"trades": [t for t in main["trades"] if not (t["expiry"].startswith("2008") or t["expiry"][:7] in ("2018-02", "2020-03"))],
           "skipped": {}}
     dropped = len(main["trades"]) - len(ex["trades"])
     var[f"excluding 2008, 2018-02, 2020-03 ({dropped} gated trades fall in them; 2008 predates the VX file)"] = ex
     prelim = soq_preliminary(vro, vix, tdays, set(exps) | _monthly_vix_expiries(min(vro) if vro else "2008-01-01", tdays[-1]))
-    rep = soq_spread_claim(main, var, prelim, calib, 60, costs_measured=measured)
+    rep = soq_spread_claim(main, var, prelim, calib, 60, costs_measured=measured,
+                           decide_variants=(same_close, "gate and strikes at the previous close"))
     return _wrap(rep)
 
 

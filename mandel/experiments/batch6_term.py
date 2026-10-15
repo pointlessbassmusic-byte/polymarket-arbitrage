@@ -59,10 +59,19 @@ Entry calendars (house rule 10: a verdict must not depend on an arbitrary grid p
     bound and how many offsets pass (per-offset CIs use blocks of 6 monthly cycles, or the trial's 4 weeks). n stays in the
     claim's units: distinct non-overlapping holds in the window, or for a gated or decile statistic the mean per-offset
     count of such holds.
-  * T-143, T-144 and T-155 already enter on every session (their trials say "daily entries"). That is the pooled estimate
+  * T-143 and T-144 already enter on every session (their trials say "daily entries"). That is the pooled estimate
     itself, so their bootstrap and block-shift blocks are raised to 2 x the 21-session hold (42). The trial's own block 21
     is reported. The per-offset range of a non-overlapping 21-session grid is reported for robustness (for T-143 this is
     the trial's "plain bootstrap on non-overlapping monthly entries").
+  * T-155 is both. Its claim names the monthly calendar ("rolling it out at the same strike to the next monthly"), so (a)
+    every put lives on SPY's standard monthly expiries: each daily entry sells the put on the monthly expiry nearest 45 DTE
+    (a tie, 31 vs 59 days, goes to the later one), the test is at that expiry's 21-DTE close, the roll moves the same strike
+    to the next monthly expiry and the reset sells a fresh 0.16-delta put (the strike rule at the test close) on that same
+    next expiry, and both paths exit at that expiry's 21-DTE close (the trial's "next cycle's 21-DTE exit"), so they share
+    expiry, exit and days held. Its trial asks for daily entries, which (b) are the pooled all-start estimate: blocks are
+    2 x the longest entry-to-exit hold of a tested entry in sessions; blocks of 2 x the decision-to-exit window and the
+    trial's block 21 are reported. Report only: one entry about 45 DTE before each monthly expiry (one tested put per
+    cycle, block 6 cycles), and the range over calendar offsets (entering k sessions before the 21-DTE test).
   * Costs: half the bid-ask spread per contract fill, from the archived SPY chains (median half-spread / spot of OTM
     quotes by DTE and moneyness bucket, pooled over the capture days). An ITM leg is charged the same-strike OTM
     option's half-spread (put-call parity): the pre-open captures quote ITM SPY options 15-30 bp wide, which is staleness,
@@ -1869,51 +1878,101 @@ def eval_time_fly(m: Market, term: Term, spreads: Spreads, start: str, min_n: in
 
 # ------------------------------------------------------------------------------ T-155 roll vs reset --
 
-def roll_vs_reset(m: Market, v30: np.ndarray, a, spreads: Spreads, tilt: Optional[Tilt] = None, dte0: float = 45.0, check: float = 21.0,
-                  roll_out: float = 28.0, delta0: float = -0.16, tested: float = -0.30) -> dict:
-    """Short a ``delta0`` put at ``dte0`` days (IV = VIX). At the first close with <= ``check`` days left, the put is tested
-    if its delta (at that day's VIX) is below ``tested``. Roll: buy it back, sell the same strike at the next monthly
-    (``roll_out`` days later) and exit at its 21-DTE close. Reset: buy it back, sell a fresh ``delta0`` put at ``dte0`` days
-    and exit at its 21-DTE close. P&L per day held from the decision, per unit of spot at the decision, after half-spread
-    costs on 3 fills per path (close the tested put, open, close) and margin-time at the bill rate (Reg-T broad-based:
-    premium + max(15% S - OTM, 10% K))."""
-    a = np.asarray(a, int); n = len(m.days)
+def expiry_ordinals(m: Market, extend: int = 3) -> np.ndarray:
+    """Rule 10(a) calendar for T-155: ordinals of SPY's standard monthly expiries from the first archived day
+    (``monthly_expiries``: the third Friday, or the prior session when it is an exchange holiday), then ``extend`` projected
+    third Fridays after the last archived day, so a put sold near the end of the data has its expiry (a path is kept only
+    when its exit close is archived)."""
+    if not m.days:
+        return np.array([], float)
+    ec = [float(m.cal[i]) for i in monthly_expiries(m, m.days[0])]
+    last = date.fromisoformat(m.days[-1]); y, mo = last.year, last.month
+    while extend > 0:
+        tf = third_friday(y, mo)
+        if tf > last:
+            ec.append(float(tf.toordinal())); extend -= 1
+        y, mo = (y + 1, 1) if mo == 12 else (y, mo + 1)
+    return np.array(ec, float)
+
+
+def nearest_expiry(cal_a, ec, dte0: float = 45.0) -> tuple:
+    """(index into ``ec``, valid) of the monthly expiry nearest ``dte0`` calendar days after each ordinal in ``cal_a``, among
+    expiries strictly after it; a tie (28-day cycles: 31 vs 59 days) goes to the later expiry (at least ``dte0`` days)."""
+    cal_a = np.asarray(cal_a, float); ec = np.asarray(ec, float)
+    if not ec.size:
+        z = np.zeros(cal_a.shape, int)
+        return z, z.astype(bool)
+    j = np.searchsorted(ec, cal_a + dte0, "left")                       # first expiry at least dte0 days out
+    lo, hi = np.clip(j - 1, 0, ec.size - 1), np.clip(j, 0, ec.size - 1)
+    d_lo = np.where((j >= 1) & (ec[lo] > cal_a), cal_a + dte0 - ec[lo], np.inf)
+    d_hi = np.where(j < ec.size, ec[hi] - cal_a - dte0, np.inf)
+    return np.where(d_hi <= d_lo, hi, lo), np.isfinite(np.minimum(d_lo, d_hi))
+
+
+def entries_near_dte(m: Market, ec, a, dte0: float = 45.0) -> np.ndarray:
+    """One entry per monthly expiry (T-155 sensitivity): the session among ``a`` whose close is nearest ``dte0`` calendar days
+    before the expiry (a tie goes to the earlier session, at least ``dte0`` days out)."""
+    a = np.asarray(a, int); out = []
+    if not a.size:
+        return a
+    ca = m.cal[a]
+    for E in np.asarray(ec, float):
+        t = E - dte0; j = int(np.searchsorted(ca, t, "left"))
+        cand = [k for k in (j - 1, j) if 0 <= k < a.size and ca[k] < E]
+        if cand:
+            k = min(cand, key=lambda k: (abs(ca[k] - t), -(E - ca[k])))
+            if abs(ca[k] - t) <= 3:                                     # 'about dte0': within a weekend or holiday of it
+                out.append(int(a[k]))
+    return np.array(sorted(set(out)), int)
+
+
+def roll_vs_reset(m: Market, v30: np.ndarray, a, spreads: Spreads, ec, tilt: Optional[Tilt] = None, dte0: float = 45.0,
+                  check: float = 21.0, delta0: float = -0.16, tested: float = -0.30) -> dict:
+    """T-155 on SPY's standard monthly expiry calendar (rule 10(a); ``ec`` = ``expiry_ordinals``). Each entry a sells a
+    ``delta0`` put (IV = VIX; strike solved at the entry close for its real days to expiry) on the monthly expiry E0 nearest
+    ``dte0`` days out. The test is at E0's ``check``-DTE close c (the first close with <= ``check`` days left): the put is
+    tested if its delta at that day's VIX is below ``tested``. Both paths buy it back at c and sell a put on the NEXT monthly
+    expiry E1 = the expiry after E0, and both exit at E1's ``check``-DTE close e: the roll sells the same strike, the reset a
+    fresh ``delta0`` put (the strike rule at c for E1). Same expiry, same exit, so the same cal[e] - cal[c] days held from the
+    decision for both paths. P&L per day held from the decision, per unit of spot at c, after half-spread costs on 3 fills per
+    path (close the tested put, open, close) and margin-time at the bill rate (Reg-T broad-based: premium + max(15% S - OTM,
+    10% K)). Entries whose exit close is not archived are dropped."""
+    a = np.asarray(a, int); n = len(m.days); ec = np.asarray(ec, float)
     sig = lambda i, K, T: v30[i] if tilt is None else tilt.sig(v30[i], i, K, m.close[i], T)
-    E0 = m.cal[a] + dte0; K = k_delta(m, a, E0, v30[a], delta0, "put")
-    c = np.searchsorted(m.cal, E0 - check, "left")
-    ok = c < n
-    a, E0, K, c = a[ok], E0[ok], K[ok], c[ok]
-    Er = E0 + roll_out; er = np.searchsorted(m.cal, Er - check, "left")
-    Es = m.cal[c] + dte0; es = np.searchsorted(m.cal, Es - check, "left")
-    ok = (er < n) & (es < n) & np.isfinite(v30[c]) & np.isfinite(m.rate[c])
-    a, E0, K, c, Er, er, Es, es = (x[ok] for x in (a, E0, K, c, Er, er, Es, es))
+    j0, ok = nearest_expiry(m.cal[a], ec, dte0)
+    ok &= j0 + 1 < ec.size
+    a, j0 = a[ok], j0[ok]
+    E0, E1 = ec[j0], ec[np.minimum(j0 + 1, ec.size - 1)]
+    c = np.searchsorted(m.cal, E0 - check, "left"); e = np.searchsorted(m.cal, E1 - check, "left")
+    ok = (E0 - m.cal[a] > check) & (c < n) & (e < n)
+    a, j0, E0, E1, c, e = (x[ok] for x in (a, j0, E0, E1, c, e))
+    ok = np.isfinite(v30[c]) & (v30[c] > 0) & np.isfinite(m.rate[c]) & (m.cal[e] <= E1)
+    a, j0, E0, E1, c, e = (x[ok] for x in (a, j0, E0, E1, c, e))
+    K = k_delta(m, a, E0, v30[a], delta0, "put")
     Tc = E0 - m.cal[c]
     dl = np.asarray(greeks_at(m, c, E0, K, "put", sig(c, K, Tc))["delta"], float)
     test = dl < tested
-    p_entry = px(m, a, E0, K, "put", sig(a, K, np.full(a.size, dte0)))
+    p_entry = px(m, a, E0, K, "put", sig(a, K, E0 - m.cal[a]))
     p_close = px(m, c, E0, K, "put", sig(c, K, Tc))
-    Sc = m.close[c]; rc = m.rate[c]
-    Ks = k_delta(m, c, Es, v30[c], delta0, "put")
-    pr0 = px(m, c, Er, K, "put", sig(c, K, Er - m.cal[c])); pr1 = px(m, er, Er, K, "put", sig(er, K, Er - m.cal[er]))
-    ps0 = px(m, c, Es, Ks, "put", sig(c, Ks, Es - m.cal[c])); ps1 = px(m, es, Es, Ks, "put", sig(es, Ks, Es - m.cal[es]))
+    Sc = m.close[c]; rc = m.rate[c]; days = m.cal[e] - m.cal[c]
+    Ks = k_delta(m, c, E1, v30[c], delta0, "put")
     close_cost = spreads.cost(Tc, K, Sc)
-    def path(p0, p1, Kn, E, e):
-        days = m.cal[e] - m.cal[c]
+    def path(Kn):
+        p0 = px(m, c, E1, Kn, "put", sig(c, Kn, E1 - m.cal[c])); p1 = px(m, e, E1, Kn, "put", sig(e, Kn, E1 - m.cal[e]))
         margin = p0 + np.maximum(0.15 * Sc - np.maximum(Sc - Kn, 0.0), 0.10 * Kn)
-        cost = close_cost + spreads.cost(E - m.cal[c], Kn, Sc) + spreads.cost(E - m.cal[e], Kn, m.close[e])
-        pnl = p0 - p1 - cost - rc * margin * days / 365.0
-        return pnl, days
-    pnl_r, dr = path(pr0, pr1, K, Er, er); pnl_s, ds = path(ps0, ps1, Ks, Es, es)
-    orig = p_entry - p_close
-    return {"a": a, "tested": test, "roll": pnl_r / dr / Sc, "reset": pnl_s / ds / Sc, "days_roll": dr, "days_reset": ds, "exit_roll": er,
-            "life_roll": (orig + pnl_r) / (m.cal[er] - m.cal[a]) / Sc, "life_reset": (orig + pnl_s) / (m.cal[es] - m.cal[a]) / Sc,
-            "delta_check": dl}
+        cost = close_cost + spreads.cost(E1 - m.cal[c], Kn, Sc) + spreads.cost(E1 - m.cal[e], Kn, m.close[e])
+        return p0 - p1 - cost - rc * margin * days / 365.0
+    pnl_r, pnl_s = path(K), path(Ks)
+    orig = p_entry - p_close; life = m.cal[e] - m.cal[a]
+    return {"a": a, "tested": test, "roll": pnl_r / days / Sc, "reset": pnl_s / days / Sc, "days": days, "exit": e, "check": c,
+            "E0": E0, "E1": E1, "cycle": j0, "K": K, "K_reset": Ks, "dte_entry": E0 - m.cal[a],
+            "life_roll": (orig + pnl_r) / life / Sc, "life_reset": (orig + pnl_s) / life / Sc, "delta_check": dl}
 
 
 def judge_roll(roll, reset, min_n: int = 200, n_boot: int = N_BOOT, block: int = BLOCK_P) -> dict:
     """T-155: the claim survives a half when the paired block-bootstrap 95% CI of mean(roll - reset) includes 0 or lies
-    below it. Daily entries are the pooled estimate (rule 10), so ``block`` = 2 x the 21-session decision-to-exit window;
-    ``bound`` = the higher half's lower bound (the binding one)."""
+    below it. Daily entries are the pooled estimate (rule 10(b)), so ``eval_roll`` passes ``block`` = 2 x the longest
+    entry-to-exit hold in sessions; ``bound`` = the higher half's lower bound (the binding one)."""
     d = np.asarray(roll, float) - np.asarray(reset, float); n = d.size
     full = (_mean(d),) + boot_mean_ci(d, block, n_boot); c = Criteria(); hv = []
     for nm, ii in zip(("first half", "second half"), _halves_idx(n)):
@@ -1927,53 +1986,91 @@ def judge_roll(roll, reset, min_n: int = 200, n_boot: int = N_BOOT, block: int =
             "bound": max(lows) if len(lows) == 2 else None, "criteria_pass": c.all_pass()}
 
 
-def eval_roll(m: Market, v30: np.ndarray, spreads: Spreads, start: str = "1993-01-29", tilt: Optional[Tilt] = None, min_n: int = 200,
-              n_boot: int = N_BOOT, headline_only: bool = False) -> dict:
+def _roll_entries(m: Market, v30: np.ndarray, start: str) -> np.ndarray:
+    """Daily entries from ``start``: every session SPY, VIX and the bill can price."""
     i0 = bisect.bisect_left(m.days, start)
-    a = np.array([i for i in range(i0, len(m.days)) if np.isfinite(v30[i]) and v30[i] > 0 and np.isfinite(m.rate[i])], int)
-    res = roll_vs_reset(m, v30, a, spreads)
+    return np.array([i for i in range(i0, len(m.days)) if np.isfinite(v30[i]) and v30[i] > 0 and np.isfinite(m.rate[i])], int)
+
+
+def _roll_block(res: dict) -> tuple:
+    """Rule 10(b) for T-155's overlapping daily entries: (block, hold) with hold = the longest entry-to-exit life of a tested
+    entry in sessions (entry close to the next cycle's 21-DTE exit) and block = 2 x hold tested entries (each tested entry
+    is at least one session from the next, so a block spans at least 2 x hold sessions)."""
     t = res["tested"]
+    hold = int(np.max(res["exit"][t] - res["a"][t])) if t.any() else MONTH
+    return 2 * hold, hold
+
+
+def eval_roll(m: Market, v30: np.ndarray, spreads: Spreads, start: str = "1993-01-29", tilt: Optional[Tilt] = None, min_n: int = 200,
+              n_boot: int = N_BOOT, headline_only: bool = False, dte0: float = 45.0) -> dict:
+    a = _roll_entries(m, v30, start); ec = expiry_ordinals(m)
+    res = roll_vs_reset(m, v30, a, spreads, ec, dte0=dte0)
+    t = res["tested"]; block, hold = _roll_block(res)
     if headline_only:
         d = res["roll"][t] - res["reset"][t]
-        return {"headline": _mean(d), "n": int(t.sum()), "ci": boot_mean_ci(d, BLOCK_P, n_boot)}
-    j = judge_roll(res["roll"][t], res["reset"][t], min_n, n_boot, BLOCK_P)
-    life = (_mean(res["life_roll"][t] - res["life_reset"][t]),) + boot_mean_ci(res["life_roll"][t] - res["life_reset"][t], BLOCK_P, n_boot)
+        return {"headline": _mean(d), "n": int(t.sum()), "ci": boot_mean_ci(d, block, n_boot), "block": block}
+    j = judge_roll(res["roll"][t], res["reset"][t], min_n, n_boot, block)
+    dlife = res["life_roll"][t] - res["life_reset"][t]
+    life = (_mean(dlife),) + boot_mean_ci(dlife, block, n_boot)
     tl = None
     if tilt is not None:
-        rt = roll_vs_reset(m, v30, a, spreads, tilt); tt = rt["tested"]
-        dd = rt["roll"][tt] - rt["reset"][tt]; tl = (_mean(dd),) + boot_mean_ci(dd, BLOCK_P, n_boot) + (int(tt.sum()),)
-    life_s = int(np.median(res["exit_roll"] - res["a"])) if res["a"].size else MONTH      # entry-to-exit sessions (roll path)
-    jl = judge_roll(res["roll"][t], res["reset"][t], min_n, n_boot, 2 * life_s)
+        rt = roll_vs_reset(m, v30, a, spreads, ec, tilt, dte0=dte0); tt = rt["tested"]
+        dd = rt["roll"][tt] - rt["reset"][tt]; tl = (_mean(dd),) + boot_mean_ci(dd, _roll_block(rt)[0], n_boot) + (int(tt.sum()),)
+    dec = int(np.max(res["exit"][t] - res["check"][t])) if t.any() else MONTH          # decision-to-exit sessions
+    jd = judge_roll(res["roll"][t], res["reset"][t], min_n, n_boot, 2 * dec)
     jt = judge_roll(res["roll"][t], res["reset"][t], min_n, n_boot, BLOCK_D)
-    offs = []                                                  # rule 10 robustness: entries on each 21-session grid offset
-    ph = (res["a"] - (res["a"][0] if res["a"].size else 0)) % MONTH
-    for k in range(MONTH if res["a"].size else 0):
-        sel = t & (ph == k)
+    # Sensitivity (report only): one entry about dte0 days before each monthly expiry, one tested put per cycle.
+    e1 = entries_near_dte(m, ec, a, dte0); r1 = roll_vs_reset(m, v30, e1, spreads, ec, dte0=dte0); t1 = r1["tested"]
+    j1 = judge_roll(r1["roll"][t1], r1["reset"][t1], min_n, n_boot, BLOCK_M)
+    # Robustness (report only): each calendar start offset = entering k sessions before the 21-DTE test, one entry per cycle;
+    # offsets present in at least 90% of the entry cycles.
+    k_all = res["check"] - res["a"]; n_cyc = np.unique(res["cycle"]).size; offs = []
+    for k in sorted(set(k_all.tolist())):
+        if np.sum(k_all == k) < 0.9 * n_cyc:
+            continue
+        sel = t & (k_all == k)
         jk = judge_roll(res["roll"][sel], res["reset"][sel], min_n, n_boot, BLOCK_M)
-        offs.append({"start": k, "n": int(sel.sum()), "stat": jk["full"][0], "bound": jk["bound"], "ok": jk["criteria_pass"]})
+        offs.append({"start": int(k), "n": int(sel.sum()), "stat": jk["full"][0], "bound": jk["bound"], "ok": jk["criteria_pass"]})
     so = _summ(offs)
     bp = lambda x: "n/a" if x is None or not np.isfinite(x) else f"{x * 1e4:+.3f} bp"
     fr = lambda r: f"{bp(r[0])} (95% CI {bp(r[1])} to {bp(r[2])})"
-    ad = res["a"][t]
-    reason = (f"{MODEL} SPY 0.16-delta 45-DTE short put (VIX as IV), entered every session "
-              f"{m.days[int(res['a'][0])] if res['a'].size else ''} to {m.days[int(res['a'][-1])] if res['a'].size else ''}; tested "
-              f"(delta < -0.30 at 21 DTE) on {j['n']} of {res['a'].size} entries "
-              f"({m.days[int(ad[0])] if ad.size else ''} to {m.days[int(ad[-1])] if ad.size else ''}); roll = same strike to the "
-              f"next monthly (+28 days), reset = fresh 0.16-delta 45-DTE put, both exited at their 21-DTE close; P&L per day held "
+    ad = res["a"][t]; dte = res["dte_entry"]; dd_ = res["days"][t].astype(int); dte1 = r1["dte_entry"]
+    n_tc = int(np.unique(res["cycle"][t]).size)
+    span = lambda x: f"{int(x.min())}-{int(x.max())}" if x.size else "n/a"
+    reason = (f"{MODEL} SPY 0.16-delta short put (VIX as IV) sold on the monthly expiry nearest 45 DTE, entered every session "
+              f"{m.days[int(res['a'][0])] if res['a'].size else ''} to {m.days[int(res['a'][-1])] if res['a'].size else ''} "
+              f"({res['a'].size} entries; DTE at entry median {int(np.median(dte)) if dte.size else 'n/a'}, range {span(dte)}); "
+              f"rule 10(a): the claim names the monthly calendar ('to the next monthly'), so expiries are SPY's standard monthly "
+              f"expiries (third Friday, or the prior session when it is a holiday); the test is at the put's own expiry's 21-DTE "
+              f"close (delta < -0.30 at that day's VIX), tested on {j['n']} of {res['a'].size} entries in {n_tc} expiry cycles "
+              f"({m.days[int(ad[0])] if ad.size else ''} to {m.days[int(ad[-1])] if ad.size else ''}); roll = buy back, sell the "
+              f"same strike on the next monthly expiry; reset = buy back, sell a fresh 0.16-delta put (the strike rule at the test "
+              f"close) on that same next monthly expiry; both paths exit at that expiry's 21-DTE close, the same day "
+              f"({span(dd_)} calendar days after the test: the next cycle, 28 or 35 days, moved by holidays); P&L per day held "
               f"from the decision per unit of spot, after {spreads.describe()} on 3 fills per path and margin-time at the bill "
-              f"rate. Roll - reset: {fr(j['full'])}; halves {fr(j['halves'][0])} / {fr(j['halves'][1])} (paired block-{j['block']} percentile "
-              f"bootstrap over the tested entries; the claim survives a half unless its CI lies entirely above 0); rule 10: the "
-              f"trial enters on every session, which is itself the pooled all-offset estimate, so blocks are 2 x the 21-session "
-              f"decision-to-exit window (the trial's block 21: halves' lower bounds {bp(jt['halves'][0][1])} / {bp(jt['halves'][1][1])}; "
-              f"blocks of 2 x the {life_s}-session entry-to-exit life: {bp(jl['halves'][0][1])} / {bp(jl['halves'][1][1])}; report "
-              f"only); " + _summ_txt(so, "robustness, the tested entries of each start offset of a 21-session entry grid (about "
-                                     + str(int(np.median([o['n'] for o in offs])) if offs else "0") + " each, block-6 bootstrap; pass "
-                                     "= neither half's CI lies entirely above 0)", "higher half lower bound", bp)
-              + f"; mean roll {bp(_mean(res['roll'][t]))} vs reset "
-              f"{bp(_mean(res['reset'][t]))} per day; variance ratio (roll / reset) {j['var_ratio']:.3f}; whole-life variant "
-              f"(report only) {fr(life)}; SKEW-tilt rerun (report only) " + (f"{fr(tl)} on {tl[3]} tested entries" if tl else "not available"))
-    out = dict(j); out.update({"n_entries": int(res["a"].size), "life_variant": life, "skew_tilt": tl, "offsets": offs, "offsets_summary": so,
-                               "trial_block_halves": jt["halves"], "life_block": 2 * life_s, "life_block_halves": jl["halves"],
+              f"rate. Roll - reset: "
+              f"{fr(j['full'])}; halves {fr(j['halves'][0])} / {fr(j['halves'][1])} (paired block-{j['block']} percentile bootstrap "
+              f"over the tested entries; the claim survives a half unless its CI lies entirely above 0); rule 10(b): the trial "
+              f"enters on every session, which is itself the pooled all-start estimate, so blocks are {block} tested entries = 2 x "
+              f"the longest entry-to-exit hold ({hold} sessions) (report only: blocks of 2 x the longest {dec}-session "
+              f"decision-to-exit window, halves' lower bounds {bp(jd['halves'][0][1])} / {bp(jd['halves'][1][1])}; the trial's "
+              f"block 21: {bp(jt['halves'][0][1])} / {bp(jt['halves'][1][1])}); sensitivity (report only), one entry about 45 DTE "
+              f"before each monthly expiry ({r1['a'].size} entries, DTE {span(dte1)}): roll - reset {fr(j1['full'])} on "
+              f"{j1['n']} tested cycles, halves {fr(j1['halves'][0])} / {fr(j1['halves'][1])} (block-6 cycles); "
+              + _summ_txt(so, "robustness (report only), entering k sessions before the 21-DTE test for each calendar offset k "
+                          "present in at least 90% of the cycles (one entry per cycle, about "
+                          + (str(int(np.median([o['n'] for o in offs]))) if offs else "0") + " tested each, block-6 bootstrap; "
+                          "pass = neither half's CI lies entirely above 0)", "higher half lower bound", bp)
+              + f"; mean roll {bp(_mean(res['roll'][t]))} vs reset {bp(_mean(res['reset'][t]))} per day; variance ratio (roll / "
+              f"reset) {j['var_ratio']:.3f}; whole-life variant (report only, P&L from entry per day from entry) {fr(life)}; "
+              f"SKEW-tilt rerun (report only) " + (f"{fr(tl)} on {tl[3]} tested entries" if tl else "not available"))
+    out = dict(j); out.update({"n_entries": int(res["a"].size), "n_tested_cycles": n_tc, "hold_sessions": hold, "life_variant": life,
+                               "skew_tilt": tl, "offsets": offs, "offsets_summary": so, "trial_block_halves": jt["halves"],
+                               "decision_block": 2 * dec, "decision_block_halves": jd["halves"],
+                               "first_entry": m.days[int(res["a"][0])] if res["a"].size else None,
+                               "tested_expiries": [date.fromordinal(int(x)).isoformat() for x in np.unique(res["E0"][t])],
+                               "dte_entry": [float(dte.min()), float(np.median(dte)), float(dte.max())] if dte.size else None,
+                               "near_45": {"n_entries": int(r1["a"].size), "n": j1["n"], "full": j1["full"], "halves": j1["halves"]},
                                "model_priced": True, "reason_core": reason})
     return out
 
@@ -2278,8 +2375,9 @@ def b6_term_calendarised_fly(archive):
 
 
 def b6_term_roll_tested_put(archive):
-    """T-155: MODEL-PRICED tested 0.16-delta short put: roll out vs reset, P&L/day; the claim survives unless the CI of
-    (roll - reset) lies entirely above 0 in a half."""
+    """T-155: MODEL-PRICED tested 0.16-delta short put on SPY's monthly expiry calendar (rule 10a): roll out to the next
+    monthly vs reset on that same expiry, P&L/day to the same exit; the claim survives unless the CI of (roll - reset) lies
+    entirely above 0 in a half (daily entries pooled, rule 10b)."""
     miss = _missing(archive, SPY_BASE, [CHAIN])
     if miss:
         return miss

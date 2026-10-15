@@ -153,6 +153,29 @@ def test_t517_flag_on_the_calendar_series_blocks_support(monkeypatch):
     good["zero_cost_ok"][0] = False                                # shared cache: evaluate's calendar view sees the flag
     rep = sc.evaluate("T-517", c)
     assert rep["verdict"] != "supported" and "1 cycles with no zero-cost put strike" in rep["reason"]
+    # the report describes the calendar it ran on (the halves split once reused `h`, the grid-start count, and reported
+    # 'all 20 starts of the 20-day grid pooled', block 6 days, grid_starts 20)
+    assert rep["grid_starts"] == 1 and "standard monthly expiry calendar" in rep["entries"] and rep["ci"].endswith("block 6 cycles")
+    assert rep["entries"] in rep["reason"] and "starts of the" not in rep["reason"] and "block 6 days" not in rep["reason"]
+
+
+@pytest.mark.parametrize("cid", sorted(sc.CALENDAR))
+def test_calendar_claims_report_the_calendar_they_ran_on(cid):
+    """Every CALENDAR claim's report (grid_starts, entries, ci, n_cycles and the reason built from them) names the monthly
+    expiry calendar and blocks of 6 cycles, whatever locals the claim's own branch uses."""
+    c, exp = _calendar_ctx(n=900)
+    rep = sc.evaluate(cid, c)
+    assert rep["grid_starts"] == 1 and rep["n_cycles"] == len(exp) - 1
+    assert rep["entries"].startswith("standard monthly expiry calendar") and rep["ci"].endswith("block 6 cycles")
+    assert f"{rep['entries']}; " in rep["reason"] and "block 6 cycles)" in rep["reason"] and "starts of the" not in rep["reason"]
+
+
+def test_t517_halves_split_the_calendar_series():
+    c, _ = _calendar_ctx(n=900)
+    rep = sc.evaluate("T-517", c)
+    seagull = [("call", "long", 1, 1.0), ("call", "short", 1, 1.05), ("put", "short", 1, ("zero_cost_put",))]
+    x = metric(c.aligned("monthly").run(seagull, ("flat", 1.0)), "per_spot"); half = len(x) // 2
+    assert f"halves {x[:half].mean()*100:+.2f}%/{x[half:].mean()*100:+.2f}%" in rep["reason"]
 
 
 def test_default_engine_grid_unchanged_for_other_callers():

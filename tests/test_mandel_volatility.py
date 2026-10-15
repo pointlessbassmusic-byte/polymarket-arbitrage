@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from mandel.experiments.volatility import overlay_backtest, overlay_verdict, skew_tail, term_structure_reversion, variance_risk_premium
+from mandel.experiments.volatility import monthly_expiry_sessions, overlay_backtest, overlay_verdict, skew_tail, term_structure_reversion, variance_risk_premium
 
 
 def _days(n, start=1_262_304_000):            # 2010-01-01, daily (weekends included: harmless for these tests)
@@ -30,6 +30,38 @@ def test_vrp_detects_premium_and_respects_null():
     assert variance_risk_premium(_idx_rows(days[:50], np.full(50, 20.0)), _px_rows(days[:50], closes[:50]))["verdict"] == "inconclusive"
 
 
+class _Arch:
+    def __init__(self, bundles):
+        self._b = bundles
+
+    def load(self, name):
+        return iter(self._b[name])
+
+
+def test_vrp_min_n_is_the_trials_in_daily_windows():
+    """Harness rules 3 and 5: below the trial's min_n (2000 daily windows; 1000 for T-49 and T-67) a premium is never supported,
+    and only a decisive failure (mean VRP below zero at one-sided p < 0.05) is not_supported. The gate used to be window + 100."""
+    rng = np.random.default_rng(10)
+    n = 1500; days = _days(n)
+    closes = 100 * np.exp(np.cumsum(rng.normal(0, 0.16 / np.sqrt(252), n)))
+    idx = lambda v: _idx_rows(days, np.full(n, v))
+    rich = variance_risk_premium(idx(22.0), _px_rows(days, closes))
+    assert rich["n"] < 2000 and rich["min_n"] == 2000 and rich["p_value"] < 0.01 and rich["verdict"] == "inconclusive"   # was supported
+    assert variance_risk_premium(idx(22.0), _px_rows(days, closes), min_n=1000)["verdict"] == "supported"
+    assert variance_risk_premium(idx(16.0), _px_rows(days, closes), seed=1)["verdict"] == "inconclusive"   # a non-decisive miss
+    cheap = variance_risk_premium(idx(10.0), _px_rows(days, closes))
+    assert cheap["verdict"] == "not_supported" and cheap["p_value_reverse"] < 0.05 and "decisive" in cheap["reason"]
+    from mandel.experiments import run
+    arch = _Arch({"deribit-dvol-BTC-history": idx(22.0), "daily-history-BTC-USD": _px_rows(days, closes, symbol="BTC-USD"),
+                  "deribit-dvol-ETH-history": idx(22.0), "daily-history-ETH-USD": _px_rows(days, closes, symbol="ETH-USD"),
+                  "cboe-VIX-history": idx(22.0), "daily-history-SPY": _px_rows(days, closes)})
+    for h in (run.harness_vrp_btc, run.harness_vrp_eth):                    # T-49, T-67: min_n 1000
+        stat, _, verdict, _ = h(arch)
+        assert stat["min_n"] == 1000 and verdict == "supported"
+    stat, _, verdict, _ = run.harness_vrp_spx(arch)                         # T-48: min_n 2000
+    assert stat["min_n"] == 2000 and verdict == "inconclusive"
+
+
 def test_skew_and_term_structure_nulls_do_not_fire_on_noise():
     rng = np.random.default_rng(2)
     n = 2500; days = _days(n)
@@ -54,13 +86,15 @@ def test_term_structure_detects_planted_reversion():
 
 
 def test_overlay_engine_relationships():
+    """Engine sanity on the claims' own calendar (monthly expiries, harness rule 10), not a 21-session grid from the first day:
+    a capped call lowers volatility, a put floor shallows the drawdown, short and long straddles are mirror images."""
     rng = np.random.default_rng(4)
     n = 2600; days = _days(n)
     closes = 100 * np.exp(np.cumsum(rng.normal(0.0003, 0.01, n)))
     vix_rows = _idx_rows(days, np.full(n, 16.0)); px = _px_rows(days, closes); rate = _idx_rows(days, np.full(n, 2.0))
     bh = overlay_backtest(px, vix_rows, rate, "buy_and_hold"); cc = overlay_backtest(px, vix_rows, rate, "covered_call")
     col = overlay_backtest(px, vix_rows, rate, "collar"); ss = overlay_backtest(px, vix_rows, rate, "short_straddle"); ls = overlay_backtest(px, vix_rows, rate, "long_straddle")
-    assert bh["n_cycles"] == cc["n_cycles"] > 100 and cc["model_priced"]
+    assert bh["n_cycles"] == cc["n_cycles"] == len(monthly_expiry_sessions(days)) - 1 > 80 and cc["model_priced"]
     assert cc["returns"].std() < bh["returns"].std()                       # capped upside lowers volatility
     assert col["max_drawdown"] > bh["max_drawdown"]                          # drawdown less negative with a put floor
     assert np.allclose(ss["returns"], -ls["returns"])                        # straddle P&L antisymmetric
