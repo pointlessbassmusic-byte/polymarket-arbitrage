@@ -797,7 +797,7 @@
   result: "PRE-REGISTERED 2026-10-14; forward from 2026-10-15; read 2027-02"
   verdict: inconclusive
   regime: "collecting"
-  rerun: "python -m cryptobot.kalshi_carry_study --scratch <dir> (the forward ETF-hedged variant is read from the same funding files)"
+  rerun: "python -m cryptobot.carry_forward (fetches Kalshi funding history, the perp's 16:00 ET closes and IBIT closes at read time; refuses a verdict before 2027-02-12)"
   preregistered: true
   trials_run: 0
 
