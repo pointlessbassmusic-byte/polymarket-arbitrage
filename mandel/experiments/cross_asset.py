@@ -6,8 +6,10 @@ Model-free claims compare an implied-vol index (DVOL for BTC/ETH, GVZ for gold, 
 with subsequently realised volatility of the matching ETF or coin. Model-priced claims reuse the structure engine with the
 index as a flat implied vol (the claims say "flat IV", so no smile). Calendar conventions: equity ETFs use trading days and
 252/yr; BTC/ETH use calendar days and 365/yr. Verdicts follow the shared rule in underlying2._verdict. Below the trial's
-min_n (in the claim's own units: non-overlapping signals, entries, episodes or cycles) a verdict is capped at inconclusive,
-as in batch4_fomc.
+min_n (in the claim's own units: non-overlapping signals, entries, episodes or cycles) house rule 5 applies before _verdict
+(see _rule5): the verdict is never supported, and a failing criterion still counts only when it fails decisively (its
+interval lies wholly on the wrong side of the claimed bound, or the failure would persist at min_n whatever the missing
+observations are); any other failure there is undecided (None), so the verdict is inconclusive.
 """
 
 from __future__ import annotations
@@ -41,11 +43,35 @@ def _trial(fn: str, label: str, key: str, given, default):
     return given if given is not None else _TRIAL.get((fn, label), {}).get(key, default)
 
 
-def _cap_min_n(v: str, why: str, n: int, min_n: Optional[int], unit: str) -> tuple[str, str]:
-    """Below the trial's min_n the verdict cannot be 'supported' or decided either way: inconclusive (batch4_fomc convention)."""
-    if min_n and n < min_n:
-        return "inconclusive", f"only {n} {unit}, below the trial's min_n {min_n}, so the verdict is capped at inconclusive (criteria: {v}, {why})"
-    return v, why
+def _rule5(rows, n: int, min_n: Optional[int], unit: str) -> tuple[str, str]:
+    """House rule 5, applied before _verdict. rows: [(name, ok, decisive)] with ok True / False / None (not implemented) and decisive
+    True when a failure stands below min_n: the criterion's interval lies wholly on the wrong side of the claimed bound, or the failure
+    would persist at min_n whatever the missing observations turn out to be. At or above min_n (or with no min_n) every criterion is
+    judged as it is. Below min_n a passing or decisively failing criterion keeps its bool, any other failure becomes None (undecided),
+    and an unmet min_n criterion (None) keeps the verdict from 'supported'."""
+    face = [(name, None if ok is None else bool(ok)) for name, ok, _ in rows]
+    if not min_n or n >= min_n:
+        return _verdict(face)
+    crit = [(name, None) if ok is None else (name, True) if ok else (name + " (fails decisively below min_n)", False) if decisive
+            else (name + " (fails, not decisively, below min_n: undecided)", None) for name, ok, decisive in rows]
+    crit.append((f"n >= trial min_n ({n} of {min_n} {unit})", None))
+    v, why = _verdict(crit)
+    v0, why0 = _verdict(face)
+    return v, (f"only {n} {unit}, below the trial's min_n {min_n}, so the verdict cannot be supported and a failing criterion counts only "
+               f"when it fails decisively (house rule 5): {v}, {why} (criteria: {v0}, {why0})")
+
+
+def _rate_fails_at_min_n(hits: int, n: int, min_n: Optional[int], need: float) -> bool:
+    """A 'rate > need' criterion fails at min_n even if every missing observation were a hit: (hits + min_n - n) / min_n <= need."""
+    return bool(min_n) and n < min_n and (hits + min_n - n) / min_n <= need
+
+
+def _first_half_fails_at_min_n(n: int, min_n: Optional[int], first_half_ok) -> bool:
+    """A 'positive in both halves' criterion fails at min_n whatever comes when the first half at min_n (the first min_n // 2
+    observations, already observed once n >= min_n // 2; later data only appends) already fails. first_half_ok(h) judges the first
+    h observations."""
+    h = (min_n or 0) // 2
+    return bool(min_n) and h >= 1 and h <= n < min_n and not first_half_ok(h)
 
 
 def _asof(series: dict):
@@ -108,8 +134,9 @@ def gap_test(days, closes, idx, n, ppy, threshold, units, block, thirds=False, s
 
 def multi_asset_short_variance(legs: dict, n: int = 21, block: int = 3, min_n: int = 180):
     """T-245: equal-vega short 21-day variance on SPX, GLD, USO, TLT (pnl_i = (K_i^2 - RV_i^2) / (2 K_i)) vs SPX alone:
-    Sharpe difference > 0 with one-sided p < 0.05, positive in both halves. Non-overlapping 21-day cycles on common dates;
-    fewer than min_n cycles caps the verdict at inconclusive."""
+    Sharpe difference > 0 with one-sided p < 0.05, positive in both halves. Non-overlapping 21-day cycles on common dates.
+    Below min_n cycles (house rule 5) the Sharpe criterion fails decisively only when the one-sided 95% upper bound of the difference
+    is <= 0, and the halves criterion only when the first half at min_n (cycles [0, min_n // 2), already observed) is <= 0."""
     common = sorted(set.intersection(*(set(d for d in v[0] if d in v[2]) for v in legs.values())))
     series = {}
     for k, (days, closes, idx) in legs.items():
@@ -129,11 +156,15 @@ def multi_asset_short_variance(legs: dict, n: int = 21, block: int = 3, min_n: i
             port.append(np.mean(list(vals.values()))); spx.append(vals["SPX"])
     port, spx = np.array(port), np.array(spx)
     obs, lo = _sharpe_diff_lower(port, spx, 12, block, q=0.05)
+    _, up = _sharpe_diff_lower(port, spx, 12, block, q=0.95)              # same draws: the one-sided 95% upper bound
     h = len(port) // 2
     halves = [_sr(port[:h], 12) - _sr(spx[:h], 12), _sr(port[h:], 12) - _sr(spx[h:], 12)]
-    v, why = _verdict([("Sharpe diff > 0 with one-sided p < 0.05", obs > 0 and lo > 0), ("positive in both halves", all(x > 0 for x in halves))])
-    v, why = _cap_min_n(v, why, len(port), min_n, "non-overlapping 21-day cycles")
-    return {"n_cycles": int(len(port)), "sharpe_portfolio": _sr(port, 12), "sharpe_spx": _sr(spx, 12), "diff": obs, "lower": lo, "halves": halves, "verdict": v,
+    # (name, passes, fails decisively below min_n)
+    v, why = _rule5([("Sharpe diff > 0 with one-sided p < 0.05", obs > 0 and lo > 0, up <= 0),
+                     ("positive in both halves", all(x > 0 for x in halves),
+                      _first_half_fails_at_min_n(len(port), min_n, lambda k: _sr(port[:k], 12) - _sr(spx[:k], 12) > 0))],
+                    len(port), min_n, "non-overlapping 21-day cycles")
+    return {"n_cycles": int(len(port)), "sharpe_portfolio": _sr(port, 12), "sharpe_spx": _sr(spx, 12), "diff": obs, "lower": lo, "upper": up, "halves": halves, "verdict": v,
             "reason": f"equal-vega short variance on SPX/GLD/USO/TLT Sharpe {_sr(port,12):.2f} vs SPX alone {_sr(spx,12):.2f} over {len(port)} months since {common[0]} (diff {obs:+.2f}, one-sided lower {lo:+.2f}; halves {halves[0]:+.2f}/{halves[1]:+.2f}) — {why}"}
 
 
@@ -142,8 +173,9 @@ def ratio_extremes(a_days, a_closes, b_days, b_closes, ia: dict, ib: dict, n: in
     """T-247 / T-266 shape: after the implied ratio ia/ib leaves its trailing window's [lo_q, hi_q] band (s = +1 below the band, -1 above),
     the signed gap between the realised vol ratio over the next n periods and the entry implied ratio. statistic 'log' (T-247):
     s*[ln(RV_a/RV_b) - ln(ia/ib)]; 'level' (T-266): s*[RV_a/RV_b - ia/ib]. Non-overlapping signals. The unconditional mean of the same
-    unsigned statistic over every post-warm-up day is reported for comparison. Fewer than min_n signals caps the verdict at inconclusive.
-    statistic and min_n default to the _TRIAL entry for the label (else 'log' and 10)."""
+    unsigned statistic over every post-warm-up day is reported for comparison. Below min_n signals (house rule 5) the mean criterion
+    fails decisively only when its 95% CI lies wholly at or below 0, and the win-rate criterion only when it would fail at min_n even
+    if every missing signal won. statistic and min_n default to the _TRIAL entry for the label (else 'log' and 10)."""
     statistic = _trial("ratio_extremes", label, "statistic", statistic, "log")
     min_n = _trial("ratio_extremes", label, "min_n", min_n, 10)
     if statistic not in ("log", "level"):
@@ -178,9 +210,11 @@ def ratio_extremes(a_days, a_closes, b_days, b_closes, ia: dict, ib: dict, n: in
         return {"n": len(x), "statistic": statistic, "min_n": min_n, "unconditional_mean": unc_mean, "signal_days": sig_days, "verdict": "inconclusive",
                 "reason": f"{label}: only {len(x)} non-overlapping extreme signals (min_n {min_n}); {unc_txt}"}
     lo, hi = _mean_ci(x, block); win = float((x > 0).mean())
-    crit = [("mean > 0 with CI excluding 0", x.mean() > 0 and lo > 0)] + ([(f"win rate > {win_req}", win > win_req)] if win_req is not None else [])
-    v, why = _verdict(crit)
-    v, why = _cap_min_n(v, why, len(x), min_n, "non-overlapping signals")
+    # (name, passes, fails decisively below min_n)
+    rows = [("mean > 0 with CI excluding 0", x.mean() > 0 and lo > 0, hi <= 0)]
+    if win_req is not None:
+        rows.append((f"win rate > {win_req}", win > win_req, _rate_fails_at_min_n(int((x > 0).sum()), len(x), min_n, win_req)))
+    v, why = _rule5(rows, len(x), min_n, "non-overlapping signals")
     return {"n": int(len(x)), "statistic": statistic, "min_n": min_n, "mean": float(x.mean()), "ci": [lo, hi], "win_rate": win, "unconditional_mean": unc_mean,
             "signal_days": sig_days, "verdict": v,
             "reason": f"{label} extremes: {len(x)} non-overlapping signals, mean {x.mean():+.3f} {units} (95% CI {lo:+.3f} to {hi:+.3f}), win rate {win:.2f}; {unc_txt} — {why}"}
@@ -190,7 +224,9 @@ def ratio_mean_reversion_signal(a_days, a_closes, b_days, b_closes, window: int 
                                 min_n: int = 15):
     """T-274: when GLD/SLV exceeds its trailing 5-year (1260 trading days) 90th percentile, the 180-day forward log change of the ratio
     (to the first common trading day at or after entry + 180 calendar days) is negative at 90% confidence, judged one-sided by the
-    bootstrap 0.90 quantile of the mean being < 0, with hit rate > 60%. Non-overlapping episodes; fewer than min_n caps at inconclusive."""
+    bootstrap 0.90 quantile of the mean being < 0, with hit rate > 60%. Non-overlapping episodes. Below min_n episodes (house rule 5) the
+    mean criterion fails decisively only when the one-sided 90% lower bound (bootstrap 0.10 quantile) is >= 0, and the hit rate only when
+    it would be <= 60% at min_n even if every missing episode were a hit."""
     pb = {d: i for i, d in enumerate(b_days)}
     common = [d for d in a_days if d in pb]
     pa = {d: i for i, d in enumerate(a_days)}
@@ -209,15 +245,19 @@ def ratio_mean_reversion_signal(a_days, a_closes, b_days, b_closes, window: int 
         return {"n": len(x), "n_signals": len(x), "episodes": eps, "verdict": "inconclusive", "reason": f"only {len(x)} independent episodes (min_n {min_n})"}
     rng = np.random.default_rng(0); bs = np.array([rng.choice(x, x.size).mean() for _ in range(4000)])
     upper90 = float(np.quantile(bs, 0.90)); hit = float((x < 0).mean())      # one-sided 90% upper bound of the mean
-    v, why = _verdict([("mean < 0 at 90% confidence (one-sided)", upper90 < 0), ("hit rate > 60%", hit > 0.6)])
-    v, why = _cap_min_n(v, why, len(x), min_n, "independent episodes")
-    return {"n_signals": int(len(x)), "mean": float(x.mean()), "upper90": upper90, "hit_rate": hit, "changes": x.tolist(), "episodes": eps, "verdict": v,
+    lower90 = float(np.quantile(bs, 0.10))                                   # the bound on the wrong side, for rule 5
+    # (name, passes, fails decisively below min_n)
+    v, why = _rule5([("mean < 0 at 90% confidence (one-sided)", upper90 < 0, lower90 >= 0),
+                     ("hit rate > 60%", hit > 0.6, _rate_fails_at_min_n(int((x < 0).sum()), len(x), min_n, 0.6))],
+                    len(x), min_n, "independent episodes")
+    return {"n_signals": int(len(x)), "mean": float(x.mean()), "upper90": upper90, "lower90": lower90, "hit_rate": hit, "changes": x.tolist(), "episodes": eps, "verdict": v,
             "reason": f"GLD/SLV above its 5-year 90th percentile: {len(x)} independent episodes, {horizon_days}-calendar-day change {x.mean():+.3f} (one-sided 90% upper {upper90:+.3f}), hit rate {hit:.2f} — {why}"}
 
 
 def zscore_slope(days, a_idx: dict, b_idx: dict, window: int = 252, horizon: int = 20, start: str = "2010-01-01", min_n: int = 150):
     """T-514: OLS slope of the 20-day forward change in log(a/b) on its z-score vs the trailing 252-day mean; slope 95% CI < 0 in both
-    halves. Non-overlapping 20-day samples; fewer than min_n samples caps the verdict at inconclusive."""
+    halves. Non-overlapping 20-day samples. Below min_n samples (house rule 5) a half's criterion fails decisively only when its slope
+    95% CI lies wholly at or above 0 (lower bound >= 0)."""
     common = [d for d in sorted(set(a_idx) & set(b_idx))]
     lr = np.log(np.array([a_idx[d] / b_idx[d] for d in common]))
     z, f, ds = [], [], []
@@ -232,12 +272,13 @@ def zscore_slope(days, a_idx: dict, b_idx: dict, window: int = 252, horizon: int
         rng = np.random.default_rng(seed); n = len(zz); bs = []
         for _ in range(2000):
             i = rng.integers(0, n, n); bs.append(np.polyfit(zz[i], ff[i], 1)[0])
-        return float(np.polyfit(zz, ff, 1)[0]), float(np.quantile(bs, 0.975))
+        return float(np.polyfit(zz, ff, 1)[0]), float(np.quantile(bs, 0.025)), float(np.quantile(bs, 0.975))
     h = len(z) // 2
-    s1, u1 = slope_ci(z[:h], f[:h]); s2, u2 = slope_ci(z[h:], f[h:], 1)
-    v, why = _verdict([("first-half slope CI < 0", u1 < 0), ("second-half slope CI < 0", u2 < 0)])
-    v, why = _cap_min_n(v, why, len(z), min_n, "non-overlapping 20-day samples")
-    return {"n": int(len(z)), "slopes": [s1, s2], "upper": [u1, u2], "verdict": v,
+    s1, l1, u1 = slope_ci(z[:h], f[:h]); s2, l2, u2 = slope_ci(z[h:], f[h:], 1)
+    # (name, passes, fails decisively below min_n: the half's CI lies wholly at or above 0)
+    v, why = _rule5([("first-half slope CI < 0", u1 < 0, l1 >= 0), ("second-half slope CI < 0", u2 < 0, l2 >= 0)],
+                    len(z), min_n, "non-overlapping 20-day samples")
+    return {"n": int(len(z)), "slopes": [s1, s2], "lower": [l1, l2], "upper": [u1, u2], "verdict": v,
             "reason": f"GVZ/VIX 20-day reversion: slope on z-score {s1:+.4f} (upper {u1:+.4f}) and {s2:+.4f} (upper {u2:+.4f}) in the two halves, {len(z)} samples — {why}"}
 
 
@@ -251,7 +292,9 @@ def covered_call_vs_hold(days, closes, idx, rates, delta, dte, hold, ppy_cycles,
     """T-253 / T-270: monthly delta-d covered call (priced at the index as flat IV) vs holding: pooled Sharpe-difference 95% CI excludes 0,
     sign holds in both halves, deflated Sharpe > 0 over the declared delta variants. deflated_sharpe_ratio returns a probability
     (PSR against the expected best-of-N zero-skill Sharpe SR*), so 'deflated Sharpe > 0' (SR_hat > SR*) is DSR probability > 0.5.
-    Fewer than min_n cycles (default: the _TRIAL entry for the label) caps the verdict at inconclusive."""
+    The claim's 'higher Sharpe' is its own criterion (difference > 0), so a CI excluding 0 on the negative side fails the claim.
+    Below min_n cycles (default: the _TRIAL entry for the label; house rule 5) only that criterion can fail decisively, when the 95% CI of
+    the difference lies wholly at or below 0; a straddling CI, a halves sign flip or a DSR shortfall there is undecided."""
     min_n = _trial("covered_call_vs_hold", label, "min_n", min_n, 0)
     def run(d):
         res = _cycles(days, closes, idx, rates, [("underlying", "long", 1, None), ("call", "short", 1, ("delta", d))], dte, hold, start)
@@ -262,25 +305,30 @@ def covered_call_vs_hold(days, closes, idx, rates, delta, dte, hold, ppy_cycles,
     obs, lo = _sharpe_diff_lower(cc, bh, ppy_cycles, 3, q=0.025); _, hi = _sharpe_diff_lower(cc, bh, ppy_cycles, 3, q=0.975)
     h = len(cc) // 2; halves = [_sr(cc[:h], ppy_cycles) - _sr(bh[:h], ppy_cycles), _sr(cc[h:], ppy_cycles) - _sr(bh[h:], ppy_cycles)]
     dsr = deflated_sharpe_ratio(cc - bh, n_trials=len(dsr_variants), trial_sharpes=[sharpe_ratio(run(d) - bh) for d in dsr_variants])
-    v, why = _verdict([("Sharpe diff 95% CI excludes 0", lo > 0 or hi < 0), ("sign holds in both halves", np.sign(halves[0]) == np.sign(halves[1]) == np.sign(obs)),
-                       ("deflated Sharpe > 0 (DSR probability > 0.5)", dsr > 0.5)])
-    if v == "supported" and obs < 0:
-        v, why = "not_supported", "the CI excludes 0 on the negative side: the covered call has the LOWER Sharpe"
-    v, why = _cap_min_n(v, why, len(cc), min_n, "cycles")
+    # (name, passes, fails decisively below min_n). A failing two-sided 'excludes 0' CI straddles 0, so it is never wholly on the wrong
+    # side; the halves' signs and the DSR at min_n depend on the missing cycles.
+    v, why = _rule5([("covered call Sharpe higher than hold (Sharpe difference > 0)", obs > 0, hi <= 0),
+                     ("Sharpe diff 95% CI excludes 0", lo > 0 or hi < 0, False),
+                     ("sign holds in both halves", np.sign(halves[0]) == np.sign(halves[1]) == np.sign(obs), False),
+                     ("deflated Sharpe > 0 (DSR probability > 0.5)", dsr > 0.5, False)],
+                    len(cc), min_n, "cycles")
     return {"n_cycles": int(len(cc)), "sharpe_cc": _sr(cc, ppy_cycles), "sharpe_hold": _sr(bh, ppy_cycles), "diff": obs, "ci": [lo, hi], "halves": halves, "dsr": float(dsr), "verdict": v,
             "reason": f"MODEL-PRICED at flat {label}: {delta:.2f}-delta covered call Sharpe {_sr(cc,ppy_cycles):.2f} vs hold {_sr(bh,ppy_cycles):.2f} over {len(cc)} cycles (diff {obs:+.2f}, 95% CI {lo:+.2f} to {hi:+.2f}; halves {halves[0]:+.2f}/{halves[1]:+.2f}), DSR probability {dsr:.2f} (deflated Sharpe > 0 needs > 0.5), MDD {_mdd(cc)*100:.0f}% vs {_mdd(bh)*100:.0f}% — {why}"}
 
 
 def short_put_mean(days, closes, idx, rates, delta, dte, hold, start, label, min_n: Optional[int] = None):
     """T-254 / T-279: monthly delta-d short put at flat index IV, P&L = (premium - payoff)/K: 95% CI of the mean > 0, positive in both halves.
-    Fewer than min_n cycles (default: the _TRIAL entry for the label) caps the verdict at inconclusive."""
+    Below min_n cycles (default: the _TRIAL entry for the label; house rule 5) the CI criterion fails decisively only when the CI lies
+    wholly at or below 0, and the halves criterion only when the first half at min_n (cycles [0, min_n // 2), already observed) is <= 0."""
     min_n = _trial("short_put_mean", label, "min_n", min_n, 0)
     res = _cycles(days, closes, idx, rates, [("put", "short", 1, ("delta", delta))], dte, hold, start)
     K = np.array([k[0] for k in res["strikes"]])
     x = res["pnl"] / K
     lo, hi = _mean_ci(x, 3); h = len(x) // 2
-    v, why = _verdict([("95% CI of the mean > 0", lo > 0), ("positive in both halves", x[:h].mean() > 0 and x[h:].mean() > 0)])
-    v, why = _cap_min_n(v, why, len(x), min_n, "cycles")
+    # (name, passes, fails decisively below min_n)
+    v, why = _rule5([("95% CI of the mean > 0", lo > 0, hi <= 0),
+                     ("positive in both halves", x[:h].mean() > 0 and x[h:].mean() > 0, _first_half_fails_at_min_n(len(x), min_n, lambda k: x[:k].mean() > 0))],
+                    len(x), min_n, "cycles")
     return {"n_cycles": int(len(x)), "mean": float(x.mean()), "ci": [lo, hi], "verdict": v,
             "reason": f"MODEL-PRICED at flat {label}: {abs(delta):.2f}-delta short put mean {x.mean()*100:+.2f}% of strike per cycle over {len(x)} cycles (95% CI {lo*100:+.2f} to {hi*100:+.2f}), halves {x[:h].mean()*100:+.2f}/{x[h:].mean()*100:+.2f} — {why}"}
 
@@ -292,8 +340,9 @@ def conditional_straddle(days, closes, idx, rates, dte, hold, start, window, pct
     unconditional mean is over every daily entry. CI: paired circular block bootstrap of the difference on the daily timeline (blocks of
     `block` x `hold` rows, about `block` conditional entries each) of z = 1[entry] x / p - x, p = share of rows that are entries, whose
     mean is exactly mean_low - mean_all; both means move together in every draw, so their positive covariance is kept.
-    n_entries counts the non-overlapping conditional entries (the trials' unit); fewer than min_n (default: the _TRIAL entry for the
-    label) caps the verdict at inconclusive."""
+    n_entries counts the non-overlapping conditional entries (the trials' unit). Below min_n (default: the _TRIAL entry for the label;
+    house rule 5) the verdict cannot be supported, and the CI criterion fails decisively only when the CI lies wholly at or below 0;
+    a straddling CI there is inconclusive."""
     min_n = _trial("conditional_straddle", label, "min_n", min_n, 0)
     d, c, iv = _align(days, closes, idx)
     T = dte / 365.0
@@ -324,8 +373,7 @@ def conditional_straddle(days, closes, idx, rates, dte, hold, start, window, pct
     draws = _block_mean_draws(z, block * hold, seed=0)
     lo, hi = float(np.quantile(draws, 0.025)), float(np.quantile(draws, 0.975))
     dmean = float(xc.mean() - x.mean())
-    v, why = _verdict([("difference 95% CI > 0", lo > 0)])
-    v, why = _cap_min_n(v, why, nc, min_n, "non-overlapping conditional entries")
+    v, why = _rule5([("difference 95% CI > 0", lo > 0, hi <= 0)], nc, min_n, "non-overlapping conditional entries")   # (name, passes, decisive)
     return {"n_entries": nc, "n_days": int(len(x)), "n_low_days": int(m.sum()), "entry_days": entry_days, "mean_all": float(x.mean()), "mean_low": float(xc.mean()),
             "conditional_mean_positive": bool(xc.mean() > 0), "diff": dmean, "ci": [lo, hi], "min_n": min_n, "verdict": v,
             "reason": f"MODEL-PRICED at flat {label}: {dte}-day ATM straddles bought with {label} below its trailing {pct:.0%} quantile return {xc.mean()*100:+.1f}% on premium "
@@ -339,7 +387,9 @@ def protective_put_calmar(days, closes, idx, rates, start, label="DVOL", dte: in
     `roll` days the held put (then dte - roll days to expiry) is sold at its BS mark and a new 90-DTE 10-delta put is bought; vs buy-and-hold.
     Both arms are marked daily (spot plus the put at BS with that day's index and bill rate), and Calmar = CAGR / |max drawdown of the daily
     path|. Pass: bootstrap 95% lower bound of the Calmar difference > 0 (circular blocks of `block` roll periods, each keeping its daily
-    path) and positive in >= 2 of 3 windows. Fewer than min_n roll periods caps the verdict at inconclusive."""
+    path) and positive in >= 2 of 3 windows. Below min_n roll periods (house rule 5) the CI criterion fails decisively only when the
+    bootstrap 95% CI lies wholly at or below 0 (upper bound <= 0), and the windows criterion only when at least 2 of the 3 windows at
+    min_n (np.array_split of the first min_n periods) are already fully observed and not positive."""
     from mandel.options import bs
     vol, rate = _asof(idx), _asof(rates)
     i = next((k for k, d in enumerate(days) if d >= start and d in idx), len(days))
@@ -370,12 +420,16 @@ def protective_put_calmar(days, closes, idx, rates, start, label="DVOL", dte: in
     rng = np.random.default_rng(0); b = max(1, min(block, n)); draws = []
     for _ in range(2000):
         j = ((rng.integers(0, n, math.ceil(n / b))[:, None] + np.arange(b)[None, :]).ravel()[:n]) % n; draws.append(calmar(GH[j]) - calmar(GB[j]))
-    lo = float(np.nanquantile(draws, 0.025))
+    lo, hi = float(np.nanquantile(draws, 0.025)), float(np.nanquantile(draws, 0.975))
     thirds = [calmar(GH[s]) - calmar(GB[s]) for s in np.array_split(np.arange(n), 3)]
-    v, why = _verdict([("Calmar difference 95% CI > 0", lo > 0), ("positive in >= 2 of 3 windows", sum(t > 0 for t in thirds) >= 2)])
-    v, why = _cap_min_n(v, why, n, min_n, "monthly roll periods")
+    # windows at min_n that are already fully observed (later periods only append) and not positive: >= 2 fails at min_n whatever comes
+    settled_bad = sum(not (calmar(GH[s]) - calmar(GB[s]) > 0) for s in np.array_split(np.arange(min_n), 3) if len(s) and s[-1] < n) if min_n and n < min_n else 0
+    # (name, passes, fails decisively below min_n)
+    v, why = _rule5([("Calmar difference 95% CI > 0", lo > 0, hi <= 0),
+                     ("positive in >= 2 of 3 windows", sum(t > 0 for t in thirds) >= 2, settled_bad >= 2)],
+                    n, min_n, "monthly roll periods")
     mh, mb = mdd(GH), mdd(GB); annual_cost = float(np.mean(cost) * ppy / roll)
-    return {"n_cycles": int(n), "first_day": first, "calmar_hedged": calmar(GH), "calmar_hold": calmar(GB), "diff": obs, "lower": lo, "thirds": thirds,
+    return {"n_cycles": int(n), "first_day": first, "calmar_hedged": calmar(GH), "calmar_hold": calmar(GB), "diff": obs, "lower": lo, "upper": hi, "thirds": thirds,
             "mdd_hedged": mh, "mdd_hold": mb, "annual_premium": annual_cost, "verdict": v,
             "reason": f"MODEL-PRICED at flat {label}: BTC + 10-delta {dte}-DTE puts rolled every {roll} days Calmar {calmar(GH):.2f} vs hold {calmar(GB):.2f} over {n} roll periods "
                       f"since {first} (daily-path MDD {mh*100:.0f}% vs {mb*100:.0f}%, gross premium {annual_cost*100:.1f}% of spot a year; diff {obs:+.2f}, 95% lower {lo:+.2f}; thirds "
@@ -399,7 +453,8 @@ def inverse_covered_call_btc(days, closes, idx, rates, start, delivery: Optional
     on entry date + settle_offset_days. The entry is the daily close (24:00 UTC), so the 30-day expiry falls at 00:00 UTC of day +31
     and the first 08:00 UTC delivery at or after it is on day +31. Cycles without a delivery price are dropped. Without `delivery`,
     spot closes on day +30 stand in and the claim's 'settlement at Deribit delivery prices' criterion is not implemented (None), so
-    the verdict is at best inconclusive. Fewer than min_n cycles caps the verdict at inconclusive."""
+    the verdict is at best inconclusive. Below min_n cycles (house rule 5) the verdict cannot be supported, and the CI criterion fails
+    decisively only when the CI lies wholly at or below 0."""
     res = _cycles(days, closes, idx, rates, [("call", "short", 1, ("delta", 0.25))], 30, 30, start)
     K = np.array([s[0] for s in res["strikes"]])
     premium_btc = -res["debit"] / res["spot"]                     # c: BTC received at inception (debit < 0 for a short call)
@@ -414,8 +469,9 @@ def inverse_covered_call_btc(days, closes, idx, rates, start, delivery: Optional
     if len(x) < 2:
         return {"n_cycles": int(len(x)), "dropped": dropped, "verdict": "inconclusive", "reason": f"MODEL-PRICED at flat DVOL: only {len(x)} cycles settle on {src} (min_n {min_n})"}
     lo, hi = _mean_ci(x, 3)
-    v, why = _verdict([("95% CI of the mean > 0", lo > 0), ("settled at Deribit delivery prices", True if delivery is not None else None)])
-    v, why = _cap_min_n(v, why, len(x), min_n, "monthly cycles")
+    # (name, passes, fails decisively below min_n)
+    v, why = _rule5([("95% CI of the mean > 0", lo > 0, hi <= 0), ("settled at Deribit delivery prices", True if delivery is not None else None, False)],
+                    len(x), min_n, "monthly cycles")
     return {"n_cycles": int(len(x)), "dropped": dropped, "mean_btc": float(x.mean()), "mean_premium_btc": float(premium_btc[ok].mean()), "ci": [lo, hi], "verdict": v,
             "reason": f"MODEL-PRICED at flat DVOL: 25-delta 30-day BTC call against 1 BTC earns {x.mean():+.4f} BTC per cycle on average (premium {premium_btc[ok].mean():.4f} BTC at S_0) "
                       f"over {len(x)} cycles (95% CI {lo:+.4f} to {hi:+.4f}); {src}" + (f", {dropped} cycles without one dropped" if dropped else "") + f" — {why}"}

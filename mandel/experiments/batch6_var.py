@@ -629,7 +629,10 @@ def straddle_tercile(fr: dict, pre_signal=None, scales=(0.81, 0.90, 1.00), main:
     block_sens = {b: stud_ci_group_diff(xo, t["top"], t["bottom"], b, 0.95, max(2000, n_boot // 5), seed)["ci"] for b in (3, 12)}
     parts.append(f"s={main:.2f} interval sensitivity: percentile {_ci_s(m.get('ci_percentile', (None, None)), 1, 100)}, studentized "
                  + ", ".join(f"block {b} {_ci_s(ci, 1, 100)}" for b, ci in block_sens.items())
-                 + f" ({n_boot} draws, block {block} as declared)")
+                 + f" ({n_boot} draws, block {block} as declared)"
+                 + ("; MARGINAL: the declared interval excludes 0 but an alternative interval does not"
+                    if lo is not None and lo > 0 and any(c[0] is not None and c[0] <= 0
+                                                          for c in [m.get("ci_percentile", (None, None)), *block_sens.values()]) else ""))
     uncond = {s: {"mean": float(x[s].mean()), "ci": list(stud_ci(x[s], block, 0.95, n_boot, seed))} for s in scales}
     spot_pnl = res[main]["pnl"] / res[main]["spot"]
     extras = {"unconditional": uncond, "s_main_desc": _desc(xm),
@@ -639,6 +642,9 @@ def straddle_tercile(fr: dict, pre_signal=None, scales=(0.81, 0.90, 1.00), main:
               "haircut_5pct": {"mean_top": None if m["mean_top"] is None else m["mean_top"] - haircut,
                                "mean_bottom": None if m["mean_bottom"] is None else m["mean_bottom"] - haircut,
                                "diff": m["diff"], "note": "a constant per-premium haircut leaves the tercile difference unchanged"}}
+    hc = extras["haircut_5pct"]
+    parts.append(f"5%-of-premium round-trip haircut: top {_s(hc['mean_top'] and hc['mean_top'] * 100, 1)}% vs bottom "
+                 f"{_s(hc['mean_bottom'] and hc['mean_bottom'] * 100, 1)}% (difference unchanged)")
     parts.append(f"unconditional mean at s={main:.2f} {xm.mean() * 100:+.1f}% of premium "
                  f"({_ci_s(uncond[main]['ci'], 1, 100)}), skew {extras['s_main_desc'].get('skew', float('nan')):.2f}, "
                  f"PSR {extras['psr_all_cycles']:.2f}, DSR(top tercile, 3 trials) {_f(extras['dsr_top_tercile_oos_n_trials_3'])}")
@@ -737,12 +743,12 @@ def vrp_hedged_short(fr: dict, measured_scale: Optional[float], measured_note: s
     if n < 8:
         return {"verdict": "inconclusive", "n": n, "reason": f"only {n} cycles"}
     crit, parts, by = [], [], {}
-    for s in scales:
-        y = variants[(round(s, 4) if s == measured_scale else s, 1)]
+    for j, s in enumerate(scales):
+        y = variants[(round(s, 4) if j == 1 else s, 1)]
         lo, hi = stud_ci(y, block, 0.95, n_boot, seed)
         th = _thirds(y)
-        by[f"{s:.4f}"] = {"mean": float(y.mean()), "ci": [lo, hi], "thirds": th, "desc": _desc(y)}
-        tag = f"s={s:.3f}" + (" (measured on the capture)" if s == measured_scale else "")
+        by["measured" if j == 1 else f"{s:.4f}"] = {"scale": s, "mean": float(y.mean()), "ci": [lo, hi], "thirds": th, "desc": _desc(y)}
+        tag = f"s={s:.3f}" + (" (measured on the capture)" if j == 1 else "")
         crit.append((f"{tag}: mean > 0 with 95% CI excluding 0", None if lo is None else bool(lo > 0), hi is not None and hi < 0))
         crit.append((f"{tag}: mean > 0 in all three thirds", all(v is not None and v > 0 for v in th), False))
         parts.append(f"{tag}: mean {y.mean() * 100:+.2f}% of premium ({_ci_s((lo, hi), 2, 100)}), thirds "

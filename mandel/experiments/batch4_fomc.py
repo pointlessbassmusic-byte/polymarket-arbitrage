@@ -11,6 +11,16 @@ future information. Meetings after the last price bar are dropped. Unscheduled m
 non-FOMC group are mapped to the first trading day on or after their decision day (the 2020-03-15 meeting was a Sunday;
 its market reaction is the 2020-03-16 session), plus the statement-release day when it differs (2020-03-02 -> 2020-03-03).
 
+CPI calendar. CPI release days are the ALFRED vintage dates of CPIAUCSL in ``macro-release-cpi`` (08:30 ET releases),
+with the revision-only vintages dropped by ``batch5_macro.release_days_from_rows`` (the February seasonal-factor vintage
+and any vintage less than 14 days after the previous release). The schedule is published about a year ahead; a delayed
+release (shutdowns) keeps its actual day, which was announced before it happened. An 08:30 ET release on day D lies in
+the close(D-1)-to-close(D) window of the first SPY session on or after D, in the 00:00-to-00:00 UTC BTC day D (12:30 or
+13:30 UTC), and in the GVZ close-before-to-close-after window around D. The CPI parts of these claims are reported
+variants and controls, never pass criteria: T-221's pooled FOMC+CPI variant (the pass reports it alongside the FOMC-only
+test) and its random non-macro-day control, T-273's CPI-date repeat, and T-341's CPI-overlap flag. A harness loads the
+bundle only for those parts; without it they are listed under ``not_run`` and the FOMC test still runs.
+
 Day-flagged tests. A daily series x_t with event flag f_t is turned into d_t = diff + w_t (x_t - m_g(t)), where
 w_t = 1/p on event days and -1/(1-p) on other days (p = share of event days), m_g is the group mean and diff is the
 event-minus-other difference in means. mean(d) = diff exactly, and resampling d in circular blocks gives the sampling
@@ -39,6 +49,7 @@ from typing import Optional, Sequence
 
 import numpy as np
 
+from mandel.experiments.batch5_macro import release_days_from_rows, to_sessions
 from mandel.experiments.underlying2 import _mean_ci, _sharpe_diff_lower, _sr, _verdict, load_series
 from mandel.experiments.volatility import index_closes
 from mandel.options import bs
@@ -133,6 +144,24 @@ def _missing(archive, names: Sequence[str]):
     if miss:
         return {"missing_bundles": miss}, 0, "inconclusive", f"missing data bundles {miss}: the claim cannot be tested until they are archived"
     return None
+
+
+CPI_BUNDLE = "macro-release-cpi"
+CPI_ABSENT = f"{CPI_BUNDLE} not archived"
+
+
+def _cpi(archive) -> Optional[list[str]]:
+    """CPI release days (08:30 ET) from ``macro-release-cpi``, rows available at the bundle's capture only, revision-only
+    vintages dropped (``batch5_macro.release_days_from_rows``). None when the bundle is not archived: the CPI variant is
+    then reported as not run."""
+    if _missing(archive, [CPI_BUNDLE]):
+        return None
+
+    def load():
+        cap = archive.get(CPI_BUNDLE).created_at
+        rows = [r for r in archive.load(CPI_BUNDLE) if not (cap and r.get("available_at") and r["available_at"] > cap)]
+        return release_days_from_rows(rows, "cpi")[0]
+    return _cached(archive, ("cpi",), load)
 
 
 def _clean(x):
@@ -243,6 +272,15 @@ def _ci_bps(ci) -> str:
     return "n/a" if ci[0] is None else f"{ci[0] * 1e4:+.1f} to {ci[1] * 1e4:+.1f}"
 
 
+def _f_bps(x) -> str:
+    """A value already in bps."""
+    return "n/a" if x is None else f"{x:+.1f}"
+
+
+def _f_p(x) -> str:
+    return "n/a" if x is None else f"{x:.4f}"
+
+
 # ------------------------------------------------------------------------------- model-priced event straddles --
 
 def short_straddle_pnl(s_prev, s_now, sigma, tau: float, r: float = 0.0):
@@ -349,17 +387,54 @@ def spx_event_straddle(days, closes, vix: dict, fomc_days, start: str = "1994-01
     return rep
 
 
+def _random_day_placebo(x: np.ndarray, flag: np.ndarray, pool: np.ndarray, n_draw: int, seed: int) -> tuple[Optional[float], Optional[float]]:
+    """Event-minus-pool difference in means and its one-sided placebo p (H1: the events are LOWER than random days): the
+    share of ``n_draw`` random same-size sets of ``pool`` days whose mean minus the rest of the pool is at or below the
+    observed difference. (None, None) when either group is too small."""
+    x = np.asarray(x, dtype=float); f = np.asarray(flag, dtype=bool); pool = np.asarray(pool, dtype=bool) & ~f
+    ne, npool = int(f.sum()), int(pool.sum())
+    if ne < 1 or npool <= ne:
+        return None, None
+    obs = float(x[f].mean() - x[pool].mean())
+    xp = x[pool]; tot = xp.sum(); rng = np.random.default_rng(seed); null = np.empty(n_draw)
+    for b in range(n_draw):
+        s = xp[rng.choice(npool, ne, replace=False)].sum()
+        null[b] = s / ne - (tot - s) / (npool - ne)
+    return obs, float((np.sum(null <= obs) + 1) / (n_draw + 1))
+
+
 def btc_event_straddle(days, closes, dvol: dict, fomc_days, start: str = "2021-04-01", vix: Optional[dict] = None,
-                       block: int = 10, n_boot: int = 2000, seed: int = 0, min_n: int = 40) -> dict:
+                       cpi_days: Optional[Sequence[str]] = None, block: int = 10, n_boot: int = 2000, n_placebo: int = 2000,
+                       seed: int = 0, min_n: int = 40) -> dict:
     """T-221 (MODEL-PRICED): 1-day ATM BTC straddle, sigma = DVOL at 00:00 UTC of day D (the close of the D-1 daily candle),
     T = 1/365, strike and sale at the 00:00 UTC price (BTC-USD close of the D-1 UTC bar), settled at the next 00:00 UTC
     (close of the D bar). Pass: FOMC-minus-non-FOMC mean short P&L < 0 with the 95% CI excluding 0. Controls reported:
     weekday-only non-FOMC days, coin (BTC) accounting sign, VIX-regime split (VIX close of the last US session before D).
-    The pooled FOMC+CPI variant needs a CPI release calendar, which is not archived."""
+    With ``cpi_days`` (CPI release dates; the 08:30 ET release lies in BTC day D) two more rows are reported, neither a
+    criterion: the pooled FOMC+CPI variant (FOMC or CPI days minus all other days, the pass's "pooled reported
+    alongside") with CPI-only and FOMC-only parts, and the random non-macro-day control (FOMC minus days that are neither
+    FOMC nor CPI, with the share of ``n_placebo`` random same-size sets of non-macro days that come out as low)."""
     P = event_straddle_panel(days, closes, dvol, fomc_days, 1.0 / CRYPTO_PPY, CRYPTO_PPY, start=start, max_gap_days=1)
     if len(P["days"]) == 0:
         return {"n": 0, "verdict": "inconclusive", "reason": "no BTC day has a prior-candle DVOL close"}
     f = P["flag"]
+    pooled = cpi_only = non_macro = None
+    if cpi_days is not None:
+        fc = np.isin(P["days"], sorted(set(cpi_days)))
+        fp = f | fc
+        pooled = group_diff(P["pnl"], fp, block, n_boot, seed)
+        pooled.update(n_fomc=int(f.sum()), n_cpi=int(fc.sum()), n_fomc_and_cpi_same_day=int((f & fc).sum()),
+                      meets_pass_rule_as_fomc=bool(pooled["diff"] is not None and pooled["diff"] < 0 and pooled["ci"][1] < 0),
+                      coin_accounting_diff=_point_diff(P["pnl_coin"], fp))
+        nf = ~f
+        cpi_only = group_diff(P["pnl"][nf], fc[nf], block, n_boot, seed)               # CPI vs non-macro days (FOMC days out)
+        cpi_only["note"] = "CPI release days minus days that are neither FOMC nor CPI"
+        keep = f | ~fp
+        nm = group_diff(P["pnl"][keep], f[keep], block, n_boot, seed)                    # FOMC vs non-macro days (CPI days out)
+        obs, p_plc = _random_day_placebo(P["pnl"], f, ~fp, n_placebo, seed)
+        non_macro = {**nm, "random_non_macro_placebo_p_lower": p_plc, "n_placebo": n_placebo,
+                     "note": "FOMC days minus non-macro days (neither FOMC nor CPI); placebo p = share of random same-size sets of "
+                             "non-macro days whose mean minus the other non-macro days is at or below the FOMC difference"}
     full = group_diff(P["pnl"], f, block, n_boot, seed)
     coin = group_diff(P["pnl_coin"], f, block, n_boot, seed)
     wk = np.array([date.fromisoformat(d).weekday() < 5 for d in P["days"]])
@@ -378,9 +453,17 @@ def btc_event_straddle(days, closes, dvol: dict, fomc_days, start: str = "2021-0
            "full": full, "coin_accounting": coin, "weekday_only": weekday, "vix_regime": regime,
            "mean_premium_fomc": float(P["premium"][f].mean()), "mean_premium_other": float(P["premium"][~f].mean()),
            "ratio_abs_r_over_dvol_daily": {"fomc": float(P["ratio"][f].mean()), "other": float(P["ratio"][~f].mean())},
-           "not_run": ["pooled FOMC+CPI variant: no CPI release calendar archived"]}
+           "pooled_fomc_cpi": pooled, "cpi_only": cpi_only, "non_macro_control": non_macro,
+           "not_run": [] if cpi_days is not None else [f"pooled FOMC+CPI variant ({CPI_ABSENT})", f"random non-macro-day control ({CPI_ABSENT})"]}
+    if pooled is not None:
+        cpi_txt = (f"pooled FOMC+CPI (reported, not a criterion) {_bps(pooled['diff'])} bps (95% CI {_ci_bps(pooled['ci'])}) over "
+                   f"{pooled['n_event']} event days ({pooled['n_fomc']} FOMC, {pooled['n_cpi']} CPI); CPI only {_bps(cpi_only['diff'])} bps "
+                   f"(95% CI {_ci_bps(cpi_only['ci'])}); FOMC vs non-macro days {_bps(non_macro['diff'])} bps (95% CI {_ci_bps(non_macro['ci'])}, "
+                   f"random non-macro-day placebo p={'n/a' if non_macro['random_non_macro_placebo_p_lower'] is None else format(non_macro['random_non_macro_placebo_p_lower'], '.3f')})")
+    else:
+        cpi_txt = f"pooled FOMC+CPI variant and non-macro control not run ({CPI_ABSENT})"
     if full["n_event"] < min_n:
-        rep.update(verdict="inconclusive", reason=f"MODEL-PRICED: only {full['n_event']} FOMC days with BTC and DVOL since {start} (min_n {min_n})")
+        rep.update(verdict="inconclusive", reason=f"MODEL-PRICED: only {full['n_event']} FOMC days with BTC and DVOL since {start} (min_n {min_n}); {cpi_txt}")
         return rep
     ok = None if full["diff"] is None else (full["diff"] < 0 and full["ci"][1] < 0)
     v, why = _verdict([("FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0", ok)])
@@ -388,7 +471,7 @@ def btc_event_straddle(days, closes, dvol: dict, fomc_days, start: str = "2021-0
     rep["reason"] = (f"MODEL-PRICED short 1-day ATM BTC straddle (BS, sigma=DVOL 00:00 UTC, T=1/365) since {start}: FOMC minus non-FOMC mean P&L "
                      f"{_bps(full['diff'])} bps of spot (95% CI {_ci_bps(full['ci'])}) over {full['n_event']} FOMC / {full['n_other']} other days; "
                      f"|r|/(DVOL/sqrt365) FOMC {rep['ratio_abs_r_over_dvol_daily']['fomc']:.2f} vs other {rep['ratio_abs_r_over_dvol_daily']['other']:.2f}; "
-                     f"weekdays only {_bps(weekday['diff'])} bps; coin accounting {_bps(coin['diff'])} bps; CPI-pooled variant not run (no CPI calendar) — {why}")
+                     f"weekdays only {_bps(weekday['diff'])} bps; coin accounting {_bps(coin['diff'])} bps; {cpi_txt} — {why}")
     return rep
 
 
@@ -464,11 +547,15 @@ def pre_fomc_drift_oos(days, closes, fomc_days, test=("2012-01-01", "2026-12-31"
 
 def statement_day_effect(days, closes, fomc_days, start: str = "1994-01-01", end: str = "2026-12-31",
                          sub=("2016-01-01", "2026-12-31"), cost_bps: float = 2.0, threshold_bps: float = 15.0,
-                         secondary: Optional[dict] = None, block: int = 10, n_boot: int = 2000, seed: int = 0, min_n: int = 200) -> dict:
+                         secondary: Optional[dict] = None, cpi_days: Optional[Sequence[str]] = None, block: int = 10, n_boot: int = 2000,
+                         seed: int = 0, min_n: int = 200) -> dict:
     """T-341: SPY close-to-close return on scheduled FOMC statement days minus the mean on all other days, net of a
     ``cost_bps`` round trip per statement day. Pass: net difference > 15 bps with studentized block-bootstrap (block 10)
     p < 0.05 (H0: difference <= 0) over 1994-2026 AND a positive 2016-2026 net difference. Secondary assets (QQQ, IWM, TLT,
-    GLD, BTC) are reported with Holm-adjusted p-values; the 5 unnamed non-primary variants are not defined and not run."""
+    GLD, BTC) are reported with Holm-adjusted p-values; the 5 unnamed non-primary variants are not defined and not run.
+    CPI-overlap flag (a control, not a criterion), with ``cpi_days``: each CPI release is mapped to the first SPY session on
+    or after it; the statement days that are also CPI sessions are listed, and the net difference is reported without
+    them and with every CPI session left out of both groups."""
     ds, r = _returns(days, closes, start, end)
     ev = set(fomc_days); f = np.array([d in ev for d in ds], dtype=bool)
     net = r - f * cost_bps / 1e4
@@ -479,6 +566,16 @@ def statement_day_effect(days, closes, fomc_days, start: str = "1994-01-01", end
     p_thr = float(block_bootstrap_pvalue(d - threshold_bps / 1e4, np.zeros_like(d), n_boot=n_boot, block_len=block, seed=seed))
     ms = _range_mask(ds, *sub)
     sub_diff = _point_diff(net[ms], f[ms])
+    cpi = None
+    if cpi_days is not None:
+        fc = np.isin(ds, to_sessions(cpi_days, list(days))[0]); ov = f & fc
+        cpi = {"n_cpi_sessions": int(fc.sum()), "n_overlap": int(ov.sum()), "overlap_days": [str(x) for x in ds[ov]],
+               f"n_overlap_{sub[0][:4]}_{sub[1][:4]}": int((ov & ms).sum())}
+        for key, keep in (("excluding_overlap_days", ~ov), ("excluding_all_cpi_sessions", ~fc)):
+            gk = group_diff(net[keep], f[keep], block, n_boot, seed); sk = _point_diff(net[keep & ms], f[keep & ms])
+            cpi[key] = {"n_statement_days": gk["n_event"], "net_diff_bps": None if gk["diff"] is None else gk["diff"] * 1e4,
+                        "ci_bps": [None if c_ is None else c_ * 1e4 for c_ in gk["ci"]], "p": gk["p_greater"],
+                        "sub_diff_bps": None if sk is None else sk * 1e4}
     splits = {}
     for lab, lo, hi in (("pre-2015", "1994-01-01", "2015-12-31"), ("post-2015", "2016-01-01", "2026-12-31"),
                         ("ZLB 2009-2015", "2009-01-01", "2015-12-31")):
@@ -493,9 +590,18 @@ def statement_day_effect(days, closes, fomc_days, start: str = "1994-01-01", end
     rep = {"n": g["n_event"], "n_days": int(len(r)), "cost_bps_round_trip": cost_bps, "net": g, "gross_diff_bps": float(_point_diff(r, f) * 1e4),
            "p_vs_15bps": p_thr, "sub_2016_2026_diff_bps": None if sub_diff is None else sub_diff * 1e4,
            "splits_bps": {k: (None if v is None else v * 1e4) for k, v in splits.items()}, "secondary": sec, "holm_adjusted_p": holm,
-           "not_run": ["5 non-primary variants (not specified)", "CPI-overlap flag (no CPI calendar archived)"]}
+           "cpi_overlap": cpi,
+           "not_run": ["5 non-primary variants (not specified)"] + ([] if cpi is not None else [f"CPI-overlap flag ({CPI_ABSENT})"])}
+    if cpi is not None:
+        eo, ea = cpi["excluding_overlap_days"], cpi["excluding_all_cpi_sessions"]
+        cpi_txt = (f"; CPI overlap (flag, not a criterion): {cpi['n_overlap']} statement days are CPI sessions"
+                   + (f" ({', '.join(cpi['overlap_days'])})" if 0 < cpi["n_overlap"] <= 6 else "")
+                   + f", without them {_f_bps(eo['net_diff_bps'])} bps (p={_f_p(eo['p'])}; {sub[0][:4]}-{sub[1][:4]} {_f_bps(eo['sub_diff_bps'])}), "
+                   f"all CPI sessions out of both groups {_f_bps(ea['net_diff_bps'])} bps (p={_f_p(ea['p'])}; {sub[0][:4]}-{sub[1][:4]} {_f_bps(ea['sub_diff_bps'])})")
+    else:
+        cpi_txt = f"; CPI-overlap flag not run ({CPI_ABSENT})"
     if g["n_event"] < min_n:
-        rep.update(verdict="inconclusive", reason=f"only {g['n_event']} statement days (min_n {min_n})")
+        rep.update(verdict="inconclusive", reason=f"only {g['n_event']} statement days (min_n {min_n}){cpi_txt}")
         return rep
     crit = [(f"{start[:4]}-{end[:4]} net difference > {threshold_bps:g} bps", g["diff"] > threshold_bps / 1e4),
             ("block-bootstrap p < 0.05", g["p_greater"] < 0.05),
@@ -506,7 +612,7 @@ def statement_day_effect(days, closes, fomc_days, start: str = "1994-01-01", end
                      f"{g['n_event']} statement days {str(ds[0])}..{str(ds[-1])}: net difference {_bps(g['diff'])} bps (95% CI {_ci_bps(g['ci'])}), "
                      f"p={g['p_greater']:.4f} (H0 diff<=0; p vs 15 bps {p_thr:.3f}); {sub[0][:4]}-{sub[1][:4]} {_bps(sub_diff)} bps"
                      + ("; secondary Holm p " + ", ".join(f"{k} {sec[k]['diff_bps']:+.1f} bps p_holm={holm.get(k, float('nan')):.3f}" for k in sec if sec[k]['diff_bps'] is not None) if sec else "")
-                     + f" — {why}")
+                     + f"{cpi_txt} — {why}")
     return rep
 
 
@@ -718,13 +824,16 @@ def monetary_momentum(days, closes, dgs2: dict, statement_days, start: str = "19
 
 # ---------------------------------------------------------------------------------------------- GVZ around FOMC --
 
-def index_event_change(idx: dict, event_days, start: str, end: str, n_boot: int = 4000, seed: int = 0) -> dict:
+def index_event_change(idx: dict, event_days, start: str, end: str, n_boot: int = 4000, seed: int = 0, control_exclude=()) -> dict:
     """Change in an index from the close before each event day to the close after it (index observations strictly
     before and after the event day), with an iid bootstrap CI over events, sign test, and a weekday-matched non-event
-    control (same 2-close window around non-event days whose window contains no event day)."""
+    control (same 2-close window around non-event days whose window contains no event day). Days in
+    ``control_exclude`` (another event type, e.g. CPI releases for an FOMC test) are kept out of the control windows too,
+    so the control is non-macro days."""
     ks = sorted(idx); ka = np.array(ks); kpos = {k: i for i, k in enumerate(ks)}
     evs = sorted(e for e in event_days if start <= e <= end)
     ev_set = set(evs); rows = []
+    busy = ev_set | set(control_exclude)
     for e in evs:
         j0 = int(np.searchsorted(ka, e, side="left")) - 1; j1 = int(np.searchsorted(ka, e, side="right"))
         if j0 < 0 or j1 >= len(ks):
@@ -740,12 +849,12 @@ def index_event_change(idx: dict, event_days, start: str, end: str, n_boot: int 
     # weekday-matched control
     ctrl = {}
     for k in ks:
-        if not (start <= k <= end) or k in ev_set:
+        if not (start <= k <= end) or k in busy:
             continue
         i = kpos[k]
         if i == 0 or i + 1 >= len(ks):
             continue
-        if any(ks[m] in ev_set for m in (i - 1, i + 1)):
+        if any(ks[m] in busy for m in (i - 1, i + 1)):
             continue
         if (date.fromisoformat(ks[i + 1]) - date.fromisoformat(ks[i - 1])).days > 7:
             continue
@@ -758,26 +867,61 @@ def index_event_change(idx: dict, event_days, start: str, end: str, n_boot: int 
             "n_control_days": int(sum(len(v) for v in ctrl.values()))}
 
 
-def gvz_fomc_change(gvz: dict, fomc_days, vix: Optional[dict] = None, start: str = "2009-10-01", end: str = "2026-09-30",
-                    n_boot: int = 4000, seed: int = 0, min_n: int = 100) -> dict:
+def events_clear_of(idx: dict, event_days, other_days) -> list[str]:
+    """Event days whose close-before-to-close-after window (the index observations strictly before and after the event
+    day) contains no ``other_days`` date: none after the close before and on or before the close after."""
+    ks = np.array(sorted(idx)); oth = np.array(sorted(set(other_days))); out = []
+    for e in event_days:
+        j0 = int(np.searchsorted(ks, e, side="left")) - 1; j1 = int(np.searchsorted(ks, e, side="right"))
+        if j0 < 0 or j1 >= len(ks):
+            continue
+        a = int(np.searchsorted(oth, ks[j0], side="right")); b = int(np.searchsorted(oth, ks[j1], side="right"))
+        if a == b:
+            out.append(e)
+    return out
+
+
+def _chg_txt(g: Optional[dict]) -> str:
+    if not g or g.get("mean") is None:
+        return "n/a"
+    return f"{g['mean']:+.3f} pts (95% CI {g['ci'][0]:+.3f} to {g['ci'][1]:+.3f}, {g['share_declining']*100:.0f}% declining, n={g['n']})"
+
+
+def gvz_fomc_change(gvz: dict, fomc_days, vix: Optional[dict] = None, cpi_days: Optional[Sequence[str]] = None, start: str = "2009-10-01",
+                    end: str = "2026-09-30", n_boot: int = 4000, seed: int = 0, min_n: int = 100) -> dict:
     """T-273: mean change in GVZ from the close before each scheduled FOMC decision day to the close after it,
     2009-10..2026-09. Pass: mean < 0 with the 95% CI excluding 0. Reported: share declining and sign test, weekday-matched
     non-event control, the same test on VIX (positive control). 30-day VIX-method indices drop mechanically when an event
-    leaves their window, so a fall is expected even with no event premium. CPI dates are not archived (CPI repeat not run)."""
-    g = index_event_change(gvz, fomc_days, start, end, n_boot, seed)
-    rep = {"n": g["n"], "gvz": g, "vix_positive_control": index_event_change(vix, fomc_days, start, end, n_boot, seed) if vix else None,
-           "not_run": ["CPI-date repeat (no CPI calendar archived)"]}
+    leaves their window, so a fall is expected even with no event premium. With ``cpi_days`` the procedure's CPI-date
+    repeat is reported (not a criterion: the claim is about FOMC days): the same GVZ test and VIX control around CPI
+    release days in the same window, and on the CPI days whose window holds no FOMC decision day; the weekday-matched
+    controls of both tests then use non-macro days (no FOMC or CPI day in the window)."""
+    cpi_set = sorted(set(cpi_days)) if cpi_days is not None else ()
+    g = index_event_change(gvz, fomc_days, start, end, n_boot, seed, control_exclude=cpi_set)
+    rep = {"n": g["n"], "gvz": g, "vix_positive_control": index_event_change(vix, fomc_days, start, end, n_boot, seed, control_exclude=cpi_set) if vix else None,
+           "cpi_repeat": None, "not_run": [] if cpi_days is not None else [f"CPI-date repeat ({CPI_ABSENT})"]}
+    if cpi_days is not None:
+        clear = events_clear_of(gvz, cpi_set, fomc_days)
+        rep["cpi_repeat"] = {"gvz": index_event_change(gvz, cpi_set, start, end, n_boot, seed, control_exclude=fomc_days),
+                             "vix": index_event_change(vix, cpi_set, start, end, n_boot, seed, control_exclude=fomc_days) if vix else None,
+                             "gvz_windows_without_fomc": index_event_change(gvz, clear, start, end, n_boot, seed, control_exclude=fomc_days),
+                             "control": "weekday-matched non-macro days (no FOMC or CPI day in the 2-close window)"}
+        cr = rep["cpi_repeat"]
+        cpi_txt = (f"; CPI-date repeat (reported, not a criterion): GVZ {_chg_txt(cr['gvz'])}, windows without an FOMC day {_chg_txt(cr['gvz_windows_without_fomc'])}"
+                   + (f", VIX {_chg_txt(cr['vix'])}" if cr["vix"] else ""))
+    else:
+        cpi_txt = f"; CPI-date repeat not run ({CPI_ABSENT})"
     if g["n"] < min_n:
-        rep.update(verdict="inconclusive", reason=f"only {g['n']} FOMC decision days with GVZ closes either side in {start}..{end} (min_n {min_n})")
+        rep.update(verdict="inconclusive", reason=f"only {g['n']} FOMC decision days with GVZ closes either side in {start}..{end} (min_n {min_n}){cpi_txt}")
         return rep
     v, why = _verdict([("mean GVZ change < 0 with 95% CI excluding 0", g["mean"] < 0 and g["ci"][1] < 0)])
     rep["verdict"] = v
     vc = rep["vix_positive_control"]
     rep["reason"] = (f"GVZ change from the close before to the close after {g['n']} scheduled FOMC decision days ({g['first_event']}..{g['last_event']}): "
                      f"mean {g['mean']:+.3f} vol pts (95% CI {g['ci'][0]:+.3f} to {g['ci'][1]:+.3f}), {g['share_declining']*100:.0f}% declining (sign-test p={g['sign_test_p']:.4f}); "
-                     f"weekday-matched non-event 2-day change {('n/a' if g['matched_control_mean'] is None else format(g['matched_control_mean'], '+.3f'))}"
+                     f"weekday-matched {'non-macro' if cpi_days is not None else 'non-event'} 2-day change {('n/a' if g['matched_control_mean'] is None else format(g['matched_control_mean'], '+.3f'))}"
                      + (f"; VIX positive control {vc['mean']:+.3f} pts (95% CI {vc['ci'][0]:+.3f} to {vc['ci'][1]:+.3f})" if vc and vc.get("mean") is not None else "")
-                     + f" — {why}")
+                     + f"{cpi_txt} — {why}")
     return rep
 
 
@@ -804,32 +948,35 @@ def fomc_pre_drift_oos(archive):
 
 
 def fomc_btc_event_straddle(archive):
-    """T-221: MODEL-PRICED 1-day ATM BTC straddle on FOMC vs non-FOMC days (DVOL as IV), since April 2021."""
+    """T-221: MODEL-PRICED 1-day ATM BTC straddle on FOMC vs non-FOMC days (DVOL as IV), since April 2021 (pooled
+    FOMC+CPI variant and non-macro control reported when ``macro-release-cpi`` is archived)."""
     miss = _missing(archive, ["daily-history-BTC-USD", "deribit-dvol-BTC-history", "fomc-meetings"])
     if miss:
         return miss
     days, closes = _prices(archive, "BTC-USD", adjusted=False)
     vix = _index(archive, "cboe-VIX-history") if _has(archive, "cboe-VIX-history") else None
-    return _wrap(btc_event_straddle(days, closes, _index(archive, "deribit-dvol-BTC-history"), _fomc(archive), vix=vix))
+    return _wrap(btc_event_straddle(days, closes, _index(archive, "deribit-dvol-BTC-history"), _fomc(archive), vix=vix, cpi_days=_cpi(archive)))
 
 
 def fomc_gvz_event_change(archive):
-    """T-273: GVZ change from the close before to the close after FOMC decision days, 2009-10..2026-09."""
+    """T-273: GVZ change from the close before to the close after FOMC decision days, 2009-10..2026-09 (CPI-date repeat
+    reported when ``macro-release-cpi`` is archived)."""
     miss = _missing(archive, ["cboe-GVZ-history", "fomc-meetings"])
     if miss:
         return miss
     vix = _index(archive, "cboe-VIX-history") if _has(archive, "cboe-VIX-history") else None
-    return _wrap(gvz_fomc_change(_index(archive, "cboe-GVZ-history"), _fomc(archive), vix=vix))
+    return _wrap(gvz_fomc_change(_index(archive, "cboe-GVZ-history"), _fomc(archive), vix=vix, cpi_days=_cpi(archive)))
 
 
 def fomc_statement_day_drift(archive):
-    """T-341: SPY statement-day return minus other days >= 15 bps (1994-2026), positive 2016-2026."""
+    """T-341: SPY statement-day return minus other days >= 15 bps (1994-2026), positive 2016-2026 (CPI-overlap flag
+    reported when ``macro-release-cpi`` is archived)."""
     miss = _missing(archive, ["daily-history-SPY", "fomc-meetings"])
     if miss:
         return miss
     days, closes = _prices(archive, "SPY", adjusted=True)
     sec = {s: _prices(archive, s, adjusted=True) for s in ("QQQ", "IWM", "TLT", "GLD", "BTC-USD") if _has(archive, "daily-history-" + s)}
-    return _wrap(statement_day_effect(days, closes, _fomc(archive), secondary=sec))
+    return _wrap(statement_day_effect(days, closes, _fomc(archive), secondary=sec, cpi_days=_cpi(archive)))
 
 
 def fomc_cycle_even_weeks(archive):

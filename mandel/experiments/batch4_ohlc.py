@@ -42,7 +42,10 @@ Model pricing (T-216) is Black-Scholes with sigma = VIX/100, T = 1/252, r = 0 an
 30-day index cannot see any expiry-specific premium that traded weekly options carry. The straddle settles on the
 raw closes, |SPY_Fri - SPY_Thu|, as the procedure states; on an ex-dividend Friday the known cash dividend (declared
 before the ex-date) is priced into the forward, S_thu - D. The r = q = 0 price without the dividend is reported as
-the as-worded sensitivity.
+the as-worded sensitivity. Its "exclude opex days with FOMC/CPI" control reads CPI release days from
+``macro-release-cpi`` (ALFRED vintage dates of CPIAUCSL, 08:30 ET, revision-only vintages dropped by
+``batch5_macro.release_days_from_rows``); the bundle is loaded only for that control, and without it the CPI part is
+listed under ``not_run``.
 """
 
 from __future__ import annotations
@@ -53,6 +56,7 @@ from typing import NamedTuple, Optional, Sequence
 
 import numpy as np
 
+from mandel.experiments.batch5_macro import release_days_from_rows, to_sessions
 from mandel.experiments.overfit import pbo_cscv
 from mandel.experiments.underlying2 import _mean_ci, _sharpe_diff_lower, _sr, _verdict
 from mandel.experiments.volatility import index_closes
@@ -163,6 +167,21 @@ def _missing(archive, names: Sequence[str]):
     if miss:
         return {"missing_bundles": miss}, 0, "inconclusive", f"missing data bundles {miss}: the claim cannot be tested until they are archived"
     return None
+
+
+CPI_BUNDLE = "macro-release-cpi"
+
+
+def _cpi_days(archive) -> Optional[list]:
+    """CPI release days (08:30 ET) from ``macro-release-cpi``, rows available at the bundle's capture only, revision-only
+    vintages dropped (``batch5_macro.release_days_from_rows``). None when the bundle is not archived."""
+    if _missing(archive, [CPI_BUNDLE]):
+        return None
+
+    def load():
+        cap = archive.get(CPI_BUNDLE).created_at
+        return release_days_from_rows([r for r in archive.load(CPI_BUNDLE) if not (cap and r.get("available_at") and r["available_at"] > cap)], "cpi")[0]
+    return _cached(archive, ("cpi",), load)
 
 
 def _clean(x):
@@ -936,13 +955,17 @@ def thu_fri_straddles(days: Sequence[str], closes, vix: dict, divs=None, T: floa
 
 def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: Optional[set] = None, start: Optional[str] = None,
                   end: Optional[str] = None, block: int = 8, n_boot: int = 4000, seed: int = 0, min_n: int = 300, n_perm: int = 5000,
-                  split: str = "2010-01-01") -> dict:
+                  split: str = "2010-01-01", cpi_days: Optional[Sequence[str]] = None) -> dict:
     """T-216 (MODEL-PRICED): mean short-straddle P&L on monthly third-Friday expirations minus other Fridays. Pass:
     difference > 0 with the two-sided 95% block-bootstrap CI (block of ``block`` Fridays) excluding 0, over >= 300
     opex Fridays. Settlement on the raw closes |SPY_Fri - SPY_Thu|; the known ex-date dividend is priced into the
     forward. Secondary: distance of the Friday close to the nearest $1 strike, opex vs other (permutation test).
-    Controls: FOMC-day exclusion, quarterly vs other opex, pre/post-2010. Sensitivities: the as-worded r = q = 0 price
-    that ignores the dividend, and all ex-dividend Fridays dropped."""
+    Controls (reported, not criteria): FOMC-day exclusion, the trial's "exclude opex days with FOMC/CPI" (with
+    ``cpi_days``: an opex Friday is dropped when it is the first session on or after a CPI release, whose 08:30 ET print
+    falls inside the Thursday-close-to-Friday-close window, or when it or its Thursday is a scheduled FOMC decision day;
+    reported with a block-bootstrap CI, with the same Fridays also out of the non-opex group, and with Thursday CPI
+    releases, which come before the sale, also dropped), quarterly vs other opex, pre/post-2010. Sensitivities: the
+    as-worded r = q = 0 price that ignores the dividend, and all ex-dividend Fridays dropped."""
     fri, pnl, pnl_raw, prem = thu_fri_straddles(days, closes, vix, divs)
     fr = np.array(fri)
     m = _range_mask(fr, start, end) if len(fr) else np.zeros(0, dtype=bool)
@@ -969,13 +992,40 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
             "monthly_only_opex_minus_other_bps": float((pnl[ox & ~quarterly].mean() - pnl[~ox].mean()) * 1e4) if np.any(ox & ~quarterly) else None}
     for nm, msk in (("pre_" + split[:4], fr < split), ("post_" + split[:4], fr >= split)):
         ctrl[nm + "_diff_bps"] = float((pnl[msk & ox].mean() - pnl[msk & ~ox].mean()) * 1e4) if np.any(msk & ox) and np.any(msk & ~ox) else None
+    di = {d: i for i, d in enumerate(days)}
+    near = np.zeros(len(fr), dtype=bool)
     if fomc_days:
-        di = {d: i for i, d in enumerate(days)}
-        near = np.array([d in fomc_days or days[di[d] - 1] in fomc_days for d in fr])
+        near = np.array([d in fomc_days or days[di[d] - 1] in fomc_days for d in fr], dtype=bool)
         k = ~(near & ox)
         ctrl["ex_fomc_opex_diff_bps"] = float((pnl[k & ox].mean() - pnl[k & ~ox].mean()) * 1e4)
         ctrl["n_opex_fomc_excluded"] = int((near & ox).sum())
-    ctrl["cpi_exclusion"] = "not implemented: no CPI release calendar in the archive"
+    not_run, macro_txt = [], ""
+    if cpi_days is not None:
+        cs = set(to_sessions(cpi_days, list(days))[0])                   # first session on or after each 08:30 ET release
+        cpi_fri = np.array([d in cs for d in fr], dtype=bool)             # released inside the Thu-close -> Fri-close window
+        cpi_thu = np.array([days[di[d] - 1] in cs for d in fr], dtype=bool)   # released before Thursday's close (the sale)
+        macro = near | cpi_fri
+        k = ~(macro & ox)
+        gx = group_diff(pnl[k], ox[k], block, n_boot, seed)
+        kc = ~(cpi_fri & ox); kb = ~macro; kt = ~((macro | cpi_thu) & ox)
+        pdiff = lambda m: float((pnl[m & ox].mean() - pnl[m & ~ox].mean()) * 1e4) if np.any(m & ox) and np.any(m & ~ox) else None
+        ctrl["ex_cpi_opex_diff_bps"] = pdiff(kc)
+        ctrl["n_opex_cpi_excluded"] = int((cpi_fri & ox).sum())
+        ctrl["ex_fomc_cpi_opex"] = {
+            "rule": "opex Fridays dropped when the Friday is a CPI release session (08:30 ET, inside the straddle window) or the "
+                    "Friday or its Thursday is a scheduled FOMC decision day; other Fridays kept",
+            "n_opex_excluded": int((macro & ox).sum()), "n_opex_left": gx["n_flag"],
+            "diff_bps": None if gx["diff"] is None else gx["diff"] * 1e4,
+            "ci_bps": [None if c_ is None else c_ * 1e4 for c_ in gx["ci"]], "p": gx["p"],
+            "macro_fridays_out_of_both_groups_diff_bps": pdiff(kb), "n_fridays_out_of_both_groups": int(macro.sum()),
+            "also_thursday_cpi_diff_bps": pdiff(kt), "n_opex_thursday_cpi": int((cpi_thu & ox).sum())}
+        e = ctrl["ex_fomc_cpi_opex"]
+        macro_txt = (f"; control, opex Fridays with FOMC/CPI excluded ({e['n_opex_excluded']} dropped, {ctrl['n_opex_cpi_excluded']} for CPI): "
+                     + (f"{e['diff_bps']:+.2f} bps (CI {e['ci_bps'][0]:+.2f}..{e['ci_bps'][1]:+.2f})" if e["diff_bps"] is not None else "n/a")
+                     + (f", out of both groups {e['macro_fridays_out_of_both_groups_diff_bps']:+.2f}" if e["macro_fridays_out_of_both_groups_diff_bps"] is not None else ""))
+    else:
+        not_run.append("CPI part of the FOMC/CPI opex exclusion control (macro-release-cpi not archived)")
+        macro_txt = "; CPI exclusion control not run (macro-release-cpi not archived)"
     C = np.asarray(closes, dtype=float)
     fri_i = [i for i, d in enumerate(days) if date.fromisoformat(d).weekday() == 4 and (not start or d >= start) and (not end or d <= end)]
     dist = np.array([abs(C[i] - round(C[i])) for i in fri_i])
@@ -1002,7 +1052,7 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
                ex_dividend_fridays_excluded={"n_excluded": int(exd.sum()), "n_opex": g_nodiv["n_flag"],
                                              "diff_bps": g_nodiv["diff"] * 1e4 if nd_ok else None,
                                              "ci_bps": [g_nodiv["ci"][0] * 1e4, g_nodiv["ci"][1] * 1e4] if nd_ok else [None, None]},
-               controls=ctrl, strike_pin=pin, verdict=v,
+               controls=ctrl, not_run=not_run, strike_pin=pin, verdict=v,
                reason=(f"MODEL-PRICED (BS, sigma = Thursday VIX, T=1/252): {n} opex vs {int((~ox).sum())} other Fridays "
                        f"{rep['first']}..{rep['last']}; short-straddle P&L {g['mean_flag'] * 1e4:+.2f} vs {g['mean_other'] * 1e4:+.2f} bps of spot, "
                        f"difference {g['diff'] * 1e4:+.2f} bps (95% block-{block} CI {lo * 1e4:+.2f}..{hi * 1e4:+.2f}, p={g['p']:.3f}); "
@@ -1010,7 +1060,7 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
                        f"{int(exd.sum())} ex-dividend Fridays ({n_exd_opex} of them opex); as-worded sensitivity at r = q = 0 ignoring the dividend: "
                        f"{g_raw['diff'] * 1e4:+.2f}, CI {g_raw['ci'][0] * 1e4:+.2f}..{g_raw['ci'][1] * 1e4:+.2f} ({v_raw.replace('_', ' ')}"
                        f"{', so the verdict depends on how the dividend is treated' if v_raw != v else ''}); with all ex-dividend Fridays dropped: "
-                       f"{nd_txt}; $1-strike distance opex {pin.get('opex_mean_distance', float('nan')):.3f} vs "
+                       f"{nd_txt}{macro_txt}; $1-strike distance opex {pin.get('opex_mean_distance', float('nan')):.3f} vs "
                        f"{pin.get('other_mean_distance', float('nan')):.3f} (perm p={pin.get('p_opex_closer', float('nan')):.3f}) — {why}"))
     return rep
 
@@ -1024,7 +1074,8 @@ def ohlc_opex_pin_straddle(archive):
         return miss
     b = _bars(archive, "SPY")
     fomc = _fomc_days(archive) if _has(archive, "fomc-meetings") else None
-    return _wrap(opex_straddle(b.days, b.close, _index(archive, "cboe-VIX-history"), ex_dividends(b.close, b.adj), fomc_days=fomc))
+    return _wrap(opex_straddle(b.days, b.close, _index(archive, "cboe-VIX-history"), ex_dividends(b.close, b.adj), fomc_days=fomc,
+                               cpi_days=_cpi_days(archive)))
 
 
 DONCHIAN_ASSETS = {"SPY": 0.0005, "QQQ": 0.0005, "GLD": 0.0005, "SLV": 0.0005, "XLK": 0.0005, "XLE": 0.0005,
