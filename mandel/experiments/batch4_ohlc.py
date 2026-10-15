@@ -48,6 +48,11 @@ Statistics
   >= 4 resampling units (blocks or clusters). Any other failure there is undecided (None), so the verdict is
   inconclusive; with too little data for the statistics at all the verdict is inconclusive. The criteria judged and
   the decisive failures are reported under ``rule5``.
+* House rule 10 (no arbitrary grid phase) does not bind here: no statistic rests on a non-overlapping cycle grid.
+  T-216 compares calendar dates (monthly third Fridays vs other Fridays); T-332, T-333 and T-348 use every trading day;
+  T-421's regression uses every overlapping daily row (20-day blocks, as the trial names) and its event count is the
+  maximal set of shocks spaced >= 20 days (greedy interval scheduling, so no start phase); T-304 and T-324 trade
+  signal-driven rules whose trades do not depend on the scan's first day beyond the warm-up trade.
 
 Model pricing (T-216) is Black-Scholes with sigma = VIX/100, T = 1/252, r = 0 and labelled MODEL-PRICED: a flat
 30-day index cannot see any expiry-specific premium that traded weekly options carry. The straddle settles on the

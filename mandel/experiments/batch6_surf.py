@@ -1407,7 +1407,7 @@ def put_spread_skew(days, spx, skew, vix, rate, qy, atm_ratio: float, kappa: flo
               f"{int(held.min())}-{int(held.max())} sessions held; settled on the expiry session's close as the proxy for the AM settlement; "
               f"{days[ts[0]]}..{days[te[-1]]}"
               + (f"; {n_drop} unpriceable dropped" if n_drop else "")
-              + (f"; {n_stale} entries on a carried SKEW/VIX print" if n_stale else "")
+              + (f"; {n_stale} entr{'y' if n_stale == 1 else 'ies'} on a carried SKEW/VIX print" if n_stale else "")
               + (f"; {n_qa} entries up to {days[ts[qa[ts]][-1]]} price on an ASSUMED dividend yield, see q" if n_qa else "")
               + f"), {n_low} with SKEW below its trailing 20th percentile; "
               f"mean payoff/debit low-SKEW {_f(b0['mean_low'], 3)} vs all {_f(b0['mean_all'], 3)}: difference {_s(b0['diff'], 3)} "
@@ -1869,6 +1869,7 @@ def vvix_win_rate(days, vvix, vix, window: int = MONTH, bound: float = 0.70, blo
     hw = [float(p.mean()) for p in np.array_split(win, 2)]
     ovl_all = np.maximum(ts[:-1] + window - ts[1:], 0)
     ovl, n_ovl3 = int(ovl_all.max()), int((ovl_all > 2).sum())
+    ovl_months = [days[ts[i]][:7] for i in np.nonzero(ovl_all > 2)[0]]
     # rule 10: the 21-session grid (reported)
     gi = np.arange(int(ts[0]), m_all, dtype=np.int64)
     gi = gi[okv[gi]]
@@ -1896,8 +1897,8 @@ def vvix_win_rate(days, vvix, vix, window: int = MONTH, bound: float = 0.70, blo
     verdict, why = _decide(crit, n, min_n, "calendar months")
     reason = (f"VVIX above the realised 21d vol of daily log changes in spot VIX in {k} of {n} calendar months, each entered at "
               f"its first session with a VVIX print ({days[ts[0]]}..{days[ts[-1]]}; spot-VIX changes over 21 sessions of the "
-              f"trading calendar; a window runs at most {ovl} session(s) into the next month's, {n_ovl3} by more than 2, all where "
-              f"VVIX's history is sparse): win rate {k/n:.3f}, one-sided 95% lower bound Clopper-Pearson {cp1[0]:.3f} / "
+              f"trading calendar; a window runs at most {ovl} session(s) into the next month's window, {n_ovl3} by more than 2"
+              + (f": {', '.join(ovl_months[:6])}" if ovl_months else "") + f"): win rate {k/n:.3f}, one-sided 95% lower bound Clopper-Pearson {cp1[0]:.3f} / "
               f"block bootstrap {b_lo1:.3f} (two-sided exact {cp2[0]:.3f}-{cp2[1]:.3f}) vs {bound:.2f}; mean premium "
               f"{prem.mean():+.1f} vol pts, halves {halves[0]:+.1f}/{halves[1]:+.1f} (win rates {hw[0]:.2f}/{hw[1]:.2f}). Rule 10 "
               f"grid sensitivity (reported): all {gi.size} daily entries pooled win rate {gwin.mean():.3f} (one-sided lower "
@@ -1910,7 +1911,7 @@ def vvix_win_rate(days, vvix, vix, window: int = MONTH, bound: float = 0.70, blo
             "boot_lower_one_sided": b_lo1, "lower_bound": lb, "mean_premium": float(prem.mean()), "premium_halves": halves,
             "win_rate_halves": hw, "spx_vrp_win_rate": spx_wr, "placebo_win_rate": plc, "first_window": days[ts[0]],
             "last_window": days[ts[-1]], "calendar": "calendar months, first session with a VVIX print",
-            "max_window_overlap": ovl, "windows_overlapping_over_2": n_ovl3,
+            "max_window_overlap": ovl, "windows_overlapping_over_2": n_ovl3, "months_overlapping_over_2": ovl_months,
             "grid_pooled_rate": float(gwin.mean()), "grid_pooled_lower": g_lo, "grid_offsets": gcp,
             "verdict": verdict, "reason": reason + " — " + why}
 
