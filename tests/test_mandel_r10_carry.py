@@ -4,8 +4,8 @@ Two harnesses rest on a grid whose phase the claim does not fix. T-198's "non-ov
 name no window calendar: a window now starts on every day from 2020-01-01, both criteria are judged on that pooled
 all-start set (circular-block bootstrap in blocks of 180 daily starts) and the 90 per-offset grids are reported. T-364's
 weekly observations name no weekday: the five weekday phases are pooled (each labelled from its own trailing 52
-observations, blocks of 8 weeks of pooled entries) and each phase is reported. n stays in the claims' units (windows,
-weeks). The other six are calendar-month (T-258), CME contract-calendar (T-362), daily (T-303, T-363), signal-driven
+observations, blocks of 9 weeks = 45 pooled entries, >= 2 x the 30-day horizon; the episode count is the most any single
+phase holds, never the union) and each phase is reported. n stays in the claims' units (windows, weeks). The other six are calendar-month (T-258), CME contract-calendar (T-362), daily (T-303, T-363), signal-driven
 (T-329) or daily event-study (T-423) tests; the last tests pin the calendar anchoring of T-258 and T-362."""
 
 from datetime import date, timedelta
@@ -169,7 +169,8 @@ def test_t364_pooled_over_weekday_phases_matches_the_union_and_reports_each_phas
                                    phase_labels=cy.WEEKDAY_PHASES)
     singles = [cy.basis_crash_predictor(*ph, pdays, px, n_perm=NB) for ph in phases]
     r10 = rep["rule10"]
-    assert r10["phases"] == list(cy.WEEKDAY_PHASES) and r10["pooled_block_entries"] == 8 * 5
+    assert r10["phases"] == list(cy.WEEKDAY_PHASES) and r10["pooled_block_entries"] == 9 * 5 == 45  # 9 weeks x 5 phases
+    assert r10["pooled_block_weeks"] == 9 and r10["block_weeks"] == 8                # per phase: the trial's 8 weeks
     assert rep["n"] == singles[0]["n"]                                             # n in ISO weeks, not observations
     assert r10["pooled_entries"] == sum(s["n"] for s in singles)
     tops = sum(s["mean_depth_top"] * cnt for s, cnt in zip(singles, [r10["per_phase"][k]["top"] for k in cy.WEEKDAY_PHASES]))
@@ -181,6 +182,7 @@ def test_t364_pooled_over_weekday_phases_matches_the_union_and_reports_each_phas
         x = r10["per_phase"][k]
         assert x["gap_pp"] == pytest.approx(s["gap_pp"]) and x["p_perm"] == pytest.approx(s["p_perm"])
         assert x["episodes"] == s["episodes"] and x["weeks"] == s["n"]
+    assert rep["episodes"] == max(s["episodes"] for s in singles)                  # the best single phase, not the union
     assert r10["gap_range_pp"] == pytest.approx([min(s["gap_pp"] for s in singles), max(s["gap_pp"] for s in singles)])
     assert r10["n_phases_all_pass"] == 5 and rep["verdict"] == "supported", rep["reason"]
     head = rep["reason"].split(" — ")[0]
@@ -214,8 +216,76 @@ def test_t364_rule5_below_min_n_uses_the_pooled_blocks(monkeypatch):
     rep = cy.basis_crash_predictor(*phases[0], pdays, px, n_perm=NB, more_phases=phases[1:], end="2023-12-31",
                                    phase_labels=cy.WEEKDAY_PHASES)
     assert rep["n"] < 350 and "rule5" in rep
-    assert seen and all(b == 40 for _, b in seen) and seen[0][0] == rep["rule10"]["pooled_entries"]
+    # the rule-5 bootstrap uses the permutation's pooled blocks: 9 weeks x 5 phases = 45 entries, >= 2 x the 30-day horizon
+    assert seen and all(b == 45 for _, b in seen) and seen[0][0] == rep["rule10"]["pooled_entries"]
     assert rep["verdict"] == "not_supported" and rep["rule5"]["decisive_failures"]
+    assert "9-week (45 pooled entries, >= 2 x the 30-day horizon) block-bootstrap" in rep["reason"]
+    # a single phase keeps the trial's 8-week blocks
+    seen.clear()
+    one = cy.basis_crash_predictor(*phases[0], pdays, px, n_perm=NB, end="2023-12-31")
+    assert "rule5" in one and seen and all(b == 8 for _, b in seen)
+
+
+@pytest.mark.parametrize("horizon", [30, 45])
+def test_t364_pooled_blocks_span_at_least_twice_the_horizon(horizon):
+    # house rule 10: the pooled entries overlap (a 30-day forward drawdown, a 30-day flat hold), so a pooled block of
+    # P phases' entries must span >= 2 x the horizon in days: entries x 7 / P >= 2 x horizon (9 weeks = 45 at 30 days)
+    phases, pdays, px = _phased_crash({0, 1, 2, 3, 4})
+    rep = cy.basis_crash_predictor(*phases[0], pdays, px, n_perm=50, horizon=horizon, more_phases=phases[1:],
+                                   phase_labels=cy.WEEKDAY_PHASES)
+    r10 = rep["rule10"]
+    assert r10["pooled_block_entries"] * 7 / 5 >= 2 * horizon
+    assert r10["pooled_block_entries"] == 5 * r10["pooled_block_weeks"] == 5 * max(8, -(-2 * horizon // 7))
+    if horizon == 30:
+        assert r10["pooled_block_entries"] == 45 and "blocks of 9 weeks = 45 pooled entries" in rep["reason"]
+
+
+def _rotating_crash(seed=0):
+    """A ~30% fall starts on the Saturday of every 13th week, as in ``_phased_crash``; the basis declines slowly (every
+    quiet week is bottom half, none top decile) and spikes on crash weeks, but phase p spikes only on every fifth crash
+    (crashes p, p + 5, ...). Each phase alone holds at most 7 non-overlapping top-decile episodes; the five phases'
+    top-decile days together hold 30-odd."""
+    rng = np.random.default_rng(seed)
+    mondays = [d for d in _days("2017-12-04", "2026-09-28") if date.fromisoformat(d).weekday() == 0]
+    pdays = _days("2017-11-01", "2026-12-31")
+    pos = {d: i for i, d in enumerate(pdays)}
+    r = 0.01 * rng.standard_normal(len(pdays))
+    spikes = list(range(5, len(mondays), 13))
+    for k in spikes:
+        i = pos[mondays[k]]
+        r[i + 5:i + 15] = -0.035
+    px = 100 * np.cumprod(1 + r)
+    phases = []
+    for p in range(5):
+        wd = [(date.fromisoformat(m) + timedelta(days=p)).isoformat() for m in mondays]
+        b = 0.10 - 1e-5 * np.arange(len(wd))
+        b[spikes[p::5]] = 0.20
+        phases.append((wd, b))
+    return phases, pdays, px
+
+
+def test_t364_pooled_episodes_are_the_best_single_phase_not_the_union():
+    # every phase alone has <= 7 episodes (insufficient events); a greedy count over the union of their top-decile days
+    # has 30-odd and would turn the inconclusive into a supported. The pooled count is the best single phase's.
+    phases, pdays, px = _rotating_crash()
+    rep = cy.basis_crash_predictor(*phases[0], pdays, px, n_perm=NB, more_phases=phases[1:],
+                                   phase_labels=cy.WEEKDAY_PHASES)
+    r10 = rep["rule10"]
+    per_eps = [r10["per_phase"][k]["episodes"] for k in cy.WEEKDAY_PHASES]
+    assert max(per_eps) <= 7 and rep["episodes"] == max(per_eps)
+    top_days = [date.fromisoformat(w).toordinal() for wd, b in phases for w, x in zip(wd, b)
+                if x == 0.20 and "2018-12-01" <= w <= "2026-09-30"]
+    assert len(top_days) == sum(r10["per_phase"][k]["top"] for k in cy.WEEKDAY_PHASES)  # the planted spikes are the tops
+    assert cy._episodes(top_days, 30) >= 8                                           # the union would have passed
+    crit = dict(rep["criteria"])
+    assert crit["at least 8 non-overlapping top-decile episodes (else insufficient events)"] is None
+    assert all(v is True for k, v in crit.items() if "episodes" not in k)          # everything else passes
+    assert rep["verdict"] != "supported" and rep["verdict"] == "inconclusive", rep["reason"]
+    assert f"{max(per_eps)} non-overlapping episodes in the best single phase (need >= 8)" in rep["reason"]
+    # the same data with a 7-episode bar is supported: the episode count was the only thing holding it back
+    rep7 = cy.basis_crash_predictor(*phases[0], pdays, px, n_perm=NB, more_phases=phases[1:],
+                                    phase_labels=cy.WEEKDAY_PHASES, min_episodes=max(per_eps))
+    assert rep7["verdict"] == "supported", rep7["reason"]
 
 
 def test_t364_harness_passes_every_weekday_phase(monkeypatch):
