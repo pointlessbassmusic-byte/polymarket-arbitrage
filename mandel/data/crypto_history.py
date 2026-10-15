@@ -65,9 +65,10 @@ Sources, endpoints and point-in-time rules (every row: {source, kind, key, obser
    &convertId=2781``: the point-in-time ranking for that date, dead coins included (BitConnect id 1513 on
    2018-01-07); limit=500 answered 500 rows. Rows: kind ``listing`` value = {date, id, symbol, slug, name, cmcRank,
    price, volume24h, marketCap, circulatingSupply, totalSupply, maxSupply, percentChange24h, percentChange7d,
-   dateAdded, lastUpdated, platform, flags (the coin's tags that mark stablecoins / wrapped / tokenized / staked
-   assets, for the declared exclusion lists)}, plus one kind ``snapshot`` row per date (n coins, depth).
-   observed_at = the coin's lastUpdated (about 23:59 UTC on the date); available_at = the next day 00:00 UTC.
+   dateAdded, lastUpdated, platform, flags (the coin's tags that mark stablecoins / wrapped / tokenized / bridged /
+   liquid-staking assets, for the declared exclusion lists)}, plus one kind ``snapshot`` row per date (n coins, depth).
+   The snapshot price for date D is D's close (it equals CMC's daily OHLC close; checked on 2026-10-10..12), so
+   observed_at = D 23:59:59 UTC and available_at = D + 1 day 00:00 UTC.
    CMC prices are cross-exchange VWAPs and volume24h includes wash trades; CMC can revise history (exchange
    removals), so these are near point in time, not vintage-stamped. ``.../data-api/v3.1/cryptocurrency/historical?
    id=<id>&convertId=2781&timeStart=<s>&timeEnd=<s>&interval=daily`` returns at most the latest 400 days of the range
@@ -111,6 +112,21 @@ with tag ``partial`` and fetched again on the next run. A bundle whose paging fa
 (``max_calls``), is never stored. Snapshot bundles (CMC, Kraken episodes, iShares) merge new dates into the stored
 bundle with ``mandel.data.deribit_history._merge_store`` (streamed) and skip dates already stored. A long run can be
 interrupted at any point: what was stored stays, and the next run continues.
+
+Estimates (``dry_run``, 2026-10-15; gzip bytes per row measured on the live previews in fetch6c/crypto; minutes at ``PACE``):
+  * coinbase-daily-*: ~493 bundles (492 USD products + CBETH-ETH), 6.9k calls, ~0.57M rows, ~16 MB, ~29 min.
+  * coinbase-hourly-*: ~110 bundles (depends on the candidate ranking), ~12.5k calls, ~3.4M rows, ~125 MB, ~52 min.
+  * coinbase-1m-BTC-USD-*: 58 bundles, 8.4k calls, 2.5M rows, ~83 MB, ~35 min.
+  * kraken-trades-1m-XBTUSD-*: 58 bundles, ~67k calls, 2.5M rows, ~250 MB, ~18.6 h at 1 call/s (busy days page 4x more:
+    2026-10-15 printed 166k trades in 19 hours). Run it as its own process next to the rest: the hosts differ and the
+    archive serialises concurrent writers.
+  * kraken-trades-stablecoin-episodes: ~200 calls, ~0.19M rows, ~6 MB, ~4 min (the 2023-03-11 USDC window pages more).
+  * cmc-historical-listings: 926 calls, 0.46M rows, ~42 MB, ~19 min; cmc-daily-listings-*: 3,270 calls, 0.66M rows, ~68 MB,
+    ~65 min.
+  * coinmetrics-*-daily: 7 calls, 25k rows, ~1 MB; btc-hashrate-daily: 1 call, 6.5k rows; defillama: 5 calls (the /pools
+    snapshot is 11.5 MB raw, 2.5 MB stored); ishares: 1 call.
+  * Default total: ~99k calls, ~10.3M rows, ~595 MB gzip, ~22 hours (18.6 of them Kraken). Optional: cmc-coin-daily-*
+    ~2.7k calls, ~41 MB, ~54 min; coinbase-trades-1m-BTC-USD-2025-01 ~14k calls, ~58 min.
 
 Every ``fetch_*`` takes ``store`` (an Archive, an ObservationStore whose ``.archive`` is used, or None to store
 nothing), ``limit`` (bundles, or snapshot dates for CMC), ``dry_run`` (no request: the plan with calls, rows, gzip MB
@@ -306,13 +322,13 @@ def _recipe(core: str, licence: str) -> str:
 PACE = {"coinbase": 0.25, "kraken": 1.0, "cmc": 1.2, "coinmetrics": 0.7, "blockchain": 1.0, "llama": 0.5, "ishares": 2.0}
 LATENCY = {"coinbase": 0.2, "kraken": 0.32, "cmc": 0.6, "coinmetrics": 0.6, "blockchain": 0.8, "llama": 1.2, "ishares": 0.9}
 # gzip bytes per stored row (compresslevel 9), measured on the 2026-10-15 previews (fetch6c/crypto)
-ROW_GZ = {"cb_daily": 46, "cb_hourly": 40, "cb_1m": 37, "kraken_1m": 95, "kraken_trade": 45, "cmc": 70, "cm": 60,
-          "hash": 30, "llama_chart": 45, "llama_pool": 140, "ishares": 60, "products": 120, "cmc_coin": 80}
+ROW_GZ = {"cb_daily": 28, "cb_hourly": 37, "cb_1m": 33, "kraken_1m": 100, "kraken_trade": 30, "cmc_weekly": 91, "cmc_daily": 104,
+          "cm": 40, "hash": 25, "llama_chart": 33, "llama_pool": 148, "ishares": 25, "products": 19, "cmc_coin": 91}
 CB_USD_PRODUCTS = 492               # USD-quoted products on 2026-10-15 (online + delisted); dry-run estimate only
 CB_DAILY_ROWS_AVG = 1150            # mean daily bars per USD product (listing to delisting); dry-run estimate only
 CB_HOURLY_CANDIDATES = 110          # products ever in the top HOURLY_TOP_K, 2019-2026; dry-run estimate only
 CB_HOURLY_YEARS_AVG = 3.6           # mean years of hourly history per candidate inside 2019-01 .. now; estimate only
-CB_TRADES_PER_DAY = 600_000         # Coinbase BTC-USD trades per day (2025); estimate only
+CB_TRADES_PER_DAY = 450_000         # Coinbase BTC-USD trades per day (about 300 a minute on 2026-10-14); estimate only
 KRAKEN_TRADES_PER_DAY = {2022: 26_100, 2023: 32_600, 2024: 32_600, 2025: 51_500, 2026: 51_500}   # from trade ids by date
 CMC_COINS_OPTIONAL = 300            # coins ever in the top 30 by volume24h (optional per-coin history); estimate only
 
@@ -619,9 +635,10 @@ def fetch_coinbase_hourly(store=None, products: Optional[Iterable[str]] = None, 
                           refresh: bool = False, max_calls: Optional[int] = None, min_interval: float = PACE["coinbase"],
                           retries: int = 4, backoff: float = 1.0, report: Optional[dict] = None, rows_out: Optional[dict] = None,
                           client: Optional[httpx.Client] = None, log: Optional[Callable] = None, **_) -> dict:
-    """``coinbase-hourly-<PID>``: hourly candles from max(first, the product's first daily bar) to min(now, its last daily
-    bar + 1 day). Without ``products``: CB_ALWAYS_HOURLY plus ``hourly_candidates`` computed from the stored
-    coinbase-daily-* bundles (fetch those first)."""
+    """``coinbase-hourly-<PID>``: hourly candles from max(first, the product's first daily bar) to the last closed hour, or
+    to its last daily bar + 1 day when that bar is more than 7 days older than the daily bundle (delisted or halted).
+    Without ``products``: CB_ALWAYS_HOURLY plus ``hourly_candidates`` computed from the stored coinbase-daily-* bundles
+    (fetch those first)."""
     archive, rep, c, own, th = _setup(store, report, client, min_interval)
     try:
         last_s = min(_ts(last) + DAY - 3600, _last_closed(3600)) if last else _last_closed(3600)
@@ -647,7 +664,12 @@ def fetch_coinbase_hourly(store=None, products: Optional[Iterable[str]] = None, 
             for p in pids:
                 d = daily.get(p) or {}
                 if d:
-                    spans[p] = (max(_ts(first), _ts(min(d))), min(last_s, _ts(max(d)) + DAY - 3600))
+                    try:
+                        fetched = datetime.fromisoformat(archive.get(f"coinbase-daily-{p}").created_at).timestamp()
+                    except (KeyError, AttributeError, ValueError):
+                        fetched = _now_s()
+                    trading = _ts(max(d)) >= fetched - 7 * DAY      # still trading when the daily bundle was fetched
+                    spans[p] = (max(_ts(first), _ts(min(d))), last_s if trading else min(last_s, _ts(max(d)) + DAY - 3600))
         else:
             pids = list(products)
         family_estimate = products is None and archive is None or (products is None and not spans and dry_run)
@@ -1204,12 +1226,13 @@ CMC_DAILY_LIMIT = 200
 CMC_CHUNK = 60                                   # snapshot dates per merge
 CMC_COIN_FIRST = "2017-11-01"
 CMC_COIN_DAYS = 400                              # the v3.1 historical route returns at most the latest 400 days of a range
-_CMC_FLAG = re.compile(r"stablecoin|wrapped|tokeni[sz]ed|pegged|staking|staked|bridged|derivative|commodit", re.I)
+_CMC_FLAG = re.compile(r"stablecoin|wrapped|tokeni[sz]ed|pegged|bridged|liquid-staking|restaking", re.I)
 CMC_SCHEMA = ("kind listing: value = {date (snapshot day), id, symbol, slug, name, cmcRank, price, volume24h, marketCap (USD), "
               "circulatingSupply, totalSupply, maxSupply, percentChange24h, percentChange7d, dateAdded, lastUpdated, platform (the "
               "token's chain, or None), flags (CMC tags marking stablecoins, wrapped, tokenized, staked or bridged assets)}; dead coins "
-              "included (point-in-time ranking); observed_at = the coin's lastUpdated (about 23:59 UTC on the date); available_at = the "
-              "next day 00:00 UTC | kind snapshot: value = {date, n, limit}, one per date. CMC prices are cross-exchange VWAPs, "
+              "included (point-in-time ranking); price = the day's close (it equals CMC's daily OHLC close for the date; lastUpdated "
+              "reads 23:59 UTC in 2017-2019 snapshots and 00:00 of the date in 2026 ones, a label quirk); observed_at = the date 23:59:59 "
+              "UTC; available_at = the next day 00:00 UTC | kind snapshot: value = {date, n, limit}, one per date. CMC prices are cross-exchange VWAPs, "
               "volume24h includes wash trades, and CMC can revise history: near point in time, not vintage-stamped")
 
 
@@ -1240,9 +1263,7 @@ def cmc_rows(day: str, coins: list[dict], limit: int) -> list[dict]:
              "dateAdded": x.get("dateAdded"), "lastUpdated": x.get("lastUpdated"),
              "platform": (plat.get("name") or plat.get("symbol")) if isinstance(plat, dict) else plat,
              "flags": sorted(t for t in (x.get("tags") or []) if isinstance(t, str) and _CMC_FLAG.search(t))}
-        lu = x.get("lastUpdated")
-        obs = lu.replace("Z", "+00:00") if isinstance(lu, str) and lu[:10] == day else f"{day}T23:59:59+00:00"
-        out.append(_row("coinmarketcap", "listing", f"{day}:{x.get('id')}", obs, avail, v))
+        out.append(_row("coinmarketcap", "listing", f"{day}:{x.get('id')}", f"{day}T23:59:59+00:00", avail, v))
     out.append(_row("coinmarketcap", "snapshot", day, f"{day}T23:59:59+00:00", avail, {"date": day, "n": len(coins), "limit": limit}))
     return out
 
@@ -1331,7 +1352,7 @@ def fetch_cmc_weekly_listings(store=None, first: str = CMC_WEEKLY_FIRST, last: O
         if max_calls is not None:
             todo = todo[:max_calls]
         if dry_run:
-            rep["_plan"] = _total([_item(CMC_WEEKLY_BUNDLE, "cmc", len(todo), len(todo) * (depth + 1), "cmc", min_interval)],
+            rep["_plan"] = _total([_item(CMC_WEEKLY_BUNDLE, "cmc", len(todo), len(todo) * (depth + 1), "cmc_weekly", min_interval)],
                                   dates=len(todo), first=todo[0] if todo else None, last=todo[-1] if todo else None)
             return rep
         _cmc_snapshot_bundle(archive, CMC_WEEKLY_BUNDLE, todo, depth,
@@ -1372,7 +1393,7 @@ def fetch_cmc_daily_listings(store=None, first: str = CMC_DAILY_FIRST, last: Opt
                 todo = todo[:max_calls]
             if todo:
                 work.append((name, todo))
-                plan.append(_item(name, "cmc", len(todo), len(todo) * (depth + 1), "cmc", min_interval))
+                plan.append(_item(name, "cmc", len(todo), len(todo) * (depth + 1), "cmc_daily", min_interval))
         if dry_run:
             rep["_plan"] = _total(plan)
             return rep
@@ -1456,8 +1477,8 @@ def fetch_cmc_coin_history(store=None, ids: Optional[Iterable[int]] = None, firs
                 for q in qs:
                     quotes[q["timeOpen"][:10]] = q
                 earliest = min(_ts(q["timeOpen"][:10]) for q in qs)
-                if earliest <= first_s or earliest - 1 >= end:
-                    break
+                if len(qs) < CMC_COIN_DAYS or earliest <= first_s or earliest - 1 >= end:
+                    break                                   # a short page: the range start or the coin's first day
                 end = earliest - 1
             rows = []
             for d in sorted(quotes):
@@ -1757,17 +1778,14 @@ ISH_BASKET_SHARES = 40_000
 
 def _ish_obj(text: str, name: str, need: Optional[str] = None) -> Optional[dict]:
     """The first JSON object ``"name": {...}`` in the (unescaped) page that holds key ``need``."""
-    key = f'"{name}":{{'
     dec = json.JSONDecoder()
-    i = text.find(key)
-    while i >= 0:
+    for mt in re.finditer(r'"' + re.escape(name) + r'"\s*:\s*\{', text):
         try:
-            obj, _ = dec.raw_decode(text, i + len(key) - 1)
-            if isinstance(obj, dict) and (need is None or need in obj):
-                return obj
+            obj, _ = dec.raw_decode(text, mt.end() - 1)
         except ValueError:
-            pass
-        i = text.find(key, i + 1)
+            continue
+        if isinstance(obj, dict) and (need is None or need in obj):
+            return obj
     return None
 
 
@@ -1932,9 +1950,11 @@ OPTIONAL_SOURCES = ("cmc_coins", "coinbase_trades")
 
 def fetch_all_crypto(store, dry_run: bool = False, limit: Optional[int] = None, sources: Optional[Iterable[str]] = None,
                      include_optional: bool = False, max_calls: Optional[int] = None, refresh: bool = False,
-                     report: Optional[dict] = None, rows_out: Optional[dict] = None, log: Optional[Callable] = None) -> dict:
+                     report: Optional[dict] = None, rows_out: Optional[dict] = None, log: Optional[Callable] = None,
+                     min_interval: Optional[float] = None) -> dict:
     """Run every crypto fetcher in order (cheap and dependency-first, the ~19-hour Kraken paging last). ``limit`` caps
-    bundles (CMC: snapshot dates) per source; ``dry_run`` makes no request and returns per-source plans plus a total.
+    bundles (CMC: snapshot dates) per source; ``dry_run`` makes no request and returns per-source plans plus a total;
+    ``min_interval`` (seconds between requests) overrides every source's default pace (``PACE``) when given.
     Returns {source: report}, with '_total' (dry run) and '_gitignore' (the .gitignore lines of every family)."""
     names = list(sources) if sources is not None else list(DEFAULT_SOURCES) + (list(OPTIONAL_SOURCES) if include_optional else [])
     unknown = [n for n in names if n not in SOURCES]
@@ -1942,6 +1962,8 @@ def fetch_all_crypto(store, dry_run: bool = False, limit: Optional[int] = None, 
         raise ValueError(f"unknown sources: {unknown}; known: {sorted(SOURCES)}")
     out = report if report is not None else {}
     kw = {"dry_run": dry_run, "limit": limit, "max_calls": max_calls, "refresh": refresh, "rows_out": rows_out, "log": log}
+    if min_interval is not None:
+        kw["min_interval"] = min_interval
     product_list = None
     for n in names:
         rep: dict = {}
@@ -2003,6 +2025,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--limit", type=int, help="bundles (CMC: snapshot dates) per source")
     p.add_argument("--max-calls", type=int, help="requests per bundle (preview; such bundles are never stored)")
     p.add_argument("--refresh", action="store_true", help="fetch again bundles already stored complete")
+    p.add_argument("--min-interval", type=float, help="seconds between requests for every source (default: PACE per source)")
     a = p.parse_args(argv)
     store = None
     if not a.preview:
@@ -2011,7 +2034,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     rows_out: Optional[dict] = {} if a.preview else None
     log = (lambda s: print(s, file=sys.stderr, flush=True))
     rep = fetch_all_crypto(store, dry_run=a.dry_run, limit=a.limit, sources=a.sources.split(",") if a.sources else None,
-                           include_optional=a.optional, max_calls=a.max_calls, refresh=a.refresh, rows_out=rows_out, log=log)
+                           include_optional=a.optional, max_calls=a.max_calls, refresh=a.refresh, rows_out=rows_out, log=log,
+                           min_interval=a.min_interval)
     if a.preview:
         os.makedirs(a.preview, exist_ok=True)
         for name, rows in (rows_out or {}).items():
