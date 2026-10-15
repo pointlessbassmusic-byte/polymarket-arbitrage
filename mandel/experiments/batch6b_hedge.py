@@ -765,10 +765,14 @@ def month_end_gaps(series: dict, panel: dict, skip: Sequence[str] = ()) -> list:
 
 
 def partial_last_month(series: dict, panel: dict, is_session) -> Optional[dict]:
-    """The panel's last month when it ends before that month's last exchange session (``is_session(date)``): {month,
-    last_day, month_end, leg_ends: {leg: its own last close in the month}}; None when the last month is complete."""
+    """The panel's last month when the data end before that month's last exchange session (``is_session(date)``): some
+    leg has no close after the panel's last day, and that day is before the month's last session. Returns {month,
+    last_day, month_end, leg_ends: {leg: its own last close in the month}}; None when the last month is complete (a
+    month-end moved by one missing close, with data after it, is ``month_end_gaps``'s case)."""
     last = panel.get("last")
-    if not panel.get("months") or not last:
+    if not panel.get("months") or not last or not series:
+        return None
+    if all(max(sr, default="") > last for sr in series.values()):
         return None
     m = last[:7]
     y, mo = int(m[:4]), int(m[5:7])
@@ -1830,10 +1834,11 @@ def soq_spread_claim(readings: dict, variants: dict, prelim: Optional[dict] = No
         cname = ("mean return on max loss > 0 with 95% CI excluding 0 NET OF HALF-SPREADS (no VIX chain captured: "
                  "half-spreads not measurable)")
     else:
-        disagree = len({c[2]["ok"] for c in cells}) > 1 or any(c[2]["ok"] is None for c in cells)
-        cname = (f"mean return on max loss > 0 with 95% CI excluding 0 under every information-set reading (rule 12)"
-                 + (" and both named pricings (rule 11)" if alt else "") + f" ({cell_txt}"
-                 + ("; they disagree: undecided" if disagree and len(cells) > 1 else "") + ")")
+        oks = [c[2]["ok"] for c in cells]
+        tag = ("; a reading is MARGINAL: undecided" if any(o is None for o in oks) else
+               "; they disagree: undecided" if len(set(oks)) > 1 else "")
+        cname = ("mean return on max loss > 0 with 95% CI excluding 0 under every information-set reading (rule 12)"
+                 + (" and both named pricings (rule 11)" if alt else "") + f" ({cell_txt}{tag})")
         if alt_pricing_missing:
             if ok is True:
                 ok = None
@@ -1891,7 +1896,7 @@ def soq_spread_claim(readings: dict, variants: dict, prelim: Optional[dict] = No
         f"{_f(s['mean_net_credit'], 3)} (mid {_f(s['mean_mid_credit'], 3)}), net credit <= 0 in {s['n_net_credit_le0']}, "
         f"win rate {_pu(s['win_rate'], 1)}, {s['max_losses']} max losses, mean return on max loss {_pc(s['mean'])} (95% "
         f"{_ci_s(s['ci95'], 2, 100, '%')}, block {block}; {_rob_txt(s['robustness'])})"
-        + (f"; skipped: " + ", ".join(f"{k} {c}" for k, c in s["skipped"].items()) if s["skipped"] else "")
+        + ("; skipped: " + ", ".join(f"{k} {c}" for k, c in s["skipped"].items()) if s["skipped"] else "")
         for lab, s in summ.items())
     atxt = ""
     if alt:
@@ -1907,19 +1912,19 @@ def soq_spread_claim(readings: dict, variants: dict, prelim: Optional[dict] = No
             + ("in the strategy's favour)" if c["model_credit"] > c["market_mid_credit"] else "against the strategy)")
             for c in cap) + (
             (" — the only calibration day with both " if len(cap) == 1 else f" — only {len(cap)} calibration days with both ")
-            + f"prices, so the bias over the sample is unmeasured and the VVIX-flat result carries it"
+            + "prices, so the bias over the sample is unmeasured and the VVIX-flat result carries it"
             + (" (hence the chain-calibrated pricing decides too)" if alt else ""))
     ctxt = ""
     if cost_rob:
         def _k(k):
             if k is None:
                 return "n/a"
-            return "not even at zero half-spreads" if k == 0 else f"up to x{k:.2f} those half-spreads"
+            return "not even at zero half-spreads" if k == 0 else f"up to x{k:.2f} the measured half-spreads"
         mm = first["mean_mid_credit"] if first else None
         share = f", {100 * (hs1 + hs2) / mm:.0f}% of the mean mid credit" if mm else ""
         ctxt = (f"; cost assumption: half-spreads {hs1:.3f} + {hs2:.3f} per spread measured on the 2026-10 captures and "
                 f"applied to every year (no historical VIX option quotes are archived{share}); robustness: "
-                + "; ".join(f"[{lab}] mean > 0 {_k(c['k_mean'])}, every variant's CI lower bound > 0 {_k(c['k_ci'])}"
+                + "; ".join(f"[{lab}] mean > 0 {_k(c['k_mean'])}; CI excluding 0 in every bootstrap variant {_k(c['k_ci'])}"
                             for lab, c in cost_rob.items()))
         kcs = [c["k_ci"] for c in cost_rob.values() if c.get("k_ci") is not None]
         if ok is True and kcs and min(kcs) < 2:
@@ -2291,8 +2296,9 @@ def b6b_hedge_vix_soq_credit_spread(archive):
         keep = [t for t in td["trades"] if not (t["expiry"].startswith("2008") or t["expiry"][:7] in ("2018-02", "2020-03"))]
         ex[lab] = {"trades": keep, "skipped": {}}
         dropped[lab] = len(td["trades"]) - len(keep)
+    first_vx = min((str(r["value"]["day"])[:10] for r in vxr), default="n/a")
     var["excluding 2008, 2018-02, 2020-03 (gated trades in them: " + ", ".join(f"{k} at the {lab}" for lab, k in dropped.items())
-        + "; the 2008 exclusion is vacuous: 2008 predates the VX file)"] = ex
+        + ("; the 2008 exclusion is vacuous: 2008 predates the VX file" if first_vx > "2008-12-31" else "") + ")"] = ex
     le0 = {lab: (sum(1 for t in td["trades"] if t["net_credit"] <= 0), len(td["trades"])) for lab, td in readings.items()}
     notes = []
     if measured:
@@ -2302,7 +2308,6 @@ def b6b_hedge_vix_soq_credit_spread(archive):
                        "the claim does not state (such a trade cannot gain, so counting it is the conservative choice); the "
                        f"'{filt}' sensitivity drops them")
     pe = sorted({t["expiry"] for td in readings.values() for t in td["trades"] if t.get("f_proxy")})
-    first_vx = min((str(r["value"]["day"])[:10] for r in vxr), default="n/a")
     notes.append(f"sample: the VX futures file starts {first_vx}, so the trial's settlement calendar since 2006 (VRO since "
                  f"2008) cannot be tested before then (no front-future level)"
                  + (f"; where the {first_vx[:4]} rows carry settle 0 the VX close (16:15 ET, stamped at the same 21:30Z as the "

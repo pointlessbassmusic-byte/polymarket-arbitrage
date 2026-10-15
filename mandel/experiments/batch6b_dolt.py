@@ -111,8 +111,10 @@ DTE_TOL = 7                      # calendar days around the claim's DTE (one wee
 DTE_SENS = (4, 14)               # reported tolerance sensitivities
 DELTA_TOL = 0.075                # |vendor delta| within this of the target
 ATM_TOL = 0.02                   # ATM strike within 2% of the spot
-MONEY_TOL = 0.02                 # moneyness legs within 2% of S of the target
-SLOPE_GAP = 0.06                 # IV interpolation: bracketing strikes at most this far apart in K/S
+MONEY_TOL = 0.02                 # nearest-strike moneyness legs within 2% of S of the target
+BAND_TOL = 0.01                  # T-173 reported: nearest strikes within 1% of S of both targets
+SLOPE_GAP = 0.06                 # IV interpolation and exact-moneyness mixtures: bracketing strikes at most this far apart in K/S
+PREV_EXP_TOL = 14                # T-173 previous-close reading: the capture's listing nearest 30 DTE within this, if it lacks the cohort's expiry
 STRESS_VIX = 40.0                # stress session: VIX close >= 40
 STRESS_DD = 0.10                 # reported: SPY >= 10% below its 63-session high
 DD_WINDOW = 63
@@ -132,6 +134,7 @@ T539_MIN_N, T539_DTE = 250, 45
 T173_MIN_N, T173_DTE = 24, 30
 FILLS = ("mid", "exec")
 EVENING = "T22:00:00+00:00"      # the data module's available_at time on a quote day's evening
+FILL_UTC = "T20:15:00+00:00"     # the 16:15 ET fill at its earliest in UTC (EDT): rows known before the fill are stamped before it
 NO_CONTROL = "the GLD and IBIT controls cannot run (DoltHub has neither symbol)"
 
 
@@ -584,6 +587,24 @@ def pick_moneyness(legs: Sequence[dict], spot: float, ratio: float, tol: float) 
     if best is None or best[0][0] > tol:
         return None
     return best[1]
+
+
+def mix_legs(legs: Sequence[dict], k_target: float, gap: float) -> Optional[list]:
+    """The claim's exact moneyness from tradable quotes: [(leg, weight)] over the two usable listed strikes bracketing
+    ``k_target`` (weights sum to 1 and put the average strike exactly at the target; one leg at weight 1 when a usable
+    strike sits on it). None when a side has no usable strike or the bracket is wider than ``gap`` (in $)."""
+    us = [l for l in legs if usable(l)]
+    lo = [l for l in us if l["strike"] <= k_target]
+    hi = [l for l in us if l["strike"] >= k_target]
+    if not lo or not hi:
+        return None
+    a, b = max(lo, key=lambda l: l["strike"]), min(hi, key=lambda l: l["strike"])
+    if b["strike"] == a["strike"]:
+        return [(a, 1.0)]
+    if b["strike"] - a["strike"] > gap:
+        return None
+    w = (b["strike"] - k_target) / (b["strike"] - a["strike"])
+    return [(a, w), (b, 1.0 - w)]
 
 
 def iv_at(legs: Sequence[dict], spot: float, ratio: float, tol: float = MONEY_TOL, gap: float = SLOPE_GAP) -> Optional[float]:

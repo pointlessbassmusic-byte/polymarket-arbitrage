@@ -649,7 +649,7 @@ def test_harness_soq_2013_proxy_costs_and_chain_pricing():
     assert stat["variants"][sett]["previous close"]["n"] == len(exps) - len(early)
     assert "the documented proxy" in reason and ", ".join(early) in reason and "cannot be tested before then" in reason
     assert "COUNTED as sold" in reason and "net credit > 0 at the decision" in reason
-    assert "mean > 0 up to x" in reason and stat["cost_robustness"]["entry close"]["k_mean"] > 0
+    assert "mean > 0 up to x" in reason and "CI excluding 0 in every bootstrap variant" in reason and stat["cost_robustness"]["entry close"]["k_mean"] > 0
     assert "VVIX-flat pricing bias: on " + qd in reason and "the only calibration day" in reason
     assert stat["alt_pricing"] and len(stat["decision"]["cells"]) == 4 and "chain-calibrated Black-76" in reason
     assert "the 2008 exclusion is vacuous" in reason
@@ -783,7 +783,7 @@ def test_sharpe_noworse_reports_partial_month_and_annualised_controls():
     n = 400
     spy = 0.01 + 0.045 * rng.standard_normal(n)
     good = _panel(n, 0.002, CLLZ=0.7 * spy - 0.002 + 0.008 * rng.standard_normal(n), SPY=spy)
-    ctl = _panel(n, 0.002, strat=spy + 0.004 * rng.standard_normal(n), bench=spy)
+    ctl = _panel(n, 0.002, strat=spy + 0.001 + 0.01 * np.random.default_rng(34).standard_normal(n), bench=spy)
     part = {"month": good["months"][-1], "last_day": "2023-04-13", "month_end": "2023-04-28", "leg_ends": {}}
     rep = h.sharpe_noworse_claim(good, "CLLZ", "SPY", 0.05, 380, controls={"near-tie": ctl}, n_boot=NB, partial_last=part)
     c = rep["stat"]["controls"]["near-tie"]
