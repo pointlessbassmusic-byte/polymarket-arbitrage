@@ -182,11 +182,11 @@ def test_even_week_effect_planted_and_null():
 
 # -------------------------------------------------------------------------------------- T-361 monetary momentum --
 
-def _mm_setup(drift, seed=0):
+def _mm_setup(drift, seed=0, labels=None):
     rng = np.random.default_rng(seed)
     days = _days("1994-01-03", "2026-10-13"); ev = _events(days, 32)
     pos = {d: i for i, d in enumerate(days)}
-    lab = rng.choice([-1, 0, 1], len(ev))
+    lab = rng.choice([-1, 0, 1], len(ev)) if labels is None else np.resize(np.asarray(labels), len(ev))
     level = 5.0; dgs2 = {}
     evset = dict(zip(ev, lab))
     for d in days:
@@ -222,6 +222,71 @@ def test_monetary_momentum_entry_is_after_publication():
         r[i:i + 2] += -s * 0.02                                              # returns ending on t+1 and t+2
     rep = fm.monetary_momentum(days, _closes(r), dgs2, ev, n_perm=1000, n_boot=200)
     assert abs(rep["gap_gross_pp"]) < 0.5
+
+
+def test_monetary_momentum_exact_5bp_move_is_neutral():
+    """Regression: DGS2 has 2 decimals; (5.60 - 5.65) * 100 is -5.000000000000071 in floating point. 'More than 5 bps'
+    means an exact 5 bp move is neutral."""
+    rng = np.random.default_rng(13)
+    days = _days("1994-01-03", "2026-10-13"); ev = _events(days, 32); pos = {d: i for i, d in enumerate(days)}
+    exact = [(5.65, 5.60), (1.82, 1.87), (0.74, 0.69), (1.72, 1.77)]           # float error put these in exp / con
+    moved = [(5.65, 5.59), (1.82, 1.88), (0.74, 0.64), (1.72, 1.82)]           # 6 and 10 bps: exp, con, exp, con
+    assert (5.60 - 5.65) * 100 < -5 and (1.87 - 1.82) * 100 > 5                  # the float trap the fix removes
+    dgs2 = {}
+    for k, e in enumerate(ev):
+        prev, now = (exact if k % 2 == 0 else moved)[(k // 2) % 4]
+        dgs2[days[pos[e] - 1]] = prev; dgs2[e] = now
+    r = rng.normal(0.0002, 0.01, len(days) - 1)
+    rep = fm.monetary_momentum(days, _closes(r), dgs2, ev, n_perm=500, n_boot=100)
+    n_cls = rep["n_expansionary"] + rep["n_contractionary"] + rep["n_neutral"]; n_exact = (n_cls + 1) // 2
+    assert rep["n_neutral"] == n_exact, (rep["n_neutral"], n_exact)
+    assert abs(rep["n_expansionary"] - rep["n_contractionary"]) <= 1 and rep["n_expansionary"] + rep["n_contractionary"] == n_cls - n_exact
+
+
+def test_monetary_momentum_min_n_counts_only_expansionary_and_contractionary():
+    """Regression: min_n is compared with the meetings that enter the gap, not with all classified meetings."""
+    days, c, dgs2, ev = _mm_setup(0.002, seed=14, labels=[-1, 0, 1, 0, 0])      # 2 of every 5 meetings are surprises
+    rep = fm.monetary_momentum(days, c, dgs2, ev, n_perm=2000, n_boot=300)
+    n_used = rep["n_expansionary"] + rep["n_contractionary"]
+    assert rep["n_classified"] >= 120 and n_used < 120 and rep["n"] == n_used
+    assert rep["verdict"] == "inconclusive", rep["reason"]
+    assert rep["reason"].startswith(f"only {n_used} expansionary+contractionary meetings (min_n 120)")
+    assert rep["criteria_verdict_if_min_n_ignored"] == "supported" and all(rep["criteria"].values())   # criteria still reported
+    assert rep["reason"].rsplit(" — ", 1)[1].startswith("inconclusive")
+    ok = fm.monetary_momentum(days, c, dgs2, ev, n_perm=2000, n_boot=300, min_n=n_used)
+    assert ok["verdict"] == "supported", ok["reason"]
+
+
+# ------------------------------------------------------------------------------- unscheduled-meeting exclusion --
+
+def test_align_to_trading_days():
+    days = _days("2020-03-02", "2020-03-20")
+    assert fm.align_to_trading_days(days, ["2020-03-15", "2020-03-03", "2020-03-21", "2020-03-01"]) == {"2020-03-16", "2020-03-03"}
+
+
+def test_unscheduled_days_include_release_day():
+    class _A:
+        def load(self, name):
+            return [{"value": {"decision_day": "2020-03-02", "scheduled": False}}, {"value": {"decision_day": "2020-03-15", "scheduled": False}},
+                    {"value": {"decision_day": "2020-03-18", "scheduled": True}}]
+    assert fm._fomc_unscheduled(_A()) == ["2020-03-02", "2020-03-03", "2020-03-15"]
+
+
+def test_sunday_unscheduled_meeting_excludes_the_next_session():
+    """Regression: an unscheduled meeting on a Sunday (2020-03-15) must drop the Monday reaction session (2020-03-16)
+    from the non-FOMC group in T-214 and T-215."""
+    days, c, ev = _drift_setup(0.0, seed=15)
+    assert "2020-03-16" in days and "2020-03-16" not in ev and "2020-03-15" not in days
+    i = days.index("2020-03-16"); r = c[1:] / c[:-1] - 1; r[i - 1] = -0.11; c = _closes(r)     # a -11% Monday
+    base = fm.pre_fomc_drift_oos(days, c, ev, n_boot=200, n_placebo=50)
+    ex = fm.pre_fomc_drift_oos(days, c, ev, exclude_days=["2020-03-15"], n_boot=200, n_placebo=50)
+    assert ex["test"]["n_other"] == base["test"]["n_other"] - 1 and ex["test"]["mean_other"] > base["test"]["mean_other"]
+    vix = {d: 16.0 for d in days}
+    P = fm.event_straddle_panel(days, c, vix, ev, 1 / 252, 252, exclude_days=["2020-03-15"])
+    assert "2020-03-16" not in set(P["days"]) and "2020-03-13" in set(P["days"])
+    s0 = fm.spx_event_straddle(days, c, vix, ev, n_boot=100)
+    s1 = fm.spx_event_straddle(days, c, vix, ev, exclude_days=["2020-03-15"], n_boot=100)
+    assert s1["full"]["n_other"] == s0["full"]["n_other"] - 1
 
 
 # ---------------------------------------------------------------------------------------------- T-273 GVZ --

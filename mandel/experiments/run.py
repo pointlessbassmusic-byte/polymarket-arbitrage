@@ -10,6 +10,7 @@ stays in the registry.
 
 from __future__ import annotations
 
+import bisect
 import json
 import time
 from pathlib import Path
@@ -23,7 +24,8 @@ from mandel.experiments import ExperimentLog
 from mandel.experiments.markets import bundle_arb_scan, market_calibration, multiscale_edge, price_at_horizons, resolved_outcomes
 from mandel.experiments.markov import markov_vs_persistence
 from mandel.experiments.msm import msm_vs_rolling
-from mandel.experiments.overfit import overfit_report
+from mandel.experiments.overfit import momentum_variants, overfit_report
+from mandel.validation.backtest_eval import sharpe_ratio
 from mandel.experiments.scaling import hurst_with_interval, multifractal_test
 from mandel.experiments.social import attention_vs_abs_return, fear_greed_forward_returns
 from mandel.experiments.volatility import implied_move_vs_realised, index_closes, overlay_backtest, overlay_verdict, price_closes, skew_tail, term_structure_reversion, variance_risk_premium
@@ -37,6 +39,15 @@ from mandel.paths import MANDEL_ROOT
 REGISTRY = MANDEL_ROOT / "theories" / "registry.json"
 
 
+class MissingData(Exception):
+    """An input the harness needs (listed in the INDEX or declared) cannot be read on this machine. run_all records the result as
+    inconclusive and leaves theory status and results untouched, exactly as for a declared bundle that is absent."""
+
+    def __init__(self, names):
+        self.names = sorted(set(names))
+        super().__init__(f"not on this machine: {', '.join(self.names)}")
+
+
 def _series_by_market(price_rows) -> dict[str, np.ndarray]:
     by = {}
     for r in price_rows:
@@ -45,18 +56,26 @@ def _series_by_market(price_rows) -> dict[str, np.ndarray]:
     return {k: np.array([p for _, p in sorted(v)]) for k, v in by.items()}
 
 
-def harness_market_calibration(archive: Archive) -> tuple[dict, int, str, str]:
-    rep = market_calibration(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"))
+def harness_market_calibration(archive: Archive, horizons=(1, 3, 7, 30, 90), min_n: int = 300) -> tuple[dict, int, str, str]:
+    """T-01: Brier skill vs coin > 0 at EVERY registered horizon (1, 3, 7, 30, 90 days). A scored horizon with skill <= 0 falsifies
+    'every horizon'; otherwise each registered horizon must be scored on >= min_n markets (the trial's min_n, per horizon), else
+    inconclusive. n is the binding (smallest) per-horizon count."""
+    rep = market_calibration(archive.load("polymarket-price-history-daily"), archive.load("polymarket-closed-markets"), horizons_days=horizons)
     h = rep["horizons"]
-    usable = {k: v for k, v in h.items() if "brier" in v}
-    if not usable:
-        return rep, 0, "inconclusive", "no horizon had 20+ priced resolved markets"
-    worst_skill = min(v["skill_vs_coin"] for v in usable.values())
-    n = max(v["n"] for v in usable.values())
-    verdict = "supported" if worst_skill > 0 else "not_supported"
-    reason = f"market price beats the coin at every horizon (min skill {worst_skill:.2f})" if verdict == "supported" else \
-             f"market price fails to beat the coin at some horizon (min skill {worst_skill:.2f})"
-    return rep, n, verdict, reason
+    ns = {k: int(h.get(k, {}).get("n", 0)) for k in horizons}
+    n = min(ns.values())
+    usable = {k: h[k]["skill_vs_coin"] for k in horizons if "brier" in h.get(k, {}) and h[k].get("skill_vs_coin") is not None}
+    rep["n_by_horizon"] = {str(k): v for k, v in ns.items()}
+    failing = {k: s for k, s in usable.items() if s <= 0}
+    if failing:
+        return rep, n, "not_supported", "market price fails to beat the coin at " + ", ".join(f"{k}d (skill {s:.2f}, n {ns[k]})" for k, s in failing.items())
+    missing = [k for k in horizons if k not in usable]
+    thin = [k for k in horizons if k in usable and ns[k] < min_n]
+    if missing or thin:
+        return rep, n, "inconclusive", (f"skill > 0 where scored, but the claim needs every horizon with n >= {min_n}: "
+                                        + ", ".join([f"{k}d unscored (n {ns[k]})" for k in missing] + [f"{k}d n {ns[k]}" for k in thin]))
+    worst_skill = min(usable.values())
+    return rep, n, "supported", f"market price beats the coin at every horizon (min skill {worst_skill:.2f}; smallest horizon n {n})"
 
 
 def harness_multiscale_edge(archive: Archive) -> tuple[dict, int, str, str]:
@@ -71,59 +90,79 @@ def harness_multiscale_edge(archive: Archive) -> tuple[dict, int, str, str]:
                               else "significant horizons disagree in sign")
 
 
-def harness_bundle_arb(archive: Archive) -> tuple[dict, int, str, str]:
-    """T-04: >= 1 after-fee YES+NO mispricing per 100 markets in every snapshot, across >= 2 snapshots. One snapshot can falsify
-    persistence (a snapshot below the rate) but cannot confirm it."""
+def harness_bundle_arb(archive: Archive, min_n: int = 200) -> tuple[dict, int, str, str]:
+    """T-04: >= 1 after-fee LONG bundle mispricing (best-ask YES + best-ask NO + fee + gas < 1, depth >= 5 USD) per 100 markets in every
+    snapshot, across >= 2 snapshots. One snapshot can falsify persistence (a snapshot below the rate) but cannot confirm it. Short-side
+    crosses (bids summing above 1) are outside the claim and reported only. A snapshot of fewer than min_n markets cannot confirm."""
     names = ["polymarket-books-snapshot"] * bool(_bundles_matching(archive, "polymarket-books-snapshot")) + [n for n in _bundles_matching(archive, "polymarket-books-2*")]
     snaps = []
     for name in names:
         rep = bundle_arb_scan(archive.load(name))
         if rep["markets_scanned"] >= 50:
-            found = rep["long_after_fees"] + rep["short_after_fees"]
+            found = rep["long_after_fees"]
             snaps.append({"bundle": name, "markets": rep["markets_scanned"], "found": found, "rate_per_100": 100 * found / rep["markets_scanned"],
-                          "gross_long_candidates": rep["gross_long_candidates"], "median_spread": rep["median_round_trip_spread"], "examples": rep["examples_long"][:3] + rep["examples_short"][:3]})
+                          "short_after_fees_reported_only": rep["short_after_fees"],
+                          "gross_long_candidates": rep["gross_long_candidates"], "median_spread": rep["median_round_trip_spread"], "examples": rep["examples_long"][:3],
+                          "examples_short_reported_only": rep["examples_short"][:3]})
     if not snaps:
         return {"snapshots": []}, 0, "inconclusive", "no snapshot with 50+ markets"
     ok = [s["rate_per_100"] >= 1 for s in snaps]
-    verdict = "not_supported" if not all(ok) else ("supported" if len(snaps) >= 2 else "inconclusive")
-    txt = "; ".join(f"{s['bundle'].replace('polymarket-books-', '')}: {s['found']} after-fee in {s['markets']} markets ({s['gross_long_candidates']} with YES+NO asks below 1 before fees), median round-trip spread {s['median_spread']:.3f}" for s in snaps)
+    verdict = "not_supported" if not all(ok) else ("supported" if len(snaps) >= 2 and all(s["markets"] >= min_n for s in snaps) else "inconclusive")
+    txt = "; ".join(f"{s['bundle'].replace('polymarket-books-', '')}: {s['found']} after-fee long bundles in {s['markets']} markets ({s['gross_long_candidates']} with YES+NO asks below 1 before fees; "
+                    f"{s['short_after_fees_reported_only']} short-side, not counted), median round-trip spread {s['median_spread']:.3f}" for s in snaps)
     return {"snapshots": snaps}, sum(s["markets"] for s in snaps), verdict, f"{len(snaps)} snapshot(s): {txt}"
 
 
-def harness_multifractal(archive: Archive, max_markets: int = 40) -> tuple[dict, int, str, str]:
+def harness_multifractal(archive: Archive, max_markets: int = 40, n_shuffles: int = 200, min_n: int = 40) -> tuple[dict, int, str, str]:
+    """T-06: > 25% of series with tau(q) concavity beyond the 95th percentile of 200 shuffles per series (the trial's count).
+    Fewer than min_n series cannot support the claim."""
     series = _series_by_market(archive.load("polymarket-price-history-daily"))
     long_enough = [(k, s) for k, s in series.items() if s.size >= 120]
     long_enough.sort(key=lambda kv: -kv[1].size)
     results = []
     for k, s in long_enough[:max_markets]:
-        r = multifractal_test(np.log(np.clip(s, 0.01, 0.99) / (1 - np.clip(s, 0.01, 0.99))), n_shuffles=100)
+        r = multifractal_test(np.log(np.clip(s, 0.01, 0.99) / (1 - np.clip(s, 0.01, 0.99))), n_shuffles=n_shuffles)
         results.append({"market": k, "n": r.n, "concavity": r.concavity, "null_q95": r.null_concavity_q95, "exceeds": r.exceeds_null})
     n = len(results)
     if n < 10:
         return {"per_market": results}, n, "inconclusive", "fewer than 10 series of 120+ daily points"
     frac = sum(1 for r in results if r["exceeds"]) / n
     verdict = "supported" if frac > 0.25 else "not_supported"
-    return {"fraction_exceeding_null": frac, "n_series": n, "per_market": results[:40]}, n, verdict, \
-        f"{frac:.0%} of {n} daily logit-price series show concavity beyond the shuffled null (threshold 25%; chance ~5%)"
+    if verdict == "supported" and n < min_n:
+        verdict = "inconclusive"
+    return {"fraction_exceeding_null": frac, "n_series": n, "n_shuffles": n_shuffles, "per_market": results[:40]}, n, verdict, \
+        f"{frac:.0%} of {n} daily logit-price series show concavity beyond the shuffled null ({n_shuffles} shuffles; threshold 25%; chance ~5%)" + \
+        (f"; fewer than the {min_n} series the trial requires" if n < min_n else "")
 
 
-def harness_hurst(archive: Archive, max_markets: int = 40) -> tuple[dict, int, str, str]:
+def harness_hurst(archive: Archive, max_markets: int = 40, n_null: int = 200, min_n: int = 40) -> tuple[dict, int, str, str]:
+    """T-07: anti-persistence in a majority of markets, outside the shuffle null. Two criteria: share of series with H < 0.5 > 50%,
+    and share significantly ANTI-persistent (H below its own 200-shuffle 2.5% quantile) > 25%. Series above the null (persistent)
+    count against the claim, never for it. Fewer than min_n series cannot support the claim."""
     series = _series_by_market(archive.load("polymarket-price-history-daily"))
     long_enough = sorted([(k, s) for k, s in series.items() if s.size >= 120], key=lambda kv: -kv[1].size)[:max_markets]
     rows = []
     for k, s in long_enough:
         x = np.log(np.clip(s, 0.01, 0.99) / (1 - np.clip(s, 0.01, 0.99)))
-        h = hurst_with_interval(x, n_null=100)
+        h = hurst_with_interval(x, n_null=n_null)
         h["market"] = k
         rows.append(h)
     n = len(rows)
     if n < 10:
         return {"per_market": rows}, n, "inconclusive", "fewer than 10 long series"
-    Hs = np.array([r["H"] for r in rows if np.isfinite(r["H"])])
-    outside = sum(1 for r in rows if r["outside_null"])
-    verdict = "supported" if outside / n > 0.25 else "not_supported"
-    return {"median_H": float(np.median(Hs)), "n_series": n, "fraction_outside_null": outside / n, "per_market": rows}, n, verdict, \
-        f"median H {np.median(Hs):.2f}; {outside}/{n} series outside their shuffle null (threshold 25%)"
+    fin = [r for r in rows if np.isfinite(r["H"])]
+    Hs = np.array([r["H"] for r in fin])
+    below = sum(1 for r in fin if r["H"] < 0.5) / n
+    anti = sum(1 for r in fin if np.isfinite(r["null_lo"]) and r["H"] < r["null_lo"])
+    persistent = sum(1 for r in fin if np.isfinite(r["null_hi"]) and r["H"] > r["null_hi"])
+    verdict = "supported" if below > 0.5 and anti / n > 0.25 else "not_supported"
+    if verdict == "supported" and n < min_n:
+        verdict = "inconclusive"
+    med = float(np.median(Hs)) if Hs.size else float("nan")
+    return {"median_H": med, "n_series": n, "n_null": n_null, "share_H_below_half": below, "n_anti_persistent_outside_null": anti,
+            "share_anti_persistent_outside_null": anti / n, "n_persistent_outside_null": persistent, "per_market": rows}, n, verdict, \
+        (f"median H {med:.2f}; {below:.0%} of {n} series with H < 0.5 (need > 50%); {anti}/{n} significantly anti-persistent, below their "
+         f"{n_null}-shuffle null (need > 25%); {persistent} significantly persistent (count against)" + (f"; fewer than the {min_n} series the trial requires" if n < min_n else ""))
 
 
 def harness_markov(archive: Archive, max_markets: int = 60) -> tuple[dict, int, str, str]:
@@ -173,6 +212,33 @@ def harness_overfit(archive: Archive, max_markets: int = 150) -> tuple[dict, int
     return rep, n, verdict, f"best of {rep['n_variants']} momentum rules: Sharpe {rep['best_sharpe']:.3f}, DSR {rep['dsr_best']:.2f}, PBO {rep['pbo']:.2f}"
 
 
+def harness_holdout_sharpe(archive: Archive, max_markets: int = 150, min_n: int = 100) -> tuple[dict, int, str, str]:
+    """T-36: the in-sample best of the declared momentum rules (T-10's search) has holdout Sharpe <= 0. The pooled return matrix is split
+    once, the same for every rule: first half of the rows in-sample, second half holdout. Fewer than min_n holdout periods or series
+    cannot support the claim."""
+    series = _series_by_market(archive.load("polymarket-price-history-daily"))
+    prices = [s for _, s in sorted(series.items(), key=lambda kv: -kv[1].size)[:max_markets] if s.size >= 60]
+    if len(prices) < 20:
+        return {}, len(prices), "inconclusive", "fewer than 20 series"
+    R, names = momentum_variants(prices)
+    T, N = R.shape
+    k = T // 2
+    is_sr = np.array([sharpe_ratio(R[:k, j]) for j in range(N)])
+    best = int(np.argmax(is_sr))
+    ho = float(sharpe_ratio(R[k:, best]))
+    n = T - k
+    stat = {"n_variants": int(N), "n_periods": int(T), "n_holdout_periods": int(n), "n_series": len(prices), "split": "first half of pooled rows in-sample, second half holdout",
+            "is_best_variant": names[best], "is_best_sharpe": float(is_sr[best]), "holdout_sharpe": ho}
+    if ho > 0:
+        verdict = "not_supported"
+    elif n < min_n or len(prices) < min_n:
+        verdict = "inconclusive"
+    else:
+        verdict = "supported"
+    return stat, n, verdict, (f"in-sample best of {N} momentum rules {names[best]} (IS Sharpe {is_sr[best]:+.4f}) has holdout Sharpe {ho:+.4f} over {n} periods "
+                              f"from {len(prices)} series (pass: <= 0)" + (f"; below min_n {min_n}" if verdict == "inconclusive" else ""))
+
+
 def harness_controls(archive: Archive, ledger: Ledger, n_markets: int = 200) -> tuple[dict, int, str, str]:
     """Write coin, oracle and market-price forecasts for resolved markets into the real forecast book and
     check the scoring path end to end: coin ~0.25 Brier, oracle 0, market below coin."""
@@ -201,21 +267,58 @@ def harness_controls(archive: Archive, ledger: Ledger, n_markets: int = 200) -> 
         f"coin {coin}, oracle {oracle}, market {mkt}: scoring path {'intact' if ok else 'BROKEN'}"
 
 
-def harness_longshot(archive: Archive, horizon: int = 7, hi_p: float = 0.10, n_boot: int = 2000, seed: int = 0) -> tuple[dict, int, str, str]:
+def _event_keys(market_rows) -> dict[str, str]:
+    """market id -> dependence cluster: events[0].id, else negRiskMarketID, else the market itself. Markets of one negRisk event are
+    mutually exclusive and resolve together, so they are one unit for resampling."""
+    out = {}
+    for r in market_rows:
+        m = r.get("value", {})
+        mid = str(m.get("id"))
+        ev = m.get("events")
+        if isinstance(ev, str):
+            try:
+                ev = json.loads(ev)
+            except ValueError:
+                ev = None
+        eid = ev[0].get("id") if isinstance(ev, list) and ev and isinstance(ev[0], dict) else None
+        out[mid] = f"event:{eid}" if eid is not None else (f"negrisk:{m['negRiskMarketID']}" if m.get("negRiskMarketID") else f"market:{mid}")
+    return out
+
+
+def _cluster_mean_ci(e: np.ndarray, keys: list, n_boot: int, seed: int, q=(0.025, 0.975)) -> tuple[float, float, int]:
+    """Percentile CI of the pooled mean sum(e)/count with whole clusters resampled (ratio estimator)."""
+    _, inv = np.unique(np.asarray(keys, dtype=object).astype(str), return_inverse=True)
+    S = np.bincount(inv, weights=e); C = np.bincount(inv).astype(float); G = S.size
+    idx = np.random.default_rng(seed).integers(0, G, size=(n_boot, G))
+    boots = S[idx].sum(axis=1) / C[idx].sum(axis=1)
+    lo, hi = (float(x) for x in np.quantile(boots, list(q)))
+    return lo, hi, int(G)
+
+
+def harness_longshot(archive: Archive, horizon: int = 7, hi_p: float = 0.10, n_boot: int = 2000, seed: int = 0, min_n: int = 300) -> tuple[dict, int, str, str]:
     """T-02: in the under-0.10 bucket at the 7d horizon, mean(outcome - price) < 0 (classic longshot bias:
-    cheap YES over-priced). Bootstrap 95% interval; the upper bound must be below zero."""
-    outcomes = resolved_outcomes(archive.load("polymarket-closed-markets"))
+    cheap YES over-priced). Event-clustered bootstrap 95% interval (markets of one event resampled together); the upper bound must be
+    below zero. Below the trial's min_n markets a failing bound still falsifies, but a passing one is only inconclusive."""
+    market_rows = list(archive.load("polymarket-closed-markets"))
+    outcomes = resolved_outcomes(market_rows)
     rows = price_at_horizons(archive.load("polymarket-price-history-daily"), outcomes, horizons_days=(horizon,))[horizon]
-    sel = np.array([o - p for p, o, _ in rows if p < hi_p])
+    picked = [(p, o, mid) for p, o, mid in rows if p < hi_p]
+    sel = np.array([o - p for p, o, _ in picked])
     if sel.size < 100:
         return {"n": int(sel.size)}, int(sel.size), "inconclusive", f"only {sel.size} observations under {hi_p}"
-    rng = np.random.default_rng(seed)
-    boots = rng.choice(sel, size=(n_boot, sel.size), replace=True).mean(axis=1)
-    lo, hi = (float(x) for x in np.quantile(boots, [0.025, 0.975]))
-    stat = {"n": int(sel.size), "horizon_days": horizon, "bucket_hi": hi_p, "mean_error": float(sel.mean()), "ci": [lo, hi],
-            "yes_events": int(sum(1 for p, o, _ in rows if p < hi_p and o == 1)), "mean_price": float(np.mean([p for p, o, _ in rows if p < hi_p]))}
-    verdict = "supported" if hi < 0 else "not_supported"
-    return stat, int(sel.size), verdict, f"<{hi_p} bucket at {horizon}d: mean(outcome-price) {sel.mean():+.4f}, 95% [{lo:+.4f}, {hi:+.4f}], {stat['yes_events']} YES events of {sel.size}"
+    cluster = _event_keys(market_rows)
+    lo, hi, n_events = _cluster_mean_ci(sel, [cluster.get(mid, f"market:{mid}") for _, _, mid in picked], n_boot, seed)
+    stat = {"n": int(sel.size), "n_events": n_events, "horizon_days": horizon, "bucket_hi": hi_p, "mean_error": float(sel.mean()), "ci": [lo, hi],
+            "ci_method": "event-clustered percentile bootstrap (events[0].id, else negRiskMarketID, else market)",
+            "yes_events": int(sum(1 for p, o, _ in picked if o == 1)), "mean_price": float(np.mean([p for p, _, _ in picked]))}
+    if hi >= 0:
+        verdict = "not_supported"
+    elif sel.size < min_n:
+        verdict = "inconclusive"
+    else:
+        verdict = "supported"
+    return stat, int(sel.size), verdict, (f"<{hi_p} bucket at {horizon}d: mean(outcome-price) {sel.mean():+.4f}, event-clustered 95% [{lo:+.4f}, {hi:+.4f}], "
+                                          f"{stat['yes_events']} YES events of {sel.size} markets in {n_events} events" + (f"; below min_n {min_n}" if verdict == "inconclusive" else ""))
 
 
 def harness_horizon_monotone(archive: Archive, horizons=(1, 3, 7, 30, 90)) -> tuple[dict, int, str, str]:
