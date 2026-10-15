@@ -379,12 +379,16 @@ def test_twin_random_walk_not_supported():
 
 def test_twin_min_n_counts_trades():
     """Regression (T-324): the statistic is per trade, so min_n 1000 counts trades, not daily observations of x.
-    Fewer trades -> inconclusive, with the interval still reported in the reason."""
+    Fewer trades -> never supported, with the interval still reported in the reason. House rule 5: the random walk's
+    net CI lies wholly below 0 (a decisive failure), so the verdict is not_supported rather than capped at inconclusive."""
     days, a, b = _twins(1.0, seed=7)
     rep = ob.twin_reversion(days, a, b)
     assert rep["n"] == rep["n_trades"] < 1000 < rep["n_days"]
-    assert rep["verdict"] == "inconclusive", rep["reason"]
-    assert rep["reason"].endswith(f"{rep['n_trades']} trades, below the trial's min_n 1000")
+    assert rep["ci_bps"][1] < 0
+    assert rep["verdict"] == "not_supported", rep["reason"]
+    assert f"{rep['n_trades']} trades, below the trial's min_n 1000" in rep["reason"] and "house rule 5" in rep["reason"]
+    assert "fails decisively below min_n" in rep["reason"]
+    assert "95% lower bound of mean net return per trade > 0" in rep["rule5"]["decisive_failures"]
     assert f"{rep['ci_bps'][0]:+.2f}..{rep['ci_bps'][1]:+.2f}" in rep["reason"]
     assert rep["criteria_on_available_trades"]["95% lower bound of mean net return per trade > 0"] is False
 

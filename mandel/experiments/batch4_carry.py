@@ -53,6 +53,19 @@ MODEL-PRICED.
 Verdicts use ``underlying2._verdict``. Any implemented criterion failing gives not_supported. Any criterion that is
 not implemented (missing data, too few events) gives at best inconclusive. A claim is supported only when every
 criterion is implemented and passes.
+
+House rule 5 (``_rule5``). Below the trial's min_n, counted in the claim's own units (T-198 windows, T-258 months,
+T-303 days, T-329 trades, T-362 test contract-months, T-363 in-position test days, T-364 weeks, T-423 top-decile days),
+the min_n criterion is unmet, so the verdict is never supported. A failing criterion still counts there only when it
+fails decisively: its 95% interval lies wholly on the wrong side of the claimed bound, or the failure would persist at
+min_n whatever the missing observations are (T-198's share). Any other failure is undecided (None), so the verdict is
+inconclusive. A criterion with no interval (a DSR, an event count) never decides below min_n. A p-value criterion
+decides when the interval of the statistic it tests lies wholly on the wrong side of 0. A zero-width interval (constant
+data) or one from fewer than 4 observations or month clusters decides nothing. Where the face-value statistic has no
+interval (T-258's Sharpe, T-329's halves, T-364's gaps, T-423's out-of-sample difference), the interval is computed
+below min_n only; T-363's Sharpe tests use the optimistic-spread Sharpe interval already reported. At or above min_n
+every criterion is judged at face value, exactly as before. Below min_n the report's ``criteria`` are the ones judged, and ``rule5`` holds the face-value criteria and
+the decisive failures.
 """
 
 from __future__ import annotations
@@ -340,6 +353,76 @@ def _next_month(y: int, m: int) -> date:
     return date(y + (m == 12), 1 if m == 12 else m + 1, 1)
 
 
+# ------------------------------------------------------------------------------------------------- house rule 5 --
+
+MIN_DECISIVE_OBS = 4      # an interval from fewer observations (or month clusters) never decides a failure below min_n
+
+
+def _ci_below(ci, bound: float, strict: bool = False) -> bool:
+    """The 95% interval lies wholly at or below ``bound`` (strictly below with ``strict``). False without an interval
+    and for a zero-width one: constant data decide nothing."""
+    lo, hi = ci
+    if lo is None or hi is None or not lo < hi:
+        return False
+    return bool(hi < bound) if strict else bool(hi <= bound)
+
+
+def _ci_above(ci, bound: float, strict: bool = False) -> bool:
+    """The 95% interval lies wholly at or above ``bound`` (strictly above with ``strict``); False as in ``_ci_below``."""
+    lo, hi = ci
+    if lo is None or hi is None or not lo < hi:
+        return False
+    return bool(lo > bound) if strict else bool(lo >= bound)
+
+
+def _rule5(crit, n: int, min_n: int, unit: str, decisive: Callable[[], Sequence[bool]]):
+    """House rule 5 in place of a bare ``_verdict(crit)``. ``crit``: the face-value criteria [(name, ok)], whose min_n row
+    is (name, True if n >= min_n else None). ``decisive()``: one flag per criterion, True when that criterion's failure
+    stands below min_n (its 95% interval lies wholly on the wrong side of the claimed bound, or the failure would persist
+    at min_n whatever the missing observations are); it is called only below min_n. At or above min_n ``crit`` is judged
+    as it is. Below min_n a passing or decisively failing criterion keeps its bool, any other failure becomes None
+    (undecided), and the unmet min_n row (None) keeps the verdict from 'supported'.
+    Returns (verdict, why, criteria judged, rule-5 record or None at or above min_n)."""
+    if n >= min_n:
+        v, why = _verdict(crit)
+        return v, why, crit, None
+    dec = list(decisive())
+    judged = [(name, ok) if ok is None or ok else (name + " (fails decisively below min_n)", False) if d
+              else (name + " (fails, not decisively, below min_n: undecided)", None) for (name, ok), d in zip(crit, dec)]
+    failed = [name for (name, ok), d in zip(crit, dec) if ok is not None and not ok and d]
+    v, why = _verdict(judged)
+    v0, why0 = _verdict(crit)
+    face = "" if (v0, why0) == (v, why) else f" (criteria at face value: {v0}, {why0})"
+    why = (f"only {n} {unit}, below the trial's min_n {min_n}, so the verdict cannot be supported and a failing criterion "
+           f"counts only when it fails decisively (house rule 5). Decisive failures: {'; '.join(failed) if failed else 'none'}. "
+           f"{v}: {why}{face}")
+    return v, why, judged, {"min_n": min_n, "n": n, "unit": unit, "criteria_at_face_value": crit, "decisive_failures": failed}
+
+
+def block_sharpe_ci(x, block: int, n_boot: int = 5000, seed: int = 0, ppy: int = 12, chunk: int = 500) -> list:
+    """Two-sided 95% circular-block-bootstrap interval of the annualised Sharpe ([None, None] under 8 observations)."""
+    x = np.asarray(x, dtype=float); n = len(x)
+    if n < 8:
+        return [None, None]
+    rng = np.random.default_rng(seed); vals = []
+    for s in range(0, n_boot, chunk):
+        vals.append(_row_sharpe(x[_cbb_idx(rng, n, block, min(chunk, n_boot - s))], ppy))
+    v = np.concatenate(vals)
+    return [float(np.quantile(v, 0.025)), float(np.quantile(v, 0.975))]
+
+
+def stationary_mean_ci(x, mean_block: float = 7, n_boot: int = 5000, seed: int = 0, chunk: int = 500) -> list:
+    """Two-sided 95% stationary-bootstrap percentile interval of the mean ([None, None] under 8 observations)."""
+    x = np.asarray(x, dtype=float); n = len(x)
+    if n < 8:
+        return [None, None]
+    rng = np.random.default_rng(seed); vals = []
+    for s in range(0, n_boot, chunk):
+        vals.append(x[_stationary_idx(rng, n, mean_block, min(chunk, n_boot - s))].mean(axis=1))
+    v = np.concatenate(vals)
+    return [float(np.quantile(v, 0.025)), float(np.quantile(v, 0.975))]
+
+
 # ===================================================================================================================
 # T-198: perp funding vs the front Deribit quarterly basis, non-overlapping 90-day windows
 # ===================================================================================================================
@@ -361,7 +444,9 @@ def perp_vs_quarterly_basis(fts, i1, fidx, futures: Sequence[dict], start: str =
     (received by a short perp). basis_90d = (F/S - 1) x 365/dte x 90/365, with F the close at t of the nearest
     quarterly with at least ``min_dte_days`` to expiry (closer ones are in delivery week, where the annualised basis is
     noise) and S the Deribit index at the same 08:00 UTC hour. Pass: share(funding_90d > basis_90d) >= 50% and the
-    two-sided 95% block-bootstrap CI of the mean difference above 0."""
+    two-sided 95% block-bootstrap CI of the mean difference above 0. Below min_n windows (house rule 5) the share fails
+    decisively when it would stay under 50% at min_n even if every missing window won, and the mean criterion when its
+    CI lies wholly at or below 0."""
     ts, cs = _hourly(fts, i1)
     i1a = np.asarray(i1, dtype=float)
     cap = float(np.quantile(i1a, 0.99))
@@ -404,7 +489,12 @@ def perp_vs_quarterly_basis(fts, i1, fidx, futures: Sequence[dict], start: str =
     crit = [(f"windows >= {min_n} (min_n)", True if n >= min_n else None),
             ("share of windows with funding_90d > basis_90d >= 50%", None if main["share"] is None else main["share"] >= 0.5),
             ("mean difference's 95% block-bootstrap CI above 0", None if main["ci95"][0] is None else main["ci95"][0] > 0)]
-    v, why = _verdict(crit)
+
+    def decisive():       # rule 5: the share stays < 50% at min_n even if every missing window wins; the CI lies at or below 0
+        hits = sum(w["diff"] > 0 for w in ws)
+        return [False, (hits + min_n - n) / min_n < 0.5, _ci_below(main["ci95"], 0.0)]
+
+    v, why, crit, r5 = _rule5(crit, n, min_n, "windows", decisive)
     reason = (f"{n} non-overlapping {window_days}-day windows from {start} (front quarterly with >= {min_dte_days:g} days to "
               f"expiry, F and Deribit index both at 08:00 UTC): funding_90d > basis_90d in "
               f"{sum(w['diff'] > 0 for w in ws)}/{n} = {_f(main['share'] * 100 if main['share'] is not None else None, 0)}% "
@@ -414,7 +504,8 @@ def perp_vs_quarterly_basis(fts, i1, fidx, futures: Sequence[dict], start: str =
               f"(need lower > 0) — {why}")
     return {"n": n, "share": main["share"], "mean_diff": main["mean"], "ci95": main["ci95"], "windows": ws,
             "per_year": per_year, "controls": controls, "criteria": crit, "verdict": v, "reason": reason,
-            "sign_convention": "short perp receives +interest_1h x notional (positive funding: longs pay shorts)"}
+            "sign_convention": "short perp receives +interest_1h x notional (positive funding: longs pay shorts)",
+            **({"rule5": r5} if r5 else {})}
 
 
 # ===================================================================================================================
@@ -431,7 +522,9 @@ def funding_call_hedged(fts, i1, deliv: dict, dvol: dict, dtb3: Optional[dict] =
     00:00 UTC) and K the 10-delta strike. It pays max(S_T - K, 0) at the delivery price 30 days later. Everything is
     per unit of spot notional. The spot/perp leg is delta-neutral; its perp-index spread is not archived and is taken
     as 0. Pass: studentized block-bootstrap (block 3) two-sided 95% CI of the mean monthly net carry above 0, and an
-    annualised Sharpe of monthly net carry in excess of DTB3 above 1."""
+    annualised Sharpe of monthly net carry in excess of DTB3 above 1. Below min_n months (house rule 5) the mean fails
+    decisively when its CI lies wholly at or below 0, and the Sharpe when its circular-block (block 3) 95% interval
+    lies wholly at or below 1."""
     ts, cs = _hourly(fts, i1)
     rates = Rates(dtb3)
 
@@ -475,17 +568,28 @@ def funding_call_hedged(fts, i1, deliv: dict, dvol: dict, dtb3: Optional[dict] =
     crit = [(f"months >= {min_n} (min_n)", True if n >= min_n else None),
             ("studentized block-bootstrap 95% CI of mean monthly net carry above 0", None if main["ci95"][0] is None else main["ci95"][0] > 0),
             ("annualised Sharpe of monthly net carry over DTB3 > 1", None if main["sharpe_excess"] is None else main["sharpe_excess"] > 1.0)]
-    v, why = _verdict(crit)
+    sharpe_ci = None
+
+    def decisive():       # rule 5: the mean's CI lies at or below 0; the Sharpe's block-bootstrap interval at or below 1
+        nonlocal sharpe_ci
+        sharpe_ci = block_sharpe_ci(net - rf, block, n_boot, seed, 12)
+        return [False, _ci_below(main["ci95"], 0.0), _ci_below(sharpe_ci, 1.0)]
+
+    v, why, crit, r5 = _rule5(crit, n, min_n, "months", decisive)
+    if r5:
+        r5["sharpe_excess_ci95"] = sharpe_ci
     reason = (f"MODEL-PRICED (BS at DVOL, 10-delta 30-DTE call). {n} months {rows[0]['month']}..{rows[-1]['month']}: mean "
               f"funding {_pp(fund.mean())}%/month, mean call premium {_pp(np.mean([r['premium'] for r in rows]))}%, mean "
               f"payoff {_pp(np.mean([r['payoff'] for r in rows]))}%; net carry mean {_pp(main['mean'], 3)}%/month, "
               f"studentized 95% CI [{_pp(main['ci95'][0], 3)}, {_pp(main['ci95'][1], 3)}]% (need lower > 0); Sharpe of "
-              f"net over DTB3 {_f(main['sharpe_excess'])} (need > 1); unhedged mean {_pp(unh['mean'], 3)}%, Sharpe "
+              f"net over DTB3 {_f(main['sharpe_excess'])} (need > 1"
+              f"{'' if sharpe_ci is None else f'; block-bootstrap 95% interval [{_f(sharpe_ci[0])}, {_f(sharpe_ci[1])}]'}); "
+              f"unhedged mean {_pp(unh['mean'], 3)}%, Sharpe "
               f"{_f(unh['sharpe_excess'])}; DVOL+5 hedge mean {_pp(bump['mean'] if bump else None, 3)}% — {why}")
     return {"n": n, "pricing": "MODEL-PRICED: Black-Scholes at DVOL/100, r=0, 30/365 years, 10-delta strike",
             "mean_net": main["mean"], "ci95": main["ci95"], "sharpe_excess": main["sharpe_excess"],
             "unhedged": unh, "dvol_plus_5": bump, "halves": halves, "months": rows, "criteria": crit, "verdict": v,
-            "reason": reason}
+            "reason": reason, **({"rule5": r5} if r5 else {})}
 
 
 # ===================================================================================================================
@@ -536,7 +640,10 @@ def trend_funding_filter(days: Sequence[str], closes, fts, i8, start: str = "202
     rule does not make. Pass: Sharpe difference > 0 with a paired circular-block (30-day) bootstrap 95% interval
     excluding 0; the placebo (F lagged 30 days, percentiles recomputed) interval includes 0; DSR of the daily
     filtered-minus-unfiltered returns > 0.95 at the joint funding-trial count; at least 10 funding-driven activations
-    (fewer = inconclusive)."""
+    (fewer = inconclusive). Below min_n days (house rule 5) the Sharpe difference fails decisively when its interval lies
+    wholly at or below 0, and the placebo when its interval lies wholly on one side of 0 (the claimed value); the DSR,
+    which has no interval, and the activation count never decide there. Under 3 blocks of evaluable days nothing is
+    computed and the verdict is inconclusive."""
     c = np.asarray(closes, dtype=float); n = len(c)
     ts, cs = _hourly(fts, i8)
     dec = np.array([_utc_ts(d) + DAY for d in days], dtype=np.int64)
@@ -564,10 +671,12 @@ def trend_funding_filter(days: Sequence[str], closes, fts, i8, start: str = "202
     rf_, rb_, pf, pb = run(F)
     ev = (ds >= start) & (ds <= end) & np.isfinite(rf_) & np.isfinite(rb_)
     a, b = rf_[ev], rb_[ev]; N = int(ev.sum())
-    if N < 3 * block:
+    if N < 3 * block:     # under 3 blocks the paired block bootstrap gives no interval, so no failure can be decisive
         crit = [(f"days >= {min_n} (min_n)", None)]
         v, why = _verdict(crit)
-        return {"n": N, "criteria": crit, "verdict": v, "reason": f"only {N} evaluable days — {why}"}
+        return {"n": N, "criteria": crit, "verdict": v,
+                "reason": (f"only {N} evaluable days, fewer than 3 blocks of {block} days for the paired block bootstrap, so "
+                           f"no interval and no decisive failure below min_n {min_n} (house rule 5) — {why}")}
     main = paired_sharpe_diff_ci(a, b, CRYPTO_PPY, block, n_boot, seed)
     F_lag = np.full(n, np.nan); F_lag[placebo_lag:] = F[:-placebo_lag]
     pa, pbb, _, _ = run(F_lag)
@@ -586,7 +695,12 @@ def trend_funding_filter(days: Sequence[str], closes, fts, i8, start: str = "202
             ("placebo (F lagged 30 days) 95% interval includes 0", plc["ci95"][0] <= 0 <= plc["ci95"][1]),
             (f"DSR of daily filtered-minus-unfiltered returns > 0.95 (n_trials = {n_trials})", dsr is not None and dsr > 0.95),
             (f"at least {min_activations} funding-driven activations", True if acts >= min_activations else None)]
-    v, why = _verdict(crit)
+
+    def decisive():       # rule 5: the Sharpe-difference interval lies at or below 0; the placebo interval wholly off 0
+        return [False, _ci_below(main["ci95"], 0.0),
+                _ci_above(plc["ci95"], 0.0, strict=True) or _ci_below(plc["ci95"], 0.0, strict=True), False, False]
+
+    v, why, crit, r5 = _rule5(crit, N, min_n, "days", decisive)
     reason = (f"{N} days {ds[ev][0]}..{ds[ev][-1]}: Sharpe filtered {_f(_sr(a, CRYPTO_PPY))} vs unfiltered "
               f"{_f(_sr(b, CRYPTO_PPY))}, difference {_f(main['diff'], 3)} with 95% interval [{_f(main['ci95'][0], 3)}, "
               f"{_f(main['ci95'][1], 3)}] (need > 0 and excluding 0); placebo difference {_f(plc['diff'], 3)} interval "
@@ -596,7 +710,7 @@ def trend_funding_filter(days: Sequence[str], closes, fts, i8, start: str = "202
             "ci95": main["ci95"], "placebo": plc, "dsr": dsr, "dsr_n_trials": n_trials, "activations": acts,
             "days_half": int(np.sum(pf[ev] == 0.5)), "days_flat_by_funding": int(np.sum((pf[ev] == 0) & (pb[ev] == 1))),
             "mdd_filtered": _mdd(a), "mdd_unfiltered": _mdd(b), "halves": halves, "criteria": crit, "verdict": v,
-            "reason": reason}
+            "reason": reason, **({"rule5": r5} if r5 else {})}
 
 
 # ===================================================================================================================
@@ -675,7 +789,9 @@ def cme_basis_spike(days: Sequence[str], F, S, std_bar, expiries: Sequence[date]
     be a signal or entry day. The exit may fall in that window if it is a standard synchronous bar of the same contract
     before expiry day, so trades never span a roll. Trades never overlap. Pass: one-sided 95% lower bound of the mean
     net return (month-clustered bootstrap) > 0, positive means before and after 2024-01, DSR > 0.95 over 5 variants,
-    and the claim window from ``start`` covered by synchronous spot."""
+    and the claim window from ``start`` covered by synchronous spot. Below min_n trades (house rule 5) the mean fails
+    decisively when its month-clustered 95% interval lies wholly at or below 0, and the halves criterion when either
+    half's does (each needs at least 4 months); the DSR never decides there."""
     F = np.asarray(F, dtype=float); S = np.asarray(S, dtype=float); ds = list(days); n = len(ds)
     tab = cme_daily_basis(ds, F, S, std_bar, expiries, roll_trading_days=roll_trading_days)
     ok, valid, b, exp = tab["ok"], tab["valid"], tab["basis"], tab["expiry"]
@@ -712,7 +828,24 @@ def cme_basis_spike(days: Sequence[str], F, S, std_bar, expiries: Sequence[date]
             ("positive mean before and after 2024-01", same_sign),
             (f"DSR > 0.95 (n_trials = {n_trials})", dsr is not None and dsr > 0.95),
             (f"claim window from {start[:7]} covered by settle-synchronous spot", True if covered else None)]
-    v, why = _verdict(crit)
+    half_boot = {}
+
+    def decisive():       # rule 5: a month-clustered 95% interval (>= 4 months) lies wholly at or below 0
+        def down(bt):
+            return bt["clusters"] >= MIN_DECISIVE_OBS and _ci_below(bt["ci95"], 0.0)
+        for nm, sel in (("pre_2024", [t["entry"] < split for t in trades]), ("post_2024", [t["entry"] >= split for t in trades])):
+            sub = [t for t, s_ in zip(trades, sel) if s_]
+            if sub:
+                half_boot[nm] = cluster_mean_boot([t["net"] for t in sub], [t["entry"][:7] for t in sub], n_boot, seed)
+        return [False, down(boot), any(down(bt) for bt in half_boot.values()), False, False]
+
+    v, why, crit, r5 = _rule5(crit, nt, min_n, "trades", decisive)
+    ci_txt = ""
+    if r5:
+        r5["halves_month_clustered"] = half_boot
+        ci_txt = "; month-clustered 95% CIs " + ", ".join(
+            f"{nm} [{_pp(bt['ci95'][0], 3)}, {_pp(bt['ci95'][1], 3)}]% ({bt['clusters']} months)"
+            for nm, bt in (("all trades", boot), *((k.replace("_", "-"), b_) for k, b_ in half_boot.items())))
     reason = (f"{nt} trades {trades[0]['entry']}..{trades[-1]['entry']} (synchronous spot from {first_sync}; z > {z_thr:g} "
               f"vs the valid settles in the trailing {z_window} trading days, at least {z_min_obs}, the {roll_trading_days} "
               f"days before expiry excluded; enter next settle, hold {hold} trading days in the same contract, "
@@ -720,13 +853,14 @@ def cme_basis_spike(days: Sequence[str], F, S, std_bar, expiries: Sequence[date]
               f"roll window): mean net {_pp(net.mean(), 3)}%, one-sided 95% lower bound {_pp(boot['lb95'], 3)}% (need > 0); "
               f"pre-2024 mean {_pp(pre.mean() if len(pre) else None, 3)}% (n={len(pre)}), post {_pp(post.mean() if len(post) else None, 3)}% "
               f"(n={len(post)}) (need both > 0); DSR {_f(dsr, 3)} (need > 0.95); window from {start[:7]} covered: "
-              f"{'yes' if covered else 'no, no settle-synchronous spot before ' + str(first_sync)} — {why}")
+              f"{'yes' if covered else 'no, no settle-synchronous spot before ' + str(first_sync)}{ci_txt} — {why}")
     return {"n": nt, "mean_net": float(net.mean()), "boot": boot, "pre_2024": {"n": len(pre), "mean": float(pre.mean()) if len(pre) else None},
             "post_2024": {"n": len(post), "mean": float(post.mean()) if len(post) else None}, "dsr": dsr,
             "p_block_shifted_signal": p_shift, "mean_basis_change": float(np.mean([t["basis_change"] for t in trades])),
             "mean_decay_implied_change": float(np.mean([t["decay_implied_change"] for t in trades])),
             "mean_net_after_financing_dtb3_plus_150bp": float(fin.mean()), "first_synchronous_day": first_sync,
-            "signals": int(sig.sum()), "trades": trades, "criteria": crit, "verdict": v, "reason": reason}
+            "signals": int(sig.sum()), "trades": trades, "criteria": crit, "verdict": v, "reason": reason,
+            **({"rule5": r5} if r5 else {})}
 
 
 # ===================================================================================================================
@@ -772,7 +906,9 @@ def cme_cash_and_carry(contracts: Sequence[dict], h: float = 0.03, test: tuple =
     Annualised: excess / capital x 365/d. Months not entered count as 0. Pass (test window): one-sided 95% studentized
     block-bootstrap (block 3) lower bound of the mean > 0, and DSR > 0.95 with n_trials = 10. The claim covers every
     contract month in ``claim``: months without synchronous prices leave a not-implemented coverage criterion (at
-    best inconclusive)."""
+    best inconclusive). Below min_n test contract-months (house rule 5) the mean fails decisively when its two-sided
+    studentized 95% CI lies wholly at or below 0; the DSR never decides there. Under 4 test contract-months nothing is
+    computed and the verdict is inconclusive."""
 
     def run(hh: float, rows: Sequence[dict], exit_key: str = "S_exit"):
         ann, per, entered = [], [], []
@@ -796,7 +932,9 @@ def cme_cash_and_carry(contracts: Sequence[dict], h: float = 0.03, test: tuple =
     if n < 4:
         crit = [(f"test-window contract-months >= {min_n}", None)]
         v, why = _verdict(crit)
-        return {"n": n, "criteria": crit, "verdict": v, "reason": f"only {n} test-window contracts with synchronous prices — {why}"}
+        return {"n": n, "criteria": crit, "verdict": v,
+                "reason": (f"only {n} test-window contracts with synchronous prices, fewer than 4 for the studentized "
+                           f"bootstrap, so no interval and no decisive failure below min_n {min_n} (house rule 5) — {why}")}
     ann, per, ent = run(h, tst)
     ci = student_mean_ci(ann, block, n_boot, seed)
     dsr = _dsr(per, n_trials)
@@ -826,10 +964,13 @@ def cme_cash_and_carry(contracts: Sequence[dict], h: float = 0.03, test: tuple =
             ("one-sided 95% studentized block-bootstrap lower bound of mean annualised excess > 0", ci["lb95"] is not None and ci["lb95"] > 0),
             (f"DSR > 0.95 (n_trials = {n_trials})", dsr is not None and dsr > 0.95),
             (f"claim window from {claim[0]} covered by settle-synchronous spot", None if uncovered else True)]
-    v, why = _verdict(crit)
+    # rule 5: the studentized 95% CI lies wholly at or below 0 (zero width, e.g. never entered, decides nothing)
+    v, why, crit, r5 = _rule5(crit, n, min_n, "test-window contract-months",
+                              lambda: [False, _ci_below(ci["ci95"], 0.0), False, False])
+    ci_txt = f"; two-sided 95% CI [{_pp(ci['ci95'][0])}, {_pp(ci['ci95'][1])}]%" if r5 else ""
     reason = (f"{n} test contract-months {tst[0]['contract']}..{tst[-1]['contract']} (h = DTB3 + {h * 100:g}%, entered "
               f"{int(ent.sum())}; exit at the 16:00 London index, the trial's BRR proxy): mean annualised excess over DTB3 "
-              f"on capital {_pp(ann.mean())}%, one-sided 95% lower bound {_pp(ci['lb95'])}% (need > 0); DSR {_f(dsr, 3)} "
+              f"on capital {_pp(ann.mean())}%, one-sided 95% lower bound {_pp(ci['lb95'])}% (need > 0{ci_txt}); DSR {_f(dsr, 3)} "
               f"(need > 0.95); mean settlement slippage {_pp(np.mean(slips) if slips else None, 3)}% of spot; control with "
               f"the mean 15:00/16:00 London index as exit (not in the verdict): mean {_pp(win['mean_ann_excess'] if win else None)}%, "
               f"lower bound {_pp(win['lb95'] if win else None)}%, DSR {_f(win['dsr'] if win else None, 3)}; claim window "
@@ -841,7 +982,7 @@ def cme_cash_and_carry(contracts: Sequence[dict], h: float = 0.03, test: tuple =
             "fit": fit_rep, "regimes": reg, "mean_slippage": float(np.mean(slips)) if slips else None,
             "brr_window_mean_exit_control": win, "uncovered_contracts": uncovered,
             "contracts": [{**c, "ann_excess": float(a)} for c, a in zip(tst, ann)], "criteria": crit, "verdict": v,
-            "reason": reason}
+            "reason": reason, **({"rule5": r5} if r5 else {})}
 
 
 # ===================================================================================================================
@@ -861,7 +1002,9 @@ def perp_funding_carry(fts, i1, dtb3: Optional[dict] = None, threshold: float = 
     funding formula, p = f8 + u with f8 = 8 x interest_1h and |u| <= damper, giving a central path (u = 0; its daily
     changes are the mark-to-market). Pessimistic adds an adverse damper at every entry and exit; optimistic adds a
     favourable one. A Sharpe criterion passes if it passes under the pessimistic bound and fails if it fails under the
-    optimistic bound; otherwise it is not decided (None)."""
+    optimistic bound; otherwise it is not decided (None). Below min_days in-position test days (the trial's min_n, house
+    rule 5) a Sharpe criterion fails decisively only when the optimistic Sharpe's stationary-bootstrap 95% interval lies
+    wholly at or below its bound (1.0; 0.3 for the lower-bound criterion); the DSR never decides there."""
     ts, cs = _hourly(fts, i1)
     i1a = np.asarray(i1, dtype=float); rates = Rates(dtb3)
     d0 = _d(_day_of(int(ts[0]) + 8 * DAY)); d1 = _d(_day_of(int(ts[-1]) - DAY))
@@ -935,7 +1078,12 @@ def perp_funding_carry(fts, i1, dtb3: Optional[dict] = None, threshold: float = 
             ("test Sharpe > 1.0 after costs and perp-spot spread (spread-bounded)", sh_ok),
             ("stationary-bootstrap one-sided 95% lower bound of Sharpe > 0.3 (spread-bounded)", lb_ok),
             (f"DSR > 0.95 with n_trials = {n_trials} (spread-bounded)", ds_ok)]
-    v, why = _verdict(crit)
+    # rule 5: a Sharpe criterion fails only under the optimistic spread, and decisively when the optimistic Sharpe's
+    # stationary-bootstrap 95% interval lies wholly at or below the bound (1.0, and 0.3 for the lower-bound criterion)
+    v, why, crit, r5 = _rule5(crit, inpos_days, min_days, "in-position test days",
+                              lambda: [False, _ci_below(stats["opt"]["ci95"], 1.0), _ci_below(stats["opt"]["ci95"], 0.3), False])
+    ci_txt = (f"; optimistic-spread Sharpe two-sided 95% interval [{_f(stats['opt']['ci95'][0])}, {_f(stats['opt']['ci95'][1])}]"
+              if r5 else "")
     reason = (f"test {test[0]}..{test[1]}, {ndays} days, {inpos_days} in position, {S['switches']} switches overall "
               f"(threshold DTB3 + {threshold * 100:g}%, 10 bp per side per leg): Sharpe of daily excess, pessimistic / central / "
               f"optimistic spread = {_f(stats['pess']['sharpe'])} / {_f(stats['central']['sharpe'])} / {_f(stats['opt']['sharpe'])} "
@@ -944,7 +1092,7 @@ def perp_funding_carry(fts, i1, dtb3: Optional[dict] = None, threshold: float = 
               f"{_f(dsr['pess'], 3)} / {_f(dsr['central'], 3)} / {_f(dsr['opt'], 3)} (need > 0.95); perp mark history not "
               f"archived, spread reconstructed from funding with |u| <= {damper * 100:g}%; cost read as {cost_side * 1e4:g} bp "
               f"per side for the whole position instead of per leg: Sharpe {_f(cost_alt['pess'])} / {_f(cost_alt['central'])} / "
-              f"{_f(cost_alt['opt'])}; hysteresis control (exit < DTB3) central Sharpe {_f(hysteresis['sharpe_central'])} — {why}")
+              f"{_f(cost_alt['opt'])}; hysteresis control (exit < DTB3) central Sharpe {_f(hysteresis['sharpe_central'])}{ci_txt} — {why}")
     return {"n": ndays, "days_in_position": inpos_days, "sharpe": {k: stats[k]["sharpe"] for k in stats},
             "lb95": {k: stats[k]["lb95"] for k in stats}, "ci95": {k: stats[k]["ci95"] for k in stats}, "dsr": dsr,
             "mdd_central": _mdd(S["central"][tm]) if ndays else None, "ar1_hourly_funding": ar1,
@@ -952,7 +1100,7 @@ def perp_funding_carry(fts, i1, dtb3: Optional[dict] = None, threshold: float = 
             "walk_forward": {"fit_sharpe_by_threshold": wf, "chosen_threshold": best,
                              "test_sharpe_at_chosen": _sr(series(best)["central"][tm], CRYPTO_PPY) if best is not None else None},
             "by_year": years, "hysteresis_control": hysteresis, "cost_reading_control": cost_alt, "criteria": crit,
-            "verdict": v, "reason": reason,
+            "verdict": v, "reason": reason, **({"rule5": r5} if r5 else {}),
             "notes": "Deribit-specific (not US-accessible); Kraken/CDE replication and the ETH variant need bundles not archived"}
 
 
@@ -980,6 +1128,24 @@ def _fwd_mdd(px_pos: dict, px: np.ndarray, day: str, horizon: int) -> Optional[f
     return float((p / np.maximum.accumulate(p) - 1.0).min())
 
 
+def block_gap_ci(lab, dep, block: int, n_boot: int = 5000, seed: int = 0) -> list:
+    """Two-sided 95% circular-block-bootstrap interval of mean dep[lab == 2] - mean dep[lab == 0], resampling weeks
+    (label and depth together) in blocks of ``block``. Resamples missing either group are skipped. [None, None] with
+    fewer than 4 top or 4 bottom weeks."""
+    lab = np.asarray(lab); dep = np.asarray(dep, dtype=float); n = len(lab)
+    if (lab == 2).sum() < MIN_DECISIVE_OBS or (lab == 0).sum() < MIN_DECISIVE_OBS:
+        return [None, None]
+    idx = _cbb_idx(np.random.default_rng(seed), n, block, n_boot)
+    L, D = lab[idx], dep[idx]
+    top, bot = L == 2, L == 0
+    nt, nb = top.sum(axis=1), bot.sum(axis=1)
+    use = (nt > 0) & (nb > 0)
+    if not use.any():
+        return [None, None]
+    g = (np.where(top, D, 0.0).sum(axis=1)[use] / nt[use]) - (np.where(bot, D, 0.0).sum(axis=1)[use] / nb[use])
+    return [float(np.quantile(g, 0.025)), float(np.quantile(g, 0.975))]
+
+
 def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[str], px_close, dtb3: Optional[dict] = None,
                           start: str = "2018-12-01", end: str = "2026-09-30", trailing: int = 52, horizon: int = 30,
                           block: int = 8, n_perm: int = 5000, seed: int = 0, min_n: int = 350, split: str = "2022-01-01",
@@ -989,7 +1155,10 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
     30-day max drawdown from the daily close on the observation day (the first close after the 15:00 CT signal)
     through 30 days later. Depth = -MDD in percentage points. Pass: mean depth(top) - mean depth(bottom half) >= 10
     pp, block-permutation (8-week blocks) p < 0.05, a positive gap in both halves, >= 8 non-overlapping top-decile
-    episodes (fewer = insufficient events), >= 350 weeks, and the claim window from ``start`` covered."""
+    episodes (fewer = insufficient events), >= 350 weeks, and the claim window from ``start`` covered. Below min_n weeks
+    (house rule 5) the gap fails decisively when its 8-week block-bootstrap 95% interval lies wholly below 10 pp, the
+    permutation test when that interval lies wholly at or below 0, and the halves criterion when either half's interval
+    does; the episode count never decides there."""
     ob = np.asarray(obs_basis, dtype=float); px = np.asarray(px_close, dtype=float)
     pos = {d: i for i, d in enumerate(px_days)}
     lab, dep, wk = [], [], []
@@ -1023,7 +1192,7 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
             gp = gap(Lp, dep)
             hits += int(gp is not None and gp >= g)
         p = (1 + hits) / (1 + n_perm)
-    wka = np.array(wk)
+    wka = np.array(wk, dtype=str)                        # str dtype: an empty sample compares with the split too
     halves = {}
     for nm, msk in (("first", wka < split), ("second", wka >= split)):
         halves[nm] = {"weeks": int(msk.sum()), "top": int((lab[msk] == 2).sum()) if n else 0,
@@ -1053,17 +1222,34 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
             ("block-permutation p < 0.05", None if p is None else p < 0.05),
             ("gap positive in both halves (split 2022-01)", same),
             (f"at least {min_episodes} non-overlapping top-decile episodes (else insufficient events)", True if eps >= min_episodes else None)]
-    v, why = _verdict(crit)
+    gap_ci = {}
+
+    def decisive():       # rule 5: block-bootstrap (8-week) 95% intervals of the gaps, the permutation n_perm draws
+        gap_ci["all"] = block_gap_ci(lab, dep, block, n_perm, seed) if n else [None, None]
+        for nm, msk in (("first", wka < split), ("second", wka >= split)):
+            gap_ci[nm] = block_gap_ci(lab[msk], dep[msk], block, n_perm, seed) if n and msk.any() else [None, None]
+        return [False, False, _ci_below(gap_ci["all"], gap_pp, strict=True),       # gap wholly below 10 pp
+                _ci_below(gap_ci["all"], 0.0),                                        # the tested gap wholly at or below 0
+                _ci_below(gap_ci["first"], 0.0) or _ci_below(gap_ci["second"], 0.0),  # a half's gap wholly at or below 0
+                False]
+
+    v, why, crit, r5 = _rule5(crit, n, min_n, "weeks", decisive)
+    ci_txt = ""
+    if r5:
+        r5["gap_ci95_pp"] = gap_ci
+        ci_txt = "; 8-week block-bootstrap 95% CIs of the gap " + ", ".join(
+            f"{nm} [{_f(c_[0], 1)}, {_f(c_[1], 1)}] pp" for nm, c_ in gap_ci.items())
     reason = (f"{n} weeks {wk[0] if wk else 'n/a'}..{wk[-1] if wk else 'n/a'} ({int((lab == 2).sum()) if n else 0} top-decile, "
               f"{int((lab == 0).sum()) if n else 0} bottom-half): mean 30-day max drawdown {_f(dep[lab == 2].mean() if n and (lab == 2).any() else None, 1)}% "
               f"vs {_f(dep[lab == 0].mean() if n and (lab == 0).any() else None, 1)}%, gap {_f(g, 1)} pp (need >= {gap_pp:g}); "
               f"permutation p {_f(p, 4)} (need < 0.05); halves {_f(hs[0], 1)} / {_f(hs[1], 1)} pp (need both > 0); "
               f"{eps} non-overlapping episodes (need >= {min_episodes}); weeks need >= {min_n}; window from {start[:7]} "
-              f"covered: {'yes' if covered else 'no (settle-synchronous spot starts 2019-05, first labelled week ' + (wk[0] if wk else 'n/a') + ')'} — {why}")
+              f"covered: {'yes' if covered else 'no (settle-synchronous spot starts 2019-05, first labelled week ' + (wk[0] if wk else 'n/a') + ')'}{ci_txt} — {why}")
     return {"n": n, "gap_pp": g, "p_perm": p, "halves": halves, "episodes": eps,
             "mean_depth_top": float(dep[lab == 2].mean()) if n and (lab == 2).any() else None,
             "mean_depth_bottom": float(dep[lab == 0].mean()) if n and (lab == 0).any() else None,
-            "timing_rule": timing, "first_week": wk[0] if wk else None, "criteria": crit, "verdict": v, "reason": reason}
+            "timing_rule": timing, "first_week": wk[0] if wk else None, "criteria": crit, "verdict": v, "reason": reason,
+            **({"rule5": r5} if r5 else {})}
 
 
 # ===================================================================================================================
@@ -1081,7 +1267,10 @@ def funding_sentiment(fts, i8, fidx, i1=None, start: str = "2019-06-01", end: st
     block 7) of the estimating series g = diff + f (x - m_top)/p - (x - m_all), with H0: diff >= 0. Pass: >= 200
     top-decile days, >= 30 non-overlapping events (7-day separation), out-of-sample (2023-) diff <= -2 pp with
     p < 0.05, and DSR >= 0.95 (24 cells) of the contrarian rule's daily return net of costs, measured against buy and
-    hold. The rule is flat for 7 days after a top-decile day and otherwise long, with 0.5% per side."""
+    hold. The rule is flat for 7 days after a top-decile day and otherwise long, with 0.5% per side. Below 200
+    top-decile days (min_top, the trial's min_n; house rule 5) the out-of-sample difference fails decisively when its
+    stationary-bootstrap 95% interval (the mean of g, mean block 7) lies wholly above -2 pp, and the p-value criterion
+    when it lies wholly at or above 0; the DSR and the event count never decide there."""
     ts, cs = _hourly(fts, i8); fidx = np.asarray(fidx, dtype=float)
     d0, d1 = _d(start), _d(end)
     days = [(d0 + timedelta(days=k)).isoformat() for k in range((d1 - d0).days + 1)]
@@ -1113,6 +1302,14 @@ def funding_sentiment(fts, i8, fidx, i1=None, start: str = "2019-06-01", end: st
         return {"n": int(msk.sum()), "n_top": int(f.sum()), "mean_top": mt, "mean_all": ma, "diff": dif,
                 "p": stationary_mean_p_less(g, mean_block, n_boot, seed) if with_p else None}
 
+    def diff_ci(msk: np.ndarray) -> list:
+        """Stationary-bootstrap 95% interval of the difference: the mean of the same estimating series g."""
+        x = fwd[msk]; f = top[msk]
+        if f.sum() < MIN_DECISIVE_OBS or (~f).sum() < MIN_DECISIVE_OBS:
+            return [None, None]
+        mt, ma = float(x[f].mean()), float(x.mean()); dif = mt - ma
+        return stationary_mean_ci(dif + f * (x - mt) / f.mean() - (x - ma), mean_block, n_boot, seed)
+
     full = diff_stats(use, False)
     oos = diff_stats(use & (da >= oos_start), True)
     ins = diff_stats(use & (da < oos_start), True)
@@ -1142,16 +1339,29 @@ def funding_sentiment(fts, i8, fidx, i1=None, start: str = "2019-06-01", end: st
             (f"out-of-sample difference <= {gap * 100:g} pp", None if oos["diff"] is None else oos["diff"] <= gap),
             ("out-of-sample stationary-bootstrap p < 0.05 (H0: difference >= 0)", None if oos["p"] is None else oos["p"] < 0.05),
             (f"DSR >= 0.95 of contrarian-minus-buy-and-hold daily returns (n_trials = {n_trials})", dsr is not None and dsr >= 0.95)]
-    v, why = _verdict(crit)
+    oos_ci = [None, None]
+
+    def decisive():       # rule 5: the out-of-sample difference's stationary-bootstrap 95% interval
+        nonlocal oos_ci
+        oos_ci = diff_ci(use & (da >= oos_start))
+        return [False, False, _ci_above(oos_ci, gap, strict=True),     # wholly above -2 pp
+                _ci_above(oos_ci, 0.0),                                 # wholly at or above 0 (H0 side)
+                False]
+
+    v, why, crit, r5 = _rule5(crit, full["n_top"], min_top, "top-decile days", decisive)
+    ci_txt = ""
+    if r5:
+        r5["oos_diff_ci95"] = oos_ci
+        ci_txt = f"; out-of-sample difference stationary-bootstrap 95% interval [{_pp(oos_ci[0])}, {_pp(oos_ci[1])}] pp"
     reason = (f"{full['n']} days ({full['n_top']} top-decile, {events} non-overlapping events): full-sample 7-day return top "
               f"{_pp(full.get('mean_top'))}% vs all {_pp(full.get('mean_all'))}%, difference {_pp(full['diff'])} pp; "
               f"out-of-sample {oos_start[:4]}+ difference {_pp(oos['diff'])} pp (need <= {gap * 100:g}) with p {_f(oos['p'], 4)} "
               f"(need < 0.05; {oos['n_top']} top days); in-sample difference {_pp(ins['diff'])} pp; DSR of contrarian vs "
-              f"buy-and-hold {_f(dsr, 3)} (need >= 0.95) — {why}")
+              f"buy-and-hold {_f(dsr, 3)} (need >= 0.95){ci_txt} — {why}")
     return {"n": full["n"], "n_top": full["n_top"], "events": events, "full": full, "oos": oos, "in_sample": ins,
             "halves": halves, "dsr_contrarian_vs_hold": dsr,
             "contrarian_sharpe": _sr(rule[ev], CRYPTO_PPY), "buy_hold_sharpe": _sr(R[ev], CRYPTO_PPY),
-            "carry_variant": carry, "criteria": crit, "verdict": v, "reason": reason}
+            "carry_variant": carry, "criteria": crit, "verdict": v, "reason": reason, **({"rule5": r5} if r5 else {})}
 
 
 # ===================================================================================================================

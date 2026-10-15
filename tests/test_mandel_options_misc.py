@@ -9,7 +9,7 @@ formats (the box file is CC BY-NC-ND and Tardis data may not be redistributed, s
 import gzip
 import io
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 

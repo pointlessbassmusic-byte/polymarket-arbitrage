@@ -26,8 +26,18 @@ Shared conventions
   n_trials = 34 (the family size the claims state) and the variance of trial Sharpes estimated from the daily
   family variants the archive supports (``FAMILY``, 14 of the 34), floored at the zero-skill variance 1/(T-1).
 * Ken French files currently end 2026-08 and AQR BAB 2026-07; windows that the claims state as ending 2026-09 are
-  reported with the end actually used. The min-n criteria decide whether the sample is sufficient; when a sample
-  is too short the verdict is inconclusive, not a failure.
+  reported with the end actually used.
+* Sample size (house rule 5, ``_decide``): at or above the trial's min_n (in the claim's own units: days or months)
+  every criterion is judged at face value. Below min_n the verdict can never be supported, and a failing criterion
+  still counts only when it fails decisively, i.e. its interval lies wholly on the wrong side of the claimed bound
+  (none of these criteria has bounded outcomes, so "fails at min_n whatever the missing observations are" never
+  applies): a 'lower 95% bound > 0' criterion when the whole 95% interval lies at or below 0; an 'NW t >= c'
+  criterion when the coefficient's +/-c standard-error interval lies wholly at or below 0 (t <= -c); '|beta| < b'
+  when the beta's 95% NW interval lies wholly outside (-b, b); a 'DSR > 0.95' criterion when the PSR's one-sided
+  95% interval of the Sharpe lies wholly below the deflation benchmark (DSR <= 0.05), with the benchmark the trial
+  would face at min_n (the 1/(T-1) floor of the trial-Sharpe variance taken at min_n, which can only lower it) and
+  at least 8 observations. PBO and a QMJ loading given without an interval never fail decisively. Any other
+  failure below min_n is undecided (None), so the verdict is inconclusive.
 """
 
 from __future__ import annotations
@@ -42,7 +52,7 @@ import numpy as np
 from mandel.experiments.overfit import pbo_cscv
 from mandel.experiments.underlying2 import _verdict, load_series
 from mandel.experiments.volatility import index_closes
-from mandel.validation.backtest_eval import deflated_sharpe_ratio, sharpe_ratio
+from mandel.validation.backtest_eval import deflated_sharpe_ratio, expected_max_sharpe, sharpe_ratio
 
 FAMILY_TRIALS = 34
 DSR_PASS = 0.95
@@ -168,13 +178,19 @@ def sharpe_diff_ci(a, b, ppy: int, block: int, n_boot: int = 5000, seed: int = 0
     return d * k_ann, (d - float(q_hi) * se) * k_ann, (d - float(q_lo) * se) * k_ann
 
 
+def _family_var(family_sharpes, T: int) -> float:
+    """Variance of the family's trial Sharpes (ddof 1; 0 with fewer than 2), floored at the zero-skill variance 1/(T-1)."""
+    fs = np.asarray(list(family_sharpes), dtype=float)
+    v = float(fs.var(ddof=1)) if fs.size > 1 else 0.0
+    return max(v, 1.0 / max(1, T - 1))
+
+
 def family_dsr(x, family_sharpes: Sequence[float], n_trials: int = FAMILY_TRIALS) -> dict:
     """DSR of ``x`` (per-period returns) against the best of ``n_trials`` trials whose Sharpe variance is estimated
     from ``family_sharpes`` (per-period Sharpes of the computable family members), floored at 1/(T-1)."""
     x = np.asarray(x, dtype=float)
     fs = np.asarray(list(family_sharpes), dtype=float)
-    v = float(fs.var(ddof=1)) if fs.size > 1 else 0.0
-    v = max(v, 1.0 / max(1, x.size - 1))
+    v = _family_var(fs, x.size)
     dsr = float(deflated_sharpe_ratio(x, n_trials=n_trials, var_trials_sr=v))
     return {"dsr": dsr, "var_trials_sr": v, "n_trials": int(n_trials), "n_family_computed": int(fs.size),
             "sr_per_period": float(sharpe_ratio(x))}
@@ -316,11 +332,71 @@ def _rolling(r: np.ndarray, w: int, ppy: int = 252) -> Optional[dict]:
     return {"min": float(m.min()), "max": float(m.max()), "share_positive": float((m > 0).mean()), "window": int(w)}
 
 
-def _decide(crit: list, n: int, min_n: int, unit: str) -> tuple[str, str]:
-    """``_verdict`` with the sample-size criterion first; a sample below the claim's minimum is inconclusive (rule 6)."""
-    if n < min_n:
-        return "inconclusive", f"data cannot support the claim: {n} {unit} in the window, below the {min_n} required"
-    return _verdict([(f">= {min_n} {unit}", True)] + crit)
+def _decide(rows: list, n: int, min_n: int, unit: str) -> tuple[str, str]:
+    """``_verdict`` under house rule 5. rows: [(name, ok, decisive, evidence)] with ok True / False / None (not
+    implemented), decisive True when a failure stands below min_n (its interval lies wholly on the wrong side of the
+    claimed bound) and evidence a short note on that test. At or above min_n the sample-size criterion passes and every
+    criterion is judged at face value. Below min_n a passing or decisively failing criterion keeps its bool, any other
+    failure becomes None (undecided) and the unmet min_n criterion is None, so the verdict is never 'supported'."""
+    face = [(name, ok) for name, ok, _, _ in rows]
+    if n >= min_n:
+        return _verdict([(f">= {min_n} {unit}", True)] + face)
+    crit = []
+    for name, ok, decisive, ev in rows:
+        note = f": {ev}" if ev else ""
+        if ok is None or ok:
+            crit.append((name, ok))
+        elif decisive:
+            crit.append((f"{name} (fails decisively below min_n{note})", False))
+        else:
+            crit.append((f"{name} (fails, not decisively, below min_n{note}; undecided)", None))
+    crit.append((f"n >= trial min_n ({n} of {min_n} {unit})", None))
+    v, why = _verdict(crit)
+    v0, why0 = _verdict(face)
+    return v, (f"only {n} {unit} in the window, below the trial's min_n {min_n}, so the verdict cannot be supported and a "
+               f"failing criterion counts only when it fails decisively (house rule 5): {why} [criteria at face value: {v0}, {why0}]")
+
+
+def _ci_row(name: str, lo: float, hi: float, hi_txt: str) -> tuple:
+    """'lower 95% bound > 0': passes when lo > 0; fails decisively when the whole interval lies at or below 0 (hi <= 0)."""
+    if not np.isfinite(hi):
+        return (name, bool(lo > 0), False, "no interval (fewer than 8 observations or no variation)")
+    dec = bool(hi <= 0)
+    return (name, bool(lo > 0), dec, f"upper 95% bound {hi_txt} {'<=' if dec else '>'} 0")
+
+
+def _t_row(name: str, t: Optional[float], c: float, strict: bool = False) -> tuple:
+    """'NW t >= c' (``strict``: t > c): fails decisively when the coefficient's +/-c NW standard-error interval lies
+    wholly at or below 0, i.e. t <= -c. None when the regression was not estimated."""
+    if t is None:
+        return (name, None, False, "")
+    dec = bool(t <= -c)
+    return (name, bool(t > c) if strict else bool(t >= c), dec,
+            f"NW t {t:+.2f} {'<=' if dec else '>'} -{c:g}, so the +/-{c:g} se interval {'lies wholly at or below' if dec else 'reaches above'} 0")
+
+
+def _dsr_row(name: str, ok: Optional[bool], x, n_trials: int, var_at_min_n: float) -> tuple:
+    """'DSR > DSR_PASS'. The DSR is the PSR of the Sharpe against the deflation benchmark (the expected best of n_trials
+    zero-skill Sharpes); a failure is decisive when that test's one-sided 95% interval of the Sharpe lies wholly below
+    the benchmark the trial faces at min_n (trial-Sharpe variance ``var_at_min_n``): DSR <= 1 - DSR_PASS with the
+    Sharpe under the benchmark. Needs >= 8 observations."""
+    if ok is None or ok:
+        return (name, ok, False, "")
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if x.size < 8 or not var_at_min_n > 0:
+        return (name, ok, False, "too few observations to bound the Sharpe")
+    sr0 = expected_max_sharpe(n_trials, var_at_min_n)
+    d = float(deflated_sharpe_ratio(x, n_trials=n_trials, var_trials_sr=var_at_min_n))
+    dec = bool(float(sharpe_ratio(x)) < sr0 and d <= 1.0 - DSR_PASS)
+    return (name, ok, dec, f"DSR {d:.3f} against the min_n benchmark {'<=' if dec else '>'} {1.0 - DSR_PASS:.2f}")
+
+
+def _trial_var(trial_sharpes: Sequence[float], T_at_min_n: int) -> float:
+    """Trial-Sharpe variance as ``deflated_sharpe_ratio`` takes it from trial Sharpes (ddof 1), with its zero-skill
+    fallback 1/(T-1) taken at min_n."""
+    v = float(np.var(np.asarray(trial_sharpes, dtype=float), ddof=1)) if len(trial_sharpes) > 1 else 0.0
+    return v if v > 0 else 1.0 / max(1, T_at_min_n - 1)
 
 
 def _end_note(used_end: str, requested_end: str) -> str:
@@ -348,9 +424,10 @@ def factor_mean_test(days, r, start: str, end: str, min_n: int, family_sharpes: 
     n = int(x.size)
     mean, lo, hi = stud_mean_ci(x, block, n_boot, seed) if n else (float("nan"),) * 3
     fd = family_dsr(x, family_sharpes) if (family_sharpes is not None and n > 1) else None
-    crit = [("lower 95% bound of the annualised mean > 0", bool(lo > 0)),
-            (f"family-wide DSR > {DSR_PASS}", None if fd is None else bool(fd["dsr"] > DSR_PASS))]
-    v, why = _decide(crit, n, min_n, "daily observations")
+    rows = [_ci_row("lower 95% bound of the annualised mean > 0", lo, hi, f"{hi * 252:+.2%}/yr"),
+            _dsr_row(f"family-wide DSR > {DSR_PASS}", None if fd is None else bool(fd["dsr"] > DSR_PASS), x, FAMILY_TRIALS,
+                     _family_var(family_sharpes, max(n, min_n)) if fd is not None else 0.0)]
+    v, why = _decide(rows, n, min_n, "daily observations")
     reg = _ann_means(d, x, regimes) if n else {}
     roll = _rolling(x, 252 * roll_years) if (roll_years and n) else None
     window_used = f"{d[0]}..{d[-1]}" if n else "empty"
@@ -401,17 +478,28 @@ def hedged_alpha_test(days, r_long, r_hedge, rf, fac_months, F, fac_names, start
     n = len(y)
     out = {"label": label, "n": n, "n_months": n, "window_requested": f"{start[:7]}..{end[:7]}",
            "window_used": f"{ms[0]}..{ms[-1]}" if n else "empty", "mean_hedge_ratio": float(np.nanmean(beta[m])) if m.any() else None}
-    if n < max(12, len(fac_names) + 3):
-        v, why = _decide([], n, min_n, "monthly observations")
-        return {**out, "verdict": v, "reason": f"{label}: {n} usable months — {why}"}
+    qmj_row = ("QMJ loading > 0.5 (validity)", None if qmj_loading is None else bool(qmj_loading > 0.5), False,
+               "a loading given without an interval cannot fail decisively")
+    days_at_min_n = max(int(x.size), min_n * 21)                 # the family-DSR floor works on daily T; ~21 days a month
+    n_min_reg = max(12, len(fac_names) + 3)
+    if n < n_min_reg:
+        # the monthly regression is not estimable, but the family DSR (daily P&L) is, so a decisive DSR failure still counts
+        fd = family_dsr(x, family_sharpes) if (family_sharpes is not None and x.size > 1) else None
+        rows = [(f"FF5+UMD alpha NW t >= 2.0 (not estimated: {n} months, the {len(fac_names) + 1}-coefficient regression needs {n_min_reg})",
+                 None, False, ""), qmj_row,
+                _dsr_row(f"family-wide DSR > {DSR_PASS}", None if fd is None else bool(fd["dsr"] > DSR_PASS), x, FAMILY_TRIALS,
+                         _family_var(family_sharpes, days_at_min_n) if fd is not None else 0.0)]
+        v, why = _decide(rows, n, min_n, "monthly observations")
+        return {**out, "family": fd, "verdict": v,
+                "reason": f"{label}: {n} usable months ({x.size} daily P&L observations); {_fmt_dsr(fd)} — {why}"}
     reg = ols_nw(y, X, NW_LAGS)
     a, t = float(reg["coef"][0]), float(reg["t"][0])
     lo, hi = alpha_boot_ci(y, X, 12, n_boot)
     fd = family_dsr(x, family_sharpes) if family_sharpes is not None else None
-    crit = [("FF5+UMD alpha NW t >= 2.0", bool(t >= 2.0)),
-            ("QMJ loading > 0.5 (validity)", None if qmj_loading is None else bool(qmj_loading > 0.5)),
-            (f"family-wide DSR > {DSR_PASS}", None if fd is None else bool(fd["dsr"] > DSR_PASS))]
-    v, why = _decide(crit, n, min_n, "monthly observations")
+    rows = [_t_row("FF5+UMD alpha NW t >= 2.0", t, 2.0), qmj_row,
+            _dsr_row(f"family-wide DSR > {DSR_PASS}", None if fd is None else bool(fd["dsr"] > DSR_PASS), x, FAMILY_TRIALS,
+                     _family_var(family_sharpes, days_at_min_n) if fd is not None else 0.0)]
+    v, why = _decide(rows, n, min_n, "monthly observations")
     loads = {nm: {"beta": float(reg["coef"][j + 1]), "t": float(reg["t"][j + 1])} for j, nm in enumerate(fac_names)}
     sub = [j for j, mm in enumerate(ms) if "2020-01" <= mm <= "2022-12"]
     sub_t = float(ols_nw(y[sub], X[sub], NW_LAGS)["t"][0]) if len(sub) > len(fac_names) + 5 else None
@@ -446,10 +534,11 @@ def size_spread_test(days, r_long, r_short, fac_months, F5, start: str = "2000-0
         reg = ols_nw(y, X, NW_LAGS)
         b_rmw, t_rmw = float(reg["coef"][1 + FF5.index("RMW")]), float(reg["t"][1 + FF5.index("RMW")])
     fd = family_dsr(pnl, family_sharpes) if family_sharpes is not None else None
-    crit = [("lower 95% bound of the annualised mean > 0", bool(lo > 0)),
-            ("RMW loading significantly positive (NW t > 1.96)", None if t_rmw is None else bool(t_rmw > 1.96)),
-            (f"family-wide DSR > {DSR_PASS}", None if fd is None else bool(fd["dsr"] > DSR_PASS))]
-    v, why = _decide(crit, n, min_n, "daily observations")
+    rows = [_ci_row("lower 95% bound of the annualised mean > 0", lo, hi, f"{hi * 252:+.2%}/yr"),
+            _t_row("RMW loading significantly positive (NW t > 1.96)", t_rmw, 1.96, strict=True),
+            _dsr_row(f"family-wide DSR > {DSR_PASS}", None if fd is None else bool(fd["dsr"] > DSR_PASS), pnl, FAMILY_TRIALS,
+                     _family_var(family_sharpes, max(int(pnl.size), min_n)) if fd is not None else 0.0)]
+    v, why = _decide(rows, n, min_n, "daily observations")
     june = np.array([dd[5:7] != "06" for dd in d])
     reg_m = _ann_means(d, pnl, [("2000-2006", "2000-01-01", "2006-12-31"), ("2014-2026", "2014-01-01", "2026-12-31")])
     roll = _rolling(pnl, 252 * 5)
@@ -512,10 +601,17 @@ def bab_spread_test(days, r_low, r_high, r_mkt, rate, start: str = "2011-06-01",
     mean, lo, hi = stud_mean_ci(x, 20, n_boot) if n >= 8 else (float("nan"),) * 3
     beta = float(ols_nw(x, r_mkt[live], 0)["coef"][1]) if n > 30 else float("nan")
     fd = family_dsr(x, family_sharpes) if (family_sharpes is not None and n > 1) else None
-    crit = [("lower 95% bound of the annualised mean net excess return > 0", bool(lo > 0)),
-            ("|ex-post beta to the market| < 0.1", bool(abs(beta) < 0.1) if np.isfinite(beta) else None),
-            (f"family-wide DSR > {DSR_PASS}", None if fd is None else bool(fd["dsr"] > DSR_PASS))]
-    v, why = _decide(crit, n, min_n, "daily observations")
+    beta_row = ("|ex-post beta to the market| < 0.1", bool(abs(beta) < 0.1) if np.isfinite(beta) else None, False, "")
+    if np.isfinite(beta) and not beta_row[1]:
+        se_b = float(ols_nw(x, r_mkt[live], 20)["se"][1])        # 95% NW (20-lag) interval of the beta, for rule 5 only
+        b_lo, b_hi = beta - 1.96 * se_b, beta + 1.96 * se_b
+        dec = bool(b_lo >= 0.1 or b_hi <= -0.1)
+        beta_row = (beta_row[0], False, dec, f"95% NW interval of the beta {b_lo:+.3f} to {b_hi:+.3f} "
+                                             f"{'lies wholly outside' if dec else 'overlaps'} (-0.1, 0.1)")
+    rows = [_ci_row("lower 95% bound of the annualised mean net excess return > 0", lo, hi, f"{hi * 252:+.2%}/yr"), beta_row,
+            _dsr_row(f"family-wide DSR > {DSR_PASS}", None if fd is None else bool(fd["dsr"] > DSR_PASS), x, FAMILY_TRIALS,
+                     _family_var(family_sharpes, max(n, min_n)) if fd is not None else 0.0)]
+    v, why = _decide(rows, n, min_n, "daily observations")
     roll = _rolling(x, 252 * 3) if n else None
     reason = (f"BAB spread {d[0] if d else ''}..{d[-1] if d else ''} (n={n} days, {nreb} resets, financing at bill + {fin_spread:.1%}, "
               f"{borrow:.1%} borrow, {cost * 1e4:.0f} bp per reset; {n_flat} flat days held in cash because a reset found a trailing "
@@ -594,10 +690,11 @@ def factor_momentum_test(months: Sequence[str], F: np.ndarray, names: Sequence[s
     pbo = pbo_cscv(np.column_stack([diffs[k] for k in FORMATIONS]), n_partitions=8)
     post = np.array([m >= post_from for m in ms])
     post_diff = float(sharpe_ratio(var["ts_12_1"][post], 12) - sharpe_ratio(static[post], 12)) if post.sum() > 12 else None
-    crit = [("lower 95% bound of the Sharpe difference > 0", bool(lo > 0)),
-            (f"DSR > {DSR_PASS} with all 5 variants counted", bool(dsr > DSR_PASS)),
-            ("PBO < 0.5", bool(pbo["pbo"] < 0.5))]
-    v, why = _decide(crit, n, min_n, "monthly observations")
+    rows = [_ci_row("lower 95% bound of the Sharpe difference > 0", lo, hi, f"{hi:+.2f}"),
+            _dsr_row(f"DSR > {DSR_PASS} with all 5 variants counted", bool(dsr > DSR_PASS), diffs["ts_12_1"], len(FORMATIONS),
+                     _trial_var(trial_sr, max(n, min_n))),
+            ("PBO < 0.5", bool(pbo["pbo"] < 0.5), False, "PBO is a share of CSCV splits of one sample, with no interval")]
+    v, why = _decide(rows, n, min_n, "monthly observations")
     s_t, s_s = float(sharpe_ratio(var["ts_12_1"], 12)), float(sharpe_ratio(static, 12))
     reason = (f"{'/'.join(names)} {ms[0]}..{ms[-1]} (n={n} months): timed 12-1 Sharpe {s_t:.2f} vs static {s_s:.2f}, "
               f"difference {obs:+.2f} (95% studentized CI {lo:+.2f} to {hi:+.2f}); DSR {dsr:.3f} over 5 variants "
@@ -691,8 +788,9 @@ def contrarian_timing_test(months: Sequence[str], F: np.ndarray, names: Sequence
     var_tsr = float(np.var(tsr, ddof=1))
     dsr = float(deflated_sharpe_ratio(diffs["z60_all"], n_trials=5, var_trials_sr=var_tsr if var_tsr > 0 else None))
     dsr_name = f"DSR > {DSR_PASS} over 5 trials" + ("" if have_vs else " (value-spread trial not computable)")
-    crit = [("lower 95% bound of the Sharpe difference > 0", bool(lo > 0)), (dsr_name, bool(dsr > DSR_PASS) if have_vs else None)]
-    v, why = _decide(crit, n, min_n, "monthly observations")
+    rows = [_ci_row("lower 95% bound of the Sharpe difference > 0", lo, hi, f"{hi:+.2f}"),
+            _dsr_row(dsr_name, bool(dsr > DSR_PASS) if have_vs else None, diffs["z60_all"], 5, _trial_var(tsr, max(n, min_n)))]
+    v, why = _decide(rows, n, min_n, "monthly observations")
     s_t, s_s = float(sharpe_ratio(trials["z60_all"], 12)), float(sharpe_ratio(static, 12))
     dsr_s = (f"DSR {dsr:.3f} over 5 trials (needs > {DSR_PASS})" if have_vs else
              f"DSR {dsr:.3f} over 5 trials not decided: value-spread trial not computable (6_Portfolios_2x3 BE/ME not archived), so only "
@@ -718,7 +816,9 @@ def industry_alpha_test(months: Sequence[str], port: np.ndarray, rf: np.ndarray,
     n = int(m.sum())
     out = {"label": label, "n": n, "n_months": n, "window_requested": f"{start}..{end}"}
     if n < 24:
-        v, why = _decide([], n, min_n, "monthly observations")
+        # below the module's 24-month floor for a monthly FF5 regression (6 coefficients, NW 6 lags) nothing is estimated
+        v, why = _decide([(f"FF5 alpha NW t >= 2 (not estimated: {n} months, the FF5 regression needs 24)", None, False, "")],
+                         n, min_n, "monthly observations")
         return {**out, "verdict": v, "reason": f"{label}: {n} months — {why}"}
     y, X = y_all[m], F5[m]
     reg = ols_nw(y, X, NW_LAGS)
@@ -727,7 +827,7 @@ def industry_alpha_test(months: Sequence[str], port: np.ndarray, rf: np.ndarray,
     lo, hi = alpha_boot_ci(y, X, 12, 2000)
     pm = np.array([split[0] <= mm <= split[1] for mm in months])
     pre = ols_nw(y_all[pm], F5[pm], NW_LAGS) if pm.sum() > 24 else None
-    v, why = _decide([("FF5 alpha NW t >= 2", bool(t >= 2.0))], n, min_n, "monthly observations")
+    v, why = _decide([_t_row("FF5 alpha NW t >= 2", t, 2.0)], n, min_n, "monthly observations")
     used = [mm for mm, k in zip(months, m) if k]
     pre_s = f"; {split[0][:4]}-{split[1][:4]} FF5 alpha {float(pre['coef'][0]) * 12:+.2%}/yr (t {float(pre['t'][0]):+.2f})" if pre else ""
     reason = (f"{label} {used[0]}..{used[-1]}{_end_note(used[-1], end)} (n={n} months): FF5 alpha {a * 12:+.2%}/yr, NW t {t:+.2f} (needs >= 2), bootstrap 95% CI "
@@ -755,8 +855,9 @@ def sort_spread_test(months: Sequence[str], spread: np.ndarray, fac_months: Sequ
     if len(y) > 24:
         reg = ols_nw(y, X, NW_LAGS)
         a, t = float(reg["coef"][0]), float(reg["t"][0])
-    crit = [("lower 95% bound of the mean monthly spread > 0", bool(lo > 0)), ("FF5 alpha NW t >= 2", None if t is None else bool(t >= 2.0))]
-    v, why = _decide(crit, n, min_n, "monthly observations")
+    rows = [_ci_row("lower 95% bound of the mean monthly spread > 0", lo, hi, f"{hi * 100:+.2f}%/month"),
+            _t_row("FF5 alpha NW t >= 2", t, 2.0)]
+    v, why = _decide(rows, n, min_n, "monthly observations")
     pre = None
     if split_before:
         pm = np.array([mm < split_before for mm in months])

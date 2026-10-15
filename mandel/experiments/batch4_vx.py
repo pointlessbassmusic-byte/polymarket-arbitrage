@@ -47,7 +47,11 @@ split-adjusted closes, and VXX pays no dividends. The matured 2009-2019 series i
 
 Verdicts use ``underlying2._verdict``. Any implemented criterion failing gives not_supported. Any criterion not
 implemented (missing data, too few events) gives at best inconclusive. A claim is supported only when every criterion
-is implemented and passes.
+is implemented and passes. Below the trial's min_n (T-160: daily observations; T-242: non-overlapping conditional
+cycles) house rule 5 applies (``_rule5_criteria``): the min_n criterion is unmet, so the verdict is never supported, and
+a failing criterion counts only when it fails decisively, its studentized 95% CI lying wholly on the wrong side of the
+claimed bound (T-160: at or below 0; T-242: at or above -3%). Any other failure there is undecided, so the verdict is
+inconclusive. Under 8 observations no bootstrap runs and the verdict is inconclusive.
 """
 
 from __future__ import annotations
@@ -139,6 +143,29 @@ def _cvar(x: np.ndarray, q: float = 0.01) -> Optional[float]:
         return None
     k = max(1, int(math.ceil(q * len(x))))
     return float(np.sort(x)[:k].mean())
+
+
+def _rule5_criteria(min_row: str, rows, n: int, min_n: int) -> list:
+    """House rule 5. ``rows``: [(name, ok, decisive)] with ok True / False / None and decisive True when a failure stands
+    below min_n: the criterion's 95% CI lies wholly on the wrong side of the claimed bound. At or above min_n the criteria
+    are judged at face value after a passing ``min_row`` (n >= min_n). Below min_n ``min_row`` is unmet (None), so the
+    verdict cannot be supported; a passing or decisively failing criterion keeps its bool and any other failure becomes
+    None (undecided)."""
+    if n >= min_n:
+        return [(min_row, True)] + [(name, ok) for name, ok, _ in rows]
+    return [(min_row, None)] + [(name, ok) if (ok is None or ok) else (name + " (fails decisively below min_n)", False) if decisive
+                                else (name + " (fails, not decisively, below min_n: undecided)", None) for name, ok, decisive in rows]
+
+
+def _rule5_note(rows, n: int, min_n: int, unit: str) -> str:
+    """Reason fragment below min_n ('' at or above): rule 5 and the face-value criteria verdict."""
+    if n >= min_n:
+        return ""
+    v0, why0 = _verdict([(name, ok) for name, ok, _ in rows])
+    dec = [name for name, ok, d in rows if ok is not None and not ok and d]
+    return (f". Only {n} of the trial's min_n {min_n} {unit}, so the verdict cannot be supported and a failing criterion counts "
+            f"only when it fails decisively, its 95% CI wholly on the wrong side of the claimed bound (house rule 5); "
+            f"decisive failures: {'; '.join(dec) if dec else 'none'}; criteria at face value: {v0}, {why0}")
 
 
 def _mdd_abs(pnl: np.ndarray) -> float:
@@ -295,8 +322,9 @@ def vx_calendar(curve: dict, vix: dict, vix3m: dict, cost_per_contract: float = 
                 crisis_months: Sequence[str] = CRISIS_MONTHS) -> dict:
     """T-160. Pass (as worded): after costs, mean daily P&L > 0, with the 95% CI excluding 0 in both chronological
     halves. Criteria: n >= min_n daily observations; full-sample mean > 0; the first half's studentized block-21 95%
-    CI lies above 0; the second half's does too. Sharpe, 1% CVaR, the ex-crisis run, the ungated and lag-0 runs, the
-    block-shifted placebo and the VIX3M - VIX basis cross-check are reported."""
+    CI lies above 0; the second half's does too. Below min_n (house rule 5) a failure counts only when the CI in question
+    lies wholly at or below 0. Sharpe, 1% CVaR, the ex-crisis run, the ungated and lag-0 runs, the block-shifted placebo
+    and the VIX3M - VIX basis cross-check are reported."""
     ratio = ratio_series(vix, vix3m)                       # VIX / VIX3M
     res = calendar_pnl(curve, ratio, lag=lag, cost_per_contract=cost_per_contract, mult=mult)
     net = res["net"]; n = int(len(net))
@@ -331,12 +359,14 @@ def vx_calendar(curve: dict, vix: dict, vix3m: dict, cost_per_contract: float = 
     cvar = _cvar(net, 0.01)
     cvar_held = _cvar(net[held], 0.01) if held.any() else None
     worst = sorted(zip(days, net.tolist()), key=lambda t: t[1])[:5]
-    crit = [(f"n >= {min_n} daily observations (min_n)", True if n >= min_n else None),
-            ("full-sample mean daily net P&L > 0", full["mean"] > 0),
+    def down(s):        # rule 5: the 95% CI lies wholly at or below 0 (a zero-width CI, e.g. never held, decides nothing)
+        return s["ci95"][1] is not None and bool(s["se"]) and s["ci95"][1] <= 0
+    rows = [("full-sample mean daily net P&L > 0", full["mean"] > 0, down(full)),
             (f"first half {days[0]}..{days[h - 1]}: mean > 0 and studentized block-{block} 95% CI excludes 0",
-             None if first["ci95"][0] is None else bool(first["mean"] > 0 and first["ci95"][0] > 0)),
+             None if first["ci95"][0] is None else bool(first["mean"] > 0 and first["ci95"][0] > 0), down(first)),
             (f"second half {days[h]}..{days[-1]}: mean > 0 and studentized block-{block} 95% CI excludes 0",
-             None if second["ci95"][0] is None else bool(second["mean"] > 0 and second["ci95"][0] > 0))]
+             None if second["ci95"][0] is None else bool(second["mean"] > 0 and second["ci95"][0] > 0), down(second))]
+    crit = _rule5_criteria(f"n >= {min_n} daily observations (min_n)", rows, n, min_n)
     v, why = _verdict(crit)
 
     def ci(s):
@@ -358,25 +388,28 @@ def vx_calendar(curve: dict, vix: dict, vix3m: dict, cost_per_contract: float = 
               f"{f', halves CI {ci(lag0_halves[0])} and {ci(lag0_halves[1])}' if lag0_halves else ''}; block-shifted "
               f"gate placebo: {plc_pct if plc_pct is None else f'{plc_pct:.0%}'} of {len(plc)} shifts reach the actual gross mean "
               f"{_usd(gross_mean)}; basis cross-check corr(M2 - M1, VIX3M - VIX) = {_f(basis_corr)}. Margin outlay is not "
-              f"archived (the statistic is dollars per spread) — {why}")
-    return {"n": n, "start": days[0], "end": days[-1], "mean_net": full["mean"], "ci95": full["ci95"], "se": full["se"],
-            "halves": {"first": {"days": f"{days[0]}..{days[h - 1]}", **first},
-                       "second": {"days": f"{days[h]}..{days[-1]}", **second}},
-            "mean_gross": gross_mean, "total_cost": float(res["cost"].sum()), "n_rolls": res["n_rolls"],
-            "n_gate_switches": res["n_switches"], "frac_held": float(held.mean()), "mean_held_day": float(net[held].mean()) if held.any() else None,
-            "sharpe": sharpe, "cvar_1pct": cvar, "cvar_1pct_held": cvar_held, "max_drawdown_usd": _mdd_abs(net),
-            "ex_crisis": {"months_dropped": list(crisis_months), **ex},
-            "ungated_mean": float(ungated["net"].mean()) if len(ungated["net"]) else None,
-            "lag0_mean": float(l0.mean()) if len(l0) else None, "lag0_halves": lag0_halves,
-            "placebo": {"n_shifts": int(len(plc)), "share_ge_actual": plc_pct,
-                        "mean": float(plc.mean()) if len(plc) else None, "actual_gross": gross_mean},
-            "basis_corr_spread_vs_vix3m_minus_vix": basis_corr, "worst_days": worst,
-            "gap_intervals": len(res["gaps"]), "gap_abs_gross_usd": res["gap_abs_gross"],
-            "gap_abs_spread_chg_usd": res["gap_abs_spread_chg"], "n_deferred_trades": res["n_deferred"],
-            "n_stale_closes": res["n_stale_closes"],
-            "conventions": "M1/M2 = first two expiries after the day; Wednesday (expiry-day) rolls; gate at previous close; "
-                           "$2 x contracts traded",
-            "criteria": crit, "verdict": v, "reason": reason}
+              f"archived (the statistic is dollars per spread){_rule5_note(rows, n, min_n, 'daily observations')} — {why}")
+    rep = {"n": n, "start": days[0], "end": days[-1], "mean_net": full["mean"], "ci95": full["ci95"], "se": full["se"],
+           "halves": {"first": {"days": f"{days[0]}..{days[h - 1]}", **first},
+                      "second": {"days": f"{days[h]}..{days[-1]}", **second}},
+           "mean_gross": gross_mean, "total_cost": float(res["cost"].sum()), "n_rolls": res["n_rolls"],
+           "n_gate_switches": res["n_switches"], "frac_held": float(held.mean()), "mean_held_day": float(net[held].mean()) if held.any() else None,
+           "sharpe": sharpe, "cvar_1pct": cvar, "cvar_1pct_held": cvar_held, "max_drawdown_usd": _mdd_abs(net),
+           "ex_crisis": {"months_dropped": list(crisis_months), **ex},
+           "ungated_mean": float(ungated["net"].mean()) if len(ungated["net"]) else None,
+           "lag0_mean": float(l0.mean()) if len(l0) else None, "lag0_halves": lag0_halves,
+           "placebo": {"n_shifts": int(len(plc)), "share_ge_actual": plc_pct,
+                       "mean": float(plc.mean()) if len(plc) else None, "actual_gross": gross_mean},
+           "basis_corr_spread_vs_vix3m_minus_vix": basis_corr, "worst_days": worst,
+           "gap_intervals": len(res["gaps"]), "gap_abs_gross_usd": res["gap_abs_gross"],
+           "gap_abs_spread_chg_usd": res["gap_abs_spread_chg"], "n_deferred_trades": res["n_deferred"],
+           "n_stale_closes": res["n_stale_closes"],
+           "conventions": "M1/M2 = first two expiries after the day; Wednesday (expiry-day) rolls; gate at previous close; "
+                          "$2 x contracts traded",
+           "criteria": crit, "verdict": v, "reason": reason}
+    if n < min_n:
+        rep["rule5"] = {"min_n": min_n, "n": n, "decisive_failures": [c for c, ok, d in rows if ok is not None and not ok and d]}
+    return rep
 
 
 # ============================================================================== T-242: VXX 21-day decay in contango ==
@@ -487,8 +520,9 @@ def vxx_decay(days: Sequence[str], closes: np.ndarray, vix: dict, vix3m: dict, t
               rates: Optional[dict] = None, grid: Sequence[float] = THRESHOLD_GRID) -> dict:
     """T-242. Pass (as worded): the upper 95% bound of the mean 21-day VXX log return, conditional on VIX3M/VIX >
     ``threshold`` at entry, is below ``bound``. Criteria: n >= min_n non-overlapping conditional cycles, and the
-    one-sided 95% studentized block-bootstrap upper bound < bound. ``proxy`` = (days, closes) of the SVXY-based
-    proxy, reported as a cross-check. The model-priced put spread is reported separately."""
+    one-sided 95% studentized block-bootstrap upper bound < bound. Below min_n (house rule 5) the bound criterion's
+    failure counts only when the two-sided 95% CI lies wholly at or above ``bound``. ``proxy`` = (days, closes) of the
+    SVXY-based proxy, reported as a cross-check. The model-priced put spread is reported separately."""
     days = list(days); c = np.asarray(closes, dtype=float)
     ratio = ratio_series(vix3m, vix)                       # VIX3M / VIX
     ev = conditional_cycles(days, c, ratio, threshold, horizon, lag)
@@ -528,9 +562,11 @@ def vxx_decay(days: Sequence[str], closes: np.ndarray, vix: dict, vix3m: dict, t
         prox = {"start": pd_[0], "end": pd_[-1], "n": int(len(pe)), "mean": ps["mean"], "ub95": ps.get("ub95"),
                 "n_before_vxx": int(len(pre)), "mean_before_vxx": float(pre.mean()) if len(pre) else None}
     mp = put_spread_model(days, c, ev["idx"], vvix, rates or {}, horizon) if vvix else {"pricing": "MODEL-PRICED", "n": 0}
-    crit = [(f"n >= {min_n} non-overlapping conditional cycles (min_n)", True if n >= min_n else None),
-            (f"one-sided 95% studentized block-{block} bootstrap upper bound of the conditional mean < {bound}",
-             None if st["ub95"] is None else bool(st["ub95"] < bound))]
+    # rule 5: decisive when the two-sided 95% CI lies wholly at or above the bound (a zero-width CI decides nothing)
+    rows = [(f"one-sided 95% studentized block-{block} bootstrap upper bound of the conditional mean < {bound}",
+             None if st["ub95"] is None else bool(st["ub95"] < bound),
+             st["ci95"][0] is not None and bool(st["se"]) and st["ci95"][0] >= bound)]
+    crit = _rule5_criteria(f"n >= {min_n} non-overlapping conditional cycles (min_n)", rows, n, min_n)
     v, why = _verdict(crit)
     pr = (f"SVXY proxy (sign-flipped, -1x to 2018-02-27 then -0.5x) {prox['start']}..{prox['end']}: n={prox['n']}, mean "
           f"{_pc(prox['mean'])}, upper bound {_pc(prox['ub95'])}, pre-2018 cycles {prox['n_before_vxx']} mean {_pc(prox['mean_before_vxx'])}"
@@ -547,16 +583,20 @@ def vxx_decay(days: Sequence[str], closes: np.ndarray, vix: dict, vix3m: dict, t
               f"(n={len(lag0)}); fixed-grid phases {_pc(min(ph_means) if ph_means else None)} to {_pc(max(ph_means) if ph_means else None)}; "
               f"walk-forward threshold {pick} (first half to {mid}) gives second-half mean {_pc(float(wf.mean()) if len(wf) else None)} "
               f"(n={len(wf)}); DSR of the short-VXX cycle over {len(grid)} thresholds {_f(dsr, 3)}; worst cycles (largest VXX gains) "
-              f"{', '.join(f'{d} {_pc(r, 0)}' for d, r in worst[:3])}; {pr}. Secondary, reported separately: {mps} — {why}")
-    return {"n": n, "start": days[0], "end": days[-1], "threshold": threshold, "mean_logret": st["mean"],
-            "median_logret": float(np.median(x)), "ub95": st["ub95"], "ci95": st["ci95"], "se": st["se"],
-            "entries": ev["days"], "unconditional_mean": float(unc.mean()) if len(unc) else None, "unconditional_n": int(len(unc)),
-            "lag0": {"n": int(len(lag0)), "mean": float(lag0.mean()) if len(lag0) else None},
-            "grid_phase_means": ph_means, "placebo_share_le": plc_p, "worst_cycles": worst,
-            "walk_forward": {"split": mid, "threshold": pick, "n": int(len(wf)), "mean": float(wf.mean()) if len(wf) else None,
-                             "first_half_means": {str(t): (float(first[t].mean()) if len(first[t]) else None) for t in grid}},
-            "dsr": dsr, "grid_sharpes_per_cycle": dict(zip([str(t) for t in grid], tsr)), "svxy_proxy": prox,
-            "model_priced_put_spread": mp, "criteria": crit, "verdict": v, "reason": reason}
+              f"{', '.join(f'{d} {_pc(r, 0)}' for d, r in worst[:3])}; {pr}. Secondary, reported separately: {mps}"
+              f"{_rule5_note(rows, n, min_n, 'non-overlapping conditional cycles')} — {why}")
+    rep = {"n": n, "start": days[0], "end": days[-1], "threshold": threshold, "mean_logret": st["mean"],
+           "median_logret": float(np.median(x)), "ub95": st["ub95"], "ci95": st["ci95"], "se": st["se"],
+           "entries": ev["days"], "unconditional_mean": float(unc.mean()) if len(unc) else None, "unconditional_n": int(len(unc)),
+           "lag0": {"n": int(len(lag0)), "mean": float(lag0.mean()) if len(lag0) else None},
+           "grid_phase_means": ph_means, "placebo_share_le": plc_p, "worst_cycles": worst,
+           "walk_forward": {"split": mid, "threshold": pick, "n": int(len(wf)), "mean": float(wf.mean()) if len(wf) else None,
+                            "first_half_means": {str(t): (float(first[t].mean()) if len(first[t]) else None) for t in grid}},
+           "dsr": dsr, "grid_sharpes_per_cycle": dict(zip([str(t) for t in grid], tsr)), "svxy_proxy": prox,
+           "model_priced_put_spread": mp, "criteria": crit, "verdict": v, "reason": reason}
+    if n < min_n:
+        rep["rule5"] = {"min_n": min_n, "n": n, "decisive_failures": [c for c, ok, d in rows if ok is not None and not ok and d]}
+    return rep
 
 
 # ========================================================================================== formatting helpers ==

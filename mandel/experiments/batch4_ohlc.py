@@ -36,7 +36,16 @@ Statistics
   the variants the archive supports (when there are at least two), floored at the zero-skill variance 1/(T-1).
 * Annualisation: 252 trading days for US-listed instruments, 365 for crypto.
 * ``_verdict`` from underlying2 decides: an implemented criterion that fails -> not_supported; a criterion that
-  cannot be implemented (None) -> at best inconclusive. A sample below the trial's min_n -> inconclusive.
+  cannot be implemented (None) -> at best inconclusive.
+* Below the trial's min_n (in the claim's own units) house rule 5 applies (``_rule5``): the statistics are still
+  computed, the verdict is never supported, and a failing criterion still counts only when it fails decisively, its
+  95% interval lying wholly on the wrong side of the claimed bound (the bootstrap CI of the mean, difference or
+  coefficient at or below the bound; the halves' own CIs on opposite sides of 0, or a half's at or below 0 where both
+  must be positive; for a DSR, the Sharpe's one-sided 95% upper bound at or below 0, since the deflation benchmark is
+  never below 0; for T-304's trial correction, both of its routes). An interval decides only on >= 8 observations in
+  >= 4 resampling units (blocks or clusters). Any other failure there is undecided (None), so the verdict is
+  inconclusive; with too little data for the statistics at all the verdict is inconclusive. The criteria judged and
+  the decisive failures are reported under ``rule5``.
 
 Model pricing (T-216) is Black-Scholes with sigma = VIX/100, T = 1/252, r = 0 and labelled MODEL-PRICED: a flat
 30-day index cannot see any expiry-specific premium that traded weekly options carry. The straddle settles on the
@@ -280,6 +289,99 @@ def _decide(crit: list, n: int, min_n: int, unit: str) -> tuple[str, str]:
     return _verdict([(f">= {min_n} {unit}", True)] + crit)
 
 
+# ================================================================================================ house rule 5 ==
+
+MIN_DECISIVE_OBS = 8        # a 95% interval decides a failure below min_n only when it rests on >= 8 observations ...
+MIN_DECISIVE_UNITS = 4      # ... spread over >= 4 resampling units (blocks or clusters): a one-block resample is a rotation
+
+
+def _too_few(n: int, min_n: int, unit: str, what: str) -> tuple[str, str]:
+    """Below min_n with too little data to compute the statistics at all: inconclusive (nothing can fail decisively)."""
+    return "inconclusive", (f"data cannot support the claim: {n} {unit}, below the trial's min_n {min_n}, and too few for {what}, "
+                            f"so no criterion can fail decisively (house rule 5)")
+
+
+def _resolvable(n_obs: int, n_units: float) -> bool:
+    return n_obs >= MIN_DECISIVE_OBS and n_units >= MIN_DECISIVE_UNITS
+
+
+def _upper_dec(hi, bound: float, fmt, n_obs: int, n_units: float, strict: bool = False, what: str = "95% interval") -> tuple[bool, str]:
+    """Decisive failure of a 'statistic > bound' (or >= bound with ``strict``) criterion: the upper end ``hi`` of its
+    ``what`` lies at or below ``bound`` (below it with ``strict``), on an interval that can decide (_resolvable)."""
+    if not _resolvable(n_obs, n_units):
+        return False, f"{what} on {n_obs} observations in {n_units:.0f} resampling units, too few to decide"
+    if hi is None or not math.isfinite(hi):
+        return False, f"no {what}"
+    dec = bool(hi < bound) if strict else bool(hi <= bound)
+    rel = ("<" if strict else "<=") if dec else (">=" if strict else ">")
+    return dec, f"upper end of the {what} {fmt(hi)} {rel} {fmt(bound)}"
+
+
+def _dsr_dec(x, n_obs: int) -> tuple[bool, str]:
+    """Decisive failure of 'DSR > 0.95': the Sharpe's one-sided 95% upper bound lies at or below 0 (the PSR test against a
+    zero Sharpe is <= 0.05). The deflation benchmark, the expected best of the trial count's zero-skill Sharpes, is never
+    below 0 (at min_n or any other sample size), so the DSR is then <= 0.05 against every benchmark the trial can face.
+    ``n_obs`` counts the claim's independent units behind the series (trades, signals, events)."""
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if n_obs < MIN_DECISIVE_OBS or x.size < MIN_DECISIVE_OBS:
+        return False, f"{n_obs} observations, too few to bound the Sharpe"
+    psr = float(deflated_sharpe_ratio(x, n_trials=1))
+    dec = psr <= 1.0 - DSR_PASS
+    return dec, f"PSR against a zero Sharpe {psr:.3f} {'<=' if dec else '>'} {1.0 - DSR_PASS:.2f}"
+
+
+def _halves_dec(cis, n_obs, n_units, fmt, opposite: bool = False) -> tuple[bool, str]:
+    """``cis``: [(label, lo, hi)] of the two halves. 'Positive in both halves' fails decisively when a half's resolvable 95%
+    interval lies wholly at or below 0; 'same sign in both halves' (``opposite``) when the two halves' resolvable intervals lie
+    strictly on opposite sides of 0."""
+    ok = [_resolvable(o, u) and lo is not None and hi is not None and math.isfinite(lo) and math.isfinite(hi)
+          for (_, lo, hi), o, u in zip(cis, n_obs, n_units)]
+    txt = "; ".join(f"{lab} 95% interval {fmt(lo)}..{fmt(hi)}" if k else f"{lab} {o} observations, too few to decide"
+                    for (lab, lo, hi), k, o in zip(cis, ok, n_obs))
+    if opposite:
+        if not all(ok):
+            return False, txt
+        (_, l0, h0), (_, l1, h1) = cis
+        dec = bool((l0 > 0 and h1 < 0) or (h0 < 0 and l1 > 0))
+        return dec, txt + ("; the halves lie on opposite sides of 0" if dec else "; not significantly of opposite sign")
+    dec = any(k and hi <= 0 for (_, _, hi), k in zip(cis, ok))
+    return dec, txt + ("; a half lies wholly at or below 0" if dec else "; no half lies wholly at or below 0")
+
+
+def _rule5(rows, n: int, min_n: int, unit: str) -> tuple[str, str, list]:
+    """House rule 5 below the trial's min_n (``n`` in the claim's own units). ``rows``: [(name, ok, decisive, note)] with ok
+    True / False / None (not implemented) and decisive True when the failure stands below min_n (its 95% interval lies
+    wholly on the wrong side of the claimed bound). A passing or decisively failing criterion keeps its bool, any other
+    failure becomes None (undecided), and the unmet 'n >= trial min_n' criterion (None) keeps the verdict from
+    'supported'. Returns (verdict, explanation, criteria judged)."""
+    crit = []
+    for name, ok, dec, note in rows:
+        nt = f": {note}" if note else ""
+        if ok is None:
+            crit.append((name, None))
+        elif ok:
+            crit.append((name, True))
+        elif dec:
+            crit.append((f"{name} (fails decisively below min_n{nt})", False))
+        else:
+            crit.append((f"{name} (fails, not decisively, below min_n{nt}; undecided)", None))
+    crit.append((f"n >= trial min_n ({n} of {min_n} {unit})", None))
+    v, why = _verdict(crit)
+    v0, why0 = _verdict([(name, None if ok is None else bool(ok)) for name, ok, _, _ in rows])
+    return v, (f"house rule 5: only {n} {unit}, below the trial's min_n {min_n}, so the verdict cannot be supported and a failing "
+               f"criterion counts only when it fails decisively, its 95% interval wholly on the wrong side of the claimed bound: "
+               f"{v}, {why} [criteria at face value: {v0}, {why0}]"), crit
+
+
+def _apply_rule5(rep: dict, rows, n: int, min_n: int, unit: str) -> tuple[str, str]:
+    """_rule5, recording the criteria judged and the decisive failures under ``rep['rule5']``."""
+    v, why, crit = _rule5(rows, n, min_n, unit)
+    rep["rule5"] = {"n": n, "min_n": min_n, "unit": unit, "criteria": [[c, ok] for c, ok in crit],
+                    "decisive_failures": [name for name, ok, dec, _ in rows if ok is not None and not ok and dec]}
+    return v, why
+
+
 def _trailing_z(x: np.ndarray, window: int, include_current: bool = False) -> np.ndarray:
     """z_t = (x_t - mean)/sd (ddof=1) over the ``window`` values ending at t-1 (or at t when include_current)."""
     x = np.asarray(x, dtype=float); n = len(x); z = np.full(n, np.nan)
@@ -332,8 +434,8 @@ def overnight_intraday(days: Sequence[str], opens, closes, divs=None, adj=None, 
     n = len(ds)
     rep = {"n": n, "first": ds[0] if n else None, "last": ds[-1] if n else None, "n_ex_dividend_days": int(np.sum(D[1:][m] > 0)),
            "open_equals_close_share": flat_open}
-    if n < min_n:
-        v, why = _decide([], n, min_n, "trading days")
+    if n < min_n and n < MIN_DECISIVE_OBS:
+        v, why = _too_few(n, min_n, "trading days", "a block-bootstrap interval")
         rep.update(verdict=v, reason=f"SPY overnight vs intraday: {n} days — {why}")
         return rep
     d = night - dayr
@@ -351,7 +453,17 @@ def overnight_intraday(days: Sequence[str], opens, closes, divs=None, adj=None, 
     crit = [(f"gap > {min_gap * 1e4:.0f} bps/day", gap > min_gap),
             (f"p < 0.05 vs gap <= {min_gap * 1e4:.0f} bps (studentized block-{block} bootstrap)", p_thr < 0.05),
             ("gap positive in both halves", all(math.isfinite(h) and h > 0 for h in halves))]
-    v, why = _decide(crit, n, min_n, "trading days")
+    if n < min_n:
+        # rule 5: the gap and its p fail decisively when the gap's 95% CI lies wholly at or below 3 bps; the halves when a
+        # half's own block-bootstrap 95% CI lies wholly at or below 0
+        bps = lambda v_: f"{v_ * 1e4:+.2f} bps"
+        gdec = _upper_dec(hi, min_gap, bps, n, math.ceil(n / block), what="gap's 95% CI")
+        hcis = [(lab, *(_mean_ci(d[g_], block, n_boot, seed) if g_.sum() >= MIN_DECISIVE_OBS else (None, None)))
+                for lab, g_ in ((f"<{split}", early), (f">={split}", ~early))]
+        hdec = _halves_dec(hcis, halves_n, [math.ceil(k / block) for k in halves_n], bps)
+        v, why = _apply_rule5(rep, [(*crit[0], *gdec), (*crit[1], *gdec), (*crit[2], *hdec)], n, min_n, "trading days")
+    else:
+        v, why = _decide(crit, n, min_n, "trading days")
     rep.update(mean_night_bps=float(night.mean() * 1e4), mean_day_bps=float(dayr.mean() * 1e4), gap_bps=gap * 1e4,
                gap_ci_bps=[lo * 1e4, hi * 1e4], gap_lower95_one_sided_bps=lo1 * 1e4, p_criterion="H0: gap <= threshold",
                p_equal_means=p_eq, p_gap_le_threshold=p_thr, halves_gap_bps=[h * 1e4 for h in halves],
@@ -407,8 +519,8 @@ def gap_fade(days: Sequence[str], opens, closes, start: Optional[str] = "2000-01
     n = int(tr.sum())
     rep = {"n": n, "n_days": int(len(ds)), "first": ds[0] if len(ds) else None, "last": ds[-1] if len(ds) else None,
            "n_long": int(np.sum(side > 0)), "n_short": int(np.sum(side < 0))}
-    if n < min_n:
-        v, why = _decide([], n, min_n, "gap trades")
+    if n < min_n and n < MIN_DECISIVE_OBS:
+        v, why = _too_few(n, min_n, "gap trades", "a block-bootstrap interval")
         rep.update(verdict=v, reason=f"gap fade: {n} trades — {why}")
         return rep
     mean = float(net.mean())
@@ -439,7 +551,19 @@ def gap_fade(days: Sequence[str], opens, closes, start: Optional[str] = "2000-01
                        f"mean {rnet.mean() * 1e4:+.2f} bps, CI {rlo * 1e4:+.2f}..{rhi * 1e4:+.2f}; {raw['n_side_changed']} days change side)")
     crit = [("95% lower bound of mean net per trade > 0", lo > 0), (f"same sign in <{split} and >={split}", bool(same_sign)),
             (f"DSR > 0.95 over {n_trials} variants", None if dsr is None else dsr > DSR_PASS)]
-    v, why = _decide(crit, n, min_n, "gap trades")
+    if n < min_n:
+        # rule 5: the lower bound fails decisively when the whole 95% CI lies at or below 0; the halves when their own 95% CIs
+        # lie on opposite sides of 0; the DSR when the daily series' Sharpe is significantly at or below 0
+        bps = lambda v_: f"{v_ * 1e4:+.2f} bps"
+        hn = [int(early.sum()), int((~early).sum())]
+        hcis = [(lab, *(_mean_ci(net[g_], block, n_boot, seed) if k >= MIN_DECISIVE_OBS else (None, None)))
+                for lab, g_, k in ((f"<{split}", early, hn[0]), (f">={split}", ~early, hn[1]))]
+        r5 = [(*crit[0], *_upper_dec(hi, 0.0, bps, n, math.ceil(n / block), what="95% CI")),
+                (*crit[1], *_halves_dec(hcis, hn, [math.ceil(k / block) for k in hn], bps, opposite=True)),
+                (*crit[2], *((False, "") if dsr is None else _dsr_dec(daily, n)))]
+        v, why = _apply_rule5(rep, r5, n, min_n, "gap trades")
+    else:
+        v, why = _decide(crit, n, min_n, "gap trades")
     rep.update(mean_net_bps=mean * 1e4, ci_bps=[lo * 1e4, hi * 1e4], halves_bps=[h * 1e4 for h in halves], dsr=dsr, n_trials=n_trials,
                corr_o_i=corr, corr_ci=corr_ci, by_decade=dec, by_side=by_side, threshold=thr, cost_rt=cost_rt,
                dividend_neutral_gap=divs is not None, raw_gap_sensitivity=raw, verdict=v,
@@ -511,6 +635,17 @@ def rule_daily_net(pos: np.ndarray, adj, cost_side: float = 0.0001) -> np.ndarra
     return p * r - cost_side * turn
 
 
+def _signal_diff_ci(r: np.ndarray, f: np.ndarray, mean_block: int, n_boot: int, rng) -> tuple:
+    """Two-sided 95% stationary-bootstrap interval of mean(r[f]) - mean(r), resampling the paired (signal, return)
+    series as ibs_reversal does; (None, None) when no resample holds a signal day."""
+    n = len(r); bd = np.empty(n_boot)
+    for k in range(n_boot):
+        j = stationary_idx(n, mean_block, rng); fj = f[j]
+        bd[k] = r[j][fj].mean() - r[j].mean() if fj.any() else np.nan
+    bd = bd[np.isfinite(bd)]
+    return (float(np.quantile(bd, 0.025)), float(np.quantile(bd, 0.975))) if bd.size else (None, None)
+
+
 def ibs_reversal(days: Sequence[str], highs, lows, closes, adj, opens=None, start: str = "2000-01-01", end: str = "2026-09-30",
                  thr: float = 0.2, split: str = "2013-01-01", min_gap: float = 0.0002, mean_block: int = 20, n_boot: int = 2000,
                  seed: int = 0, min_n: int = 2000, grid_sharpes: Optional[Sequence[float]] = None, n_trials: int = 12,
@@ -529,8 +664,8 @@ def ibs_reversal(days: Sequence[str], highs, lows, closes, adj, opens=None, star
     r_w = r[idx]; f = x[idx] < thr; sdays = sd[idx]
     n = len(idx)
     rep = {"n": n, "first": sdays[0] if n else None, "last": sdays[-1] if n else None, "n_signal": int(f.sum())}
-    if n < min_n:
-        v, why = _decide([], n, min_n, "trading days")
+    if n < min_n and (f.sum() < 2 or (~f).sum() < 2 or n <= 2 * mean_block):
+        v, why = _too_few(n, min_n, "trading days", "the signal comparison and its block-shift null")
         rep.update(verdict=v, reason=f"IBS reversal: {n} days, {int(f.sum())} signals — {why}")
         return rep
     if f.sum() < 2 or (~f).sum() < 2:
@@ -565,7 +700,24 @@ def ibs_reversal(days: Sequence[str], highs, lows, closes, adj, opens=None, star
     crit = [(f"95% lower bound of the difference > {min_gap * 1e4:.0f} bps", lo > min_gap),
             (f"same sign in <{split} and >={split}", bool(same_sign)),
             (f"DSR > 0.95 over {n_trials} trials", None if dsr is None else dsr > DSR_PASS)]
-    v, why = _decide(crit, n, min_n, "trading days")  # the statistic compares the signal days with all days, so n counts trading days
+    if n < min_n:
+        # rule 5: the lower bound fails decisively when the whole stationary-bootstrap 95% CI lies at or below 2 bps; the
+        # halves when their own stationary-bootstrap 95% CIs lie on opposite sides of 0; the DSR when the rule's Sharpe is
+        # significantly at or below 0. Intervals rest on the signal days, in blocks of mean length mean_block.
+        bps = lambda v_: f"{v_ * 1e4:+.2f} bps"
+        ns = int(f.sum())
+        hrng = np.random.default_rng(seed + 1)
+        hcis, hn, hu = [], [], []
+        for lab, g_ in ((f"<{split}", early), (f">={split}", ~early)):
+            k = int((g_ & f).sum()); hn.append(k); hu.append(g_.sum() / mean_block)
+            hcis.append((lab, *(_signal_diff_ci(r_w[g_], f[g_], mean_block, n_boot, hrng)
+                                 if k >= MIN_DECISIVE_OBS and (g_ & ~f).sum() >= 2 else (None, None))))
+        r5 = [(*crit[0], *_upper_dec(hi, min_gap, bps, ns, n / mean_block, what="stationary-bootstrap 95% CI")),
+                (*crit[1], *_halves_dec(hcis, hn, hu, bps, opposite=True)),
+                (*crit[2], *((False, "") if dsr is None else _dsr_dec(daily, ns)))]
+        v, why = _apply_rule5(rep, r5, n, min_n, "trading days")
+    else:
+        v, why = _decide(crit, n, min_n, "trading days")  # the statistic compares the signal days with all days, so n counts trading days
     rep.update(mean_after_signal_bps=float(r_w[f].mean() * 1e4), mean_unconditional_bps=float(r_w.mean() * 1e4), diff_bps=diff * 1e4,
                ci_bps=[lo * 1e4, hi * 1e4], p_block_shift=p_shift, halves_bps=[h * 1e4 for h in halves], dsr=dsr, n_trials=n_trials,
                rule_sharpe_net=_sr(daily, EQ_PPY), execution=diag, verdict=v,
@@ -653,8 +805,8 @@ def spread_shock(days: Sequence[str], highs, lows, closes, adj, vix: dict, start
     n_ev = len(ev)
     rep = {"n": n_ev, "n_rows": int(len(idx)), "n_shock_days": int(shock.sum()), "first": ds[idx[0]] if len(idx) else None,
            "last": ds[idx[-1]] if len(idx) else None}
-    if n_ev < min_events or shock.sum() < 2:
-        v_, why = _decide([], n_ev, min_events, "non-overlapping shock events")
+    if n_ev < min_events and (shock.sum() < 2 or n_ev < 2):
+        v_, why = _too_few(n_ev, min_events, "non-overlapping shock events", "the shock regression")
         rep.update(verdict=v_, reason=f"CS spread shock: {n_ev} non-overlapping events — {why}")
         return rep
     y = R[idx]; X = np.column_stack([np.ones(len(idx)), shock.astype(float), dv[idx]])
@@ -678,13 +830,34 @@ def spread_shock(days: Sequence[str], highs, lows, closes, adj, vix: dict, start
     cs_net = _hold_net(_hold_positions(n, sig_all, horizon), A, cost_side)[w]
     vx_net = _hold_net(_hold_positions(n, sig_vix, horizon), A, cost_side)[w]
     dsr = _dsr(cs_net, n_trials)
-    test = np.concatenate([te for _, te in walk_forward_splits(len(w), n_splits=4, min_train=len(w) // 3, embargo=horizon)])
-    sd_obs, sd_lo = _sharpe_diff_lower(cs_net[test], vx_net[test], EQ_PPY, block, n_boot=n_boot, seed=seed, q=0.05)
-    beats = bool(sd_obs > 0 and sd_lo > 0)
+    try:
+        test = np.concatenate([te for _, te in walk_forward_splits(len(w), n_splits=4, min_train=len(w) // 3, embargo=horizon)])
+        sd_obs, sd_lo = _sharpe_diff_lower(cs_net[test], vx_net[test], EQ_PPY, block, n_boot=n_boot, seed=seed, q=0.05)
+        beats = bool(sd_obs > 0 and sd_lo > 0)
+    except ValueError:
+        if n_ev >= min_events:
+            raise
+        test, sd_obs, sd_lo, beats = np.zeros(0, dtype=int), float("nan"), float("nan"), None   # below min_n: window too short to split
     crit = [(f">= {min_events} non-overlapping events", True), (f"shock coefficient >= {min_coef * 100:.0f} point", b >= min_coef),
             ("p < 0.05 (H0 coefficient <= 0)", p0 < 0.05), (f"DSR >= 0.95 over {n_trials} cells", dsr >= DSR_PASS),
             ("beats the VIX-only rule out of sample", beats)]
-    v_, why = _decide(crit[1:], n_ev, min_events, "non-overlapping shock events")
+    if n_ev < min_events:
+        # rule 5: the coefficient fails decisively when its 95% CI lies wholly below 1 point, its p when the CI lies wholly at or
+        # below 0, the DSR when the rule's daily Sharpe is significantly at or below 0, and the out-of-sample comparison when the
+        # one-sided 95% upper bound of the Sharpe difference is at or below 0. Every interval needs >= 8 events.
+        pts = lambda v_: f"{v_ * 100:+.2f} points"
+        nu = math.ceil(len(y) / block)
+        sd_hi = (_sharpe_diff_lower(cs_net[test], vx_net[test], EQ_PPY, block, n_boot=n_boot, seed=seed, q=0.95)[1]
+                 if beats is not None and len(test) >= 2 else float("nan"))
+        r5 = [(*crit[1], *_upper_dec(hi, min_coef, pts, n_ev, nu, strict=True, what="coefficient's 95% CI")),
+                (*crit[2], *_upper_dec(hi, 0.0, pts, n_ev, nu, what="coefficient's 95% CI")),
+                (*crit[3], *_dsr_dec(cs_net, n_ev)),
+                (*crit[4], *((False, "walk-forward window too short") if beats is None else
+                             _upper_dec(sd_hi, 0.0, lambda v_: f"{v_:+.2f}", n_ev, math.ceil(len(test) / block),
+                                        what="one-sided 95% interval of the out-of-sample Sharpe difference")))]
+        v_, why = _apply_rule5(rep, r5, n_ev, min_events, "non-overlapping shock events")
+    else:
+        v_, why = _decide(crit[1:], n_ev, min_events, "non-overlapping shock events")
     rep.update(coef_shock=b, coef_ci=[lo, hi], p_coef_le0=p0, p_coef_le_1pt=p1, coef_vix_change=float(coef[2]),
                coef_shock_ex_years=b_ex, excluded_years=list(exclude_years), shock_minus_unconditional=uncond, dsr=dsr, n_trials=n_trials,
                rule_sharpe=_sr(cs_net, EQ_PPY), vix_rule_sharpe=_sr(vx_net, EQ_PPY), oos_sharpe_diff=sd_obs, oos_sharpe_diff_lower95=sd_lo,
@@ -775,8 +948,8 @@ def breakout_vs_random(assets: dict, n: int = 55, atr_n: int = 20, mult: float =
                            "first_day": days[lo_e] if Nn > lo_e else None}
     nt = len(rows)
     rep = {"n": nt, "assets": list(assets), "open_trades_dropped": int(open_trades), "per_asset": per_asset}
-    if nt < min_n:
-        v, why = _decide([], nt, min_n, "pooled trades")
+    if nt < min_n and nt < MIN_DECISIVE_OBS:
+        v, why = _too_few(nt, min_n, "pooled trades", "a cluster-bootstrap interval")
         rep.update(verdict=v, reason=f"Donchian {n}/ATR x{mult:g}: {nt} pooled trades — {why}")
         return rep
     net = np.array([r_[4] for r_ in rows]); rnd = np.array([r_[5] for r_ in rows]); rnd_gross = np.array([r_[6] for r_ in rows])
@@ -817,7 +990,17 @@ def breakout_vs_random(assets: dict, n: int = 55, atr_n: int = 20, mult: float =
                     for nm, msk in (("low", lvl <= q1), ("mid", (lvl > q1) & (lvl <= q2)), ("high", lvl > q2))}
     crit = [("mean difference > 0 with cluster-bootstrap 95% CI excluding 0", lo > 0),
             (f"survives the {n_trials}-trial correction (DSR > 0.95 or Holm p < 0.05)", survive)]
-    v, why = _decide(crit, nt, min_n, "pooled trades")
+    if nt < min_n:
+        # rule 5: the difference fails decisively when its cluster 95% CI lies wholly at or below 0; the trial correction when
+        # both of its routes fail decisively: the rule's trade-return Sharpe significantly at or below 0 (no DSR can pass) and
+        # the CI wholly at or below 0 (no Holm-adjusted p can reach 0.05)
+        pct = lambda v_: f"{v_ * 100:+.2f}%"
+        cdec = _upper_dec(hi, 0.0, pct, nt, K, what="cluster 95% CI")
+        ddec = _dsr_dec(net, nt)
+        r5 = [(*crit[0], *cdec), (*crit[1], cdec[0] and ddec[0], f"DSR route: {ddec[1]}; Holm route: {cdec[1]}")]
+        v, why = _apply_rule5(rep, r5, nt, min_n, "pooled trades")
+    else:
+        v, why = _decide(crit, nt, min_n, "pooled trades")
     rep.update(mean_rule_net=float(net.mean()), mean_random_net=float(rnd.mean()), mean_diff=obs, ci=[lo, hi], p=p, p_bonferroni=bonf,
                dsr=dsr, n_trials=n_trials, n_clusters=K, mean_diff_vs_gross_random=float((net - rnd_gross).mean()),
                trade_skew=float(skewness(net)), mean_hold_days=float(np.mean([r_[3] for r_ in rows])), by_decade=dec, by_vix_tercile=terc,
@@ -898,7 +1081,14 @@ def twin_reversion(days: Sequence[str], a, b, start: str = "2010-01-01", end: st
     exc = np.abs(x[e_i - 1] - mu60[e_i - 1])
     mar20 = months == "2020-03"
     crit = [("95% lower bound of mean net return per trade > 0", lo > 0), (f"DSR > 0.95 across {n_trials} twin variants", dsr > DSR_PASS)]
-    v, why = _decide(crit, n_tr, min_n, "trades")
+    if n_tr < min_n:
+        # rule 5: the lower bound fails decisively when the whole month-clustered 95% CI lies at or below 0; the DSR when the
+        # trade-return Sharpe is significantly at or below 0
+        bps = lambda v_: f"{v_ * 1e4:+.2f} bps"
+        r5 = [(*crit[0], *_upper_dec(hi, 0.0, bps, n_tr, K, what="month-clustered 95% CI")), (*crit[1], *_dsr_dec(net, n_tr))]
+        v, why = _apply_rule5(rep, r5, n_tr, min_n, "trades")
+    else:
+        v, why = _decide(crit, n_tr, min_n, "trades")
     below = ""
     if n_tr < min_n:
         failing = [nm for nm, ok in crit if not ok]
@@ -975,7 +1165,11 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
     n = int(ox.sum())
     rep = {"n": n, "n_other": int((~ox).sum()), "first": fr[0] if len(fr) else None, "last": fr[-1] if len(fr) else None,
            "label": "MODEL-PRICED"}
-    if n < min_n or (~ox).sum() < 2:
+    if n < min_n and (n < 2 or (~ox).sum() < 2 or len(fr) < 8):
+        v, why = _too_few(n, min_n, "opex Fridays", "a block-bootstrap difference")
+        rep.update(verdict=v, reason=f"MODEL-PRICED opex straddle: {n} opex Fridays — {why}")
+        return rep
+    if (~ox).sum() < 2:
         v, why = _decide([], n, min_n, "opex Fridays")
         rep.update(verdict=v, reason=f"MODEL-PRICED opex straddle: {n} opex Fridays — {why}")
         return rep
@@ -1044,8 +1238,17 @@ def opex_straddle(days: Sequence[str], closes, vix: dict, divs=None, fomc_days: 
                "p_opex_closer": float((np.sum(perm <= obs) + 1) / (n_perm + 1))}
     lo, hi = g["ci"]
     crit = [("difference > 0", g["diff"] > 0), ("95% CI excludes 0", lo > 0)]
-    v, why = _decide(crit, n, min_n, "opex Fridays")
-    v_raw, _ = _decide([("difference > 0", g_raw["diff"] > 0), ("95% CI excludes 0", g_raw["ci"][0] > 0)], n, min_n, "opex Fridays")
+    crit_raw = [("difference > 0", g_raw["diff"] > 0), ("95% CI excludes 0", g_raw["ci"][0] > 0)]
+    if n < min_n:
+        # rule 5: both criteria fail decisively when the block-bootstrap 95% CI of the difference lies wholly at or below 0
+        bps = lambda v_: f"{v_ * 1e4:+.2f} bps"
+        nu = math.ceil(len(fr) / block)
+        r5 = lambda cr, hi_: [(*c_, *_upper_dec(hi_, 0.0, bps, n, nu, what=f"block-{block} 95% CI")) for c_ in cr]
+        v, why = _apply_rule5(rep, r5(crit, hi), n, min_n, "opex Fridays")
+        v_raw = _rule5(r5(crit_raw, g_raw["ci"][1]), n, min_n, "opex Fridays")[0]
+    else:
+        v, why = _decide(crit, n, min_n, "opex Fridays")
+        v_raw, _ = _decide(crit_raw, n, min_n, "opex Fridays")
     n_exd_opex = int((exd & ox).sum())
     rep.update(mean_opex_bps=g["mean_flag"] * 1e4, mean_other_bps=g["mean_other"] * 1e4, diff_bps=g["diff"] * 1e4,
                ci_bps=[lo * 1e4, hi * 1e4], p=g["p"], mean_premium_bps=float(prem.mean() * 1e4),

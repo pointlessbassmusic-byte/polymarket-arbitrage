@@ -51,6 +51,19 @@ Annualisation: 252 equity trading days. No results here are model-priced. Verdic
 implemented criterion failing -> not_supported; any criterion not implemented -> at best inconclusive; supported only
 when every criterion is implemented and passes. Fewer than 500 usable days, or an archived window that does not
 cover the claimed 2023-11..2026-10 (data limits) -> at best inconclusive.
+
+House rule 5 (``_rule5``). Below the trial's min_n (500 usable days) the unmet 'at least 500 days' criterion keeps the
+verdict from supported, and a failing criterion still counts only when it fails decisively: its 95% interval lies
+wholly on the wrong side of the claimed bound. T-427: the mean and the deflated-p criteria when the mean's 95%
+block-bootstrap CI lies wholly at or below 0 (the deflation benchmark, the expected best of 60 zero-skill Sharpes, is
+>= 0 at any sample size); the QQQ/IWM criterion when either asset's 95% HAC interval of its mean net return lies
+wholly at or below 0 (HAC t <= -1.96, at least 8 days). T-428: the slope criterion when the slope's 95% block-bootstrap
+CI lies wholly above -0.2, the deflated-p criterion when it lies wholly at or above 0, and the reversal leg (when a
+15:45 signal is supplied) when its annualised Sharpe's 95% block-bootstrap interval lies wholly at or below 0.5. A
+zero-width interval decides nothing. Any other failure there is undecided (None), so the verdict is inconclusive;
+under 8 (T-427) or 10 (T-428) usable days nothing is computed. At or above min_n every criterion is judged at face
+value, exactly as before. Below min_n the report's ``rule5`` holds the face-value and judged criteria and the decisive
+failures.
 """
 
 from __future__ import annotations
@@ -141,6 +154,60 @@ def sidak(p: float, k: int) -> float:
 
 def _block(n: int) -> int:
     return max(1, min(int(round(n ** (1.0 / 3.0))), max(1, n // 4)))
+
+
+def sharpe_block_ci(x, block: int, n_boot: int = 2000, seed: int = 0, ppy: int = EQ_PPY) -> tuple[float, float]:
+    """Two-sided 95% circular-block-bootstrap interval of the annualised Sharpe of ``x`` (a resample with zero spread
+    counts as Sharpe 0)."""
+    x = np.asarray(x, float)
+    n = len(x)
+    rng = np.random.default_rng(seed)
+    block = max(1, min(int(block), n))
+    nb = math.ceil(n / block)
+    idx = ((rng.integers(0, n, (n_boot, nb))[:, :, None] + np.arange(block)[None, None, :]).reshape(n_boot, -1)[:, :n]) % n
+    s = x[idx]
+    sd = s.std(axis=1, ddof=1)
+    sr = np.where(sd > 0, s.mean(axis=1) / np.where(sd > 0, sd, 1.0), 0.0) * math.sqrt(ppy)
+    return float(np.quantile(sr, 0.025)), float(np.quantile(sr, 0.975))
+
+
+# ------------------------------------------------------------------------------------------------ house rule 5 --
+
+Z95 = 1.959964
+
+
+def _ci_below(ci, bound: float) -> bool:
+    """The 95% interval lies wholly at or below ``bound``. False without an interval and for a zero-width one."""
+    lo, hi = ci
+    return lo is not None and hi is not None and lo < hi and hi <= bound
+
+
+def _ci_above(ci, bound: float, strict: bool = False) -> bool:
+    """The 95% interval lies wholly at or above ``bound`` (strictly above with ``strict``). False as in ``_ci_below``."""
+    lo, hi = ci
+    return lo is not None and hi is not None and lo < hi and (lo > bound if strict else lo >= bound)
+
+
+def _rule5(crit, decisive, n: int, min_n: int) -> tuple[str, str, dict]:
+    """House rule 5 below the trial's min_n usable days (at or above min_n callers judge their criteria at face value with
+    ``_verdict``, exactly as before). ``crit``: the face-value criteria [(name, ok)] other than the day count;
+    ``decisive``: one flag per criterion, True when its failure stands below min_n (its 95% interval lies wholly on the
+    wrong side of the claimed bound). A passing or decisively failing criterion keeps its bool, any other failure becomes
+    None (undecided), and the unmet day-count criterion (None) keeps the verdict from 'supported'.
+    Returns (verdict, why, rule-5 record)."""
+    crit = [(name, None if ok is None else bool(ok)) for name, ok in crit]
+    judged = [(f"at least {min_n} days (only {n}: data limit)", None)]
+    judged += [(name, ok) if ok is None or ok else (name + " (fails decisively below min_n)", False) if d
+               else (name + " (fails, not decisively, below min_n: undecided)", None) for (name, ok), d in zip(crit, decisive)]
+    failed = [name for (name, ok), d in zip(crit, decisive) if ok is False and d]
+    v, why = _verdict(judged)
+    v0, why0 = _verdict(crit)
+    why = (f"only {n} usable days, below the trial's min_n {min_n}, so the verdict cannot be supported and a failing "
+           f"criterion counts only when it fails decisively, its 95% interval wholly on the wrong side of the claimed bound "
+           f"(house rule 5). Decisive failures: {'; '.join(failed) if failed else 'none'}. {v}: {why} "
+           f"(criteria at face value: {v0}, {why0})")
+    return v, why, {"min_n": min_n, "n": n, "unit": "usable days", "criteria": [[c, ok] for c, ok in judged],
+                    "criteria_at_face_value": [[c, ok] for c, ok in crit], "decisive_failures": failed}
 
 
 # ------------------------------------------------------------------------------------------------- sessions --
@@ -343,7 +410,10 @@ def _regime_split(leg: dict, regimes: Optional[dict]) -> dict:
 def intraday_momentum(spy: dict, others: Optional[dict] = None, cost_rt: float = 0.0002, n_cells: int = 60,
                       min_n: int = MIN_N, alpha: float = 0.05, regimes: Optional[dict] = None, n_boot: int = 2000,
                       seed: int = 0) -> dict:
-    """T-427 on sessions from ``build_sessions``. ``others`` = {"QQQ": sessions or None, "IWM": sessions or None}."""
+    """T-427 on sessions from ``build_sessions``. ``others`` = {"QQQ": sessions or None, "IWM": sessions or None}.
+    Below ``min_n`` usable days house rule 5 applies: never supported; the mean and deflated-p criteria fail decisively
+    when the mean's 95% block-bootstrap CI lies wholly at or below 0, the QQQ/IWM criterion when either asset's HAC t of
+    its mean net return is <= -1.96. Under 8 usable days nothing is computed."""
     others = {"QQQ": None, "IWM": None} if others is None else others
     leg = momentum_leg(spy, cost_rt)
     n = len(leg["net"])
@@ -395,13 +465,23 @@ def intraday_momentum(spy: dict, others: Optional[dict] = None, cost_rt: float =
             f"{rep['sharpe_net_annual']:+.2f}; DSR over {n_cells} cells {dsr:.3f} -> deflated p {p_defl:.3f} "
             f"(needs < {alpha}); {oth_txt}; diagnostic slope of the last half hour on r1 {b[1]:+.4f} "
             f"(HAC t {rep['diagnostic_slope_hac_t']:+.2f})")
-    if n < min_n:
-        v, why = _verdict([(f"at least {min_n} days (only {n}: data limit)", None)])
-        rep.update(verdict=v, reason=head + " — " + why)
-        return rep
     same = None
     if all(per.get(s) and per[s]["n"] for s in ("QQQ", "IWM")):
         same = bool(per["QQQ"]["mean_net_bps"] > 0 and per["IWM"]["mean_net_bps"] > 0)
+    if n < min_n:
+        # rule 5: the mean and the deflated p (benchmark >= 0) fail decisively when the mean's 95% CI lies wholly at or
+        # below 0; the QQQ/IWM sign when either asset's 95% HAC interval lies wholly at or below 0 (HAC t <= -1.96)
+        down = _ci_below(ci, 0.0)
+        oth_down = any(per.get(s) and per[s]["n"] >= 8 and per[s]["hac_t"] is not None and per[s]["hac_t"] <= -Z95
+                       for s in ("QQQ", "IWM"))
+        v, why, r5 = _rule5([
+            (f"archived window covers the claimed {CLAIM_LABEL}", None if window_short(first, last) else True),
+            ("SPY mean net return > 0", mean_net > 0),
+            (f"deflated p < {alpha} over {n_cells} cells", p_defl < alpha),
+            ("same sign on QQQ and IWM (mean net return > 0 on both)", same),
+        ], [False, down, down, oth_down], n, min_n)
+        rep.update(verdict=v, reason=head + " — " + why, rule5=r5)
+        return rep
     v, why = _verdict([
         (f"at least {min_n} days", n >= min_n),
         (f"archived window covers the claimed {CLAIM_LABEL}", None if window_short(first, last) else True),
@@ -439,7 +519,11 @@ def closing_reversal(sess: dict, l_decision=None, open_cost: float = 0.0001, n_c
                      seed: int = 0) -> dict:
     """T-428 on sessions from ``build_sessions``. ``l_decision``: optional array aligned with ``sess['days']`` holding
     the last-half-hour return measured to 15:45 (the MOC decision state); without it the reversal-leg criterion is not
-    implemented. ``others`` = {symbol: sessions} for the other declared assets (diagnostic slopes)."""
+    implemented. ``others`` = {symbol: sessions} for the other declared assets (diagnostic slopes). Below ``min_n``
+    usable days house rule 5 applies: never supported; the slope fails decisively when its 95% block-bootstrap CI lies
+    wholly above ``slope_max``, the deflated p when it lies wholly at or above 0, and the reversal leg when its
+    annualised Sharpe's 95% block-bootstrap interval lies wholly at or below ``sharpe_min``. Under 10 usable days
+    nothing is computed."""
     d = reversal_data(sess)
     n = len(d["y"])
     ex = sess.get("excluded", {})
@@ -493,11 +577,11 @@ def closing_reversal(sess: dict, l_decision=None, open_cost: float = 0.0001, n_c
             entry.update(slope_univariate=float(bb[1]), slope_t=float(bb[1] / ss[1]) if ss[1] > 0 else None)
         reg[name] = entry
     rep["regimes"] = reg
-    leg_txt, leg_ok = "", None
+    leg_txt, leg_ok, leg_net = "", None, None
     if l_decision is not None:
         ld = np.asarray(l_decision, float)[d["mask"]]
         pos = -np.sign(np.where(np.isfinite(ld), ld, 0.0))
-        net = pos * y - open_cost * (pos != 0)
+        net = leg_net = pos * y - open_cost * (pos != 0)
         sh = sharpe_ratio(net, EQ_PPY)
         rep["reversal_leg"] = {"signal": "L measured to 15:45 (supplied)", "mean_net_bps": float(net.mean()) * 1e4,
                                "sharpe_net_annual": sh, "trades": int((pos != 0).sum())}
@@ -524,8 +608,20 @@ def closing_reversal(sess: dict, l_decision=None, open_cost: float = 0.0001, n_c
             f"b <= {slope_max} and deflated p < {alpha}; a = {b[0] * 1e4:+.2f} bps, c = {b[2]:+.3f}; univariate "
             f"b {bu[1]:+.3f}; {leg_txt}" + (f"; {oth_txt}" if oth_txt else ""))
     if n < min_n:
-        v, why = _verdict([(f"at least {min_n} days (only {n}: data limit)", None)])
-        rep.update(verdict=v, reason=head + " — " + why)
+        # rule 5: the slope fails decisively when its 95% block-bootstrap CI lies wholly above -0.2, the deflated p when
+        # it lies wholly at or above 0; the reversal leg when its Sharpe's 95% block-bootstrap interval lies wholly at or
+        # below 0.5
+        sh_ci = sharpe_block_ci(leg_net, _block(n), n_boot, seed) if leg_net is not None else (None, None)
+        v, why, r5 = _rule5([
+            (f"archived window covers the claimed {CLAIM_LABEL}", None if window_short(first, last) else True),
+            (f"slope <= {slope_max}", bool(b[1] <= slope_max)),
+            (f"deflated (Sidak, {n_cells} cells) one-sided p < {alpha}", p_defl < alpha),
+            (f"reversal-leg net Sharpe > {sharpe_min} sized on the 15:45 state (needs sub-hourly bars)", leg_ok),
+        ], [False, _ci_above(ci, slope_max, strict=True), _ci_above(ci, 0.0), _ci_below(sh_ci, sharpe_min)], n, min_n)
+        r5["reversal_leg_sharpe_ci95"] = list(sh_ci)
+        sh_txt = (f"; reversal-leg Sharpe 95% block-bootstrap interval [{sh_ci[0]:+.2f}, {sh_ci[1]:+.2f}]"
+                  if sh_ci[0] is not None else "")
+        rep.update(verdict=v, reason=head + sh_txt + " — " + why, rule5=r5)
         return rep
     v, why = _verdict([
         (f"at least {min_n} days", n >= min_n),

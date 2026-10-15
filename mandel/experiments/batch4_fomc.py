@@ -38,7 +38,13 @@ holding block, T-361 charges 2 bps per leg. Equity annualisation uses 252 tradin
 
 Verdicts use ``underlying2._verdict``: any implemented criterion failing -> not_supported; any criterion not
 implemented -> at best inconclusive; supported only when every criterion is implemented and passes. When the data
-cannot support the claim (too few events, missing bundle) the verdict is inconclusive with the reason.
+cannot support the claim (no events, missing bundle) the verdict is inconclusive with the reason. Below the trial's
+min_n (in the claim's own units: FOMC days, statement days, cycle days, expansionary+contractionary meetings) house
+rule 5 applies (``_rule5``): the verdict is never supported, and a failing criterion still counts only when it fails
+decisively, its 95% interval lying wholly on the wrong side of the claimed bound (a block-bootstrap CI, the meeting
+bootstrap CI of T-361's gaps, or the bootstrap quantile of its Sharpe difference). Any other failure there is undecided
+(None), so the verdict is inconclusive; a criterion with no interval (T-342's placebo p) never decides below min_n.
+The criteria judged, and the decisive failures, are reported under ``rule5``.
 """
 
 from __future__ import annotations
@@ -281,6 +287,44 @@ def _f_p(x) -> str:
     return "n/a" if x is None else f"{x:.4f}"
 
 
+# ----------------------------------------------------------------------------------------------- house rule 5 --
+
+def _ci_at_or_above(ci, bound: float) -> bool:
+    """The 95% interval lies wholly at or above ``bound`` (False when there is no interval)."""
+    return ci[0] is not None and ci[0] >= bound
+
+
+def _ci_at_or_below(ci, bound: float) -> bool:
+    """The 95% interval lies wholly at or below ``bound`` (False when there is no interval)."""
+    return ci[1] is not None and ci[1] <= bound
+
+
+def _rule5(rows, n: int, min_n: int, unit: str) -> tuple[str, str, list]:
+    """House rule 5 for a sample below the trial's min_n (``n`` in the claim's own units; callers judge a sample at or
+    above min_n at face value with ``_verdict``). ``rows``: [(name, ok, decisive)] with ok True / False / None (not
+    computable) and decisive True when the failure stands below min_n: the criterion's 95% interval lies wholly on the
+    wrong side of the claimed bound. A passing or decisively failing criterion keeps its bool, any other failure becomes
+    None (undecided), and the unmet 'n >= trial min_n' criterion (None) keeps the verdict from 'supported'.
+    Returns (verdict, explanation starting with the verdict, the criteria judged)."""
+    crit = [(name, None) if ok is None else (name, True) if ok else (name + " (fails decisively below min_n)", False) if decisive
+            else (name + " (fails, not decisively, below min_n: undecided)", None) for name, ok, decisive in rows]
+    crit.append((f"n >= trial min_n ({n} of {min_n} {unit})", None))
+    v, why = _verdict(crit)
+    v0, why0 = _verdict([(name, ok) for name, ok, _ in rows])
+    return v, (f"{v}: only {n} {unit}, below the trial's min_n {min_n}, so the verdict cannot be supported and a failing "
+               f"criterion counts only when it fails decisively, its 95% interval wholly on the wrong side of the claimed bound "
+               f"(house rule 5): {why} (criteria at face value: {v0}, {why0})"), crit
+
+
+def _below_min_n(rep: dict, rows, n: int, min_n: int, unit: str, head: str, body: Optional[str]) -> dict:
+    """Sets the rule-5 verdict and reason on ``rep`` (reason: ``head``; ``body`` — explanation) and returns it."""
+    v, why, crit = _rule5(rows, n, min_n, unit)
+    rep["rule5"] = {"min_n": min_n, "n": n, "criteria": [[c, ok] for c, ok in crit],
+                    "decisive_failures": [name for name, ok, d in rows if ok is not None and not ok and d]}
+    rep.update(verdict=v, reason=f"{head}; {body} — {why}" if body else f"{head} — {why}")
+    return rep
+
+
 # ------------------------------------------------------------------------------- model-priced event straddles --
 
 def short_straddle_pnl(s_prev, s_now, sigma, tau: float, r: float = 0.0):
@@ -370,20 +414,22 @@ def spx_event_straddle(days, closes, vix: dict, fomc_days, start: str = "1994-01
            "ratio_abs_r_over_vix_daily": {"fomc": float(P["ratio"][f].mean()), "other": float(P["ratio"][~f].mean())},
            "scale_check_abs_r_over_rv30": {"fomc": float(scale[f[okrv]].mean()), "other": float(scale[~f[okrv]].mean())},
            "placebo_fomc_pm7": placebo, "excluding_2008_09_and_2020_03": excl_diff, "vix_terciles": terc}
-    if full["n_event"] < min_n:
-        rep.update(verdict="inconclusive", reason=f"MODEL-PRICED: only {full['n_event']} FOMC days with SPY and VIX (min_n {min_n})")
-        return rep
-    crit = []
+    crit, dec = [], []
     for lab, h in hv.items():
         ok = None if h["diff"] is None else (h["diff"] < 0 and h["ci"][1] < 0)
         crit.append((f"{lab} FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0", ok))
+        dec.append(_ci_at_or_above(h["ci"], 0.0))            # rule 5: the half's 95% CI lies wholly at or above 0
+    body = (f"MODEL-PRICED short 1-day ATM SPY straddle (BS, sigma=VIX(T-1), T=1/252): FOMC minus non-FOMC mean P&L "
+            f"{_bps(full['diff'])} bps of spot over {full['n_event']} FOMC / {full['n_other']} other days; "
+            + "; ".join(f"{lab} {_bps(h['diff'])} bps (95% CI {_ci_bps(h['ci'])}, {h['n_event']} FOMC days)" for lab, h in hv.items())
+            + f"; |r|/(VIX/sqrt252) FOMC {rep['ratio_abs_r_over_vix_daily']['fomc']:.2f} vs other {rep['ratio_abs_r_over_vix_daily']['other']:.2f}; "
+            f"placebo +/-7d {_bps(placebo['diff'])} bps; ex Sep-2008/Mar-2020 {_bps(excl_diff['diff'])} bps")
+    if full["n_event"] < min_n:
+        return _below_min_n(rep, [(c, ok, d) for (c, ok), d in zip(crit, dec)], full["n_event"], min_n, "FOMC days",
+                            f"MODEL-PRICED: only {full['n_event']} FOMC days with SPY and VIX (min_n {min_n})", body)
     v, why = _verdict(crit)
     rep["verdict"] = v
-    rep["reason"] = (f"MODEL-PRICED short 1-day ATM SPY straddle (BS, sigma=VIX(T-1), T=1/252): FOMC minus non-FOMC mean P&L "
-                     f"{_bps(full['diff'])} bps of spot over {full['n_event']} FOMC / {full['n_other']} other days; "
-                     + "; ".join(f"{lab} {_bps(h['diff'])} bps (95% CI {_ci_bps(h['ci'])}, {h['n_event']} FOMC days)" for lab, h in hv.items())
-                     + f"; |r|/(VIX/sqrt252) FOMC {rep['ratio_abs_r_over_vix_daily']['fomc']:.2f} vs other {rep['ratio_abs_r_over_vix_daily']['other']:.2f}; "
-                     f"placebo +/-7d {_bps(placebo['diff'])} bps; ex Sep-2008/Mar-2020 {_bps(excl_diff['diff'])} bps — {why}")
+    rep["reason"] = f"{body} — {why}"
     return rep
 
 
@@ -463,16 +509,18 @@ def btc_event_straddle(days, closes, dvol: dict, fomc_days, start: str = "2021-0
                    f"random non-macro-day placebo p={'n/a' if non_macro['random_non_macro_placebo_p_lower'] is None else format(non_macro['random_non_macro_placebo_p_lower'], '.3f')})")
     else:
         cpi_txt = f"pooled FOMC+CPI variant and non-macro control not run ({CPI_ABSENT})"
-    if full["n_event"] < min_n:
-        rep.update(verdict="inconclusive", reason=f"MODEL-PRICED: only {full['n_event']} FOMC days with BTC and DVOL since {start} (min_n {min_n}); {cpi_txt}")
-        return rep
     ok = None if full["diff"] is None else (full["diff"] < 0 and full["ci"][1] < 0)
-    v, why = _verdict([("FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0", ok)])
+    name = "FOMC-minus-non-FOMC short-straddle P&L < 0 with 95% CI excluding 0"
+    body = (f"MODEL-PRICED short 1-day ATM BTC straddle (BS, sigma=DVOL 00:00 UTC, T=1/365) since {start}: FOMC minus non-FOMC mean P&L "
+            f"{_bps(full['diff'])} bps of spot (95% CI {_ci_bps(full['ci'])}) over {full['n_event']} FOMC / {full['n_other']} other days; "
+            f"|r|/(DVOL/sqrt365) FOMC {rep['ratio_abs_r_over_dvol_daily']['fomc']:.2f} vs other {rep['ratio_abs_r_over_dvol_daily']['other']:.2f}; "
+            f"weekdays only {_bps(weekday['diff'])} bps; coin accounting {_bps(coin['diff'])} bps; {cpi_txt}")
+    if full["n_event"] < min_n:                                # rule 5: decisive when the 95% CI lies wholly at or above 0
+        return _below_min_n(rep, [(name, ok, _ci_at_or_above(full["ci"], 0.0))], full["n_event"], min_n, "FOMC days",
+                            f"MODEL-PRICED: only {full['n_event']} FOMC days with BTC and DVOL since {start} (min_n {min_n})", body)
+    v, why = _verdict([(name, ok)])
     rep["verdict"] = v
-    rep["reason"] = (f"MODEL-PRICED short 1-day ATM BTC straddle (BS, sigma=DVOL 00:00 UTC, T=1/365) since {start}: FOMC minus non-FOMC mean P&L "
-                     f"{_bps(full['diff'])} bps of spot (95% CI {_ci_bps(full['ci'])}) over {full['n_event']} FOMC / {full['n_other']} other days; "
-                     f"|r|/(DVOL/sqrt365) FOMC {rep['ratio_abs_r_over_dvol_daily']['fomc']:.2f} vs other {rep['ratio_abs_r_over_dvol_daily']['other']:.2f}; "
-                     f"weekdays only {_bps(weekday['diff'])} bps; coin accounting {_bps(coin['diff'])} bps; {cpi_txt} — {why}")
+    rep["reason"] = f"{body} — {why}"
     return rep
 
 
@@ -530,19 +578,20 @@ def pre_fomc_drift_oos(days, closes, fomc_days, test=("2012-01-01", "2026-12-31"
     if overlay is not None:
         od, oc, vix = overlay
         rep["call_spread_overlay"] = call_spread_overlay(od, oc, vix, fomc_days, *test)
-    if ne < min_n:
-        rep.update(verdict="inconclusive", reason=f"only {ne} FOMC days in {test[0]}..{test[1]} (min_n {min_n})")
-        return rep
     crit = [(f"{test[0][:4]}-{test[1][:4]} FOMC-minus-non-FOMC mean return > 0", g["diff"] > 0),
             ("95% CI excludes 0 (lower bound > 0)", g["ci"][0] > 0)]
+    ov = rep.get("call_spread_overlay") or {}
+    body = (f"SPY FOMC-day close-to-close {g['mean_event']*1e4:+.1f} bps vs non-FOMC {g['mean_other']*1e4:+.1f} bps over {test[0][:4]}-{test[1][:4]} "
+            f"({ne} FOMC days): difference {_bps(g['diff'])} bps, 95% block-bootstrap CI {_ci_bps(g['ci'])} (HAC {_ci_bps(hac)}), "
+            f"random-date placebo p={p_placebo:.3f}; 1994-2011 difference {_bps(pre_g['diff'])} bps"
+            + (f"; MODEL-PRICED 1% call spread FOMC {ov['mean_pnl_fomc_bps']:+.1f} vs other {ov['mean_pnl_other_bps']:+.1f} bps of spot" if ov.get("mean_pnl_fomc_bps") is not None else ""))
+    if ne < min_n:                                             # rule 5: both fail decisively when the 95% CI lies wholly at or below 0
+        down = _ci_at_or_below(g["ci"], 0.0)
+        return _below_min_n(rep, [(c, ok, down) for c, ok in crit], ne, min_n, "FOMC days",
+                            f"only {ne} FOMC days in {test[0]}..{test[1]} (min_n {min_n})", body)
     v, why = _verdict(crit)
     rep["verdict"] = v
-    ov = rep.get("call_spread_overlay") or {}
-    rep["reason"] = (f"SPY FOMC-day close-to-close {g['mean_event']*1e4:+.1f} bps vs non-FOMC {g['mean_other']*1e4:+.1f} bps over {test[0][:4]}-{test[1][:4]} "
-                     f"({ne} FOMC days): difference {_bps(g['diff'])} bps, 95% block-bootstrap CI {_ci_bps(g['ci'])} (HAC {_ci_bps(hac)}), "
-                     f"random-date placebo p={p_placebo:.3f}; 1994-2011 difference {_bps(pre_g['diff'])} bps"
-                     + (f"; MODEL-PRICED 1% call spread FOMC {ov['mean_pnl_fomc_bps']:+.1f} vs other {ov['mean_pnl_other_bps']:+.1f} bps of spot" if ov.get("mean_pnl_fomc_bps") is not None else "")
-                     + f" — {why}")
+    rep["reason"] = f"{body} — {why}"
     return rep
 
 
@@ -601,19 +650,25 @@ def statement_day_effect(days, closes, fomc_days, start: str = "1994-01-01", end
                    f"all CPI sessions out of both groups {_f_bps(ea['net_diff_bps'])} bps (p={_f_p(ea['p'])}; {sub[0][:4]}-{sub[1][:4]} {_f_bps(ea['sub_diff_bps'])})")
     else:
         cpi_txt = f"; CPI-overlap flag not run ({CPI_ABSENT})"
-    if g["n_event"] < min_n:
-        rep.update(verdict="inconclusive", reason=f"only {g['n_event']} statement days (min_n {min_n}){cpi_txt}")
-        return rep
     crit = [(f"{start[:4]}-{end[:4]} net difference > {threshold_bps:g} bps", g["diff"] > threshold_bps / 1e4),
             ("block-bootstrap p < 0.05", g["p_greater"] < 0.05),
             (f"{sub[0][:4]}-{sub[1][:4]} net difference > 0", None if sub_diff is None else sub_diff > 0)]
+    body = (f"SPY statement-day return {g['mean_event']*1e4:+.1f} bps (net of {cost_bps:g} bps) vs other days {g['mean_other']*1e4:+.1f} bps over "
+            f"{g['n_event']} statement days {str(ds[0])}..{str(ds[-1])}: net difference {_bps(g['diff'])} bps (95% CI {_ci_bps(g['ci'])}), "
+            f"p={g['p_greater']:.4f} (H0 diff<=0; p vs 15 bps {p_thr:.3f}); {sub[0][:4]}-{sub[1][:4]} {_bps(sub_diff)} bps"
+            + ("; secondary Holm p " + ", ".join(f"{k} {sec[k]['diff_bps']:+.1f} bps p_holm={holm.get(k, float('nan')):.3f}" for k in sec if sec[k]['diff_bps'] is not None) if sec else "")
+            + f"{cpi_txt}")
+    if g["n_event"] < min_n:
+        # rule 5: a criterion fails decisively when its 95% CI lies wholly at or below the bound (15 bps, 0, 0); the
+        # subsample has only a point difference above, so its block-bootstrap CI is computed here
+        gs = group_diff(net[ms], f[ms], block, n_boot, seed)
+        dec = [_ci_at_or_below(g["ci"], threshold_bps / 1e4), _ci_at_or_below(g["ci"], 0.0), _ci_at_or_below(gs["ci"], 0.0)]
+        rep["sub_ci_bps"] = [None if c_ is None else c_ * 1e4 for c_ in gs["ci"]]
+        return _below_min_n(rep, [(c, ok, d) for (c, ok), d in zip(crit, dec)], g["n_event"], min_n, "statement days",
+                            f"only {g['n_event']} statement days (min_n {min_n})", body)
     v, why = _verdict(crit)
     rep["verdict"] = v
-    rep["reason"] = (f"SPY statement-day return {g['mean_event']*1e4:+.1f} bps (net of {cost_bps:g} bps) vs other days {g['mean_other']*1e4:+.1f} bps over "
-                     f"{g['n_event']} statement days {str(ds[0])}..{str(ds[-1])}: net difference {_bps(g['diff'])} bps (95% CI {_ci_bps(g['ci'])}), "
-                     f"p={g['p_greater']:.4f} (H0 diff<=0; p vs 15 bps {p_thr:.3f}); {sub[0][:4]}-{sub[1][:4]} {_bps(sub_diff)} bps"
-                     + ("; secondary Holm p " + ", ".join(f"{k} {sec[k]['diff_bps']:+.1f} bps p_holm={holm.get(k, float('nan')):.3f}" for k in sec if sec[k]['diff_bps'] is not None) if sec else "")
-                     + f"{cpi_txt} — {why}")
+    rep["reason"] = f"{body} — {why}"
     return rep
 
 
@@ -671,10 +726,10 @@ def even_week_effect(days, closes, statement_days, start: str = "1994-01-01", en
     g = group_diff(x, fe, block, n_boot, seed)
     if g["diff"] is None:
         return {"n": int(incl.sum()), "verdict": "inconclusive", "reason": "no even or no odd FOMC-cycle days in range"}
-    parts = {}
+    parts, part_masks = {}, {}
     for lab, lo, hi in tuple(halves) + ((f"{sub[0][:4]}-{sub[1][:4]}", sub[0], sub[1]),):
         m = _range_mask(ds, lo, hi) & incl
-        parts[lab] = _point_diff(net[m], even[m])
+        parts[lab] = _point_diff(net[m], even[m]); part_masks[lab] = m
     gross = _even_odd_diff(r, w)
     rng = np.random.default_rng(seed); null = np.empty(n_placebo)
     for b in range(n_placebo):
@@ -696,21 +751,29 @@ def even_week_effect(days, closes, statement_days, start: str = "1994-01-01", en
            "placebo_mean_bps": float(null.mean() * 1e4), "placebo_q95_bps": float(np.quantile(null, 0.95) * 1e4),
            "parity_flip_shifts_bps": {k: (None if v is None else v * 1e4) for k, v in flips.items()}, "secondary": sec,
            "not_run": ["BTC-USD variant (calendar-day series; trading-day week index undefined)", "Holm over the 4 unnamed variants"]}
-    if rep["n"] < min_n:
-        rep.update(verdict="inconclusive", reason=f"only {rep['n']} cycle days (min_n {min_n})")
-        return rep
     crit = [(f"net difference > {threshold_bps:g} bps/day", g["diff"] > threshold_bps / 1e4), ("block-bootstrap p < 0.05", g["p_greater"] < 0.05)]
     for lab, v in parts.items():
         crit.append((f"{lab} net difference > 0", None if v is None else v > 0))
     crit.append(("random-offset placebo p < 0.05", p_placebo < 0.05))
+    body = (f"SPY even FOMC-cycle weeks {g['mean_event']*1e4:+.2f} bps/day (net of {cost_bps:g} bps per block, {rep['round_trips_per_year']:.0f} blocks/yr) "
+            f"vs odd {g['mean_other']*1e4:+.2f} bps/day over {rep['n_even_days']}+{rep['n_odd_days']} days {str(ds[0])}..{str(ds[-1])}: net difference "
+            f"{_bps(g['diff'])} bps/day (95% CI {_ci_bps(g['ci'])}), p={g['p_greater']:.4f}; "
+            + ", ".join(f"{k} {_bps(v)}" for k, v in parts.items())
+            + f"; random-offset placebo p={p_placebo:.3f} (gross {gross*1e4:+.2f} vs placebo 95th pct {rep['placebo_q95_bps']:+.2f}); "
+            f"week 0 = days -1..+3 then 5-day weeks")
+    if rep["n"] < min_n:
+        # rule 5: the difference criteria fail decisively when their 95% CI lies wholly at or below the bound (5 bps/day, 0,
+        # and 0 for each part, whose block-bootstrap CI is computed here); the placebo p has no interval, so its failure
+        # stays undecided below min_n
+        pci = {lab: group_diff(net[m], even[m], block, n_boot, seed)["ci"] for lab, m in part_masks.items()}
+        dec = ([_ci_at_or_below(g["ci"], threshold_bps / 1e4), _ci_at_or_below(g["ci"], 0.0)]
+               + [_ci_at_or_below(pci[lab], 0.0) for lab in parts] + [False])
+        rep["parts_ci_net_bps"] = {lab: [None if c_ is None else c_ * 1e4 for c_ in ci] for lab, ci in pci.items()}
+        return _below_min_n(rep, [(c, ok, d) for (c, ok), d in zip(crit, dec)], rep["n"], min_n, "cycle days",
+                            f"only {rep['n']} cycle days (min_n {min_n})", body)
     v, why = _verdict(crit)
     rep["verdict"] = v
-    rep["reason"] = (f"SPY even FOMC-cycle weeks {g['mean_event']*1e4:+.2f} bps/day (net of {cost_bps:g} bps per block, {rep['round_trips_per_year']:.0f} blocks/yr) "
-                     f"vs odd {g['mean_other']*1e4:+.2f} bps/day over {rep['n_even_days']}+{rep['n_odd_days']} days {str(ds[0])}..{str(ds[-1])}: net difference "
-                     f"{_bps(g['diff'])} bps/day (95% CI {_ci_bps(g['ci'])}), p={g['p_greater']:.4f}; "
-                     + ", ".join(f"{k} {_bps(v)}" for k, v in parts.items())
-                     + f"; random-offset placebo p={p_placebo:.3f} (gross {gross*1e4:+.2f} vs placebo 95th pct {rep['placebo_q95_bps']:+.2f}); "
-                     f"week 0 = days -1..+3 then 5-day weeks — {why}")
+    rep["reason"] = f"{body} — {why}"
     return rep
 
 
@@ -728,7 +791,8 @@ def monetary_momentum(days, closes, dgs2: dict, statement_days, start: str = "19
     classified meetings, 10,000 draws), both halves positive, and the long-only expansionary arm's Sharpe (daily excess
     returns over T-bills, cash otherwise, sqrt(252)) above buy-and-hold's over the same calendar span. The DGS2 change is
     taken in exact basis points (DGS2 is quoted to 0.01 pp), so an exact 5 bp move is neutral. min_n counts the
-    expansionary + contractionary meetings, the ones that enter the gap; fewer -> inconclusive, criteria still reported."""
+    expansionary + contractionary meetings, the ones that enter the gap; with fewer, house rule 5 applies (never
+    supported; only a decisive failure counts) and the face-value criteria verdict is reported alongside."""
     c = np.asarray(closes, dtype=float); pos = {d: i for i, d in enumerate(days)}
     gk = sorted(dgs2); ga = np.array(gk)
     ev = []
@@ -813,11 +877,28 @@ def monetary_momentum(days, closes, dgs2: dict, statement_days, start: str = "19
                      + f"; ZLB 2009-2015 {('n/a' if zlb['gap_net_pp'] is None else format(zlb['gap_net_pp'], '+.2f'))} pp; long-only arm Sharpe {sr_arm:.2f} vs buy-and-hold {sr_bh:.2f} "
                      f"({rep['span'][0]}..{rep['span'][1]}, excess over T-bills)")
     if n_exp + n_con < min_n:
-        rep.update(verdict="inconclusive", criteria_verdict_if_min_n_ignored=v,
-                   reason=f"only {n_exp + n_con} expansionary+contractionary meetings (min_n {min_n}); {body} — inconclusive: only "
-                          f"{n_exp + n_con} of {len(ev)} classified meetings enter the gap (min_n {min_n}); criteria on this sample, "
-                          f"not used for the verdict: {why}")
-        return rep
+        # rule 5: a criterion fails decisively when its 95% interval lies wholly on the wrong side of the claimed bound: the
+        # net-gap bootstrap CI at or below 1 pp; the gross-gap CI (net + costs) at or below 0 for the permutation test; each
+        # half's net-gap bootstrap CI (computed here) at or below 0; the arm-minus-buy-and-hold Sharpe difference's 97.5%
+        # bootstrap quantile (computed here, same draws as the 2.5% one above) at or below 0. A gap CI decides only with
+        # >= 2 meetings per arm and >= 8 in all (the floor group_diff uses)
+        def enough(na, nb):
+            return na >= 2 and nb >= 2 and na + nb >= 8
+        rng_h = np.random.default_rng(seed + 1); half_ci = {}
+        for lab, lo, hi in halves:
+            m = _range_mask(tds, lo, hi); ah, bh_ = ret[m & exp_m], ret[m & con_m]
+            if enough(ah.size, bh_.size):
+                bt = np.array([rng_h.choice(ah, ah.size).mean() - rng_h.choice(bh_, bh_.size).mean() for _ in range(n_boot)]) - 2 * cost_arm
+                half_ci[lab] = [float(np.quantile(bt, 0.025)) * 100, float(np.quantile(bt, 0.975)) * 100]
+            else:
+                half_ci[lab] = [None, None]
+        _, sd_hi = _sharpe_diff_lower(arm, bh, EQ_PPY, block=21, n_boot=500, seed=seed, q=0.975)
+        full_ok = enough(n_exp, n_con)
+        dec = ([full_ok and ci[1] * 100 <= gap_pp, full_ok and ci[1] + 2 * cost_arm <= 0]
+               + [_ci_at_or_below(half_ci[lab], 0.0) for lab in hv] + [sd_hi <= 0])
+        rep.update(criteria_verdict_if_min_n_ignored=v, halves_gap_ci_net_pp=half_ci, sharpe_diff_upper_95=sd_hi)
+        return _below_min_n(rep, [(c, ok, d) for (c, ok), d in zip(crit, dec)], n_exp + n_con, min_n,
+                            "expansionary+contractionary meetings", f"only {n_exp + n_con} expansionary+contractionary meetings (min_n {min_n})", body)
     rep["verdict"] = v
     rep["reason"] = f"{body} — {why}"
     return rep
@@ -912,17 +993,24 @@ def gvz_fomc_change(gvz: dict, fomc_days, vix: Optional[dict] = None, cpi_days: 
                    + (f", VIX {_chg_txt(cr['vix'])}" if cr["vix"] else ""))
     else:
         cpi_txt = f"; CPI-date repeat not run ({CPI_ABSENT})"
-    if g["n"] < min_n:
-        rep.update(verdict="inconclusive", reason=f"only {g['n']} FOMC decision days with GVZ closes either side in {start}..{end} (min_n {min_n}){cpi_txt}")
-        return rep
-    v, why = _verdict([("mean GVZ change < 0 with 95% CI excluding 0", g["mean"] < 0 and g["ci"][1] < 0)])
-    rep["verdict"] = v
+    name = "mean GVZ change < 0 with 95% CI excluding 0"
     vc = rep["vix_positive_control"]
-    rep["reason"] = (f"GVZ change from the close before to the close after {g['n']} scheduled FOMC decision days ({g['first_event']}..{g['last_event']}): "
-                     f"mean {g['mean']:+.3f} vol pts (95% CI {g['ci'][0]:+.3f} to {g['ci'][1]:+.3f}), {g['share_declining']*100:.0f}% declining (sign-test p={g['sign_test_p']:.4f}); "
-                     f"weekday-matched {'non-macro' if cpi_days is not None else 'non-event'} 2-day change {('n/a' if g['matched_control_mean'] is None else format(g['matched_control_mean'], '+.3f'))}"
-                     + (f"; VIX positive control {vc['mean']:+.3f} pts (95% CI {vc['ci'][0]:+.3f} to {vc['ci'][1]:+.3f})" if vc and vc.get("mean") is not None else "")
-                     + f"{cpi_txt} — {why}")
+    body = None if g["mean"] is None else (
+        f"GVZ change from the close before to the close after {g['n']} scheduled FOMC decision days ({g['first_event']}..{g['last_event']}): "
+        f"mean {g['mean']:+.3f} vol pts (95% CI {g['ci'][0]:+.3f} to {g['ci'][1]:+.3f}), {g['share_declining']*100:.0f}% declining (sign-test p={g['sign_test_p']:.4f}); "
+        f"weekday-matched {'non-macro' if cpi_days is not None else 'non-event'} 2-day change {('n/a' if g['matched_control_mean'] is None else format(g['matched_control_mean'], '+.3f'))}"
+        + (f"; VIX positive control {vc['mean']:+.3f} pts (95% CI {vc['ci'][0]:+.3f} to {vc['ci'][1]:+.3f})" if vc and vc.get("mean") is not None else "")
+        + f"{cpi_txt}")
+    if g["n"] < min_n:
+        # rule 5: decisive when the iid-bootstrap 95% CI over events lies wholly at or above 0, with >= 8 events (fewer give no
+        # usable bootstrap interval, so the claim stays undecided)
+        ok = None if g["mean"] is None else (g["mean"] < 0 and g["ci"][1] < 0)
+        return _below_min_n(rep, [(name, ok, g["n"] >= 8 and _ci_at_or_above(g["ci"], 0.0))], g["n"], min_n, "FOMC decision days",
+                            f"only {g['n']} FOMC decision days with GVZ closes either side in {start}..{end} (min_n {min_n})",
+                            body if body is not None else cpi_txt.lstrip("; "))
+    v, why = _verdict([(name, g["mean"] < 0 and g["ci"][1] < 0)])
+    rep["verdict"] = v
+    rep["reason"] = f"{body} — {why}"
     return rep
 
 

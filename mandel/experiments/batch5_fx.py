@@ -49,8 +49,20 @@ count. Its trial-Sharpe variance comes from the family members that can be compu
 zero-skill independent-trial variance), so correlated variants cannot lower the bar.
 
 Verdicts use ``underlying2._verdict``: any implemented criterion failing -> not_supported; any criterion not
-implemented -> at best inconclusive; supported only when every criterion is implemented and passes. Too short a
-window or a missing bundle -> inconclusive with the reason.
+implemented -> at best inconclusive; supported only when every criterion is implemented and passes. A missing bundle
+-> inconclusive with the reason.
+
+House rule 5 (``_rule5``). Below the trial's min_n (T-368/T-431: 150 test months; T-478: 300 holding months) the unmet
+'n >= trial min_n' criterion keeps the verdict from supported, and a failing criterion still counts only when it fails
+decisively: its 95% interval lies wholly on the wrong side of the claimed bound. Carry: the Sharpe criterion when the
+stationary-bootstrap 95% Sharpe interval lies wholly at or below 0.3, the lower-bound criterion and the DSR when it lies
+wholly at or below 0 (the DSR's benchmark, the expected best of the trials' zero-skill Sharpes, is >= 0 at any sample
+size). Momentum: the mean and DSR criteria when the mean's 95% block-bootstrap CI lies wholly at or below 0, the
+permutation criterion when it lies wholly at or below the permutation 95th percentile. A zero-width interval decides
+nothing. Under 48 months (4 blocks of the 12-month bootstrap) no interval is computed, no failure can be decisive and
+the verdict is inconclusive. Any other failure below min_n is undecided (None), so the verdict is inconclusive. At or
+above min_n every criterion is judged at face value, exactly as before. Below min_n the report's ``criteria`` are the
+ones judged and ``rule5`` holds the face-value criteria and the decisive failures.
 """
 
 from __future__ import annotations
@@ -537,6 +549,38 @@ def _perf(net: np.ndarray, gross: Optional[np.ndarray] = None, n_boot: int = 500
     return out
 
 
+# ------------------------------------------------------------------------------------------------ house rule 5 --
+
+BOOT_BLOCK = 12
+MIN_RULE5_MONTHS = 4 * BOOT_BLOCK      # under 4 blocks of the 12-month bootstrap no interval decides a failure below min_n
+
+
+def _ci_below(lo, hi, bound: float) -> bool:
+    """The 95% interval [lo, hi] lies wholly at or below ``bound``. False without an interval and for a zero-width one."""
+    return lo is not None and hi is not None and math.isfinite(lo) and math.isfinite(hi) and lo < hi and hi <= bound
+
+
+def _rule5(crit, decisive, n: int, min_n: int, unit: str) -> tuple[str, str, list, dict]:
+    """House rule 5 below the trial's min_n (``n`` in the claim's own units; at or above min_n callers judge ``crit`` at
+    face value with ``_verdict``, exactly as before). ``crit``: the face-value criteria [(name, ok)]; ``decisive``: one
+    flag per criterion, True when its failure stands below min_n (its 95% interval lies wholly on the wrong side of the
+    claimed bound). A passing or decisively failing criterion keeps its bool, any other failure becomes None
+    (undecided), and the unmet 'n >= trial min_n' criterion (None) keeps the verdict from 'supported'.
+    Returns (verdict, why, criteria judged, rule-5 record)."""
+    crit = [(name, None if ok is None else bool(ok)) for name, ok in crit]
+    judged = [(name, ok) if ok is None or ok else (name + " (fails decisively below min_n)", False) if d
+              else (name + " (fails, not decisively, below min_n: undecided)", None) for (name, ok), d in zip(crit, decisive)]
+    judged.append((f"n >= trial min_n ({n} {unit}, need {min_n})", None))
+    failed = [name for (name, ok), d in zip(crit, decisive) if ok is False and d]
+    v, why = _verdict(judged)
+    v0, why0 = _verdict(crit)
+    why = (f"only {n} {unit}, below the trial's min_n {min_n}, so the verdict cannot be supported and a failing criterion "
+           f"counts only when it fails decisively, its 95% interval wholly on the wrong side of the claimed bound (house rule 5). "
+           f"Decisive failures: {'; '.join(failed) if failed else 'none'}. {v}: {why} (criteria at face value: {v0}, {why0})")
+    return v, why, judged, {"min_n": min_n, "n": n, "unit": unit, "criteria": [[c, ok] for c, ok in judged],
+                            "criteria_at_face_value": [[c, ok] for c, ok in crit], "decisive_failures": failed}
+
+
 def _regimes(months: Sequence[str], net: np.ndarray, regimes: dict) -> dict:
     out = {}
     for name, (a, b) in regimes.items():
@@ -638,7 +682,9 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
                  n_boot: int = 5000, seed: int = 0) -> dict:
     """Walk-forward carry test: weights and the VIX > 30 filter chosen on ``train``, frozen on ``test``. Pass: test Sharpe > ``sharpe_bar``,
     stationary-bootstrap 2.5% lower bound > 0, DSR > 0.95 at ``n_trials``. ``family`` = 'g10' (6 declared trials) or
-    'em' (4 EM trials + the G10 entry's 6)."""
+    'em' (4 EM trials + the G10 entry's 6). Below ``min_n`` test months house rule 5 applies: never supported; the
+    Sharpe fails decisively when its stationary-bootstrap 95% interval lies wholly at or below ``sharpe_bar``, the
+    lower-bound criterion and the DSR when it lies wholly at or below 0; under 48 months nothing is computed."""
     universe = list(universe)
     sel = choose_weighting(panel, universe, train, cost_bps, admin, vix=vix)
     ws = sel["chosen"]
@@ -650,10 +696,12 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
                  "flat_months": int(sum(bt["flat"])),
                  "test_window": [bt["months"][0], bt["months"][-1]] if n else None, "test_dropped": bt["dropped"],
                  "costs": {"trade_bps": cost_bps, "admin_per_year": admin}}
-    if n < min_n:
+    if n < min_n and n < MIN_RULE5_MONTHS:
         rep.update(verdict="inconclusive",
                    reason=f"{label}: only {n} test months in {test[0]}..{test[1]} with every currency's spot and lagged rate (need {min_n}); "
-                          f"dropped {len(bt['dropped'])} months — the archived data cannot support the claim's window")
+                          f"dropped {len(bt['dropped'])} months, fewer than {MIN_RULE5_MONTHS} (4 blocks of the {BOOT_BLOCK}-month "
+                          f"bootstrap), so no interval and no decisive failure below min_n (house rule 5) — the archived data cannot "
+                          f"support the claim's window")
         return rep
     perf = _perf(net, bt["gross"], n_boot, seed)
     other = "invvol" if ws == "equal" else "equal"
@@ -687,7 +735,16 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
     crit = [(f"test-window net Sharpe > {sharpe_bar:g}", perf["sharpe"] > sharpe_bar),
             ("stationary-bootstrap lower bound > 0", perf["boot_lo"] > 0),
             (f"DSR > {DSR_PASS} with n_trials = {n_trials}", d["dsr"] > DSR_PASS)]
-    v, why = _verdict(crit)
+    r5 = None
+    if n < min_n:
+        # rule 5: the Sharpe fails decisively when its stationary-bootstrap 95% interval lies wholly at or below the bar;
+        # the lower-bound criterion and the DSR (benchmark >= 0) when it lies wholly at or below 0
+        lo_, hi_ = perf["boot_lo"], perf["boot_hi"]
+        v, why, judged, r5 = _rule5(crit, [_ci_below(lo_, hi_, sharpe_bar), _ci_below(lo_, hi_, 0.0), _ci_below(lo_, hi_, 0.0)],
+                                    n, min_n, "test months")
+    else:
+        v, why = _verdict(crit)
+        judged = crit
     tr = sel["train"]
     eq_s, iv_s = tr["equal"]["sharpe"], tr["invvol"]["sharpe"]
     pre_txt = f"; Sharpe through {pre['through']} (before the splice) {pre['sharpe']:.2f}" if pre else ""
@@ -707,7 +764,9 @@ def carry_report(panel: dict, *, universe: Sequence[str], cost_bps: dict, admin:
               f"{rep['costs_pct_year']['trade']:.2f}% trade + {rep['costs_pct_year']['financing']:.2f}% financing a year, "
               f"skew {perf['skew']:+.2f}, MDD {perf['mdd'] * 100:.1f}%, carry spread {rep['carry_spread_pp_mean']:.2f} pp; "
               f"stale rates spliced by forward fill (flagged): {_fmt_filled(filled)}{pre_txt}; one-month gaps filled: {_fmt_filled(gaps)} — {why}")
-    rep.update(verdict=v, reason=reason, criteria=[[c, b] for c, b in crit])
+    rep.update(verdict=v, reason=reason, criteria=[[c, b] for c, b in judged])
+    if r5:
+        rep["rule5"] = r5
     return rep
 
 
@@ -726,17 +785,21 @@ def momentum_report(panel: dict, *, universe: Sequence[str] = G10_FX, window: tu
     """T-478: 1-month currency momentum, top third minus bottom third, with interest differentials, ``cost_bps``
     per side. Pass: mean net monthly return > 0 with the two-sided 95% block-bootstrap CI (block 12) excluding 0,
     DSR > 0.95 at ``n_trials`` (family: formation 1/3/6/12 x thirds/top-bottom-2 x with/without differentials),
-    mean above the 95th percentile of ``n_perm`` random-ranking books."""
+    mean above the 95th percentile of ``n_perm`` random-ranking books. Below ``min_n`` holding months house rule 5
+    applies: never supported; the mean and DSR criteria fail decisively when the mean's 95% CI lies wholly at or below
+    0, the permutation criterion when it lies wholly at or below the permutation 95th percentile; under 48 months
+    nothing is computed."""
     universe = list(universe)
     ms = mrange(*window)
     bt = momentum_backtest(panel, universe, ms, 1, "thirds", True, cost_bps, True)
     net, n = bt["net"], int(bt["net"].size)
     rep: dict = {"universe": universe, "n": n, "window": [bt["months"][0], bt["months"][-1]] if n else None,
                  "dropped": bt["dropped"], "cost_bps_per_side": cost_bps}
-    if n < min_n:
+    if n < min_n and n < MIN_RULE5_MONTHS:
         rep.update(verdict="inconclusive",
                    reason=f"currency momentum: only {n} holding months in {window[0]}..{window[1]} with >= 6 eligible currencies "
-                          f"(need {min_n}) — the archived data cannot support the claim's window")
+                          f"(need {min_n}), fewer than {MIN_RULE5_MONTHS} (4 blocks of the {BOOT_BLOCK}-month bootstrap), so no "
+                          f"interval and no decisive failure below min_n (house rule 5) — the archived data cannot support the claim's window")
         return rep
     lo, hi = _mean_ci(net, 12, n_boot, seed)
     fam = {}
@@ -772,7 +835,15 @@ def momentum_report(panel: dict, *, universe: Sequence[str] = G10_FX, window: tu
     crit = [("mean net monthly excess return > 0 with block-bootstrap 95% CI excluding 0", net.mean() > 0 and lo > 0),
             (f"DSR > {DSR_PASS} with {n_trials} trials", d["dsr"] > DSR_PASS),
             ("mean above the permutation 95th percentile", net.mean() > q95)]
-    v, why = _verdict(crit)
+    r5 = None
+    if n < min_n:
+        # rule 5: the mean and the DSR (benchmark >= 0) fail decisively when the mean's 95% block-bootstrap CI lies wholly
+        # at or below 0; the permutation criterion when it lies wholly at or below the permutation 95th percentile
+        v, why, judged, r5 = _rule5(crit, [_ci_below(lo, hi, 0.0), _ci_below(lo, hi, 0.0), _ci_below(lo, hi, q95)],
+                                    n, min_n, "holding months")
+    else:
+        v, why = _verdict(crit)
+        judged = crit
     sub_txt = (f"; full {len(universe)}-currency sub-sample from {sub['from']} ({sub['months']} months) {sub['mean_bps']:+.1f} bps "
                f"[{sub['ci_bps'][0]:+.1f}, {sub['ci_bps'][1]:+.1f}]") if sub else ""
     reason = (f"currency momentum {rep['window'][0]}..{rep['window'][1]} ({n} months, {len(universe)}-currency universe; "
@@ -784,7 +855,9 @@ def momentum_report(panel: dict, *, universe: Sequence[str] = G10_FX, window: tu
               f"{_f(rep['same_fixing_mean_bps'])} bps; stale rates spliced by forward fill (flagged): {_fmt_filled(filled)}; "
               f"one-month gaps filled: {_fmt_filled(gaps)}; "
               f"ETF cost check not run (FXE/FXY/FXB/FXF/FXC/FXA not archived; reported item, not a pass criterion) — {why}")
-    rep.update(verdict=v, reason=reason, criteria=[[c, b] for c, b in crit])
+    rep.update(verdict=v, reason=reason, criteria=[[c, b] for c, b in judged])
+    if r5:
+        rep["rule5"] = r5
     return rep
 
 
