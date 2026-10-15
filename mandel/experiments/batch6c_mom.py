@@ -55,6 +55,44 @@ Conventions
     are computed and the criterion needs both (rule 11 spirit: a pass must not hinge on the reading).
   * Below trial.min_n (rule 5): never supported; a failing criterion counts only when it fails decisively.
 
+Claim-specific choices (declared before any result)
+  * T-300: the 56 trials are formation (12-1, 6-1, 3-1, 1-0, 12-7, 6-2, the equal-weight ensemble of 1-0/3-0/12-0) x
+    long/flat or long/short x excess or raw returns x sign rule or Baltas-Kosowski TREND (t-statistic of the window's
+    daily log returns, neutral when |t| < 1); each trial's comparator is the historical-mean strategy on the same basis
+    and position type. The DSR uses n_trials = 104 and the variance of the 56 computed trials' per-period d Sharpes (T-58's
+    48 trials are daily-strategy Sharpes of another statistic: they enter the count only). 'Decayed' (post-2012 mean d <
+    0) is a criterion: it cannot be supported while decayed.
+  * T-301: null = the rule's own out-of-market spells re-placed at random (count and lengths kept, never merging), ties
+    counted against the rule. The claim's "95% of 1,000 paths" is judged on the first 1,000 paths; the Holm-adjusted p
+    over the 96 variants (4 lookbacks x 3 bands x SMA/EMA x monthly/daily x SPY/five-sleeve; daily = a 21 x L-session MA
+    evaluated every close, filled the next close; five-sleeve = SPY/EFA/IEF/DBC/VNQ timed independently at 20% rebalanced
+    at each month's fill) uses the primary's p on 10,000 paths (1/1001 > 0.05/96) and every variant's 1,000-path p. The
+    Holm decision is taken from bounds when they settle it (raw p >= 0.05; 96 p < 0.05; or (m - r_max + 1) p >= 0.05 with
+    r_max = 1 + the variants whose 1,000-path p is within 0.01 of the primary's), else those variants get 10,000 paths.
+    When the primary's p lies within 2 Monte Carlo s.e. of one of those thresholds it is re-estimated on 50,000 paths.
+  * T-308: residuals are the in-sample OLS residuals of months t-12..t-2 from the regression on months t-36..t-1 (the
+    library's rule); the 12-2 total return compounds the same 11 months; every trial starts at the first 36-month
+    decision (2002-01) so the 8 trials share one sample. Long/short has no borrow cost (the claim states 5 bps only).
+  * T-311: the claim's filter is the base cell (24-month bear, 80th percentile, short leg 0 and long leg halved = 'both');
+    'short' cuts the short leg only. The Daniel-Moskowitz trials scale the same legs by k = clip(mu_on / mu_off, 0, 1),
+    mu from an expanding past-only regression of the base WML hold return on the activation dummy (decisions <= t-2, from
+    1999-12; fewer than 3 past activations = the binary action). Random filters move the spells intact, carrying their k.
+    Episodes are activation runs merged across gaps of <= 2 months. "Fewer than 5 = inconclusive": below the episode gate
+    a failure stands only when decisive (the filter worse than 95% of random filters, or the Sharpe bound below -0.1).
+  * T-317: sleeves enter after 13 complete hold blocks; the null resamples whole hold blocks (fill to fill) of all
+    sleeves' daily excess returns jointly, i.i.d., from the blocks in which every sleeve of the trial trades, demeaned per
+    sleeve (driftless), with the actual activity calendar; it is run through the same engine (EWMA, caps, costs, borrow).
+    Excess gamma = gamma - mean simulated gamma; its block-bootstrap CI shifts the actual gamma's bootstrap quantiles, the
+    HAC CI adds the simulation mean's s.e. Crisis years left out: 2000-2002, 2008, 2020, 2022.
+  * T-310: the pooled book holds 1/N of capital per active sleeve on SPY's session calendar (crypto priced at the same
+    calendar day's close), drifting within the month. Estimators: EWMA 0.94, 21- and 126-session realized, Yang-Zhang
+    over 21 sessions on adjusted OHLC, and DVOL for BTC (from 2021-03-24 only; EWMA before and for every other sleeve).
+    Holm p's: the primary from 5,000 x 5 joint resamples, the other 19 trials from 2,000 each.
+  * T-481: the synthetic 10-year return is the library's y_(t-1)/12 - 8 x (y_t - y_(t-1)) (constant modified duration
+    8: a 10-year par bond's runs from about 6.5 at 9% yields to 9.3 at 1.5%; the yield-dependent duration is reported as a
+    sensitivity), used before IEF's first full month (2002-08); its fit to IEF over 2002-08.. is reported. The TLT trials
+    have no pre-TLT synthetic (no 20-year yield archived) and start when their window is all TLT.
+
 Verdicts use ``underlying2._verdict`` through ``batch6b_bw._decide``: any implemented criterion failing -> not_supported;
 any criterion not implemented (None) -> at best inconclusive; supported needs every criterion implemented and passing.
 """
@@ -861,11 +899,12 @@ def sma_timing_vs_random(series: dict, bills: Bills, start: str = T301_START, mi
                   "n_paths": int(null.size), "pos": pos, "cell": key, "time_in_market": float(np.mean([x.mean() for x in pos.values()])),
                   "vi": vi}
 
-    def refine(v):
+    def refine(v, target=None):
         r = res[v]
-        if r["n_paths"] >= n_refine:
+        target = n_refine if target is None else int(target)
+        if r["n_paths"] >= target:
             return
-        extra = _t301_null(cells[r["cell"]], r["pos"], costs, n_refine - r["n_paths"], seed + 104729 + 7919 * r["vi"])
+        extra = _t301_null(cells[r["cell"]], r["pos"], costs, target - r["n_paths"], seed + 104729 * (1 + r["n_paths"] // 1000) + 7919 * r["vi"])
         r["null"] = np.concatenate([r["null"], extra])
         r["n_paths"] = int(r["null"].size)
         r["p"] = _mc_p(r["null"], r["depth"])
@@ -874,9 +913,19 @@ def sma_timing_vs_random(series: dict, bills: Bills, start: str = T301_START, mi
     prim = res[pk]
     m = len(family)
     refine(pk)
-    p0 = prim["p"]
     # Holm-adjusted p of the primary lies in [(m - r + 1) p0, m p0], r = its rank. Variants whose 1,000-path p exceeds
     # p0 + 0.01 rank after it (their p's binomial s.e. at 1,000 paths is <= 0.003 near p0 < 0.05), so r <= 1 + #cand.
+    # When p0 lies within 2 Monte Carlo s.e. of a threshold the bounds use, the primary is extended to 5 x n_refine paths.
+    for _ in range(2):
+        p0 = prim["p"]
+        cand = [v for v, r in res.items() if v != pk and r["p"] <= p0 + 0.01]
+        se0 = math.sqrt(max(p0 * (1 - p0), 1e-12) / prim["n_paths"])
+        thr = (ALPHA, ALPHA / m, ALPHA / max(1, m - len(cand)))
+        if any(abs(p0 - t_) < 2 * se0 for t_ in thr) and prim["n_paths"] < 5 * n_refine:
+            refine(pk, 5 * n_refine)
+        else:
+            break
+    p0 = prim["p"]
     cand = [v for v, r in res.items() if v != pk and r["p"] <= p0 + 0.01]
     lower = (m - len(cand)) * p0
     if p0 >= ALPHA:
@@ -1170,7 +1219,11 @@ def _spy_indicators(spy_days: Sequence[str], spy_adj: np.ndarray, dec_days: Sequ
     v0 = next((k for k, d in enumerate(spy_days) if d >= vol_start), 0)
     out = np.zeros(len(dec_days), bool)
     for j, d in enumerate(dec_days):
-        i = idx[d]
+        i = idx.get(d)
+        if i is None:                                   # the last SPY session on or before the decision day
+            i = int(np.searchsorted(spy_days, d, side="right")) - 1
+            if i < 0:
+                continue
         m0 = _month_add(d[:7], -lookback)
         i0 = last.get(m0)
         bear = i0 is not None and spy_adj[i] / spy_adj[i0] - 1 < 0
@@ -1689,8 +1742,9 @@ def b6c_mom_trend_crisis_smile(archive):
               f"a 60-day-centre-of-mass EWMA, cap 2x, equal risk across active sleeves, month-end signal filled at the next "
               f"close, 5 bps per side, 50 bps/yr borrow on shorts), quarterly excess returns {j['keys'][0]}..{j['keys'][1]} "
               f"({j['n']} quarters) on SPY's quarterly excess return and its square: gamma {_s(p['g'], 2)} (HAC s.e. "
-              f"{_f(p['se_hac'], 2)}), mean gamma of {T317_N_SIM} driftless simulations (whole months of all sleeves' daily "
-              f"excess returns resampled i.i.d. after demeaning: cross-correlation kept, autocorrelation removed) "
+              f"{_f(p['se_hac'], 2)}), mean gamma of {T317_N_SIM} driftless simulations (whole fill-to-fill hold months of all "
+              f"sleeves' daily excess returns resampled jointly i.i.d. after demeaning: cross-correlation kept, autocorrelation "
+              f"removed) "
               f"{_s(p['g_sim'], 2)} (sd {_f(p['sim_sd'], 2)}; actual above {_pc(p['pct_in_sim'])} of them); excess "
               f"{_s(p['excess'], 2)}: block bootstrap {_ci(p['ci_boot'], 2)}, HAC {_ci(p['ci_hac'], 2)}; Holm over the 8 declared "
               f"trials (quarterly/monthly x with/without BTC x long-short/long-flat) "

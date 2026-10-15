@@ -68,8 +68,13 @@ Conventions
     floor(4 (n/100)^(2/9)); lags 0 and 12 are reported.
   * Monte-Carlo precision. A criterion's studentized bootstrap p is the mean over 5 seeds of 2000 resamples (the
     batch6b_bw convention); permutation p's use 10,000 draws. A resampled p decides "p < 0.05" only when its
-    Monte-Carlo 95% band (p +/- 1.96 sqrt(p (1 - p) / draws)) lies on one side of 0.05; otherwise the criterion is
-    undecided (None): a seed must not decide a verdict (rule 11, T-162). Reasons print each p with its band.
+    Monte-Carlo 95% band (p +/- 1.96 sqrt(p (1 - p) / draws)) lies on one side of 0.05: a seed must not decide a
+    verdict (rule 11, T-162). Too few draws is not a reason to leave a computable criterion undecided (it is neither a
+    data limit, rule 9, nor an unimplementable criterion, rule 2), so while a criterion p's band straddles 0.05 it is
+    escalated (``escalate_p``): one more seed of 2000 resamples (seed + k) at a time up to MAX_SEEDS = 50 (100,000), or
+    one more batch of 10,000 permutation draws up to MAX_PERM_BATCHES = 10 (100,000), the pooled p and its band
+    recomputed after each. The criterion is undecided (None) only if the band still straddles 0.05 at the cap.
+    Reported-only p's are not escalated. Reasons print each p with its band; the stat records the draws behind it.
   * Costs (rule 9) as the claims state: T-345 charges 2 legs x 2 bps (4 bps) per signal month against the claim (net
     difference = gross + 4 bps) in the magnitude and both halves; T-347's net-of-cost Friday/Monday strategy (4 and 8 bps
     a week) and T-349's net-of-cost (2 bps per round trip) are reported, not criteria; T-450's threshold rule is reported
@@ -102,6 +107,8 @@ from mandel.validation.backtest_eval import block_bootstrap_pvalue
 N_BOOT = 2000
 N_PERM = 10000
 N_SEEDS = 5                     # criterion bootstrap p's: the mean over 5 seeds of N_BOOT resamples (as batch6b_bw)
+MAX_SEEDS = 50                  # ... escalated one seed (N_BOOT resamples) at a time while undecided, up to 50 seeds (100,000)
+MAX_PERM_BATCHES = 10           # criterion permutation p's: escalated one N_PERM batch at a time, up to 10 (100,000 draws)
 SEED = 0
 ALPHA = 0.05
 Z_MC = 1.959964                 # Monte-Carlo band of a resampled p: p +/- Z_MC * sqrt(p (1 - p) / draws)
@@ -539,22 +546,49 @@ def mean_ci(d, block: int, n_boot: Optional[int] = None, seed: int = SEED, level
 def studentized_p(d, block: int, n_boot: Optional[int] = None, seed: int = SEED, n_seeds: int = 1) -> tuple:
     """(p_greater, p_less): studentized circular block-bootstrap one-sided p-values for H0 mean(d) <= 0 and H0 mean(d)
     >= 0 (``block_bootstrap_pvalue``), each the mean over ``n_seeds`` seeds (seed, seed + 1, ...); (None, None) below
-    its 8-period minimum."""
+    its 8-period minimum. No escalation (reported p's); criteria use ``studentized_p_escalated``."""
+    return studentized_p_escalated(d, block, n_boot, seed, n_seeds, n_seeds)[:2]
+
+
+def studentized_p_escalated(d, block: int, n_boot: Optional[int] = None, seed: int = SEED, n_seeds: int = 1,
+                            max_seeds: Optional[int] = None) -> tuple:
+    """(p_greater, p_less, draws): ``studentized_p`` over ``n_seeds`` seeds, then one more seed (seed + k, N_BOOT
+    resamples) at a time while ``decide_p`` leaves either pooled p undecided, up to ``max_seeds`` (MAX_SEEDS when None)."""
     d = np.asarray(d, float)
-    if d.size < 8 or not np.isfinite(d).all():
-        return None, None
-    z = np.zeros_like(d)
     nb = _nb(n_boot)
-    pg = [block_bootstrap_pvalue(d, z, n_boot=nb, block_len=block, seed=seed + k) for k in range(n_seeds)]
-    pl = [block_bootstrap_pvalue(-d, z, n_boot=nb, block_len=block, seed=seed + k) for k in range(n_seeds)]
-    return float(np.mean(pg)), float(np.mean(pl))
+    if d.size < 8 or not np.isfinite(d).all():
+        return None, None, nb * n_seeds
+    z = np.zeros_like(d)
+
+    def batch(k):
+        return (block_bootstrap_pvalue(d, z, n_boot=nb, block_len=block, seed=seed + k),
+                block_bootstrap_pvalue(-d, z, n_boot=nb, block_len=block, seed=seed + k))
+
+    return escalate_p(batch, nb, n_seeds, MAX_SEEDS if max_seeds is None else max_seeds)
+
+
+def escalate_p(batch: Callable[[int], tuple], draws: int, k0: int, k_max: int) -> tuple:
+    """(p_greater, p_less, total draws) pooled over batches 0, 1, ... (``batch(k)`` -> the batch's (p_greater, p_less),
+    ``draws`` resamples on seed + k; the pooled p is the mean of the batch p's). Starts with ``k0`` batches and adds one
+    at a time while ``decide_p`` leaves either pooled p undecided, up to ``k_max``: a p computed from too few draws is
+    resolved by more draws, and stays undecided only if its band still straddles 0.05 at the declared cap."""
+    ps = [batch(k) for k in range(max(1, int(k0)))]
+    while True:
+        if any(p is None for p in ps[0]):
+            return None, None, draws * len(ps)
+        pg, pl = float(np.mean([p[0] for p in ps])), float(np.mean([p[1] for p in ps]))
+        nd = draws * len(ps)
+        if len(ps) >= k_max or (decide_p(pg, nd) is not None and decide_p(pl, nd) is not None):
+            return pg, pl, nd
+        ps.append(batch(len(ps)))
 
 
 def decide_p(p: Optional[float], draws: int, alpha: float = ALPHA) -> Optional[bool]:
     """A resampled p decides 'p < alpha' only when its Monte-Carlo 95% band lies on one side of alpha: True when
     p + Z_MC * se < alpha, False when p - Z_MC * se >= alpha, None (undecided at this precision) otherwise; se =
     sqrt(p (1 - p) / draws). A seed must not decide a verdict (rule 11: a borderline result that flips under a
-    permitted alternative is not evidence)."""
+    permitted alternative is not evidence). Criterion p's reach this only after ``escalate_p`` has added draws up to
+    its cap, so None means undecided at MAX_SEEDS / MAX_PERM_BATCHES, not too few draws."""
     if p is None or not np.isfinite(p):
         return None
     se = math.sqrt(max(p * (1 - p), 0.0) / max(int(draws), 1))
@@ -598,17 +632,28 @@ def _perm_p(obs: float, draws: np.ndarray) -> tuple:
 
 def label_perm_diff(x, flag, groups=None, n_perm: Optional[int] = None, seed: int = SEED) -> tuple:
     """Permutation null of mean(x[flag]) - mean(x[~flag]) with the flag permuted (within ``groups`` if given):
-    (observed, p_greater, p_less)."""
+    (observed, p_greater, p_less). No escalation (reported p's); criteria use ``label_perm_test``."""
+    return label_perm_test(x, flag, groups, n_perm, seed, 1)[:3]
+
+
+def label_perm_test(x, flag, groups=None, n_perm: Optional[int] = None, seed: int = SEED,
+                    max_batches: Optional[int] = None) -> tuple:
+    """(observed, p_greater, p_less, draws): ``label_perm_diff`` escalated by ``escalate_p``, one more batch of N_PERM
+    draws (seed + k) at a time while either p is undecided, up to ``max_batches`` (MAX_PERM_BATCHES when None)."""
     x = np.asarray(x, float); f = np.asarray(flag, bool)
     k, n = int(f.sum()), f.size
     obs = float(x[f].mean() - x[~f].mean())
     tot = x.sum()
-    draws = []
-    for L in permuted_labels(f.astype(np.int8), groups, n_perm, seed):
-        s = L.astype(float) @ x
-        draws.append(s / k - (tot - s) / (n - k))
-    pg, pl = _perm_p(obs, np.concatenate(draws))
-    return obs, pg, pl
+
+    def batch(j):
+        draws = []
+        for L in permuted_labels(f.astype(np.int8), groups, n_perm, seed + j):
+            s = L.astype(float) @ x
+            draws.append(s / k - (tot - s) / (n - k))
+        return _perm_p(obs, np.concatenate(draws))
+
+    pg, pl, nd = escalate_p(batch, _np(n_perm), 1, MAX_PERM_BATCHES if max_batches is None else max_batches)
+    return obs, pg, pl, nd
 
 
 def _holm(ps: dict, m: Optional[int] = None) -> dict:
@@ -634,8 +679,8 @@ def _agree(oks) -> Optional[bool]:
     return None
 
 
-UNDECIDED = ("undecided: the rule-11/12 readings disagree or a Monte-Carlo band of p straddles 0.05, so the criterion is "
-             "computed but not decided")
+UNDECIDED = ("undecided: the rule-11/12 readings disagree or a Monte-Carlo band of p still straddles 0.05 at the escalation "
+             "cap, so the criterion is computed but not decided")
 
 
 def _undecided(rows, note: str = UNDECIDED) -> list:
@@ -661,16 +706,20 @@ def _judge(rows, n: int, min_n: int, unit: str) -> tuple:
 
 
 def group_test(x, flag, block: int, n_boot: Optional[int] = None, seed: int = SEED, n_seeds: int = 1,
-               pvals: bool = True) -> dict:
+               pvals: bool = True, max_seeds: Optional[int] = None) -> dict:
     """Flagged-minus-other difference in means: point, percentile 95% CI and (``pvals``) studentized one-sided
-    p-values over ``n_seeds`` seeds (``draws`` = the resamples behind each p)."""
+    p-values over ``n_seeds`` seeds, escalated up to ``max_seeds`` seeds while undecided when given (a criterion p;
+    None = no escalation) (``draws`` = the resamples behind each p)."""
     x = np.asarray(x, float); f = np.asarray(flag, bool)
     out = {"n_event": int(f.sum()), "n_other": int((~f).sum()), "diff": None, "ci": [None, None],
            "p_greater": None, "p_less": None, "mean_event": None, "mean_other": None, "draws": _nb(n_boot) * n_seeds}
     if f.sum() < 2 or (~f).sum() < 2:
         return out
     d = flag_diff_series(x, f)
-    pg, pl = studentized_p(d, block, n_boot, seed, n_seeds) if pvals else (None, None)
+    if pvals:
+        pg, pl, out["draws"] = studentized_p_escalated(d, block, n_boot, seed, n_seeds, n_seeds if max_seeds is None else max_seeds)
+    else:
+        pg, pl = None, None
     out.update(diff=float(d.mean()), ci=mean_ci(d, block, n_boot, seed), p_greater=pg, p_less=pl,
                mean_event=float(x[f].mean()), mean_other=float(x[~f].mean()))
     return out
@@ -757,8 +806,8 @@ def conditional_month_test(x, flag, months, split: str, cost: float = 0.0, block
     out = {"n_signal": int(f.sum()), "n_other": int((~f).sum()), "diff": None, "net": None}
     if f.sum() < 2 or (~f).sum() < 2 or x.size < 8:
         return out
-    obs, ppg, ppl = label_perm_diff(x, f, None, n_perm, seed)
-    g = group_test(x, f, block, n_boot, seed, N_SEEDS)
+    obs, ppg, ppl, pdraws = label_perm_test(x, f, None, n_perm, seed, MAX_PERM_BATCHES)
+    g = group_test(x, f, block, n_boot, seed, N_SEEDS, max_seeds=MAX_SEEDS)
     halves = {}
     for lab, m in (("first", ms < split), ("second", ms >= split)):
         if f[m].sum() >= 2 and (~f[m]).sum() >= 2:
@@ -769,7 +818,7 @@ def conditional_month_test(x, flag, months, split: str, cost: float = 0.0, block
             halves[lab] = {"n_signal": int(f[m].sum()), "n_other": int((~f[m]).sum()), "diff": None, "net": None, "net_ci": [None, None]}
     out.update(diff=obs, net=obs + cost, mean_signal=float(x[f].mean()), mean_other=float(x[~f].mean()),
                perm_p_less=ppl, perm_p_greater=ppg, boot_p_less=g["p_less"], boot_p_greater=g["p_greater"],
-               perm_draws=_np(n_perm), boot_draws=g["draws"],
+               perm_draws=pdraws, boot_draws=g["draws"],
                net_ci=[c + cost for c in g["ci"]] if g["ci"][0] is not None else [None, None], halves=halves)
     return out
 
@@ -1119,25 +1168,34 @@ def spread_returns(spec, safe) -> tuple:
 
 def weekday_contrast(days, x, wa: int = 4, wb: int = 0, block: int = T347_BLOCK, n_boot: Optional[int] = None,
                      seed: int = SEED, permute: bool = True, n_perm: Optional[int] = None, n_seeds: int = 1,
-                     pvals: bool = True) -> dict:
+                     pvals: bool = True, max_seeds: Optional[int] = None, max_perm_batches: int = 1) -> dict:
     """Mean of x on weekday ``wa`` minus weekday ``wb``: point, percentile CI and (``pvals``) studentized p's of the
     contrast series (block ``block``, mean over ``n_seeds`` seeds) and, with ``permute``, the within-ISO-week
-    weekday-label permutation p's."""
+    weekday-label permutation p's. A criterion's p's escalate while undecided up to ``max_seeds`` seeds and
+    ``max_perm_batches`` permutation batches (``boot_draws`` / ``perm_draws`` = the draws behind each)."""
     x = np.asarray(x, float); wd = _weekdays(days)
     fa, fb = wd == wa, wd == wb
     out = {"n_a": int(fa.sum()), "n_b": int(fb.sum()), "diff": None, "boot_draws": _nb(n_boot) * n_seeds, "perm_draws": _np(n_perm)}
     if fa.sum() < 2 or fb.sum() < 2:
         return out
     d = contrast_series(x, fa, fb)
-    pg, pl = studentized_p(d, block, n_boot, seed, n_seeds) if pvals else (None, None)
+    if pvals:
+        pg, pl, out["boot_draws"] = studentized_p_escalated(d, block, n_boot, seed, n_seeds, n_seeds if max_seeds is None else max_seeds)
+    else:
+        pg, pl = None, None
     out.update(diff=float(x[fa].mean() - x[fb].mean()), mean_a=float(x[fa].mean()), mean_b=float(x[fb].mean()),
                ci=mean_ci(d, block, n_boot, seed), boot_p_greater=pg, boot_p_less=pl)
     if permute:
-        draws = []
         Fa, Fb = fa.sum(), fb.sum()
-        for L in permuted_labels(wd.astype(np.int8), _iso_week_ids(days), n_perm, seed):
-            draws.append((L == wa).astype(float) @ x / Fa - (L == wb).astype(float) @ x / Fb)
-        out["perm_p_greater"], out["perm_p_less"] = _perm_p(out["diff"], np.concatenate(draws))
+        weeks = _iso_week_ids(days)
+
+        def batch(j):
+            draws = []
+            for L in permuted_labels(wd.astype(np.int8), weeks, n_perm, seed + j):
+                draws.append((L == wa).astype(float) @ x / Fa - (L == wb).astype(float) @ x / Fb)
+            return _perm_p(out["diff"], np.concatenate(draws))
+
+        out["perm_p_greater"], out["perm_p_less"], out["perm_draws"] = escalate_p(batch, _np(n_perm), 1, max_perm_batches)
     return out
 
 
@@ -1149,7 +1207,8 @@ def speculative_spread(spec, safe, bound: float = T347_BOUND, split: str = T347_
     if len(days) < 40:
         v, why = _verdict([("enough common sessions to build the spread", None)])
         return {"n": 0, "verdict": v, "reason": f"only {len(days)} common sessions — {why}"}
-    full = weekday_contrast(days, s, n_boot=n_boot, seed=seed, n_perm=n_perm, n_seeds=N_SEEDS)
+    full = weekday_contrast(days, s, n_boot=n_boot, seed=seed, n_perm=n_perm, n_seeds=N_SEEDS, max_seeds=MAX_SEEDS,
+                            max_perm_batches=MAX_PERM_BATCHES)
     ds = np.array(days)
     halves = {}
     for lab, m in (("first", ds < split), ("second", ds >= split)):
@@ -1269,7 +1328,7 @@ def pre_holiday_effect(days, closes, start: str = T349_START, split: str = T349_
     rep = {"n": int(f.sum()), "first_day": ds[0], "last_day": ds[-1], "n_sessions": len(ds),
            "pre_holiday_sessions_without_a_bar": sorted(d for d in pre if d not in have),
            "by_holiday": {}}
-    g = group_test(r, f, block, n_boot, seed, N_SEEDS)
+    g = group_test(r, f, block, n_boot, seed, N_SEEDS, max_seeds=MAX_SEEDS)
     rep["test"] = g
     names_by = {}
     for d, h in pre.items():
@@ -1299,13 +1358,14 @@ def pre_holiday_effect(days, closes, start: str = T349_START, split: str = T349_
     names = [f"pre-holiday minus other sessions > {bound * 1e4:.0f} bps",
              "studentized block-bootstrap (block 10) p < 0.05",
              f"difference > 0 in {ds[0][:4]}-{y1}", f"difference > 0 in {split[:4]}-{ds[-1][:4]}"]
-    v, why, crit = _judge(_undecided(list(zip(names, c, dec)), "undecided: its Monte-Carlo band straddles 0.05, so the computed p "
-                                                                "does not decide the criterion"), rep["n"], min_n, "pre-holiday sessions")
+    v, why, crit = _judge(_undecided(list(zip(names, c, dec)), f"undecided: its Monte-Carlo band still straddles 0.05 at the "
+                                                                f"escalation cap ({g['draws']} resamples), so the computed p does "
+                                                                "not decide the criterion"), rep["n"], min_n, "pre-holiday sessions")
     rep.update(criteria=[[a, ok] for a, ok in crit], verdict=v)
     h1, h2 = halves["first"], halves["second"]
     rep["reason"] = (f"{rep['n']} pre-holiday sessions (rule calendar) {ds[0]}..{ds[-1]}: {_bps(g['mean_event'])} vs "
                      f"{_bps(g['mean_other'])} bps on {g['n_other']} other sessions, difference {_bps(g['diff'])} bps "
-                     f"(95% CI {_ci_bps(g['ci'])}, p {_mc(g['p_greater'], g['draws'])}, {N_SEEDS} seeds x {_nb(n_boot)}); halves {_bps(h1['diff'])} ({h1['n_pre']}) / "
+                     f"(95% CI {_ci_bps(g['ci'])}, p {_mc(g['p_greater'], g['draws'])}, {g['draws'] // _nb(n_boot)} seeds x {_nb(n_boot)}); halves {_bps(h1['diff'])} ({h1['n_pre']}) / "
                      f"{_bps(h2['diff'])} ({h2['n_pre']}) bps; net of 2 bps (reported) {_bps(rep['net_of_cost_diff'])} bps — {why}")
     return rep
 
@@ -1448,14 +1508,18 @@ def presidential_year3(years, rets, bound: float = T357_BOUND, split: int = T357
     perms = {}
     for blab, groups in (("term blocks (years 1-4)", (yrs - (FIRST_ELECTION + 1)) // 4),
                          ("1928-anchored blocks", (yrs - FIRST_ELECTION) // 4)):
-        draws = []
-        k = f.sum(); tot = r.sum()
-        for L in permuted_labels(lab.astype(np.int8), groups, n_perm, seed):
-            m3 = (L == 3)
-            s = m3.astype(float) @ r; c3 = m3.sum(axis=1)
-            draws.append(s / c3 - (tot - s) / (yrs.size - c3))
-        pg, pl = _perm_p(obs, np.concatenate(draws))
-        perms[blab] = {"p_greater": pg, "p_less": pl}
+        tot = r.sum()
+
+        def batch(j, groups=groups):
+            draws = []
+            for L in permuted_labels(lab.astype(np.int8), groups, n_perm, seed + j):
+                m3 = (L == 3)
+                s = m3.astype(float) @ r; c3 = m3.sum(axis=1)
+                draws.append(s / c3 - (tot - s) / (yrs.size - c3))
+            return _perm_p(obs, np.concatenate(draws))
+
+        pg, pl, nd = escalate_p(batch, _np(n_perm), 1, MAX_PERM_BATCHES)
+        perms[blab] = {"p_greater": pg, "p_less": pl, "draws": nd}
     # whole-term bootstrap for the rule-5 intervals and reporting
     terms = (yrs - (FIRST_ELECTION + 1)) // 4
     blocks = [np.where(terms == t)[0] for t in np.unique(terms)]
@@ -1486,11 +1550,10 @@ def presidential_year3(years, rets, bound: float = T357_BOUND, split: int = T357
                flags=["price return only (dividends excluded)", "before 1957 the series is the S&P 90 composite",
                       "the partial current year is excluded"])
     P = list(perms.values())
-    nd = _np(n_perm)
-    c = [obs > bound, _agree([decide_p(p["p_greater"], nd) for p in P]),
+    c = [obs > bound, _agree([decide_p(p["p_greater"], p["draws"]) for p in P]),
          None if halves["first"]["excess"] is None else halves["first"]["excess"] > 0,
          None if halves["second"]["excess"] is None else halves["second"]["excess"] > 0]
-    dec = [ci[1] is not None and ci[1] <= bound, all(decide_p(p["p_less"], nd) is True for p in P),
+    dec = [ci[1] is not None and ci[1] <= bound, all(decide_p(p["p_less"], p["draws"]) is True for p in P),
            halves["first"]["ci"][1] is not None and halves["first"]["ci"][1] <= 0,
            halves["second"]["ci"][1] is not None and halves["second"]["ci"][1] <= 0]
     h1, h2 = halves["first"], halves["second"]
@@ -1500,10 +1563,11 @@ def presidential_year3(years, rets, bound: float = T357_BOUND, split: int = T357
     v, why, crit = _judge(_undecided(list(zip(names, c, dec))), n, min_n, "year-3 years")
     rep.update(criteria=[[a, ok] for a, ok in crit], verdict=v)
     pt = perms["term blocks (years 1-4)"]["p_greater"]; pa = perms["1928-anchored blocks"]["p_greater"]
+    dt = perms["term blocks (years 1-4)"]["draws"]; da = perms["1928-anchored blocks"]["draws"]
     rep["reason"] = (f"^GSPC price return {rep['first_year']}-{rep['last_year']} ({rep['n_years']} complete years, {n} year-3): "
                      f"year 3 {_pp(rep['mean_year3'])}% vs other years {_pp(rep['mean_other'])}%, excess {_pp(obs)} pp (term-bootstrap "
-                     f"95% CI {_pp(ci[0])} to {_pp(ci[1])}), permutation p {_mc(pt, nd)} (term blocks) / {_mc(pa, nd)} "
-                     f"(1928-anchored), {nd} draws; "
+                     f"95% CI {_pp(ci[0])} to {_pp(ci[1])}), permutation p {_mc(pt, dt)} (term blocks) / {_mc(pa, da)} "
+                     f"(1928-anchored), {dt if dt == da else f'{dt}/{da}'} draws; "
                      f"halves {_pp(h1['excess'])} pp ({h1['n_year3']}) / {_pp(h2['excess'])} pp ({h2['n_year3']}); "
                      f"{late}- (reported) {_pp(rep['late_period']['excess'])} pp ({rep['late_period']['n_year3']}); "
                      f"price only, pre-1957 S&P 90 flagged — {why}")

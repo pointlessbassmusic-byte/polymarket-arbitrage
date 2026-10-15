@@ -160,6 +160,74 @@ def test_monte_carlo_band_decides_p_only_when_clear():
     assert five == pytest.approx(np.mean([m.studentized_p(d, 5, 200, k)[0] for k in range(5)])) and one > 0
 
 
+def _const_batches(pg, pl, calls=None):
+    def batch(k):
+        if calls is not None:
+            calls.append(k)
+        return pg, pl
+    return batch
+
+
+def test_escalate_p_adds_draws_until_the_band_clears():
+    # regression (T-349): a p undecided at 5 x 200 draws is resolved by more draws, not left to cap the verdict
+    calls = []
+    pg, pl, nd = m.escalate_p(_const_batches(0.043, 0.958, calls), 200, 5, 50)
+    assert nd == 17 * 200 and calls == list(range(17))                # 16 x 200: 0.043 + 1.96 se = 0.0500 still straddles
+    assert m.decide_p(pg, nd) is True and m.decide_p(pl, nd) is False
+    assert m.decide_p(0.043, 5 * 200) is None and m.escalate_p(_const_batches(0.043, 0.958), 200, 5, 5)[2] == 1000
+    pg, _, nd = m.escalate_p(_const_batches(0.0499, 0.951), 200, 5, 50)
+    assert nd == 50 * 200 and m.decide_p(pg, nd) is None              # undecided only when it still straddles at the cap
+    calls = []
+    assert m.escalate_p(_const_batches(0.01, 0.99, calls), 200, 5, 50)[2] == 1000 and calls == list(range(5))
+    assert m.escalate_p(_const_batches(None, None), 200, 5, 50)[:2] == (None, None)
+
+
+def test_escalated_p_pools_the_seed_sequence():
+    d = np.random.default_rng(4).normal(0.3, 1, 200)
+    pg, pl, nd = m.studentized_p_escalated(d, 5, 200, 0, 5, 50)
+    assert nd == 1000 and (pg, pl) == pytest.approx(m.studentized_p(d, 5, 200, 0, n_seeds=5))   # decided: no extra seeds
+    x = np.random.default_rng(5).normal(0, 1, 300); f = np.arange(300) % 3 == 0
+    x[f] += 0.6
+    obs, pg, pl, nd = m.label_perm_test(x, f, None, 200, 0, 10)
+    assert nd == 200 and (obs, pg, pl) == pytest.approx(m.label_perm_diff(x, f, None, 200, 0))
+
+
+def test_pre_holiday_escalates_an_undecided_bootstrap_p(monkeypatch):
+    # regression (T-349): with a borderline p every other criterion passing, the verdict follows the escalated p
+    days, c = _holiday_series(0.004, 11)
+    monkeypatch.setattr(m, "block_bootstrap_pvalue", lambda a, b, n_boot=0, block_len=0, seed=0: 0.043 if np.mean(a) > 0 else 0.958)
+    rep = m.pre_holiday_effect(days, c, n_boot=NB)
+    assert rep["test"]["draws"] == 17 * NB and rep["verdict"] == "supported", rep["reason"]
+    assert "17 seeds x 200" in rep["reason"] and rep["reason"].endswith("all criteria pass")
+    monkeypatch.setattr(m, "MAX_SEEDS", m.N_SEEDS)                      # the defect: no escalation -> capped at inconclusive
+    rep = m.pre_holiday_effect(days, c, n_boot=NB)
+    assert rep["verdict"] == "inconclusive" and rep["test"]["draws"] == m.N_SEEDS * NB
+    monkeypatch.setattr(m, "MAX_SEEDS", 50)
+    monkeypatch.setattr(m, "block_bootstrap_pvalue", lambda a, b, n_boot=0, block_len=0, seed=0: 0.0499 if np.mean(a) > 0 else 0.951)
+    rep = m.pre_holiday_effect(days, c, n_boot=NB)
+    assert rep["verdict"] == "inconclusive" and rep["test"]["draws"] == 50 * NB
+    assert f"escalation cap ({50 * NB} resamples)" in rep["reason"]
+
+
+def test_criterion_permutation_and_bootstrap_p_escalate_uniformly(monkeypatch):
+    # the same escalation for every criterion p in the module (T-345, T-347, T-357), reported p's untouched
+    monkeypatch.setattr(m, "block_bootstrap_pvalue", lambda a, b, n_boot=0, block_len=0, seed=0: 0.043 if np.mean(a) > 0 else 0.958)
+    monkeypatch.setattr(m, "_perm_p", lambda obs, draws: (0.043, 0.958) if obs > 0 else (0.958, 0.043))
+    spy, tlt = _rebal_series(-0.015, 5)
+    rep = m.rebalancing_flow(spy, tlt, n_perm=NP, n_boot=NB)
+    for r in rep["readings"].values():
+        assert r["perm_draws"] == 7 * NP and r["boot_draws"] == 17 * NB
+    assert rep["verdict"] == "supported", rep["reason"]
+    spec, safe = _spread_series(0.0012, 9)
+    rep = m.speculative_spread(spec, safe, n_perm=NP, n_boot=NB)
+    assert rep["contrast"]["perm_draws"] == 7 * NP and rep["contrast"]["boot_draws"] == 17 * NB
+    assert rep["verdict"] == "supported", rep["reason"]
+    yrs, r = _annual(0.20, 14)
+    rep = m.presidential_year3(yrs, r, n_perm=NP, n_boot=NB)
+    assert all(p["draws"] == 7 * NP for p in rep["permutation"].values()) and rep["verdict"] == "supported", rep["reason"]
+    assert m.group_test(np.arange(50.0), np.arange(50) % 5 == 0, 5, NB)["draws"] == NB          # reported: no escalation
+
+
 def test_undecided_criteria_are_labelled_not_unimplemented():
     rows = m._undecided([("a", True, False), ("b", None, False)], "undecided: x")
     assert rows[1][0] == "b (undecided: x)" and rows[0][0] == "a"

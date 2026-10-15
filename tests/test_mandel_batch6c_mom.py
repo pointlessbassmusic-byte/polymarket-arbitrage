@@ -186,7 +186,7 @@ def test_rebalanced_five_sleeve_logwealth_matches_loop():
 def _t300_assets(planted):
     out = {}
     for k, s in enumerate(("SPY", "QQQ", "GLD")):
-        r = regime_returns(10 + k, period=24, mu=0.03, phase=7 * k) if planted else iid_returns(20 + k, mu=0.0004)
+        r = regime_returns(10 + k, period=30, mu=0.04, phase=7 * k) if planted else iid_returns(20 + k, mu=0.0004)
         out[s] = (DAYS, price(r))
     return out
 
@@ -248,34 +248,52 @@ def test_t301_family_is_96_and_daily_cell_windows():
 # ------------------------------------------------------------------------------------ T-308 residual mom --
 
 def _t308_data(planted, seed=7):
+    """Planted: each sector's alpha is constant over staggered 12-month blocks (so the 36-month intercept does not absorb
+    the current block) and the market alternates 12-month up/down regimes, so a total-return ranking loads on beta and is
+    hit at every regime turn while the residual ranking is not. Null: no alpha, i.i.d. market."""
     rng = np.random.default_rng(seed)
     mo = MO - MO[0]
     nm = mo.max() + 1
-    mkt = rng.normal(0.0, 0.009, len(DAYS))
-    betas = np.linspace(0.4, 1.6, 9)
+    if planted:
+        msign = np.where((mo // 12) % 2 == 0, 1.0, -1.0)
+        mkt = (0.01 + 0.05 * msign) / 21 + rng.normal(0.0, 0.006, len(DAYS))
+    else:
+        mkt = rng.normal(0.0004, 0.009, len(DAYS))
+    betas = np.linspace(0.1, 1.9, 9)
     sec = {}
     for i, s in enumerate(m.SECTORS):
         a = np.zeros(nm)
         if planted:
-            for t in range(1, nm):
-                a[t] = 0.97 * a[t - 1] + rng.normal(0, 0.015 * math.sqrt(1 - 0.97 ** 2))
-        r = betas[i] * mkt + a[mo] / 21 + rng.normal(0, 0.006, len(DAYS))
+            off = rng.integers(0, 12)
+            vals = rng.normal(0, 0.025, nm // 12 + 3)
+            a = vals[(np.arange(nm) + off) // 12]
+        r = betas[i] * mkt + a[mo] / 21 + rng.normal(0, 0.004, len(DAYS))
         sec[s] = (DAYS, price(r))
     return sec, (DAYS, price(mkt))
 
 
+T308_TOP3 = tuple((w, sc, "top3") for w in (36, 24) for sc in (True, False))
+
+
 def test_t308_planted_residual_momentum_wins():
     sec, spy = _t308_data(True)
-    j = m.residual_vs_total(sec, spy, BILLS)
+    j = m.residual_vs_total(sec, spy, BILLS, family=T308_TOP3)
     assert j["n"] >= 280
     assert j["verdict"] == "supported", j["why"]
 
 
 def test_t308_null_does_not_pass():
     sec, spy = _t308_data(False, seed=8)
-    j = m.residual_vs_total(sec, spy, BILLS)
+    j = m.residual_vs_total(sec, spy, BILLS, family=T308_TOP3)
     assert j["verdict"] != "supported"
     assert -1 <= j["mean_rank_corr"] <= 1
+
+
+def test_t308_family_is_8_and_windows_are_past_only():
+    assert len(m.T308_FAMILY) == 8 and m.T308_PRIMARY in m.T308_FAMILY
+    sec, spy = _t308_data(False, seed=9)
+    j = m.residual_vs_total(sec, spy, BILLS, family=(m.T308_PRIMARY,))
+    assert j["labels"][0] == "1996-03"          # first decision 36 + 1 months after the first month-end, hold the next month
 
 
 # ------------------------------------------------------------------------------------ T-311 crash filter --
@@ -357,9 +375,10 @@ def test_t311_family_is_24():
 def _t317_data(planted, seed=17):
     rng = np.random.default_rng(seed)
     if planted:
-        spy_r = regime_returns(seed, period=18, mu=0.045, vol=0.007)
-        k = (MO - MO[0]) // 18
-        tlt_r = -np.where(k % 2 == 0, 1.0, -1.0) * 0.02 / 21 + rng.normal(0, 0.005, len(DAYS))
+        k = (MO - MO[0]) // 20                                          # 20-month trends of varied size (some flat)
+        dr = rng.choice([-0.08, -0.04, 0.0, 0.0, 0.04, 0.08], size=k.max() + 1)
+        spy_r = dr[k] / 21 + rng.normal(0, 0.006, len(DAYS))
+        tlt_r = -np.sign(dr[k]) * 0.015 / 21 + rng.normal(0, 0.005, len(DAYS))
     else:
         spy_r = iid_returns(seed, mu=0.0, vol=0.01)
         tlt_r = iid_returns(seed + 1, mu=0.0, vol=0.006)
@@ -435,62 +454,66 @@ def test_t310_joint_bootstrap_matches_direct_resampling():
 
 # ------------------------------------------------------------------------------------ T-481 cross-asset --
 
-def _t481_data(planted, seed=41):
+def _t481_data(planted, seed=60):
+    """Random-walk 10-year yield with a constant 5% term premium over the bill (so b is mostly +1 and b(t-12) is
+    independent of b(t)); planted: SPY drifts -6%/month in months after b < 0 and +2% otherwise; null: constant +2%."""
     rng = np.random.default_rng(seed)
-    allm = sorted(set(d[:7] for d in bdays("1990-01-01", "2026-10-14")))
-    dy = rng.normal(0, 0.3, len(allm))
-    ym = 6.0 + np.cumsum(dy)
-    ym = np.clip(ym, 0.5, 15)
     ydays = bdays("1990-01-01", "2026-10-14")
+    allm = sorted(set(d[:7] for d in ydays))
     mi = {mm: k for k, mm in enumerate(allm)}
-    yd = {d: ym[mi[d[:7]]] for d in ydays}
-    dgs10 = {d: (v, d + "T20:00:00+00:00") for d, v in yd.items()}
-    syn = np.r_[0.0, m.synthetic_bond(ym, 8.0)]                       # monthly synthetic returns by month index
-    bill_m = 0.03 / 12
+    ym = 8.0 + np.cumsum(rng.normal(0, 0.2, len(allm)))
+    ym = ym - min(0.0, ym.min() - 6.0)
+    dgs10 = {d: (ym[mi[d[:7]]], d + "T20:00:00+00:00") for d in ydays}
+    bills = m.Bills({d: ym[mi[d[:7]]] - 5.0 for d in ydays})
+    syn = np.r_[0.0, m.synthetic_bond(ym, 8.0)]
+    bm = np.r_[0.0, (ym[:-1] - 5.0) / 1200]
     b = np.zeros(len(allm))
     for t in range(12, len(allm)):
-        cum = np.prod(1 + syn[t - 11:t]) / (1 + bill_m) ** 11 - 1
-        b[t] = np.sign(cum)
+        b[t] = np.sign(np.prod(1 + syn[t - 11:t]) / np.prod(1 + bm[t - 11:t]) - 1)
     mo_d = [mi[d[:7]] for d in DAYS]
     if planted:
-        drift = np.array([0.03 * b[k - 1] / 21 if k >= 13 else 0.0 for k in mo_d])
-        spy_r = drift + rng.normal(0, 0.008, len(DAYS))
+        dr = np.array([(0.02 if b[k - 1] > 0 else -0.06) if k >= 13 else 0.0 for k in mo_d])
     else:
-        spy_r = rng.normal(0.0004, 0.009, len(DAYS))
+        dr = np.full(len(DAYS), 0.02)
+    spy_r = dr / 21 + rng.normal(0, 0.012, len(DAYS))
     idays = [d for d in DAYS if d >= "2002-07-30"]
-    # IEF level flat within a month, equal at each month-end to the cumulative synthetic return
-    me_level, lv = {}, 100.0
+    me_level, lv = {}, 100.0                                            # IEF: flat within a month, synthetic at month-ends
     for mm in allm:
         if mm >= "2002-08":
             lv *= 1 + syn[mi[mm]]
         me_level[mm] = lv
     ief = np.array([me_level[d[:7]] for d in idays])
-    return (DAYS, price(spy_r)), (idays, ief), (idays, ief * 1.0), dgs10
+    return (DAYS, price(spy_r)), (idays, ief), (idays, ief.copy()), dgs10, bills
 
 
 T481_TEST_FAMILY = (m.T481_PRIMARY, ("synthetic", "LF", 12))
 
 
 def test_t481_planted_bond_signal_adds_to_own_trend():
-    spy, ief, tlt, dgs = _t481_data(True)
-    j = m.cross_asset_tsmom(spy, ief, tlt, dgs, BILLS, family=T481_TEST_FAMILY)
+    spy, ief, tlt, dgs, bills = _t481_data(True)
+    j = m.cross_asset_tsmom(spy, ief, tlt, dgs, bills, family=T481_TEST_FAMILY)
     assert j["n"] >= 380 and j["sharpe"]["diff"] > 0
     assert j["verdict"] == "supported", j["why"]
 
 
 def test_t481_null_does_not_pass():
-    spy, ief, tlt, dgs = _t481_data(False, seed=42)
-    j = m.cross_asset_tsmom(spy, ief, tlt, dgs, BILLS, family=T481_TEST_FAMILY)
+    spy, ief, tlt, dgs, bills = _t481_data(False, seed=61)
+    j = m.cross_asset_tsmom(spy, ief, tlt, dgs, bills, family=T481_TEST_FAMILY)
     assert j["verdict"] != "supported"
 
 
 def test_t481_yield_known_by_the_fill_only():
-    spy, ief, tlt, dgs = _t481_data(False, seed=43)
-    late = {d: (v, (date.fromisoformat(d) + timedelta(days=10)).isoformat() + "T20:00:00+00:00") for d, (v, _) in dgs.items()}
-    D = m._t481_monthly(spy, ief, tlt, late, BILLS)
+    spy, ief, tlt, _, bills = _t481_data(False, seed=43)
+    ydays = bdays("1990-01-01", "2026-10-14")
+    vals = {d: 5.0 + i * 1e-4 for i, d in enumerate(ydays)}                 # a distinct print every day
+    late = {d: (v, (date.fromisoformat(d) + timedelta(days=10)).isoformat() + "T20:00:00+00:00") for d, v in vals.items()}
+    D = m._t481_monthly(spy, ief, tlt, late, bills)
     k = D["months"].index("2010-06")
-    # each month-end yield must be a print released by the fill: with a 10-day publication lag it is an older print
-    assert D["y"][k] != dgs[D["me_day"][k]][0] or D["y"][k] == D["y"][k - 1]
+    me = D["me_day"][k]
+    known = max(d for d in ydays if d <= me and (date.fromisoformat(d) + timedelta(days=10)) <= date.fromisoformat(me) + timedelta(days=4))
+    assert D["y"][k] == pytest.approx(vals[known]) and known < me
+    D0 = m._t481_monthly(spy, ief, tlt, {d: (v, d + "T20:00:00+00:00") for d, v in vals.items()}, bills)
+    assert D0["y"][k] == pytest.approx(vals[me])                            # same-day release: the month-end print itself
 
 
 # ------------------------------------------------------------------------------------------ fake archive --

@@ -16,11 +16,12 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            sign on the roll-adjusted GC=F/SI=F route (NOT IMPLEMENTED: see the roll note below).
   * T-370  gold implied financing (GC=F vs GLD-implied spot, the rule's ounces-per-share formula, d to the CME last
            trading day of the front active month, roll windows dropped) minus DTB3, 2005-01..2026-09: HAC (lag 21) 95%
-           CI of the mean inside [-50, +50] bp. Silver (SI=F vs SLV) is run as its own criterion; platinum, palladium,
-           copper and the GLD-NAV robustness need series that are not archived (None).
+           CI of the mean inside [-50, +50] bp, with the pass's 6 trials counted (Bonferroni). The claim is gold-only:
+           silver (SI=F vs SLV) is a separate trial, computed and reported; platinum, palladium and copper (separate
+           trials) are not archived and reported as such; the GLD-NAV robustness item is report-only (not archived).
   * T-372  ES=F vs ^GSPC implied financing with a prior-year SPY dividend forecast, calendar days 5-60 after each
-           quarterly roll, 2010-01..2026-09: one-sided 95% lower bound of mean(r_imp - DTB3) > 20 bp under both the
-           Newey-West HAC (lag 21) and a quarter-clustered bootstrap.
+           quarterly roll, 2010-01..2026-09: one-sided 95% lower bound of mean(r_imp - DTB3) > 20 bp, with the pass's 5
+           trials counted (Bonferroni), under both the Newey-West HAC (lag 21) and a quarter-clustered bootstrap.
   * T-416  first crossings of the alternative.me Fear & Greed index to <= 20 (F above 20 the day before, no crossing in
            the prior 10 days), BTC entered at the close of the day F becomes known: regression coefficient of the 30-day
            forward log return on the event indicator controlling for the trailing 30-day return >= 5 points with one-
@@ -43,7 +44,8 @@ Conventions
     continuous basis, ln(F/S) x 365/d (the rule's simple (F/S - 1) x 365/d is reported). Sharpe ratios are on excess
     returns (252 a year; 365 for crypto).
   * Point in time (rules 4, 12). T-318 signals at close t are traded at close t+1 (one-bar delay; a daily bar is
-    available the next day). T-326 decides at close t and fills at close t+1 on trailing statistics only. T-416: F for
+    available the next day); a walk-forward re-selection that switches at close e ranks the rules on returns through
+    close e - 1. T-326 decides at close t and fills at close t+1 on trailing statistics only. T-416: F for
     day t is available at 00:00 UTC on t+1 and BTC is bought at the close of t+1; the trailing-return control ends at
     that close. T-372's dividend forecast uses only SPY dividends that went ex at least a year before the window.
     T-484's 12-1 signal ends a month before the decision; DGS10 rows are used only when available by the next day.
@@ -58,9 +60,10 @@ Conventions
     (lower/upper p reported); walk-forward Sharpe difference by the paired studentized circular block bootstrap
     (batch6b_bw.sharpe_diff_test, 20-day blocks). T-326: stationary-bootstrap percentile interval of the mean (mean
     block 60; the null is two-sided, so the lower end of the two-sided 95% interval). T-370: Newey-West HAC (Bartlett,
-    lag 21) two-sided 95%. T-372: the null is one-sided (mean <= 20 bp), so one-sided 95% lower bounds: HAC (lag 21) and
-    a quarter-clustered percentile bootstrap. T-416: stationary bootstrap of the daily regression rows, one-sided p.
-    T-484: studentized CBB (12-month blocks). Every decisive bootstrap end is averaged over 5 seeds with its Monte Carlo
+    lag 21) two-sided, at 1 - 0.05/6. T-372: the null is one-sided (mean <= 20 bp), so one-sided lower bounds at
+    1 - 0.05/5: HAC (lag 21) and a quarter-clustered percentile bootstrap. T-416: stationary bootstrap of the daily
+    regression rows, percentile one-sided bounds (quantiles of b*) and p = P(b* <= 0). T-484: studentized CBB (12-month
+    blocks). Every decisive bootstrap end is averaged over 5 seeds with its Monte Carlo
     s.e. (25 seeds when 5 cannot resolve it).
   * Costs (rule 9) as each claim states: T-318 2 bps SPY, 5 bps QQQ/GLD, 25 + 10 bps BTC per switch; T-326 20 bps per
     leg per trade + 50 bps/yr borrow on the short leg; T-484 2 bps per side; T-416 is a forecast claim (no costs; the
@@ -68,7 +71,16 @@ Conventions
   * Data limits (rule 9). T-326's GC/SI route needs CME active-month roll adjustment of Yahoo's continuous GC=F/SI=F;
     Yahoo serves no expired contracts, so the roll dates and contract identity cannot be reconstructed: the criterion is
     None and an approximate route (scheduled roll windows replaced by GLD/SLV returns) is reported only. T-370's
-    platinum (PL=F/PPLT), palladium (PA=F/PALL), copper (HG=F/CPER) trials and the GLD-NAV robustness are None.
+    platinum (PL=F/PPLT), palladium (PA=F/PALL) and copper (HG=F/CPER) trials and its GLD-NAV robustness check are not
+    archived; they are separate trials / a report-only check, so they are reported, not None criteria.
+  * Robustness items and trial counts (one convention for the module). A trial's 'Robustness: X instead of Y' (T-370's
+    GLD NAV instead of the GLD close, T-372's realized instead of forecast dividends) is a report-only check, never a
+    criterion: the claim's own rule decides (for T-370 the rule's S = GLD close / formula ounces, sponsor ounces only
+    'where available'; the controls call the NAV check a noise check). Rule 11 applies where a trial names alternative
+    procedures for the pass statistic itself (T-318's calendar and pooled walk-forward readings, T-416's 30-day blocks
+    and rule 10's 60-day blocks). A pass judged by an interval that also says 'N trials counted' (T-370: 6, T-372: 5) is
+    judged at the Bonferroni level 1 - 0.05/N (the house reading of a declared trial count, as batch6_surf); the
+    unadjusted 95% bounds are reported. Where the trial count feeds a DSR (T-326, T-416, T-484), the DSR takes it.
   * Below trial.min_n (rule 5) the verdict is never supported and a failing criterion counts only when it fails
     decisively. T-416's trial also pre-registers that a non-rejection is "recorded as underpowered, not as a
     refutation": its coefficient and DSR criteria fail only decisively (the claimed 5-point effect itself rejected, or
@@ -397,7 +409,6 @@ T318_SPA_BLOCK = 20
 T318_PBO_S = 16
 T318_WF_YEARS = 5
 T318_WF_BLOCK = 20
-T318_START_YEAR = 1994
 T318_N_TRIALS = 88
 T318_DECADES = (("1994", "2003"), ("2004", "2013"), ("2014", "2026"))
 
@@ -615,11 +626,13 @@ def _wf_boundaries(months: Sequence[str], phase: int, years: int, start_year: in
 
 def walk_forward(ex: np.ndarray, xr: np.ndarray, days: Sequence[str], cost: float, pos: Optional[np.ndarray] = None,
                  phase: int = 0, years: int = T318_WF_YEARS, start_year: Optional[int] = None) -> dict:
-    """Walk-forward selection: at each re-selection month-end pick the rule with the best ddof-1 Sharpe of its net excess
-    returns over the prior ``years`` x 12 months (point in time: returns up to that close) and trade it until the next
-    re-selection. With ``pos`` the strategy's own position path is re-costed (a switch at a boundary pays ``cost``);
-    without it the selected rule's net excess return is used. Returns the full-length series (NaN before the first
-    out-of-sample day) and the selections."""
+    """Walk-forward selection: at each re-selection month-end close e pick the rule with the best ddof-1 Sharpe of its net
+    excess returns over the prior ``years`` x 12 months and trade it until the next re-selection. Point in time (the
+    module's one-bar delay: a daily bar is available the next session): the switch is made at close e, so the selection
+    window ends at the bar before it (ex[i0:e], returns through close e - 1) and the new rule earns the return (e, e+1]
+    onwards. With ``pos`` the strategy's own position path is re-costed (a switch at a boundary pays ``cost``); without it
+    the selected rule's net excess return is used. Returns the full-length series (NaN before the first out-of-sample
+    day) and the selections."""
     n, K = ex.shape
     months = [d[:7] for d in days]
     bnd = _wf_boundaries(months, phase, years, int(days[0][:4]) if start_year is None else start_year)
@@ -628,7 +641,7 @@ def walk_forward(ex: np.ndarray, xr: np.ndarray, days: Sequence[str], cost: floa
     sel = []
     for j, (bm, e) in enumerate(bnd):
         i0 = bisect.bisect_right(months, _month_add(bm, -12 * years))
-        win = ex[i0:e + 1]
+        win = ex[i0:e]                                       # bars through close e - 1: known when switching at close e
         if win.shape[0] < 20:
             continue
         mu, sd = win.mean(axis=0), win.std(axis=0, ddof=1)
@@ -713,7 +726,7 @@ def reality_check(ex: np.ndarray, xr: np.ndarray, days: Sequence[str], cost: flo
             (f"CSCV PBO > 0.5 ({_f(pbo['pbo'])} over {pbo['n_combinations']} splits, {T318_PBO_S} partitions)",
              pbo["pbo"] > 0.5, False)]
     if wf["calendar"] is not None and wf_ci:
-        rows = [_le_crit(wf["calendar"], 0.0, "calendar 5-year re-selection (1994 + 5k)"),
+        rows = [_le_crit(wf["calendar"], 0.0, f"calendar 5-year re-selection ({days[0][:4]} + 5k)"),
                 _le_crit(wf["pooled"], 0.0, f"pooled {len(phases)} monthly re-selection phases")]
         crit.append(all_constructions(rows, "walk-forward selected rule minus buy-and-hold out-of-sample excess Sharpe: 95% "
                                             "interval includes or lies below 0"))
@@ -778,13 +791,15 @@ def b6c_misc_ta_reality_check(archive):
               f"{T318_PBO_S} partitions; median logit {pbo['median_logit']:+.2f}); by decade "
               + ", ".join(f"{k} {v:.2f}" for k, v in j["pbo_by_decade"].items())
               + f". In-sample best {j['best_rule']} (annualised excess Sharpe {j['best_sharpe_ann']:.3f}) DSR at 88 trials "
-              f"{_f(j['dsr_best'])}. Walk-forward (best prior-5-year Sharpe, re-selected every 5 years on the calendar "
-              f"1994 + 5k; out of sample {j['wf_window'][0]}..{j['wf_window'][1]}, {j['wf_window'][2]} days; picks "
-              + ", ".join(f"{s['month']} {s['rule']}" for s in j["wf_selections"])
-              + f"): excess Sharpe minus buy-and-hold {_s(wc.get('diff'))} ({_ci(wc.get('ci'))}, paired studentized CBB, "
-              f"{T318_WF_BLOCK}-day blocks); pooled over {j['wf_n_phases']} monthly re-selection phases {_s(wp.get('diff'))} "
-              f"({_ci(wp.get('ci'))}); per-phase range {_s((j['wf_phase_range'] or [None])[0])} to "
-              f"{_s((j['wf_phase_range'] or [None, None])[1])}"
+              f"{_f(j['dsr_best'])}. "
+              + ((f"Walk-forward (best prior-5-year Sharpe on returns through the close before each switch, re-selected every 5 years on the calendar {j['window'][0][:4]} + 5k; "
+                  f"out of sample {j['wf_window'][0]}..{j['wf_window'][1]}, {j['wf_window'][2]} days; picks "
+                  + ", ".join(f"{s['month']} {s['rule']}" for s in j["wf_selections"])
+                  + f"): excess Sharpe minus buy-and-hold {_s(wc.get('diff'))} ({_ci(wc.get('ci'))}, paired studentized CBB, "
+                  f"{T318_WF_BLOCK}-day blocks); pooled over {j['wf_n_phases']} monthly re-selection phases {_s(wp.get('diff'))} "
+                  f"({_ci(wp.get('ci'))}); per-phase range {_s((j['wf_phase_range'] or [None])[0])} to "
+                  f"{_s((j['wf_phase_range'] or [None, None])[1])}") if j["wf_window"] else
+                 "Walk-forward: the window is shorter than one 5-year selection plus an out-of-sample day")
               + (". SURPRISE: SPA rejects and PBO < 0.5" if j["surprise"] else "")
               + ". Replications (reported only): "
               + "; ".join(f"{s} {r['window'][0][:4]}-{r['window'][1][:4]} SPA p_c {r['spa_p_c']:.3f}, PBO {r['pbo']:.2f}, "
@@ -1059,7 +1074,7 @@ def ratio_reversion(gld: tuple, slv: tuple, gcf: Optional[tuple] = None, scf: Op
              hi is not None and resolve(hi, se_hi, 0.0, "lt")[0] is True),
             dsr_row(ds, f"DSR > {DSR_PASS} at {T326_N_TRIALS} trials"),
             ("same sign on the roll-adjusted GC=F/SI=F route (NOT IMPLEMENTED: the CME active-month roll of Yahoo's continuous "
-             "series cannot be reconstructed — Yahoo serves no expired contracts; approximate route reported only)", None, False)]
+             "series cannot be reconstructed, since Yahoo serves no expired contracts; approximate route reported only)", None, False)]
     v, why = _decide(crit, n, min_n, "trading days")
     reg = {}
     for a, b in T326_REGIMES:
@@ -1099,7 +1114,7 @@ def b6c_misc_gold_silver_ratio(archive):
               + ", ".join(f"{k} {_s(v, 4)}" for k, v in j["family_sharpes"].items())
               + " per-session Sharpes). GC=F/SI=F route (APPROXIMATE: scheduled CME roll windows replaced by GLD/SLV returns; "
               f"20 bps per leg, no borrow): mean {_bp(rt.get('adj_mean'), 2)} over {rt.get('adj_n')} sessions "
-              f"({rt.get('adj_trades')} trades), unadjusted {_bp(rt.get('raw_mean'), 2)} — not a criterion value. Regimes: "
+              f"({rt.get('adj_trades')} trades), unadjusted {_bp(rt.get('raw_mean'), 2)}; not a criterion value. Regimes: "
               + ", ".join(f"{k} {v['mean_bp']:+.2f} bp ({v['days_in_trade']} days in trade)" for k, v in j["regimes"].items())
               + ". Variance ratio of the log ratio: "
               + ", ".join(f"VR({q}) {_f(v['vr'])} (z* {_s(v['z'], 2)})" for q, v in j["vr"].items())
@@ -1145,7 +1160,7 @@ def implied_financing(days: Sequence[str], F, etf_close, oz: Callable, months: S
     if dl.size > 10:
         med = np.median(dl)
         sd = 1.4826 * np.median(np.abs(dl - med))
-        for i in np.where(np.abs(dl - med) > jump_k * max(sd, 1e-9))[0]:
+        for i in np.where(np.abs(dl - med) > jump_k * max(sd, 1e-4))[0]:          # robust s.d. floored at 1 bp
             drop[max(0, i + 1 - window):min(n, i + 1 + window + 1)] = True
     keep = np.array([start <= d <= end for d in days]) & ~drop
     dd = [days[i] for i in np.where(keep)[0]]
@@ -1185,9 +1200,12 @@ def band_test(dev, band: float = T370_BAND, lag: int = T370_LAG, level: float = 
     return {**h, "ci": [lo, hi], "ok": bool(ok), "decisive": bool(hi < -band or lo > band)}
 
 
-def _band_summary(F: dict, label: str) -> dict:
+def _band_summary(F: dict, label: str) -> Optional[dict]:
+    if F["dev"].size < 3:
+        return {"label": label, "n": int(F["dev"].size), "window": None, "mean": None, "se": None, "ci": [None, None],
+                "ok": None, "decisive": False, "ci_bonf6": [None, None], "ok_bonf6": None, "decisive_bonf6": False, "decay": None}
     t = band_test(F["dev"])
-    t6 = band_test(F["dev"], level=1 - 0.05 / T370_N_TRIALS)
+    t6 = band_test(F["dev"], level=1 - 0.05 / T370_N_TRIALS)          # the pass's '6 trials counted' (Bonferroni)
     dv = F["dev"]
     reg = {}
     for nm, a, b in (("2005-2019", "2005", "2019-12-31"), ("2020-2026", "2020", "2026-12-31"),
@@ -1197,14 +1215,35 @@ def _band_summary(F: dict, label: str) -> dict:
             reg[nm] = {"mean": float(dv[m].mean()), "n": int(m.sum())}
     return {"label": label, "n": int(dv.size), "window": (F["days"][0], F["days"][-1]) if F["days"] else None,
             "mean": t["mean"], "se": t["se"], "ci": t["ci"], "ok": t["ok"], "decisive": t["decisive"], "ci_bonf6": t6["ci"],
+            "ok_bonf6": t6["ok"], "decisive_bonf6": t6["decisive"],
             "sd": float(dv.std(ddof=1)) if dv.size > 1 else None, "share_i_neg": float(np.mean(F["i"] < 0)) if dv.size else None,
             "mean_simple": float(np.mean(F["dev_simple"])) if dv.size else None, "regimes": reg,
             "n_dropped_roll": F["n_dropped_roll"], "daily_noise_bp": F["daily_noise_bp"], "median_d": float(np.median(F["d"])) if dv.size else None,
             "s_sensitivity_bp": float(0.001 * 365.0 / np.median(F["d"]) * 1e4) if dv.size else None, "decay": F["decay"]}
 
 
+T370_OTHER = (("platinum", "PL=F", "PPLT"), ("palladium", "PA=F", "PALL"), ("copper", "HG=F", "CPER"))
+
+
+def band_row(x: Optional[dict], label: str) -> tuple:
+    """(name, ok, decisive) for the T-370 pass: the HAC (lag 21) interval of mean(i - DTB3) at the 6-trial Bonferroni
+    level (two-sided 1 - 0.05/6, the pass's '6 trials counted') inside [-50, +50] bp; wholly outside fails decisively. The
+    unadjusted 95% interval is printed alongside."""
+    if x is None or x.get("mean") is None:
+        return (f"{label} (no usable days)", None, False)
+    lv = 100.0 * (1.0 - 0.05 / T370_N_TRIALS)
+    return (f"{label}: HAC (lag {T370_LAG}) {lv:.2f}% CI (95% Bonferroni over {T370_N_TRIALS} trials) of mean(i - DTB3) inside "
+            f"+-50 bp (mean {_bp(x['mean'])}, {_ci(x['ci_bonf6'], 1, 1e4, ' bp')}; unadjusted 95% {_ci(x['ci'], 1, 1e4, ' bp')}; "
+            f"{x['n']} days)", x["ok_bonf6"], bool(x["decisive_bonf6"]))
+
+
 def metals_basis(gold: tuple, silver: Optional[tuple], rate: Callable, min_n: int = T370_MIN_N) -> dict:
-    """T-370 core. ``gold`` = (days, GC=F close, GLD close), ``silver`` = (days, SI=F close, SLV close) or None."""
+    """T-370 core. ``gold`` = (days, GC=F close, GLD close), ``silver`` = (days, SI=F close, SLV close) or None.
+
+    The claim and its pass are gold-only: the one criterion is the gold band test on the rule's construction (GLD close /
+    fee-formula ounces, the sponsor's ounces being unavailable) at the 6-trial Bonferroni level. 'Each other metal is a
+    separate trial' (silver computed and reported with the same test; platinum, palladium, copper not archived), and the
+    trial's 'Robustness: GLD NAV instead of the GLD close' is report-only (module convention; not archived)."""
     gd, gf, ge = gold
     G = implied_financing(gd, gf, ge, lambda d: ounces_per_share(d, GLD_OZ0, GLD_FEE, GLD_LAUNCH), GC_MONTHS, rate)
     g = _band_summary(G, "gold")
@@ -1215,26 +1254,15 @@ def metals_basis(gold: tuple, silver: Optional[tuple], rate: Callable, min_n: in
         sd_, sf, se = silver
         Sv = implied_financing(sd_, sf, se, lambda d: ounces_per_share(d, SLV_OZ0, SLV_FEE, SLV_LAUNCH), SI_MONTHS, rate)
         s = _band_summary(Sv, "silver")
-
-    def row(x, nm):
-        if x is None:
-            return (f"{nm}: series not archived", None, False)
-        return (f"{nm} (mean {_bp(x['mean'])}, {_ci(x['ci'], 1, 1e4, ' bp')}, {x['n']} days)", x["ok"], x["decisive"])
-
-    def metal(x, metal_nm, close_nm, nav_nm):
-        """Rule 11: the trial names two constructions of the ETF-implied spot (the ETF close / ounces-per-share formula and
-        the ETF NAV with the sponsor's ounces); the criterion passes or fails only when both do."""
-        rows = [row(x, close_nm),
-                (f"{nav_nm} (NOT IMPLEMENTED: the sponsor NAV / ounces-per-share history is not archived)", None, False)]
-        return all_constructions(rows, f"{metal_nm}: HAC (lag {T370_LAG}) 95% CI of mean(i - DTB3) inside +-50 bp")
-
-    crit = [metal(g, "gold", "GLD close / fee-formula ounces", "GLD NAV (LBMA PM)"),
-            metal(s, "silver", "SLV close / fee-formula ounces", "SLV NAV"),
-            ("platinum (PL=F vs PPLT) same criterion (NOT IMPLEMENTED: PL=F and PPLT not archived)", None, False),
-            ("palladium (PA=F vs PALL) same criterion (NOT IMPLEMENTED: PA=F and PALL not archived)", None, False),
-            ("copper (HG=F vs CPER) same criterion (NOT IMPLEMENTED: HG=F and CPER not archived)", None, False)]
+    crit = [band_row(g, "gold (GC=F vs GLD close / fee-formula ounces)")]
     v, why = _decide(crit, g["n"], min_n, "trading days")
-    return {"n": g["n"], "gold": g, "silver": s, "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
+    sep = {"silver": None if s is None else {"ok": s.get("ok_bonf6"), "decisive": bool(s.get("decisive_bonf6")),
+                                             "row": band_row(s, "silver (SI=F vs SLV close / fee-formula ounces)")[0]}}
+    for nm, fut, etf in T370_OTHER:
+        sep[nm] = f"{fut} vs {etf}: not archived"
+    return {"n": g["n"], "gold": g, "silver": s, "separate_trials": sep,
+            "robustness_nav": "GLD NAV (LBMA PM) with sponsor ounces per share: not archived (report-only check, not run)",
+            "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
 
 
 def b6c_misc_metals_basis(archive):
@@ -1257,6 +1285,8 @@ def b6c_misc_metals_basis(archive):
     def txt(x):
         if x is None:
             return "not archived"
+        if not x["n"]:
+            return "no usable days"
         return (f"{x['window'][0]}..{x['window'][1]}, {x['n']} days after dropping {x['n_dropped_roll']} roll-window/jump "
                 f"days (median d {x['median_d']:.0f} calendar days; daily ln(F/S) noise {x['daily_noise_bp']:.0f} bp): mean(i - "
                 f"DTB3) {_bp(x['mean'])} ({_ci(x['ci'], 1, 1e4, ' bp')}, HAC lag {T370_LAG}; 6-trial Bonferroni "
@@ -1273,14 +1303,19 @@ def b6c_misc_metals_basis(archive):
               f"active month (rolled at first notice), +-2 sessions around each scheduled roll and any > {T370_JUMP_K:g}-robust-"
               f"s.d. jump in ln(F/S) dropped. Gold (GC=F vs GLD): " + txt(g)
               + f"; with Oct skipped (Yahoo's observed 2025 practice) the gold mean would be {_bp(g.get('alt_no_oct_mean'))} "
-              f"(sensitivity only). Silver (SI=F vs SLV, Mar/May/Jul/Sep/Dec): " + txt(s)
-              + ". Measurement limits (rule 9): Yahoo's continuous contract identity and roll days are undocumented (expired "
-              "contracts return 404), the GLD close trades at 16:00 ET against a 13:30 ET COMEX settle, and the fee formula "
-              "stands in for the sponsor's ounces per share, whose level error is amplified by 365/d; the trial's NAV construction "
-              "(rule 11: both named constructions must agree) cannot be run, so the close-based band test alone decides neither "
-              "way — " + j["why"])
+              f"(sensitivity only). The claim is gold-only and is judged on the gold interval at the pass's 6-trial "
+              f"Bonferroni level. Separate trials (reported, not this claim's criteria): silver (SI=F vs SLV, Mar/May/Jul/Sep/"
+              f"Dec): " + txt(s)
+              + "; platinum (PL=F vs PPLT), palladium (PA=F vs PALL) and copper (HG=F vs CPER) not archived. Measurement limits "
+              "(rule 9): Yahoo's continuous contract identity and roll days are undocumented (expired contracts return 404), the "
+              "GLD close trades at 16:00 ET against a 13:30 ET COMEX settle, and the fee formula stands in for the sponsor's "
+              "ounces per share (the rule's own fallback), whose level error is amplified by 365/d; the trial's robustness check "
+              "(GLD NAV, LBMA PM, instead of the GLD close; the controls' noise check) is report-only and cannot be run: the "
+              "sponsor NAV / ounces-per-share history is not archived — " + j["why"])
     stat = {"n_days": j["n"], "gold": g, "silver": s, "band_bp": T370_BAND * 1e4, "hac_lag": T370_LAG,
-            "n_trials": T370_N_TRIALS, "criteria": j["criteria"], "rule10": "daily measurement (no grid phase)"}
+            "n_trials": T370_N_TRIALS, "decision_level_two_sided": 1 - 0.05 / T370_N_TRIALS,
+            "separate_trials": j["separate_trials"], "robustness_nav": j["robustness_nav"], "criteria": j["criteria"],
+            "rule10": "daily measurement (no grid phase)"}
     return _out(stat, j["n"], j["verdict"], reason)
 
 
@@ -1424,8 +1459,10 @@ def cluster_lower(x, clusters: Sequence, n_boot: Optional[int] = None, seed: int
 
 def es_financing(es: tuple, gspc: tuple, spy: tuple, rate: Callable, min_n: int = T372_MIN_N, n_boot: Optional[int] = None,
                  seed: int = SEED) -> dict:
-    """T-372 core: lower one-sided 95% bound of mean(r_imp - DTB3) > 20 bp under the HAC and the quarter-clustered
-    bootstrap (both must pass)."""
+    """T-372 core: lower one-sided bound of mean(r_imp - DTB3) > 20 bp under the HAC and the quarter-clustered bootstrap
+    (both must pass), at the pass's 95% with its '5 trials counted' applied as Bonferroni (one-sided 1 - 0.05/5); the
+    unadjusted one-sided 95% bounds are reported. Realized (ex-post) dividends are the trial's robustness item: reported
+    only (module convention)."""
     nb = N_BOOT if n_boot is None else int(n_boot)
     B = es_basis(es, gspc, spy, rate)
     n = B["n"]
@@ -1435,16 +1472,21 @@ def es_financing(es: tuple, gspc: tuple, spy: tuple, rate: Callable, min_n: int 
         return {"n": n, "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why, "basis": B}
     sp = B["spread"]
     h = hac_mean(sp, T372_LAG)
-    h_lo, h_hi = h["mean"] - Z95_1 * h["se"], h["mean"] + Z95_1 * h["se"]
-    cl = _mc(lambda seed: cluster_lower(sp, B["quarter"], nb, seed),
+    qb = 0.05 / T372_N_TRIALS                                          # the pass's '5 trials counted' (Bonferroni)
+    zb = NormalDist().inv_cdf(1 - qb)
+    h_lo, h_hi = h["mean"] - zb * h["se"], h["mean"] + zb * h["se"]
+    h_lo95, h_hi95 = h["mean"] - Z95_1 * h["se"], h["mean"] + Z95_1 * h["se"]
+    cl = _mc(lambda seed: cluster_lower(sp, B["quarter"], nb, seed, q=qb),
              lambda t: resolve(t["ci"][0], (t.get("ci_mc_se") or [0, 0])[0], T372_THR, "gt")[0], seed)
+    cl95 = mc_reps(lambda seed: cluster_lower(sp, B["quarter"], nb, seed), REPS, seed, ("ci",))
     c_lo, c_hi = cl["ci"]
     c_se = (cl.get("ci_mc_se") or [0.0, 0.0])
     okc, notec = resolve(c_lo, c_se[0], T372_THR, "gt")
-    crit = [(f"HAC (Newey-West lag {T372_LAG}) one-sided 95% lower bound of mean(r_imp - DTB3) > 20 bp (lower {_bp(h_lo)})",
-             bool(h_lo > T372_THR), bool(h_hi < T372_THR)),
-            (f"quarter-clustered bootstrap ({cl['n_clusters']} quarters) one-sided 95% lower bound > 20 bp (lower {_bp(c_lo)}){notec}",
-             okc, resolve(c_hi, c_se[1], T372_THR, "lt")[0] is True)]
+    lv = f"one-sided {100 * (1 - qb):g}% (95% Bonferroni over {T372_N_TRIALS} trials)"
+    crit = [(f"HAC (Newey-West lag {T372_LAG}) {lv} lower bound of mean(r_imp - DTB3) > 20 bp (lower {_bp(h_lo)}; "
+             f"unadjusted 95% {_bp(h_lo95)})", bool(h_lo > T372_THR), bool(h_hi < T372_THR)),
+            (f"quarter-clustered bootstrap ({cl['n_clusters']} quarters) {lv} lower bound > 20 bp (lower {_bp(c_lo)}{notec}; "
+             f"unadjusted 95% {_bp(cl95['ci'][0])})", okc, resolve(c_hi, c_se[1], T372_THR, "lt")[0] is True)]
     v, why = _decide(crit, n, min_n, "window days")
     T = es_basis(es, gspc, spy, rate, reading="trading")
     tr = None
@@ -1460,11 +1502,13 @@ def es_financing(es: tuple, gspc: tuple, spy: tuple, rate: Callable, min_n: int 
             reg[nm] = {"mean": float(sp[m].mean()), "n": int(m.sum())}
     hr = hac_mean(B["spread_realized"], T372_LAG)
     return {"n": int(n), "window": (B["days"][0], B["days"][-1]), "n_quarters": cl["n_clusters"], "mean": h["mean"],
-            "hac_se": h["se"], "hac_lower": h_lo, "cluster": cl, "simple_mean": float(B["spread_simple"].mean()),
+            "hac_se": h["se"], "hac_lower": h_lo, "hac_upper": h_hi, "hac_lower95": h_lo95, "hac_upper95": h_hi95,
+            "cluster": cl, "cluster95": {"ci": cl95["ci"], "ci_mc_se": cl95.get("ci_mc_se")}, "level_one_sided": 1 - qb,
+            "simple_mean": float(B["spread_simple"].mean()),
             "realized": {"mean": hr["mean"], "hac_lower": hr["mean"] - Z95_1 * hr["se"]}, "trading_reading": tr,
             "literal": {"mean": float(B["spread_literal"].mean()), "share_D_zero": B["share_literal_zero"]},
             "regimes": reg, "median_d": float(np.median(B["d"])), "mean_D_fc_pts": float(B["D_fc"].mean()),
-            "mean_D_real_pts": float(B["D_real"].mean()), "bonf5_hac_lower": h["mean"] - NormalDist().inv_cdf(1 - 0.05 / T372_N_TRIALS) * h["se"],
+            "mean_D_real_pts": float(B["D_real"].mean()),
             "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
 
 
@@ -1488,18 +1532,23 @@ def b6c_misc_es_basis(archive):
               f"goes ex on the expiry Friday itself, one day outside the shifted window in most years: D = 0 on "
               f"{j['literal']['share_D_zero'] * 100:.0f}% of days, mean spread {_bp(j['literal']['mean'])}, reported only); calendar days 5-60 after "
               f"each detected roll, {j['window'][0]}..{j['window'][1]}: {j['n']} days in {j['n_quarters']} quarters. Mean spread "
-              f"{_bp(j['mean'])}; one-sided 95% lower bounds: HAC (lag {T372_LAG}) {_bp(j['hac_lower'])}, quarter-clustered "
-              f"bootstrap {_bp(cl['ci'][0])} (threshold +20 bp; 5-trial Bonferroni HAC lower {_bp(j['bonf5_hac_lower'])}). "
-              f"Reported: simple-rate form {_bp(j['simple_mean'])}; realized (ex-post) dividends mean {_bp(j['realized']['mean'])} "
+              f"{_bp(j['mean'])}; one-sided {j['level_one_sided'] * 100:g}% bounds (the pass's 95% with its {T372_N_TRIALS} "
+              f"trials counted, Bonferroni): HAC (lag {T372_LAG}) lower {_bp(j['hac_lower'])} / upper {_bp(j['hac_upper'])}, "
+              f"quarter-clustered bootstrap lower {_bp(cl['ci'][0])} / upper {_bp(cl['ci'][1])} (threshold +20 bp; unadjusted "
+              f"one-sided 95% lower bounds: HAC {_bp(j['hac_lower95'])}, clustered {_bp(j['cluster95']['ci'][0])}). "
+              f"Reported: simple-rate form {_bp(j['simple_mean'])}; realized (ex-post) dividends (the trial's robustness item, "
+              f"report-only) mean {_bp(j['realized']['mean'])} "
               f"(HAC lower {_bp(j['realized']['hac_lower'])}); sessions 5-60 reading "
               + (f"{tr['n']} days, mean {_bp(tr['mean'])}, HAC lower {_bp(tr['hac_lower'])}" if tr else "n/a")
               + "; " + ", ".join(f"{k} {_bp(v['mean'])} ({v['n']} d)" for k, v in j["regimes"].items())
               + ". The 16:00 ET settle check needs hourly ES=F (not archived); NQ/NDX variants not archived — " + j["why"])
     stat = {"n_days": j["n"], "window": j["window"], "n_quarters": j["n_quarters"], "mean_spread": j["mean"],
-            "hac_se": j["hac_se"], "hac_lower_1s95": j["hac_lower"], "cluster_lower_1s95": cl["ci"][0],
-            "cluster_ci_mc_se": cl.get("ci_mc_se"), "simple_mean": j["simple_mean"], "realized": j["realized"],
+            "hac_se": j["hac_se"], "level_one_sided": j["level_one_sided"], "hac_lower_bonf5": j["hac_lower"],
+            "hac_upper_bonf5": j["hac_upper"], "cluster_bonf5": cl["ci"], "cluster_ci_mc_se": cl.get("ci_mc_se"),
+            "hac_lower_1s95": j["hac_lower95"], "cluster_lower_1s95": j["cluster95"]["ci"][0],
+            "simple_mean": j["simple_mean"], "realized": j["realized"],
             "trading_day_reading": tr, "regimes": j["regimes"], "mean_D_forecast_pts": j["mean_D_fc_pts"],
-            "mean_D_realized_pts": j["mean_D_real_pts"], "bonf5_hac_lower": j["bonf5_hac_lower"], "literal_reading": j["literal"],
+            "mean_D_realized_pts": j["mean_D_real_pts"], "literal_reading": j["literal"],
             "criteria": j["criteria"],
             "rule10": "daily measurement on the claim's roll calendar (days 5-60 after each quarterly roll)"}
     return _out(stat, j["n"], j["verdict"], reason)
@@ -1614,15 +1663,15 @@ def _boot_coef(y, I, x, mean_block: float, n_boot: int, seed: int) -> np.ndarray
 
 
 def coef_test(y, I, x, mean_block: float, n_boot: Optional[int] = None, seed: int = SEED) -> dict:
-    """OLS coefficient of the event indicator (y on 1, I, x) with the one-sided stationary-bootstrap p (H0: coef <= 0,
-    centred draws) and the one-sided 95% upper bound."""
+    """OLS coefficient of the event indicator (y on 1, I, x) with stationary-bootstrap PERCENTILE inference (rule 6): the
+    one-sided 95% lower / upper bounds are the 5% / 95% quantiles of the resampled coefficients b*, and the one-sided p
+    for H0: coef <= 0 is P(b* <= 0) (the level at which the percentile lower bound reaches 0)."""
     nb = T416_BOOT if n_boot is None else int(n_boot)
     y, I, x = (np.asarray(v, float) for v in (y, I, x))
     b = float(_ols3(y, I, x)[1])
     bs = _boot_coef(y, I, x, mean_block, nb, seed)
-    c = bs - b
-    return {"coef": b, "p": float((np.sum(c >= b) + 1) / (c.size + 1)),
-            "ci": [float(b - np.quantile(c, 0.95)), float(b - np.quantile(c, 0.05))],   # one-sided 95% lower / upper bounds
+    return {"coef": b, "p": float((np.sum(bs <= 0.0) + 1) / (bs.size + 1)),
+            "ci": [float(np.quantile(bs, 0.05)), float(np.quantile(bs, 0.95))],   # one-sided 95% lower / upper bounds
             "n_boot": int(bs.size), "mean_block": mean_block}
 
 
@@ -1700,7 +1749,8 @@ def fear_greed_study(btc: dict, eth: Optional[dict], fng: dict, min_n: int = T41
             ("same (positive) sign in 2018-21 and 2022-26 (" + ", ".join(f"{k} {_pc(v['coef'], 1)} on {v['events']} events" for k, v in subs.items()) + ")",
              sub_ok, False)]
     v, why = _decide(crit, n_ev, min_n, "non-overlapping first-crossing events at H = 30")
-    return {"n_events": n_ev, "n_crossings": len(E["all"]), "events": E["kept"], "n_days": int(y.size), "coef": coef,
+    label = "underpowered" if any(c[1] is None and "underpowered" in c[0] for c in crit) else None
+    return {"label": label, "n_events": n_ev, "n_crossings": len(E["all"]), "events": E["kept"], "n_days": int(y.size), "coef": coef,
             "tests": {str(k): {kk: t.get(kk) for kk in ("coef", "p", "p_mc_se", "ci", "ci_mc_se", "n_boot", "reps")} for k, t in tests.items()},
             "dsr": ds, "cells": cells, "subsamples": subs, "uncond_mean": float(y.mean()) if y.size else None,
             "event_mean_raw": float(y[I == 1].mean()) if n_ev else None, "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
@@ -1757,8 +1807,8 @@ def b6c_misc_fear_greed_extremes(archive):
               f"prior 10 days), {j['n_events']} non-overlapping at 30 days. Regression of the 30-day forward log return on the "
               f"event indicator and the trailing 30-day log return over {j['n_days']} daily entry rows: coefficient "
               f"{_pc(j['coef'], 2)} (event raw mean {_pc(j['event_mean_raw'], 2)} vs unconditional {_pc(j['uncond_mean'], 2)}); "
-              f"one-sided stationary-bootstrap p {_f(t30.get('p'), 4)} (30-day blocks) / {_f(t60.get('p'), 4)} (60-day blocks, "
-              f"rule 10), one-sided 95% upper bounds {_pc((t30.get('ci') or [None, None])[1], 1)} / "
+              f"one-sided stationary-bootstrap percentile p = P(b* <= 0) {_f(t30.get('p'), 4)} (30-day blocks) / {_f(t60.get('p'), 4)} "
+              f"(60-day blocks, rule 10), one-sided 95% percentile upper bounds {_pc((t30.get('ci') or [None, None])[1], 1)} / "
               f"{_pc((t60.get('ci') or [None, None])[1], 1)} ({T416_BOOT} draws "
               f"x {REPS} seeds). DSR of the primary cell's per-event residual returns {_f(ds.get('dsr'))} at {T416_N_CELLS} cells "
               f"(PSR vs 0 {_f(ds.get('psr0'))}; {sum(1 for c in j['cells'].values() if c['sharpe'] is not None)} cells computed). "
@@ -1766,7 +1816,7 @@ def b6c_misc_fear_greed_extremes(archive):
               + f". Rule (30 days or F >= 50) excess Sharpe {_s(rs[0.005].get('rule'), 2)} at 0.5% / {_s(rs[0.012].get('rule'), 2)} "
               f"at 1.2% round trip vs buy-and-hold {_s(rs[0.005].get('bh'), 2)} (reported). Caveat: the F&G file is one current "
               f"download (no vintages) — " + j["why"])
-    stat = {"n_events": j["n_events"], "n_crossings": j["n_crossings"], "events": j["events"], "n_days": j["n_days"],
+    stat = {"label": j["label"], "n_events": j["n_events"], "n_crossings": j["n_crossings"], "events": j["events"], "n_days": j["n_days"],
             "coef": j["coef"], "tests": j["tests"], "dsr": ds, "subsamples": j["subsamples"], "cells": j["cells"],
             "uncond_mean": j["uncond_mean"], "event_mean_raw": j["event_mean_raw"],
             "rule_sharpe": {str(k): v for k, v in rs.items()}, "criteria": j["criteria"],
