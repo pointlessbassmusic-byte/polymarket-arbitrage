@@ -626,8 +626,10 @@ def iv_at(legs: Sequence[dict], spot: float, ratio: float, tol: float = MONEY_TO
 
 # ============================================================================================== structures ==
 
-def _leg(l: dict, kind: str, qty: int) -> dict:
-    return {"kind": kind, "strike": l["strike"], "qty": int(qty), "bid": l["bid"], "ask": l["ask"], "mid": mid(l),
+def _leg(l: dict, kind: str, qty: float) -> dict:
+    """A position leg; ``qty`` is a whole number of contracts, or a mixture weight (exact-moneyness legs)."""
+    q = int(qty) if float(qty).is_integer() else float(qty)
+    return {"kind": kind, "strike": l["strike"], "qty": q, "bid": l["bid"], "ask": l["ask"], "mid": mid(l),
             "iv": l.get("iv"), "delta": l.get("delta")}
 
 
