@@ -1862,7 +1862,9 @@
     "pass": "OOS top-minus-bottom difference CI excludes 0 at s = 0.90, with the same sign at s = 0.81 and s = 1.00",
     "controls": "Tercile thresholds fixed in-sample. Report skewness, kurtosis, PSR, max drawdown and the unconditional mean (T-57 found +0.24%/month, p 0.07, at s = 0.81). Repeat with a 5%-of-premium round-trip haircut. 2008 and 2020 stay in the sample."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_var_short_straddle_tercile"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -2204,7 +2206,9 @@
     "pass": "lower CI > 0 and positive in both walk-forward halves",
     "controls": "Overlaps the neutral/income family; DSR counts it once across families. Flat pricing understates the put credit and overstates the call credit relative to real skew; recheck with chain mids at 60 days."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_dir_jade_lizard"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -2476,7 +2480,9 @@
     "pass": "upper CI < 0 at s = 0.90; report the s at which the sign flips",
     "controls": "Daily (not intraday) hedging; cost declared; VIX is SPX; q = 0 with unadjusted closes; report the variance-term share of P&L vs hedging error; BTZ 1990-2007 as an external anchor (monthly %^2 units)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_var_gamma_scalp_long_straddle"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -2774,7 +2780,9 @@
     "pass": "lower CI of the mean > 0 AND tail-frequency lower CI > 3% (both pre-registered)",
     "controls": "Flat IV overprices the OTM shorts relative to the real smile, so the real zero-cost K2 sits closer to ATM (more negative gamma); report by VIX tercile; recheck with chain mids at 60 days."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_dir_ratio_1x2"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -2829,7 +2837,9 @@
     "pass": "lower CI of (hit - RN) > 0",
     "controls": "Correction: the original direction (hit rate below RN because drift carries SPY past the zone) does not hold up. Monthly drift is about 1% and the zone spans about +1% to +7%, so drift and VRP both push mass into the zone; the claim was reversed. The zone is defined from model prices only; report ATM and ITM anchors."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_dir_christmas_tree"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -2855,7 +2865,9 @@
     "pass": "lower CI of the mean difference > 0",
     "controls": "Correction: the original 'recovers breakeven more often' claim was tautological, because the repaired breakeven K2 < B makes it true by construction; replaced with the mean-P&L comparison. Expect only about 25-40 SPY episodes, so report power; QQQ episodes overlap in time and are not independent. Flat IV misprices skew (stated)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_dir_stock_repair"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -2881,12 +2893,14 @@
     "pass": "share < 1% with a day-clustered 95% CI entirely below 1%",
     "controls": "Delayed (15-min) quotes can be stale: exclude crossed or zero bids. SPX is the clean European control. The repo's T-181 parity_check (mandel/experiments/options_market.py) already regresses C - P on K: run both."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_xc_parity_deviation_scan"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "daily chain capture, about 5 trading days. One capture already gives about 250 near-ATM pairs (SPY/GLD/IBIT/SPX have dozens of expiries each), so 500 pairs come quickly, but at least 5 separate days are needed for a day-clustered CI. Not 20 days.",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Synthetic Long / Short Stock (Combo); harness suggestion: parity_deviation_scan(symbols=['SPY','GLD','IBIT']) over the chain archive | verifier: corrected claim/trial"
+   "notes": "from the options-library library: Synthetic Long / Short Stock (Combo); harness suggestion: parity_deviation_scan(symbols=['SPY','GLD','IBIT']) over the chain archive | verifier: corrected claim/trial",
+   "unblocked_from": "daily chain capture, about 5 trading days. One capture already gives about 250 near-ATM pairs (SPY/GLD/IBIT/SPX have dozens of expiries each), so 500 pairs come quickly, but at least 5 separate days are needed for a day-clustered CI. Not 20 days."
   },
   {
    "id": "T-138",
@@ -2907,7 +2921,9 @@
     "pass": "lower CI of the difference > 0 in both the full-sample and expanding-window quintile definitions",
     "controls": "Flat pricing means the entry premium does not vary with skew, so this isolates the conditional return of the underlying wings (a SKEW timing test). A real skew-premium test needs chain capture (60+ days, follow-up). Under flat pricing the structure is a small debit, not a credit; state this. SPY starts in 1993, so the sample is 1993-2026, not 1990."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_dir_risk_reversal_skew"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -2933,7 +2949,9 @@
     "pass": "return difference upper CI < 0 AND drawdown ratio < 1 (both pre-registered); report that n of independent annual cycles is about 33",
     "controls": "Correction: by put-call parity, call + (S - C) in bills = SPY + a 1-year 20%-OTM put financed at the bill rate (with dividends via q), so the original claim (higher return, drawdown >= 1.5x SPY) contradicted the structure, since loss per cycle is capped at C. The return difference equals the embedded put's P&L. IV proxy mismatch: 1-year IV is usually above VIX3M, so the put cost is understated (stated)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_dir_leaps_replacement"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -2959,7 +2977,9 @@
     "pass": "correlation lower CI > 0.98 AND shortfall upper CI < 1 pp",
     "controls": "Correction: the original drag bound (DTB3*K/S + 1pp) compared an unfunded option with SPY. With the bills included, parity makes the shortfall equal the P&L of the embedded 10%-OTM 1-month put (premium minus payoff), which is the quantity tested. Bid-ask on deep-ITM strikes is not in the history; add it once chain capture reaches 20 days."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_dir_deep_itm_call"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3037,7 +3057,9 @@
     "pass": "Regime difference > 0 with p < 0.05 after deflating for thresholds (0.9/0.95/1.0), with the same sign in both walk-forward halves. A sensitivity rerun at today's measured SPY 30/60-DTE ATM IV spread from the chain capture.",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV because it includes the skew, so using VIX as ATM IV overstates premium levels. This trial is model-priced, not market-priced, and runs on a flat smile. The verdict stays 'model-only' until at least 120 daily chain captures confirm the real front-vs-back ATM IV spread. Costs and pin risk at T1 are modelled by closing both legs at mid minus half the spread. Backwardation entries cluster in 2008, 2011, 2020 and 2022, so report the result with each of those episodes left out."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_long_calendar"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3063,7 +3085,9 @@
     "pass": "Conditional mean > 0 with the 95% CI excluding 0 in both halves after deflation, surviving removal of the five largest VIX-spike months",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced, and runs on a flat smile. A VIX-level tercile control checks that the result is not just a low-VIX effect. Unconditional entry is reported alongside. Cost is half the bid-ask on four fills, from today's SPY chain spreads."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_short_calendar"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3089,7 +3113,9 @@
     "pass": "Sharpe difference > 0 with the bootstrap 95% CI excluding 0 in both halves, and PBO < 0.5",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. A flat smile overstates SPY OTM call premia, so rerun with a SKEW-index tilt. Report how often each entry met tastylive's setup rules. Costs come from today's SPY chain spreads."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_long_diagonal"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3115,7 +3141,9 @@
     "pass": "Std ratio < 0.9 with the 95% CI excluding 1 in both halves",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. A flat smile understates the put wing. Commissions for 8 fills vs 4. Pin risk modelled by closing at mid minus half the spread at T1. The OTM debit is smaller, so also report std of P&L per unit of max loss."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_double_calendar"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3141,7 +3169,9 @@
     "pass": "Difference > 0 with the 95% CI excluding 0 in both halves, holding with and without the SKEW tilt",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. Costs on eight fills vs four. Max-loss normalisation uses the realised far-wing value at T1."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_double_diagonal"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3198,7 +3228,9 @@
     "pass": "Upper bound of the 95% CI of |rho| < 0.3 in both halves",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. Gamma losses co-move with VIX spikes, so also report the correlation of the delta-hedged P&L. Separate top-decile VIX-spike weeks. Costs on 2.7 fills."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_ratio_calendar"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3224,7 +3256,9 @@
     "pass": "The claim survives if the CI of the Sharpe difference includes 0 or lies below it in both halves; return on capital and drawdown are also reported",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV, and VIX3M (93-day) is a coarse proxy for 365-day IV (sensitivity +/-3 vol points), so this trial is model-priced, not market-priced. The covered call receives dividends and the PMCC does not. Costs on monthly rolls."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_pmcc"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3250,7 +3284,9 @@
     "pass": "Sharpe difference > 0 with the 95% CI excluding 0 in both halves",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV, and VIX3M is a coarse proxy for 365-day IV (sensitivity +/-3 vol points), so this trial is model-priced, not market-priced. A flat smile underprices the OTM put: rerun with a SKEW-index tilt. Dividends are credited to the stock leg in both strategies."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_leaps_collar"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3276,7 +3312,9 @@
     "pass": "Spike-decile difference > 0 with the 95% CI excluding 0",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced (flat smile). Costs on 6 vs 4 contracts. Pin risk modelled at mid minus half the spread. The overall mean P&L is reported but is not the claim."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_calendarised_fly"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3327,7 +3365,9 @@
     "pass": "upper CI < 0",
     "controls": "The net extrinsic paid (about 0.25% of S per month under flat pricing) is the cost tested against the convexity gained. Flat IV misprices the ITM call wing; rerun on chain mids at 60 days."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_dir_zebra"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3353,7 +3393,9 @@
     "pass": "The claim survives if the CI of (roll - reset) includes 0 or lies below it in both halves; the variance ratio is reported",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV and has no skew, so this trial is model-priced, not market-priced; rerun with a SKEW tilt. Both paths pay the same number of fills. Margin-time cost charged at the bill rate."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_term_roll_tested_put"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3379,7 +3421,9 @@
     "pass": "(21-DTE - hold) P&L/day > 0 with the CI excluding 0 in both halves after deflation",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV (it overstates 0.16-delta call premium and understates put skew), so this trial is model-priced, not market-priced; SKEW-tilt sensitivity. Commissions $0.65/contract; margin-time cost. Compare with the existing harness_short_straddle outputs."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_var_theta_harvest_45dte"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3405,7 +3449,9 @@
     "pass": "Drawdown ratio < 0.85 with the bootstrap CI upper bound < 1 in both halves",
     "controls": "VIX is a 30-day variance-swap index that sits above 30-day ATM IV, so this trial is model-priced, not market-priced. Four times the fills are charged. Strikes are set on different days, so the average moneyness differs; report delta-matched results. Same total margin."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_var_theta_ladder"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -3457,7 +3503,9 @@
     "pass": "Difference > 0 with p < 0.05 after deflation, in both halves and in at least 2 of 3 VIX terciles (the high tercile holds most backwardation days)",
     "controls": "VIX level (terciles). Regime autocorrelation (block null). Report with and without 2008 and 2020. The strangle secondary is model-priced (VIX overstates ATM IV; flat smile)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_vrp_term_regime"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4410,7 +4458,9 @@
     "pass": ">= 90% of matched expiries within 25 bp on day one and on >= 80% of 20 captured days.",
     "controls": "XSP box as a second reference; strike-invariance of each forward; exclude AM-settled SPX monthlies."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_xc_spy_spx_financing"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -4544,7 +4594,9 @@
     "pass": "Share >= 90% on day one and on >= 80% of captured days.",
     "controls": "Executable vs mid; strike-invariance; compare the residual against the SPX box-bill spread (option-market financing basis) to avoid attributing it to lease rates."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_xc_gld_implied_carry"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5295,7 +5347,9 @@
     "pass": "95% upper bound of (freq_high - freq_low) < 0.01, and the realised-skewness difference is not significantly negative (p > 0.1) in both halves 1991-2008 and 2009-2026.",
     "controls": "Shuffled-SKEW placebo; VIX-tercile stratification (SKEW must not proxy for the VIX level); sensitivity run excluding Oct-2008 and Mar-2020; repeat with the 21-day SKEW change instead of its level."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_skew_tail_frequency"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5321,7 +5375,9 @@
     "pass": "Lower 95% bound of the mean gap > 0.02, and the gap is positive in at least 2 of 3 sub-periods.",
     "controls": "Constant-normal benchmark (P = 2.28%) to show SKEW adds information; shuffled-SKEW placebo. SKEW readings above 145 (154.7 on 2026-10-13) are outside the white-paper table and use the formula's extrapolation; report them separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_skew_implied_tail_gap"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5346,7 +5402,9 @@
     "pass": "Difference > 0 with the 95% CI excluding zero, at least 60 low-SKEW entries, and the sign unchanged at kappa x0.5 and x2.",
     "controls": "Random-timing placebo with the same entry count; VIX-tercile stratification; a VIX < 15 gate as an alternative rule counted in the deflation."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_skew_cheap_put_spread"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5460,7 +5518,9 @@
     "pass": "Mean > 0 with the 95% CI excluding zero at IV scale 0.81 and at the scale measured on the capture; deflated Sharpe p < 0.05; positive in all three thirds.",
     "controls": "Unhedged short straddle; buy-and-hold SPY (harness_controls); shuffled-VIX placebo."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_var_vrp_short_straddle_hedged"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5486,7 +5546,9 @@
     "pass": "Lower 95% bound of the win rate > 0.75 and positive in all three thirds; truncation error < 5% of the strike on the captured chain (reported, not part of the pass).",
     "controls": "ATM-straddle-only VRP (should be smaller: the smile adds premium); shuffled-returns placebo; dividend-adjusted SPY as a check on the ^GSPC price-return RV."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_var_variance_strip_win_rate"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5512,7 +5574,9 @@
     "pass": "Sharpe difference > 0 at p < 0.05 and PBO < 0.3.",
     "controls": "VIX-level-only scaling (shows the realised forecast adds information beyond the VIX level); random-z placebo; top-tercile share of P&L reported descriptively."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_var_iv_rv_spread_scaled"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5564,7 +5628,9 @@
     "pass": "Mean > 0 with the 95% CI excluding zero, win rate > 0.6, same sign in both halves.",
     "controls": "Unconditional spread (no signal); random-entry placebo with a matched count; RVX-VIX replication with IWM."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_cross_index_vol_spread"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5621,7 +5687,9 @@
     "pass": "Lower 95% bound of the drawdown reduction > 25%, with the Sharpe difference reported (not required to be positive).",
     "controls": "SPX 10-delta put hedge with the same budget (model-priced at VIX x skew scale); cash-drag control at the same budget."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_vix_call_hedge"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5647,7 +5715,9 @@
     "pass": "Lower 95% bound of the win rate > 0.70; positive premium in both halves.",
     "controls": "SPX VRP win rate (VIX^2 vs RV^2) for scale; shuffled-VVIX placebo."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_vvix_vs_realised"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -5917,7 +5987,9 @@
     "pass": "Paired difference > 0 with the 95% CI excluding zero; forward win rate > 0.7 (reported).",
     "controls": "Shuffled-VIX3M placebo; sensitivity run excluding 2020; level (not ratio) version as in harness_term_vs_spot."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_forward_variance_premium"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -6084,7 +6156,9 @@
     "pass": "CI excludes 0 pooled and the sign holds in both halves; Sharpe of hedged P&L > 0.5 after fees",
     "controls": "SPY/VIX hedged straddle as positive control (model-priced); shuffled-DVOL negative control; 1 bp/day funding; haircut the premium by the DVOL-ATM IV gap (estimated from history.deribit.com trade IVs)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6_xc_btc_hedged_straddle"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -6244,7 +6318,9 @@
     "pass": "Upper end of the 95% CI of the variance ratio < 0.8",
     "controls": "The same test on a USDC-linear strangle must give ratio ~1; vary collateral treatment (premium only vs premium + collateral)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6_xc_inverse_strangle_hedge"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12295,7 +12371,9 @@
     "pass": "Upper bound of the 95% CI of R < 1.5 in both halves",
     "controls": "Holiday weekends separately. Winsorised vs raw. The realised-variance leg is testable now; whether listed option prices actually charge calendar-day variance is a separate check on the daily captures (Friday-close vs Monday-open ATM straddle marks), with paid history needed for a backtest. Jones and Shemesh's evidence is on option returns, not on realised variance."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_weekend_variance"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12442,7 +12520,9 @@
     "pass": "upper CI of (realised - RN) < 0",
     "controls": "Flat IV ignores skew, which raises the market's digital-put price further (the slope term -dC/dK includes the skew), so the real overpricing is larger than modelled. Follow-up (blocked): compare SPXW tight-vertical probabilities with Kalshi KXINX mids at synchronised snapshots."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_dir_digital_put"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12785,7 +12865,9 @@
     "pass": "Mean > 0 with the 95% CI excluding zero under the /365 convention, positive in both halves.",
     "controls": "Same test with VIX/sqrt(21)-scaled daily variance (shows whether the 1-day premium differs from the 30-day one); event-day exclusion."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_var_vix1d_premium"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -13049,12 +13131,14 @@
     "pass": "lower CI > 0",
     "controls": "Sector ETFs give an upward-biased realised correlation (diversified within sector), which is conservative; COR1M uses the top-50 constituents."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_surf_implied_correlation"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "constituent or sector-ETF daily closes are not in the free data set yet (the daily-history fetcher already handles ETFs, so adding XLK..XLU bundles unblocks the proxy); a market-priced test also needs single-stock chain captures",
+   "status": "untested",
    "results": [],
-   "notes": "from the options-library library: Dispersion Trade (short index vol, long constituent vol); harness suggestion: Harness 'implied_vs_realised_correlation' in mandel/experiments/volatility.py with bundles ['cboe-COR1M-history','daily-history-XL*']. | added by the verifier pass"
+   "notes": "from the options-library library: Dispersion Trade (short index vol, long constituent vol); harness suggestion: Harness 'implied_vs_realised_correlation' in mandel/experiments/volatility.py with bundles ['cboe-COR1M-history','daily-history-XL*']. | added by the verifier pass",
+   "unblocked_from": "constituent or sector-ETF daily closes are not in the free data set yet (the daily-history fetcher already handles ETFs, so adding XLK..XLU bundles unblocks the proxy); a market-priced test also needs single-stock chain captures"
   },
   {
    "id": "T-539",
@@ -13100,7 +13184,9 @@
     "pass": "lower CI > 0; robust to excluding the single worst cycle is NOT required (the tail is the point), but report it",
     "controls": "SPX vs SPY basis; close-to-close vs 5-minute RV (BTZ use 5-minute RV, which runs lower); no cap; vrp_spx already supports this in vol units (T-48), so this is the variance-unit and tail-statistics restatement."
    },
-   "experiments": [],
+   "experiments": [
+    "b6_var_variance_swap_units"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",

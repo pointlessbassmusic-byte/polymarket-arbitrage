@@ -33,6 +33,7 @@ from mandel.experiments.volatility import implied_move_vs_realised, index_closes
 from mandel.experiments.underlying import ratio_reversion, trend_rules_multi, turn_of_month, weekday_effect, weekend_effect
 from mandel.experiments import options_market as om
 from mandel.experiments import batch4_carry, batch4_fact, batch4_fomc, batch4_ohlc, batch4_vx, batch5_fx, batch5_hourly, batch5_macro
+from mandel.experiments import batch6_dir, batch6_surf, batch6_term, batch6_var, batch6_xc
 from mandel.experiments import underlying2 as u2
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
@@ -966,10 +967,11 @@ XA_NULLS = {
 
 
 # Batch modules, one per data unlock: FOMC calendar, Fama-French/AQR factors, Deribit carry, OHLC, VX futures (batch 4); macro release
-# dates, FX spot and 3-month rates, hourly bars (batch 5). Each exports HARNESSES {name: fn(archive) -> (stat, n, verdict, reason)} and
-# THEORY_MAP {theory id: harness}; each harness checks its own inputs. BATCH_BUNDLES lists the bundles each one loads, traced on the
-# archive (a test asserts declared == loaded).
-BATCH_MODULES = (batch4_fomc, batch4_fact, batch4_carry, batch4_ohlc, batch4_vx, batch5_macro, batch5_fx, batch5_hourly)
+# dates, FX spot and 3-month rates, hourly bars (batch 5); options-library claims on archived data (batch 6a). Each exports HARNESSES
+# {name: fn(archive) -> (stat, n, verdict, reason)} and THEORY_MAP {theory id: harness}; each harness checks its own inputs.
+# BATCH_BUNDLES lists the bundles each one loads, traced on the archive (dated daily captures as name-* patterns).
+BATCH_MODULES = (batch4_fomc, batch4_fact, batch4_carry, batch4_ohlc, batch4_vx, batch5_macro, batch5_fx, batch5_hourly,
+                 batch6_var, batch6_dir, batch6_term, batch6_surf, batch6_xc)
 BATCH_HARNESSES = {h: fn for m in BATCH_MODULES for h, fn in m.HARNESSES.items()}
 BATCH_THEORY = {h: tid for m in BATCH_MODULES for tid, h in m.THEORY_MAP.items()}
 BATCH_BUNDLES = {
@@ -1018,6 +1020,49 @@ BATCH_BUNDLES = {
     "macro_fomc_im_hm_filter": ["cboe-VIX-history", "daily-history-SPY", "fomc-meetings"],
     "macro_gld_event_straddle": ["cboe-GVZ-history", "cboe-VIX-history", "daily-history-GLD", "daily-history-SPY", "fomc-meetings", "macro-release-cpi", "macro-release-employment-situation"],
     "macro_triple_witching_straddle": ["cboe-VIX-history", "daily-history-SPY", "fomc-meetings"],
+    "b6_dir_christmas_tree": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_dir_deep_itm_call": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_dir_digital_put": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_dir_jade_lizard": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_dir_leaps_replacement": ["cboe-VIX-history", "cboe-VIX3M-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_dir_ratio_1x2": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_dir_risk_reversal_skew": ["cboe-SKEW-history", "cboe-VIX-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_dir_stock_repair": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-VXN-history", "daily-history-QQQ", "daily-history-SPY", "fred-DTB3"],
+    "b6_dir_zebra": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_surf_cross_index_vol_spread": ["cboe-RVX-history", "cboe-VIX-history", "cboe-VXN-history", "daily-history-IWM", "daily-history-QQQ", "daily-history-SPY"],
+    "b6_surf_forward_variance_premium": ["cboe-VIX-history", "cboe-VIX3M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPX-*"],
+    "b6_surf_implied_correlation": ["cboe-COR1M-history", "daily-history-XLB", "daily-history-XLE", "daily-history-XLF", "daily-history-XLI", "daily-history-XLK", "daily-history-XLP", "daily-history-XLU", "daily-history-XLV", "daily-history-XLY"],
+    "b6_surf_skew_cheap_put_spread": ["cboe-SKEW-history", "cboe-VIX-history", "daily-history--GSPC", "daily-history-SPY", "fred-DTB3", "options-chain-SPX-*"],
+    "b6_surf_skew_implied_tail_gap": ["cboe-SKEW-history", "cboe-VIX-history", "daily-history--GSPC"],
+    "b6_surf_skew_tail_frequency": ["cboe-SKEW-history", "cboe-VIX-history", "daily-history--GSPC"],
+    "b6_surf_vix_call_hedge": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-VVIX-history", "daily-history-SPY", "fred-DTB3", "spy-smile-*"],
+    "b6_surf_vrp_term_regime": ["cboe-VIX-history", "cboe-VIX3M-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_surf_vvix_vs_realised": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-VVIX-history", "daily-history--GSPC", "fred-DTB3"],
+    "b6_surf_weekend_variance": ["daily-history-SPY"],
+    "b6_term_calendarised_fly": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-VIX6M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*"],
+    "b6_term_double_calendar": ["cboe-SKEW-history", "cboe-VIX-history", "cboe-VIX3M-history", "cboe-VIX6M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*", "spy-smile-*"],
+    "b6_term_double_diagonal": ["cboe-SKEW-history", "cboe-VIX-history", "cboe-VIX3M-history", "cboe-VIX6M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*", "spy-smile-*"],
+    "b6_term_leaps_collar": ["cboe-SKEW-history", "cboe-VIX-history", "cboe-VIX3M-history", "cboe-VIX6M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*", "options-surface-*", "spy-smile-*"],
+    "b6_term_long_calendar": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-VIX6M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*", "options-surface-*"],
+    "b6_term_long_diagonal": ["cboe-SKEW-history", "cboe-VIX-history", "cboe-VIX3M-history", "cboe-VIX6M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*", "spy-smile-*"],
+    "b6_term_pmcc": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-VIX6M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*", "options-surface-*"],
+    "b6_term_ratio_calendar": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-VIX6M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*"],
+    "b6_term_roll_tested_put": ["cboe-SKEW-history", "cboe-VIX-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*", "spy-smile-*"],
+    "b6_term_short_calendar": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-VIX6M-history", "daily-history-SPY", "fred-DTB3", "options-chain-SPY-*"],
+    "b6_var_gamma_scalp_long_straddle": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_var_iv_rv_spread_scaled": ["cboe-VIX-history", "daily-history--GSPC"],
+    "b6_var_short_straddle_tercile": ["cboe-VIX-history", "daily-history--GSPC", "daily-history-SPY", "fred-DTB3"],
+    "b6_var_theta_harvest_45dte": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3", "spy-smile-*"],
+    "b6_var_theta_ladder": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3"],
+    "b6_var_variance_strip_win_rate": ["cboe-VIX-history", "daily-history--GSPC", "daily-history-SPY", "fred-DTB3", "options-chain-SPX-*"],
+    "b6_var_variance_swap_units": ["cboe-VIX-history", "daily-history--GSPC", "daily-history-SPY"],
+    "b6_var_vix1d_premium": ["cboe-VIX-history", "cboe-VIX1D-history", "daily-history--GSPC", "fomc-meetings", "macro-release-cpi", "macro-release-employment-situation"],
+    "b6_var_vrp_short_straddle_hedged": ["cboe-VIX-history", "daily-history-SPY", "fred-DTB3", "spy-smile-*"],
+    "b6_xc_btc_hedged_straddle": ["cboe-VIX-history", "daily-history-BTC-USD", "daily-history-SPY", "deribit-dvol-BTC-history", "deribit-surface-BTC-*", "fred-DTB3"],
+    "b6_xc_gld_implied_carry": ["daily-history--GSPC", "daily-history-GLD", "daily-history-SLV", "fred-DTB3", "options-chain-GLD-*", "options-chain-SLV-*", "options-chain-SPX-*"],
+    "b6_xc_inverse_strangle_hedge": ["daily-history-BTC-USD", "deribit-dvol-BTC-history"],
+    "b6_xc_parity_deviation_scan": ["daily-history--GSPC", "daily-history-GLD", "daily-history-IBIT", "daily-history-SPY", "fred-DGS2", "fred-DTB3", "options-chain-GLD-*", "options-chain-IBIT-*", "options-chain-SPX-*", "options-chain-SPY-*"],
+    "b6_xc_spy_spx_financing": ["daily-history--GSPC", "daily-history-SPY", "options-chain-SPX-*", "options-chain-SPY-*"],
 }
 
 

@@ -13,7 +13,7 @@ def _index_names() -> set[str]:
 
 
 def test_every_batch_harness_is_wired_with_declared_bundles():
-    assert len(run.BATCH_HARNESSES) == 45
+    assert len(run.BATCH_HARNESSES) == 88
     for m in run.BATCH_MODULES:
         for h, fn in m.HARNESSES.items():
             assert run.HARNESSES[h] is fn, h
@@ -25,7 +25,8 @@ def test_every_batch_harness_is_wired_with_declared_bundles():
 def test_batch_bundles_are_archived_names():
     names = _index_names()
     for h, bundles in run.BATCH_BUNDLES.items():
-        assert set(bundles) <= names, (h, set(bundles) - names)
+        for b in bundles:                                         # a dated daily capture is declared as a name-* pattern
+            assert (any(n.startswith(b[:-1]) for n in names) if b.endswith("*") else b in names), (h, b)
 
 
 def test_batch_harness_names_do_not_shadow_earlier_harnesses():
