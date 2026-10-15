@@ -3432,12 +3432,16 @@
     "pass": "Mean > 0 with the CI excluding 0 in both halves after costs",
     "controls": "Margin outlay as capital. Roll-date convention. Report with and without Feb 2018 and Mar 2020. Some rows have Settle = 0 (e.g. the 2013 file) and must be filtered. The VIX3M - VIX slope serves as a free cross-check of the basis."
    },
-   "experiments": [],
+   "experiments": [
+    "vx_calendar_gated"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "VX per-contract settlement history is free but not in Mandel's reachable data list until ingested (cboe_vx_settlements ingest plus a continuous-contract builder). Coverage verified from 2013 only.",
-   "results": [],
-   "notes": "from the options-library library: VIX futures / VIX options calendar (term-structure roll trade); harness suggestion: Add a cboe_vx_settlements ingest (per-contract daily settlement CSVs) and a continuous-contract builder; then vx_calendar_backtest with the regime gate; register as a theory blocked on ingest. | verifier: corrected claim/trial"
+   "status": "not_supported",
+   "results": [
+    "X-c5827bb7"
+   ],
+   "notes": "from the options-library library: VIX futures / VIX options calendar (term-structure roll trade); harness suggestion: Add a cboe_vx_settlements ingest (per-contract daily settlement CSVs) and a continuous-contract builder; then vx_calendar_backtest with the regime gate; register as a theory blocked on ingest. | verifier: corrected claim/trial",
+   "unblocked_from": "VX per-contract settlement history is free but not in Mandel's reachable data list until ingested (cboe_vx_settlements ingest plus a continuous-contract builder). Coverage verified from 2013 only."
   },
   {
    "id": "T-161",
@@ -4453,11 +4457,15 @@
     "pass": "Share >= 50% with the mean difference's 95% CI excluding 0 from below.",
     "controls": "ETH replication; drop top 1% funding prints; account for taker fees on four legs; options-synthetic version tested separately on captured chains."
    },
-   "experiments": [],
+   "experiments": [
+    "carry_perp_funding_vs_quarterly"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e906b9f3"
+   ],
    "notes": "from the options-library library: Perpetual funding vs dated-future/option-synthetic carry; harness suggestion: mandel/ingest deribit funding history -> mandel/experiments/perp_funding_carry.py with block bootstrap. | verifier: corrected claim/trial"
   },
   {
@@ -4711,11 +4719,15 @@
     "pass": "rho < -0.1 with p < 0.05 out-of-sample and Q1-Q5 > 0 with CI excluding 0.",
     "controls": "Placebo on random non-event days; partial out VIX level; close-to-close vs close-to-open realised definitions (open requires OHLC, not in the current data list)."
    },
-   "experiments": [],
+   "experiments": [
+    "macro_fomc_im_hm_filter"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-65240d9f"
+   ],
    "notes": "from the options-library library: Implied-move vs realised-move signal (conditional straddle, sign chosen by IM/HM); harness suggestion: Build an 'event-move table' harness (event_type, date, IM, HM, realised) as the shared dataset for the whole family; VIX-as-IV SPX FOMC version first. | verifier: corrected claim/trial"
   },
   {
@@ -4864,11 +4876,15 @@
     "pass": "Difference < 0 with 95% CI excluding 0 in both halves.",
     "controls": "Placebo dates (FOMC +/- 7 days); exclude 2008-09 and 2020-03; trailing ratio of 1-day to 30-day realised vol as a scale check."
    },
-   "experiments": [],
+   "experiments": [
+    "fomc_spx_event_straddle"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-38efc61c"
+   ],
    "notes": "from the options-library library: SPX macro-event straddle (FOMC / CPI / NFP): event vol vs realised; harness suggestion: VIX-as-IV straddle pricer over an event-date list; run the identical code for CPI and NFP dates once BLS release calendars are loaded (also free). | verifier: corrected claim/trial"
   },
   {
@@ -4889,11 +4905,15 @@
     "pass": "Difference > 0 with 95% CI excluding 0 in 2012-2026 (about 120 meetings).",
     "controls": "Random-date placebo; exclude unscheduled meetings; subtract the unconditional mean."
    },
-   "experiments": [],
+   "experiments": [
+    "fomc_pre_drift_oos"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a98432dc"
+   ],
    "notes": "from the options-library library: Pre-FOMC announcement drift call spread; harness suggestion: Event-window return harness with (T-1 close -> T open) and (T-1 close -> T close) variants; flag that intraday 13:55 is the true target. | verifier: corrected claim/trial"
   },
   {
@@ -4915,12 +4935,16 @@
     "pass": "Difference > 0 with 95% CI excluding 0.",
     "controls": "Exclude opex days with FOMC/CPI; quarterly vs non-quarterly opex; pre/post-2010 split."
    },
-   "experiments": [],
+   "experiments": [
+    "ohlc_opex_pin_straddle"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the options-library library: Monthly opex gamma pin (short ATM straddle / iron butterfly on heavy-OI strikes); harness suggestion: Add a GEX estimator (sum over strikes of OI*gamma*spot^2*0.01 with sign convention calls +, puts -) once chain captures accumulate; join to the opex clustering test. | verifier: corrected claim/trial"
+   "results": [
+    "X-ace3719a"
+   ],
+   "notes": "from the options-library library: Monthly opex gamma pin (short ATM straddle / iron butterfly on heavy-OI strikes); harness suggestion: Add a GEX estimator (sum over strikes of OI*gamma*spot^2*0.01 with sign convention calls +, puts -) once chain captures accumulate; join to the opex clustering test. | verifier: corrected claim/trial | Scope (2026-10-15): supported for the MODEL-PRICED straddle (sigma = Thursday VIX, T = 1/252), priced on the dividend forward on ex-dividend Fridays. The 132 quarterly opex Fridays are SPY ex-dividend days; at r = q = 0 with the dividend ignored the difference is +6.57 bps with a CI of -0.76..+13.77, so the as-priced reading matters. With every ex-dividend Friday dropped the result holds (+10.15 bps, CI +2.05..+18.11). A traded-price test needs 1-day implied vol on opex Thursdays (chain captures). CPI-day exclusion control pending (task: CPI-calendar controls)."
   },
   {
    "id": "T-217",
@@ -4993,11 +5017,15 @@
     "pass": "Difference > 0 with 95% CI excluding 0 and permutation p < 0.05.",
     "controls": "Monthly non-quarterly opex Fridays as a separate control; exclude witching days with FOMC; pre/post-2010 split."
    },
-   "experiments": [],
+   "experiments": [
+    "macro_triple_witching_straddle"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-00792bd7"
+   ],
    "notes": "from the options-library library: Triple witching / quarterly rebalance close (long gamma into the close); harness suggestion: Event-day realised-move comparison harness (event dates vs matched weekday controls) with VIX-as-IV straddle pricer. | verifier: corrected claim/trial"
   },
   {
@@ -5045,11 +5073,15 @@
     "pass": "Difference < 0 with 95% CI excluding 0 (FOMC-only; pooled reported alongside).",
     "controls": "Random non-macro days; weekend exclusion; VIX-regime control; check BTC- vs USD-accounting give the same sign."
    },
-   "experiments": [],
+   "experiments": [
+    "fomc_btc_event_straddle"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-bd896fa6"
+   ],
    "notes": "from the options-library library: Crypto macro-event straddle on Deribit (FOMC / CPI) - DVOL vs realised; harness suggestion: Reuse the BTC VRP harness (DVOL vs realised) with an event-date mask; add inverse-option payoff mode to the payoff engine (payoff/S_T). | verifier: corrected claim/trial"
   },
   {
@@ -5123,12 +5155,16 @@
     "pass": "Difference < 0 with 95% CI excluding 0.",
     "controls": "Placebo dates; exclude 2020-03; compare with the SPX result."
    },
-   "experiments": [],
+   "experiments": [
+    "macro_gld_event_straddle"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "GLD daily closes and GVZ history fetchers (both free) plus CPI calendar; runnable as soon as they are loaded.",
-   "results": [],
-   "notes": "from the options-library library: Metals macro-event straddle (FOMC / CPI / NFP) on GC or GLD; harness suggestion: Generalise the VIX-as-IV straddle harness to (underlying, vol index) pairs: (SPY,VIX), (GLD,GVZ), (BTC,DVOL), (QQQ,VXN). | verifier: corrected claim/trial"
+   "status": "supported",
+   "results": [
+    "X-6e050abd"
+   ],
+   "notes": "from the options-library library: Metals macro-event straddle (FOMC / CPI / NFP) on GC or GLD; harness suggestion: Generalise the VIX-as-IV straddle harness to (underlying, vol index) pairs: (SPY,VIX), (GLD,GVZ), (BTC,DVOL), (QQQ,VXN). | verifier: corrected claim/trial | Scope (2026-10-15): supported for the claim as worded, a MODEL-PRICED straddle at sigma = GVZ(T-1). GVZ is 30-day implied vol; on event days the true 1-day implied vol carries the event premium, so a traded short straddle collects more than this model and the gap would shrink. A traded test needs event-day 1-day GLD implied vol.",
+   "unblocked_from": "GLD daily closes and GVZ history fetchers (both free) plus CPI calendar; runnable as soon as they are loaded."
   },
   {
    "id": "T-225",
@@ -5606,12 +5642,16 @@
     "pass": "Upper 95% bound of the conditional mean < -0.03; model-priced P&L reported separately.",
     "controls": "Unconditional VXX drift (also expected negative); random-entry placebo; worst-month table; SVXY-based proxy run (sign-flipped, leverage-adjusted) as a cross-check."
    },
-   "experiments": [],
+   "experiments": [
+    "vx_vxx_contango_decay"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "VXX/UVXY daily close history (add to the closes fetch) and adding VXX/UVXY/SVXY to CHAIN_SYMBOLS, ~60 days of capture for real IVs. An SVXY-based proxy of the same contango claim is testable now from the archived SVXY closes.",
-   "results": [],
-   "notes": "from the options-library library: VXX / UVXY decay harvest with options (put spreads, call spreads, diagonals); harness suggestion: Add VXX/UVXY/SVXY to CHAIN_SYMBOLS and to the daily closes fetch; then a harness_vxx_decay in the harness_term_structure style. | verifier: corrected claim/trial"
+   "status": "not_supported",
+   "results": [
+    "X-a09c37e5"
+   ],
+   "notes": "from the options-library library: VXX / UVXY decay harvest with options (put spreads, call spreads, diagonals); harness suggestion: Add VXX/UVXY/SVXY to CHAIN_SYMBOLS and to the daily closes fetch; then a harness_vxx_decay in the harness_term_structure style. | verifier: corrected claim/trial",
+   "unblocked_from": "VXX/UVXY daily close history (add to the closes fetch) and adding VXX/UVXY/SVXY to CHAIN_SYMBOLS, ~60 days of capture for real IVs. An SVXY-based proxy of the same contango claim is testable now from the archived SVXY closes."
   },
   {
    "id": "T-243",
@@ -6053,11 +6093,15 @@
     "pass": "CI of net monthly carry > 0; Sharpe > 1 reported",
     "controls": "Unhedged carry as comparison; months with negative funding included; call priced at DVOL + 5 vol points (the 10-delta call wing usually trades above DVOL)"
    },
-   "experiments": [],
+   "experiments": [
+    "carry_funding_call_hedged"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f07adf1e"
+   ],
    "notes": "from the options-library library: Perpetual funding carry hedged with options; harness suggestion: Add deribit_funding_history to mandel.data.options; monthly aggregation; hedge from DVOL | verifier: corrected claim/trial"
   },
   {
@@ -6456,11 +6500,15 @@
     "pass": "Mean change < 0 with 95% CI excluding 0",
     "controls": "Non-event days matched by weekday; the same test on VIX as positive control; note that 30-day VIX-method indices mechanically drop when an event leaves the window"
    },
-   "experiments": [],
+   "experiments": [
+    "fomc_gvz_event_change"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-dfd2c227"
+   ],
    "notes": "from the options-library library: Gold event vol (FOMC/CPI straddle on GLD); harness suggestion: Event-date table in mandel/knowledge; paired-difference harness over cboe_index_history('GVZ') | verifier: corrected claim/trial"
   },
   {
@@ -6727,11 +6775,15 @@
     "pass": "Sharpe difference > 0 with 95% interval excluding 0, placebo interval includes 0, DSR > 0.95, and at least 10 separate funding-driven activations (fewer = inconclusive)",
     "controls": "Look-ahead: only funding records timestamped before the decision; percentile window strictly trailing; survivorship: n/a; costs: 25 bps per side plus 10 bps slippage on every extra state change; multiple testing: joint count with sibling funding entries; regime: report 2021-22 and 2023-26 halves"
    },
-   "experiments": [],
+   "experiments": [
+    "carry_trend_funding_filter"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-45363c88"
+   ],
    "notes": "from the underlying-library library: Funding-rate-aware crypto trend (crowding filter on BTC/ETH trend signals); harness suggestion: New fetcher mandel/data/deribit.py: funding_history(instrument, start, end) paging by 14 days into bundle deribit-funding-<instrument> with available_at = timestamp; harness funding_filter_vs_trend in trend.py sharing the sma rule; report activation count as a hard inconclusive gate. | verifier: corrected claim/trial"
   },
   {
@@ -6753,11 +6805,15 @@
     "pass": "Difference > 0 with 95% interval excluding 0 over at least 150 pooled trades, surviving the 60-trial correction (DSR > 0.95 on the trade-return series or Holm-adjusted p < 0.05)",
     "controls": "Look-ahead: signal on close t, fill at close t+1; dividend adjustment of OHLC; survivorship: survivor ETFs/crypto only, single-stock version blocked; costs: 5 bps ETFs, 25+10 bps crypto per side, plus gap slippage when the close-to-close move through the stop exceeds the stop; multiple testing: 60 trials; regime: trades by decade and VIX tercile"
    },
-   "experiments": [],
+   "experiments": [
+    "ohlc_donchian_atr_breakout"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-d019c368"
+   ],
    "notes": "from the underlying-library library: Donchian channel breakout and all-time-high entry with ATR trailing stop; harness suggestion: trend.py donchian_atr(ohlc, n, atr_mult) returning trade list and daily returns; harness breakout_expectancy with the matched-hold random-entry control; extend the Yahoo bundle schema to keep open/high/low (currently close and volume). | verifier: corrected claim/trial"
   },
   {
@@ -7297,11 +7353,15 @@
     "pass": "95% lower bound of mean net return per trade > 0 AND DSR > 0.95 across the 5 twin variants; otherwise park as 'reversion real but below retail cost'",
     "controls": "Look-ahead: trailing windows; execute at the next close after the signal. Dividends: total-return series, because SPY (UIT) holds dividends in cash and pays quarterly with a lag, creating a slow drift absorbed by the trailing mean. Closing-auction prints for both legs. Costs: 2 bps per leg per trade. Survivorship: none (all twins listed). Multiple testing: 5 twins. Regime: March 2020 reported separately."
    },
-   "experiments": [],
+   "experiments": [
+    "ohlc_spy_ivv_twin"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-baa72a98"
+   ],
    "notes": "from the underlying-library library: ETF premium/discount to NAV reversion (and identical-exposure twins); harness suggestion: twin_spread_halflife: ratio AR(1), excursion-vs-cost counter, rule simulator; later nav_premium_reversion when NAV lands | verifier: corrected claim/trial"
   },
   {
@@ -7427,11 +7487,15 @@
     "pass": "95% lower bound of mean net return per trade > 0 AND same sign before and after 2024-01 AND DSR > 0.95",
     "controls": "Synchronicity: Yahoo BTC-USD's 00:00 UTC close is 2-3 hours away from CME settlement, and that hourly BTC move (~0.5-1%) exceeds a month of basis, so only settlement-aligned hourly spot is valid. T-362 uses BTC-USD daily closes and has the same flaw (flagged). Roll contamination: BTC=F is a continuous front-month series, expired per-contract history is not on Yahoo (BTCZ23.CME returns null), so roll windows are excluded rather than reconstructed. Costs: 20 bps round trip plus margin financing at DTB3+1.5%. Regime: 2021 boom, 2022, post-ETF. Multiple testing: 5 variants."
    },
-   "experiments": [],
+   "experiments": [
+    "carry_cme_basis_spike"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-2543136c"
+   ],
    "notes": "from the underlying-library library: Crypto futures basis / cash-and-carry (CME BTC futures and Deribit); harness suggestion: basis_carry_harness: basis calculator with roll detection, hurdle rule, hold-to-expiry accounting; daily Deribit snapshot writer for the forward sample | verifier: corrected claim/trial"
   },
   {
@@ -7505,12 +7569,16 @@
     "pass": "95% lower bound of the difference > 2 bps AND same sign in both halves AND DSR > 0.95",
     "controls": "Look-ahead: trading at the same close that defines IBS is optimistic (MOC orders must be sent before the final print), so next-open/next-close execution is reported. Costs: 1 bp spread per side, zero commission. Multiple testing: 12 trials plus prior T-58/T-10/T-36. Regime: post-2013 weakening reported; VIX terciles."
    },
-   "experiments": [],
+   "experiments": [
+    "ohlc_ibs_reversal"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Index ETF daily technical reversal (RSI(2), Bollinger, IBS, down-day streak); harness suggestion: daily_rule_grid: declared indicator set, conditional-mean test, split-sample sign check, dsr_pbo_harness feed (parallels the Polymarket T-10 harness) | verifier: corrected claim/trial"
+   "results": [
+    "X-660e7d9f"
+   ],
+   "notes": "from the underlying-library library: Index ETF daily technical reversal (RSI(2), Bollinger, IBS, down-day streak); harness suggestion: daily_rule_grid: declared indicator set, conditional-mean test, split-sample sign check, dsr_pbo_harness feed (parallels the Polymarket T-10 harness) | verifier: corrected claim/trial | Scope (2026-10-15): min_n 2000 is counted in trading days (6,725 in the window); the signal fires on 1,310 days. The pass statistic trades at the close that defines IBS (optimistic for MOC); next-open-to-close +7.5 bps and next-close entry +6.9 bps are reported as execution diagnostics, both above the 2 bps bar but not tested against it."
   },
   {
    "id": "T-333",
@@ -7531,11 +7599,15 @@
     "pass": "95% lower bound of mean net return per trade > 0 AND same sign in 2000-2012 and 2013-2026 AND DSR > 0.95 over variants; the correlation alone, if significant, parks the entry as 'structure without edge'",
     "controls": "Look-ahead: trade at the opening auction print. Costs: 1 bp per side plus auction slippage for size. Survivorship: stock variants biased. Multiple testing: 6 variants. Regime: pre/post 2013, VIX terciles."
    },
-   "experiments": [],
+   "experiments": [
+    "ohlc_gap_fade"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e6d84c5e"
+   ],
    "notes": "from the underlying-library library: Overnight vs intraday return reversal; harness suggestion: overnight_intraday_decomp: OHLC decomposition, correlation test, gap-fade simulator, IBIT control | verifier: corrected claim/trial"
   },
   {
@@ -7738,11 +7810,15 @@
     "pass": "Difference > 15 bps with p < 0.05 over 1994-2026 AND a 2016-2026 difference > 0.",
     "controls": "Look-ahead: the schedule is published a year ahead; scheduled dates only. Survivorship: n/a. Costs: 8 round trips/yr at 1-2 bps, charged. Multiple testing: 1 primary plus 10 secondary trials (Holm). Regime: pre/post-2015 is the pre-registered split; ZLB years 2009-2015 flagged; overlap with CPI release days flagged."
    },
-   "experiments": [],
+   "experiments": [
+    "fomc_statement_day_drift"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3b985170"
+   ],
    "notes": "from the underlying-library library: Pre-FOMC announcement drift; harness suggestion: events.py: fomc_dates() fetcher (parse statement URLs by year, cache to mandel/data as 'fomc-dates'), then event_day_effect(days, closes, event_days, offset=-1, n_boot=2000) generalizing turn_of_month's paired block bootstrap; add subsample argument. | verifier: corrected claim/trial"
   },
   {
@@ -7764,11 +7840,15 @@
     "pass": "Difference > 5 bps/day with p < 0.05; both halves and 2017-2026 positive; random-offset placebo p < 0.05.",
     "controls": "Look-ahead: scheduled dates only. Survivorship: n/a. Costs: about 28 round trips/yr at 1-2 bps (about 30-55 bps/yr), charged. Multiple testing: week indexing fixed to the published definition, 5 variants Holm. Regime: halves, ZLB years flagged."
    },
-   "experiments": [],
+   "experiments": [
+    "fomc_cycle_even_weeks"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-93025618"
+   ],
    "notes": "from the underlying-library library: FOMC-cycle even-week effect; harness suggestion: events.py: fomc_cycle_week(days, statement_days) -> week index per day; even_week_effect(days, closes, statement_days, cost_bps=1.5) with the cycle-shift placebo; verdict format as weekday_effect. | verifier: corrected claim/trial"
   },
   {
@@ -7790,12 +7870,16 @@
     "pass": "Difference > 5 bps/day with p < 0.05 and both halves positive; the FOMC-excluded sensitivity is also reported.",
     "controls": "Look-ahead: scheduled dates only; shutdown-delayed releases (Oct 2013, autumn 2025) use the actual release day, flagged. Survivorship: n/a. Costs: about 32 round trips/yr at 1-2 bps, charged. Multiple testing: 6 variants plus 3 types (Holm). Regime: halves; 2008 and 2020 flagged; overlap with pre-FOMC days declared."
    },
-   "experiments": [],
+   "experiments": [
+    "macro_announcement_day_premium"
+   ],
    "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "CPI and Employment Situation release dates for 1993-2026. The FRED release-dates API needs a free API key that Mandel does not hold (verified error), and the BLS schedule archive returns 403 from this host. A free FRED key (minutes to obtain) or running the BLS scrape from the user's server unblocks it. The FOMC-only component is already testable in the pre-FOMC entry.",
-   "results": [],
-   "notes": "from the underlying-library library: Scheduled macro announcement-day premium (CPI, jobs, FOMC, GDP, ISM); harness suggestion: data/fetch.py: fred_release_dates(release_id) cached as 'fred-release-dates-<id>'; events.py: event_day_effect(days, closes, event_days, offset=0) shared with pre-FOMC; per-type loop with Bonferroni as in weekday_effect. | verifier: corrected claim/trial"
+   "status": "not_supported",
+   "results": [
+    "X-05b99f6b"
+   ],
+   "notes": "from the underlying-library library: Scheduled macro announcement-day premium (CPI, jobs, FOMC, GDP, ISM); harness suggestion: data/fetch.py: fred_release_dates(release_id) cached as 'fred-release-dates-<id>'; events.py: event_day_effect(days, closes, event_days, offset=0) shared with pre-FOMC; per-type loop with Bonferroni as in weekday_effect. | verifier: corrected claim/trial",
+   "unblocked_from": "CPI and Employment Situation release dates for 1993-2026. The FRED release-dates API needs a free API key that Mandel does not hold (verified error), and the BLS schedule archive returns 403 from this host. A free FRED key (minutes to obtain) or running the BLS scrape from the user's server unblocks it. The FOMC-only component is already testable in the pre-FOMC entry."
   },
   {
    "id": "T-344",
@@ -7931,11 +8015,15 @@
     "pass": "Gap > 3 bps/day with p < 0.05 and both halves positive. The net-of-cost Sharpe comparison is reported but is not part of the pass.",
     "controls": "Look-ahead: none. Survivorship: n/a. Costs: 252 round trips/yr at 1 bp (2 bp sensitivity). Multiple testing: 6 assets plus 3 variants (Holm). Regime: halves; Yahoo's 'open' may be the first print rather than the auction price, flagged; dividend adjustment mandatory."
    },
-   "experiments": [],
+   "experiments": [
+    "ohlc_overnight_vs_intraday"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5ba41761"
+   ],
    "notes": "from the underlying-library library: Overnight vs intraday return split (the night effect); harness suggestion: social.py yahoo_history: keep open/high/low; experiments/volatility.price_ohlc(rows) returning aligned arrays; events.py: overnight_intraday(days, opens, closes, cost_bps=1.0) with paired block bootstrap and net Sharpe. | verifier: corrected claim/trial"
   },
   {
@@ -8300,11 +8388,15 @@
     "pass": "Gap > 1 pp with permutation p < 0.05 and both halves positive; the long-only expansionary arm's Sharpe beats buy-and-hold over matched windows.",
     "controls": "Look-ahead: entry after DGS2 is published (t+2); the ^FVX variant uses same-day closes. Survivorship: n/a. Costs: up to 16 legs/yr at 1-2 bps. Multiple testing: 6 variants. Regime: halves and ZLB split."
    },
-   "experiments": [],
+   "experiments": [
+    "fomc_monetary_momentum"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-bf82b216"
+   ],
    "notes": "from the underlying-library library: Post-FOMC directional drift (monetary momentum); harness suggestion: data/fetch.py: fred_series('DGS2') (the FRED route exists); events.py: post_event_directional_drift(days, closes, event_days, signal_by_event, horizon=15, threshold_bps=5) with label permutation and block bootstrap. | verifier: corrected claim/trial"
   },
   {
@@ -8326,11 +8418,15 @@
     "pass": "Test-window (2022-2026, about 57 contract-months) bootstrap lower 95% bound of mean excess return > 0, and DSR > 0.95 with n_trials = 10 (2 assets x 4 thresholds + 2 reverse).",
     "controls": "Look-ahead: days to expiry from the exchange calendar; spot sampled at the futures settle time; DTB3 known on the day. Yahoo's front-month roll date is undocumented: drop observations within 3 days of expiry, and cross-check the continuous series against listed contracts (BTCZ26.CME has data from 2024-12) where they overlap. Costs: 20 bp round trip plus CME fees ($2.5-6 per 5-BTC contract). Margin earns T-bills. Survivorship: none (single asset). Multiple testing: 10 trials into the DSR. Regimes: pre/post FTX (2022-11) and pre/post spot ETF (2024-01) reported separately."
    },
-   "experiments": [],
+   "experiments": [
+    "carry_cme_cash_and_carry"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-952748a4"
+   ],
    "notes": "from the underlying-library library: Crypto cash-and-carry via CME/Coinbase dated futures; harness suggestion: mandel/experiments/carry.py: basis_carry(spot, fut, rf, cost_bps) reusing ratio_reversion bootstrap; add Yahoo BTC=F/ETH=F/MBT=F to the daily-history bundles | verifier: corrected claim/trial"
   },
   {
@@ -8352,11 +8448,15 @@
     "pass": "Test-window Sharpe > 1.0 with bootstrap lower bound > 0.3 over at least 250 in-position days, and DSR > 0.95 with n_trials = 12.",
     "controls": "Look-ahead: funding is known only after each hour (available_at = record timestamp). Inverse-contract P&L is converted to USD at each mark. Costs: taker 5-10 bp per side plus the observed spot-perp spread. Liquidation is modeled for linear perps at 2x with the daily mark. Survivorship: BTC and ETH only, but venue survivorship applies (FTX perps no longer exist, so the result is Deribit-specific). Deribit is not US-accessible, so the US claim needs the Kraken/CDE replication. Regimes reported: 2020 crash, 2021 bull, 2022 FTX, 2024+ ETF era. 12 trials deflated."
    },
-   "experiments": [],
+   "experiments": [
+    "carry_perp_funding_threshold"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-4644d81f"
+   ],
    "notes": "from the underlying-library library: Perpetual funding-rate carry (long spot, short perp); harness suggestion: mandel/data/options.py: add deribit_funding_history and coinbase_cde_products snapshot to collect_options_daily; mandel/experiments/carry.py: funding_carry() | verifier: corrected claim/trial"
   },
   {
@@ -8378,11 +8478,15 @@
     "pass": "Gap >= 10 points with permutation p < 0.05, the same sign in both halves, and at least 8 non-overlapping top-decile episodes. Otherwise record 'insufficient events'. DSR on the timing rule with n_trials = 4.",
     "controls": "Look-ahead: trailing percentiles only, synchronous spot, roll days excluded. Overlap handled by block permutation. Costs: 10 bp per switch for the timing rule. Survivorship: none. Multiple testing: 4 variants counted. Regime: pre/post 2022 and pre/post ETF reported."
    },
-   "experiments": [],
+   "experiments": [
+    "carry_basis_crash_predictor"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1578602f"
+   ],
    "notes": "from the underlying-library library: Crypto carry as a crash predictor (basis signal); harness suggestion: mandel/experiments/carry.py: conditional_tail(signal, returns, horizon) with block permutation | verifier: corrected claim/trial"
   },
   {
@@ -8482,11 +8586,15 @@
     "pass": "Test-window Sharpe > 0.3 with bootstrap lower bound > 0, and DSR > 0.95 with n_trials = 6.",
     "controls": "Look-ahead: OECD monthly averages lagged one month. Costs: FRED noon fixing vs broker fill (+2 bp), financing 1% per leg per year. Survivorship: none (fixed G10 universe; EUR from 1999, legacy DEM not used). Regime: pre/post 2008, ZIRP 2009-2021, 2022 hikes and the 2024 yen unwind reported. Stale-series splice flagged. Crash skew reported. 6 trials deflated."
    },
-   "experiments": [],
+   "experiments": [
+    "fx_carry_g10"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a37f0b0b"
+   ],
    "notes": "from the underlying-library library: G10 FX carry for US retail (OANDA/IBKR); harness suggestion: mandel/experiments/carry.py: cross_sectional_carry(rates, spots, k=3) with bootstrap; FRED fetch list extended | verifier: corrected claim/trial"
   },
   {
@@ -8851,11 +8959,15 @@
     "pass": "Lower 95% bootstrap bound of the annualized HML mean > 0 over >= 8000 daily observations AND the result survives the family-wide deflation (DSR over all factor-ETF variants tried, about 34 across entries value/quality/low-vol/size/profitability/BAB/factor-momentum/contrarian-timing).",
     "controls": "Look-ahead: FF portfolios formed in June using prior-fiscal-year book equity (6-month lag by construction); pin the data vintage. Survivorship: none (CRSP-based, includes delistings). Costs: applied to the ETF diagnostic (fees, borrow, spreads). Multiple testing: 5 variants here, counted in the family-wide DSR. Regime: report 1993-2006, 2007-2020 and 2021-2026 separately; the 2007-2020 drawdown is the key stress."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_value_hml"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7be8d61a"
+   ],
    "notes": "from the underlying-library library: Value premium (HML) via value/growth ETF pair; harness suggestion: mandel/experiments/underlying.py: add factor_etf_tilt(symbol_long, symbol_short, ff_factor) returning capture ratio, alpha t-stat, bootstrap CI; shared by value/quality/size/profitability/BAB entries. | verifier: corrected claim/trial"
   },
   {
@@ -8877,11 +8989,15 @@
     "pass": "Alpha t >= 2.0 over >= 150 monthly observations AND QMJ loading > 0.5 (validity) AND survives the family-wide DSR. Power note: with ~158 months, only alphas above ~3%/yr are detectable.",
     "controls": "Look-ahead: betas from t-1; ETF prices tradable. Survivorship: none at ETF level. Costs: 0.15% fee, SPY borrow ~0.3%, 2 bp/month hedge rebalance. Multiple testing: 4 variants into the family-wide DSR. Regime: 2020-2022 growth/rate shock sub-sample reported separately."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_quality_qual"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a957b72c"
+   ],
    "notes": "from the underlying-library library: Quality minus junk via quality ETF; harness suggestion: Reuse factor_etf_tilt; add a factor-regression helper (OLS with Newey-West) on FF5+UMD that every factor-ETF entry calls. | verifier: corrected claim/trial"
   },
   {
@@ -8934,11 +9050,15 @@
     "pass": "Lower 95% bound > 0 over >= 6000 daily observations AND RMW loading significantly positive (mechanism) AND survives the family-wide DSR.",
     "controls": "Look-ahead: none (no parameters). Survivorship: none at ETF/factor level. Costs: fee differential (IJR 0.06%, IWM 0.19%) is in NAV; IWM borrow ~0.3%; 5 bp per rebalance. Multiple testing: 4 variants into the family-wide DSR. Regime: 2000-2006 small-cap boom vs 2014-2026 mega-cap era; June reconstitution confound."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_size_ijr_iwm"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-d778fa2b"
+   ],
    "notes": "from the underlying-library library: Size premium (small minus big); harness suggestion: factor_etf_tilt; add a two-part verdict (raw vs conditional) in the registry so the parked raw-size claim and the live conditional claim are distinct trials. | verifier: corrected claim/trial"
   },
   {
@@ -8960,11 +9080,15 @@
     "pass": "Lower 95% bound of the RMW mean > 0 over >= 3000 daily observations AND survives the family-wide DSR.",
     "controls": "Look-ahead: June formation with prior fiscal-year accounting data; pin vintage. Survivorship: none (CRSP). Costs: COWZ 0.49% fee is material in the diagnostic. Multiple testing: 4 variants. Regime: 2021-2023 energy rally; 2020 junk rally."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_profitability_rmw"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-895b101f"
+   ],
    "notes": "from the underlying-library library: Profitability / cash-flow tilt (RMW); harness suggestion: factor_etf_tilt + factor regression helper; add sector-ETF controls (XLE, XLK) as optional regressors. | verifier: corrected claim/trial"
   },
   {
@@ -8986,11 +9110,15 @@
     "pass": "Lower 95% bound > 0 over >= 3500 days AND |ex-post beta| < 0.1 AND survives the family-wide DSR.",
     "controls": "Look-ahead: betas to t-1. Survivorship: none at ETF level. Costs: broker margin rate (not T-bill), borrow, 2 bp rebalance. Multiple testing: 4 variants; trials correlated with low-volatility-tilt (same ETFs). Regime: 2020 high-beta rebound; 2022 rate hikes."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_bab_etf"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-4f844e88"
+   ],
    "notes": "from the underlying-library library: Betting against beta (BAB) with low/high-beta ETFs; harness suggestion: Add beta_neutral_spread() to underlying.py (rolling beta, leverage, financing) and reuse for any pair; ingest AQR BAB Excel through the same fetch layer as Ken French. | verifier: corrected claim/trial"
   },
   {
@@ -9012,11 +9140,15 @@
     "pass": "Lower 95% bound of the Sharpe difference > 0 over >= 600 months AND DSR > 0.95 with all 5 variants counted AND PBO < 0.5; post-2019 point estimate reported (sign expected positive).",
     "controls": "Look-ahead: 1-month skip; vol weights to t-1. Survivorship: none. Costs: ~2 switches/yr per factor at 5 bp, factor turnover itself not costed in FF series (note: paper factors are pre-cost). Multiple testing: formation windows and rules counted. Regime: 2009 momentum crash, 2020-2021 value reversal."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_factor_momentum"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1ee8d7ce"
+   ],
    "notes": "from the underlying-library library: Factor momentum rotation across factor ETFs; harness suggestion: Reuse the deflated trend-rule search from T-58 (overfit.py) with factor series as the input; add ETF implementation as the holdout. | verifier: corrected claim/trial"
   },
   {
@@ -9038,11 +9170,15 @@
     "pass": "Lower 95% bound > 0 AND DSR > 0.95 over 5 trials; otherwise parked with reason 'contrarian factor timing adds nothing beyond static exposure' (the expected outcome).",
     "controls": "Look-ahead: expanding windows; BE/ME uses fiscal-year t-1 book known by June t. Survivorship: none. Costs: quarterly tilts at 5 bp. Multiple testing: 5 trials. Regime: 2018-2020 value drawdown is the key stress."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_contrarian_timing"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-fb91d2c6"
+   ],
    "notes": "from the underlying-library library: Contrarian factor timing (value-spread / long-term factor reversal); harness suggestion: Small addition to the factor-momentum harness: z-score tilt vs static baseline, same bootstrap. | verifier: corrected claim/trial"
   },
   {
@@ -9246,11 +9382,15 @@
     "pass": "FF5 alpha t >= 2 over >= 200 post-2009 months.",
     "controls": "Look-ahead: none (industry codes are point-in-time in CRSP). Survivorship: FF industry portfolios include delistings; the single-stock basket is survivor-picked today (flag, context only). Costs: 5 bp per rebalance; ESGU borrow ~0.5%. Multiple testing: 4 variants. Regime: 2017-2022 tobacco multiple compression; 2022 defence rally."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_sin_alpha"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-da0f8875"
+   ],
    "notes": "from the underlying-library library: ESG exclusion / sin-stock premium; harness suggestion: Reuse factor regression helper on Ken French industry portfolios; add an industry-portfolio loader to data/fetch.py. | verifier: corrected claim/trial"
   },
   {
@@ -9869,11 +10009,15 @@
     "pass": "At least 60 non-overlapping SPY shock events (at least 40 on BTC). Coefficient >= 1 point with p < 0.05. DSR >= 0.95. Beats the VIX-only rule out of sample.",
     "controls": "Look-ahead: estimators use days t-1 and t only; VIX at the same close. Survivorship: not applicable. Costs: SPY 1 bp; BTC 0.5-1% round trip at retail. Multiple testing: 32 cells. Regime: report excluding 2008 and 2020."
    },
-   "experiments": [],
+   "experiments": [
+    "ohlc_cs_spread_shock"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-ea63a856"
+   ],
    "notes": "from the underlying-library library: Liquidity-shock timing from daily high-low spread estimates; harness suggestion: Implement corwin_schultz() and amihud() helpers in mandel/experiments/volatility.py (needs highs/lows from the Yahoo rows); timing rule via the ma_rule_returns pattern; compare_strategies against a VIX rule; pbo_cscv on the grid. | verifier: corrected claim/trial"
   },
   {
@@ -9921,11 +10065,15 @@
     "pass": "At least 200 top-decile days and at least 30 non-overlapping events. Difference <= -2 points with p < 0.05 out of sample. DSR >= 0.95. Carry variant reported with its maximum drawdown.",
     "controls": "Look-ahead: daily mean uses only hours up to 00:00 UTC; entry at the next hourly bar. Survivorship: not applicable. Costs: spot 0.5-1% round trip retail; perp 5 bps taker (not available to US persons). Multiple testing: 24 cells. Regime: bull vs bear; liquidation-cascade days (|return| > 10%)."
    },
-   "experiments": [],
+   "experiments": [
+    "carry_funding_sentiment"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-6eca056b"
+   ],
    "notes": "from the underlying-library library: Crypto perpetual basis and funding as positioning sentiment; harness suggestion: Add deribit_funding_history() beside deribit_dvol_history in mandel/data/options.py (page backward like DVOL); event study and rule P&L via underlying.py helpers; costs through backtest_eval inputs. | verifier: corrected claim/trial"
   },
   {
@@ -10024,11 +10172,15 @@
     "pass": "At least 500 days. Mean net return > 0 with p < 0.05 after deflation over 60 cells. Same sign on QQQ and IWM.",
     "controls": "Look-ahead: r1 known at 10:30; the position opens at the 15:30 bar open; the exit uses the daily official close, not the 15:30 bar's last trade. Survivorship: not applicable. Costs: 2 bps round trip. Multiple testing: 60 cells. Regime: FOMC/CPI and option-expiration days (gamma mechanism)."
    },
-   "experiments": [],
+   "experiments": [
+    "hourly_half_hour_momentum"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-34f40b31"
+   ],
    "notes": "from the underlying-library library: Market intraday momentum: first half-hour predicts last half-hour; harness suggestion: Yahoo interval=1h pilot fetch; regression and rule P&L in mandel/experiments/intraday_equity.py; BTC session variant via coinbase_candles(granularity=3600). | verifier: corrected claim/trial"
   },
   {
@@ -10049,11 +10201,15 @@
     "pass": "At least 500 days. Slope <= -0.2 with p < 0.01 after deflation. Reversal-leg net Sharpe > 0.5.",
     "controls": "Look-ahead: decision information ends at 15:45; the MOC cutoff is honoured; L is measured to the official close, which is the fill price. Survivorship: not applicable. Costs: no spread at the close print; 1 bp at the open. Multiple testing: 32 cells. Regime: month-end, index rebalances, triple witching."
    },
-   "experiments": [],
+   "experiments": [
+    "hourly_closing_reversal"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-749ca45c"
+   ],
    "notes": "from the underlying-library library: Closing-auction imbalance and close-to-open reversal; harness suggestion: Pilot on Yahoo interval=1h bars in mandel/experiments/intraday_equity.py; full version waits for minute data; register the proxy and feed versions as separate trials. | verifier: corrected claim/trial"
   },
   {
@@ -10127,11 +10283,15 @@
     "pass": "Test Sharpe > 0.3 with bootstrap lower bound > 0, and DSR > 0.95 with n_trials = 4 plus the G10 entry's 6 (shared deflation).",
     "controls": "Look-ahead: rates lagged one month. Costs: EM financing 1-2% admin plus spread. Survivorship: none (fixed list chosen ex ante). Crash skew reported. Regimes: 2013 taper, 2015, 2020, 2024 yen unwind."
    },
-   "experiments": [],
+   "experiments": [
+    "fx_carry_em"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5357a646"
+   ],
    "notes": "from the underlying-library library: Emerging-market FX carry (high-yielders vs funders); harness suggestion: Reuse cross_sectional_carry() with an extended universe. Add DEXMXUS, DEXSFUS, DEXKOUS and the EM IR3TIB01 series to the FRED list. | added by the verifier pass"
   },
   {
@@ -10535,11 +10695,15 @@
     "pass": "Lower 95% bound > 0 over >= 300 post-publication months AND FF5 alpha t >= 2; otherwise parked as 'arbitraged away'.",
     "controls": "Look-ahead: June formation with lagged accounting data. Survivorship: none (CRSP/Compustat with delistings). Costs: annual rebalance ~5-10 bp per side, not in paper returns. Multiple testing: 4 variants. Regime: 2000-2002 and 2008."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_accruals"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3a88110f"
+   ],
    "notes": "from the underlying-library library: Accruals anomaly (Sloan) post-publication; harness suggestion: data/kenfrench.py sort-portfolio loader; one spread_test() for all characteristic-sorted Ken French files (AC, NI, OP, INV, VAR). | added by the verifier pass"
   },
   {
@@ -10561,11 +10725,15 @@
     "pass": "Lower 95% bound > 0 over >= 8000 days AND survives family-wide DSR.",
     "controls": "Look-ahead: skip month in formation. Survivorship: none (CRSP). Costs: UMD turnover is high (~100%+/yr per leg); paper factor pre-cost; note. Multiple testing: 4 variants; overlaps factor-momentum entry and the trend family. Regime: 2009 and 2020-2021 crashes."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_momentum_umd"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a05566d2"
+   ],
    "notes": "from the underlying-library library: Cross-sectional stock momentum (UMD) post-publication; harness suggestion: factor_etf_tilt on UMD/MTUM; flag cross-family duplicate with trend library. | added by the verifier pass"
   },
   {
@@ -10587,11 +10755,15 @@
     "pass": "Lower 95% bound > 0 over >= 4000 days AND survives family-wide DSR.",
     "controls": "Look-ahead: June formation. Survivorship: none. Costs: paper factor pre-cost; note. Multiple testing: 4 variants. Regime: 2008, 2020 junk rally."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_investment_cma"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-38e281c1"
+   ],
    "notes": "from the underlying-library library: Investment / asset-growth factor (CMA); harness suggestion: factor_etf_tilt bootstrap mode on FF5 columns. | added by the verifier pass"
   },
   {
@@ -10644,11 +10816,15 @@
     "pass": "Lower 95% bound > 0 over >= 200 months AND FF5 alpha t >= 2 (beyond CMA).",
     "controls": "Look-ahead: June formation. Survivorship: none at portfolio level. Costs: annual rebalance. Multiple testing: 4 variants; correlated with buyback-announcement-drift. Regime: 2021 SPAC/issuance boom; 2023 buyback excise tax."
    },
-   "experiments": [],
+   "experiments": [
+    "fact_net_issuance"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b0f715c4"
+   ],
    "notes": "from the underlying-library library: Net share issuance; harness suggestion: spread_test() on Ken French NI file; PKW via factor_etf_tilt. | added by the verifier pass"
   },
   {
@@ -11402,11 +11578,15 @@
     "pass": "Mean > 0 with 95% interval excluding 0, DSR > 0.95, above the permutation 95th percentile",
     "controls": "Look-ahead: month-end noon NY rates published next business day; survivorship: none (fixed currency set, EUR replaces legacy DEM from 1999); costs: 5 bps per side spot, 10-20 bps ETF spreads; multiple testing: 16 trials; regime: 2008 and 2022 dollar spikes reported"
    },
-   "experiments": [],
+   "experiments": [
+    "fx_momentum_g10"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-44d40cbe"
+   ],
    "notes": "from the underlying-library library: Currency momentum on G10 spot rates (FRED H.10) traded through currency ETFs; harness suggestion: mandel/data/fred.py batch fetch of the H.10 and IR3TIB series; xs_momentum reused on the currency panel; harness currency_momentum. | added by the verifier pass"
   },
   {

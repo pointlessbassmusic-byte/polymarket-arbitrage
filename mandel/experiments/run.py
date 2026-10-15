@@ -32,6 +32,7 @@ from mandel.experiments.social import attention_vs_abs_return, fear_greed_forwar
 from mandel.experiments.volatility import implied_move_vs_realised, index_closes, overlay_backtest, overlay_verdict, price_closes, skew_tail, term_structure_reversion, variance_risk_premium
 from mandel.experiments.underlying import ratio_reversion, trend_rules_multi, turn_of_month, weekday_effect, weekend_effect
 from mandel.experiments import options_market as om
+from mandel.experiments import batch4_carry, batch4_fact, batch4_fomc, batch4_ohlc, batch4_vx, batch5_fx, batch5_hourly, batch5_macro
 from mandel.experiments import underlying2 as u2
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
@@ -879,6 +880,69 @@ XA_NULLS = {
 }
 
 
+# Batch modules, one per data unlock: FOMC calendar, Fama-French/AQR factors, Deribit carry, OHLC, VX futures (batch 4); macro release
+# dates, FX spot and 3-month rates, hourly bars (batch 5). Each exports HARNESSES {name: fn(archive) -> (stat, n, verdict, reason)} and
+# THEORY_MAP {theory id: harness}; each harness checks its own inputs. BATCH_BUNDLES lists the bundles each one loads, traced on the
+# archive (a test asserts declared == loaded).
+BATCH_MODULES = (batch4_fomc, batch4_fact, batch4_carry, batch4_ohlc, batch4_vx, batch5_macro, batch5_fx, batch5_hourly)
+BATCH_HARNESSES = {h: fn for m in BATCH_MODULES for h, fn in m.HARNESSES.items()}
+BATCH_THEORY = {h: tid for m in BATCH_MODULES for tid, h in m.THEORY_MAP.items()}
+BATCH_BUNDLES = {
+    "carry_basis_crash_predictor": ["daily-history-BTC-F", "daily-history-BTC-USD", "deribit-funding-BTC-PERPETUAL", "fred-DTB3"],
+    "carry_cme_basis_spike": ["daily-history-BTC-F", "deribit-funding-BTC-PERPETUAL", "fred-DTB3"],
+    "carry_cme_cash_and_carry": ["daily-history-BTC-F", "deribit-funding-BTC-PERPETUAL", "fred-DTB3"],
+    "carry_funding_call_hedged": ["deribit-delivery-prices-btc", "deribit-dvol-BTC-history", "deribit-funding-BTC-PERPETUAL", "fred-DTB3"],
+    "carry_funding_sentiment": ["deribit-funding-BTC-PERPETUAL"],
+    "carry_perp_funding_threshold": ["deribit-funding-BTC-PERPETUAL", "fred-DTB3"],
+    "carry_perp_funding_vs_quarterly": ["deribit-funding-BTC-PERPETUAL", "deribit-quarterly-futures-btc"],
+    "carry_trend_funding_filter": ["daily-history-BTC-USD", "deribit-funding-BTC-PERPETUAL"],
+    "fact_accruals": ["french-accruals-monthly", "french-ff5-daily", "french-momentum-daily"],
+    "fact_bab_etf": ["aqr-bab-daily", "daily-history-COWZ", "daily-history-IJR", "daily-history-IWD", "daily-history-IWF", "daily-history-IWM", "daily-history-QUAL", "daily-history-SPHB", "daily-history-SPLV", "daily-history-SPY", "daily-history-USMV", "fred-DTB3", "french-ff3-daily", "french-ff5-daily", "french-momentum-daily"],
+    "fact_contrarian_timing": ["french-ff5-daily", "french-momentum-daily"],
+    "fact_factor_momentum": ["aqr-bab-daily", "french-ff5-daily", "french-momentum-daily"],
+    "fact_investment_cma": ["aqr-bab-daily", "daily-history-COWZ", "daily-history-IJR", "daily-history-IWD", "daily-history-IWF", "daily-history-IWM", "daily-history-QUAL", "daily-history-SPHB", "daily-history-SPLV", "daily-history-SPY", "daily-history-USMV", "fred-DTB3", "french-ff3-daily", "french-ff5-daily", "french-momentum-daily"],
+    "fact_momentum_umd": ["aqr-bab-daily", "daily-history-COWZ", "daily-history-IJR", "daily-history-IWD", "daily-history-IWF", "daily-history-IWM", "daily-history-QUAL", "daily-history-SPHB", "daily-history-SPLV", "daily-history-SPY", "daily-history-USMV", "fred-DTB3", "french-ff3-daily", "french-ff5-daily", "french-momentum-daily"],
+    "fact_net_issuance": ["daily-history-PKW", "daily-history-SPY", "french-ff5-daily", "french-momentum-daily", "french-net-issuance-monthly"],
+    "fact_profitability_rmw": ["aqr-bab-daily", "daily-history-COWZ", "daily-history-IJR", "daily-history-IWD", "daily-history-IWF", "daily-history-IWM", "daily-history-QUAL", "daily-history-SPHB", "daily-history-SPLV", "daily-history-SPY", "daily-history-USMV", "daily-history-XLE", "daily-history-XLK", "fred-DTB3", "french-ff3-daily", "french-ff5-daily", "french-momentum-daily"],
+    "fact_quality_qual": ["aqr-bab-daily", "daily-history-COWZ", "daily-history-IJR", "daily-history-IWD", "daily-history-IWF", "daily-history-IWM", "daily-history-QUAL", "daily-history-SPHB", "daily-history-SPLV", "daily-history-SPY", "daily-history-USMV", "fred-DTB3", "french-ff3-daily", "french-ff5-daily", "french-momentum-daily"],
+    "fact_sin_alpha": ["french-ff5-daily", "french-industry49-daily", "french-momentum-daily"],
+    "fact_size_ijr_iwm": ["aqr-bab-daily", "daily-history-COWZ", "daily-history-IJR", "daily-history-IWD", "daily-history-IWF", "daily-history-IWM", "daily-history-QUAL", "daily-history-SPHB", "daily-history-SPLV", "daily-history-SPY", "daily-history-USMV", "fred-DTB3", "french-ff3-daily", "french-ff5-daily", "french-momentum-daily"],
+    "fact_value_hml": ["aqr-bab-daily", "daily-history-COWZ", "daily-history-IJR", "daily-history-IWD", "daily-history-IWF", "daily-history-IWM", "daily-history-QUAL", "daily-history-SPHB", "daily-history-SPLV", "daily-history-SPY", "daily-history-USMV", "fred-DTB3", "french-ff3-daily", "french-ff5-daily", "french-momentum-daily"],
+    "fomc_btc_event_straddle": ["cboe-VIX-history", "daily-history-BTC-USD", "deribit-dvol-BTC-history", "fomc-meetings"],
+    "fomc_cycle_even_weeks": ["daily-history-EFA", "daily-history-SPY", "fomc-meetings"],
+    "fomc_gvz_event_change": ["cboe-GVZ-history", "cboe-VIX-history", "fomc-meetings"],
+    "fomc_monetary_momentum": ["daily-history-SPY", "fomc-meetings", "fred-DGS2", "fred-DTB3"],
+    "fomc_pre_drift_oos": ["cboe-VIX-history", "daily-history-SPY", "fomc-meetings"],
+    "fomc_spx_event_straddle": ["cboe-VIX-history", "daily-history-SPY", "fomc-meetings"],
+    "fomc_statement_day_drift": ["daily-history-BTC-USD", "daily-history-GLD", "daily-history-IWM", "daily-history-QQQ", "daily-history-SPY", "daily-history-TLT", "fomc-meetings"],
+    "ohlc_cs_spread_shock": ["cboe-VIX-history", "daily-history-SPY"],
+    "ohlc_donchian_atr_breakout": ["cboe-VIX-history", "daily-history-BTC-USD", "daily-history-ETH-USD", "daily-history-GLD", "daily-history-QQQ", "daily-history-SLV", "daily-history-SPY", "daily-history-XLE", "daily-history-XLK"],
+    "ohlc_gap_fade": ["daily-history-IBIT", "daily-history-QQQ", "daily-history-SPY"],
+    "ohlc_ibs_reversal": ["daily-history-QQQ", "daily-history-SPY"],
+    "ohlc_opex_pin_straddle": ["cboe-VIX-history", "daily-history-SPY", "fomc-meetings"],
+    "ohlc_overnight_vs_intraday": ["daily-history-SPY"],
+    "ohlc_spy_ivv_twin": ["daily-history-IVV", "daily-history-SPY"],
+    "vx_calendar_gated": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-vx-futures"],
+    "vx_vxx_contango_decay": ["cboe-VIX-history", "cboe-VIX3M-history", "cboe-VVIX-history", "daily-history-SVXY", "daily-history-VXX", "fred-DTB3"],
+    "fx_carry_em": ["cboe-VIX-history", "fx-rates-3m", "fx-spot-g10"],
+    "fx_carry_g10": ["cboe-VIX-history", "fx-rates-3m", "fx-spot-g10"],
+    "fx_momentum_g10": ["fx-rates-3m", "fx-spot-g10"],
+    "hourly_closing_reversal": ["daily-history-GLD", "daily-history-IWM", "daily-history-QQQ", "daily-history-SPY", "hourly-GLD", "hourly-IWM", "hourly-QQQ", "hourly-SPY"],
+    "hourly_half_hour_momentum": ["daily-history-IWM", "daily-history-QQQ", "daily-history-SPY", "fomc-meetings", "hourly-IWM", "hourly-QQQ", "hourly-SPY", "macro-release-cpi"],
+    "macro_announcement_day_premium": ["daily-history-SPY", "daily-history-TLT", "fomc-meetings", "macro-release-cpi", "macro-release-employment-situation"],
+    "macro_fomc_im_hm_filter": ["cboe-VIX-history", "daily-history-SPY", "fomc-meetings"],
+    "macro_gld_event_straddle": ["cboe-GVZ-history", "cboe-VIX-history", "daily-history-GLD", "daily-history-SPY", "fomc-meetings", "macro-release-cpi", "macro-release-employment-situation"],
+    "macro_triple_witching_straddle": ["cboe-VIX-history", "daily-history-SPY", "fomc-meetings"],
+}
+
+
+def _batch_null(name: str) -> str:
+    """The null of the theory a batch harness tests, as registered in its trial."""
+    tid = BATCH_THEORY.get(name)
+    reg = load_registry() if tid else None
+    t = next((t for t in reg["theories"] if t["id"] == tid), None) if reg else None
+    return f"{tid}: {t['trial']['null']}" if t else "see the harness docstring"
+
 def _bundles_matching(archive: Archive, pattern: str) -> list[str]:
     """INDEX entries matching the pattern. Listing is not availability: bundles kept off git have INDEX entries on every checkout."""
     names = sorted(e.name for e in archive.entries())
@@ -941,6 +1005,7 @@ HARNESSES: dict[str, Callable] = {
     **U2_HARNESSES,
     **OM2_HARNESSES,
     **XA_HARNESSES,
+    **BATCH_HARNESSES,
     **{f"structure_{c.replace('-', '_').lower()}": _structure_harness(c) for c in ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]},
 }
 BUNDLES_NEEDED = {
@@ -972,6 +1037,7 @@ BUNDLES_NEEDED = {
     **U2_BUNDLES,
     **OM2_BUNDLES,
     **XA_BUNDLES,
+    **BATCH_BUNDLES,
     **{f"structure_{c.replace('-', '_').lower()}": ["daily-history-SPY", "cboe-VIX-history", "fred-DTB3", "spy-smile-*"] for c in ["T-100", "T-102", "T-104", "T-105", "T-106", "T-107", "T-109", "T-110", "T-114", "T-115", "T-116", "T-124", "T-125", "T-126", "T-127", "T-129", "T-130", "T-131", "T-132", "T-134", "T-517"]},
 }
 
@@ -1107,4 +1173,5 @@ def _null_for(name: str) -> str:
         "parity_forward": "parity deviations within the half-spread; implied rate = bill", "opex_pinning": "distance to nearest $1 uniform on opex and other days",
         "btc_weekend_variance": "weekend variance >= 3x weekday variance",
         **XA_NULLS,
-    }.get(name, "see the harness docstring in mandel/experiments/underlying2.py (null stated per criterion)" if name in U2_HARNESSES else "n/a")
+    }.get(name, "see the harness docstring in mandel/experiments/underlying2.py (null stated per criterion)" if name in U2_HARNESSES
+          else _batch_null(name) if name in BATCH_HARNESSES else "n/a")
