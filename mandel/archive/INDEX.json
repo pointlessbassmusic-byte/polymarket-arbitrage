@@ -12240,6 +12240,159 @@
    "parked_reason": "",
    "in_git": false,
    "schema": "value = {symbol (Coinbase product id), t (bar start, unix s), open, high, low, close, volume (base currency)}; one row per UTC day with trades (days without trades are absent); observed_at = bar start; available_at = bar start + 24 h (the daily-history-<SYM> convention)"
+  },
+  "kalshi-settled-markets-KXNHLGAME": {
+   "name": "kalshi-settled-markets-KXNHLGAME",
+   "kind": "data",
+   "path": "mandel/archive/data/kalshi-settled-markets-KXNHLGAME.jsonl.gz",
+   "created_at": "2026-10-15T23:08:46.291656+00:00",
+   "rows": 3408,
+   "bytes": 365571,
+   "sha256": "465ec3b434030fd3a37c9963c407c8809b1955b3cb35068dae19a0d50bb365c0",
+   "tags": [
+    "KXNHLGAME",
+    "complete",
+    "history",
+    "kalshi",
+    "markets",
+    "settled"
+   ],
+   "recipe": "GET https://api.elections.kalshi.com/trade-api/v2/historical/markets?series_ticker=KXNHLGAME&limit=1000&cursor=<c> plus GET https://api.elections.kalshi.com/trade-api/v2/markets?series_ticker=KXNHLGAME&status=settled&limit=1000&cursor=<c>, de-duplicated by ticker (as of 2026-10-15); legacy pre-KX tickers of the series included, KXMVE combos excluded; via mandel.data.pm_history.fetch_kalshi_markets. Same row schema as kalshi-settled-markets. Licence: Kalshi trade-api v2 public market data: Kalshi's terms grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = raw Kalshi market row (as kalshi-settled-markets); observed_at = settlement_ts (else close_time); available_at = fetch time"
+  },
+  "finra-short-interest-2018-03-29": {
+   "name": "finra-short-interest-2018-03-29",
+   "kind": "data",
+   "path": "mandel/archive/data/finra-short-interest-2018-03-29.jsonl.gz",
+   "created_at": "2026-10-15T23:08:46.525155+00:00",
+   "rows": 8400,
+   "bytes": 419038,
+   "sha256": "0c3cc60c1941935ac30bbf409f12b72ef68f4abe093d1d9d324f946091b280f1",
+   "tags": [
+    "2018-03-29",
+    "T-375",
+    "T-393",
+    "complete",
+    "equities",
+    "finra",
+    "short-interest"
+   ],
+   "recipe": "POST https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest JSON {limit 5000, offset k, compareFilters [settlementDate EQUAL 2018-03-29], domainFilters [marketClassCode IN ['NNM', 'NYSE', 'ARCA', 'SC', 'BZX', 'AMEX', 'TXSE', 'IEXG', 'NGM', 'NGS', 'NCM', 'NAS']]} (paged; checked against the date's total 15398 minus OTC/OTCBB 6998; mode listed) via mandel.data.public_history.fetch_finra_short_interest. FINRA does not give the dissemination date: available_at = end of the 8th NYSE business day after settlement (UTC), one day later than FINRA's usual schedule. Licence: FINRA data (FINRA API / Reg SHO files): FINRA terms of use, no open redistribution licence. The repo is public, so this bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind short-interest: value = the FINRA row {symbolCode, issueName, marketClassCode, settlementDate, currentShortPositionQuantity, previousShortPositionQuantity, changePreviousNumber, changePercent, averageDailyVolumeQuantity, daysToCoverQuantity, stockSplitFlag, revisionFlag, issuerServicesGroupExchangeCode} (accountingYearMonthNumber dropped: equal to settlementDate); exchange-listed classes only (OTC, OTCBB out); observed_at = settlement day 16:00 ET; available_at = end of the 8th NYSE business day after settlement (UTC)"
+  },
+  "coinbase-daily-ANKR-USD": {
+   "name": "coinbase-daily-ANKR-USD",
+   "kind": "data",
+   "path": "mandel/archive/data/coinbase-daily-ANKR-USD.jsonl.gz",
+   "created_at": "2026-10-15T23:08:47.281261+00:00",
+   "rows": 2030,
+   "bytes": 59105,
+   "sha256": "83238fbd1794b9adbac89ebb78b8f94fd44f71da4743d938f35dede7f77427b1",
+   "tags": [
+    "coinbase",
+    "complete",
+    "crypto",
+    "daily",
+    "history",
+    "prices",
+    "span:2015-07-20..2026-10-14"
+   ],
+   "recipe": "GET https://api.exchange.coinbase.com/products/ANKR-USD/candles?granularity=86400&start=<ISO>&end=<ISO> in windows of 300 days, 2015-07-20..2026-10-14 (the whole range scanned); via mandel.data.crypto_history.fetch_coinbase_daily. Licence: Coinbase Exchange public market data: Coinbase's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol (Coinbase product id), t (bar start, unix s), open, high, low, close, volume (base currency)}; one row per UTC day with trades (days without trades are absent); observed_at = bar start; available_at = bar start + 24 h (the daily-history-<SYM> convention)"
+  },
+  "finra-short-interest-2018-04-13": {
+   "name": "finra-short-interest-2018-04-13",
+   "kind": "data",
+   "path": "mandel/archive/data/finra-short-interest-2018-04-13.jsonl.gz",
+   "created_at": "2026-10-15T23:08:50.853543+00:00",
+   "rows": 8339,
+   "bytes": 415950,
+   "sha256": "0b3fc5f8fe90d2e85c4df14537e7bfe5c3259e00214557b91897180c073d97b9",
+   "tags": [
+    "2018-04-13",
+    "T-375",
+    "T-393",
+    "complete",
+    "equities",
+    "finra",
+    "short-interest"
+   ],
+   "recipe": "POST https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest JSON {limit 5000, offset k, compareFilters [settlementDate EQUAL 2018-04-13], domainFilters [marketClassCode IN ['NNM', 'NYSE', 'ARCA', 'SC', 'BZX', 'AMEX', 'TXSE', 'IEXG', 'NGM', 'NGS', 'NCM', 'NAS']]} (paged; checked against the date's total 15378 minus OTC/OTCBB 7039; mode listed) via mandel.data.public_history.fetch_finra_short_interest. FINRA does not give the dissemination date: available_at = end of the 8th NYSE business day after settlement (UTC), one day later than FINRA's usual schedule. Licence: FINRA data (FINRA API / Reg SHO files): FINRA terms of use, no open redistribution licence. The repo is public, so this bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind short-interest: value = the FINRA row {symbolCode, issueName, marketClassCode, settlementDate, currentShortPositionQuantity, previousShortPositionQuantity, changePreviousNumber, changePercent, averageDailyVolumeQuantity, daysToCoverQuantity, stockSplitFlag, revisionFlag, issuerServicesGroupExchangeCode} (accountingYearMonthNumber dropped: equal to settlementDate); exchange-listed classes only (OTC, OTCBB out); observed_at = settlement day 16:00 ET; available_at = end of the 8th NYSE business day after settlement (UTC)"
+  },
+  "coinbase-daily-ANT-USD": {
+   "name": "coinbase-daily-ANT-USD",
+   "kind": "data",
+   "path": "mandel/archive/data/coinbase-daily-ANT-USD.jsonl.gz",
+   "created_at": "2026-10-15T23:08:50.885870+00:00",
+   "rows": 394,
+   "bytes": 10091,
+   "sha256": "9a942327fdea9745eb7a2a7bb9b3754d6dada08ac675cdc4a03602ff82ec0a17",
+   "tags": [
+    "coinbase",
+    "complete",
+    "crypto",
+    "daily",
+    "history",
+    "prices",
+    "span:2015-07-20..2026-10-14"
+   ],
+   "recipe": "GET https://api.exchange.coinbase.com/products/ANT-USD/candles?granularity=86400&start=<ISO>&end=<ISO> in windows of 300 days, 2015-07-20..2026-10-14 (the whole range scanned); via mandel.data.crypto_history.fetch_coinbase_daily. Licence: Coinbase Exchange public market data: Coinbase's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol (Coinbase product id), t (bar start, unix s), open, high, low, close, volume (base currency)}; one row per UTC day with trades (days without trades are absent); observed_at = bar start; available_at = bar start + 24 h (the daily-history-<SYM> convention)"
+  },
+  "coinbase-daily-APE-USD": {
+   "name": "coinbase-daily-APE-USD",
+   "kind": "data",
+   "path": "mandel/archive/data/coinbase-daily-APE-USD.jsonl.gz",
+   "created_at": "2026-10-15T23:08:54.348425+00:00",
+   "rows": 1673,
+   "bytes": 48119,
+   "sha256": "9b4e06264c47a50a845a4b2105f2b6b614b030aeed76987b891042b6151d8609",
+   "tags": [
+    "coinbase",
+    "complete",
+    "crypto",
+    "daily",
+    "history",
+    "prices",
+    "span:2015-07-20..2026-10-14"
+   ],
+   "recipe": "GET https://api.exchange.coinbase.com/products/APE-USD/candles?granularity=86400&start=<ISO>&end=<ISO> in windows of 300 days, 2015-07-20..2026-10-14 (the whole range scanned); via mandel.data.crypto_history.fetch_coinbase_daily. Licence: Coinbase Exchange public market data: Coinbase's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol (Coinbase product id), t (bar start, unix s), open, high, low, close, volume (base currency)}; one row per UTC day with trades (days without trades are absent); observed_at = bar start; available_at = bar start + 24 h (the daily-history-<SYM> convention)"
+  },
+  "finra-short-interest-2018-04-30": {
+   "name": "finra-short-interest-2018-04-30",
+   "kind": "data",
+   "path": "mandel/archive/data/finra-short-interest-2018-04-30.jsonl.gz",
+   "created_at": "2026-10-15T23:08:55.182810+00:00",
+   "rows": 8353,
+   "bytes": 416348,
+   "sha256": "c0a44b32e1022a201218f51967cebfe05700b655e3329f347e75f368d7fb9575",
+   "tags": [
+    "2018-04-30",
+    "T-375",
+    "T-393",
+    "complete",
+    "equities",
+    "finra",
+    "short-interest"
+   ],
+   "recipe": "POST https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest JSON {limit 5000, offset k, compareFilters [settlementDate EQUAL 2018-04-30], domainFilters [marketClassCode IN ['NNM', 'NYSE', 'ARCA', 'SC', 'BZX', 'AMEX', 'TXSE', 'IEXG', 'NGM', 'NGS', 'NCM', 'NAS']]} (paged; checked against the date's total 15474 minus OTC/OTCBB 7121; mode listed) via mandel.data.public_history.fetch_finra_short_interest. FINRA does not give the dissemination date: available_at = end of the 8th NYSE business day after settlement (UTC), one day later than FINRA's usual schedule. Licence: FINRA data (FINRA API / Reg SHO files): FINRA terms of use, no open redistribution licence. The repo is public, so this bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind short-interest: value = the FINRA row {symbolCode, issueName, marketClassCode, settlementDate, currentShortPositionQuantity, previousShortPositionQuantity, changePreviousNumber, changePercent, averageDailyVolumeQuantity, daysToCoverQuantity, stockSplitFlag, revisionFlag, issuerServicesGroupExchangeCode} (accountingYearMonthNumber dropped: equal to settlementDate); exchange-listed classes only (OTC, OTCBB out); observed_at = settlement day 16:00 ET; available_at = end of the 8th NYSE business day after settlement (UTC)"
   }
  }
 }
