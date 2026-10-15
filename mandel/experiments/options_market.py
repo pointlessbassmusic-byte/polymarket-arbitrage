@@ -444,27 +444,87 @@ def _third_friday(y: int, m: int) -> date:
     return d + timedelta(days=14)
 
 
+_SPY_MW_WEEKLIES = "2016-01-01"     # T-502: "pre-2016 non-Fridays" carry no SPY expiration; Monday/Wednesday SPY weeklies from 2016
+_SPY_DAILY_EXPIRIES = "2022-11-14"  # Tuesday/Thursday SPY expirations from mid-November 2022 ("late 2022"): every weekday expires
+T502_MIN_OPEX = 200                 # T-502 trial.min_n, in monthly expiration days
+
+
+def _expiry_on_or_before(trading: list[str], iso: str) -> Optional[str]:
+    """The trading day an expiry scheduled for ``iso`` falls on: iso itself, or the preceding trading day when iso is a holiday."""
+    j = bisect.bisect_right(trading, iso) - 1
+    return trading[j] if j >= 0 else None
+
+
+def _monthly_expiries(trading: list[str]) -> set[str]:
+    """Monthly (third-Friday) SPY expirations within the data; a holiday third Friday expires on the preceding trading day."""
+    out = set()
+    if not trading:
+        return out
+    for y in range(int(trading[0][:4]), int(trading[-1][:4]) + 1):
+        for m in range(1, 13):
+            tf = _third_friday(y, m).isoformat()
+            if trading[0] <= tf <= trading[-1]:
+                out.add(_expiry_on_or_before(trading, tf))
+    return out
+
+
+def _spy_expiry_days(trading: list[str]) -> set[str]:
+    """Every day with a SPY expiration by the deterministic calendar: Fridays throughout (monthlies, weeklies), Mondays and Wednesdays from
+    2016, every weekday from late 2022; a scheduled expiry on a market holiday expires on the preceding trading day."""
+    out = set()
+    if not trading:
+        return out
+    d, end = date.fromisoformat(trading[0]), date.fromisoformat(trading[-1])
+    while d <= end:
+        iso = d.isoformat()
+        sched = (4,) if iso < _SPY_MW_WEEKLIES else ((0, 2, 4) if iso < _SPY_DAILY_EXPIRIES else (0, 1, 2, 3, 4))
+        if d.weekday() in sched:
+            e = _expiry_on_or_before(trading, iso)
+            if e:
+                out.add(e)
+        d += timedelta(days=1)
+    return out
+
+
 def expiry_pinning(spy_rows, start: str = "2005-01-01", n_boot: int = 4000, seed: int = 0) -> dict:
-    """T-192 (monthly opex only): mean |close - nearest integer| on third Fridays at least 10% below other days, bootstrap
-    p < 0.05, and lower in a majority of years. Weeklies are not separated: since 2022 SPY expires every trading day."""
+    """T-502: mean |close - nearest $1| on monthly (third-Friday) expiration days at least 10% below non-expiration days. Treatment: third
+    Fridays, or the preceding trading day when the Friday is a holiday. Control: days with NO SPY expiration by the calendar (before 2016
+    Mon-Thu; 2016 to Nov 2022 Tue/Thu), over 2005 to Nov 2022. From Nov 2022 every weekday expires, so that regime (monthly vs non-monthly
+    days) is reported separately and does not enter the verdict. Null: ratio of means >= 0.90; p = P(bootstrap ratio >= 0.90).
+    Pass: ratio < 0.90, p < 0.05, opex mean lower in a majority of years, and at least trial.min_n (200) opex days."""
     px = price_closes(spy_rows, "SPY")
     days = sorted(d for d in px if d >= start)
-    opex = {_third_friday(y, m).isoformat() for y in range(int(start[:4]), 2027) for m in range(1, 13)}
+    monthly = _monthly_expiries(days); expiring = _spy_expiry_days(days) | monthly
     dist = {d: abs(px[d] - round(px[d])) for d in days}
-    A = np.array([dist[d] for d in days if d in opex]); B = np.array([dist[d] for d in days if d not in opex])
+    prim = [d for d in days if d < _SPY_DAILY_EXPIRIES]
+    A = np.array([dist[d] for d in prim if d in monthly]); B = np.array([dist[d] for d in prim if d not in expiring])
     rng = np.random.default_rng(seed)
-    boots = np.array([rng.choice(A, A.size).mean() - rng.choice(B, B.size).mean() for _ in range(n_boot)])
-    p = float((np.sum(boots >= 0) + 1) / (n_boot + 1))
-    years = sorted({d[:4] for d in days}); wins = 0; counted = 0
+    ab = np.array([(rng.choice(A, A.size).mean(), rng.choice(B, B.size).mean()) for _ in range(n_boot)])
+    p = float((np.sum(ab[:, 0] / ab[:, 1] >= 0.90) + 1) / (n_boot + 1))          # T-502 null: ratio >= 0.90
+    p_diff = float((np.sum(ab[:, 0] - ab[:, 1] >= 0) + 1) / (n_boot + 1))         # no-difference null (T-192's), reported only
+    years = sorted({d[:4] for d in prim}); wins = wins10 = counted = 0
     for y in years:
-        a = [dist[d] for d in days if d.startswith(y) and d in opex]; b = [dist[d] for d in days if d.startswith(y) and d not in opex]
-        if len(a) >= 6:
-            counted += 1; wins += np.mean(a) < np.mean(b)
+        a = [dist[d] for d in prim if d.startswith(y) and d in monthly]; b = [dist[d] for d in prim if d.startswith(y) and d not in expiring]
+        if len(a) >= 6 and b:
+            counted += 1; wins += bool(np.mean(a) < np.mean(b)); wins10 += bool(np.mean(a) < 0.9 * np.mean(b))
     ratio = float(A.mean() / B.mean())
-    ok = ratio <= 0.9 and p < 0.05 and wins > counted / 2
-    return {"n_opex": int(A.size), "n_other": int(B.size), "mean_opex": float(A.mean()), "mean_other": float(B.mean()), "ratio": ratio, "p_value": p,
-            "years_lower": wins, "years": counted, "verdict": "supported" if ok else "not_supported",
-            "reason": f"SPY close's distance to the nearest $1 on {A.size} monthly opex days {A.mean():.3f} vs {B.mean():.3f} on other days (ratio {ratio:.2f}, need <= 0.90; p={p:.3f}); lower in {wins}/{counted} years"}
+
+    def _regime(lo, hi, control_excludes):
+        sel = [d for d in days if lo <= d < hi]
+        a = [dist[d] for d in sel if d in monthly]; b = [dist[d] for d in sel if d not in control_excludes]
+        return {"n_opex": len(a), "n_control": len(b), "mean_opex": float(np.mean(a)) if a else None, "mean_control": float(np.mean(b)) if b else None,
+                "ratio": float(np.mean(a) / np.mean(b)) if a and b else None}
+    regimes = {"2005-2015 (control Mon-Thu)": _regime(start, _SPY_MW_WEEKLIES, expiring),
+               "2016-Nov 2022 (control Tue/Thu)": _regime(_SPY_MW_WEEKLIES, _SPY_DAILY_EXPIRIES, expiring),
+               "Nov 2022 on (daily expiries; control non-monthly days)": _regime(_SPY_DAILY_EXPIRIES, "9999", monthly)}
+    verdict, why = _verdict([("ratio of means < 0.90", ratio < 0.90), ("bootstrap p < 0.05 against ratio >= 0.90", p < 0.05),
+                             ("opex mean lower in a majority of years", wins > counted / 2),
+                             (f"sample reaches trial min_n {T502_MIN_OPEX} opex days ({A.size})", True if A.size >= T502_MIN_OPEX else None)])
+    return {"n_opex": int(A.size), "n_other": int(B.size), "mean_opex": float(A.mean()), "mean_other": float(B.mean()), "ratio": ratio, "p_value": p, "p_diff": p_diff,
+            "years_lower": int(wins), "years_ratio_below_090": int(wins10), "years": counted, "regimes": regimes, "verdict": verdict,
+            "reason": f"SPY close's distance to the nearest $1 on {A.size} monthly expiration days {A.mean():.3f} vs {B.mean():.3f} on {B.size} days with no SPY expiration, 2005 to Nov 2022 "
+                      f"(ratio {ratio:.3f}, need < 0.90; P(boot ratio >= 0.90) = {p:.3f}; difference p {p_diff:.3f}); lower in {wins}/{counted} years ({wins10} at least 10% lower); "
+                      "regimes (reported, the last outside the verdict): " + ", ".join(f"{k} {v['ratio']:.3f}" for k, v in regimes.items() if v["ratio"] is not None) + f"; verdict: {why}"}
 
 
 def btc_weekend_variance(btc_rows, start_year: int = 2017, n_boot: int = 2000, seed: int = 0) -> dict:
@@ -519,7 +579,8 @@ def _chain_by_root_expiry(rows) -> dict:
 
 
 def _bill_cont(dtb3: dict, day: str) -> float:
-    return math.log(1 + dtb3[max(d for d in dtb3 if d <= day)] / 100)
+    """Continuously compounded 3-month bill from DTB3 (discount basis), latest row dated before the capture day."""
+    return _dtb3_cont(_bill_obs(dtb3, day)[1])
 
 
 def _boxes_v2(rows, spot, day, dte_range, moneyness=0.15, min_width_frac=0.05, step=None):
@@ -538,7 +599,7 @@ def _boxes_v2(rows, spot, day, dte_range, moneyness=0.15, min_width_frac=0.05, s
                 W = k2 - k1
                 mid = (c1b + c1a) / 2 - (c2b + c2a) / 2 - (p1b + p1a) / 2 + (p2b + p2a) / 2
                 borrow = c1b - c2a - p1a + p2b
-                out.append({"root": root, "expiry": exp, "T": T, "r_mid": math.log(W / mid) / T if mid > 0 else None,
+                out.append({"root": root, "expiry": exp, "T": T, "k1": k1, "k2": k2, "r_mid": math.log(W / mid) / T if mid > 0 else None,
                             "r_borrow": math.log(W / borrow) / T if borrow > 0 else None})
     return out
 
