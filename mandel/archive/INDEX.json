@@ -4081,6 +4081,27 @@
    "parked_reason": "",
    "in_git": true,
    "schema": "kind opec-announcement: value = {day, weekday, effective_weekday (next Monday for a weekend date; holidays not adjusted), vintage, in_pre_covid_sheet (vintage and in_pre_covid_sheet describe the research file, ex post), known_since, known_since_basis, available_basis}; available_at = the end of the announcement day (23:59:59 UTC; the day's 00:00 comes before unscheduled announcements, which the file does not mark), or the end of the day of the earlier OPEC press release that announced the meeting date when known_since is verified (then known_since and known_since_basis are set). A harness entering at the T-1 close may only use rows with a verified known_since; the available_at filter enforces this | kind oil-supply-surprise: value = {day, vintage, surprise{Front, 1M..12M, PC} as published, pc_pre_covid}, available_at = the vintage's GitHub commit time (a lower bound on the push), never before the end of the event day"
+  },
+  "dolt-chain-SPY": {
+   "name": "dolt-chain-SPY",
+   "kind": "data",
+   "path": "mandel/archive/data/dolt-chain-SPY.jsonl.gz",
+   "created_at": "2026-10-15T16:17:27.292250+00:00",
+   "rows": 184226,
+   "bytes": 5812304,
+   "sha256": "10906bd3d812f677dcd4c626b387e325081f1caa1a778330d995dd3413b6184c",
+   "tags": [
+    "cc-by-sa-4.0",
+    "chain",
+    "dolthub",
+    "history",
+    "options",
+    "spy"
+   ],
+   "recipe": "GET https://www.dolthub.com/api/v1alpha1/post-no-preference/options/master?q=SELECT * FROM option_chain WHERE act_symbol = 'SPY' AND date IN (<every calendar day of an adaptive 1-31 day window>), walked 2019-02-09..2026-10-15; a window that hits the 1000-row cap or 'context deadline exceeded' is halved; commit times (provenance) from SELECT date, message FROM dolt_log LIMIT/OFFSET pages; stale check against archive daily-history-SPY closes and fred-DTB3 (read only). Rebuild: mandel.data.dolt_options.fetch_dolt_chains(store, 'SPY', pace=1.0, in_git=True). Licence CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/; post-no-preference/options on DoltHub, LICENSE.md in dolt_docs). Attribution: post-no-preference via DoltHub (https://www.dolthub.com/repositories/post-no-preference/options). Changes: vol renamed iv, call_put renamed type (call/put); added quote_date, available_at, observed_at, dolt_commit_at, backfilled, stale and stale_basis. ShareAlike: this bundle is an adaptation redistributed under CC BY-SA 4.0; anything shared that is built from it must carry the same licence and this attribution.",
+   "parked_reason": "",
+   "in_git": true,
+   "schema": "value = {symbol, snapshot_date (DoltHub date), quote_date (close quoted: last NYSE trading day <= snapshot_date, or the session a decisive put-call parity match against the closes points to), expiry, strike, type, bid, ask, iv (source column vol), delta, gamma, theta, vega, rho, dolt_commit_at (last named DoltHub commit for the date; 2021-04-21T01:13:00+00:00 for the bulk era; provenance), backfilled (that commit after the next session's open; None = unknown; provenance), stale (True = quote_date moved off the rule, None = not checked), stale_basis}; observed_at = fetch time; available_at = 22:00 UTC on the later of snapshot_date and quote_date"
   }
  }
 }
