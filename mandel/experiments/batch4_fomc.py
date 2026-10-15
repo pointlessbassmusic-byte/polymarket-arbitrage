@@ -41,10 +41,15 @@ implemented -> at best inconclusive; supported only when every criterion is impl
 cannot support the claim (no events, missing bundle) the verdict is inconclusive with the reason. Below the trial's
 min_n (in the claim's own units: FOMC days, statement days, cycle days, expansionary+contractionary meetings) house
 rule 5 applies (``_rule5``): the verdict is never supported, and a failing criterion still counts only when it fails
-decisively, its 95% interval lying wholly on the wrong side of the claimed bound (a block-bootstrap CI, the meeting
-bootstrap CI of T-361's gaps, or the bootstrap quantile of its Sharpe difference). Any other failure there is undecided
-(None), so the verdict is inconclusive; a criterion with no interval (T-342's placebo p) never decides below min_n.
-The criteria judged, and the decisive failures, are reported under ``rule5``.
+decisively, its bound at the pass's own confidence lying wholly on the wrong side of the claimed bound. A criterion
+judged on a two-sided 95% interval or on a point estimate fails decisively when its 95% interval (a block-bootstrap CI,
+the meeting bootstrap CI of T-361's gaps, or the bootstrap quantile of its Sharpe difference) lies wholly on the wrong
+side. A one-sided test at 5% (the block-bootstrap p of T-341 and T-342, the permutation p of T-361) fails decisively
+when the mirror one-sided test from the same draws rejects at 5% the other way: the studentized block-bootstrap p for
+H0 diff >= 0 (``group_diff``'s p_less), or the lower-tail permutation p. That is the one-sided 95% bound on the other
+side. The two-sided 95% interval would be a one-sided 97.5% bound, a higher confidence than the pass, and would
+under-call. Any other failure there is undecided (None), so the verdict is inconclusive; T-342's random-offset placebo
+p never decides below min_n. The criteria judged, and the decisive failures, are reported under ``rule5``.
 """
 
 from __future__ import annotations
@@ -299,13 +304,21 @@ def _ci_at_or_below(ci, bound: float) -> bool:
     return ci[1] is not None and ci[1] <= bound
 
 
+def _mirror_rejects(p_other_side: Optional[float], alpha: float = 0.05) -> bool:
+    """Rule 5 for a one-sided test at ``alpha``: the mirror one-sided test from the same draws (H0 on the claimed side)
+    rejects at the same ``alpha``, i.e. the one-sided (1 - alpha) bound lies wholly on the wrong side (False when there
+    is no p)."""
+    return p_other_side is not None and p_other_side < alpha
+
+
 def _rule5(rows, n: int, min_n: int, unit: str) -> tuple[str, str, list]:
     """House rule 5 for a sample below the trial's min_n (``n`` in the claim's own units; callers judge a sample at or
     above min_n at face value with ``_verdict``). ``rows``: [(name, ok, decisive)] with ok True / False / None (not
-    computable) and decisive True when the failure stands below min_n: the criterion's 95% interval lies wholly on the
-    wrong side of the claimed bound. A passing or decisively failing criterion keeps its bool, any other failure becomes
-    None (undecided), and the unmet 'n >= trial min_n' criterion (None) keeps the verdict from 'supported'.
-    Returns (verdict, explanation starting with the verdict, the criteria judged)."""
+    computable) and decisive True when the failure stands below min_n: the criterion's bound at the pass's own
+    confidence lies wholly on the wrong side of the claimed bound (its 95% interval; for a one-sided 5% test, the mirror
+    one-sided test from the same draws rejecting at 5%, ``_mirror_rejects``). A passing or decisively failing criterion
+    keeps its bool, any other failure becomes None (undecided), and the unmet 'n >= trial min_n' criterion (None) keeps
+    the verdict from 'supported'. Returns (verdict, explanation starting with the verdict, the criteria judged)."""
     crit = [(name, None) if ok is None else (name, True) if ok else (name + " (fails decisively below min_n)", False) if decisive
             else (name + " (fails, not decisively, below min_n: undecided)", None) for name, ok, decisive in rows]
     crit.append((f"n >= trial min_n ({n} of {min_n} {unit})", None))
@@ -313,6 +326,7 @@ def _rule5(rows, n: int, min_n: int, unit: str) -> tuple[str, str, list]:
     v0, why0 = _verdict([(name, ok) for name, ok, _ in rows])
     return v, (f"{v}: only {n} {unit}, below the trial's min_n {min_n}, so the verdict cannot be supported and a failing "
                f"criterion counts only when it fails decisively, its 95% interval wholly on the wrong side of the claimed bound "
+               f"or, for a one-sided 5% test, the mirror one-sided test from the same draws rejecting at 5% "
                f"(house rule 5): {why} (criteria at face value: {v0}, {why0})"), crit
 
 
@@ -659,13 +673,16 @@ def statement_day_effect(days, closes, fomc_days, start: str = "1994-01-01", end
             + ("; secondary Holm p " + ", ".join(f"{k} {sec[k]['diff_bps']:+.1f} bps p_holm={holm.get(k, float('nan')):.3f}" for k in sec if sec[k]['diff_bps'] is not None) if sec else "")
             + f"{cpi_txt}")
     if g["n_event"] < min_n:
-        # rule 5: a criterion fails decisively when its 95% CI lies wholly at or below the bound (15 bps, 0, 0); the
-        # subsample has only a point difference above, so its block-bootstrap CI is computed here
+        # rule 5: the difference criteria fail decisively when their 95% CI lies wholly at or below the bound (15 bps; 0
+        # for the subsample, which has only a point difference above, so its block-bootstrap CI is computed here). The
+        # p criterion is a one-sided 5% test (p_greater, H0 diff <= 0), so its decisive failure is the mirror from the same
+        # studentized draws, p_less (H0 diff >= 0) < 0.05: the one-sided 95% bound at or below 0, not the two-sided CI's
+        # upper end (a one-sided 97.5% bound)
         gs = group_diff(net[ms], f[ms], block, n_boot, seed)
-        dec = [_ci_at_or_below(g["ci"], threshold_bps / 1e4), _ci_at_or_below(g["ci"], 0.0), _ci_at_or_below(gs["ci"], 0.0)]
+        dec = [_ci_at_or_below(g["ci"], threshold_bps / 1e4), _mirror_rejects(g["p_less"]), _ci_at_or_below(gs["ci"], 0.0)]
         rep["sub_ci_bps"] = [None if c_ is None else c_ * 1e4 for c_ in gs["ci"]]
         return _below_min_n(rep, [(c, ok, d) for (c, ok), d in zip(crit, dec)], g["n_event"], min_n, "statement days",
-                            f"only {g['n_event']} statement days (min_n {min_n})", body)
+                            f"only {g['n_event']} statement days (min_n {min_n}); mirror p (H0 diff >= 0) {_f_p(g['p_less'])}", body)
     v, why = _verdict(crit)
     rep["verdict"] = v
     rep["reason"] = f"{body} — {why}"
@@ -762,15 +779,17 @@ def even_week_effect(days, closes, statement_days, start: str = "1994-01-01", en
             + f"; random-offset placebo p={p_placebo:.3f} (gross {gross*1e4:+.2f} vs placebo 95th pct {rep['placebo_q95_bps']:+.2f}); "
             f"week 0 = days -1..+3 then 5-day weeks")
     if rep["n"] < min_n:
-        # rule 5: the difference criteria fail decisively when their 95% CI lies wholly at or below the bound (5 bps/day, 0,
-        # and 0 for each part, whose block-bootstrap CI is computed here); the placebo p has no interval, so its failure
-        # stays undecided below min_n
+        # rule 5: the difference criteria fail decisively when their 95% CI lies wholly at or below the bound (5 bps/day,
+        # and 0 for each part, whose block-bootstrap CI is computed here). The block-bootstrap p criterion is a one-sided
+        # 5% test (p_greater, H0 diff <= 0), so its decisive failure is the mirror from the same studentized draws, p_less
+        # (H0 diff >= 0) < 0.05: the one-sided 95% bound at or below 0, not the two-sided CI's upper end (a one-sided
+        # 97.5% bound). The random-offset placebo p stays undecided below min_n
         pci = {lab: group_diff(net[m], even[m], block, n_boot, seed)["ci"] for lab, m in part_masks.items()}
-        dec = ([_ci_at_or_below(g["ci"], threshold_bps / 1e4), _ci_at_or_below(g["ci"], 0.0)]
+        dec = ([_ci_at_or_below(g["ci"], threshold_bps / 1e4), _mirror_rejects(g["p_less"])]
                + [_ci_at_or_below(pci[lab], 0.0) for lab in parts] + [False])
         rep["parts_ci_net_bps"] = {lab: [None if c_ is None else c_ * 1e4 for c_ in ci] for lab, ci in pci.items()}
         return _below_min_n(rep, [(c, ok, d) for (c, ok), d in zip(crit, dec)], rep["n"], min_n, "cycle days",
-                            f"only {rep['n']} cycle days (min_n {min_n})", body)
+                            f"only {rep['n']} cycle days (min_n {min_n}); mirror p (H0 diff >= 0) {_f_p(g['p_less'])}", body)
     v, why = _verdict(crit)
     rep["verdict"] = v
     rep["reason"] = f"{body} — {why}"
@@ -877,11 +896,13 @@ def monetary_momentum(days, closes, dgs2: dict, statement_days, start: str = "19
                      + f"; ZLB 2009-2015 {('n/a' if zlb['gap_net_pp'] is None else format(zlb['gap_net_pp'], '+.2f'))} pp; long-only arm Sharpe {sr_arm:.2f} vs buy-and-hold {sr_bh:.2f} "
                      f"({rep['span'][0]}..{rep['span'][1]}, excess over T-bills)")
     if n_exp + n_con < min_n:
-        # rule 5: a criterion fails decisively when its 95% interval lies wholly on the wrong side of the claimed bound: the
-        # net-gap bootstrap CI at or below 1 pp; the gross-gap CI (net + costs) at or below 0 for the permutation test; each
-        # half's net-gap bootstrap CI (computed here) at or below 0; the arm-minus-buy-and-hold Sharpe difference's 97.5%
-        # bootstrap quantile (computed here, same draws as the 2.5% one above) at or below 0. A gap CI decides only with
-        # >= 2 meetings per arm and >= 8 in all (the floor group_diff uses)
+        # rule 5: a criterion fails decisively when its bound at the pass's own confidence lies wholly on the wrong side of
+        # the claimed bound: the net-gap bootstrap CI at or below 1 pp; for the one-sided 5% permutation test, the mirror
+        # lower-tail permutation p from the same draws (H1: gross gap < 0) below 0.05, i.e. the one-sided 95% bound at or
+        # below 0 (the two-sided CI's upper end would be a one-sided 97.5% bound); each half's net-gap bootstrap CI
+        # (computed here) at or below 0; the arm-minus-buy-and-hold Sharpe difference's 97.5% bootstrap quantile (computed
+        # here, same draws as the 2.5% one above) at or below 0. The full-sample gap rows decide only with >= 2 meetings
+        # per arm and >= 8 in all (the floor group_diff uses)
         def enough(na, nb):
             return na >= 2 and nb >= 2 and na + nb >= 8
         rng_h = np.random.default_rng(seed + 1); half_ci = {}
@@ -894,11 +915,15 @@ def monetary_momentum(days, closes, dgs2: dict, statement_days, start: str = "19
                 half_ci[lab] = [None, None]
         _, sd_hi = _sharpe_diff_lower(arm, bh, EQ_PPY, block=21, n_boot=500, seed=seed, q=0.975)
         full_ok = enough(n_exp, n_con)
-        dec = ([full_ok and ci[1] * 100 <= gap_pp, full_ok and ci[1] + 2 * cost_arm <= 0]
+        p_lo = float((np.sum(perm <= g_gross) + 1) / (n_perm + 1))       # mirror of p_perm, same permutation draws
+        dec = ([full_ok and ci[1] * 100 <= gap_pp, full_ok and _mirror_rejects(p_lo)]
                + [_ci_at_or_below(half_ci[lab], 0.0) for lab in hv] + [sd_hi <= 0])
-        rep.update(criteria_verdict_if_min_n_ignored=v, halves_gap_ci_net_pp=half_ci, sharpe_diff_upper_95=sd_hi)
+        rep.update(criteria_verdict_if_min_n_ignored=v, halves_gap_ci_net_pp=half_ci, sharpe_diff_upper_95=sd_hi,
+                   permutation_p_lower=p_lo)
         return _below_min_n(rep, [(c, ok, d) for (c, ok), d in zip(crit, dec)], n_exp + n_con, min_n,
-                            "expansionary+contractionary meetings", f"only {n_exp + n_con} expansionary+contractionary meetings (min_n {min_n})", body)
+                            "expansionary+contractionary meetings",
+                            f"only {n_exp + n_con} expansionary+contractionary meetings (min_n {min_n}); lower-tail permutation p "
+                            f"(H1 gap < 0) {p_lo:.4f}", body)
     rep["verdict"] = v
     rep["reason"] = f"{body} — {why}"
     return rep

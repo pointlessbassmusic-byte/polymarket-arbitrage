@@ -57,15 +57,21 @@ criterion is implemented and passes.
 House rule 5 (``_rule5``). Below the trial's min_n, counted in the claim's own units (T-198 windows, T-258 months,
 T-303 days, T-329 trades, T-362 test contract-months, T-363 in-position test days, T-364 weeks, T-423 top-decile days),
 the min_n criterion is unmet, so the verdict is never supported. A failing criterion still counts there only when it
-fails decisively: its 95% interval lies wholly on the wrong side of the claimed bound, or the failure would persist at
-min_n whatever the missing observations are (T-198's share). Any other failure is undecided (None), so the verdict is
-inconclusive. A criterion with no interval (a DSR, an event count) never decides below min_n. A p-value criterion
-decides when the interval of the statistic it tests lies wholly on the wrong side of 0. A zero-width interval (constant
-data) or one from fewer than 4 observations or month clusters decides nothing. Where the face-value statistic has no
-interval (T-258's Sharpe, T-329's halves, T-364's gaps, T-423's out-of-sample difference), the interval is computed
-below min_n only; T-363's Sharpe tests use the optimistic-spread Sharpe interval already reported. At or above min_n
-every criterion is judged at face value, exactly as before. Below min_n the report's ``criteria`` are the ones judged, and ``rule5`` holds the face-value criteria and
-the decisive failures.
+fails decisively: the statistic's bound at the SAME confidence as the pass lies wholly on the wrong side of the claimed
+bound, or the failure would persist at min_n whatever the missing observations are (T-198's share). A one-sided 95% pass
+(a 95% lower bound above the bound, or a one-sided p < 0.05) is mirrored by the one-sided 95% bound on the other side
+from the same bootstrap draws (the 95% quantile, the studentized m - q05(t*) x se, or the opposite-tail p < 0.05), not
+by the two-sided 95% interval, which is one-sided 97.5%: T-329's and T-362's means, T-363's Sharpe lower bound, T-364's
+permutation test (the gap's 95% upper bound at or below 0) and T-423's p-value (the opposite-tail p on the p-value's own
+draws). A point-estimate pass, or a two-sided 95% interval pass, is mirrored by the two-sided 95% interval lying wholly
+on the wrong side. Any other failure is undecided (None), so the verdict is inconclusive. A criterion with no interval
+(a DSR, an event count) never decides below min_n. A zero-width interval (constant data) or one from fewer than 4
+observations or month clusters decides nothing, and neither does a one-sided bound from such draws. Where the
+face-value statistic has no interval or bound (T-258's Sharpe, T-329's halves and the mean's upper bound, T-362's upper
+bound, T-363's optimistic Sharpe upper bound, T-364's gaps, T-423's out-of-sample difference), it is computed below
+min_n only. At or above min_n every criterion is judged at face value, exactly as before. Below min_n the report's
+``criteria`` are the ones judged, and ``rule5`` holds the face-value criteria, the decisive failures and the bounds
+that decided them.
 """
 
 from __future__ import annotations
@@ -239,6 +245,20 @@ def _row_sharpe(X: np.ndarray, ppy: int) -> np.ndarray:
     return out * math.sqrt(ppy)
 
 
+def _student_draws(x: np.ndarray, block: int, n_boot: int, seed: int):
+    """(se, t*) of the studentized circular-block bootstrap of the mean of a non-constant x (at least 4 values):
+    t* = (mean* - mean) / se*, se from a Bartlett long-run variance with bandwidth = block."""
+    n = len(x); m = float(x.mean())
+    se = math.sqrt(_lrv(x, block) / n)
+    rng = np.random.default_rng(seed)
+    idx = _cbb_idx(rng, n, block, n_boot)
+    t = np.empty(n_boot)
+    for b in range(n_boot):
+        xb = x[idx[b]]
+        t[b] = (xb.mean() - m) / math.sqrt(_lrv(xb, block) / n)
+    return se, t
+
+
 def student_mean_ci(x, block: int = 3, n_boot: int = 5000, seed: int = 0) -> dict:
     """Studentized circular-block bootstrap for the mean: two-sided 95% CI and one-sided 95% lower bound.
     t* = (mean* - mean) / se*, se from a Bartlett long-run variance with bandwidth = block."""
@@ -249,16 +269,28 @@ def student_mean_ci(x, block: int = 3, n_boot: int = 5000, seed: int = 0) -> dic
     if np.allclose(x, x[0]):
         out.update(se=0.0, ci95=[m, m], lb95=m)
         return out
-    se = math.sqrt(_lrv(x, block) / n)
-    rng = np.random.default_rng(seed)
-    idx = _cbb_idx(rng, n, block, n_boot)
-    t = np.empty(n_boot)
-    for b in range(n_boot):
-        xb = x[idx[b]]
-        t[b] = (xb.mean() - m) / math.sqrt(_lrv(xb, block) / n)
+    se, t = _student_draws(x, block, n_boot, seed)
     out.update(se=se, ci95=[m - float(np.quantile(t, 0.975)) * se, m - float(np.quantile(t, 0.025)) * se],
                lb95=m - float(np.quantile(t, 0.95)) * se)
     return out
+
+
+def student_mean_ub95(x, block: int = 3, n_boot: int = 5000, seed: int = 0) -> Optional[float]:
+    """One-sided 95% studentized upper bound of the mean, m - q05(t*) x se, from the same draws (block, n_boot, seed)
+    as ``student_mean_ci``: the mirror of its lb95. None under 4 values or for constant data (se 0)."""
+    x = np.asarray(x, dtype=float)
+    if len(x) < 4 or np.allclose(x, x[0]):
+        return None
+    se, t = _student_draws(x, block, n_boot, seed)
+    return float(x.mean()) - float(np.quantile(t, 0.05)) * se
+
+
+def _stationary_sharpe_draws(x: np.ndarray, mean_block: float, n_boot: int, seed: int, ppy: int, chunk: int) -> np.ndarray:
+    """Annualised Sharpe ratios of n_boot stationary-bootstrap resamples of x (drawn ``chunk`` at a time)."""
+    n = len(x); rng = np.random.default_rng(seed); vals = []
+    for s in range(0, n_boot, chunk):
+        vals.append(_row_sharpe(x[_stationary_idx(rng, n, mean_block, min(chunk, n_boot - s))], ppy))
+    return np.concatenate(vals)
 
 
 def stationary_sharpe_ci(x, mean_block: float = 14, n_boot: int = 5000, seed: int = 0, ppy: int = CRYPTO_PPY,
@@ -268,12 +300,19 @@ def stationary_sharpe_ci(x, mean_block: float = 14, n_boot: int = 5000, seed: in
     out = {"sharpe": _sr(x, ppy) if n > 2 else None, "ci95": [None, None], "lb95": None}
     if n < 8:
         return out
-    rng = np.random.default_rng(seed); vals = []
-    for s in range(0, n_boot, chunk):
-        vals.append(_row_sharpe(x[_stationary_idx(rng, n, mean_block, min(chunk, n_boot - s))], ppy))
-    v = np.concatenate(vals)
+    v = _stationary_sharpe_draws(x, mean_block, n_boot, seed, ppy, chunk)
     out.update(ci95=[float(np.quantile(v, 0.025)), float(np.quantile(v, 0.975))], lb95=float(np.quantile(v, 0.05)))
     return out
+
+
+def stationary_sharpe_ub95(x, mean_block: float = 14, n_boot: int = 5000, seed: int = 0, ppy: int = CRYPTO_PPY,
+                           chunk: int = 500) -> Optional[float]:
+    """One-sided 95% upper bound (the 95% quantile) of the annualised Sharpe from the same stationary-bootstrap draws
+    (mean_block, n_boot, seed, chunk) as ``stationary_sharpe_ci``: the mirror of its lb95. None under 8 values."""
+    x = np.asarray(x, dtype=float)
+    if len(x) < 8:
+        return None
+    return float(np.quantile(_stationary_sharpe_draws(x, mean_block, n_boot, seed, ppy, chunk), 0.95))
 
 
 def stationary_mean_p_less(g, mean_block: float = 7, n_boot: int = 5000, seed: int = 0, chunk: int = 500) -> Optional[float]:
@@ -300,16 +339,28 @@ def paired_sharpe_diff_ci(a, b, ppy: int, block: int, n_boot: int = 5000, seed: 
     return {"diff": float(obs), "ci95": [float(np.quantile(v, 0.025)), float(np.quantile(v, 0.975))]}
 
 
-def cluster_mean_boot(x, clusters, n_boot: int = 5000, seed: int = 0) -> dict:
-    """Mean of x with a cluster bootstrap (clusters resampled with replacement): 2.5/5/97.5% quantiles."""
-    x = np.asarray(x, dtype=float); cl = np.asarray(clusters)
+def _cluster_mean_draws(x: np.ndarray, clusters, n_boot: int, seed: int):
+    """(bootstrap means, cluster count) of x with clusters resampled with replacement."""
+    cl = np.asarray(clusters)
     keys = sorted(set(cl.tolist()))
     sums = np.array([x[cl == k].sum() for k in keys]); cnts = np.array([(cl == k).sum() for k in keys])
     rng = np.random.default_rng(seed)
     pick = rng.integers(0, len(keys), size=(n_boot, len(keys)))
-    m = sums[pick].sum(axis=1) / cnts[pick].sum(axis=1)
+    return sums[pick].sum(axis=1) / cnts[pick].sum(axis=1), len(keys)
+
+
+def cluster_mean_boot(x, clusters, n_boot: int = 5000, seed: int = 0) -> dict:
+    """Mean of x with a cluster bootstrap (clusters resampled with replacement): 2.5/5/97.5% quantiles."""
+    x = np.asarray(x, dtype=float)
+    m, k = _cluster_mean_draws(x, clusters, n_boot, seed)
     return {"mean": float(x.mean()), "ci95": [float(np.quantile(m, 0.025)), float(np.quantile(m, 0.975))],
-            "lb95": float(np.quantile(m, 0.05)), "clusters": len(keys)}
+            "lb95": float(np.quantile(m, 0.05)), "clusters": k}
+
+
+def cluster_mean_ub95(x, clusters, n_boot: int = 5000, seed: int = 0) -> float:
+    """One-sided 95% upper bound (the 95% quantile) of the cluster-bootstrap mean, from the same draws (n_boot, seed)
+    as ``cluster_mean_boot``: the mirror of its lb95."""
+    return float(np.quantile(_cluster_mean_draws(np.asarray(x, dtype=float), clusters, n_boot, seed)[0], 0.95))
 
 
 def _dsr(x, n_trials: int) -> Optional[float]:
@@ -358,9 +409,17 @@ def _next_month(y: int, m: int) -> date:
 MIN_DECISIVE_OBS = 4      # an interval from fewer observations (or month clusters) never decides a failure below min_n
 
 
+def _wide(ci) -> bool:
+    """The bootstrap's two-sided 95% interval exists and has positive width. A one-sided bound from the same draws decides
+    a failure only then: constant data (or a degenerate resampling) decide nothing."""
+    lo, hi = ci
+    return lo is not None and hi is not None and bool(lo < hi)
+
+
 def _ci_below(ci, bound: float, strict: bool = False) -> bool:
-    """The 95% interval lies wholly at or below ``bound`` (strictly below with ``strict``). False without an interval
-    and for a zero-width one: constant data decide nothing."""
+    """The two-sided 95% interval lies wholly at or below ``bound`` (strictly below with ``strict``). False without an
+    interval and for a zero-width one: constant data decide nothing. It mirrors a point-estimate pass; a one-sided 95%
+    pass is mirrored by the one-sided 95% bound on the other side from the same draws, not by this interval."""
     lo, hi = ci
     if lo is None or hi is None or not lo < hi:
         return False
@@ -368,7 +427,8 @@ def _ci_below(ci, bound: float, strict: bool = False) -> bool:
 
 
 def _ci_above(ci, bound: float, strict: bool = False) -> bool:
-    """The 95% interval lies wholly at or above ``bound`` (strictly above with ``strict``); False as in ``_ci_below``."""
+    """The two-sided 95% interval lies wholly at or above ``bound`` (strictly above with ``strict``); False and a
+    point-estimate mirror as in ``_ci_below``."""
     lo, hi = ci
     if lo is None or hi is None or not lo < hi:
         return False
@@ -378,8 +438,10 @@ def _ci_above(ci, bound: float, strict: bool = False) -> bool:
 def _rule5(crit, n: int, min_n: int, unit: str, decisive: Callable[[], Sequence[bool]]):
     """House rule 5 in place of a bare ``_verdict(crit)``. ``crit``: the face-value criteria [(name, ok)], whose min_n row
     is (name, True if n >= min_n else None). ``decisive()``: one flag per criterion, True when that criterion's failure
-    stands below min_n (its 95% interval lies wholly on the wrong side of the claimed bound, or the failure would persist
-    at min_n whatever the missing observations are); it is called only below min_n. At or above min_n ``crit`` is judged
+    stands below min_n: the statistic's bound at the same confidence as the pass lies wholly on the wrong side of the
+    claimed bound (a one-sided 95% pass is mirrored by the one-sided 95% bound on the other side from the same draws, a
+    point-estimate pass by the two-sided 95% interval), or the failure would persist at min_n whatever the missing
+    observations are; it is called only below min_n. At or above min_n ``crit`` is judged
     as it is. Below min_n a passing or decisively failing criterion keeps its bool, any other failure becomes None
     (undecided), and the unmet min_n row (None) keeps the verdict from 'supported'.
     Returns (verdict, why, criteria judged, rule-5 record or None at or above min_n)."""
@@ -411,15 +473,21 @@ def block_sharpe_ci(x, block: int, n_boot: int = 5000, seed: int = 0, ppy: int =
     return [float(np.quantile(v, 0.025)), float(np.quantile(v, 0.975))]
 
 
+def _stationary_mean_draws(x: np.ndarray, mean_block: float, n_boot: int, seed: int, chunk: int) -> np.ndarray:
+    """Means of n_boot stationary-bootstrap resamples of x, drawn ``chunk`` at a time: the same draws, for the same
+    (mean_block, n_boot, seed, chunk), as ``stationary_mean_p_less``."""
+    n = len(x); rng = np.random.default_rng(seed); vals = []
+    for s in range(0, n_boot, chunk):
+        vals.append(x[_stationary_idx(rng, n, mean_block, min(chunk, n_boot - s))].mean(axis=1))
+    return np.concatenate(vals)
+
+
 def stationary_mean_ci(x, mean_block: float = 7, n_boot: int = 5000, seed: int = 0, chunk: int = 500) -> list:
     """Two-sided 95% stationary-bootstrap percentile interval of the mean ([None, None] under 8 observations)."""
     x = np.asarray(x, dtype=float); n = len(x)
     if n < 8:
         return [None, None]
-    rng = np.random.default_rng(seed); vals = []
-    for s in range(0, n_boot, chunk):
-        vals.append(x[_stationary_idx(rng, n, mean_block, min(chunk, n_boot - s))].mean(axis=1))
-    v = np.concatenate(vals)
+    v = _stationary_mean_draws(x, mean_block, n_boot, seed, chunk)
     return [float(np.quantile(v, 0.025)), float(np.quantile(v, 0.975))]
 
 
@@ -790,8 +858,10 @@ def cme_basis_spike(days: Sequence[str], F, S, std_bar, expiries: Sequence[date]
     before expiry day, so trades never span a roll. Trades never overlap. Pass: one-sided 95% lower bound of the mean
     net return (month-clustered bootstrap) > 0, positive means before and after 2024-01, DSR > 0.95 over 5 variants,
     and the claim window from ``start`` covered by synchronous spot. Below min_n trades (house rule 5) the mean fails
-    decisively when its month-clustered 95% interval lies wholly at or below 0, and the halves criterion when either
-    half's does (each needs at least 4 months); the DSR never decides there."""
+    decisively when its month-clustered one-sided 95% upper bound (the 95% quantile of the same draws as the lower
+    bound, the mirror of the one-sided pass) is at or below 0, and the halves criterion, a point estimate, when either
+    half's two-sided month-clustered 95% interval lies wholly at or below 0. Each needs at least 4 months and an
+    interval of positive width; the DSR never decides there."""
     F = np.asarray(F, dtype=float); S = np.asarray(S, dtype=float); ds = list(days); n = len(ds)
     tab = cme_daily_basis(ds, F, S, std_bar, expiries, roll_trading_days=roll_trading_days)
     ok, valid, b, exp = tab["ok"], tab["valid"], tab["basis"], tab["expiry"]
@@ -829,23 +899,32 @@ def cme_basis_spike(days: Sequence[str], F, S, std_bar, expiries: Sequence[date]
             (f"DSR > 0.95 (n_trials = {n_trials})", dsr is not None and dsr > 0.95),
             (f"claim window from {start[:7]} covered by settle-synchronous spot", True if covered else None)]
     half_boot = {}
+    mean_ub95 = None
 
-    def decisive():       # rule 5: a month-clustered 95% interval (>= 4 months) lies wholly at or below 0
-        def down(bt):
-            return bt["clusters"] >= MIN_DECISIVE_OBS and _ci_below(bt["ci95"], 0.0)
+    def decisive():       # rule 5, at the confidence of each pass (>= 4 months, an interval of positive width)
+        nonlocal mean_ub95
+        # the one-sided 95% lower bound > 0 is mirrored by the one-sided 95% upper bound <= 0 from the same draws
+        mean_ub95 = cluster_mean_ub95(net, [t["entry"][:7] for t in trades], n_boot, seed)
+        mean_down = boot["clusters"] >= MIN_DECISIVE_OBS and _wide(boot["ci95"]) and mean_ub95 <= 0
         for nm, sel in (("pre_2024", [t["entry"] < split for t in trades]), ("post_2024", [t["entry"] >= split for t in trades])):
             sub = [t for t, s_ in zip(trades, sel) if s_]
             if sub:
                 half_boot[nm] = cluster_mean_boot([t["net"] for t in sub], [t["entry"][:7] for t in sub], n_boot, seed)
-        return [False, down(boot), any(down(bt) for bt in half_boot.values()), False, False]
+        # the halves are point estimates (> 0), mirrored by a half's two-sided 95% interval wholly at or below 0
+        half_down = any(bt["clusters"] >= MIN_DECISIVE_OBS and _ci_below(bt["ci95"], 0.0) for bt in half_boot.values())
+        return [False, mean_down, half_down, False, False]
 
     v, why, crit, r5 = _rule5(crit, nt, min_n, "trades", decisive)
     ci_txt = ""
     if r5:
+        r5["mean_ub95"] = mean_ub95
         r5["halves_month_clustered"] = half_boot
-        ci_txt = "; month-clustered 95% CIs " + ", ".join(
-            f"{nm} [{_pp(bt['ci95'][0], 3)}, {_pp(bt['ci95'][1], 3)}]% ({bt['clusters']} months)"
-            for nm, bt in (("all trades", boot), *((k.replace("_", "-"), b_) for k, b_ in half_boot.items())))
+        ci_txt = (f"; month-clustered one-sided 95% upper bound of the mean {_pp(mean_ub95, 3)}% ({boot['clusters']} "
+                  f"months; same draws as the lower bound, decisive below min_n when <= 0)")
+        if half_boot:
+            ci_txt += "; month-clustered 95% CIs " + ", ".join(
+                f"{k.replace('_', '-')} [{_pp(bt['ci95'][0], 3)}, {_pp(bt['ci95'][1], 3)}]% ({bt['clusters']} months)"
+                for k, bt in half_boot.items())
     reason = (f"{nt} trades {trades[0]['entry']}..{trades[-1]['entry']} (synchronous spot from {first_sync}; z > {z_thr:g} "
               f"vs the valid settles in the trailing {z_window} trading days, at least {z_min_obs}, the {roll_trading_days} "
               f"days before expiry excluded; enter next settle, hold {hold} trading days in the same contract, "
@@ -906,9 +985,10 @@ def cme_cash_and_carry(contracts: Sequence[dict], h: float = 0.03, test: tuple =
     Annualised: excess / capital x 365/d. Months not entered count as 0. Pass (test window): one-sided 95% studentized
     block-bootstrap (block 3) lower bound of the mean > 0, and DSR > 0.95 with n_trials = 10. The claim covers every
     contract month in ``claim``: months without synchronous prices leave a not-implemented coverage criterion (at
-    best inconclusive). Below min_n test contract-months (house rule 5) the mean fails decisively when its two-sided
-    studentized 95% CI lies wholly at or below 0; the DSR never decides there. Under 4 test contract-months nothing is
-    computed and the verdict is inconclusive."""
+    best inconclusive). Below min_n test contract-months (house rule 5) the mean fails decisively when its one-sided
+    95% studentized upper bound, m - q05(t*) x se from the same draws as the lower bound (the mirror of the one-sided
+    pass), is at or below 0, with se > 0 (never entering, zero width, decides nothing); the DSR never decides there.
+    Under 4 test contract-months nothing is computed and the verdict is inconclusive."""
 
     def run(hh: float, rows: Sequence[dict], exit_key: str = "S_exit"):
         ann, per, entered = [], [], []
@@ -964,10 +1044,20 @@ def cme_cash_and_carry(contracts: Sequence[dict], h: float = 0.03, test: tuple =
             ("one-sided 95% studentized block-bootstrap lower bound of mean annualised excess > 0", ci["lb95"] is not None and ci["lb95"] > 0),
             (f"DSR > 0.95 (n_trials = {n_trials})", dsr is not None and dsr > 0.95),
             (f"claim window from {claim[0]} covered by settle-synchronous spot", None if uncovered else True)]
-    # rule 5: the studentized 95% CI lies wholly at or below 0 (zero width, e.g. never entered, decides nothing)
-    v, why, crit, r5 = _rule5(crit, n, min_n, "test-window contract-months",
-                              lambda: [False, _ci_below(ci["ci95"], 0.0), False, False])
-    ci_txt = f"; two-sided 95% CI [{_pp(ci['ci95'][0])}, {_pp(ci['ci95'][1])}]%" if r5 else ""
+    ub95 = None
+
+    def decisive():       # rule 5: the one-sided 95% lower bound > 0 is mirrored by the one-sided 95% upper bound <= 0
+        nonlocal ub95     # from the same studentized draws; se 0 (constant, e.g. never entered) decides nothing
+        ub95 = student_mean_ub95(ann, block, n_boot, seed)
+        return [False, ci["se"] is not None and ci["se"] > 0 and ub95 is not None and ub95 <= 0, False, False]
+
+    v, why, crit, r5 = _rule5(crit, n, min_n, "test-window contract-months", decisive)
+    ci_txt = ""
+    if r5:
+        r5["ub95"] = ub95
+        ci_txt = (f"; one-sided 95% upper bound {_pp(ub95)}% from the same studentized draws, decisive below min_n when "
+                  f"<= 0; the two-sided 95% CI [{_pp(ci['ci95'][0])}, {_pp(ci['ci95'][1])}]% is one-sided 97.5% and "
+                  f"shown for reference only")
     reason = (f"{n} test contract-months {tst[0]['contract']}..{tst[-1]['contract']} (h = DTB3 + {h * 100:g}%, entered "
               f"{int(ent.sum())}; exit at the 16:00 London index, the trial's BRR proxy): mean annualised excess over DTB3 "
               f"on capital {_pp(ann.mean())}%, one-sided 95% lower bound {_pp(ci['lb95'])}% (need > 0{ci_txt}); DSR {_f(dsr, 3)} "
@@ -1003,8 +1093,11 @@ def perp_funding_carry(fts, i1, dtb3: Optional[dict] = None, threshold: float = 
     changes are the mark-to-market). Pessimistic adds an adverse damper at every entry and exit; optimistic adds a
     favourable one. A Sharpe criterion passes if it passes under the pessimistic bound and fails if it fails under the
     optimistic bound; otherwise it is not decided (None). Below min_days in-position test days (the trial's min_n, house
-    rule 5) a Sharpe criterion fails decisively only when the optimistic Sharpe's stationary-bootstrap 95% interval lies
-    wholly at or below its bound (1.0; 0.3 for the lower-bound criterion); the DSR never decides there."""
+    rule 5) a Sharpe criterion fails decisively only under the optimistic spread, at the confidence of its pass: the
+    Sharpe > 1 point estimate when the optimistic Sharpe's two-sided stationary-bootstrap 95% interval lies wholly at
+    or below 1.0, and the one-sided 95% lower bound > 0.3 when the optimistic Sharpe's one-sided 95% upper bound (the
+    95% quantile of the same draws) is at or below 0.3. Both need an interval of positive width; the DSR never decides
+    there."""
     ts, cs = _hourly(fts, i1)
     i1a = np.asarray(i1, dtype=float); rates = Rates(dtb3)
     d0 = _d(_day_of(int(ts[0]) + 8 * DAY)); d1 = _d(_day_of(int(ts[-1]) - DAY))
@@ -1078,12 +1171,23 @@ def perp_funding_carry(fts, i1, dtb3: Optional[dict] = None, threshold: float = 
             ("test Sharpe > 1.0 after costs and perp-spot spread (spread-bounded)", sh_ok),
             ("stationary-bootstrap one-sided 95% lower bound of Sharpe > 0.3 (spread-bounded)", lb_ok),
             (f"DSR > 0.95 with n_trials = {n_trials} (spread-bounded)", ds_ok)]
-    # rule 5: a Sharpe criterion fails only under the optimistic spread, and decisively when the optimistic Sharpe's
-    # stationary-bootstrap 95% interval lies wholly at or below the bound (1.0, and 0.3 for the lower-bound criterion)
-    v, why, crit, r5 = _rule5(crit, inpos_days, min_days, "in-position test days",
-                              lambda: [False, _ci_below(stats["opt"]["ci95"], 1.0), _ci_below(stats["opt"]["ci95"], 0.3), False])
-    ci_txt = (f"; optimistic-spread Sharpe two-sided 95% interval [{_f(stats['opt']['ci95'][0])}, {_f(stats['opt']['ci95'][1])}]"
-              if r5 else "")
+    opt_ub95 = None
+
+    def decisive():       # rule 5: a Sharpe criterion fails only under the optimistic spread, at its pass's confidence
+        nonlocal opt_ub95
+        opt_ub95 = stationary_sharpe_ub95(S["opt"][tm], mean_block, n_boot, seed)
+        return [False, _ci_below(stats["opt"]["ci95"], 1.0),       # point estimate > 1: two-sided interval <= 1
+                _wide(stats["opt"]["ci95"]) and opt_ub95 is not None and opt_ub95 <= 0.3,   # lb95 > 0.3: ub95 <= 0.3
+                False]
+
+    v, why, crit, r5 = _rule5(crit, inpos_days, min_days, "in-position test days", decisive)
+    ci_txt = ""
+    if r5:
+        r5["opt_sharpe_ub95"] = opt_ub95
+        ci_txt = (f"; optimistic-spread Sharpe two-sided 95% interval [{_f(stats['opt']['ci95'][0])}, "
+                  f"{_f(stats['opt']['ci95'][1])}] (decisive for the Sharpe > 1 criterion below min_n when wholly <= 1) and "
+                  f"one-sided 95% upper bound {_f(opt_ub95)} from the same draws (decisive for the lower-bound criterion "
+                  f"when <= 0.3)")
     reason = (f"test {test[0]}..{test[1]}, {ndays} days, {inpos_days} in position, {S['switches']} switches overall "
               f"(threshold DTB3 + {threshold * 100:g}%, 10 bp per side per leg): Sharpe of daily excess, pessimistic / central / "
               f"optimistic spread = {_f(stats['pess']['sharpe'])} / {_f(stats['central']['sharpe'])} / {_f(stats['opt']['sharpe'])} "
@@ -1128,22 +1232,34 @@ def _fwd_mdd(px_pos: dict, px: np.ndarray, day: str, horizon: int) -> Optional[f
     return float((p / np.maximum.accumulate(p) - 1.0).min())
 
 
-def block_gap_ci(lab, dep, block: int, n_boot: int = 5000, seed: int = 0) -> list:
-    """Two-sided 95% circular-block-bootstrap interval of mean dep[lab == 2] - mean dep[lab == 0], resampling weeks
-    (label and depth together) in blocks of ``block``. Resamples missing either group are skipped. [None, None] with
-    fewer than 4 top or 4 bottom weeks."""
+def _block_gap_draws(lab, dep, block: int, n_boot: int, seed: int) -> Optional[np.ndarray]:
+    """Circular-block-bootstrap draws of mean dep[lab == 2] - mean dep[lab == 0], resampling weeks (label and depth
+    together) in blocks of ``block``. Resamples missing either group are skipped. None with fewer than 4 top or 4
+    bottom weeks, or when no resample has both groups."""
     lab = np.asarray(lab); dep = np.asarray(dep, dtype=float); n = len(lab)
     if (lab == 2).sum() < MIN_DECISIVE_OBS or (lab == 0).sum() < MIN_DECISIVE_OBS:
-        return [None, None]
+        return None
     idx = _cbb_idx(np.random.default_rng(seed), n, block, n_boot)
     L, D = lab[idx], dep[idx]
     top, bot = L == 2, L == 0
     nt, nb = top.sum(axis=1), bot.sum(axis=1)
     use = (nt > 0) & (nb > 0)
     if not use.any():
-        return [None, None]
-    g = (np.where(top, D, 0.0).sum(axis=1)[use] / nt[use]) - (np.where(bot, D, 0.0).sum(axis=1)[use] / nb[use])
-    return [float(np.quantile(g, 0.025)), float(np.quantile(g, 0.975))]
+        return None
+    return (np.where(top, D, 0.0).sum(axis=1)[use] / nt[use]) - (np.where(bot, D, 0.0).sum(axis=1)[use] / nb[use])
+
+
+def block_gap_ci(lab, dep, block: int, n_boot: int = 5000, seed: int = 0) -> list:
+    """Two-sided 95% circular-block-bootstrap interval of mean dep[lab == 2] - mean dep[lab == 0] (``_block_gap_draws``);
+    [None, None] with fewer than 4 top or 4 bottom weeks."""
+    g = _block_gap_draws(lab, dep, block, n_boot, seed)
+    return [None, None] if g is None else [float(np.quantile(g, 0.025)), float(np.quantile(g, 0.975))]
+
+
+def block_gap_ub95(lab, dep, block: int, n_boot: int = 5000, seed: int = 0) -> Optional[float]:
+    """One-sided 95% upper bound (the 95% quantile) of the gap from the same draws as ``block_gap_ci``."""
+    g = _block_gap_draws(lab, dep, block, n_boot, seed)
+    return None if g is None else float(np.quantile(g, 0.95))
 
 
 def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[str], px_close, dtb3: Optional[dict] = None,
@@ -1156,9 +1272,11 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
     through 30 days later. Depth = -MDD in percentage points. Pass: mean depth(top) - mean depth(bottom half) >= 10
     pp, block-permutation (8-week blocks) p < 0.05, a positive gap in both halves, >= 8 non-overlapping top-decile
     episodes (fewer = insufficient events), >= 350 weeks, and the claim window from ``start`` covered. Below min_n weeks
-    (house rule 5) the gap fails decisively when its 8-week block-bootstrap 95% interval lies wholly below 10 pp, the
-    permutation test when that interval lies wholly at or below 0, and the halves criterion when either half's interval
-    does; the episode count never decides there."""
+    (house rule 5) each criterion fails decisively at the confidence of its pass, from 8-week block-bootstrap draws of
+    the gap: the gap (a point estimate >= 10 pp) when its two-sided 95% interval lies wholly below 10 pp, the
+    one-sided 5% permutation test (p < 0.05) when the gap's one-sided 95% upper bound (the 95% quantile) is at or below
+    0, and the halves (point estimates > 0) when either half's two-sided 95% interval lies wholly at or below 0. Each
+    needs an interval of positive width; the episode count never decides there."""
     ob = np.asarray(obs_basis, dtype=float); px = np.asarray(px_close, dtype=float)
     pos = {d: i for i, d in enumerate(px_days)}
     lab, dep, wk = [], [], []
@@ -1223,13 +1341,16 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
             ("gap positive in both halves (split 2022-01)", same),
             (f"at least {min_episodes} non-overlapping top-decile episodes (else insufficient events)", True if eps >= min_episodes else None)]
     gap_ci = {}
+    gap_ub95 = None
 
-    def decisive():       # rule 5: block-bootstrap (8-week) 95% intervals of the gaps, the permutation n_perm draws
+    def decisive():       # rule 5: block-bootstrap (8-week) draws of the gaps, n_perm of them, at each pass's confidence
+        nonlocal gap_ub95
         gap_ci["all"] = block_gap_ci(lab, dep, block, n_perm, seed) if n else [None, None]
+        gap_ub95 = block_gap_ub95(lab, dep, block, n_perm, seed) if n else None
         for nm, msk in (("first", wka < split), ("second", wka >= split)):
             gap_ci[nm] = block_gap_ci(lab[msk], dep[msk], block, n_perm, seed) if n and msk.any() else [None, None]
         return [False, False, _ci_below(gap_ci["all"], gap_pp, strict=True),       # gap wholly below 10 pp
-                _ci_below(gap_ci["all"], 0.0),                                        # the tested gap wholly at or below 0
+                _wide(gap_ci["all"]) and gap_ub95 is not None and gap_ub95 <= 0,     # one-sided 5% test: 95% bound <= 0
                 _ci_below(gap_ci["first"], 0.0) or _ci_below(gap_ci["second"], 0.0),  # a half's gap wholly at or below 0
                 False]
 
@@ -1237,8 +1358,11 @@ def basis_crash_predictor(obs_days: Sequence[str], obs_basis, px_days: Sequence[
     ci_txt = ""
     if r5:
         r5["gap_ci95_pp"] = gap_ci
-        ci_txt = "; 8-week block-bootstrap 95% CIs of the gap " + ", ".join(
+        r5["gap_ub95_pp"] = gap_ub95
+        ci_txt = ("; 8-week block-bootstrap 95% CIs of the gap " + ", ".join(
             f"{nm} [{_f(c_[0], 1)}, {_f(c_[1], 1)}] pp" for nm, c_ in gap_ci.items())
+            + f"; one-sided 95% upper bound of the gap {_f(gap_ub95, 1)} pp from the same draws (decisive for the "
+              f"permutation test below min_n when <= 0)")
     reason = (f"{n} weeks {wk[0] if wk else 'n/a'}..{wk[-1] if wk else 'n/a'} ({int((lab == 2).sum()) if n else 0} top-decile, "
               f"{int((lab == 0).sum()) if n else 0} bottom-half): mean 30-day max drawdown {_f(dep[lab == 2].mean() if n and (lab == 2).any() else None, 1)}% "
               f"vs {_f(dep[lab == 0].mean() if n and (lab == 0).any() else None, 1)}%, gap {_f(g, 1)} pp (need >= {gap_pp:g}); "
@@ -1268,9 +1392,12 @@ def funding_sentiment(fts, i8, fidx, i1=None, start: str = "2019-06-01", end: st
     top-decile days, >= 30 non-overlapping events (7-day separation), out-of-sample (2023-) diff <= -2 pp with
     p < 0.05, and DSR >= 0.95 (24 cells) of the contrarian rule's daily return net of costs, measured against buy and
     hold. The rule is flat for 7 days after a top-decile day and otherwise long, with 0.5% per side. Below 200
-    top-decile days (min_top, the trial's min_n; house rule 5) the out-of-sample difference fails decisively when its
-    stationary-bootstrap 95% interval (the mean of g, mean block 7) lies wholly above -2 pp, and the p-value criterion
-    when it lies wholly at or above 0; the DSR and the event count never decide there."""
+    top-decile days (min_top, the trial's min_n; house rule 5) each criterion fails decisively at the confidence of its
+    pass, from the p-value's own stationary-bootstrap draws of the mean of g (same seed, chunk and mean block 7): the
+    difference (a point estimate <= -2 pp) when the two-sided 95% interval lies wholly above -2 pp, and the one-sided
+    5% test (p < 0.05, H0: diff >= 0) when the opposite-tail test on the same draws rejects diff <= 0,
+    p_greater = (1 + #{mean* - m >= m}) / (1 + n_boot) < 0.05. Both need an interval of positive width; the DSR and the
+    event count never decide there."""
     ts, cs = _hourly(fts, i8); fidx = np.asarray(fidx, dtype=float)
     d0, d1 = _d(start), _d(end)
     days = [(d0 + timedelta(days=k)).isoformat() for k in range((d1 - d0).days + 1)]
@@ -1302,13 +1429,20 @@ def funding_sentiment(fts, i8, fidx, i1=None, start: str = "2019-06-01", end: st
         return {"n": int(msk.sum()), "n_top": int(f.sum()), "mean_top": mt, "mean_all": ma, "diff": dif,
                 "p": stationary_mean_p_less(g, mean_block, n_boot, seed) if with_p else None}
 
-    def diff_ci(msk: np.ndarray) -> list:
-        """Stationary-bootstrap 95% interval of the difference: the mean of the same estimating series g."""
+    def diff_ci(msk: np.ndarray) -> dict:
+        """Below min_top only. The stationary-bootstrap means of the same estimating series g, from the same draws
+        (seed, chunk, mean block) as its p-value: the two-sided 95% percentile interval (for the -2 pp row) and the
+        opposite-tail p of the same centred test, p_greater = (1 + #{mean* - m >= m}) / (1 + n_boot) (for the p row)."""
+        out = {"ci95": [None, None], "p_greater": None}
         x = fwd[msk]; f = top[msk]
-        if f.sum() < MIN_DECISIVE_OBS or (~f).sum() < MIN_DECISIVE_OBS:
-            return [None, None]
+        if f.sum() < MIN_DECISIVE_OBS or (~f).sum() < MIN_DECISIVE_OBS or len(x) < 8:
+            return out
         mt, ma = float(x[f].mean()), float(x.mean()); dif = mt - ma
-        return stationary_mean_ci(dif + f * (x - mt) / f.mean() - (x - ma), mean_block, n_boot, seed)
+        g = dif + f * (x - mt) / f.mean() - (x - ma)
+        mb = _stationary_mean_draws(g, mean_block, n_boot, seed, 500)       # stationary_mean_p_less's chunk
+        mg = float(g.mean())
+        return {"ci95": [float(np.quantile(mb, 0.025)), float(np.quantile(mb, 0.975))],
+                "p_greater": (1 + int(np.sum(mb - mg >= mg))) / (1 + n_boot)}
 
     full = diff_stats(use, False)
     oos = diff_stats(use & (da >= oos_start), True)
@@ -1339,20 +1473,24 @@ def funding_sentiment(fts, i8, fidx, i1=None, start: str = "2019-06-01", end: st
             (f"out-of-sample difference <= {gap * 100:g} pp", None if oos["diff"] is None else oos["diff"] <= gap),
             ("out-of-sample stationary-bootstrap p < 0.05 (H0: difference >= 0)", None if oos["p"] is None else oos["p"] < 0.05),
             (f"DSR >= 0.95 of contrarian-minus-buy-and-hold daily returns (n_trials = {n_trials})", dsr is not None and dsr >= 0.95)]
-    oos_ci = [None, None]
+    oos_ci, oos_pg = [None, None], None
 
-    def decisive():       # rule 5: the out-of-sample difference's stationary-bootstrap 95% interval
-        nonlocal oos_ci
-        oos_ci = diff_ci(use & (da >= oos_start))
-        return [False, False, _ci_above(oos_ci, gap, strict=True),     # wholly above -2 pp
-                _ci_above(oos_ci, 0.0),                                 # wholly at or above 0 (H0 side)
+    def decisive():       # rule 5: the p-value's own stationary-bootstrap draws, at each pass's confidence
+        nonlocal oos_ci, oos_pg
+        dc = diff_ci(use & (da >= oos_start))
+        oos_ci, oos_pg = dc["ci95"], dc["p_greater"]
+        return [False, False, _ci_above(oos_ci, gap, strict=True),                   # point estimate: wholly above -2 pp
+                _wide(oos_ci) and oos_pg is not None and oos_pg < 0.05,              # one-sided 5%: opposite tail rejects
                 False]
 
     v, why, crit, r5 = _rule5(crit, full["n_top"], min_top, "top-decile days", decisive)
     ci_txt = ""
     if r5:
         r5["oos_diff_ci95"] = oos_ci
-        ci_txt = f"; out-of-sample difference stationary-bootstrap 95% interval [{_pp(oos_ci[0])}, {_pp(oos_ci[1])}] pp"
+        r5["oos_p_greater"] = oos_pg
+        ci_txt = (f"; out-of-sample difference stationary-bootstrap 95% interval [{_pp(oos_ci[0])}, {_pp(oos_ci[1])}] pp "
+                  f"(decisive for the -2 pp criterion below min_n when wholly above it) and opposite-tail p "
+                  f"{_f(oos_pg, 4)} (H0: difference <= 0, same draws; decisive for the p criterion when < 0.05)")
     reason = (f"{full['n']} days ({full['n_top']} top-decile, {events} non-overlapping events): full-sample 7-day return top "
               f"{_pp(full.get('mean_top'))}% vs all {_pp(full.get('mean_all'))}%, difference {_pp(full['diff'])} pp; "
               f"out-of-sample {oos_start[:4]}+ difference {_pp(oos['diff'])} pp (need <= {gap * 100:g}) with p {_f(oos['p'], 4)} "

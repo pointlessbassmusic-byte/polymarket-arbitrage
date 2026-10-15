@@ -49,9 +49,12 @@ Verdicts use ``underlying2._verdict``. Any implemented criterion failing gives n
 implemented (missing data, too few events) gives at best inconclusive. A claim is supported only when every criterion
 is implemented and passes. Below the trial's min_n (T-160: daily observations; T-242: non-overlapping conditional
 cycles) house rule 5 applies (``_rule5_criteria``): the min_n criterion is unmet, so the verdict is never supported, and
-a failing criterion counts only when it fails decisively, its studentized 95% CI lying wholly on the wrong side of the
-claimed bound (T-160: at or below 0; T-242: at or above -3%). Any other failure there is undecided, so the verdict is
-inconclusive. Under 8 observations no bootstrap runs and the verdict is inconclusive.
+a failing criterion counts only when it fails decisively, its studentized bound at the pass's own confidence lying
+wholly on the wrong side of the claimed bound. T-160's pass is a two-sided 95% CI, so its failure is decisive when the
+two-sided 95% CI lies at or below 0. T-242's pass is the one-sided 95% upper bound, so its failure is decisive when the
+one-sided 95% lower bound from the same bootstrap-t draws lies at or above -3% (the two-sided 95% CI's lower end would
+be a one-sided 97.5% bound and under-call). Any other failure there is undecided, so the verdict is inconclusive. Under
+8 observations no bootstrap runs and the verdict is inconclusive.
 """
 
 from __future__ import annotations
@@ -147,7 +150,8 @@ def _cvar(x: np.ndarray, q: float = 0.01) -> Optional[float]:
 
 def _rule5_criteria(min_row: str, rows, n: int, min_n: int) -> list:
     """House rule 5. ``rows``: [(name, ok, decisive)] with ok True / False / None and decisive True when a failure stands
-    below min_n: the criterion's 95% CI lies wholly on the wrong side of the claimed bound. At or above min_n the criteria
+    below min_n: the criterion's bound at the pass's own confidence lies wholly on the wrong side of the claimed bound
+    (T-160: the two-sided 95% CI; T-242: the one-sided 95% lower bound). At or above min_n the criteria
     are judged at face value after a passing ``min_row`` (n >= min_n). Below min_n ``min_row`` is unmet (None), so the
     verdict cannot be supported; a passing or decisively failing criterion keeps its bool and any other failure becomes
     None (undecided)."""
@@ -157,14 +161,16 @@ def _rule5_criteria(min_row: str, rows, n: int, min_n: int) -> list:
                                 else (name + " (fails, not decisively, below min_n: undecided)", None) for name, ok, decisive in rows]
 
 
-def _rule5_note(rows, n: int, min_n: int, unit: str) -> str:
-    """Reason fragment below min_n ('' at or above): rule 5 and the face-value criteria verdict."""
+def _rule5_note(rows, n: int, min_n: int, unit: str,
+                decisive: str = "its 95% CI wholly on the wrong side of the claimed bound") -> str:
+    """Reason fragment below min_n ('' at or above): rule 5 and the face-value criteria verdict. ``decisive`` says when
+    a failure counts (the default fits a pass judged on a two-sided 95% CI)."""
     if n >= min_n:
         return ""
     v0, why0 = _verdict([(name, ok) for name, ok, _ in rows])
     dec = [name for name, ok, d in rows if ok is not None and not ok and d]
     return (f". Only {n} of the trial's min_n {min_n} {unit}, so the verdict cannot be supported and a failing criterion counts "
-            f"only when it fails decisively, its 95% CI wholly on the wrong side of the claimed bound (house rule 5); "
+            f"only when it fails decisively, {decisive} (house rule 5); "
             f"decisive failures: {'; '.join(dec) if dec else 'none'}; criteria at face value: {v0}, {why0}")
 
 
@@ -521,7 +527,8 @@ def vxx_decay(days: Sequence[str], closes: np.ndarray, vix: dict, vix3m: dict, t
     """T-242. Pass (as worded): the upper 95% bound of the mean 21-day VXX log return, conditional on VIX3M/VIX >
     ``threshold`` at entry, is below ``bound``. Criteria: n >= min_n non-overlapping conditional cycles, and the
     one-sided 95% studentized block-bootstrap upper bound < bound. Below min_n (house rule 5) the bound criterion's
-    failure counts only when the two-sided 95% CI lies wholly at or above ``bound``. ``proxy`` = (days, closes) of the
+    failure counts only when the one-sided 95% lower bound (the same bootstrap-t draws, the pass's own confidence) lies
+    at or above ``bound``. ``proxy`` = (days, closes) of the
     SVXY-based proxy, reported as a cross-check. The model-priced put spread is reported separately."""
     days = list(days); c = np.asarray(closes, dtype=float)
     ratio = ratio_series(vix3m, vix)                       # VIX3M / VIX
@@ -562,12 +569,16 @@ def vxx_decay(days: Sequence[str], closes: np.ndarray, vix: dict, vix3m: dict, t
         prox = {"start": pd_[0], "end": pd_[-1], "n": int(len(pe)), "mean": ps["mean"], "ub95": ps.get("ub95"),
                 "n_before_vxx": int(len(pre)), "mean_before_vxx": float(pre.mean()) if len(pre) else None}
     mp = put_spread_model(days, c, ev["idx"], vvix, rates or {}, horizon) if vvix else {"pricing": "MODEL-PRICED", "n": 0}
-    # rule 5: decisive when the two-sided 95% CI lies wholly at or above the bound (a zero-width CI decides nothing)
+    # rule 5: the pass is the one-sided 95% upper bound, so the failure is decisive when the one-sided 95% lower bound
+    # from the same bootstrap-t draws lies at or above the bound (the two-sided CI's lower end is a one-sided 97.5% bound;
+    # a zero-width interval decides nothing)
     rows = [(f"one-sided 95% studentized block-{block} bootstrap upper bound of the conditional mean < {bound}",
              None if st["ub95"] is None else bool(st["ub95"] < bound),
-             st["ci95"][0] is not None and bool(st["se"]) and st["ci95"][0] >= bound)]
+             st["lb95"] is not None and bool(st["se"]) and st["lb95"] >= bound)]
     crit = _rule5_criteria(f"n >= {min_n} non-overlapping conditional cycles (min_n)", rows, n, min_n)
     v, why = _verdict(crit)
+    r5_dec = (f"its one-sided 95% lower bound ({_pc(st['lb95'])}, the mirror of the one-sided 95% upper-bound pass from the "
+              f"same bootstrap-t draws) at or above {_pc(bound)}")
     pr = (f"SVXY proxy (sign-flipped, -1x to 2018-02-27 then -0.5x) {prox['start']}..{prox['end']}: n={prox['n']}, mean "
           f"{_pc(prox['mean'])}, upper bound {_pc(prox['ub95'])}, pre-2018 cycles {prox['n_before_vxx']} mean {_pc(prox['mean_before_vxx'])}"
           if prox else "SVXY proxy not run")
@@ -584,7 +595,7 @@ def vxx_decay(days: Sequence[str], closes: np.ndarray, vix: dict, vix3m: dict, t
               f"walk-forward threshold {pick} (first half to {mid}) gives second-half mean {_pc(float(wf.mean()) if len(wf) else None)} "
               f"(n={len(wf)}); DSR of the short-VXX cycle over {len(grid)} thresholds {_f(dsr, 3)}; worst cycles (largest VXX gains) "
               f"{', '.join(f'{d} {_pc(r, 0)}' for d, r in worst[:3])}; {pr}. Secondary, reported separately: {mps}"
-              f"{_rule5_note(rows, n, min_n, 'non-overlapping conditional cycles')} — {why}")
+              f"{_rule5_note(rows, n, min_n, 'non-overlapping conditional cycles', r5_dec)} — {why}")
     rep = {"n": n, "start": days[0], "end": days[-1], "threshold": threshold, "mean_logret": st["mean"],
            "median_logret": float(np.median(x)), "ub95": st["ub95"], "ci95": st["ci95"], "se": st["se"],
            "entries": ev["days"], "unconditional_mean": float(unc.mean()) if len(unc) else None, "unconditional_n": int(len(unc)),
@@ -595,7 +606,8 @@ def vxx_decay(days: Sequence[str], closes: np.ndarray, vix: dict, vix3m: dict, t
            "dsr": dsr, "grid_sharpes_per_cycle": dict(zip([str(t) for t in grid], tsr)), "svxy_proxy": prox,
            "model_priced_put_spread": mp, "criteria": crit, "verdict": v, "reason": reason}
     if n < min_n:
-        rep["rule5"] = {"min_n": min_n, "n": n, "decisive_failures": [c for c, ok, d in rows if ok is not None and not ok and d]}
+        rep["rule5"] = {"min_n": min_n, "n": n, "lb95": st["lb95"],
+                        "decisive_failures": [c for c, ok, d in rows if ok is not None and not ok and d]}
     return rep
 
 
