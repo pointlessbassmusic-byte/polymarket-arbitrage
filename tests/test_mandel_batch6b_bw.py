@@ -94,6 +94,117 @@ def test_resolve_against_monte_carlo_error():
     assert t["reps"] == 3 and len(t["ci_mc_se"]) == 2
 
 
+# ------------------------------------------------------------------------------ Ledoit-Wolf (2008) and rule 11 --
+
+def _lw_reference(a, b, block, n_boot, seed):
+    """Loop-for-loop port of Ledoit & Wolf's R code (compute.se.Parzen.pw, boot.time.inference) as an independent check."""
+    ret = np.column_stack([a, b])
+    T = ret.shape[0]
+
+    def grad_V(r):
+        m1, m2 = r[:, 0].mean(), r[:, 1].mean()
+        g1, g2 = (r[:, 0] ** 2).mean(), (r[:, 1] ** 2).mean()
+        g = np.array([g1 / (g1 - m1 ** 2) ** 1.5, -g2 / (g2 - m2 ** 2) ** 1.5, -0.5 * m1 / (g1 - m1 ** 2) ** 1.5,
+                      0.5 * m2 / (g2 - m2 ** 2) ** 1.5])
+        return g, np.column_stack([r[:, 0] - m1, r[:, 1] - m2, r[:, 0] ** 2 - g1, r[:, 1] ** 2 - g2])
+
+    def parzen(x):
+        x = abs(x)
+        return 1 - 6 * x ** 2 + 6 * x ** 3 if x <= 0.5 else (2 * (1 - x) ** 3 if x <= 1 else 0.0)
+
+    def psi_hat(V):
+        n = V.shape[0]
+        num = den = 0.0
+        for i in range(4):
+            x = V[:, i] - V[:, i].mean()
+            X = np.column_stack([np.ones(n - 1), x[:-1]])
+            cf = np.linalg.lstsq(X, x[1:], rcond=None)[0]
+            s2 = np.mean((x[1:] - X @ cf) ** 2)
+            num += 4 * cf[1] ** 2 * s2 ** 2 / (1 - cf[1]) ** 8
+            den += s2 ** 2 / (1 - cf[1]) ** 4
+        S = 2.6614 * (num / den * n) ** 0.2
+        gam = lambda j: sum(np.outer(V[i], V[i - j]) for i in range(j, n)) / n
+        P, j = gam(0), 1
+        while j < S:
+            G = gam(j)
+            P = P + parzen(j / S) * (G + G.T)
+            j += 1
+        return P * n / (n - 4)
+
+    g, V = grad_V(ret)
+    A = np.zeros((4, 4))
+    for j in range(4):
+        A[j] = np.linalg.lstsq(V[:-1], V[1:, j], rcond=None)[0]
+    U, d, Vt = np.linalg.svd(A)
+    Ah = U @ np.diag(np.clip(d, -0.97, 0.97)) @ Vt
+    D = np.linalg.inv(np.eye(4) - Ah)
+    Vs = np.array([V[t] - Ah @ V[t - 1] for t in range(1, T)])
+    se = math.sqrt(g @ (D @ psi_hat(Vs) @ D.T) @ g / T)
+    sr = lambda r: r[:, 0].mean() / r[:, 0].std(ddof=1) - r[:, 1].mean() / r[:, 1].std(ddof=1)
+    d0 = sr(ret)
+    l = T // block
+    idx = bw._boot_idx(np.random.default_rng(seed), T, block, n_boot)
+    dstar = []
+    for row in idx:
+        rs = ret[row]
+        gs, ys = grad_V(rs)
+        P = np.zeros((4, 4))
+        for j in range(l):
+            z = math.sqrt(block) * ys[j * block:(j + 1) * block].mean(axis=0)
+            P += np.outer(z, z)
+        dstar.append(abs(sr(rs) - d0) / math.sqrt(gs @ (P / l) @ gs / T))
+    dstar = np.array(dstar)
+    q = np.quantile(dstar, 0.95)
+    return {"se": se, "diff": d0, "p": (1 + np.sum(dstar >= abs(d0) / se)) / (n_boot + 1), "ci": [d0 - q * se, d0 + q * se]}
+
+
+def test_lw_test_matches_loop_port_of_the_r_code():
+    a, b = _pair(150, 0.002, seed=31)
+    ref = _lw_reference(a, b, 12, 200, 5)
+    t = bw.lw_test(a, b, ppy=1, block=12, n_boot=200, seed=5)
+    assert bw.lw_se(a, b)["se"] == pytest.approx(ref["se"], rel=1e-9)
+    assert t["diff"] == pytest.approx(ref["diff"], rel=1e-12) and t["se"] == pytest.approx(ref["se"], rel=1e-9)
+    assert t["p"] == pytest.approx(ref["p"], abs=1e-12) and t["ci"] == pytest.approx(ref["ci"], rel=1e-9)
+    t12 = bw.lw_test(a, b, n_boot=200, seed=5)                              # annualised x sqrt(12), same as sharpe_diff_test
+    assert t12["diff"] == pytest.approx(bw.sharpe_diff_test(a, b, n_boot=NB)["diff"], rel=1e-9)
+    assert t12["ci"][0] == pytest.approx(ref["ci"][0] * math.sqrt(12), rel=1e-9)
+    assert t12["hac"]["p"] == pytest.approx(math.erfc(abs(ref["diff"] / ref["se"]) / math.sqrt(2)), rel=1e-9)
+
+
+def test_all_constructions_rule11():
+    T, F = ("a", True, False), ("b", False, False)
+    assert bw.all_constructions([T, ("c", True, False)], "x")[1] is True
+    nm, ok, dec = bw.all_constructions([T, F], "x")
+    assert ok is None and not dec and "disagree" in nm                       # never taken from the one that passes
+    assert bw.all_constructions([("a", False, True), ("b", False, False)], "x")[1:] == (False, False)
+    assert bw.all_constructions([("a", False, True), ("b", False, True)], "x")[1:] == (False, True)
+    nm, ok, _ = bw.all_constructions([T, ("u", None, False)], "x")
+    assert ok is None and "not every named construction resolves" in nm
+
+
+def _fake_lw(lo, hi):
+    def f(a, b, ppy=12, block=12, n_boot=None, seed=0, level=0.95):
+        return {"n": len(a), "diff": (lo + hi) / 2, "se": 0.05, "ci": [lo, hi], "p": 0.5, "block": block, "bandwidth": 3.0,
+                "hac": {"se": 0.05, "z": 1.0, "p": 0.3, "ci": [lo, hi]}}
+    return f
+
+
+def test_judge_sharpe_rule11_lw_disagreement_is_undecided(monkeypatch):
+    # regression (T-162): the CBB lower end was +0.007 while Ledoit-Wolf's own test gave -0.013; supported came from the
+    # construction that passed
+    a, b = _pair(300, 0.004)
+    assert bw.judge_sharpe(a, b, _labels(300), 280, n_boot=NB, lw="criterion")["verdict"] == "supported"   # both pass
+    monkeypatch.setattr(bw, "lw_test", _fake_lw(-0.013, 0.24))
+    j = bw.judge_sharpe(a, b, _labels(300), 280, n_boot=NB, lw="criterion")
+    assert j["full"]["ci"][0] > 0 and j["criteria"][0][1] is None and j["verdict"] == "inconclusive"
+    assert "rule 11" in j["criteria"][0][0] and "Ledoit-Wolf" in j["criteria"][0][0]
+    r = bw.judge_sharpe(a, b, _labels(300), 280, n_boot=NB, lw="report")                 # trial names only the CBB
+    assert r["verdict"] == "supported" and r["lw"]["ci"] == [-0.013, 0.24]
+    a0, b0 = _pair(300, -0.006, seed=3)                                       # both fail -> fails
+    assert bw.judge_sharpe(a0, b0, _labels(300), 280, n_boot=NB, lw="criterion")["verdict"] == "not_supported"
+    assert all("judged on the point estimate" in c[0] for c in j["criteria"][1:])
+
+
 # ---------------------------------------------------------------------------------------- judges: planted vs null --
 
 def _pair(n, edge, seed=0, noise=0.004):
@@ -399,3 +510,53 @@ def test_missing_bundles_inconclusive():
     for h in bw.HARNESSES.values():
         stat, n, verdict, reason = h(fa)
         assert verdict == "inconclusive" and n == 0 and "fred-DTB3" in stat["missing_bundles"] and " — " in reason
+
+
+def _mark_backtest(fa, sym, launch):
+    for r in fa.bundles[f"cboe-{sym}-history"]:
+        r["value"]["backtest"] = r["value"]["day"] < launch
+
+
+def test_bxmd_harness_rule11_backtest_label_and_post_launch(monkeypatch):
+    # regression (T-162 refutation): LW named by the trial is a criterion (rule 11); back-tested months are labelled and
+    # the post-launch-only result (below min_n) is reported next to the main one; the halves rows say point estimates
+    fa = _fake_archive(edge_bxmd=0.04)
+    _mark_backtest(fa, "BXMD", "2015-08-03")
+    stat, n, verdict, reason = bw.b6b_bw_bxmd_vs_bxm(fa)
+    assert verdict == "supported" and n == 294
+    assert stat["ledoit_wolf"]["role"] == "criterion (rule 11)" and stat["ledoit_wolf"]["ci"][0] > 0
+    assert stat["label"].startswith("BACK-TESTED INDEX VALUES") and "BXMD" in stat["label"]
+    assert reason.startswith("BACK-TESTED INDEX VALUES") and "ASSUMPTION" in reason
+    pl = stat["post_launch"]
+    assert pl["from"] == "2015-08-03" and pl["below_min_n"] and pl["n"] < 280 and pl["lw_ci"][0] is not None
+    assert "below min_n 280" in reason and "Fragility of the lower end" in reason
+    assert set(stat["block_length_sensitivity"]) == {"6", "24", "36"} and stat["fragility"]["leave_one_year_out_lowest"]
+    assert "rule 11" in stat["criteria"][0][0] and all("point estimate" in c[0] for c in stat["criteria"][1:3])
+    assert all(p["lw_ci"] is not None for p in stat["parts"])
+    assert "Bartlett-HAC" in reason and "boot.time.inference" in reason
+    monkeypatch.setattr(bw, "lw_test", _fake_lw(-0.01, 0.3))                  # the CBB passes, LW does not
+    bw._CACHE.clear()
+    stat, n, verdict, reason = bw.b6b_bw_bxmd_vs_bxm(fa)
+    assert stat["ci"][0] > 0 and verdict == "inconclusive" and "disagree" in stat["criteria"][0][0]
+
+
+def test_put_vs_bxm_reports_both_constructions_window_and_arms(monkeypatch):
+    # regression (T-170 refutation, reporting): LW reported next to the CBB criterion (the trial names only a studentized
+    # block bootstrap), the first/last return months and partial-month sensitivity, arms over their full common history
+    # with BXM, a block-length row and a plain scope statement
+    fa = _fake_archive()
+    stat, n, verdict, reason = bw.b6b_bw_put_vs_bxm(fa)
+    assert stat["ledoit_wolf"]["role"] == "reported, not a criterion" and stat["ledoit_wolf"]["p"] is not None
+    assert not any("Ledoit-Wolf" in c[0] for c in stat["criteria"])
+    assert stat["window"]["first_return_month"] == "2007-02" and "the first monthly return is 2007-02" in reason
+    assert "the claim's 2007-01 is missing" in reason and "is incomplete" in reason
+    assert stat["window"]["with_partial_months"]["n"] == n + 2
+    puty = stat["arm_PUTY_minus_BXM"]
+    assert puty["full_common_history"]["from"] == "2002-04" and puty["from_2007"]["from"] == "2007-02"
+    assert stat["arm_WPUT_minus_BXM"]["full_common_history"]["from"] == "2006-02"
+    assert "Scope: the support covers the PUT and BXM indices only" in reason
+    assert set(stat["block_length_sensitivity"]) == {"6", "24", "36"}
+    monkeypatch.setattr(bw, "lw_test", _fake_lw(-0.5, -0.1))                  # LW is not a criterion here
+    bw._CACHE.clear()
+    v2 = bw.b6b_bw_put_vs_bxm(fa)[2]
+    assert v2 == verdict

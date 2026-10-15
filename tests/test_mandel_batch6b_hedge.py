@@ -461,10 +461,10 @@ def test_soq_spread_gate_and_costs_unmeasured():
     assert rep["verdict"] == "inconclusive" and "half-spreads not measurable" in rep["reason"]
 
 
-def test_soq_spread_gate_is_point_in_time_by_default():
-    """Regression (T-220, rule 4): the default gate is VIX3M/VIX at the close BEFORE entry; the same-close gate (16:15 ET,
-    stamped available after the entry) is only a sensitivity (gate_lag=0). strike_lag=1 strikes off the previous
-    settlement while still pricing on the entry day's."""
+def test_soq_spread_gate_and_strikes_share_one_information_set():
+    """Regression (T-220, rule 12): the gate and the strike choice come from one information set. The default reads both
+    at the previous close; gate_lag = strike_lag = 0 reads both at the entry close (the live proxy). The fill is priced
+    at the entry close in both (it is the outcome of the order, not a decision input)."""
     w = _soq_world(40)
     pos = {d: i for i, d in enumerate(w["tdays"])}
     e_prev_only, e_same_only = w["expiries"][5], w["expiries"][9]
@@ -472,19 +472,95 @@ def test_soq_spread_gate_is_point_in_time_by_default():
     w["vix3m"][w["tdays"][pos[e_prev_only] - 3]] = 15.5                      # entry close 1.03: shut at the same close
     w["vix3m"][w["tdays"][pos[e_same_only] - 4]] = 15.5                      # previous close 1.03: shut point in time
     pit = h.soq_spread_trades(hs1=0.0, hs2=0.0, **w)
-    same = h.soq_spread_trades(hs1=0.0, hs2=0.0, gate_lag=0, **w)
-    ep, es = {t["expiry"] for t in pit["trades"]}, {t["expiry"] for t in same["trades"]}
+    live = h.soq_spread_trades(hs1=0.0, hs2=0.0, gate_lag=0, strike_lag=0, **w)
+    ep, el = {t["expiry"] for t in pit["trades"]}, {t["expiry"] for t in live["trades"]}
     assert e_prev_only in ep and e_same_only not in ep
-    assert e_same_only in es and e_prev_only not in es
-    t = next(q for q in pit["trades"] if q["expiry"] == e_prev_only)
-    assert t["entry"] == w["tdays"][pos[e_prev_only] - 3] and t["gate_day"] == w["tdays"][pos[e_prev_only] - 4]
-    # strike_lag: K1 from the previous day's settlement (F - 1 there), credit on the entry day's F
+    assert e_same_only in el and e_prev_only not in el
+    assert pit["gate_lag"] == pit["strike_lag"] == 1 and live["gate_lag"] == live["strike_lag"] == 0
+    for t in pit["trades"]:
+        prev = w["tdays"][pos[t["entry"]] - 1]
+        assert t["gate_day"] == t["strike_day"] == prev and t["entry"] == w["tdays"][pos[t["expiry"]] - 3]
+    assert all(t["gate_day"] == t["strike_day"] == t["entry"] for t in live["trades"])
+    # strikes from the reading's own settlement (F - 1 at the previous close), the fill priced on the entry day's F
     e = w["expiries"][0]
     d, g = w["tdays"][pos[e] - 3], w["tdays"][pos[e] - 4]
     w["curve"][g] = dict(w["curve"].get(g, {}), **{e: w["curve"][d][e] - 1.0})
-    t0 = next(q for q in h.soq_spread_trades(hs1=0.0, hs2=0.0, **w)["trades"] if q["expiry"] == e)
-    t1 = next(q for q in h.soq_spread_trades(hs1=0.0, hs2=0.0, strike_lag=1, **w)["trades"] if q["expiry"] == e)
-    assert t0["K1"] == round(t0["F"] + 2) and t1["K1"] == round(t1["F"] - 1 + 2) and t1["F"] == t0["F"]
+    tp = next(q for q in h.soq_spread_trades(hs1=0.0, hs2=0.0, **w)["trades"] if q["expiry"] == e)
+    tl = next(q for q in h.soq_spread_trades(hs1=0.0, hs2=0.0, gate_lag=0, strike_lag=0, **w)["trades"] if q["expiry"] == e)
+    assert tp["K1"] == round(tp["F"] - 1 + 2) and tp["F_strike"] == tp["F"] - 1.0
+    assert tl["K1"] == round(tl["F"] + 2) and tl["F"] == tp["F"] == w["curve"][d][e]
+
+
+def test_soq_spread_credit_filter_uses_the_decision_information_set():
+    """Regression (T-220, rules 12): the 'net credit > 0' filter decides on the credit priced in the reading's own
+    information set (the strike day's F and VVIX), never on the fill's later price."""
+    w = _soq_world(30)
+    pos = {d: i for i, d in enumerate(w["tdays"])}
+    e = w["expiries"][4]
+    prev = w["tdays"][pos[e] - 4]
+    w["vvix"] = dict(w["vvix"])
+    w["vvix"][prev] = 5.0                              # decision-day credit ~0 at the previous close; fill day VVIX 100
+    hs = dict(hs1=0.01, hs2=0.01)
+    assert e in {t["expiry"] for t in h.soq_spread_trades(**hs, **w)["trades"]}
+    pf = h.soq_spread_trades(**hs, credit_filter=True, **w)
+    assert e not in {t["expiry"] for t in pf["trades"]}
+    assert all(t["decision_net_credit"] > 0 for t in pf["trades"])
+    lf = h.soq_spread_trades(**hs, credit_filter=True, gate_lag=0, strike_lag=0, **w)
+    assert e in {t["expiry"] for t in lf["trades"]}
+    del w["vvix"][prev]
+    assert e in h.soq_spread_trades(**hs, credit_filter=True, **w)["skipped"]["no VVIX close at the decision"]
+
+
+def test_soq_claim_readings_must_agree_rule12_and_pricings_rule11():
+    """Regression (T-220, rules 11 and 12): the criterion passes only when every information-set reading under every
+    named pricing passes, fails only when all fail, and is undecided when they disagree; a named pricing that cannot be
+    built caps it at undecided."""
+    good = h.soq_spread_trades(hs1=0.03, hs2=0.02, **_soq_world(100, partial_share=0.05))
+    bad = h.soq_spread_trades(hs1=0.03, hs2=0.02, **_soq_world(100, loss_share=0.3, seed=14))
+    kw = dict(min_n=60, n_boot=NB, half_spreads=(0.03, 0.02))
+    rep = h.soq_spread_claim({"previous close": good, "entry close": good}, {}, **kw)
+    assert rep["verdict"] == "supported", rep["reason"]
+    assert rep["stat"]["cost_robustness"]["previous close"]["k_mean"] > 1
+    rep = h.soq_spread_claim({"previous close": good, "entry close": bad}, {}, **kw)
+    assert rep["verdict"] == "inconclusive" and "they disagree" in rep["reason"]
+    assert rep["stat"]["decision"]["ok"] is None
+    rep = h.soq_spread_claim({"previous close": bad, "entry close": bad}, {}, **kw)
+    assert rep["verdict"] == "not_supported"
+    rep = h.soq_spread_claim({"previous close": good, "entry close": good}, {}, alt_pricing={"previous close": bad, "entry close": bad},
+                             alt_pricing_label="chain-calibrated Black-76 (x)", **kw)
+    assert rep["verdict"] == "inconclusive" and "chain-calibrated" in rep["reason"] and len(rep["stat"]["decision"]["cells"]) == 4
+    rep = h.soq_spread_claim({"previous close": good, "entry close": good}, {}, alt_pricing_missing="no VIX chain captured", **kw)
+    assert rep["verdict"] == "inconclusive" and "cannot be built" in rep["reason"]
+    # a decided sensitivity says how it would decide
+    rep = h.soq_spread_claim({"previous close": good, "entry close": good}, {"mixed": bad, "grp": {"previous close": bad, "entry close": good}},
+                             decide_variants=("mixed", "grp"), **kw)
+    assert rep["stat"]["variants"]["mixed"]["_decides"] is False and rep["stat"]["variants"]["grp"]["_decides"] is None
+    assert "[would decide: fail; primary: pass]" in rep["reason"] and "[would decide: undecided; primary: pass]" in rep["reason"]
+
+
+def test_cost_breakeven_multiple():
+    """Regression (T-220): robustness of the cost assumption is the half-spread multiple at which the mean (and every
+    bootstrap variant's CI lower bound) stops clearing 0."""
+    tr = [{"mid_credit": 0.2, "payoff": 0.0} for _ in range(20)]                # ret > 0 iff 0.2 - 0.1 k > 0
+    cb = h.cost_breakeven(tr, 0.1, lambda x: [(float(x.mean()) - 0.01, float(x.mean()) + 0.01)])
+    assert cb["k_mean"] == pytest.approx(2.0, abs=0.02) and cb["k_ci"] < cb["k_mean"]
+    tr0 = [{"mid_credit": 0.05, "payoff": 1.0} for _ in range(20)]
+    assert h.cost_breakeven(tr0, 0.1)["k_mean"] == 0.0
+    assert h.cost_breakeven(tr, 0.0)["k_mean"] is None
+
+
+def test_vx_curve_close_proxy_for_zero_settles():
+    """Regression (T-220): the 2013 rows carry settle 0; with close_proxy their VX close (same 21:30Z stamp) stands in,
+    and the proxied (day, expiry) pairs are recorded. By default they are dropped."""
+    rows = [{"value": {"day": "2013-01-02", "expiry": "2013-01-16", "settle": 0.0, "close": 15.6}},
+            {"value": {"day": "2013-01-16", "expiry": "2013-01-16", "settle": 0.0, "close": None}},
+            {"value": {"day": "2013-06-03", "expiry": "2013-06-19", "settle": 16.0, "close": 16.1}},
+            {"value": {"day": "2013-06-20", "expiry": "2013-06-19", "settle": 16.0, "close": 16.1}}]
+    assert h.vx_curve(rows) == {"2013-06-03": {"2013-06-19": 16.0}}
+    px = set()
+    c = h.vx_curve(rows, close_proxy=True, proxied=px)
+    assert c == {"2013-01-02": {"2013-01-16": 15.6}, "2013-06-03": {"2013-06-19": 16.0}}
+    assert px == {("2013-01-02", "2013-01-16")}
 
 
 def _third_wed(y, m):
@@ -492,10 +568,9 @@ def _third_wed(y, m):
     return d + timedelta(days=(2 - d.weekday()) % 7 + 14)
 
 
-def test_harness_soq_exchange_calendar_and_pit_gate():
+def test_harness_soq_exchange_calendar_and_rule12_readings():
     """Regression (T-220): the harness counts exchange sessions, not VIX rows on market-closed days (MLK Day 2023-01-16,
-    Juneteenth 2023-06-19), and gates on the previous close; the same-close gate is reported and decided over the same
-    block x seed variants."""
+    Juneteenth 2023-06-19), and decides on both information-set readings (rule 12)."""
     days = _bdays("2022-06-01", 300)                                          # weekdays, holidays included like the VIX file
     exps = [_third_wed(2022 + (m > 12), (m - 1) % 12 + 1).isoformat() for m in range(7, 19)]   # 2022-07 .. 2023-06
     from mandel.data.cboe_strategy import is_trading_day
@@ -509,21 +584,75 @@ def test_harness_soq_exchange_calendar_and_pit_gate():
     for k, e in enumerate(exps):
         F = 15.0 + 0.3 * k
         for d in sess[sp[e] - 10: sp[e] + 1]:
-            vx.append({"available_at": d + "T21:00:00+00:00", "value": {"day": d, "expiry": e, "settle": F}})
+            vx.append({"available_at": d + "T21:30:00+00:00", "value": {"day": d, "expiry": e, "settle": F}})
         vro.append({"available_at": e + "T14:00:00+00:00", "value": {"day": e, "close": F - 1.0, "expiry": True, "carried": False}})
     arch = FakeArchive({h.VX_B: vx, h.CB("VRO"): vro, h.VIX_B: _idx_rows(days, [15.0] * len(days)),
                         h.VIX3M_B: _idx_rows(days, [vix3m[d] for d in days]), h.VVIX_B: _idx_rows(days, [100.0] * len(days)),
                         h.DTB3_B: _fred_rows(days[::5], 4.0)})
     stat, n, v, reason = h.HARNESSES["b6b_hedge_vix_soq_credit_spread"](arch)
     json.dumps(stat)
-    entry = {t["expiry"]: t["entry"] for t in stat["trades"]}
+    pc, ec = stat["trades"]["previous close"], stat["trades"]["entry close"]
+    entry = {t["expiry"]: t["entry"] for t in ec}
     assert entry["2023-01-18"] == "2023-01-12" and entry["2023-06-21"] == "2023-06-15"     # not 01-13 / 06-16
-    assert all(t["gate_day"] == sess[sp[t["entry"]] - 1] for t in stat["trades"])
-    assert e_prev_only in entry and e_same_only not in entry and stat["gate_lag"] == 1 and n == 11
-    lab = next(k for k in stat["variants"] if k.startswith("gate at the entry close"))
-    assert stat["variants"][lab]["n"] == 11 and stat["variants"][lab]["robustness"]["n_variants"] == 6
-    assert "at the close of the session before entry" in reason and "not point in time" in reason
+    assert all(t["gate_day"] == t["strike_day"] == sess[sp[t["entry"]] - 1] for t in pc)
+    assert all(t["gate_day"] == t["strike_day"] == t["entry"] for t in ec)
+    assert e_prev_only in {t["expiry"] for t in pc} and e_same_only not in {t["expiry"] for t in pc}
+    assert e_same_only in entry and e_prev_only not in entry and n == 11
+    mixed = next(k for k in stat["variants"] if k.startswith("mixed information sets"))
+    assert stat["variants"][mixed][""]["n"] == 11 and stat["variants"][mixed][""]["robustness"]["n_variants"] == 6
+    assert "[previous close]" in reason and "[entry close]" in reason and "rule 12" in reason
     assert v == "inconclusive" and "half-spreads not measurable" in reason          # no VIX chain captured
+    assert "chain-priced construction not built: no VIX chain captured" in reason
+
+
+def test_harness_soq_2013_proxy_costs_and_chain_pricing():
+    """Regression (T-220): the 2013 settle-0 rows use the VX close as a documented proxy (the settles-only sample is
+    reported), the untestable pre-2013 part of the trial's sample is named, zero / negative net credits are counted and
+    their treatment stated, the cost break-evens are reported, the VVIX-flat bias on the calibration day is labelled,
+    the chain-calibrated pricing decides alongside, and the preliminary check is labelled indicative."""
+    days = _bdays("2012-12-03", 290)
+    from mandel.data.cboe_strategy import is_trading_day
+    sess = [d for d in days if is_trading_day(d)]
+    sp = {d: i for i, d in enumerate(sess)}
+    exps = [_third_wed(2013, m).isoformat() for m in range(1, 13)]
+    exps = [e for e in exps if e in sp and sp[e] >= 12]
+    vx, vro, fs = [], [], {}
+    for k, e in enumerate(exps):
+        F = 15.0 + 0.3 * k
+        fs[e] = F
+        for d in sess[sp[e] - 10: sp[e] + 1]:
+            zero = d < "2013-05-20"
+            vx.append({"available_at": d + "T21:30:00+00:00", "value": {"day": d, "expiry": e, "settle": 0.0 if zero else F, "close": F}})
+        vro.append({"available_at": e + "T14:00:00+00:00", "value": {"day": e, "close": F - 1.0, "expiry": True, "carried": False}})
+    e_last = exps[-1]
+    qd = sess[sp[e_last] - 5]
+    vvix = {d: 100.0 for d in days}
+    vvix[qd] = 180.0
+    F = fs[e_last]
+    K1 = math.floor(F + 2 + 0.5)
+    T = (date.fromisoformat(e_last).toordinal() - date.fromisoformat(qd).toordinal() - 0.28) / 365
+    r0 = float(h.rate_known([qd], {days[0]: 2.0})[0])
+    chain = []
+    for K, hs in ((K1, 0.035), (K1 + 5, 0.025)):
+        mid = float(h.b76_call(F, K, T, r0, 1.8))
+        chain.append({"available_at": qd + "T20:00:00+00:00", "value": {"sym": f"VIX{K}", "expiry": e_last, "type": "call",
+                                                                        "strike": float(K), "bid": mid - hs, "ask": mid + hs}})
+    arch = FakeArchive({h.VX_B: vx, h.CB("VRO"): vro, h.VIX_B: _idx_rows(days, [15.0] * len(days)),
+                        h.VIX3M_B: _idx_rows(days, [17.0] * len(days)), h.VVIX_B: _idx_rows(days, [vvix[d] for d in days]),
+                        h.DTB3_B: _fred_rows(days[::5], 2.0), h.VIX_CHAIN_P + qd: chain})
+    stat, n, v, reason = h.HARNESSES["b6b_hedge_vix_soq_credit_spread"](arch)
+    json.dumps(stat)
+    early = [e for e in exps if sess[sp[e] - 3] < "2013-05-20"]
+    assert stat["readings"]["previous close"]["n_close_proxy"] == len(early) > 0
+    assert n == len(exps) and v == "inconclusive"                                   # below min_n 60
+    sett = next(k for k in stat["variants"] if k.startswith("settles only"))
+    assert stat["variants"][sett]["previous close"]["n"] == len(exps) - len(early)
+    assert "the documented proxy" in reason and ", ".join(early) in reason and "cannot be tested before then" in reason
+    assert "COUNTED as sold" in reason and "net credit > 0 at the decision" in reason
+    assert "mean > 0 up to x" in reason and stat["cost_robustness"]["entry close"]["k_mean"] > 0
+    assert "VVIX-flat pricing bias: on " + qd in reason and "the only calibration day" in reason
+    assert stat["alt_pricing"] and len(stat["decision"]["cells"]) == 4 and "chain-calibrated Black-76" in reason
+    assert "the 2008 exclusion is vacuous" in reason
 
 
 def test_chain_calibration_recovers_half_spreads_and_iv():
@@ -564,6 +693,26 @@ def test_soq_preliminary_planted_and_null():
     vro0 = {d: vix[days[pos[d] - 1]] + (vix[d] - vix[days[pos[d] - 1]]) for d in monthly}
     r0 = h.soq_preliminary(vro0, vix, days, monthly, 500)
     assert r0["ci95"][0] < 0 < r0["ci95"][1]
+    assert r["indicative"] and r["block"] == 8                      # regression (T-220): block bootstrap, indicative only
+
+
+def test_soq_preliminary_block_bootstrap_on_shared_timeline():
+    """Regression (T-220): the preliminary CI resamples blocks of the date-ordered timeline of settlement days and other
+    Wednesdays together (not two independent iid draws), so a persistent regime shared by nearby days widens it."""
+    days = _bdays("2008-07-01", 3000)
+    weds = [d for d in days if date.fromisoformat(d).weekday() == 2]
+    monthly = set(weds[::4])
+    pos = {d: i for i, d in enumerate(days)}
+    rng = np.random.default_rng(32)
+    level = np.repeat(rng.standard_normal(len(days) // 120 + 1) * 3.0, 120)[:len(days)]     # 6-month regimes
+    vix = {d: 20.0 + float(rng.standard_normal()) for d in days}
+    vro = {d: vix[days[pos[d] - 1]] + level[pos[d]] + 0.1 * float(rng.standard_normal()) for d in monthly}
+    for i, d in enumerate(days[1:], 1):
+        if date.fromisoformat(d).weekday() == 2 and d not in monthly:
+            vix[d] = vix[days[i - 1]] + 0.2 * float(rng.standard_normal())
+    wide = h.soq_preliminary(vro, vix, days, monthly, 600, block=24)
+    narrow = h.soq_preliminary(vro, vix, days, monthly, 600, block=1)
+    assert wide["ci95"][1] - wide["ci95"][0] > 1.3 * (narrow["ci95"][1] - narrow["ci95"][0])
 
 
 # ======================================================================================== harness wiring ==
@@ -589,15 +738,58 @@ def _monthly_world(start="1986-06-02", n_days=10600, seed=16):
 
 
 def test_harness_cllz_sharpe_end_to_end():
+    """Also a regression (T-168 reporting): the reason names the partial last month (SPY's last bar is not yet
+    available, so the panel ends a day before CLLZ's last close) with the statistic without it, the month-end that
+    CLLZ's missing 1997-01-31 close moves to 1997-01-30 for every leg, and each control on the annualised scale."""
     days, spy, rng = _monthly_world("1993-01-04", 8600)
+    cut = days.index("2025-06-13")
+    days, spy = days[:cut + 1], spy[:cut + 1]
     lr = np.diff(np.log(spy))
     cllz = 100 * np.exp(np.concatenate([[0], np.cumsum(0.6 * lr - 0.0002 + 0.002 * rng.standard_normal(lr.size))]))
-    arch = FakeArchive({h.CB("CLLZ"): _idx_rows(days, cllz, backtest=False), h.SPY_B: _px_rows(days, spy),
-                        h.GSPC_B: _px_rows(days, spy), h.DTB3_B: _fred_rows(days[::5], 2.0)})
+    crow = [r for r in _idx_rows(days, cllz, backtest=False) if r["value"]["day"] != "1997-01-31"]
+    arch = FakeArchive({h.CB("CLLZ"): crow, h.SPY_B: _px_rows(days[:-1], spy[:-1]),
+                        h.GSPC_B: _px_rows(days[:-1], spy[:-1]), h.DTB3_B: _fred_rows(days[::5], 2.0)})
     stat, n, v, reason = h.HARNESSES["b6b_hedge_cllz_sharpe"](arch)
     json.dumps(stat)
     assert n >= 380 and v == "supported", reason
     assert reason.count(" — ") >= 1
+    assert ("the last month, 2025-06, is partial: the paired panel ends 2025-06-12 (each leg's last close available at its "
+            "bundle's capture: CLLZ 2025-06-13, SPY 2025-06-12, SPX 2025-06-12), not at the month's last session 2025-06-30") in reason
+    assert stat["partial_last_month"]["diff_without"] is not None and f"without the partial 2025-06 ({n - 1} months)" in reason
+    assert "CLLZ has no close on 1997-01-31, so 1997-01 ends on 1997-01-30 for every leg" in reason
+    assert "controls (reported, not criteria)" in reason and "annualised CI" in reason
+    assert stat["controls"]["CLLZ vs price-only SPX"]["ci95_annualised"][1] == pytest.approx(
+        stat["controls"]["CLLZ vs price-only SPX"]["ci95"][1] * math.sqrt(12))
+
+
+def test_month_end_gaps_and_partial_last_month():
+    days = _bdays("1996-12-02", 60)
+    a = {d: 1.0 for d in days}
+    b = {d: 1.0 for d in days if d != "1997-01-31"}
+    p = h.monthly_panel({"A": a, "B": b}, {}, "1997-01", "1997-02")
+    assert h.month_end_gaps({"A": a, "B": b}, p) == [("1997-01", "1997-01-30", "1997-01-31", ["B"])]
+    assert h.month_end_gaps({"A": a, "B": b}, p, ("1997-01",)) == []
+    from mandel.data.cboe_strategy import is_trading_day
+    part = h.partial_last_month({"A": a, "B": b}, p, is_trading_day)
+    assert p["last"] == days[-1] == "1997-02-21" and part["month"] == "1997-02" and part["month_end"] == "1997-02-28"
+    full = h.monthly_panel({"A": a, "B": b}, {}, "1997-01", "1997-01")
+    assert h.partial_last_month({"A": a, "B": b}, full, is_trading_day) is None
+
+
+def test_sharpe_noworse_reports_partial_month_and_annualised_controls():
+    """Regression (T-168 reporting): a control whose CI upper bound clears the 0.05 margin monthly but not annualised is
+    said to; the statistic without a partial last month is reported."""
+    rng = np.random.default_rng(31)
+    n = 400
+    spy = 0.01 + 0.045 * rng.standard_normal(n)
+    good = _panel(n, 0.002, CLLZ=0.7 * spy - 0.002 + 0.008 * rng.standard_normal(n), SPY=spy)
+    ctl = _panel(n, 0.002, strat=spy + 0.004 * rng.standard_normal(n), bench=spy)
+    part = {"month": good["months"][-1], "last_day": "2023-04-13", "month_end": "2023-04-28", "leg_ends": {}}
+    rep = h.sharpe_noworse_claim(good, "CLLZ", "SPY", 0.05, 380, controls={"near-tie": ctl}, n_boot=NB, partial_last=part)
+    c = rep["stat"]["controls"]["near-tie"]
+    assert c["ci95"][1] <= 0.05 < c["ci95_annualised"][1]
+    assert "near-tie" in rep["reason"] and "upper above the 0.05 margin on the annualised scale" in rep["reason"]
+    assert rep["stat"]["partial_last_month"]["diff_without"] is not None and "without the partial" in rep["reason"]
 
 
 def test_harness_bfly_cndr_end_to_end_null():

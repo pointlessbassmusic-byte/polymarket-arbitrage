@@ -6,7 +6,7 @@ Eleven options-library claims, each tested on its own claim, trial.pass and tria
 
 Traded index histories (``cboe-<SYM>-history``, built by ``mandel.data.cboe_strategy`` from Cboe's published files):
   * T-161  BXM monthly excess return regressed on SPY total-return excess return: annualised Jensen alpha, 2002-03..2026-10.
-  * T-162  Sharpe(BXMD) - Sharpe(BXM), 2002-03..2026-10.
+  * T-162  Sharpe(BXMD) - Sharpe(BXM), 2002-03..2026-10 (studentized CBB and the Ledoit-Wolf test the trial names: rule 11).
   * T-163  Sharpe(BXMW) - Sharpe(BXM), 2012-06..2026-10, split pre/post 2020 as the trial's procedure says.
   * T-164  Sharpe(BXMH) - Sharpe(BXM), 2002-03..2026-10.
   * T-170  Sharpe(PUT) - Sharpe(BXM), 2007-01..2026-10.
@@ -33,19 +33,31 @@ Conventions (house rules)
     only when complete (its last common day is the month's last trading day), so October 2026 (data to 10-14) is out.
     Rows flagged by ``cboe_strategy.annotate`` (suspect prints, rows on market-closed days) are left out.
   * Back-tested rows. Each index's values before its launch date (``INDEX_META``) are Cboe back-tests published at launch.
-    These claims describe the published index histories, not what a trader knew, so back-tested months are used and the
-    reason says how many there are; the statistic on post-launch months alone is a reported sensitivity.
+    ASSUMPTION, stated in every such reason: these claims describe the published index histories, not what a trader knew,
+    so back-tested months are used. A verdict whose sample holds any is labelled BACK-TESTED INDEX VALUES (stat 'label')
+    with the count, and the statistic on post-launch months alone (both constructions, with its min_n shortfall) is
+    reported next to the main one.
   * Bills and Sharpe (rule 7). FRED DTB3 is a 91-day discount yield published the next day: on calendar day o the rate
     known is the print dated strictly before o, converted to r = -ln(1 - d/100 * 91/360) / (91/365), and each calendar
     day accrues at the rate known that day. Excess return = period return - bill growth over the same days. Sharpe =
     mean / sd (ddof 1) of monthly excess returns x sqrt(12). Funded strategies only (all of these are fully funded).
   * Intervals (rule 6). Sharpe differences: paired studentized circular block bootstrap (12-month blocks, the trials'
-    stated length; 2000 resamples, seed 0), each resample studentized by the Ledoit-Wolf delta-method s.e. with a Bartlett
-    long-run variance (bandwidth = block). "95% CI > 0" is the lower end of the two-sided 95% interval. The CAGR difference
+    stated length; 2000 resamples per seed, the mean of 5 seeds), the sample and every resample studentized by the same
+    Bartlett-HAC s.e. (the Ledoit-Wolf delta-method gradient with a fixed Bartlett long-run variance, bandwidth = block):
+    the "studentized CBB (Bartlett-HAC)". It is NOT the Ledoit-Wolf test. The index claims also run Ledoit & Wolf (2008)
+    boot.time.inference (``lw_test``: prewhitened Parzen HAC s.e. on the sample, Goetze-Kuensch block s.e. in circular-block
+    resamples, b = 12, symmetric 95% interval). Rule 11: where the trial names it as an alternative (T-162: "studentized
+    block bootstrap ... (or Ledoit-Wolf test)") the full-sample criterion passes only when both constructions pass and is
+    undecided when they disagree; elsewhere (T-163, T-164, T-170, T-172 name only a studentized block bootstrap) it is
+    reported next to the criterion. Block lengths 6, 24 and 36 are reported sensitivities. "95% CI > 0" is the lower end of
+    the two-sided 95% interval. The CAGR difference
     (T-202) is studentized the same way through its influence function. T-161's alpha uses the stationary block bootstrap
     the trial names (mean block 12 months, percentile CI) and reports the Newey-West (12 lags) t. "Same sign in both
-    halves" means the half's point estimate has the claimed sign; walk-forward halves are equal-count halves unless the
-    trial names the split (T-163: pre/post 2020).
+    halves" means the half's point estimate has the claimed sign (the criterion row says so and shows the half CIs);
+    walk-forward halves are equal-count halves unless the trial names the split (T-163: pre/post 2020).
+  * One information set (rule 12). The index claims take no decision. The MODEL-PRICED engines choose the strike, price
+    the option and fill on the entry-day close as the live proxy for all three (the bill rate is the last print known
+    then); no gate is applied at a decision.
   * Below min_n (rule 5), never supported; a failing criterion counts only when decisive: its 95% interval lies wholly on
     the wrong side, or (T-174's window share) the failure would persist if every missing window went the claim's way.
   * MODEL-PRICED engines. SPX: ^GSPC raw closes (strikes, settlement at the expiry-session close as the SOQ proxy, house
@@ -73,6 +85,7 @@ import bisect
 import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from statistics import NormalDist
 from typing import Callable, Optional, Sequence
 
 import numpy as np
@@ -416,7 +429,9 @@ def resolve(value: Optional[float], mc_se: Optional[float], thr: float, side: st
 
 
 def _sr_diff_stat(A, B, bw):
-    """Row-wise per-period Sharpe(A) - Sharpe(B) (population moments) and its Ledoit-Wolf delta-method HAC s.e."""
+    """Row-wise per-period Sharpe(A) - Sharpe(B) (population moments) and its s.e. from the Ledoit-Wolf delta-method
+    gradient with a FIXED-bandwidth Bartlett long-run variance (bandwidth ``bw``), on the sample and in every resample.
+    This is the Bartlett-HAC studentizer of the house CBB, not Ledoit-Wolf's (2008) test: see ``lw_test``."""
     n = A.shape[1]
     ma, mb = A.mean(axis=1), B.mean(axis=1)
     ga, gb = (A * A).mean(axis=1), (B * B).mean(axis=1)
@@ -445,6 +460,125 @@ def sharpe_diff_test(a, b, ppy: int = PPY, block: int = BLOCK, n_boot: Optional[
     out.update(diff=r["est"] * c, se=r["se"] * c, ci=sc(r["ci"]), ci_pct=sc(r.get("ci_pct", [None, None])), p=r["p"],
                p_lt=r["p_lt"], block=r["block"])
     return out
+
+
+# ---------------------------------------------------------------------------- Ledoit-Wolf (2008) Sharpe test ----
+# A port of Ledoit & Wolf (2008), "Robust performance hypothesis testing with the Sharpe ratio", J. Empirical Finance
+# 15, 850-859, and its R code (compute.se.Parzen.pw, boot.time.inference, cbb.sequence). The sample s.e. is a
+# prewhitened HAC: VAR(1) on the four moment deviations, its singular values capped at +-0.97, a Parzen kernel at the
+# Andrews (1991) automatic bandwidth S* = 2.6614 (alpha T)^0.2 on the whitened residuals, recoloured by (I - A)^-1. Each
+# circular-block resample (block b) is studentized by the Goetze-Kuensch block s.e.: the mean of (sqrt(b) x block mean
+# of the influence)^2 over the floor(T/b) whole blocks. p (two-sided, H0: Delta = 0) = (1 + #{|D* - D| / se* >= |D| /
+# se}) / (M + 1); the 95% interval is the symmetric studentized one, D +- q95(|D* - D| / se*) x se.
+
+def _parzen(x: float) -> float:
+    x = abs(x)
+    if x <= 0.5:
+        return 1.0 - 6.0 * x * x + 6.0 * x ** 3
+    if x <= 1.0:
+        return 2.0 * (1.0 - x) ** 3
+    return 0.0
+
+
+def _lw_moments(a: np.ndarray, b: np.ndarray) -> tuple:
+    """(gradient of SR_a - SR_b in (mu_a, mu_b, gamma_a, gamma_b), the T x 4 moment deviations V)."""
+    m1, m2 = a.mean(), b.mean()
+    g1, g2 = (a * a).mean(), (b * b).mean()
+    v1, v2 = max(g1 - m1 * m1, 1e-300), max(g2 - m2 * m2, 1e-300)
+    grad = np.array([g1 / v1 ** 1.5, -g2 / v2 ** 1.5, -0.5 * m1 / v1 ** 1.5, 0.5 * m2 / v2 ** 1.5])
+    return grad, np.column_stack([a - m1, b - m2, a * a - g1, b * b - g2])
+
+
+def _lw_alpha(V: np.ndarray) -> float:
+    """Andrews' alpha(2) from a univariate AR(1) (OLS with intercept on the demeaned column, as R's ar.ols) per column."""
+    num = den = 0.0
+    for i in range(V.shape[1]):
+        x = V[:, i] - V[:, i].mean()
+        X = np.column_stack([np.ones(x.size - 1), x[:-1]])
+        coef = np.linalg.lstsq(X, x[1:], rcond=None)[0]
+        rho = float(np.clip(coef[1], -0.99, 0.99))
+        s2 = float(np.mean((x[1:] - X @ coef) ** 2))
+        num += 4.0 * rho * rho * s2 * s2 / (1.0 - rho) ** 8
+        den += s2 * s2 / (1.0 - rho) ** 4
+    return num / den if den > 0 else 0.0
+
+
+def _lw_psi(V: np.ndarray) -> tuple:
+    """Parzen-kernel long-run covariance at the automatic bandwidth, with the T / (T - 4) small-sample factor."""
+    T = V.shape[0]
+    S = 2.6614 * (_lw_alpha(V) * T) ** 0.2
+    psi = V.T @ V / T
+    j = 1
+    while j < S and j < T:
+        G = V[j:].T @ V[:-j] / T
+        psi = psi + _parzen(j / S) * (G + G.T)
+        j += 1
+    return psi * T / (T - 4), S
+
+
+def lw_se(a, b) -> dict:
+    """Ledoit-Wolf prewhitened Parzen HAC s.e. of the per-period Sharpe difference (compute.se.Parzen.pw)."""
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    grad, V = _lw_moments(a, b)
+    T = V.shape[0]
+    X, Y = V[:-1], V[1:]
+    A = np.linalg.lstsq(X, Y, rcond=None)[0].T
+    U, sv, Vt = np.linalg.svd(A)
+    Ah = U @ np.diag(np.clip(sv, -0.97, 0.97)) @ Vt
+    D = np.linalg.inv(np.eye(4) - Ah)
+    psi, S = _lw_psi(Y - X @ Ah.T)
+    psi = D @ psi @ D.T
+    return {"se": math.sqrt(max(float(grad @ psi @ grad), 0.0) / T), "bandwidth": float(S),
+            "singular_values": [float(x) for x in sv]}
+
+
+def lw_test(a, b, ppy: int = PPY, block: int = BLOCK, n_boot: Optional[int] = None, seed: int = SEED,
+            level: float = 0.95) -> dict:
+    """Ledoit-Wolf (2008) boot.time.inference of Sharpe(a) - Sharpe(b) (ddof-1 Sharpe ratios), annualised x sqrt(ppy):
+    diff, se (prewhitened Parzen HAC), the symmetric studentized ``level`` CI, two-sided bootstrap p, and the plain HAC
+    test (normal p and CI on the same s.e.) under 'hac'."""
+    n_boot = N_BOOT if n_boot is None else int(n_boot)
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    T = a.size
+    out = {"n": int(T), "diff": None, "se": None, "ci": [None, None], "p": None, "block": None, "bandwidth": None,
+           "hac": None, "method": "Ledoit-Wolf (2008) boot.time.inference"}
+    if T < 8 or b.size != T:
+        return out
+    bl = max(1, min(int(block), T // 4))
+    l = T // bl
+    c = math.sqrt(ppy)
+    d0 = float(a.mean() / a.std(ddof=1) - b.mean() / b.std(ddof=1))
+    s = lw_se(a, b)
+    se0 = s["se"]
+    z = NormalDist().inv_cdf(0.5 + level / 2.0)
+    out.update(diff=d0 * c, se=se0 * c, block=bl, bandwidth=s["bandwidth"])
+    if not se0 > 1e-14:
+        out.update(ci=[d0 * c, d0 * c], p=0.0 if d0 != 0 else 1.0)
+        return out
+    out["hac"] = {"se": se0 * c, "z": d0 / se0, "p": math.erfc(abs(d0 / se0) / math.sqrt(2.0)),
+                  "ci": [(d0 - z * se0) * c, (d0 + z * se0) * c]}
+    d_obs = abs(d0) / se0
+    rng = np.random.default_rng(seed)
+    ds = []
+    for k in _chunks(n_boot, 2 * T):
+        idx = _boot_idx(rng, T, bl, k)                # cbb.sequence: ceil(T/b) circular blocks, cut to T
+        A, B = a[idx], b[idx]
+        ma, mb = A.mean(axis=1), B.mean(axis=1)
+        ga, gb = (A * A).mean(axis=1), (B * B).mean(axis=1)
+        va, vb = np.maximum(ga - ma ** 2, 1e-300), np.maximum(gb - mb ** 2, 1e-300)
+        dd = ma / A.std(axis=1, ddof=1) - mb / B.std(axis=1, ddof=1)
+        infl = ((ga / va ** 1.5)[:, None] * (A - ma[:, None]) - (gb / vb ** 1.5)[:, None] * (B - mb[:, None])
+                - (0.5 * ma / va ** 1.5)[:, None] * (A * A - ga[:, None]) + (0.5 * mb / vb ** 1.5)[:, None] * (B * B - gb[:, None]))
+        zeta = infl[:, :l * bl].reshape(k, l, bl).mean(axis=2) * math.sqrt(bl)     # g' zeta_j over the l whole blocks
+        se = np.sqrt((zeta ** 2).mean(axis=1) / T)
+        ok = se > 1e-14
+        ds.append(np.abs(dd[ok] - d0) / se[ok])
+    dstar = np.concatenate(ds)
+    q = float(np.quantile(dstar, level))
+    out.update(ci=[(d0 - q * se0) * c, (d0 + q * se0) * c], p=float((np.sum(dstar >= d_obs) + 1) / (dstar.size + 1)),
+               q=q)
+    return out
+
 
 
 def _cagr_diff_stat_factory(ppy: int):
@@ -651,25 +785,71 @@ def _ci_crit(t: dict, side: str, thr: float, label: str, fmt: Callable = None) -
     return f"{label} (upper {fmt(hi)}){note}", ok, dec
 
 
+def all_constructions(rows: Sequence[tuple], label: str) -> tuple:
+    """Rule 11: one criterion judged under every construction the trial names (rows = (name, ok, decisive) each). It
+    passes only when every construction passes and fails only when every one fails (decisively only when every failure is
+    decisive); when they disagree, or one is unresolved, it is undecided (None), never taken from the one that passes."""
+    oks = [r[1] for r in rows]
+    if all(o is True for o in oks):
+        ok = True
+    elif all(o is False for o in oks):
+        ok = False
+    else:
+        ok = None
+    dec = ok is False and all(bool(r[2]) for r in rows)
+    note = ""
+    if ok is None:
+        note = (" [the named constructions disagree: undecided under rule 11]" if (True in oks and False in oks)
+                else " [not every named construction resolves: undecided under rule 11]")
+    return f"{label}: " + "; ".join(r[0] for r in rows) + note, ok, dec
+
+
+LW_NAME = "Ledoit-Wolf (2008) test"
+CBB_NAME = "studentized CBB (Bartlett-HAC)"
+
+
 def judge_sharpe(xa, xb, labels: Sequence[str], min_n: int, names: tuple = ("A", "B"), split: Optional[str] = None,
-                 unit: str = "months", block: int = BLOCK, n_boot: Optional[int] = None, seed: int = SEED, reps: Optional[int] = None) -> dict:
+                 unit: str = "months", block: int = BLOCK, n_boot: Optional[int] = None, seed: int = SEED, reps: Optional[int] = None,
+                 lw: Optional[str] = None) -> dict:
     """Pass: the full-sample 95% CI of Sharpe(A) - Sharpe(B) lies above 0 (its lower end resolved beyond 2 Monte Carlo
-    s.e. over ``reps`` seeds) AND the difference is positive in both walk-forward parts. Decisive failures (rule 5): the
-    full CI wholly below 0; a part's CI wholly below 0."""
+    s.e. over ``reps`` seeds) AND the point-estimate difference is positive in both walk-forward parts. Decisive failures
+    (rule 5): the full CI wholly below 0; a part's CI wholly below 0.
+
+    ``lw``: None, 'report' (the Ledoit-Wolf (2008) test is run on the full sample and reported, not a criterion: the trial
+    names only a studentized block bootstrap) or 'criterion' (the trial names the LW test as an alternative: rule 11, the
+    full-sample criterion must pass under both constructions, and a part fails decisively only when both CIs are wholly
+    below 0)."""
     xa, xb = np.asarray(xa, float), np.asarray(xb, float)
     n = xa.size
     full = mc_escalate(lambda seed: sharpe_diff_test(xa, xb, PPY, block, n_boot, seed),
                        lambda t: _ci_crit(t, "gt", 0.0, "")[1], reps, seed)
+    lwf = None
+    if lw:
+        lwf = mc_escalate(lambda seed: lw_test(xa, xb, PPY, block, n_boot, seed), lambda t: _ci_crit(t, "gt", 0.0, "")[1],
+                          reps, seed, keys=("ci",))
     (i1, i2), pn = _parts(labels, split)
     halves = [sharpe_diff_test(xa[ii], xb[ii], PPY, block, n_boot, seed) for ii in (i1, i2)]
+    lw_halves = [lw_test(xa[ii], xb[ii], PPY, block, n_boot, seed) for ii in (i1, i2)] if lw == "criterion" else None
     A, B = names
-    crit = [_ci_crit(full, "gt", 0.0, f"full-sample 95% CI of Sharpe({A}) - Sharpe({B}) > 0")]
-    for nm, h, ii in zip(pn, halves, (i1, i2)):
+    label = f"full-sample 95% CI of Sharpe({A}) - Sharpe({B}) > 0"
+    if lw == "criterion":
+        crit = [all_constructions([_ci_crit(full, "gt", 0.0, CBB_NAME), _ci_crit(lwf, "gt", 0.0, LW_NAME + " (symmetric)")],
+                                  label + " under both constructions the trial names (rule 11)")]
+    else:
+        crit = [_ci_crit(full, "gt", 0.0, label + f" ({CBB_NAME})")]
+    for k, (nm, h, ii) in enumerate(zip(pn, halves, (i1, i2))):
         d = h["diff"]
-        crit.append((f"{nm} ({ii.size} {unit}): difference > 0 ({_s(d)})", None if d is None else d > 0,
-                     h["ci"][1] is not None and h["ci"][1] < 0))
+        dec = h["ci"][1] is not None and h["ci"][1] < 0
+        cis = f"{CBB_NAME} {_ci(h['ci'])}"
+        if lw_halves is not None:
+            hl = lw_halves[k]
+            dec = dec and hl["ci"][1] is not None and hl["ci"][1] < 0
+            cis += f"; {LW_NAME} {_ci(hl['ci'])}"
+        crit.append((f"{nm} ({ii.size} {unit}): point-estimate difference > 0 ({_s(d)}; judged on the point estimate, "
+                     f"{cis})", None if d is None else d > 0, dec))
     v, why = _decide(crit, n, min_n, unit)
-    return {"n": int(n), "full": full, "halves": halves, "part_names": list(pn), "part_n": [int(i1.size), int(i2.size)],
+    return {"n": int(n), "full": full, "lw": lwf, "lw_mode": lw, "halves": halves, "lw_halves": lw_halves,
+            "part_names": list(pn), "part_n": [int(i1.size), int(i2.size)],
             "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
 
 
@@ -1177,47 +1357,103 @@ def _bm_txt(bm: Optional[dict], syms: Sequence[str]) -> str:
             + ", ".join(f"{s} beta {_f(bm[s]['beta'], 2)}, alpha {_pc(bm[s]['alpha_ann'])}/yr (t {_f(bm[s]['t_hac'], 2)})" for s in syms))
 
 
+BLOCK_SENS = (6, 24, 36)       # block-length sensitivities of the index Sharpe differences (months; never criteria)
+
+
 def index_sharpe_claim(archive, A: str, B: str, start: str, min_n: int, split: Optional[str] = None,
-                       end: str = "9999-12-31", n_boot: Optional[int] = None) -> dict:
-    """The shared core of the index Sharpe-difference claims: month-end panel, the judge, roll-date and post-launch
-    sensitivities, back-test counts."""
+                       end: str = "9999-12-31", n_boot: Optional[int] = None, lw: str = "report") -> dict:
+    """The shared core of the index Sharpe-difference claims: month-end panel, the judge (the Ledoit-Wolf (2008) test is
+    a criterion only when ``lw`` = 'criterion', i.e. when the trial names it; otherwise it is reported), roll-date,
+    block-length and post-launch sensitivities, back-test counts."""
     bills = _bills(archive)
     lv = {A: cboe_index(archive, A)["close"], B: cboe_index(archive, B)["close"]}
     P = monthly_panel(lv, bills, start, end)
     if P["n"] < 8:
         return {"P": P, "j": None}
-    j = judge_sharpe(P["ex"][A], P["ex"][B], P["months"], min_n, (A, B), split, n_boot=n_boot)
+    xa, xb = P["ex"][A], P["ex"][B]
+    j = judge_sharpe(xa, xb, P["months"], min_n, (A, B), split, n_boot=n_boot, lw=lw)
     R = panel(lv, bills, roll_days(lv, start, end))
     roll = sharpe_diff_test(R["ex"][A], R["ex"][B], n_boot=n_boot) if R["n"] >= 8 else None
     ii, launch = _post_launch(P, (A, B))
-    post = sharpe_diff_test(P["ex"][A][ii], P["ex"][B][ii], n_boot=n_boot) if ii.size >= 8 else None
-    return {"P": P, "j": j, "roll": roll, "roll_n": R["n"], "post": post, "post_n": int(ii.size), "launch": launch,
-            "bt": _bt_info(archive, (A, B), P)}
+    post = sharpe_diff_test(xa[ii], xb[ii], n_boot=n_boot) if ii.size >= 8 else None
+    post_lw = lw_test(xa[ii], xb[ii], n_boot=n_boot) if ii.size >= 8 else None
+    blocks = {str(bl): sharpe_diff_test(xa, xb, PPY, bl, n_boot) for bl in BLOCK_SENS if bl <= P["n"] // 4}
+    return {"P": P, "j": j, "roll": roll, "roll_n": R["n"], "post": post, "post_lw": post_lw, "post_n": int(ii.size),
+            "launch": launch, "min_n": int(min_n), "bt": _bt_info(archive, (A, B), P), "blocks": blocks}
+
+
+def _bt_label(core: dict) -> Optional[str]:
+    """The verdict label when back-tested index values are in the sample (None when every month is live)."""
+    bt = {s: v for s, v in core["bt"].items() if v["backtested_periods"]}
+    if not bt:
+        return None
+    return ("BACK-TESTED INDEX VALUES: " + "; ".join(f"{v['backtested_periods']} of {v['periods']} months use {s} values "
+                                                     f"back-tested by Cboe before its {v['launch']} launch" for s, v in bt.items()))
+
+
+def _lw_txt(t: Optional[dict]) -> str:
+    if not t or t.get("diff") is None:
+        return "n/a"
+    hac = t.get("hac") or {}
+    return (f"{_s(t['diff'])} (symmetric {_ci(t['ci'])}, two-sided bootstrap p {_f(t['p'])}"
+            + (f", mean of {t['reps']} seeds" if t.get("reps") else "")
+            + f"; its prewhitened Parzen HAC test alone: s.e. {_f(hac.get('se'), 4)}, p {_f(hac.get('p'))}, {_ci(hac.get('ci'))})")
 
 
 def _index_reason_head(core: dict, A: str, B: str) -> str:
     P, j = core["P"], core["j"]
     f = j["full"]
     hv = "; ".join(f"{nm} {_sd_txt(h)}" for nm, h in zip(j["part_names"], j["halves"]))
-    return (f"{A} vs {B} month-end excess returns over the 3-month bill (DTB3 discount yield -> continuous, accrued daily "
+    lbl = _bt_label(core)
+    post = core["post"]
+    role = ("a criterion: the trial names it as the alternative to the studentized block bootstrap, so the full-sample "
+            "criterion must pass under both (rule 11)" if j["lw_mode"] == "criterion" else
+            "reported, not a criterion: the trial names only a studentized block bootstrap")
+    blk = ", ".join(f"{b} months {_ci(t['ci'])}" for b, t in core["blocks"].items())
+    return ((f"{lbl}. ASSUMPTION: the claim describes the published index histories, so back-tested months are used; they "
+             f"were not known at the time they describe (published at launch) and Cboe chose each index design after seeing "
+             f"that history. " if lbl else "")
+            + f"{A} vs {B} month-end excess returns over the 3-month bill (DTB3 discount yield -> continuous, accrued daily "
             f"at the prior print), {P['n']} months {P['months'][0]}..{P['months'][-1]} on the common calendar (rule 10(a): the "
             f"claim names month-end sampling; the indices roll on the third Friday). Annualised Sharpe {A} {_f(f['sharpe_a'])} vs "
-            f"{B} {_f(f['sharpe_b'])}: difference {_sd_txt(f)} (studentized paired block bootstrap, 12-month blocks, mean of "
-            f"{f.get('reps', 1)} seeds x {N_BOOT} resamples, Monte Carlo s.e. of the lower end {_f((f.get('ci_mc_se') or [None])[0], 4)}; "
-            f"percentile {_ci(f.get('ci_pct'))}; one-sided p {_f(f['p'])}); {hv}. {_bt_txt(core['bt'])}; post-launch months only (from {core['launch']}, "
-            f"{core['post_n']} months): {_sd_txt(core['post']) if core['post'] else 'n/a'}. Roll-date sampling sensitivity "
+            f"{B} {_f(f['sharpe_b'])}: difference {_sd_txt(f)} by the {CBB_NAME}: paired circular block bootstrap, 12-month "
+            f"blocks, each resample studentized by the Ledoit-Wolf delta-method gradient with a fixed Bartlett(12) long-run "
+            f"variance (mean of {f.get('reps', 1)} seeds x {N_BOOT} resamples, Monte Carlo s.e. of the lower end "
+            f"{_f((f.get('ci_mc_se') or [None])[0], 4)}; percentile {_ci(f.get('ci_pct'))}; one-sided p {_f(f['p'])}). "
+            f"{LW_NAME} (boot.time.inference: prewhitened Parzen HAC s.e. on the sample, Goetze-Kuensch block s.e. in "
+            f"circular-block resamples, b = 12; {role}): {_lw_txt(j['lw'])}. Parts (judged on point estimates): {hv}. "
+            f"Post-launch months only (from {core['launch']}, {core['post_n']} months"
+            + (f", below min_n {core['min_n']}" if core["post_n"] < core["min_n"] else "")
+            + f"): {_sd_txt(post) if post else 'n/a'}; {LW_NAME} {_lw_txt(core['post_lw']) if core['post_lw'] else 'n/a'}. "
+            + ("" if lbl else f"{_bt_txt(core['bt'])}. ") + f"Block-length sensitivity ({CBB_NAME}): {blk or 'n/a'}. Roll-date sampling sensitivity "
             f"({core['roll_n']} roll-to-roll periods): {_sd_txt(core['roll']) if core['roll'] else 'n/a'}")
 
 
 def _index_stat(core: dict) -> dict:
     P, j = core["P"], core["j"]
-    return {"n": j["n"], "months": [P["months"][0], P["months"][-1]], "sharpe_a": j["full"]["sharpe_a"],
-            "sharpe_b": j["full"]["sharpe_b"], "diff": j["full"]["diff"], "ci": j["full"]["ci"], "p": j["full"]["p"],
-            "parts": [{"name": nm, "n": nn, "diff": h["diff"], "ci": h["ci"]} for nm, nn, h in zip(j["part_names"], j["part_n"], j["halves"])],
-            "post_launch": {"from": core["launch"], "n": core["post_n"], "diff": (core["post"] or {}).get("diff"),
-                            "ci": (core["post"] or {}).get("ci")},
-            "roll_date_sampling": {"n": core["roll_n"], "diff": (core["roll"] or {}).get("diff"), "ci": (core["roll"] or {}).get("ci")},
-            "backtest": core["bt"], "criteria": j["criteria"], "sampling": "month-end (named by the claim)"}
+    lwf = j["lw"] or {}
+    pl = core["post_lw"] or {}
+    out = {"n": j["n"], "months": [P["months"][0], P["months"][-1]], "sharpe_a": j["full"]["sharpe_a"],
+           "sharpe_b": j["full"]["sharpe_b"], "diff": j["full"]["diff"], "ci": j["full"]["ci"], "p": j["full"]["p"],
+           "ci_mc_se": j["full"].get("ci_mc_se"), "method": CBB_NAME,
+           "ledoit_wolf": {"role": "criterion (rule 11)" if j["lw_mode"] == "criterion" else "reported, not a criterion",
+                           "diff": lwf.get("diff"), "ci": lwf.get("ci"), "ci_mc_se": lwf.get("ci_mc_se"), "p": lwf.get("p"),
+                           "se": lwf.get("se"), "bandwidth": lwf.get("bandwidth"), "hac": lwf.get("hac")},
+           "parts": [{"name": nm, "n": nn, "diff": h["diff"], "ci": h["ci"],
+                      "lw_ci": (j["lw_halves"][k]["ci"] if j["lw_halves"] else None)}
+                     for k, (nm, nn, h) in enumerate(zip(j["part_names"], j["part_n"], j["halves"]))],
+           "parts_judged_on": "point estimates",
+           "post_launch": {"from": core["launch"], "n": core["post_n"], "below_min_n": core["post_n"] < core["min_n"],
+                           "diff": (core["post"] or {}).get("diff"), "ci": (core["post"] or {}).get("ci"),
+                           "lw_ci": pl.get("ci"), "lw_p": pl.get("p")},
+           "block_length_sensitivity": {b: {"diff": t["diff"], "ci": t["ci"], "ci_pct": t.get("ci_pct")} for b, t in core["blocks"].items()},
+           "roll_date_sampling": {"n": core["roll_n"], "diff": (core["roll"] or {}).get("diff"), "ci": (core["roll"] or {}).get("ci")},
+           "backtest": core["bt"], "criteria": j["criteria"], "sampling": "month-end (named by the claim)"}
+    lbl = _bt_label(core)
+    if lbl:
+        out["label"] = lbl
+        out["assumption"] = "the claim describes the published index histories (back-tested values included)"
+    return out
 
 
 def _short(A: str, B: str, core: dict) -> Optional[tuple]:
@@ -1287,7 +1523,7 @@ def b6b_bw_bxmd_vs_bxm(archive):
     miss = _missing(archive, [cboe_b("BXMD"), cboe_b("BXM"), DTB3_B])
     if miss:
         return miss
-    core = index_sharpe_claim(archive, "BXMD", "BXM", "2002-03-01", 280)
+    core = index_sharpe_claim(archive, "BXMD", "BXM", "2002-03-01", 280, lw="criterion")
     s = _short("BXMD", "BXM", core)
     if s:
         return s
@@ -1295,6 +1531,8 @@ def b6b_bw_bxmd_vs_bxm(archive):
     bills = _bills(archive)
     extra = []
     stat = _index_stat(core)
+    fr = fragility(P, "BXMD", "BXM")
+    stat["fragility"] = fr
     for arm in ("BXY", "BXMC"):
         if _has(archive, cboe_b(arm)):
             Pa = monthly_panel({arm: cboe_index(archive, arm)["close"], "BXM": cboe_index(archive, "BXM")["close"]}, bills, "2002-03-01")
@@ -1316,10 +1554,39 @@ def b6b_bw_bxmd_vs_bxm(archive):
             stat["convexity"] = conv
     bm = _beta_matched(archive, ("BXMD", "BXM"), "2002-03-01", bills)
     stat["beta_matched"] = bm
-    reason = (_index_reason_head(core, "BXMD", "BXM") + ". Arms: " + ("; ".join(extra) or "none archived")
+    reason = (_index_reason_head(core, "BXMD", "BXM") + f". {_fragility_txt(fr)}. Arms: " + ("; ".join(extra) or "none archived")
               + (f". BXMD-BXM monthly spread on the SPX price return: slope {_f(conv['slope'])}, quadratic {_f(conv['quad'], 2)} "
                  f"(the 30-delta write keeps more upside)" if conv else "") + f". {_bm_txt(bm, ('BXMD', 'BXM'))} — {core['j']['why']}")
     return _out(stat, core["j"]["n"], core["j"]["verdict"], reason)
+
+
+def fragility(P: dict, A: str, B: str, n_boot: Optional[int] = None) -> dict:
+    """Sensitivities of the full-sample interval's lower end (never criteria): log excess returns, a 3-month-block
+    percentile CI, and leaving out each calendar year in turn (studentized CBB, 12-month blocks, seed 0)."""
+    xa, xb = P["ex"][A], P["ex"][B]
+    lb = np.log1p(P["bill"])
+    lg = sharpe_diff_test(np.log1p(P["ret"][A]) - lb, np.log1p(P["ret"][B]) - lb, n_boot=n_boot)
+    b3 = sharpe_diff_test(xa, xb, PPY, 3, n_boot)
+    yrs = sorted({m[:4] for m in P["months"]})
+    loyo = []
+    for yr in yrs:
+        keep = np.array([m[:4] != yr for m in P["months"]])
+        t = sharpe_diff_test(xa[keep], xb[keep], n_boot=n_boot)
+        loyo.append({"year": yr, "diff": t["diff"], "lower": t["ci"][0]})
+    loyo.sort(key=lambda r: (r["lower"] is None, r["lower"]))
+    flips = [r["year"] for r in loyo if r["lower"] is not None and r["lower"] <= 0]
+    return {"log_excess": {"diff": lg["diff"], "ci": lg["ci"]}, "block3_percentile": {"diff": b3["diff"], "ci_pct": b3.get("ci_pct")},
+            "leave_one_year_out_lowest": loyo[:6], "years_whose_removal_puts_lower_end_at_or_below_0": flips}
+
+
+def _fragility_txt(fr: dict) -> str:
+    lo = fr["leave_one_year_out_lowest"]
+    return (f"Fragility of the lower end (sensitivities, not criteria): log excess returns {_ci(fr['log_excess']['ci'])}; "
+            f"3-month-block percentile {_ci(fr['block3_percentile']['ci_pct'])}; leave-one-year-out lowest lower ends "
+            + ", ".join(f"{r['year']} {_s(r['lower'])}" for r in lo[:4])
+            + f" ({len(fr['years_whose_removal_puts_lower_end_at_or_below_0'])} years whose removal puts it at or below 0"
+            + (": " + ", ".join(fr["years_whose_removal_puts_lower_end_at_or_below_0"]) if fr["years_whose_removal_puts_lower_end_at_or_below_0"] else "")
+            + ")")
 
 
 def b6b_bw_bxmw_vs_bxm(archive):
@@ -1394,24 +1661,63 @@ def b6b_bw_put_vs_bxm(archive):
         return s
     stat = _index_stat(core)
     bills = _bills(archive)
-    arms = []
+    P = core["P"]
+    put, bxm = cboe_index(archive, "PUT")["close"], cboe_index(archive, "BXM")["close"]
+    lv = {"PUT": put, "BXM": bxm}
+    # sample window: the first return ends at the first month end after the 2007-01 month end; the last month only if complete
+    before = [d for d in put if d < "2007-01-01"]
+    cd = common_days(lv, "2007-01-01")
+    edge = {"first_return_month": P["months"][0], "last_return_month": P["months"][-1],
+            "put_last_row_before_2007": max(before) if before else None, "first_common_day": cd[0] if cd else None,
+            "last_common_day": cd[-1] if cd else None}
+    part_days = ([cd[0]] if cd and cd[0] < P["days"][0] else []) + list(P["days"]) + ([cd[-1]] if cd and cd[-1] > P["days"][-1] else [])
+    Pp_ = panel(lv, bills, part_days)
+    partial = sharpe_diff_test(Pp_["ex"]["PUT"], Pp_["ex"]["BXM"]) if Pp_["n"] > P["n"] else None
+    edge["with_partial_months"] = None if not partial else {"n": Pp_["n"], "from": Pp_["days"][0], "to": Pp_["days"][-1],
+                                                            "diff": partial["diff"], "ci": partial["ci"]}
+    stat["window"] = edge
+    arms, with_edge, ran = [], [], []
+    arm_name = {"PUTY": "2% OTM (PUTY)", "WPUT": "weekly (WPUT)", "PUTD": "dynamic (PUTD)"}
     for arm in ("PUTY", "WPUT", "PUTD"):
         if _has(archive, cboe_b(arm)):
-            Pa = monthly_panel({arm: cboe_index(archive, arm)["close"], "BXM": cboe_index(archive, "BXM")["close"]}, bills, "2007-01-01")
-            if Pa["n"] >= 8:
-                t = sharpe_diff_test(Pa["ex"][arm], Pa["ex"]["BXM"])
-                stat[f"arm_{arm}_minus_BXM"] = {"n": Pa["n"], "diff": t["diff"], "ci": t["ci"]}
-                arms.append(f"{arm} - BXM {_sd_txt(t)}")
+            alv = {arm: cboe_index(archive, arm)["close"], "BXM": bxm}
+            row = {}
+            for key, st in (("full_common_history", "2002-03-01"), ("from_2007", "2007-01-01")):
+                Pa = monthly_panel(alv, bills, st)
+                if Pa["n"] >= 8:
+                    t = sharpe_diff_test(Pa["ex"][arm], Pa["ex"]["BXM"])
+                    row[key] = {"n": Pa["n"], "from": Pa["months"][0], "diff": t["diff"], "ci": t["ci"]}
+            if row:
+                ran.append(arm_name[arm])
+                if any(v["ci"][0] is not None and v["ci"][0] > 0 for v in row.values()):
+                    with_edge.append(arm_name[arm])
+                stat[f"arm_{arm}_minus_BXM"] = row
+                arms.append(f"{arm} - BXM " + "; ".join(f"{v['n']} months from {v['from']} {_sd_txt(v)}" for v in row.values()))
     par = None
     if _has(archive, cboe_b("PUTY")) and _has(archive, cboe_b("BXY")):
         Pp = monthly_panel({"PUTY": cboe_index(archive, "PUTY")["close"], "BXY": cboe_index(archive, "BXY")["close"]}, bills, "1988-06-01")
         if Pp["n"] >= 8:
             par = sharpe_diff_test(Pp["ex"]["PUTY"], Pp["ex"]["BXY"])
             stat["control_PUTY_minus_BXY"] = {"n": Pp["n"], "from": Pp["months"][0], "diff": par["diff"], "ci": par["ci"]}
-    reason = (_index_reason_head(core, "PUT", "BXM") + " (PUT_History.csv has only seven rows before 2007-01-03, so the window starts "
-              "at the 2007-01 month end). Secondary arms (2007-): " + ("; ".join(arms) or "none archived")
+            ran.append("the PUTY - BXY parity control")
+            if par["ci"][0] is not None and par["ci"][0] > 0:
+                with_edge.append("the PUTY - BXY parity control")
+    none_ = [x for x in ran if x not in with_edge]
+    scope = ("Scope: the support covers the PUT and BXM indices only (the claim names them)"
+             + (f"; {', '.join(none_)} show{'s' if len(none_) == 1 else ''} no put-write edge (no 95% CI above 0)" if none_ else "")
+             + (f"; {', '.join(with_edge)} show{'s' if len(with_edge) == 1 else ''} one (95% CI above 0)" if with_edge else ""))
+    first_txt = (f"the first monthly return is {edge['first_return_month']} (PUT_History.csv has no 2006-12 month-end row: its "
+                 f"last row before 2007 is {edge['put_last_row_before_2007']}, and daily rows start {edge['first_common_day']}), so "
+                 f"the claim's 2007-01 is missing" if edge["first_return_month"] > "2007-01" else
+                 f"the first monthly return is {edge['first_return_month']}")
+    last_txt = (f"the last is {edge['last_return_month']}" + (f" (the final month, data to {edge['last_common_day']}, is incomplete)"
+                                                              if edge["last_common_day"] and edge["last_common_day"][:7] > edge["last_return_month"] else ""))
+    reason = (_index_reason_head(core, "PUT", "BXM")
+              + f". Window: {first_txt}; {last_txt}. With the partial first and last months added "
+              f"({edge['with_partial_months']['from'] if partial else 'n/a'}..{edge['with_partial_months']['to'] if partial else 'n/a'}): "
+              f"{_sd_txt(partial) if partial else 'n/a'}. Secondary arms (not criteria): " + ("; ".join(arms) or "none archived")
               + (f". Parity control PUTY - BXY (both 2% OTM, {stat['control_PUTY_minus_BXY']['n']} months from "
-                 f"{stat['control_PUTY_minus_BXY']['from']}): {_sd_txt(par)}" if par else "") + f" — {core['j']['why']}")
+                 f"{stat['control_PUTY_minus_BXY']['from']}): {_sd_txt(par)}" if par else "") + f". {scope} — {core['j']['why']}")
     return _out(stat, core["j"]["n"], core["j"]["verdict"], reason)
 
 

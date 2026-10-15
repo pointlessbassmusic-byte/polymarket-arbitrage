@@ -26,7 +26,11 @@ Conventions
     that has its own), the one taken on the quote day and not flagged stale is kept, else the earliest. An entry trades at
     the quote day's close at those quotes (they were the market's public closing quotes then; DoltHub's publication time
     is provenance, per the data module), with the spot = SPY's raw close that day. Strike selection uses only that
-    snapshot (vendor deltas, vendor IVs, strikes vs that close).
+    snapshot (vendor deltas, vendor IVs, strikes vs that close). Rows of a weekend, holiday or stale-moved snapshot (every
+    2019 snapshot is a Saturday) carry the module's conservative available_at on the SNAPSHOT evening, after that close;
+    the harness still enters at the quote-day close because it uses nothing but those closing quotes and that close,
+    which participants saw at the time. A strict sensitivity drops those entries (available_at after the entry close)
+    and is reported for every claim.
   * Expiry. The listed expiry nearest the claim's DTE (calendar days from the quote day), ties to the longer-dated, used
     only within +/- DTE_TOL = 7 days (one weekly listing interval; DoltHub lists only 3-4 expiries, so a 45- or 60-DTE
     expiry is missing on many days); +/- 4 and +/- 14 days are reported as sensitivities. T-173 names the monthly
@@ -42,12 +46,14 @@ Conventions
     reported sensitivity.
   * Settlement. Held to expiry and settled at intrinsic on SPY's RAW close of the expiry date (house rule 8). SPY options
     are American; early exercise is ignored as the claims say "held to expiry". For the call claims (T-119, T-173) an
-    early-assignment bound is reported: SPY goes ex-dividend on the third Friday of Mar/Jun/Sep/Dec, so a call ITM by
-    more than the dividend at the cum-dividend close (the session before an ex-date inside the life) is exercised there
-    (short calls assigned, long calls exercised) at that close's intrinsic value. Dividends are read from the
-    adjclose/close ratio steps of daily-history-SPY (used ex post, for this settlement bound only). Put early exercise is
-    ignored (an assigned short put becomes stock held to expiry, the same price exposure up to carry). Trades whose expiry
-    is after the last archived close are unresolved and left out (counted).
+    early-exercise sensitivity is reported: SPY goes ex-dividend on the third Friday of Mar/Jun/Sep/Dec, so a call is
+    exercised at the cum-dividend close (the session before an ex-date inside the life) when the dividend exceeds its
+    remaining time value, approximated at r = 0 by the Black-Scholes put on the ex-dividend price at the leg's entry
+    vendor IV (a model-assisted exercise rule; it errs towards exercising); such a leg (short calls assigned, long calls
+    exercised) settles at that close's intrinsic value. Dividends are read from the adjclose/close ratio steps of
+    daily-history-SPY (used ex post, for this settlement sensitivity only). Put early exercise is ignored (an assigned
+    short put becomes stock held to expiry, the same price exposure up to carry). Trades whose expiry is after the last
+    archived close are unresolved and left out (counted).
   * Denominators. T-119: max loss = (K2 - K1) - net credit (at S_T = K2), at the same fill as the P&L. T-121, T-539:
     naked-leg margin = Reg-T/CBOE naked equity put requirement on ONE uncovered short put, premium + max(20% x S - OTM
     amount, 10% x K) with OTM = max(S - K, 0) and premium = that put's fill price (mid, or bid when executable). The
@@ -69,8 +75,8 @@ Conventions
   * T-173's quartiles are the full-sample quartiles of the entry-day slope (the trial's statistic is the quartile
     contrast of the sample); the slope is the vendor call IV linearly interpolated in K/S at 1.10 minus that at 1.05, per
     unit of moneyness, on the cohort's expiry, known at the entry close. Expanding point-in-time quartiles (cut from
-    earlier entries only, after 12 cohorts), one entry per cohort (nearest 30 DTE), executable fills, dollar P&L and the
-    early-assignment bound are reported, not judged.
+    earlier entries only, after 12 cohorts), one entry per cohort (nearest 30 DTE), executable fills, dollar P&L, the
+    early-exercise sensitivity and the difference without its most favourable cohort(s) are reported, not judged.
   * Stress month (T-121, T-539 pass). A calendar month with a VIX close >= 40; it is "in the sample" when at least one
     resolved trade was open across such a session (entry < session <= expiry). Months where SPY closed >= 10% below its
     63-session high are reported beside it. Without one the criterion is None (the trial's control caps at inconclusive).
@@ -94,6 +100,7 @@ import numpy as np
 
 from mandel.data.dolt_options import is_trading_day
 from mandel.experiments.underlying2 import _verdict
+from mandel.options import bs
 from mandel.validation.backtest_eval import _hac_var
 
 CHAIN_B = "dolt-chain-SPY"
@@ -124,6 +131,7 @@ T121_MIN_N, T121_DTE = 250, 45
 T539_MIN_N, T539_DTE = 250, 45
 T173_MIN_N, T173_DTE = 24, 30
 FILLS = ("mid", "exec")
+EVENING = "T22:00:00+00:00"      # the data module's available_at time on a quote day's evening
 NO_CONTROL = "the GLD and IBIT controls cannot run (DoltHub has neither symbol)"
 
 
@@ -345,6 +353,20 @@ def pooled_mean_test(days: Sequence[str], x, hold_days: int, side: int, holds: S
     return {"mean": float(x.mean()) if x.size else None, "n_entries": int(x.size), "n_weeks": int(S.size),
             "by_block": rows, "ok": _robust([r["ok"] for r in rows]),
             "decisive_fail": bool(rows) and all(r["decisive_fail"] is True for r in rows)}
+
+
+def week_weighted(days: Sequence[str], x, hold_days: int, holds: int = BLOCK_HOLDS[0], n_boot: Optional[int] = None,
+                  seed: int = SEED) -> dict:
+    """Calendar-weighted sensitivity: the mean of weekly means (each week with entries counts once, so the denser
+    snapshot cadence of later years does not weigh more), CI over weeks at a block of ``holds`` x the hold."""
+    S, N = week_clusters(days, x)
+    has = N > 0
+    if not has.any():
+        return {"mean": None, "ci": [None, None], "n_weeks": 0}
+    Sw = np.where(has, S / np.maximum(N, 1.0), 0.0)
+    Nw = has.astype(float)
+    lo, hi = cluster_mean_ci(Sw, Nw, int(math.ceil(holds * hold_days / 7.0)), LEVEL, n_boot, seed)
+    return {"mean": float(Sw.sum() / Nw.sum()), "ci": [lo, hi], "n_weeks": int(has.sum())}
 
 
 def _decide(crit: list, n: int, min_n: int, unit: str) -> tuple:
@@ -590,7 +612,8 @@ def _leg(l: dict, kind: str, qty: int) -> dict:
 
 def _trade(day: dict, expiry: str, legs: list, **extra) -> dict:
     return {"entry": day["quote_date"], "snapshot": day["snapshot_date"], "expiry": expiry,
-            "dte": dte(expiry, day["quote_date"]), "spot": float(day["spot"]), "legs": legs, **extra}
+            "dte": dte(expiry, day["quote_date"]), "spot": float(day["spot"]), "legs": legs,
+            "late_stamp": bool((day.get("available_at") or "") > day["quote_date"] + EVENING), **extra}
 
 
 def leg_px(leg: dict, fill: str) -> float:
@@ -703,9 +726,23 @@ def backspread_max_loss(trade: dict, fill: str) -> float:
     return (k2 - k1) - net_credit(trade, fill)
 
 
+def exercise_early(s_cum: float, k: float, amount: float, tau: float, iv: Optional[float]) -> bool:
+    """Is an American call exercised at the cum-dividend close? Exercise value S - K beats holding, worth about
+    (S - D - K) + P(S - D, K) at r = 0 (put-call parity on the ex-dividend price), when D > P: the remaining time value.
+    P is a Black-Scholes put at the leg's entry vendor IV (r = q = 0, so it errs towards exercising); without an IV the
+    rule is S - K > D."""
+    if s_cum - k <= 0:
+        return False
+    if iv is None or not iv > 0 or tau <= 0:
+        return s_cum - k > amount
+    p = float(bs.price(max(s_cum - amount, 1e-9), k, tau, 0.0, iv, "put"))
+    return amount > p
+
+
 def early_exercise_payoff(trade: dict, s_t: float, divs: Sequence[tuple], days: Sequence[str], close_by: dict) -> float:
-    """Payoff when every call ITM by more than the dividend at the cum-dividend close (the session before an ex-date in
-    (entry, expiry]) is exercised there at that close's intrinsic value; other legs at expiry."""
+    """Payoff when each call that ``exercise_early`` exercises at the cum-dividend close (the session before an ex-date
+    in (entry, expiry]) is settled there at that close's intrinsic value (short calls assigned, long calls exercised);
+    other legs at expiry."""
     tot = 0.0
     for l in trade["legs"]:
         val = None
@@ -717,7 +754,8 @@ def early_exercise_payoff(trade: dict, s_t: float, divs: Sequence[tuple], days: 
                 if j < 0 or days[j] <= trade["entry"]:
                     continue
                 sc = close_by.get(days[j])
-                if sc is not None and sc - l["strike"] > amt:
+                tau = (_ord(trade["expiry"]) - _ord(days[j])) / 365.0
+                if sc is not None and exercise_early(sc, l["strike"], amt, tau, l.get("iv")):
                     val = sc - l["strike"]
                     break
         if val is None:
@@ -883,19 +921,32 @@ def mean_claim(trades: Sequence[dict], ratios: dict, *, hold_days: int, min_n: i
     for f in ratios:
         if f not in pooled:
             pooled[f] = pooled_mean_test(days, ratios[f], hold_days, 1, n_boot=n_boot, seed=seed)
-    crit, parts = [], []
+    crit, parts, weekly = [], [], {}
     for label, f, side in criteria:
         p = pooled[f]
         want = "lower 95% CI > 0" if side > 0 else "upper 95% CI < 0"
         crit.append((f"{label}: {want} for the mean, robust over blocks of "
                      f"{'/'.join(str(r['holds']) for r in p['by_block'])}x the hold", p["ok"], p["decisive_fail"]))
-        parts.append(f"{label}: {_pool_txt(p)} -> {want}: {_ok_txt(p['ok'])}")
+        weekly[f] = week_weighted(days, ratios[f], hold_days, n_boot=n_boot, seed=seed)
+        parts.append(f"{label}: {_pool_txt(p)} -> {want}: {_ok_txt(p['ok'])} (week-weighted, reported: mean "
+                     f"{_s(weekly[f]['mean'], 3)}, {_ci_s(weekly[f]['ci'])})")
+    keep = [i for i, t in enumerate(trades) if not t.get("late_stamp")]
+    strict = {"n": len(keep), "n_dropped": n - len(keep)}
+    if len(keep) >= MIN_CLUSTERS:
+        for label, f, side in criteria:
+            ps = pooled_mean_test([days[i] for i in keep], np.asarray(ratios[f], dtype=float)[keep], hold_days, side,
+                                  holds=(BLOCK_HOLDS[0],), n_boot=n_boot, seed=seed)
+            strict[f] = {"mean": ps["mean"], "ci": ps["by_block"][0]["ci"]}
+    parts.append(f"strict available_at sensitivity (drops the {n - len(keep)} entries whose rows are stamped available "
+                 f"after the entry close: weekend, holiday or moved snapshots): "
+                 + "; ".join(f"{f} mean {_s(strict[f]['mean'], 3)} ({_ci_s(strict[f]['ci'])})"
+                             for _, f, _ in criteria if f in strict))
     if stress is not None:
         crit.append((stress_name, True if stress else None, False))
     verdict, why = _decide(crit, n, min_n, "entry days")
     scans = {f: chain_scan(trades, ratios[f], hold_days, side, n_boot=n_boot, seed=seed) for _, f, side in criteria}
     return {"verdict": verdict, "why": why, "n": n, "pooled": pooled, "scans": scans, "parts": parts,
-            "n_holds": n_holds(days, hold_days)}
+            "week_weighted": weekly, "strict_available_at": strict, "n_holds": n_holds(days, hold_days)}
 
 
 def quartile_claim(trades: Sequence[dict], x, signal, *, min_n: int, blocks: Sequence[int] = COHORT_BLOCKS,
@@ -934,6 +985,27 @@ def quartile_claim(trades: Sequence[dict], x, signal, *, min_n: int, blocks: Seq
             "diff": rows[0]["diff"] if rows else None, "mean_top": rows[0]["mean_top"] if rows else None,
             "mean_bottom": rows[0]["mean_bottom"] if rows else None, "n_top": int(np.sum(top)),
             "n_bottom": int(np.sum(bot)), "n_entries": int(x.size)}
+
+
+def drop_influential(trades: Sequence[dict], x, top, bot, block: int = COHORT_BLOCKS[0], k: int = 1,
+                     n_boot: Optional[int] = None, seed: int = SEED) -> dict:
+    """Fragility check: remove the ``k`` cohorts whose influence on the top-minus-bottom difference is most in its
+    favour (largest (St_c - mt Nt_c)/Nt - (Sb_c - mb Nb_c)/Nb), keep every other entry's label, and recompute."""
+    x = np.asarray(x, dtype=float)
+    top = np.asarray(top, dtype=bool)
+    bot = np.asarray(bot, dtype=bool)
+    if not top.any() or not bot.any():
+        return {"dropped": [], "diff": None, "ci": [None, None]}
+    mt, mb = float(x[top].mean()), float(x[bot].mean())
+    infl = defaultdict(float)
+    for t, v, a, b in zip(trades, x, top, bot):
+        infl[t["cohort"]] += (v - mt) / top.sum() * a - (v - mb) / bot.sum() * b
+    drop = [c for c, _ in sorted(infl.items(), key=lambda kv: -kv[1])[:k]]
+    keep = np.array([t["cohort"] not in drop for t in trades], dtype=bool)
+    q = quartile_claim([t for t, kk in zip(trades, keep) if kk], x[keep], np.zeros(int(keep.sum())), min_n=0,
+                       blocks=(block,), labels=(top[keep], bot[keep]), n_boot=n_boot, seed=seed)
+    return {"dropped": drop, "diff": q["diff"], "ci": q["rows"][0]["ci"], "mean_top": q["mean_top"],
+            "mean_bottom": q["mean_bottom"]}
 
 
 def expanding_labels(trades: Sequence[dict], signal, min_cohorts: int = PIT_MIN_COHORTS) -> tuple:
@@ -1016,7 +1088,7 @@ def _tol_txt(sens: dict, nd: int = 3) -> str:
 # ============================================================================================== T-119 ==
 
 def backspread_metrics(t: dict, W: Optional[dict] = None) -> dict:
-    """P&L, max loss and ratio at mid and exec; the upper breakeven; the early-assignment-bound ratio at mid."""
+    """P&L, max loss and ratio at mid and exec; the upper breakeven; the early-exercise-sensitivity ratio at mid."""
     out = {}
     pay = payoff(t, t["s_t"])
     for f in FILLS:
@@ -1086,18 +1158,19 @@ def b6b_dolt_backspread(archive):
              f"the claim's mechanism (reported, no threshold stated): {_pct(float(above.mean()))} of trades settled above "
              f"the upper breakeven K2 + (K2 - K1) - credit",
              f"ratio of means (mean P&L / mean max loss at mid) {_s(float(pnl_mid.mean() / ml_mid.mean()), 3)}",
-             f"early-assignment bound (calls ITM by more than the dividend at a cum-dividend close are exercised there): "
+             f"early-exercise sensitivity (a call is exercised at a cum-dividend close when the dividend exceeds its time "
+             f"value, BS put at the entry vendor IV, r = 0): "
              f"mean {_s(ep['mean'], 3)} ({_ci_s(ep['by_block'][0]['ci'])})",
              f"with $0.65/contract per leg at executable fills: mean {_s(float(np.nanmean(comm)), 3)}",
              f"DTE tolerance sensitivity at mid: {_tol_txt(sens)}",
              f"25-delta leg vendor delta {_f(float(deltas.min()))}-{_f(float(deltas.max()))}; skipped quote days: "
              f"{_skips_txt(skips, unres)}; {NO_CONTROL}"]
     stat.update({"n_distinct_holds": core["n_holds"], "first_entry": trades[0]["entry"], "last_entry": trades[-1]["entry"],
-                 "mean_ratio_mid": pe["mean"], "pooled_mid": pe, "pooled_exec": px,
+                 "mean_ratio_mid": pe["mean"], "pooled_mid": pe, "pooled_exec": px, "week_weighted": core["week_weighted"], "strict_available_at": core["strict_available_at"],
                  "per_start_mid": {k: v for k, v in core["scans"]["mid"].items()},
                  "credit_share_mid": float((credit_mid > 0).mean()), "mean_credit_mid": float(credit_mid.mean()),
                  "mean_credit_exec": float(credit_exec.mean()), "share_above_upper_breakeven": float(above.mean()),
-                 "ratio_of_means_mid": float(pnl_mid.mean() / ml_mid.mean()), "early_assignment_bound": ep,
+                 "ratio_of_means_mid": float(pnl_mid.mean() / ml_mid.mean()), "early_exercise_sensitivity": ep,
                  "exec_with_commission_mean": float(np.nanmean(comm)), "dte_tolerance_sensitivity": sens,
                  "by_year_mid": _by_year(trades, [m["mid"]["ratio"] for m in mets]),
                  "desc_mid": _desc([m["mid"]["ratio"] for m in mets]), "controls": NO_CONTROL})
@@ -1183,7 +1256,7 @@ def _put_harness(archive, *, claim: str, builder: Callable, target: int, min_n: 
              f"DTE tolerance sensitivity at bid/ask: {_tol_txt(sens)}",
              f"skipped quote days: {_skips_txt(skips, unres)}"]
     stat.update({"n_distinct_holds": core["n_holds"], "first_entry": trades[0]["entry"], "last_entry": trades[-1]["entry"],
-                 "mean_ratio_mid": pm["mean"], "mean_ratio_exec": px["mean"], "pooled_mid": pm, "pooled_exec": px,
+                 "mean_ratio_mid": pm["mean"], "mean_ratio_exec": px["mean"], "pooled_mid": pm, "pooled_exec": px, "week_weighted": core["week_weighted"], "strict_available_at": core["strict_available_at"],
                  "per_start_exec": core["scans"]["exec"], "per_start_mid": core["scans"]["mid"],
                  "stress_months_in_sample": hits, "stress_sessions": len(sess), "drawdown_months": ddm,
                  "n_trades_in_stress": int(in_stress.sum()),
@@ -1217,7 +1290,7 @@ def b6b_dolt_put_ladder(archive):
 
 def overlay_values(t: dict, W: Optional[dict] = None) -> dict:
     """Overlay spread (1x2 minus single = short C5, long C10) P&L per unit of the entry spot at mid and exec, in $ at
-    mid, and under the early-assignment bound."""
+    mid, and under the early-exercise sensitivity."""
     pay = payoff(t, t["s_t"])
     out = {f: (pay + net_credit(t, f)) / t["spot"] for f in FILLS}
     out["usd"] = pay + net_credit(t, "mid")
@@ -1278,25 +1351,57 @@ def b6b_dolt_ratio_overlay_skew(archive):
     one = one_per_cohort(trades)
     tr1 = [trades[i] for i in one]
     q_one = quartile_claim(tr1, x[one], sig[one], min_n=T173_MIN_N, blocks=(COHORT_BLOCKS[0],))
+    tol_sens = {}
+    for tol in DTE_SENS:
+        tr2, _ = build_trades(W["chain"], overlay_trade, monthly=monthly, target=T173_DTE, tol=tol)
+        tr2, _ = resolve(tr2, W["close_by"], W["last"])
+        if len({t["cohort"] for t in tr2}) < MIN_CLUSTERS:
+            tol_sens[str(tol)] = {"n_cohorts": len({t["cohort"] for t in tr2}), "diff": None, "ci": [None, None]}
+            continue
+        q2 = quartile_claim(tr2, np.array([overlay_values(t)["mid"] for t in tr2]),
+                            np.array([t["signal"] for t in tr2]), min_n=T173_MIN_N, blocks=(COHORT_BLOCKS[0],))
+        tol_sens[str(tol)] = {"n_cohorts": q2["n"], "n_entries": q2["n_entries"], "diff": q2["diff"],
+                              "ci": q2["rows"][0]["ci"]}
+    keep = [i for i, t in enumerate(trades) if not t.get("late_stamp")]
+    q_strict = quartile_claim([trades[i] for i in keep], x[keep], sig[keep], min_n=T173_MIN_N,
+                              blocks=(COHORT_BLOCKS[0],)) if len(keep) >= MIN_CLUSTERS else None
+    full_lab = (sig >= core["q3"], sig <= core["q1"])
+    drop1 = drop_influential(trades, x, *full_lab, k=1)
+    drop2 = drop_influential(trades, x, *full_lab, k=2)
     per_coh = defaultdict(list)
     for t in trades:
         per_coh[t["cohort"]].append(t)
+    yrs = sorted({t["entry"][:4] for t in trades})
+    by_year = {y: {"n_top": int(sum(1 for t, a in zip(trades, full_lab[0]) if a and t["entry"][:4] == y)),
+                   "n_bottom": int(sum(1 for t, b in zip(trades, full_lab[1]) if b and t["entry"][:4] == y))} for y in yrs}
     parts = [f"{len(trades)} entries in {core['n']} monthly cohorts ({min(per_coh)}..{max(per_coh)}; "
              f"{min(len(v) for v in per_coh.values())}-{max(len(v) for v in per_coh.values())} entries per cohort)",
              f"slope quartiles Q1 {_s(core['q1'], 3)}, Q3 {_s(core['q3'], 3)} (vol per unit moneyness; median "
              f"{_s(float(np.median(sig)), 3)})",
              f"mid: {_qrows_txt(core)} -> CI > 0: {_ok_txt(core['ok'])}",
              f"unconditional mean spread {_s(float(x.mean()) * 100, 3)}% of S",
+             f"fragility (reported): without the most favourable cohort ({', '.join(drop1['dropped'])}) difference "
+             f"{_s(drop1['diff'] and drop1['diff'] * 100)}% of S ({_ci_s(drop1['ci'], 2, 100)}); without the two most "
+             f"favourable ({', '.join(drop2['dropped'])}) {_s(drop2['diff'] and drop2['diff'] * 100)}% "
+             f"({_ci_s(drop2['ci'], 2, 100)}); top/bottom entries by year "
+             + ", ".join(f"{y} {v['n_top']}/{v['n_bottom']}" for y, v in by_year.items()),
              f"reported, not judged: executable (sell 5% at the bid, buy 10% at the ask) {_qrows_txt(q_exec)}; in $ "
-             f"{_qrows_txt(q_usd, 1.0, ' $')}; early-assignment bound {_qrows_txt(q_early)}; point-in-time expanding "
-             f"quartiles (after {PIT_MIN_COHORTS} cohorts) {_qrows_txt(q_pit)}; one entry per cohort (nearest "
-             f"{T173_DTE} DTE) {_qrows_txt(q_one)}",
+             f"{_qrows_txt(q_usd, 1.0, ' $')}; early-exercise sensitivity (a call is exercised at a cum-dividend close "
+             f"when the dividend exceeds its time value, BS put at the entry vendor IV, r = 0) {_qrows_txt(q_early)}; "
+             f"point-in-time expanding quartiles (after {PIT_MIN_COHORTS} cohorts) {_qrows_txt(q_pit)}; one entry per "
+             f"cohort (nearest {T173_DTE} DTE) {_qrows_txt(q_one)}; DTE window "
+             + "; ".join(f"+/-{k}: {v['n_cohorts']} cohorts, difference {_s(v['diff'] and v['diff'] * 100)}% of S "
+                         f"({_ci_s(v['ci'], 2, 100)})" for k, v in tol_sens.items())
+             + f"; strict available_at (drops the {len(trades) - len(keep)} entries whose rows are stamped after the "
+               f"entry close) " + (f"{q_strict['n']} cohorts, {_qrows_txt(q_strict)}" if q_strict else "too few entries"),
              f"skipped quote days: {_skips_txt(skips, unres)}; {NO_CONTROL}"]
     stat.update({"n_cohorts": core["n"], "quartile_test": core, "q1": core["q1"], "q3": core["q3"],
                  "diff_mid": core["diff"], "mean_spread_mid": float(x.mean()),
-                 "sens_exec": q_exec, "sens_usd": q_usd, "sens_early_assignment": q_early, "sens_point_in_time": q_pit,
-                 "sens_one_per_cohort": q_one, "first_cohort": min(per_coh), "last_cohort": max(per_coh),
-                 "controls": NO_CONTROL})
+                 "sens_exec": q_exec, "sens_usd": q_usd, "sens_early_exercise": q_early, "sens_point_in_time": q_pit,
+                 "sens_one_per_cohort": q_one, "drop_most_favourable_cohort": drop1,
+                 "drop_two_most_favourable_cohorts": drop2, "quartile_entries_by_year": by_year,
+                 "dte_window_sensitivity": tol_sens, "sens_strict_available_at": q_strict,
+                 "first_cohort": min(per_coh), "last_cohort": max(per_coh), "controls": NO_CONTROL})
     return _out(stat, core["n"], verdict, head + ": " + "; ".join(parts) + " — " + why)
 
 

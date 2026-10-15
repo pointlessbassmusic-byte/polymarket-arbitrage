@@ -14,7 +14,8 @@ Eight options-library claims, each tested against its claim, trial.pass and tria
     (R^2 > 0.95 and TE < 2%/yr for both; BXMD and CNDR shortfalls documented);
   * T-528 VXTH vs SPY TR (and PPUT3M) daily maximum drawdowns on the common 2006-03 onward sample (90% CI > 10 points);
   * T-220 MODEL-PRICED VIX call credit spread (short front VX future + 2, long + 5) sold 3 trading days before the
-    monthly SOQ when VIX3M/VIX > 1.1, settled at VRO, return on max loss net of half-spreads (95% CI > 0).
+    monthly SOQ when VIX3M/VIX > 1.1, settled at VRO, return on max loss net of half-spreads (95% CI > 0), with the gate
+    and strikes from one information set (house rule 12) and both named pricings (house rule 11).
 
 Data (all loaded through ``archive.load``; a bar is used only if its ``available_at`` precedes the bundle's capture):
   * ``cboe-<SYM>-history`` (mandel.data.cboe_strategy): published index levels. Flags are applied as the module says: a
@@ -38,8 +39,9 @@ Data (all loaded through ``archive.load``; a bar is used only if its ``available
     exp(r * calendar days / 365) - 1 with r known at its start. T-179 names the 1-month bill, which FRED does not carry
     before 2001 (DTB4WK); DTB3 is the stated proxy and fed funds (DFF, act/360) and a zero rate are reported; the slope
     criterion is decided only when every rate choice agrees.
-  * VIX, VIX3M, VVIX closes (cboe-*-history); VX futures daily settlements (cboe-vx-futures, monthly contracts, usable
-    settles from 2013-05-20); VRO (VIX SOQ) rows with ``expiry`` set, not ``carried`` and no ``flag``; captured VIX option
+  * VIX, VIX3M, VVIX closes (cboe-*-history); VX futures daily settlements (cboe-vx-futures, monthly contracts from
+    2013-01-02; the rows before 2013-05-20 carry settle 0, and their VX close, stamped at the same 21:30Z, is the
+    documented proxy there); VRO (VIX SOQ) rows with ``expiry`` set, not ``carried`` and no ``flag``; captured VIX option
     chains (options-chain-VIX-<date>, pre-open captures carrying the previous session's quotes) for half-spreads.
 
 Conventions:
@@ -55,7 +57,9 @@ Conventions:
     resample. The trial's out-of-sample variant (beta from the first half applied to the second) is reported.
   * Sharpe differences use excess returns over the bill and a studentized circular block bootstrap of the paired months
     with a delta-method Bartlett HAC s.e. (bandwidth = block = 6 months). "Monthly Sharpe ratio" is read as the Sharpe
-    ratio of monthly returns, not annualised (T-168's 0.05 margin is on that scale; the annualised reading is reported).
+    ratio of monthly returns, not annualised (T-168's 0.05 margin is on that scale; the annualised reading is reported,
+    for the controls too). T-168's reason names a partial last month (the statistic without it is reported) and every
+    month-end that a leg's missing close moves earlier for all legs.
   * T-179's slope interval is a studentized pairs block bootstrap (block 6 rolls) with a Bartlett HAC s.e.
   * T-528 resamples paired daily returns with the stationary bootstrap (mean block 63 days, as the trial says) and takes
     the percentile 90% CI of the maximum-drawdown difference in percentage points.
@@ -70,19 +74,29 @@ Conventions:
     R^2 (squared correlation) and TE (sd of the monthly difference x sqrt 12) are computed on both monthly calendars a
     reader could mean: roll-to-roll periods and calendar month-ends. A criterion passes when both pass, fails when both
     fail, and is undecided (None) when they disagree. IV-scale sensitivity: 0.9 and 1.1 x VIX.
-  * T-220 (MODEL-PRICED): entry at the close 3 exchange sessions before each monthly VIX settlement (the VX futures
+  * T-220 (MODEL-PRICED): sale at the close 3 exchange sessions before each monthly VIX settlement (the VX futures
     expiry dates; sessions from mandel.data.cboe_strategy.is_trading_day, since cboe-VIX-history has rows on 34
-    market-closed days), F = the expiring VX future's settlement that day (15:00 CT), K1 = F + 2 rounded to the nearest
-    1-point strike, K2 = K1 + 5, Black-76 with sigma = the entry day's VVIX/100 (the fill's IV mark, not a signal) and T =
-    (calendar days - 0.28) / 365 (16:15 ET to the 09:30 ET SOQ); the credit is reduced by one half-spread per leg
-    measured on the captured VIX chains at the same strikes relative to F (today's spreads applied to history: an
-    assumption); payoff min(max(VRO - K1, 0), 5); return = P&L / (5 - net credit). The gate is point in time (rule 4):
-    VIX3M/VIX at the close of the session BEFORE entry, because the archive stamps the 16:15 ET VIX and VIX3M closes
-    available at 21:30Z, after the entry (batch4_vx's convention for the same gate and the same VX settlement). The
-    same-close gate (16:15 ET) and the gate-and-strikes-at-the-previous-close version are reported and run through the
-    same block x seed variants, so the reason says when the verdict would differ under them. IV scales 0.8 / 1.2 / 1.5,
-    a chain-skew pricing (per-leg IV / VVIX measured on the captures), doubled half-spreads, unrounded strikes and the
-    trial's controls are reported.
+    market-closed days), K1 = F + 2 rounded to the nearest 1-point strike, K2 = K1 + 5, F = the expiring VX future's
+    daily settlement (the VX close where the 2013 rows carry settle 0). House rule 12: the gate (VIX3M/VIX > 1.1) and
+    the strike choice are one decision and come from one information set. The archive stamps the sale day's VIX, VIX3M
+    and VX settlement all at 21:30Z, after the 16:15 ET sale, so the decision is read two ways: everything from the
+    previous close (strictly point in time) and everything from the sale-day close as the live proxy (15 minutes after
+    the fill). The fill is priced at the sale close in both (Black-76 on the sale day's F at the sale day's VVIX/100, T =
+    (calendar days - 0.28) / 365, 16:15 ET to the 09:30 ET SOQ): it is the outcome of the order, not a decision input.
+    The credit is reduced by one half-spread per leg measured on the captured VIX chains at the same strikes relative to
+    F (today's spreads applied to history: an assumption whose robustness is reported as the half-spread multiple at
+    which the mean and the CI stop clearing 0); payoff min(max(VRO - K1, 0), 5); return = P&L / (5 - net credit). A sale
+    whose net credit is <= 0 after half-spreads is counted (the claim fixes the structure and timing, not a minimum
+    credit; such a trade cannot gain, so counting it is conservative); dropping it, on the credit priced in the
+    reading's own information set, is a reported sensitivity. Pricing (house rule 11): the trial names captured chains
+    or Black-76 at VVIX; the chains price only sales from the first capture on (none settled yet), so their historical
+    stand-in is Black-76 at the per-leg IV / VVIX measured on the captures, and the VVIX-flat bias on the calibration
+    day is stated. The criterion passes only when both information-set readings under both pricings pass (each over
+    the block x seed variants), fails when all fail, and is undecided otherwise. The earlier mixed spec (gate at the
+    previous close, strikes from the sale-day settlement) is reported, not decided. IV scales 0.8 / 1.2 / 1.5, doubled
+    half-spreads, unrounded strikes, settles only (no 2013 proxy) and the trial's controls are reported under both
+    readings; the trial's 2006-2012 settlements cannot be tested (no VX file before 2013), so its 2008 exclusion is
+    vacuous. The preliminary SOQ check is indicative only, with a block bootstrap of the date-ordered timeline.
   * Seed and block robustness: no claim fixes a block length, so every CI-decided criterion is evaluated on several
     bootstrap variants (blocks 6 and 12 months x seeds 0-2; T-179 the same in rolls; T-528 seeds 0-2 at its named mean
     block of 63 days; T-220 blocks 3 and 6 trades x seeds 0-2). It passes only when every variant passes, fails when none
@@ -722,6 +736,66 @@ def _sub(panel: dict, mask) -> dict:
             "excluded": panel["excluded"]}
 
 
+def month_end_gaps(series: dict, panel: dict, skip: Sequence[str] = ()) -> list:
+    """Months of a paired panel whose month-end (the last day every leg has a close) is earlier than some leg's own
+    last close in that month, because another leg has no close on the later day: [(month, panel month-end, latest own
+    month-end, [legs with no close then])]. Months in ``skip`` (e.g. a partial last month) are left out."""
+    if not panel.get("months") or not series:
+        return []
+    lo, hi = panel["first"] or "", panel["last"] or ""
+    common = set.intersection(*[set(s) for s in series.values()])
+    cme: dict = {}
+    for d in common:
+        if lo < d <= hi and d > cme.get(d[:7], ""):
+            cme[d[:7]] = d
+    own: dict = defaultdict(dict)
+    for k, sr in series.items():
+        for d in sr:
+            if lo < d <= hi and d > own[k].get(d[:7], ""):
+                own[k][d[:7]] = d
+    out = []
+    for m in panel["months"]:
+        c = cme.get(m)
+        if c is None or m in skip:
+            continue
+        latest = max(own[k].get(m, "") for k in series)
+        if latest > c:
+            out.append((m, c, latest, sorted(k for k in series if latest not in series[k])))
+    return out
+
+
+def partial_last_month(series: dict, panel: dict, is_session) -> Optional[dict]:
+    """The panel's last month when it ends before that month's last exchange session (``is_session(date)``): {month,
+    last_day, month_end, leg_ends: {leg: its own last close in the month}}; None when the last month is complete."""
+    last = panel.get("last")
+    if not panel.get("months") or not last:
+        return None
+    m = last[:7]
+    y, mo = int(m[:4]), int(m[5:7])
+    d = date(y + (mo == 12), mo % 12 + 1, 1) - timedelta(days=1)
+    while not is_session(d):
+        d -= timedelta(days=1)
+    if last >= d.isoformat() or panel["months"][-1] != m:
+        return None
+    return {"month": m, "last_day": last, "month_end": d.isoformat(),
+            "leg_ends": {k: max((x for x in sr if x[:7] == m), default=None) for k, sr in series.items()}}
+
+
+def _calendar_note(series: dict, panel: dict, part: Optional[dict]) -> str:
+    """Reason text for a partial last month and for month-ends that a missing close moves earlier (empty when none)."""
+    out = []
+    if part:
+        legs = ", ".join(f"{k} {v}" for k, v in part["leg_ends"].items() if v)
+        out.append(f"the last month, {part['month']}, is partial: the paired panel ends {part['last_day']} (each leg's last "
+                   f"close available at its bundle's capture: {legs}), not at the month's last session {part['month_end']}")
+    gaps = month_end_gaps(series, panel, (part["month"],) if part else ())
+    if gaps:
+        out.append("month-ends moved by a missing close: " + "; ".join(
+            f"{' and '.join(legs)} {'has' if len(legs) == 1 else 'have'} no close on {late}, so {m} ends on {c} for every leg"
+            for m, c, late, legs in gaps))
+    return "; ".join(out)
+
+
 # ================================================================================ T-166 / T-169 beta-matched CAGR ==
 
 def beta_blend_claim(panel: dict, strat: str, bench: str, bound: float, min_n: int, claim_beta: float,
@@ -833,10 +907,13 @@ def _excess(panel: dict, name: str) -> np.ndarray:
 
 def sharpe_noworse_claim(panel: dict, strat: str, bench: str, margin: float = 0.05, min_n: int = 380,
                          crash: Optional[np.ndarray] = None, controls: Optional[dict] = None, n_boot: int = N_BOOT,
-                         seed: int = 0, sym_note: str = "", live_from: Optional[str] = None) -> dict:
+                         seed: int = 0, sym_note: str = "", live_from: Optional[str] = None,
+                         partial_last: Optional[dict] = None) -> dict:
     """T-168: Sharpe(strat) - Sharpe(bench) on monthly excess returns (per-month Sharpe, not annualised). Pass: point
     estimate <= 0 and the two-sided 95% CI upper bound <= ``margin``. ``crash``: bench-index month returns used to report
-    the mean return difference in months with SPX < -5%."""
+    the mean return difference in months with SPX < -5%. ``partial_last`` (``partial_last_month``): the last month is
+    partial, so the statistic without it is reported. Controls are reported on both the monthly and the annualised
+    scale against the margin (they are not criteria)."""
     a, b = _excess(panel, strat), _excess(panel, bench)
     n = int(a.size)
     t = sharpe_diff_test(a, b, BLOCK_M, 0.95, n_boot, seed)
@@ -872,12 +949,29 @@ def sharpe_noworse_claim(panel: dict, strat: str, bench: str, margin: float = 0.
             ctl[lab] = None
             continue
         c = sharpe_diff_test(_excess(p, "strat"), _excess(p, "bench"), BLOCK_M, 0.95, n_boot, seed)
-        ctl[lab] = {"window": [p["months"][0], p["months"][-1]], "n": c["n"], "diff_monthly": c["diff"], "ci95": c["ci"]}
+        ann = [None if x is None else x * math.sqrt(PPY_M) for x in c["ci"]]
+        ctl[lab] = {"window": [p["months"][0], p["months"][-1]], "n": c["n"], "diff_monthly": c["diff"], "ci95": c["ci"],
+                    "ci95_annualised": ann}
+
+    def _ctl_txt(k, v):
+        if v is None:
+            return f"{k} n/a"
+        hi_m, hi_a = v["ci95"][1], v["ci95_annualised"][1]
+        if hi_m is None:
+            return f"{k} {v['window'][0]}.. diff {_s(v['diff_monthly'], 3)} (CI n/a)"
+        scale = ("upper <= the margin on both scales" if hi_a <= margin else
+                 f"upper above the {margin} margin on the annualised scale" if hi_m <= margin else
+                 f"upper above the {margin} margin on both scales")
+        return (f"{k} {v['window'][0]}.. diff {_s(v['diff_monthly'], 3)} ({_ci_s(v['ci95'], 3)}; annualised "
+                f"{_ci_s(v['ci95_annualised'], 3)}: {scale})")
     if ctl:
         stat["controls"] = ctl
-        extra.append("controls: " + "; ".join(f"{k} n/a" if v is None else
-                                               f"{k} {v['window'][0]}.. diff {_s(v['diff_monthly'], 3)} ({_ci_s(v['ci95'], 3)})"
-                                               for k, v in ctl.items()))
+        extra.append("controls (reported, not criteria): " + "; ".join(_ctl_txt(k, v) for k, v in ctl.items()))
+    if partial_last and panel["months"] and panel["months"][-1] == partial_last["month"] and n > 9:
+        keep = np.arange(n) < n - 1
+        w = sharpe_diff_test(a[keep], b[keep], BLOCK_M, 0.95, n_boot, seed)
+        stat["partial_last_month"] = {**partial_last, "diff_without": w["diff"], "ci95_without": w["ci"]}
+        extra.append(f"without the partial {partial_last['month']} ({n - 1} months): {_s(w['diff'], 4)} ({_ci_s(w['ci'], 4)})")
     ann_ok = hi * math.sqrt(PPY_M) <= margin
     rd = robust_decision(lambda bl, sd: sharpe_diff_test(a, b, bl, 0.95, n_boot, seed + sd)["ci"],
                          lambda l, u: u <= margin, lambda l, u: l > margin)
@@ -1428,20 +1522,31 @@ def condor_doc(fr: dict, cndr: dict, start: str = "2002-04-01") -> dict:
 
 # =================================================================================== T-220 VIX SOQ credit spread ==
 
-def vx_curve(rows) -> dict:
-    """{day: {expiry: settle}} from cboe-vx-futures rows; missing or non-positive settles (the 2013 files carry 0) and
-    rows dated after their expiry are dropped."""
+def _pos_float(x) -> Optional[float]:
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return None
+    return f if f > 0 and math.isfinite(f) else None
+
+
+def vx_curve(rows, close_proxy: bool = False, proxied: Optional[set] = None) -> dict:
+    """{day: {expiry: settle}} from cboe-vx-futures rows; rows dated after their expiry are dropped. A missing or
+    non-positive settle (the 2013-01-02..2013-05-17 files carry 0) is dropped, or, with ``close_proxy``, replaced by
+    that day's VX close (the 16:15 ET last trade, stamped available at the same 21:30Z as the settle, so it belongs to
+    the same information set); each proxied (day, expiry) is added to ``proxied`` when a set is given."""
     curve = defaultdict(dict)
     for r in rows:
         v = r["value"]
-        try:
-            s = float(v.get("settle"))
-        except (TypeError, ValueError):
-            continue
-        if not (s > 0 and math.isfinite(s)):
-            continue
         d, e = str(v["day"])[:10], str(v["expiry"])[:10]
         if d > e:
+            continue
+        s = _pos_float(v.get("settle"))
+        if s is None and close_proxy:
+            s = _pos_float(v.get("close"))
+            if s is not None and proxied is not None:
+                proxied.add((d, e))
+        if s is None:
             continue
         curve[d][e] = s
     return dict(curve)
@@ -1543,16 +1648,30 @@ def chain_calibration(chains: list, curve: dict, vvix: dict, rates: dict, tdays:
 def soq_spread_trades(tdays: list, expiries: list, curve: dict, vix: dict, vix3m: dict, vvix: dict, vro: dict, rates: dict,
                       hs1: float, hs2: float, entry_lag: int = 3, gate: float = 1.10, otm: float = 2.0, width: float = 5.0,
                       iv_scale: float = 1.0, iv_legs: Optional[tuple] = None, round_strikes: bool = True,
-                      gate_lag: int = 1, gate_side: str = "above", strike_lag: int = 0) -> dict:
-    """One call credit spread per monthly VIX settlement E (in ``expiries``): entry at the close ``entry_lag`` sessions
-    before E (``tdays`` must be exchange sessions), gate VIX3M/VIX (``gate_lag`` sessions before entry; 1 = the previous
-    close, point in time: the VIX and VIX3M closes are stamped available after the entry) above ``gate`` (or below 1 for
-    gate_side 'below'), strikes from the expiring future's settlement ``strike_lag`` sessions before entry (0 = the
-    entry day's 15:00 CT settlement), Black-76 credit on the entry day's settlement at VVIX x iv_scale (or per-leg IV
-    ratios ``iv_legs``) minus the half-spreads, settled at the clean VRO print on E. Returns the trades and the skipped
-    expiries by reason."""
+                      gate_lag: int = 1, gate_side: str = "above", strike_lag: int = 1, credit_filter: bool = False,
+                      proxied: frozenset = frozenset()) -> dict:
+    """One call credit spread per monthly VIX settlement E (in ``expiries``): sale at the close ``entry_lag`` sessions
+    before E (``tdays`` must be exchange sessions), gate VIX3M/VIX (``gate_lag`` sessions before the sale; 0 = the sale
+    day's close) above ``gate`` (or below 1 for gate_side 'below'), strikes from the expiring future's settlement
+    ``strike_lag`` sessions before the sale (0 = the sale day's settlement). House rule 12 needs gate_lag == strike_lag
+    (one information set: 1 = the previous close, 0 = the sale-day close as the live proxy); a mixed pair is only for
+    reporting the earlier spec. The fill is priced at the sale (the outcome of the order, not a decision input):
+    Black-76 on the sale day's settlement at the sale day's VVIX x iv_scale (or per-leg IV ratios ``iv_legs``) minus
+    the half-spreads, settled at the clean VRO print on E. ``credit_filter``: skip a sale whose net credit, priced in
+    the decision's own information set (the strike day's F, VVIX, rate and time to E), is not positive. ``proxied``:
+    (day, expiry) pairs whose F is the VX close standing in for a zero settle, marked on each trade. Returns the trades
+    and the skipped expiries by reason."""
     pos = {d: i for i, d in enumerate(tdays)}
     trades, skipped = [], defaultdict(list)
+
+    def credit(Fx, K1, K2, day, exp):
+        """Black-76 mid credit of the K1/K2 call spread at ``day``'s close: F, VVIX, rate and time to ``exp``."""
+        T = (date.fromisoformat(exp).toordinal() - date.fromisoformat(day).toordinal() - 0.28) / 365.0
+        r0 = float(rate_known([day], rates)[0]) if rates else 0.0
+        s1 = vvix[day] / 100.0 * (iv_legs[0] if iv_legs else iv_scale)
+        s2 = vvix[day] / 100.0 * (iv_legs[1] if iv_legs else iv_scale)
+        return float(b76_call(Fx, K1, T, r0, s1) - b76_call(Fx, K2, T, r0, s2))
+
     for e in expiries:
         if e not in pos:
             if e <= tdays[-1]:
@@ -1563,8 +1682,9 @@ def soq_spread_trades(tdays: list, expiries: list, curve: dict, vix: dict, vix3m
             continue
         d = tdays[i]
         g = tdays[i - gate_lag]
+        k = tdays[i - strike_lag]
         F = curve.get(d, {}).get(e)
-        Fk = curve.get(tdays[i - strike_lag], {}).get(e)
+        Fk = curve.get(k, {}).get(e)
         if F is None or Fk is None:
             skipped["no VX settlement for the expiring future at entry"].append(e)
             continue
@@ -1579,59 +1699,231 @@ def soq_spread_trades(tdays: list, expiries: list, curve: dict, vix: dict, vix3m
             continue
         K1 = _strike_round(Fk + otm) if round_strikes else Fk + otm
         K2 = K1 + width
-        T = (date.fromisoformat(e).toordinal() - date.fromisoformat(d).toordinal() - 0.28) / 365.0
-        r0 = float(rate_known([d], rates)[0]) if rates else 0.0
-        s1 = vvix[d] / 100.0 * (iv_legs[0] if iv_legs else iv_scale)
-        s2 = vvix[d] / 100.0 * (iv_legs[1] if iv_legs else iv_scale)
-        mid = float(b76_call(F, K1, T, r0, s1) - b76_call(F, K2, T, r0, s2))
+        dec_net = None
+        if credit_filter:
+            if k not in vvix:
+                skipped["no VVIX close at the decision"].append(e)
+                continue
+            dec_net = credit(Fk, K1, K2, k, e) - hs1 - hs2
+            if not dec_net > 0:
+                continue
+        mid = credit(F, K1, K2, d, e)
         net = mid - hs1 - hs2
         soq = vro[e]
         pay = min(max(soq - K1, 0.0), width)
         ml = width - net
-        trades.append({"expiry": e, "entry": d, "gate_day": g, "ratio": ratio, "F": F, "K1": K1, "vvix": vvix[d], "mid_credit": mid,
-                       "net_credit": net, "soq": soq, "payoff": pay, "pnl": net - pay, "ret": (net - pay) / ml})
-    return {"trades": trades, "skipped": {k: v for k, v in skipped.items()}}
+        trades.append({"expiry": e, "entry": d, "gate_day": g, "strike_day": k, "ratio": ratio, "F": F, "F_strike": Fk,
+                       "K1": K1, "vvix": vvix[d], "mid_credit": mid, "net_credit": net, "decision_net_credit": dec_net,
+                       "soq": soq, "payoff": pay, "pnl": net - pay, "ret": (net - pay) / ml,
+                       "f_proxy": (d, e) in proxied or (k, e) in proxied})
+    return {"trades": trades, "skipped": {k2: v for k2, v in skipped.items()}, "gate_lag": gate_lag, "strike_lag": strike_lag}
 
 
-def soq_spread_claim(main: dict, variants: dict, prelim: Optional[dict] = None, calib: Optional[dict] = None, min_n: int = 60,
-                     n_boot: int = N_BOOT, seed: int = 0, block: int = 3, costs_measured: bool = True,
-                     decide_variants: Sequence[str] = ()) -> dict:
-    """T-220: mean return on max loss > 0 with a two-sided 95% CI excluding 0 (studentized block bootstrap, block 3
-    trades). ``variants``: {label: trades dict} reported (IV scales, chain skew, costs, strikes, gate timing, controls);
-    the labels in ``decide_variants`` are also run through the block x seed variants, so the reason says whether the
-    verdict would differ under them. ``main['gate_lag']`` (default 1) names the gate's timing in the reason."""
-    tr = main["trades"]
-    x = np.array([t["ret"] for t in tr])
+def _rets(trades: Sequence[dict]) -> np.ndarray:
+    return np.array([t["ret"] for t in trades], dtype=float)
+
+
+def _rets_at_cost(trades: Sequence[dict], k: float, hs_total: float, width: float = 5.0) -> np.ndarray:
+    """Returns on max loss with the half-spreads scaled by ``k`` (the gate does not depend on costs, so the trades are
+    the same; only the net credit and so the max loss change)."""
+    mid = np.array([t["mid_credit"] for t in trades], dtype=float)
+    pay = np.array([t["payoff"] for t in trades], dtype=float)
+    net = mid - k * hs_total
+    return (net - pay) / (width - net)
+
+
+def cost_breakeven(trades: Sequence[dict], hs_total: float, ci_fn=None, k_max: float = 10.0, tol: float = 0.01) -> dict:
+    """Robustness of the cost assumption: the largest multiple k of the measured half-spreads at which (a) the mean
+    return on max loss is still > 0 and (b) every bootstrap variant's CI lower bound is still > 0 (``ci_fn(x)`` -> [(lo,
+    hi)]). 0 means it fails even at zero half-spreads; ``k_max`` means it holds there too."""
+    if not trades or not hs_total > 0:
+        return {"k_mean": None, "k_ci": None}
+
+    def bis(ok):
+        if not ok(0.0):
+            return 0.0
+        if ok(k_max):
+            return k_max
+        lo, hi = 0.0, k_max
+        while hi - lo > tol:
+            mid = 0.5 * (lo + hi)
+            lo, hi = (mid, hi) if ok(mid) else (lo, mid)
+        return lo
+    km = bis(lambda k: float(np.mean(_rets_at_cost(trades, k, hs_total))) > 0)
+    kc = None
+    if ci_fn is not None and len(trades) >= 8:
+        kc = bis(lambda k: all(lo is not None and lo > 0 for lo, _ in ci_fn(_rets_at_cost(trades, k, hs_total))))
+    return {"k_mean": km, "k_ci": kc, "hs_total": hs_total}
+
+
+def _agree(oks: Sequence[Optional[bool]]) -> Optional[bool]:
+    """Rules 11 and 12: a criterion read several permitted ways passes only when every reading passes, fails only when
+    every reading fails, and is undecided (None) otherwise."""
+    oks = list(oks)
+    if not oks or any(o is None for o in oks):
+        return None
+    return oks[0] if all(o == oks[0] for o in oks) else None
+
+
+def _info_label(gate_lag: int, strike_lag: int) -> str:
+    if gate_lag == strike_lag == 1:
+        return "previous close"
+    if gate_lag == strike_lag == 0:
+        return "entry close"
+    return f"gate {gate_lag} / strikes {strike_lag} sessions before the sale (mixed information sets)"
+
+
+def _soq_summary(td: dict, block: int, n_boot: int, seed: int, bvars) -> dict:
+    tr = td["trades"]
+    x = _rets(tr)
     n = int(x.size)
     lo, hi = stud_ci(x, block, 0.95, n_boot, seed) if n >= 8 else (None, None)
-    mean = float(x.mean()) if n else None
-    bvars = tuple((b, k) for b in (block, 2 * block) for k in range(3))
     rd = robust_decision(lambda bl, sd: stud_ci(x, bl, 0.95, n_boot, seed + sd) if n >= 8 else (None, None),
                          lambda l, u: l > 0, lambda l, u: u <= 0, bvars)
-    if not costs_measured:
-        ok, dec = None, False
-        cname = "mean return on max loss > 0 with 95% CI excluding 0 NET OF HALF-SPREADS (no VIX chain captured: half-spreads not measurable)"
-    else:
-        ok, dec = rd["ok"], rd["decisive"]
-        cname = f"mean return on max loss > 0 with 95% CI excluding 0 ({_ci_s((lo, hi), 2, 100, '%')}; {_rob_txt(rd)})"
-    v, why = _decide([(cname, ok, dec)], n, min_n, "trades")
-    rep_v = {}
-    for lab, t in variants.items():
-        xv = np.array([q["ret"] for q in t["trades"]])
-        lv, hv = stud_ci(xv, block, 0.95, max(1000, n_boot // 4), seed) if xv.size >= 8 else (None, None)
-        rep_v[lab] = {"n": int(xv.size), "mean": float(xv.mean()) if xv.size else None, "ci95": [lv, hv]}
-        if lab in decide_variants and xv.size >= 8:
-            rep_v[lab]["robustness"] = robust_decision(lambda bl, sd: stud_ci(xv, bl, 0.95, n_boot, seed + sd),
-                                                       lambda l, u: l > 0, lambda l, u: u <= 0, bvars)
-    wins = float(np.mean([t["payoff"] == 0 for t in tr])) if tr else None
-    stat = {"label": MP, "n_trades": n, "mean_ret_on_max_loss": mean, "ci95": [lo, hi], "win_rate": wins,
+    return {"n": n, "window": [tr[0]["expiry"], tr[-1]["expiry"]] if tr else None, "mean": float(x.mean()) if n else None,
+            "ci95": [lo, hi], "robustness": rd,
+            "win_rate": float(np.mean([t["payoff"] == 0 for t in tr])) if tr else None,
             "mean_net_credit": float(np.mean([t["net_credit"] for t in tr])) if tr else None,
             "mean_mid_credit": float(np.mean([t["mid_credit"] for t in tr])) if tr else None,
+            "n_net_credit_le0": int(sum(1 for t in tr if t["net_credit"] <= 0)),
             "max_losses": int(sum(1 for t in tr if t["payoff"] >= 5.0 - 1e-9)),
-            "worst": sorted(({"expiry": t["expiry"], "ret": t["ret"], "soq": t["soq"], "K1": t["K1"]} for t in tr), key=lambda z: z["ret"])[:5],
-            "skipped": {k: len(v2) for k, v2 in main["skipped"].items()}, "variants": rep_v,
-            "calibration": calib, "preliminary_soq": prelim, "robustness": rd, "trades": tr}
-    window = f"{tr[0]['expiry']}..{tr[-1]['expiry']}" if tr else "no trades"
+            "n_close_proxy": int(sum(1 for t in tr if t.get("f_proxy"))),
+            "worst": sorted(({"expiry": t["expiry"], "ret": t["ret"], "soq": t["soq"], "K1": t["K1"]} for t in tr),
+                            key=lambda z: z["ret"])[:5],
+            "skipped": {k: len(v) for k, v in td.get("skipped", {}).items()}}
+
+
+def _ok_word(ok: Optional[bool]) -> str:
+    return "pass" if ok is True else "fail" if ok is False else "undecided"
+
+
+def soq_spread_claim(readings: dict, variants: dict, prelim: Optional[dict] = None, calib: Optional[dict] = None,
+                     min_n: int = 60, n_boot: int = N_BOOT, seed: int = 0, block: int = 3, costs_measured: bool = True,
+                     decide_variants: Sequence[str] = (), alt_pricing: Optional[dict] = None, alt_pricing_label: str = "",
+                     alt_pricing_missing: str = "", half_spreads: tuple = (None, None), notes: Sequence[str] = ()) -> dict:
+    """T-220: mean return on max loss > 0 with a two-sided 95% CI excluding 0 (studentized block bootstrap; blocks 3 and
+    6 trades x seeds 0-2 must agree).
+
+    ``readings``: {label: trades dict} -- the information-set readings of house rule 12 (gate and strikes both from the
+    previous close; both from the entry close as the live proxy); a bare trades dict is one reading. ``alt_pricing``:
+    {label: trades dict} for the same readings priced by the trial's second named construction (rule 11: the captured
+    chains, whose historical stand-in is Black-76 at the chain-measured per-leg IV / VVIX); ``alt_pricing_missing``
+    names why that construction cannot be built (the criterion is then at best undecided). The criterion passes only
+    when every reading under every construction passes, fails only when every one fails, and is undecided otherwise.
+    ``variants``: {label: trades dict, or {reading label: trades dict}} reported; the labels in ``decide_variants`` are
+    run through the same block x seed variants and the reason says how they would decide. ``half_spreads``: the
+    measured (hs1, hs2) behind the cost-robustness break-evens. ``notes``: extra reason fragments."""
+    if "trades" in readings:
+        readings = {_info_label(int(readings.get("gate_lag", 1)), int(readings.get("strike_lag", 1))): readings}
+    bvars = tuple((b, k) for b in (block, 2 * block) for k in range(3))
+    summ = {lab: _soq_summary(td, block, n_boot, seed, bvars) for lab, td in readings.items()}
+    alt = {lab: _soq_summary(td, block, n_boot, seed, bvars) for lab, td in (alt_pricing or {}).items()}
+    n = min(s["n"] for s in summ.values()) if summ else 0
+    alt_short = (alt_pricing_label or "alternative pricing").split(" (")[0]
+    cells = [(lab, "VVIX-flat", s["robustness"]) for lab, s in summ.items()] + \
+            [(lab, alt_short, s["robustness"]) for lab, s in alt.items()]
+    ok = _agree([c[2]["ok"] for c in cells])
+    dec = bool(cells) and all(c[2]["decisive"] for c in cells)
+    cell_txt = "; ".join(f"{lab}, {pr}: {_rob_txt(rd)}" for lab, pr, rd in cells)
+    if not costs_measured:
+        ok, dec = None, False
+        cname = ("mean return on max loss > 0 with 95% CI excluding 0 NET OF HALF-SPREADS (no VIX chain captured: "
+                 "half-spreads not measurable)")
+    else:
+        disagree = len({c[2]["ok"] for c in cells}) > 1 or any(c[2]["ok"] is None for c in cells)
+        cname = (f"mean return on max loss > 0 with 95% CI excluding 0 under every information-set reading (rule 12)"
+                 + (" and both named pricings (rule 11)" if alt else "") + f" ({cell_txt}"
+                 + ("; they disagree: undecided" if disagree and len(cells) > 1 else "") + ")")
+        if alt_pricing_missing:
+            if ok is True:
+                ok = None
+            dec = False
+            cname += f"; the trial's chain-priced construction cannot be built ({alt_pricing_missing}): at best undecided"
+    v, why = _decide([(cname, ok, dec)], n, min_n, "trades")
+
+    def _one(s: dict) -> str:
+        return f"n {s['n']}, mean {_pc(s['mean'])} ({_ci_s(s['ci95'], 2, 100, '%')}; {_rob_txt(s['robustness'])})"
+
+    rep_v = {}
+    for lab, t in variants.items():
+        grp = {"": t} if "trades" in t else t
+        rep_v[lab] = {}
+        for rl, td in grp.items():
+            xv = _rets(td["trades"])
+            lv, hv = stud_ci(xv, block, 0.95, max(1000, n_boot // 4), seed) if xv.size >= 8 else (None, None)
+            r = {"n": int(xv.size), "mean": float(xv.mean()) if xv.size else None, "ci95": [lv, hv]}
+            if lab in decide_variants and xv.size >= 8:
+                r["robustness"] = robust_decision(lambda bl, sd: stud_ci(xv, bl, 0.95, n_boot, seed + sd),
+                                                  lambda l, u: l > 0, lambda l, u: u <= 0, bvars)
+            rep_v[lab][rl] = r
+        if lab in decide_variants:
+            rep_v[lab]["_decides"] = _agree([r.get("robustness", {}).get("ok") for k, r in rep_v[lab].items() if k != "_decides"])
+
+    def _vtxt(lab: str, grp: dict) -> str:
+        parts = []
+        for rl, r in grp.items():
+            if rl == "_decides":
+                continue
+            s = (f"{rl + ' ' if rl else ''}n {r['n']}, mean {_pc(r['mean'])} ({_ci_s(r['ci95'], 2, 100, '%')}"
+                 + (f"; {_rob_txt(r['robustness'])}" if r.get("robustness") else "") + ")")
+            parts.append(s)
+        tail = ""
+        if "_decides" in grp:
+            tail = f" [would decide: {_ok_word(grp['_decides'])}; primary: {_ok_word(ok)}]"
+        return f"{lab}: " + " / ".join(parts) + tail
+
+    hs1, hs2 = half_spreads
+    cost_rob = {}
+    if costs_measured and hs1 is not None and hs2 is not None:
+        for lab, td in readings.items():
+            cost_rob[lab] = cost_breakeven(td["trades"], hs1 + hs2, lambda x: [stud_ci(x, bl, 0.95, n_boot // 2, seed + sd)
+                                                                              for bl, sd in bvars])
+    stat = {"label": MP, "n_trades": n, "readings": summ, "alt_pricing": alt, "alt_pricing_label": alt_pricing_label,
+            "decision": {"ok": ok, "decisive": dec, "cells": [[lab, pr, rd["ok"], rd["n_pass"]] for lab, pr, rd in cells]},
+            "variants": rep_v, "calibration": calib, "preliminary_soq": prelim, "cost_robustness": cost_rob,
+            "half_spreads": [hs1, hs2], "trades": {lab: td["trades"] for lab, td in readings.items()}}
+    first = next(iter(summ.values())) if summ else None
+    if first is not None:
+        stat.update(mean_ret_on_max_loss=first["mean"], ci95=first["ci95"], robustness=first["robustness"])
+
+    rtxt = "; ".join(
+        f"[{lab}] {s['n']} gated trades ({'..'.join(s['window']) if s['window'] else 'no trades'}), mean net credit "
+        f"{_f(s['mean_net_credit'], 3)} (mid {_f(s['mean_mid_credit'], 3)}), net credit <= 0 in {s['n_net_credit_le0']}, "
+        f"win rate {_pu(s['win_rate'], 1)}, {s['max_losses']} max losses, mean return on max loss {_pc(s['mean'])} (95% "
+        f"{_ci_s(s['ci95'], 2, 100, '%')}, block {block}; {_rob_txt(s['robustness'])})"
+        + (f"; skipped: " + ", ".join(f"{k} {c}" for k, c in s["skipped"].items()) if s["skipped"] else "")
+        for lab, s in summ.items())
+    atxt = ""
+    if alt:
+        atxt = f"; {alt_pricing_label or 'alternative pricing'}: " + "; ".join(f"[{lab}] {_one(s)}" for lab, s in alt.items())
+    elif alt_pricing_missing:
+        atxt = f"; chain-priced construction not built: {alt_pricing_missing}"
+    bias = ""
+    cap = [c for c in (calib or {}).get("captures", []) if c.get("model_credit") is not None and c.get("market_mid_credit")]
+    if cap:
+        bias = "; VVIX-flat pricing bias: " + ", ".join(
+            f"on {c['quote_day']} Black-76 at flat VVIX prices the spread at {c['model_credit']:.3f} against a market mid of "
+            f"{c['market_mid_credit']:.3f} ({100 * (c['model_credit'] / c['market_mid_credit'] - 1):+.0f}%, "
+            + ("in the strategy's favour)" if c["model_credit"] > c["market_mid_credit"] else "against the strategy)")
+            for c in cap) + (
+            (" — the only calibration day with both " if len(cap) == 1 else f" — only {len(cap)} calibration days with both ")
+            + f"prices, so the bias over the sample is unmeasured and the VVIX-flat result carries it"
+            + (" (hence the chain-calibrated pricing decides too)" if alt else ""))
+    ctxt = ""
+    if cost_rob:
+        def _k(k):
+            if k is None:
+                return "n/a"
+            return "not even at zero half-spreads" if k == 0 else f"up to x{k:.2f} those half-spreads"
+        mm = first["mean_mid_credit"] if first else None
+        share = f", {100 * (hs1 + hs2) / mm:.0f}% of the mean mid credit" if mm else ""
+        ctxt = (f"; cost assumption: half-spreads {hs1:.3f} + {hs2:.3f} per spread measured on the 2026-10 captures and "
+                f"applied to every year (no historical VIX option quotes are archived{share}); robustness: "
+                + "; ".join(f"[{lab}] mean > 0 {_k(c['k_mean'])}, every variant's CI lower bound > 0 {_k(c['k_ci'])}"
+                            for lab, c in cost_rob.items()))
+        kcs = [c["k_ci"] for c in cost_rob.values() if c.get("k_ci") is not None]
+        if ok is True and kcs and min(kcs) < 2:
+            ctxt += " — the pass rests on the cost assumption: it does not survive doubled half-spreads"
     cal = ""
     if calib and calib.get("captures"):
         cal = ("; captured chains: " + ", ".join(
@@ -1641,54 +1933,56 @@ def soq_spread_claim(main: dict, variants: dict, prelim: Optional[dict] = None, 
             for c in calib["captures"]))
     pre = ""
     if prelim:
-        pre = (f"; preliminary SOQ check ({prelim['n_settle']} monthly settlements from {prelim['first']}): mean VRO - prior VIX "
-               f"close {_s(prelim['mean_settle'])} vs mean daily VIX change on {prelim['n_other']} other Wednesdays "
-               f"{_s(prelim['mean_other'])} (difference {_s(prelim['diff'])}, {_ci_s(prelim['ci95'])})")
-    gl = int(main.get("gate_lag", 1))
-    gate_txt = ("VIX3M/VIX > 1.1 at the entry close" if gl == 0 else
-                "VIX3M/VIX > 1.1 at the close of the session before entry" if gl == 1 else f"VIX3M/VIX > 1.1 {gl} sessions before entry")
-    stat["gate_lag"] = gl
-
-    def _vtxt(k, r):
-        s = f"{k}: n {r['n']}, mean {_pc(r['mean'])} ({_ci_s(r['ci95'], 2, 100, '%')}"
-        if r.get("robustness"):
-            s += f"; {_rob_txt(r['robustness'])}"
-        return s + ")"
-    reason = (f"{MP} (Black-76 at VVIX on the expiring VX future): {n} gated trades ({window}; {gate_txt}, entry at the "
-              f"close 3 exchange sessions before the monthly SOQ, strikes and credit from that day's VX settlement), mean net "
-              f"credit {_f(stat['mean_net_credit'], 3)} (mid "
-              f"{_f(stat['mean_mid_credit'], 3)}, half-spreads {_f(main.get('hs1'), 3)} + {_f(main.get('hs2'), 3)} per spread "
-              f"from the captured chains), win rate {_pu(wins, 1)}, {stat['max_losses']} max losses; mean return on max loss "
-              f"{_pc(mean)} (95% {_ci_s((lo, hi), 2, 100, '%')}, studentized block bootstrap, block 3)"
-              + (f"; skipped: " + ", ".join(f"{k} {len(v2)}" for k, v2 in main["skipped"].items()) if main["skipped"] else "")
-              + "; sensitivities: " + ", ".join(_vtxt(k, r) for k, r in rep_v.items())
+        pre = (f"; preliminary SOQ check, INDICATIVE ONLY (not a pass criterion; {prelim['n_settle']} monthly settlements "
+               f"from {prelim['first']}): mean VRO - prior VIX close {_s(prelim['mean_settle'])} vs mean daily VIX change on "
+               f"{prelim['n_other']} other Wednesdays {_s(prelim['mean_other'])} (difference {_s(prelim['diff'])}, "
+               f"{_ci_s(prelim['ci95'])}, percentile circular block bootstrap of the date-ordered timeline, block "
+               f"{prelim.get('block', 'n/a')})")
+    reason = (f"{MP} (Black-76 on the expiring VX future at VVIX; sale at the close 3 exchange sessions before the monthly "
+              f"SOQ when VIX3M/VIX > 1.1, K1 = F + 2, K2 = K1 + 5; the fill is priced at the sale close; rule 12: the gate "
+              f"and the strike choice come from one information set, read at the previous close and at the entry close as "
+              f"the live proxy, and the readings must agree): " + rtxt + atxt + bias + ctxt
+              + "".join(f"; {x}" for x in notes if x)
+              + ("; sensitivities: " + ", ".join(_vtxt(k, r) for k, r in rep_v.items()) if rep_v else "")
               + cal + pre + f" — {why}")
     return {"n": n, "verdict": v, "reason": reason, "stat": stat}
 
 
-def soq_preliminary(vro: dict, vix: dict, tdays: list, monthly: set, n_boot: int = 2000, seed: int = 0) -> Optional[dict]:
-    """Mean (VRO - prior-session VIX close) on monthly settlement days vs mean daily VIX change on other Wednesdays,
-    with a percentile bootstrap CI of the difference (independent resampling of the two groups)."""
+def soq_preliminary(vro: dict, vix: dict, tdays: list, monthly: set, n_boot: int = 2000, seed: int = 0,
+                    block: int = 8) -> Optional[dict]:
+    """INDICATIVE ONLY (the trial's preliminary check, not a pass criterion): mean (VRO - prior-session VIX close) on
+    monthly settlement days vs mean daily VIX change on other Wednesdays. The CI of the difference is a percentile
+    circular block bootstrap of the date-ordered timeline of both kinds of day (``block`` consecutive observations,
+    about two monthly cycles), so the two groups are resampled together on a shared timeline and serial dependence is
+    kept."""
     pos = {d: i for i, d in enumerate(tdays)}
-    a, b = [], []
+    obs = []
     first = None
     for d in sorted(vro):
         if d in monthly and d in pos and pos[d] > 0 and tdays[pos[d] - 1] in vix:
-            a.append(vro[d] - vix[tdays[pos[d] - 1]])
+            obs.append((d, vro[d] - vix[tdays[pos[d] - 1]], True))
             first = first or d
     lo_day = first or "9999"
     for i, d in enumerate(tdays):
         if d < lo_day or i == 0 or date.fromisoformat(d).weekday() != 2 or d in monthly:
             continue
         if d in vix and tdays[i - 1] in vix:
-            b.append(vix[d] - vix[tdays[i - 1]])
-    if len(a) < 8 or len(b) < 8:
+            obs.append((d, vix[d] - vix[tdays[i - 1]], False))
+    obs.sort(key=lambda z: z[0])
+    y = np.array([o[1] for o in obs], dtype=float)
+    s = np.array([o[2] for o in obs], dtype=bool)
+    if s.sum() < 8 or (~s).sum() < 8:
         return None
-    a, b = np.array(a), np.array(b)
+    a, b = y[s], y[~s]
+    n = y.size
     rng = np.random.default_rng(seed)
-    ds = rng.choice(a, (n_boot, a.size)).mean(axis=1) - rng.choice(b, (n_boot, b.size)).mean(axis=1)
+    idx = _boot_idx(rng, n, max(1, min(block, n // 4)), n_boot)
+    ys, ss = y[idx], s[idx]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ds = (ys * ss).sum(axis=1) / ss.sum(axis=1) - (ys * ~ss).sum(axis=1) / (~ss).sum(axis=1)
+    ds = ds[np.isfinite(ds)]
     return {"n_settle": int(a.size), "n_other": int(b.size), "first": first, "mean_settle": float(a.mean()),
-            "mean_other": float(b.mean()), "diff": float(a.mean() - b.mean()),
+            "mean_other": float(b.mean()), "diff": float(a.mean() - b.mean()), "block": int(block), "indicative": True,
             "ci95": [float(np.quantile(ds, 0.025)), float(np.quantile(ds, 0.975))]}
 
 
@@ -1800,10 +2094,13 @@ def b6b_hedge_cllz_sharpe(archive):
            "PPUT": _panel_pair(archive, "PPUT", spy, dtb3, "1993-02", ref=gp),
            "CLLZ vs price-only SPX": monthly_panel({"strat": cz["close"], "bench": gp}, dtb3, "1993-02", "2026-10", cz["breaks"])}
     first, last = panel["first"] or "", panel["last"] or ""
+    from mandel.data.cboe_strategy import is_trading_day
+    legs = {"CLLZ": cz["close"], "SPY": spy, "SPX": gp}
+    part = partial_last_month(legs, panel, is_trading_day)
     sp = _spike_note({"CLLZ": cz, "CLL (control)": ctl["CLL (2008-)"] or {}, "PPUT (control)": ctl["PPUT"] or {}}, first, last)
-    note = "; ".join(x for x in (_bt_note("CLLZ", first, last), sp) if x)
+    note = "; ".join(x for x in (_bt_note("CLLZ", first, last), _calendar_note(legs, panel, part), sp) if x)
     rep = sharpe_noworse_claim(panel, "CLLZ", "SPY", 0.05, 380, crash=panel["ret"]["SPX"], controls=ctl,
-                               sym_note=note, live_from=_live_month("CLLZ"))
+                               sym_note=note, live_from=_live_month("CLLZ"), partial_last=part)
     return _wrap(rep)
 
 
@@ -1935,7 +2232,9 @@ def b6b_hedge_vix_soq_credit_spread(archive):
     if miss:
         return miss
     vxr = _rows(archive, VX_B)
-    curve = vx_curve(vxr)
+    proxied: set = set()
+    curve = vx_curve(vxr, close_proxy=True, proxied=proxied)      # the VX close where the 2013 files carry settle 0
+    curve_settle = vx_curve(vxr)
     exps = vx_expiries(vxr)
     vix = index_series(_rows(archive, VIX_B))
     vix3m = index_series(_rows(archive, VIX3M_B))
@@ -1947,33 +2246,73 @@ def b6b_hedge_vix_soq_credit_spread(archive):
     # would otherwise count as one of the claim's "3 trading days before settlement"
     tdays = [d for d in sorted(vix) if is_trading_day(d)]
     chains = [_rows(archive, nm) for nm in _names(archive, VIX_CHAIN_P)]
-    calib = chain_calibration(chains, curve, vvix, dtb3, sorted(d for d in set(vix) | set(curve) if is_trading_day(d)))
+    calib = chain_calibration(chains, curve_settle, vvix, dtb3, sorted(d for d in set(vix) | set(curve) if is_trading_day(d)))
     measured = calib["hs1"] is not None
     hs1, hs2 = (calib["hs1"], calib["hs2"]) if measured else (0.0, 0.0)
-    kw = dict(tdays=tdays, expiries=exps, curve=curve, vix=vix, vix3m=vix3m, vvix=vvix, vro=vro, rates=dtb3)
-    # point in time (rule 4): the gate is VIX3M/VIX at the previous close; the entry day's 16:15 ET closes are stamped
-    # available at 21:30Z, after the entry (batch4_vx's convention); strikes and credit use the entry day's VX settlement
-    main = soq_spread_trades(hs1=hs1, hs2=hs2, gate_lag=1, **kw)
-    main.update(hs1=hs1 if measured else None, hs2=hs2 if measured else None, gate_lag=1)
-    var = {}
-    same_close = "gate at the entry close (16:15 ET, stamped available after the entry: not point in time)"
-    var[same_close] = soq_spread_trades(hs1=hs1, hs2=hs2, gate_lag=0, **kw)
-    var["gate and strikes at the previous close"] = soq_spread_trades(hs1=hs1, hs2=hs2, gate_lag=1, strike_lag=1, **kw)
-    for s in (0.8, 1.2, 1.5):
-        var[f"IV x{s}"] = soq_spread_trades(hs1=hs1, hs2=hs2, iv_scale=s, **kw)
+    kw = dict(tdays=tdays, expiries=exps, curve=curve, vix=vix, vix3m=vix3m, vvix=vvix, vro=vro, rates=dtb3,
+              proxied=frozenset(proxied), hs1=hs1, hs2=hs2)
+    # house rule 12: the gate (VIX3M/VIX) and the strike choice (K1 = F + 2) are one decision, so they come from one
+    # information set. The archive stamps the sale day's VIX, VIX3M and VX settlement all at 21:30Z, after the 16:15 ET
+    # sale, so the decision is read two ways and the readings must agree: everything from the previous close (strictly
+    # point in time), or everything from the sale-day close as the live proxy (15 minutes after the fill). The fill
+    # itself is priced at the sale close in both: it is the outcome of the order, not an input to the decision.
+    reads = {"previous close": dict(gate_lag=1, strike_lag=1), "entry close": dict(gate_lag=0, strike_lag=0)}
+
+    def both(**over) -> dict:
+        return {lab: soq_spread_trades(**{**kw, **lags, **over}) for lab, lags in reads.items()}
+
+    readings = both()
+    alt, alt_label, alt_missing = None, "", ""
     if calib.get("ratio1") and calib.get("ratio2"):
-        var[f"chain-skew IV (K1 x{calib['ratio1']:.2f}, K2 x{calib['ratio2']:.2f} VVIX)"] = soq_spread_trades(
-            hs1=hs1, hs2=hs2, iv_legs=(calib["ratio1"], calib["ratio2"]), **kw)
-    var["half-spreads x2"] = soq_spread_trades(hs1=2 * hs1, hs2=2 * hs2, **kw)
-    var["unrounded strikes (F+2, F+7)"] = soq_spread_trades(hs1=hs1, hs2=hs2, round_strikes=False, **kw)
-    var["backwardation control (VIX3M/VIX < 1)"] = soq_spread_trades(hs1=hs1, hs2=hs2, gate_side="below", **kw)
-    ex = {"trades": [t for t in main["trades"] if not (t["expiry"].startswith("2008") or t["expiry"][:7] in ("2018-02", "2020-03"))],
-          "skipped": {}}
-    dropped = len(main["trades"]) - len(ex["trades"])
-    var[f"excluding 2008, 2018-02, 2020-03 ({dropped} gated trades fall in them; 2008 predates the VX file)"] = ex
+        qds = [c["quote_day"] for c in calib["captures"] if c.get("iv_ratio_K1") is not None]
+        alt_label = (f"chain-calibrated Black-76 (K1 x{calib['ratio1']:.2f}, K2 x{calib['ratio2']:.2f} VVIX, the per-leg IV "
+                     f"measured on the {', '.join(qds)} capture{'s' if len(qds) > 1 else ''}; the trial's captured-chain "
+                     f"pricing covers only sales from the first capture on, none settled yet, so this is its historical "
+                     f"stand-in)")
+        alt = both(iv_legs=(calib["ratio1"], calib["ratio2"]))
+    elif measured:
+        alt_missing = "no capture day has both a VVIX close and invertible quotes at the claim's strikes"
+    else:
+        alt_missing = "no VIX chain captured"
+    var = {}
+    mixed = "mixed information sets (gate at the previous close, strikes from the entry-day settlement: the earlier spec, not allowed under rule 12)"
+    var[mixed] = soq_spread_trades(**{**kw, "gate_lag": 1, "strike_lag": 0})
+    filt = "net credit > 0 at the decision (credit priced in each reading's own information set)"
+    var[filt] = both(credit_filter=True)
+    sett = "settles only (no VX-close proxy, so no sale before 2013-05-20)"
+    var[sett] = both(curve=curve_settle)
+    for s in (0.8, 1.2, 1.5):
+        var[f"IV x{s}"] = both(iv_scale=s)
+    var["half-spreads x2"] = both(hs1=2 * hs1, hs2=2 * hs2)
+    var["unrounded strikes (F+2, F+7)"] = both(round_strikes=False)
+    var["backwardation control (VIX3M/VIX < 1)"] = both(gate_side="below")
+    ex, dropped = {}, {}
+    for lab, td in readings.items():
+        keep = [t for t in td["trades"] if not (t["expiry"].startswith("2008") or t["expiry"][:7] in ("2018-02", "2020-03"))]
+        ex[lab] = {"trades": keep, "skipped": {}}
+        dropped[lab] = len(td["trades"]) - len(keep)
+    var["excluding 2008, 2018-02, 2020-03 (gated trades in them: " + ", ".join(f"{k} at the {lab}" for lab, k in dropped.items())
+        + "; the 2008 exclusion is vacuous: 2008 predates the VX file)"] = ex
+    le0 = {lab: (sum(1 for t in td["trades"] if t["net_credit"] <= 0), len(td["trades"])) for lab, td in readings.items()}
+    notes = []
+    if measured:
+        notes.append("net credit <= 0 after half-spreads in " + ", ".join(f"{a} of {b} trades at the {lab}" for lab, (a, b) in le0.items())
+                     + ": they are COUNTED as sold, because the claim fixes the structure (short F+2, long +5) and the timing, "
+                       "not a minimum credit, every spread is a credit at mid, and dropping them would add a price-based rule "
+                       "the claim does not state (such a trade cannot gain, so counting it is the conservative choice); the "
+                       f"'{filt}' sensitivity drops them")
+    pe = sorted({t["expiry"] for td in readings.values() for t in td["trades"] if t.get("f_proxy")})
+    first_vx = min((str(r["value"]["day"])[:10] for r in vxr), default="n/a")
+    notes.append(f"sample: the VX futures file starts {first_vx}, so the trial's settlement calendar since 2006 (VRO since "
+                 f"2008) cannot be tested before then (no front-future level)"
+                 + (f"; where the {first_vx[:4]} rows carry settle 0 the VX close (16:15 ET, stamped at the same 21:30Z as the "
+                    f"settle) is the documented proxy: " + ", ".join(
+                        f"{sum(1 for t in td['trades'] if t.get('f_proxy'))} trades at the {lab}" for lab, td in readings.items())
+                    + f" use it ({', '.join(pe)})" if proxied else ""))
     prelim = soq_preliminary(vro, vix, tdays, set(exps) | _monthly_vix_expiries(min(vro) if vro else "2008-01-01", tdays[-1]))
-    rep = soq_spread_claim(main, var, prelim, calib, 60, costs_measured=measured,
-                           decide_variants=(same_close, "gate and strikes at the previous close"))
+    rep = soq_spread_claim(readings, var, prelim, calib, 60, costs_measured=measured, decide_variants=(mixed, filt, sett),
+                           alt_pricing=alt, alt_pricing_label=alt_label, alt_pricing_missing=alt_missing,
+                           half_spreads=(hs1, hs2) if measured else (None, None), notes=notes)
     return _wrap(rep)
 
 
