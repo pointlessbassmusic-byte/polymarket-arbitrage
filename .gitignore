@@ -612,3 +612,16 @@ mandel/archive/data/daily-history-AMD.jsonl.gz
 mandel/archive/data/daily-history-AMGN.jsonl.gz
 mandel/archive/data/daily-history-AMH.jsonl.gz
 mandel/archive/data/daily-history-AMP.jsonl.gz
+# batch-6c fetches in progress (local only)
+mandel/archive/data/daily-events-AN.jsonl.gz
+mandel/archive/data/daily-events-ANV.jsonl.gz
+mandel/archive/data/daily-events-APD.jsonl.gz
+mandel/archive/data/daily-events-AR.jsonl.gz
+mandel/archive/data/daily-events-AS.jsonl.gz
+mandel/archive/data/daily-events-ASC.jsonl.gz
+mandel/archive/data/daily-history-AN.jsonl.gz
+mandel/archive/data/daily-history-ANV.jsonl.gz
+mandel/archive/data/daily-history-APD.jsonl.gz
+mandel/archive/data/daily-history-AR.jsonl.gz
+mandel/archive/data/daily-history-AS.jsonl.gz
+mandel/archive/data/daily-history-ASC.jsonl.gz
