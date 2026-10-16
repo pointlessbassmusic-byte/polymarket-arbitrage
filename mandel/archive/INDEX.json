@@ -32667,6 +32667,50 @@
    "parked_reason": "",
    "in_git": false,
    "schema": "value = {symbol, t (bar start, unix s), open, high, low, close, volume (base currency)}; one row per UTC hour with trades (no-trade hours are absent: align to a UTC grid); observed_at = bar start; available_at = bar start + 1 h"
+  },
+  "coinbase-hourly-RNDR-USD": {
+   "name": "coinbase-hourly-RNDR-USD",
+   "kind": "data",
+   "path": "mandel/archive/data/coinbase-hourly-RNDR-USD.jsonl.gz",
+   "created_at": "2026-10-16T00:13:33.943358+00:00",
+   "rows": 29732,
+   "bytes": 827340,
+   "sha256": "006c08c7a14d79bcf261da3406e34f21958de8ba36fc634cb3c43302ab9bec6c",
+   "tags": [
+    "coinbase",
+    "complete",
+    "crypto",
+    "history",
+    "hourly",
+    "prices",
+    "span:2019-01-01..2025-06-26"
+   ],
+   "recipe": "GET https://api.exchange.coinbase.com/products/RNDR-USD/candles?granularity=3600&start=<ISO>&end=<ISO> in windows of 300 hours, 2022-02-03T00:00:00Z..2025-06-26T23:00:00Z; candidates = BTC-USD, ETH-USD, SOL-USD, DOGE-USD plus every USD product in the top 15 by trailing 30-day dollar volume (coinbase-daily-*, stablecoins excluded) on any day from 2019-01-01; via mandel.data.crypto_history.fetch_coinbase_hourly. Licence: Coinbase Exchange public market data: Coinbase's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t (bar start, unix s), open, high, low, close, volume (base currency)}; one row per UTC hour with trades (no-trade hours are absent: align to a UTC grid); observed_at = bar start; available_at = bar start + 1 h"
+  },
+  "coinbase-hourly-TRUMP-USD": {
+   "name": "coinbase-hourly-TRUMP-USD",
+   "kind": "data",
+   "path": "mandel/archive/data/coinbase-hourly-TRUMP-USD.jsonl.gz",
+   "created_at": "2026-10-16T00:13:47.183988+00:00",
+   "rows": 15144,
+   "bytes": 351751,
+   "sha256": "da9eaf4c96ca71cc2ceb256c9730b7ffeba582334756a64d4d62920bbcaf0b2d",
+   "tags": [
+    "coinbase",
+    "complete",
+    "crypto",
+    "history",
+    "hourly",
+    "prices",
+    "span:2019-01-01..2026-10-15"
+   ],
+   "recipe": "GET https://api.exchange.coinbase.com/products/TRUMP-USD/candles?granularity=3600&start=<ISO>&end=<ISO> in windows of 300 hours, 2025-01-21T00:00:00Z..2026-10-15T23:00:00Z; candidates = BTC-USD, ETH-USD, SOL-USD, DOGE-USD plus every USD product in the top 15 by trailing 30-day dollar volume (coinbase-daily-*, stablecoins excluded) on any day from 2019-01-01; via mandel.data.crypto_history.fetch_coinbase_hourly. Licence: Coinbase Exchange public market data: Coinbase's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t (bar start, unix s), open, high, low, close, volume (base currency)}; one row per UTC hour with trades (no-trade hours are absent: align to a UTC grid); observed_at = bar start; available_at = bar start + 1 h"
   }
  }
 }
