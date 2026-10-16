@@ -373,6 +373,56 @@ def test_t313_cost_readings_disagreeing_is_undecided():
     assert ok is None and "disagree" in name
 
 
+def test_zero_volume_spikes_flag_only_isolated_zero_volume_prints():
+    # the CPER pattern: 2014-12-03 flat at zero volume (legitimate), 2014-12-04 a bogus 13.05 print at zero volume
+    close = [19.42, 19.52, 19.52, 13.05, 19.56, 19.50]
+    vol = [600, 1200, 0, 0, 200, 200]
+    assert m.zero_volume_spikes(close, vol) == [3]
+    assert m.zero_volume_spikes(close, [600, 1200, 0, 500, 200, 200]) == []           # a traded print is a real price
+    assert m.zero_volume_spikes(close, [600, 1200, 0, None, 200, 200]) == []          # unknown volume is never flagged
+    assert m.zero_volume_spikes([20.0, 16.0, 12.0, 12.1], [100, 0, 100, 100]) == []   # a move (neighbours on both sides)
+    assert m.zero_volume_spikes([20.0, 19.0, 19.1, 19.2], [100, 0, 100, 100]) == []   # within 15% of the neighbours
+    assert m.zero_volume_spikes([13.0, 19.5, 19.6], [0, 100, 0]) == []                # end bars have one neighbour
+    days, adj = ["d0", "d1", "d2"], np.array([1.0, 0.6, 1.1])
+    out = m.patch_bars((days, adj, adj.copy()), ["d1"])
+    assert list(out[1]) == [1.0, 1.0, 1.1] and list(out[2]) == [1.0, 1.0, 1.1] and adj[1] == 0.6   # copy, not in place
+
+
+def _t313_archive(bogus: bool):
+    """U13 + DBC + DTB3 with volumes; CPER's first session of 2015-02 (a fill date) is a zero-volume bar: at the
+    previous close in the clean archive, a bogus print 30% below it otherwise."""
+    dd = bdays("2010-01-04")
+    b = {}
+    for k, s in enumerate(list(m.U13) + ["DBC"]):
+        r = np.random.default_rng(300 + k).normal(0.0002, 0.01, len(dd))
+        adj = 100 * np.exp(np.cumsum(r))
+        vol = np.full(len(dd), 1000.0)
+        if s == "CPER":
+            kb = dd.index("2015-02-02")
+            adj[kb] = adj[kb - 1] * (0.7 if bogus else 1.0)
+            vol[kb] = 0.0
+        rows = _yahoo(dd, adj)
+        for row, v in zip(rows, vol):
+            row["value"]["volume"] = float(v)
+        b[m.dh(s)] = rows
+    b[m.DTB3_B] = [{"available_at": d + "T20:00:00+00:00", "value": {"day": d, "value": 2.0}} for d in bdays("2009-01-02")[::5]]
+    return FakeArchive(b)
+
+
+def test_t313_harness_sets_a_zero_volume_spike_fill_to_the_previous_close():
+    clean, bogus = _t313_archive(False), _t313_archive(True)
+    st_c, n_c, v_c, why_c = m.b6c_xs_commodity_etf_momentum(clean)
+    m._CACHE.clear()
+    st_b, n_b, v_b, why_b = m.b6c_xs_commodity_etf_momentum(bogus)
+    assert st_c["patched_bars"] == {} and st_b["patched_bars"] == {"CPER": ["2015-02-02"]}
+    assert "CPER 2015-02-02" in why_b and n_b == n_c
+    assert st_b["means"] == pytest.approx(st_c["means"], abs=1e-15)      # the patched run is the clean run
+    # without the screen the bogus print would move the book (the defect)
+    raw = {s: m._daily(bogus, m.dh(s)) for s in m.U13}
+    j = m.commodity_momentum(raw, m._bills(bogus))
+    assert abs(j["means"]["low"] - st_c["means"]["low"]) > 1e-4
+
+
 # ------------------------------------------------------------------------------------------- T-482 --
 
 U12F = [f"F{i:02d}" for i in range(10)] + ["C1", "C2"]
@@ -414,6 +464,29 @@ def test_t482_null_does_not_pass():
     j = m.frog_in_pan(series_of(U12F, DAYS02, P), crypto=("C1", "C2"))
     assert j["verdict"] != "supported"
     assert len(m.T482_FAMILY) == 4
+
+
+def test_boundary_shares_split_tied_names_equally():
+    v = [1.0, 2.0, 2.0, 3.0]
+    assert list(m.boundary_shares(v, 2, True)) == [1.0, 0.5, 0.5, 0.0]
+    assert list(m.boundary_shares(v, 2, False)) == [0.0, 0.5, 0.5, 1.0]
+    assert list(m.boundary_shares([1.0, 2.0, 3.0, 4.0], 2, True)) == [1.0, 1.0, 0.0, 0.0]   # no tie: whole slots
+    assert list(m.boundary_shares([0.5, 0.5, 0.5], 1, False)) == pytest.approx([1 / 3] * 3)
+    assert m.boundary_shares([2.0, 2.0, 1.0, 2.0, 0.0], 3, True).sum() == pytest.approx(3.0)
+
+
+def test_t482_ids_tied_at_the_split_do_not_depend_on_the_panel_order():
+    P = sim_monthly(12, DAYS02, lambda *a: None, seed=42)
+    s = series_of(U12F, DAYS02, P)
+    j = m.frog_in_pan(s, crypto=("C1", "C2"))
+    jr = m.frog_in_pan({k: s[k] for k in reversed(list(s))}, crypto=("C1", "C2"))
+    assert j["tie_months"] > 20                                            # equal counts over equal windows tie often
+    assert jr["mean_test"]["est"] == pytest.approx(j["mean_test"]["est"], abs=1e-12)
+    assert jr["no_crypto"]["mean"] == pytest.approx(j["no_crypto"]["mean"], abs=1e-12)
+    assert jr["family_sharpe_ann"] == pytest.approx(j["family_sharpe_ann"], abs=1e-9)
+    tr = j["tie_break_range"]                                              # the list-order tie-breaks it replaced differ
+    assert abs(tr["declared"]["mean"] - tr["reversed"]["mean"]) > 1e-5
+    assert jr["tie_break_range"]["declared"]["mean"] == pytest.approx(tr["reversed"]["mean"], abs=1e-12)
 
 
 # ------------------------------------------------------------------------------------------- T-471 --
@@ -524,6 +597,76 @@ def test_t462_null_does_not_pass():
     j = m.reversal_liquidity(s, vix)
     assert j["verdict"] == "not_supported"
     assert len(m.T462_CELLS) == 8 and m.T462_N_TRIALS == 18
+
+
+def _vix_hi(vix, days):
+    vd = sorted(vix)
+    vv = np.array([vix[d] for d in vd])
+
+    def hi(q):
+        p = vd.index(days[q])
+        return p >= 251 and vv[p] > np.quantile(vv[p - 251:p + 1], 0.5)
+    return hi
+
+
+def _crit(j, prefix):
+    return [(k, v) for k, v in j["criteria"] if k.startswith(prefix)][0]
+
+
+def test_vix_slope_and_rule12_readings():
+    rng = np.random.default_rng(5)
+    hi = rng.random(600) > 0.5
+    net = 0.01 * hi + rng.normal(0, 0.01, 600)
+    first = np.arange(600) < 300
+    sv = m.vix_slope(net, hi, first)
+    assert sv["n"] == 300 and sv["beta"] == pytest.approx(net[first & hi].mean() - net[first & ~hi].mean())
+    assert sv["t"] > 3 and sv["p"] < 0.01
+    assert m.vix_slope(net, np.ones(600, bool), first) is None                # one side empty
+    name, ok, dec = m._rule12([("live", True, False), ("previous close", False, False)], "x")
+    assert ok is None and "readings disagree" in name and "rule 12" in name
+    assert m._rule12([("a", False, True), ("b", False, True)], "x")[1:] == (False, True)
+
+
+def test_t462_vix_criterion_is_judged_on_the_out_of_sample_entries():
+    # VIX-conditional reversal before 2017 only, the same reversal at every VIX level after it
+    vix = syn_vix(DAYS05, seed=82)
+    hi = _vix_hi(vix, DAYS05)
+
+    def fn(r, ew):
+        q = ew - 1
+        if q < 70:
+            return None
+        aa = (0.003 if hi(q) else 0.0005) if DAYS05[q] < "2017-01-01" else 0.002
+        return rank_drift(r[:, q - 4:q + 1].sum(axis=1), 5, aa, long_high=False)
+    P = sim_weekly(25, DAYS05, fn, seed=81)
+    j = m.reversal_liquidity({sym: (DAYS05, P[i], P[i]) for i, sym in enumerate(U25W)}, vix)
+    name, ok = _crit(j, "higher when VIX")
+    assert ok is False and "out of sample (2017-2026" in name, name
+    full = [x["vix_full_diagnostic"] for x in j["readings"].values()]
+    assert all(f["beta"] > 0 and f["p"] < 0.01 for f in full)          # the 2007-2026 reading the old harness judged
+    assert _crit(j, "out-of-sample")[1] is True and j["verdict"] == "not_supported"
+
+
+def test_t462_live_proxy_and_previous_close_readings_disagreeing_is_undecided():
+    # the reversal keys on the fill-day (close t) return under high VIX: only the no-skip (live-proxy) cell sees it
+    vix = syn_vix(DAYS05, seed=92)
+    hi = _vix_hi(vix, DAYS05)
+
+    def fn(r, ew):
+        if ew < 70:
+            return None
+        return rank_drift(r[:, ew], 5, 0.003 if hi(ew) else 0.0, long_high=False)
+    P = sim_weekly(25, DAYS05, fn, seed=91)
+    j = m.reversal_liquidity({sym: (DAYS05, P[i], P[i]) for i, sym in enumerate(U25W)}, vix)
+    assert j["selected"][1] == 0 and set(j["readings"]) == {m.T462_LIVE, m.T462_PREV}
+    live, prev = j["readings"][m.T462_LIVE], j["readings"][m.T462_PREV]
+    assert prev["cell"] == [j["selected"][0], 1, j["selected"][2]] and prev["vix_cell"][1:] == [1, False]
+    assert live["oos"]["p"] < 0.05 and live["vix_oos"]["p"] < 0.05     # the live proxy alone would pass both
+    assert not (prev["oos"]["mean"] > 0 and prev["oos"]["p"] < 0.05)
+    for prefix in ("out-of-sample", "higher when VIX"):
+        name, ok = _crit(j, prefix)
+        assert ok is None and "undecided under rule 12" in name, name
+    assert j["verdict"] != "supported"
 
 
 def test_t462_declared_universe_matches_the_fetcher_list():

@@ -566,3 +566,10 @@ mandel/archive/data/polymarket-fetch-log.jsonl.gz
 # batch-6c fetches in progress (local only)
 mandel/archive/data/kalshi-fetch-log.jsonl.gz
 mandel/archive/data/pm-kalshi-pairs.jsonl.gz
+# batch-6c fetches in progress (local only)
+mandel/archive/data/btc-hashrate-daily.jsonl.gz
+mandel/archive/data/cmc-historical-listings.jsonl.gz
+mandel/archive/data/defillama-yields.jsonl.gz
+mandel/archive/data/ishares-ibit-premium-discount.jsonl.gz
+mandel/archive/data/ishares-ibit-snapshots.jsonl.gz
+mandel/archive/data/kraken-trades-stablecoin-episodes.jsonl.gz

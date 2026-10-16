@@ -26,7 +26,8 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            were selected, same test). min_n 200 selected pairs (non-overlapping equivalents: pooled pair-windows / 6).
   * T-323  On T-322's selected pair-windows: Kalman time-varying hedge ratio (random-walk alpha and beta, state noise
            w = delta/(1 - delta) on both and observation noise R by EM on the formation window only, the filter run
-           forward) against the static OLS hedge ratio, the same entry/exit rule on each estimator's standardized spread
+           forward, on point-in-time log price levels: each leg re-levelled to its raw close at the formation end) against the
+           static OLS hedge ratio, the same entry/exit rule on each estimator's standardized spread
            (|z| > 2 open, |z| < 0.5 close, |z| > 4 stop; Kalman z = innovation / sqrt(predicted variance)), hedge leg
            rebalanced only when beta moves > 5% (cost included). Pass: mean paired difference of per-window net Sharpe
            (Kalman minus static) > 0 with 95% CI excluding 0 in 2008-2016 AND 2017-2026 under both named constructions
@@ -53,15 +54,25 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            pooled 95% lower bound per trade > 0 (bootstrap clustered by pair-month), positive in >= 6 of 10 pairs, DSR
            > 0.95 over the 5 variants. LBRDK is not archived (Yahoo history starts 2026-07-17), so the LBRDK/LBRDA pair is
            None: the pooled mean and the DSR need all ten pairs and are not implemented (None, rule 9); the 6-of-10 count
-           is decided from the nine archived pairs where the tenth cannot change it. min_n 200 trades.
+           is decided from the nine archived pairs where the tenth cannot change it. Yahoo's split records are checked
+           pair by pair before x is built (``split_check``): a split recorded on one class only (or with a different
+           ratio on each) whose ex-date shows no matching move in the classes' relative price is spurious and is undone
+           on that class (BF-A's 1339:1000 'split' of 2018-02-07, which BF-B lacks and BF-A's raw price never made); the
+           other one-class records (GOOG 2015-04-27, ZG 2015-08-17, UA 2016-06-13, LEN/LEN-B 2017 and 2025: genuine, or
+           too small to tell from the daily relative move) are left alone. min_n 200 trades.
 
 Conventions
   * Data. Every bundle is read through ``archive.load``; a row is used only when its ``available_at`` is not after the
     bundle's capture time. Yahoo bars are keyed by the UTC date of their timestamp (ETF and stock bars 13:30/14:30 UTC,
     futures 04:00 UTC: the trading date; crypto 00:00 UTC: the UTC day). ETF and stock legs use ``adjclose`` (total
     return; Yahoo back-adjustment scales history by a constant, so normalized indices, OLS spreads (the constant moves
-    only the intercept) and z-scores are unaffected; the Kalman model with isotropic state noise is not scale-invariant
-    and runs on the archived log adjusted closes, the rule's log P); the futures signal uses ``close`` (settlement).
+    only the intercept) and z-scores are unaffected). The Kalman model with isotropic state noise is not scale-invariant,
+    and the archived adjusted level holds every dividend and split up to the 2026 snapshot, so T-323's inputs are put
+    point in time: each ETF leg's log total-return index is re-levelled to the leg's raw close at the formation-end close
+    f1, log P(t) = log adj(t) + log(raw close(f1) / adj(f1)), raw close = Yahoo's split-adjusted close times every split
+    dated after f1 (daily-events-<SYM>; SLV's 10:1 split of 2008-07-24 is hard-coded because its old-convention bundle
+    has no events file). That is the level a trader had at f1, with every later dividend and split unknown; the static
+    intercept moves by c_Y - b c_X, so the static spread is unchanged. The futures signal uses ``close`` (settlement).
     The ETF panel is on SPY's session calendar; a missing bar after a fund's first bar carries the previous close
     (counted per fund).
   * Point in time (rules 4, 12). Every formation statistic (SSD, sd, beta, alpha, EM parameters, the filter state) uses
@@ -132,6 +143,16 @@ CRYPTO = ("ETH-USD", "BTC-USD")                               # T-322/T-323's ET
 
 def dh(sym: str) -> str:
     return "daily-history-" + "".join(c if c.isalnum() or c in "-_." else "-" for c in sym)
+
+
+def de(sym: str) -> str:
+    return "daily-events-" + dh(sym)[len("daily-history-"):]
+
+
+# Splits the archive does not record: the old-convention daily-history bundles (XLB..XLY, SPY, QQQ, IWM, EFA, TLT, IEF,
+# GLD, SLV, VNQ) have no daily-events file, and among them only SLV split after 2007 (10:1, ex-date 2008-07-24). Used only
+# when daily-events-<SYM> is not archived.
+UNRECORDED_SPLITS = {"SLV": {"2008-07-24": 10.0}}
 
 
 # ================================================================================================= data access ==
@@ -210,6 +231,41 @@ def _daily(archive, name: str) -> dict:
                 adj[i] = close[i] * ratio
         return {"days": days, "close": close, "adj": adj, "vol": vol}
     return _cached(archive, ("daily", name), load)
+
+
+def _splits(archive, sym: str) -> Optional[dict]:
+    """{ex-date: split ratio (new shares per old share; the product when a date has several)} from daily-events-<SYM>
+    (an optional bundle), else ``UNRECORDED_SPLITS``; None when neither knows the symbol."""
+    name = de(sym)
+    if not _has(archive, name):
+        return dict(UNRECORDED_SPLITS[sym]) if sym in UNRECORDED_SPLITS else None
+
+    def load():
+        out = {}
+        for r in _rows(archive, name):
+            v = r.get("value") or {}
+            if (v.get("type") or r.get("kind")) != "split" or not v.get("ex_date"):
+                continue
+            try:
+                q = float(v["numerator"]) / float(v["denominator"])
+            except (KeyError, TypeError, ValueError, ZeroDivisionError):
+                continue
+            if q > 0 and math.isfinite(q):
+                ex = str(v["ex_date"])[:10]
+                out[ex] = out.get(ex, 1.0) * q
+        return out
+    return _cached(archive, ("splits", name), load)
+
+
+def raw_over_adj(days: Sequence[str], close, adj, splits: Optional[dict]) -> np.ndarray:
+    """Per day (sorted ``days``), the raw as-traded close over the adjusted close. Yahoo's close is split-adjusted, so
+    the raw close of day d is close(d) times every split ratio dated after d; adj(d) also removes every later dividend.
+    The log of this ratio at a decision date turns the archived log adjusted level into the level known at that date."""
+    days = list(days)
+    fac = np.ones(len(days))
+    for ex, q in (splits or {}).items():
+        fac[:bisect.bisect_left(days, ex)] *= q                  # every day before the ex-date
+    return np.asarray(close, float) * fac / np.asarray(adj, float)
 
 
 def panel(series: dict, cal: Sequence[str]) -> tuple:
@@ -1093,11 +1149,16 @@ def persistence_judge(sc: dict, min_n: int = T322_MIN_N, n_random: Optional[int]
             "verdict": v, "why": why}
 
 
-def pw_frame(sc: dict, mask: np.ndarray, cal: str, days: Sequence[str], P: np.ndarray, etf_days: Sequence[str]) -> Optional[dict]:
-    """Arrays of the pair-windows ``mask`` (on the calendar ``cal`` with prices P on ``days``): formation log adjusted
-    closes, left-padded so every formation ends at column F - 1 (Yf, Xf, Vf); trading log prices,
+def pw_frame(sc: dict, mask: np.ndarray, cal: str, days: Sequence[str], P: np.ndarray, etf_days: Sequence[str],
+             lvl: Optional[np.ndarray] = None) -> Optional[dict]:
+    """Arrays of the pair-windows ``mask`` (on the calendar ``cal`` with prices P on ``days``): formation log prices,
+    left-padded so every formation ends at column F - 1 (Yf, Xf, Vf); trading log prices,
     leg returns, calendar-day gaps (Yt, Xt, RA, RB, DT, Vt; right-padded); the ETF-session index of every trading column
-    (crypto days map to the first ETF session on or after them); OLS a, b, the formation residual sd, window k."""
+    (crypto days map to the first ETF session on or after them); OLS a, b, the formation residual sd, window k.
+    Point in time (rule 4): ``lvl`` (same shape as P) is log(raw close / adj close) per session; each leg's log prices
+    are log adj + lvl at the formation-end close f1 (cy, cx), i.e. its log total-return index re-levelled to the raw
+    close a trader saw at f1, so no dividend or split after f1 moves the level the Kalman filter sees. The OLS intercept
+    moves by cy - b cx, which leaves the static spread unchanged. lvl None (crypto: adj = close) adds nothing."""
     r = sc["rows"]
     ix = np.where(mask & (r["cal"] == cal))[0] if r["cal"].size else np.zeros(0, int)
     if ix.size == 0:
@@ -1131,11 +1192,15 @@ def pw_frame(sc: dict, mask: np.ndarray, cal: str, days: Sequence[str], P: np.nd
     ed = np.array(etf_days)
     dmap = np.minimum(np.searchsorted(ed, np.array(days)), len(etf_days) - 1) if cal == "crypto" else np.arange(len(days))
     I, J = r["i"][ix].astype(int), r["j"][ix].astype(int)
+    CY, CX = np.zeros(N), np.zeros(N)
     for q, (f0, f1, tr0, tr1) in enumerate(spans):
         i, j = I[q], J[q]
         nf, nt = f1 - f0 + 1, tr1 - tr0 + 1
-        ly = np.log(P[f0:tr1 + 1, i])
-        lx = np.log(P[f0:tr1 + 1, j])
+        if lvl is not None:
+            CY[q] = lvl[f1, i] if np.isfinite(lvl[f1, i]) else 0.0
+            CX[q] = lvl[f1, j] if np.isfinite(lvl[f1, j]) else 0.0
+        ly = np.log(P[f0:tr1 + 1, i]) + CY[q]
+        lx = np.log(P[f0:tr1 + 1, j]) + CX[q]
         Yf[q, F - nf:] = ly[:nf]
         Xf[q, F - nf:] = lx[:nf]
         Vf[q, F - nf:] = True
@@ -1148,8 +1213,9 @@ def pw_frame(sc: dict, mask: np.ndarray, cal: str, days: Sequence[str], P: np.nd
         DI[q, :nt] = dmap[tr0:tr1 + 1]
         DI[q, nt:] = DI[q, nt - 1]
     return {"ix": ix, "cal": cal, "Yf": Yf, "Xf": Xf, "Vf": Vf, "Yt": Yt, "Xt": Xt, "RA": RA, "RB": RB, "DT": DTt, "Vt": Vt,
-            "DI": DI, "a": r["a"][ix].astype(float), "b": r["b"][ix].astype(float), "sd": r["sd"][ix].astype(float),
-            "k": r["k"][ix].astype(int), "ppy": T322_PPY[cal], "cost": T322_COST[cal]}
+            "DI": DI, "a": r["a"][ix].astype(float) + CY - r["b"][ix].astype(float) * CX, "b": r["b"][ix].astype(float),
+            "sd": r["sd"][ix].astype(float), "k": r["k"][ix].astype(int), "cy": CY, "cx": CX, "ppy": T322_PPY[cal],
+            "cost": T322_COST[cal]}
 
 
 def static_sim(fr: dict, rule: tuple) -> dict:
@@ -1671,6 +1737,55 @@ T470_PAIRS = (("GOOGL", "GOOG", 1.0, "2014-04-03"), ("BRK-A", "BRK-B", 1500.0, "
               ("FOXA", "FOX", 1.0, "2019-03-19"), ("LBRDK", "LBRDA", 1.0, "2014-11-04"), ("BF-B", "BF-A", 1.0, ""),
               ("LEN", "LEN-B", 1.0, ""), ("HEI", "HEI-A", 1.0, ""), ("ZG", "Z", 1.0, "2015-08-03"), ("UA", "UAA", 1.0, "2016-04-08"))
 T470_HALF = "2020-05-24"
+T470_SPLIT_ID = 6.0             # a one-class split record is judged only when |ln ratio| > 6 robust sds of the daily move
+
+
+def split_check(A: str, B: str, dA: dict, dB: dict, sA: Optional[dict], sB: Optional[dict], first: str = "",
+                L: int = T470_L) -> tuple:
+    """Rule 9, data integrity: the two classes' Yahoo split records ({ex-date: ratio}) compared before x is built. At
+    every ex-date inside the pair's span where the recorded ratios differ (net ratio q = qA / qB), d is the one-session
+    move of ln(close A / close B) on Yahoo's split-adjusted closes. A genuine split moved the raw relative price by 1 / q
+    and the adjustment removes it (d near 0); a spurious record, whose raw price never moved, leaves d near ln q. The
+    record is spurious when d is closer to ln q than to 0 and |ln q| exceeds T470_SPLIT_ID robust sds (1.4826 MAD) of the
+    pair's daily relative move over the L sessions on each side; a smaller record cannot be told from noise and is left
+    alone, as is every genuine one. A spurious record is undone on the class carrying it: its closes and adjusted closes
+    before the ex-date times the ratio, its volumes divided by it. Returns (dA, dB, rows); the inputs are not modified."""
+    miss = [t for t, s_ in ((A, sA), (B, sB)) if s_ is None]
+    if miss:
+        return dA, dB, [{"note": f"split records not archived for {', '.join(miss)}: not checked"}]
+    days, (cA, cB) = _common((dA["days"], dA["close"]), (dB["days"], dB["close"]))
+    rows = []
+    if len(days) < 3:
+        return dA, dB, rows
+    mv = np.diff(np.log(cA) - np.log(cB))                       # mv[i - 1]: days[i - 1] -> days[i]
+    out = {A: dict(dA), B: dict(dB)}
+    for ex in sorted(set(sA) | set(sB)):
+        qa, qb = sA.get(ex, 1.0), sB.get(ex, 1.0)
+        lq = math.log(qa / qb)
+        i = bisect.bisect_left(days, ex)
+        if abs(lq) < 1e-9 or (first and ex <= first) or i < 1 or i >= len(days):
+            continue                                            # matched, or outside the span x is built on
+        d = float(mv[i - 1])
+        nb = np.r_[mv[max(0, i - 1 - L):i - 1], mv[i:i + L]]
+        sd = float(1.4826 * np.median(np.abs(nb - np.median(nb)))) if nb.size >= 10 else float("nan")
+        if not (math.isfinite(sd) and abs(lq) > T470_SPLIT_ID * sd):
+            verdict = "too small to tell from the daily relative move: left alone"
+        elif abs(d - lq) < abs(d):
+            verdict = "spurious (no matching raw-price move): undone"
+        else:
+            verdict = "genuine (the raw relative price moved): left alone"
+        cls = [t for t, q in ((A, qa), (B, qb)) if q != 1.0]
+        rows.append({"date": ex, "classes": cls, "ratio": {A: qa, B: qb}, "ln_net_ratio": lq, "relative_move": d,
+                     "robust_sd": sd if math.isfinite(sd) else None, "verdict": verdict})
+        if verdict.startswith("spurious"):
+            for t, q in ((A, qa), (B, qb)):
+                if q != 1.0:
+                    o = out[t]
+                    pre = np.array([x < ex for x in o["days"]], bool)
+                    o["close"] = np.where(pre, o["close"] * q, o["close"])
+                    o["adj"] = np.where(pre, o["adj"] * q, o["adj"])
+                    o["vol"] = np.where(pre, o["vol"] / q, o["vol"])
+    return out[A], out[B], rows
 
 
 def _trailing_median(x: np.ndarray, L: int) -> np.ndarray:
@@ -1706,12 +1821,13 @@ def dual_pair(dA: dict, dB: dict, k: float, first: str, costs: tuple, entry: flo
 
 
 def dual_class(data: dict, min_n: int = T470_MIN_N, start: str = T470_START, end: str = T470_END,
-               pairs: Sequence[tuple] = T470_PAIRS) -> dict:
-    """T-470 core. data: {ticker: _daily dict} (a pair with a missing ticker is reported as not archived). Runs every pair
-    under both cost readings and the 5 declared variants; pools trades; judges the criteria."""
+               pairs: Sequence[tuple] = T470_PAIRS, events: Optional[dict] = None) -> dict:
+    """T-470 core. data: {ticker: _daily dict} (a pair with a missing ticker is reported as not archived); events:
+    {ticker: split records or None}, checked by ``split_check`` before each pair's x is built (None: no check). Runs
+    every pair under both cost readings and the 5 declared variants; pools trades; judges the criteria."""
     readings = {"claim: 5 bps per leg": lambda s: T470_COST,
                 "controls: 25 bps on BF-A/LEN-B/HEI-A legs": lambda s: T470_COST_THIN if s in T470_THIN else T470_COST}
-    per_pair, missing = {}, []
+    per_pair, missing, checks = {}, [], {}
     pooled = {r_: [] for r_ in readings}
     daily = {r_: {} for r_ in readings}
     var_daily = {"|z| > 1.5": {}, "exit at 0.5 sd": {}, "liquidity-ordered": {}}
@@ -1722,8 +1838,11 @@ def dual_class(data: dict, min_n: int = T470_MIN_N, start: str = T470_START, end
             per_pair[name] = None
             continue
         per_pair[name] = {}
+        dA, dB = data[A], data[B]
+        if events is not None:
+            dA, dB, checks[name] = split_check(A, B, dA, dB, events.get(A), events.get(B), first)
         for r_, cf in readings.items():
-            res = dual_pair(data[A], data[B], k, first, (cf(A), cf(B)), start=start, end=end)
+            res = dual_pair(dA, dB, k, first, (cf(A), cf(B)), start=start, end=end)
             st = trade_stats(res["trades"])
             per_pair[name][r_] = {**st, "positive": bool(st["mean"] is not None and st["mean"] > 0)}
             for t in res["trades"]:
@@ -1731,7 +1850,7 @@ def dual_class(data: dict, min_n: int = T470_MIN_N, start: str = T470_START, end
             daily[r_][name] = (res["days"], res["pnl"])
         cf0 = readings["claim: 5 bps per leg"]
         for vn, kw in (("|z| > 1.5", {"entry": 1.5}), ("exit at 0.5 sd", {"exit_z": 0.5}), ("liquidity-ordered", {"liquidity": True})):
-            res = dual_pair(data[A], data[B], k, first, (cf0(A), cf0(B)), start=start, end=end, **kw)
+            res = dual_pair(dA, dB, k, first, (cf0(A), cf0(B)), start=start, end=end, **kw)
             var_daily[vn][name] = (res["days"], res["pnl"])
 
     def pool_daily(dd: dict) -> np.ndarray:
@@ -1793,7 +1912,7 @@ def dual_class(data: dict, min_n: int = T470_MIN_N, start: str = T470_START, end
           False)
     n = claim["n"]
     v, why = _decide([c1, c2, c3], n, min_n, "trades")
-    return {"n": n, "per_pair": per_pair, "missing": missing, "pooled": out, "dsr": ds,
+    return {"n": n, "per_pair": per_pair, "missing": missing, "pooled": out, "dsr": ds, "split_checks": checks,
             "family": {k_: {"sharpe_pp": _sr_pp(x), "n_days": int(len(x))} for k_, x in fam.items()},
             "criteria": [(c[0], c[1]) for c in (c1, c2, c3)], "verdict": v, "why": why}
 
@@ -1809,7 +1928,7 @@ def _pool_ok(claim: dict, thin: dict) -> tuple:
 
 # ================================================================================== T-322 secondary, T-323 judge ==
 
-_FRAME_KEYS = ("ix", "Yf", "Xf", "Vf", "Yt", "Xt", "RA", "RB", "DT", "Vt", "DI", "a", "b", "sd", "k")
+_FRAME_KEYS = ("ix", "Yf", "Xf", "Vf", "Yt", "Xt", "RA", "RB", "DT", "Vt", "DI", "a", "b", "sd", "k", "cy", "cx")
 
 
 def frame_subset(fr: dict, m: np.ndarray) -> Optional[dict]:
@@ -1989,6 +2108,21 @@ def _crypto_data(archive) -> dict:
     return _cached(archive, ("crypto",), load)
 
 
+def _etf_levels(archive) -> dict:
+    """T-323's point-in-time level shift on the ETF panel: L[t, j] = log(raw close / adj close) of fund j at session t
+    (carried like the prices), and where each fund's splits come from."""
+    def load():
+        cal = _etf_data(archive)["days"]
+        ser, src = {}, {}
+        for s in UNIVERSE:
+            d = _daily(archive, dh(s))
+            src[s] = "daily-events" if _has(archive, de(s)) else ("hard-coded" if s in UNRECORDED_SPLITS else "none recorded")
+            ser[s] = (d["days"], raw_over_adj(d["days"], d["close"], d["adj"], _splits(archive, s)))
+        Q, _ = panel(ser, cal)
+        return {"L": np.log(Q), "source": src}
+    return _cached(archive, ("etf_levels",), load)
+
+
 def _coint(archive) -> dict:
     def load():
         e, c = _etf_data(archive), _crypto_data(archive)
@@ -2002,9 +2136,10 @@ def _frames(archive, which: str) -> list:
         r = sc["rows"]
         mask = np.ones(r["k"].size, bool) if which == "eg" else r["sel"].astype(bool)
         e, c = _etf_data(archive), _crypto_data(archive)
+        lv = _etf_levels(archive)["L"]
         out = []
-        for cal, days, P in (("etf", e["days"], e["P"]), ("crypto", c["days"], c["C"])):
-            fr = pw_frame(sc, mask, cal, days, P, e["days"])
+        for cal, days, P, L in (("etf", e["days"], e["P"], lv), ("crypto", c["days"], c["C"], None)):
+            fr = pw_frame(sc, mask, cal, days, P, e["days"], L)
             if fr is not None:
                 out.append(fr)
         return out
@@ -2113,11 +2248,25 @@ def b6c_pairs_kalman(archive):
     if not j.get("halves"):
         return _out({"n": 0, "criteria": j["criteria"]}, 0, j["verdict"], "no selected pair-windows — " + j["why"])
     h1, h2 = j["halves"]["2008-2016"], j["halves"]["2017-2026"]
+    src = _etf_levels(archive)["source"]
+    ns = {k: sum(1 for v in src.values() if v == k) for k in ("daily-events", "hard-coded", "none recorded")}
+    cc = np.abs(np.concatenate([np.r_[fr["cy"], fr["cx"]] for fr in frames if fr["cal"] == "etf"] or [np.zeros(0)]))
+    pit = {"abs_shift_median": float(np.median(cc)) if cc.size else None,
+           "abs_shift_q90": float(np.quantile(cc, 0.9)) if cc.size else None,
+           "abs_shift_max": float(cc.max()) if cc.size else None, "split_source": src,
+           "rule": "log P = log adj + log(raw close(f1) / adj(f1)) per ETF leg, f1 = the formation-end close; static spread "
+                   "unchanged (intercept + c_Y - b c_X)"}
     reason = (f"Kalman (random-walk alpha/beta, delta and R by EM on each formation window, filter run forward) versus the "
               f"static OLS hedge on T-322's {j['n_pair_windows']} selected pair-windows ({j['n']} non-overlapping "
               f"equivalents), same rule on each standardized spread (|z| > 2 open, < 0.5 close, stop 4; Kalman z = "
               f"innovation / sqrt(predicted variance); hedge rebalanced when beta moves > 5%, {j['rebalances']} rebalances), "
-              f"15 bps (40 bps crypto) per leg per trade, decisions at close t filled at t+1. Paired net-Sharpe difference "
+              f"15 bps (40 bps crypto) per leg per trade, decisions at close t filled at t+1. Point in time: each ETF leg's "
+              f"log total-return index is re-levelled to its raw close at the formation-end close (raw = split-adjusted "
+              f"close times every later split: daily-events for {ns['daily-events']} funds"
+              + (", SLV's 10:1 of 2008-07-24 hard-coded" if src.get("SLV") == "hard-coded" else "")
+              + f", none for the {ns['none recorded']} other funds without an events file), so no later dividend or split moves "
+              f"the Kalman input (|shift| median {_f(pit['abs_shift_median'], 2)}, 90% {_f(pit['abs_shift_q90'], 2)}, max "
+              f"{_f(pit['abs_shift_max'], 2)}; the static spread is unchanged). Paired net-Sharpe difference "
               f"(annualised, per pair-window; Kalman minus static): all {_s(j['mean_diff'], 3)}; 2008-2016 "
               f"{_s(h1['mean'], 3)} {_ci(h1['ci'], 3)} (LW aggregate {_s(h1['lw']['diff'], 3)} {_ci(h1['lw']['ci'], 3)}); "
               f"2017-2026 {_s(h2['mean'], 3)} {_ci(h2['ci'], 3)} (LW aggregate {_s(h2['lw']['diff'], 3)} "
@@ -2129,6 +2278,7 @@ def b6c_pairs_kalman(archive):
               + ", ".join(f"{k} {_s(v['mean_diff'], 3)} ({v['n_rows']})" for k, v in j["breaks"].items()) + " — " + j["why"])
     stat = {k: j[k] for k in ("n", "n_pair_windows", "mean_diff", "halves", "dsr", "cells", "breaks", "delta_em_median",
                               "delta_em_q", "rebalances", "opens_kalman", "opens_static", "criteria")}
+    stat["pit_levels"] = pit
     stat["rule10"] = "T-322's monthly-start windows (pooled all-start, 12-month blocks over window months)"
     return _out(stat, j["n"], j["verdict"], reason)
 
@@ -2186,8 +2336,18 @@ def b6c_pairs_dual_class(archive):
         return miss
     use = [t for p in T470_PAIRS if all(_has(archive, dh(x)) for x in p[:2]) for t in p[:2]]
     data = {t: _daily(archive, dh(t)) for t in use}
-    j = dual_class(data)
+    j = dual_class(data, events={t: _splits(archive, t) for t in use})       # daily-events-<T>: optional, checked if present
     pc = j["pooled"]
+    ck = []
+    for nm, rows in j["split_checks"].items():
+        for r in rows:
+            if "note" in r:
+                ck.append(f"{nm} {r['note']}")
+                continue
+            rr = ", ".join(f"{t} x{r['ratio'][t]:.6g}" for t in r["classes"])
+            ck.append(f"{nm} {r['date']} ({rr}; relative move {r['relative_move']:+.4f} vs ln net ratio "
+                      f"{r['ln_net_ratio']:+.4f}, daily sd {_f(r['robust_sd'], 4)}): {r['verdict']}")
+    ck_txt = ("; ".join(ck) if ck else "no split recorded on one class only inside any pair's span")
     cl, th = pc["claim: 5 bps per leg"], pc["controls: 25 bps on BF-A/LEN-B/HEI-A legs"]
     pp = []
     for nm, v in j["per_pair"].items():
@@ -2200,7 +2360,10 @@ def b6c_pairs_dual_class(archive):
               f"session, z on the trailing {T470_L} sessions; |z| > 2: long the cheap class / short the rich class in equal "
               f"dollars at the next close; exit at z = 0 or after {T470_MAX_HOLD} sessions; 50 bps/yr borrow; entries "
               f"{T470_START}..data end. LBRDK is not archived (Yahoo's history starts 2026-07-17), so the LBRDK/LBRDA pair is "
-              f"None. Pooled over the {10 - len(j['missing'])} archived pairs: {cl['n']} trades, mean "
+              f"None. Split records checked class against class before x is built (a split on one class only, or with "
+              f"different ratios, whose ex-date shows no matching move in the classes' relative price is spurious and "
+              f"undone on that class: earlier closes and adjusted closes times the ratio): {ck_txt}. Pooled over the "
+              f"{10 - len(j['missing'])} archived pairs: {cl['n']} trades, mean "
               f"{_bp(cl['mean'], 2)} (5 bps/leg, {_ci(cl['boot'].get('ci'), 2, 1e4, ' bp')}, clustered by pair-month) and "
               f"{_bp(th['mean'], 2)} with 25 bps on the thin classes ({_ci(th['boot'].get('ci'), 2, 1e4, ' bp')}); halves "
               + ", ".join(f"{k} {_bp(v['mean'], 1)} ({v['n']})" for k, v in cl["halves"].items())
@@ -2210,7 +2373,7 @@ def b6c_pairs_dual_class(archive):
     stat = {"n_trades": j["n"], "per_pair": j["per_pair"], "missing_pairs": j["missing"],
             "pooled": {k: {kk: (vv if kk != "boot" else {x: vv.get(x) for x in ("est", "ci", "ci1", "ci_mc_se", "ci1_mc_se")})
                            for kk, vv in v.items()} for k, v in pc.items()},
-            "dsr_archived_pairs": j["dsr"], "family": j["family"], "criteria": j["criteria"],
+            "dsr_archived_pairs": j["dsr"], "family": j["family"], "criteria": j["criteria"], "split_checks": j["split_checks"],
             "not_archived": "daily-history-LBRDK (Yahoo history starts 2026-07-17; the LBRDK/LBRDA pair cannot be built)",
             "rule10": "daily state machine on trailing statistics (no grid phase)"}
     return _out(stat, j["n"], j["verdict"], reason)

@@ -25,13 +25,16 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
   * T-462  weekly bottom-minus-top quintile reversal on the declared T-420/T-462 ETF list (68 ETFs), entries 2007-01..
            2026-09: the cell selected on 2007-2016 has an out-of-sample (2017-2026) net mean > 0 with HAC p < 0.05,
            DSR >= 0.95 over the 18 declared cells, and (the claim's own words) a higher net return when VIX is above its
-           1-year median (HAC p < 0.05). The 10 crypto cells need the CoinMarketCap point-in-time universe
-           (cmc-daily-listings-<YYYY>), which is not archived: the DSR is judged from bounds (below).
+           1-year median (HAC p < 0.05) on the 2017-2026 test entries. The 10 crypto cells need the CoinMarketCap
+           point-in-time universe (cmc-daily-listings-<YYYY>), which is not archived: the DSR is judged from bounds (below).
 
 Conventions
   * Data. ``daily-history-<SYM>`` bundles through ``archive.load``; a row is used only when its ``available_at`` is not
     after the bundle's capture time. Prices are Yahoo ``adjclose`` (split and dividend adjusted: total return); opens
-    are put on the same basis (open x adjclose / close). ETF bars are keyed by their session date, crypto bars by the
+    are put on the same basis (open x adjclose / close). Bogus prints (T-313): before its month panel is built, a
+    zero-volume bar whose close lies more than 15% from both neighbours' closes on the same side is set to the previous
+    bar's close and named in the reason (CPER 2014-12-04 and 2015-02-02, the latter a fill date); the same screen flags
+    no bar of the other universes here. ETF bars are keyed by their session date, crypto bars by the
     UTC calendar day. VIX is ``cboe-VIX-history`` (close), bills ``fred-DTB3``.
   * Universes (no survivorship beyond the claims' own declared lists). Every universe is the claim's declared list,
     written here before any return is computed; an ETF enters only once it has the history the rule needs (T-309: 252
@@ -53,7 +56,10 @@ Conventions
     session's close, so a month-end signal filled at the next close uses one information set. T-471's signal ends at
     t-12. T-319/T-462 skip-a-day cells use closes through t-1 for the signal, the trailing volatility and the VIX
     gate, and fill at close t; the no-skip cells use close t for all of them (the live proxy) and fill at close t;
-    T-319's next-open variant forms at close t and trades at the next session's open. VIX closes are stamped 21:30 UTC
+    T-319's next-open variant forms at close t and trades at the next session's open. When T-462's selected cell is a
+    no-skip cell it is also read at the previous close (its skip-1 counterpart: formation and VIX through t-1), and
+    every selected-cell criterion (out-of-sample mean, DSR, VIX difference) passes only when both readings pass, fails
+    only when both fail, and is undecided when they disagree (rule 12). VIX closes are stamped 21:30 UTC
     on their own day, so a gate at day q reads VIX(q). T-476's seasonal scores use only same-month returns of earlier
     years.
   * Books and costs (rule 9) as each claim states, charged on drift-adjusted turnover at every rebalance (per unit of
@@ -113,7 +119,9 @@ Claim-specific choices (declared before any result)
     exclusions (the delisted commodity ETNs, among them several iPath notes, are outside the declared 13) are reported.
   * T-482: ID = sign(PRET) x (share of negative - share of positive daily returns) over the formation window's own
     sessions (all calendar days for crypto); the low-ID half is the floor(m/2) lowest, the high-ID half the floor(m/2)
-    highest (the middle name of an odd count sits out); terciles use floor(m/3). A month with fewer than 2 positive
+    highest (the middle name of an odd count sits out); terciles use floor(m/3). Names tied on ID at a boundary share
+    its remaining slots equally (both halves, median and terciles), so no list order decides a tied name; the declared-
+    and reversed-order tie-breaks are reported as a range. A month with fewer than 2 positive
     formation returns has no observation (both halves flat; its exit costs are booked in it and it is left out of n).
   * T-471: quartile = floor(n/4) names per side (4 while 17 ETFs are eligible, 5 from 21); an ETF joins once it has a
     month-end 36 months back. Cohort returns are the active cohorts' average (fully invested during the 11-month
@@ -125,7 +133,9 @@ Claim-specific choices (declared before any result)
     sessions. Halves: entries 2010-01..2017-12 and 2018-01..2026-09; VIX terciles and the break-even cost are reported.
   * T-462: the cell is selected by its 2007-2016 net Sharpe among the 8 ETF cells (the claim is "in the declared ETF
     universe"); the out-of-sample test uses that cell's 2017-2026 entries; the VIX criterion uses the selected cell's
-    formation without VIX doubling (doubling would inflate it mechanically) over 2007-2026. 2008 and 2020 reported.
+    formation without VIX doubling (doubling would inflate it mechanically) on the same 2017-2026 entries (the trial
+    tests on 2017-26; 2007-2016 is the selection sample), under each rule-12 reading; its 2007-2026 slope is reported
+    as a diagnostic only. 2008 and 2020 reported.
 
 Verdicts use ``underlying2._verdict`` through ``batch6b_bw._decide``: any implemented criterion failing -> not_supported;
 any criterion not implemented (None) -> at best inconclusive; supported needs every criterion implemented and passing.
@@ -262,6 +272,64 @@ def _daily(archive, name: str) -> tuple:
                 adj[i] = close[i] * ratio
         return days, adj, opn * adj / close
     return _cached(archive, ("daily", name), load)
+
+
+SPIKE_THR = 0.15               # a zero-volume close this far from both neighbours (same side) is a bogus print
+
+
+def zero_volume_spikes(close: Sequence[float], volume: Sequence, thr: float = SPIKE_THR) -> list:
+    """Indices of bogus prints: a bar with zero volume whose close lies more than ``thr`` from BOTH neighbours' closes,
+    on the same side (an isolated spike, not a move; CPER 2015-02-02 closes 11.90 between 16.68 and 17.34). A bar whose
+    volume is missing is never flagged, nor are the first and last bars (one neighbour)."""
+    c = np.asarray(close, float)
+    out = []
+    for k in range(1, c.size - 1):
+        v = volume[k]
+        if v is None or not isinstance(v, (int, float)) or v != 0:
+            continue
+        a, b = c[k] / c[k - 1] - 1.0, c[k] / c[k + 1] - 1.0
+        if abs(a) > thr and abs(b) > thr and a * b > 0:
+            out.append(k)
+    return out
+
+
+def _spike_days(archive, name: str) -> list:
+    """Days of a Yahoo daily bundle's zero-volume spike prints (``zero_volume_spikes`` on the raw closes, over the same
+    bars ``_daily`` keeps)."""
+    def load():
+        by = {}
+        for r in _rows(archive, name):
+            v = r["value"]
+            try:
+                c = float(v.get("close"))
+            except (TypeError, ValueError):
+                continue
+            if not (c > 0 and math.isfinite(c)):
+                continue
+            try:
+                vol = float(v["volume"]) if v.get("volume") is not None else None
+            except (TypeError, ValueError):
+                vol = None
+            by[datetime.fromtimestamp(float(v["t"]), tz=timezone.utc).strftime("%Y-%m-%d")] = (c, vol)
+        days = sorted(by)
+        return [days[k] for k in zero_volume_spikes([by[d][0] for d in days], [by[d][1] for d in days])]
+    return _cached(archive, ("spikes", name), load)
+
+
+def patch_bars(ser: tuple, bad_days: Sequence[str]) -> tuple:
+    """Copy of a (days, adjclose[, open]) series with each bad day's bar set to the previous bar's adjclose (the
+    print is treated as no trade at a stale price); the cached arrays are not touched."""
+    days = ser[0]
+    adj = np.array(ser[1], float)
+    opn = np.array(ser[2], float) if len(ser) > 2 else None
+    pos = {d: k for k, d in enumerate(days)}
+    for d in sorted(bad_days):
+        k = pos.get(d)
+        if k:
+            adj[k] = adj[k - 1]
+            if opn is not None:
+                opn[k] = adj[k - 1]
+    return (days, adj) if opn is None else (days, adj, opn)
 
 
 def _series(archive, name: str) -> dict:
@@ -1074,7 +1142,12 @@ def b6c_xs_commodity_etf_momentum(archive):
     if _has(archive, dh("DBC")):                        # benchmark only (reported, never a criterion)
         dd, aa, _ = _daily(archive, dh("DBC"))
         bench = (dd, aa)
-    j = commodity_momentum(_load(archive, U13), _bills(archive), bench=bench)
+    series, patched = _load(archive, U13), {}
+    for s in U13:                                       # zero-volume spike prints -> the previous close, flagged
+        bad = _spike_days(archive, dh(s))
+        if bad:
+            series[s], patched[s] = patch_bars(series[s], bad), bad
+    j = commodity_momentum(series, _bills(archive), bench=bench)
     if j.get("too_short"):
         return _too_short(j["n"], T313_MIN_N, "months", f"hold months {T313_START}..{T313_END} with >= 12 ranked ETFs")
     t, d, s, p = j["tests"], j["dsr"], j["subs"], j["perm"]
@@ -1082,8 +1155,11 @@ def b6c_xs_commodity_etf_momentum(archive):
     def side(r):
         return (f"{r} costs: mean {_pc(t[r].get('est'), 3)}/month ({_ci(t[r].get('ci'), 3)}), DSR {_dsr_txt(d[r])}, "
                 + ", ".join(f"{nm} {_pc(x['mean'], 3) if x else 'n/a'}" for nm, x in s[r].items()))
+    ptxt = "; ".join(f"{s} {', '.join(d)}" for s, d in patched.items()) or "none"
     reason = (f"13 declared commodity ETFs ({', '.join(U13)}; DBC benchmark only; delisted commodity ETNs, among them "
-              f"several iPath notes, are outside the declared 2026-survivor list and excluded by declaration), month-end "
+              f"several iPath notes, are outside the declared 2026-survivor list and excluded by declaration), zero-volume "
+              f"spike prints (zero volume, close more than {SPIKE_THR:.0%} from both neighbours on the same side) set to "
+              f"the previous close before the panel is built: {ptxt}; month-end "
               f"12-1 adjclose ranking, filled at the next session's close, hold months {j['labels'][0]}..{j['labels'][-1]} "
               f"({j['n']} months), top-{j['k']} minus bottom-{j['k']} (thirds), zero-investment. The claim states cost "
               f"ranges, so both ends are run and must agree (low: 10 bps per side, 1%/yr borrow on UNG/USO shorts; high: "
@@ -1099,6 +1175,7 @@ def b6c_xs_commodity_etf_momentum(archive):
             "dsr": d, "subs": s, "perm": p, "k": j["k"], "family": [list(v) for v in T313_FAMILY],
             "family_sharpe_ann": j["family_sharpe_ann"], "ex_energy_mean": j["ex_energy_mean"], "uso_2020": j["uso_2020"],
             "dbc_excess_mean": j["dbc_excess_mean"], "cost_readings": T313_COSTS, "criteria": j["criteria"],
+            "patched_bars": patched, "spike_threshold": SPIKE_THR,
             "exclusions": "delisted commodity ETNs (several iPath notes) excluded by declaration; DBC benchmark only",
             "rule10": "month-end decisions named by the claim (rule 10(a))"}
     return _out(stat, j["n"], j["verdict"], reason)
@@ -1125,6 +1202,22 @@ def info_discreteness(adj: np.ndarray, j0: int, j1: int) -> tuple:
     return pret, float(np.sign(pret) * ((r < 0).mean() - (r > 0).mean()))
 
 
+def boundary_shares(vals, k: int, low: bool, tol: float = 1e-12) -> np.ndarray:
+    """Slot shares (each in [0, 1], summing to k) of the k lowest (``low``) or k highest ``vals``: a value strictly
+    inside the k-th value takes a full slot and the values tied with the k-th share the slots left equally, so no list
+    order decides which of the tied names is in."""
+    v = np.asarray(vals, float)
+    s = np.zeros(v.size)
+    if k < 1 or v.size < k:
+        return s
+    b = np.sort(v)[k - 1] if low else np.sort(v)[::-1][k - 1]
+    inside = (v < b - tol) if low else (v > b + tol)
+    tied = np.abs(v - b) <= tol
+    s[inside] = 1.0
+    s[tied] = (k - int(inside.sum())) / int(tied.sum())
+    return s
+
+
 def frog_in_pan(series: dict, start: str = T482_START, end: str = T482_END, min_n: int = T482_MIN_N,
                 family: Sequence[tuple] = T482_FAMILY, crypto: Sequence[str] = CRYPTO) -> dict:
     """T-482 core: continuous (low-ID) half minus discrete (high-ID) half among positive J-1 formation returns."""
@@ -1140,10 +1233,10 @@ def frog_in_pan(series: dict, start: str = T482_START, end: str = T482_END, min_
     is_c = np.array([s in crypto for s in syms])
     hold = [labels[t + 1] for t in dec]
 
-    def run(v, mask):
+    def run(v, mask, tie="fractional"):
         J, split = v
         Wc, Wd = np.zeros((dec.size, N)), np.zeros((dec.size, N))
-        obs = np.zeros(dec.size, bool)
+        obs, straddle = np.zeros(dec.size, bool), np.zeros(dec.size, bool)
         for r, t in enumerate(dec):
             cand = []
             for i in range(N):
@@ -1159,15 +1252,22 @@ def frog_in_pan(series: dict, start: str = T482_START, end: str = T482_END, min_
             k = m // 2 if split == "median" else m // 3
             if k < 1:
                 continue
-            cand.sort(key=lambda z: z[0])               # stable: ties keep the declared panel order
-            lo = [i for _, i in cand[:k]]
-            hi = [i for _, i in cand[-k:]]
-            Wc[r, lo] = 1.0 / k
-            Wd[r, hi] = 1.0 / k
+            vals, idx = np.array([z[0] for z in cand]), np.array([z[1] for z in cand], int)
+            sc, sd = boundary_shares(vals, k, True), boundary_shares(vals, k, False)
+            straddle[r] = bool(((sc > 0) & (sc < 1)).any() or ((sd > 0) & (sd < 1)).any())
+            if tie == "fractional":                     # names tied at a boundary share its slots (no list order)
+                Wc[r, idx] = sc / k
+                Wd[r, idx] = sd / k
+            else:                                       # a list-order tie-break (reported range only)
+                sg = 1 if tie == "declared" else -1
+                o = sorted(range(m), key=lambda z: (vals[z], sg * idx[z]))
+                Wc[r, idx[o[:k]]] = 1.0 / k
+                Wd[r, idx[o[-k:]]] = 1.0 / k
             obs[r] = True
         bc, bd = book(Wc, R, cost), book(Wd, R, cost)
         d = bc["net"] - bd["net"]
-        return {"d": d[obs], "obs": obs, "cont": bc["net"][obs], "disc": bd["net"][obs], "labels": [h for h, o in zip(hold, obs) if o]}
+        return {"d": d[obs], "obs": obs, "cont": bc["net"][obs], "disc": bd["net"][obs], "labels": [h for h, o in zip(hold, obs) if o],
+                "straddle": int(straddle[obs].sum())}
 
     allm = np.ones(N, bool)
     out = {v: run(v, allm) for v in family}
@@ -1185,8 +1285,14 @@ def frog_in_pan(series: dict, start: str = T482_START, end: str = T482_END, min_
              f"{noc['d'].size} months)", bool(noc["d"].size > 0 and noc["d"].mean() > 0), False)]
     v, why = _decide(crit, x.size, min_n, "months")
     nt = mean_test(noc["d"], BLOCK_M) if noc["d"].size > 8 else {}
+    ties = {}                                           # reported: the list-order tie-breaks the primary no longer uses
+    for tie in ("declared", "reversed"):
+        a, b = run(pkey, allm, tie), run(pkey, ~is_c, tie)
+        ties[tie] = {"mean": float(a["d"].mean()) if a["d"].size else None,
+                     "no_crypto_mean": float(b["d"].mean()) if b["d"].size else None}
     return {"n": int(x.size), "labels": pv["labels"], "mean_test": mt, "dsr": d, "no_crypto": {"n": int(noc["d"].size),
             "mean": float(noc["d"].mean()) if noc["d"].size else None, "ci": nt.get("ci")},
+            "tie_months": pv["straddle"], "tie_break_range": ties,
             "cont_mean": float(pv["cont"].mean()) if x.size else None, "disc_mean": float(pv["disc"].mean()) if x.size else None,
             "months_without_split": [h for h, o in zip(hold, pv["obs"]) if not o], "decade": _by_decade(x, pv["labels"]),
             "family_sharpe_ann": {"|".join(map(str, k)): _sr_ann(o["d"]) for k, o in out.items()},
@@ -1203,21 +1309,27 @@ def b6c_xs_frog_in_the_pan(archive):
     j = frog_in_pan(series)
     if j.get("too_short"):
         return _too_short(j["n"], T482_MIN_N, "months", f"hold months {T482_START}..{T482_END} with >= 2 positive formation returns")
-    mt, d = j["mean_test"], j["dsr"]
+    mt, d, tr = j["mean_test"], j["dsr"], j["tie_break_range"]
     reason = (f"21-asset panel ({', '.join(U21)}; an asset joins once it has a month-end 12 months back), month-end "
               f"decisions, 12-1 formation return and information discreteness on the window's own sessions (crypto every "
               f"calendar day), filled at the next session's close (crypto: next UTC day), hold months "
               f"{j['labels'][0]}..{j['labels'][-1]} ({j['n']} months with >= 2 positive formation returns; without a split: "
               f"{', '.join(j['months_without_split']) or 'none'}), each half after its own costs (5 bps ETFs, 25 + 10 bps "
-              f"crypto per side): continuous half {_pc(j['cont_mean'], 3)}, discrete half {_pc(j['disc_mean'], 3)}/month, "
+              f"crypto per side), names tied on ID at a split boundary sharing its remaining slots equally (no list-order "
+              f"tie-break; boundary ties in {j['tie_months']} of {j['n']} months): continuous half {_pc(j['cont_mean'], 3)}, "
+              f"discrete half {_pc(j['disc_mean'], 3)}/month, "
               f"difference {_pc(mt.get('est'), 3)} ({_ci(mt.get('ci'), 3)}, studentized CBB, 12-month blocks, {N_BOOT:,} draws "
               f"x {REPS} seeds); DSR over the 4 declared trials (12-1/6-1 x median/terciles) {_dsr_txt(d)}; without crypto "
-              f"{_pc(j['no_crypto']['mean'], 3)} over {j['no_crypto']['n']} months ({_ci(j['no_crypto']['ci'], 3)}). By decade "
+              f"{_pc(j['no_crypto']['mean'], 3)} over {j['no_crypto']['n']} months ({_ci(j['no_crypto']['ci'], 3)}). Range "
+              f"across list-order tie-breaks (reported, not used): difference {_pc(tr['declared']['mean'], 3)} (declared "
+              f"order) / {_pc(tr['reversed']['mean'], 3)} (reversed), without crypto {_pc(tr['declared']['no_crypto_mean'], 3)} "
+              f"/ {_pc(tr['reversed']['no_crypto_mean'], 3)}. By decade "
               + "; ".join(f"{k} {_pc(v['mean'], 3)} ({v['n']})" for k, v in j["decade"].items())
               + f"; annualised trial Sharpes {_fmt_family(j['family_sharpe_ann'])} — " + j["why"])
     stat = {"n_months": j["n"], "window": [j["labels"][0], j["labels"][-1]] if j["labels"] else None, "mean": mt.get("est"),
             "ci": mt.get("ci"), "ci_mc_se": mt.get("ci_mc_se"), "cont_mean": j["cont_mean"], "disc_mean": j["disc_mean"],
             "dsr": d, "no_crypto": j["no_crypto"], "months_without_split": j["months_without_split"], "decade": j["decade"],
+            "tie_months": j["tie_months"], "tie_break_range": tr, "ties": "names tied on ID at a split boundary share its slots",
             "family": [list(v) for v in T482_FAMILY], "family_sharpe_ann": j["family_sharpe_ann"], "criteria": j["criteria"],
             "rule10": "month-end decisions named by the claim (rule 10(a))"}
     return _out(stat, j["n"], j["verdict"], reason)
@@ -1570,6 +1682,35 @@ T462_N_TRIALS = 18
 T462_YEARS = ("2008", "2020")
 
 
+T462_LIVE = "close t (live proxy: formation and VIX at the fill close)"
+T462_PREV = "previous close (skip-1 counterpart: formation and VIX through t-1)"
+T462_OWN = "previous close (the cell's own skip day)"
+
+
+def vix_slope(net, hi, mask) -> Optional[dict]:
+    """OLS slope of the weekly net return on the high-VIX dummy over the ``mask`` weeks (= high-VIX minus low-VIX mean)
+    with a Newey-West s.e. (lag nw_lag(n)); one-sided p (H0: slope <= 0). None when either side is empty."""
+    y, hv = np.asarray(net, float)[mask], np.asarray(hi, bool)[mask]
+    if y.size < 3 or not hv.any() or hv.all():
+        return None
+    lag = nw_lag(y.size)
+    reg = ols_hac(y, hv.astype(float), lag)
+    t = reg["beta"] / reg["se_beta"] if reg["se_beta"] > 0 else None
+    return {"beta": reg["beta"], "t": t, "p": None if t is None else 1.0 - _N.cdf(t), "lag": lag, "n": int(y.size),
+            "high_share": float(hv.mean())}
+
+
+def _rule12(rows: Sequence[tuple], label: str) -> tuple:
+    """One criterion under every information-set reading (rule 12): passes only when every reading passes, fails only
+    when every reading fails, undecided (None) when they disagree (all_constructions' logic)."""
+    name, ok, dec = all_constructions(rows, label)
+    name = (name.replace("[the named constructions disagree: undecided under rule 11]",
+                         "[the information-set readings disagree: undecided under rule 12]")
+            .replace("[not every named construction resolves: undecided under rule 11]",
+                     "[not every information-set reading resolves: undecided under rule 12]"))
+    return name, ok, dec
+
+
 def _t462_cell(dp, e, ws, v, vixt: VixTool):
     L, skip, vix_on = v
     gate = (lambda q: 2.0 if vixt.level(q) > vixt.trailing(q, 0.5) else 1.0) if vix_on else None
@@ -1596,34 +1737,55 @@ def reversal_liquidity(series: dict, vix: dict, start: str = T462_START, end: st
     is_sh = {v: _sr_pp(o["net"][ins]) for v, o in out.items()}
     sel = max(cells, key=lambda v: (is_sh[v] if is_sh[v] is not None else -1e9))
     x = out[sel]["net"]
-    oos = x[~ins]
-    h = hac_mean(oos)
+    # Rule 12: a no-skip cell reads its formation and its VIX (gate and conditioning) at close t, the fill close: the live
+    # proxy. Its previous-close reading is its skip-1 counterpart (formation and VIX through t-1). Every selected-cell
+    # criterion is judged under both readings and is undecided when they disagree; a skip-1 cell has one reading (t-1).
+    extra = {}
+
+    def cell(cv):
+        if cv in out:
+            return out[cv]
+        if cv not in extra:
+            extra[cv] = _t462_cell(dp, e, ws, cv, vixt)
+        return extra[cv]
+
+    reads = (((T462_LIVE, sel), (T462_PREV, (sel[0], 1, sel[2]))) if sel[1] == 0 else ((T462_OWN, sel),))
     full_sh = [_sr_pp(o["net"]) for o in out.values()]
     oos_sh = [_sr_pp(o["net"][~ins]) for o in out.values()]
-    row_full, info_full = dsr_bound(x, full_sh, n_trials, "selected cell, 2007-2026 series")
-    row_oos, info_oos = dsr_bound(oos, oos_sh, n_trials, "selected cell, out-of-sample series")
-    base = (sel[0], sel[1], False)
-    bx = out[base]["net"] if base in out else _t462_cell(dp, e, ws, base, vixt)["net"]
-    qs = out[sel]["q"]
-    hi = np.array([vixt.level(int(q)) > vixt.trailing(int(q), 0.5) for q in qs])
-    reg = ols_hac(bx, hi.astype(float), nw_lag(bx.size)) if hi.any() and (~hi).any() else None
-    t_v = reg["beta"] / reg["se_beta"] if reg and reg["se_beta"] > 0 else None
-    p_v = 1.0 - _N.cdf(t_v) if t_v is not None else None
-    crit = [(f"out-of-sample ({split[:4]}-2026) net mean > 0 with HAC p < 0.05 ({_pc(h['mean'], 3)}/week, t {_s(h['t'], 2)}, p "
-             f"{_f(h['p'], 4)}, Newey-West lag {h['lag']}, {h['n']} weeks)", None if h["p"] is None else bool(h["mean"] > 0 and h["p"] < ALPHA),
-             bool(h["t"] is not None and h["t"] < -_N.inv_cdf(1 - ALPHA))),
-            all_constructions([row_full, row_oos], f"DSR >= {DSR_PASS} over the {n_trials} declared cells"),
-            (f"higher when VIX is above its 1-year median (selected formation without doubling, 2007-2026: high-minus-low "
-             f"{_pc(reg['beta'] if reg else None, 3)}/week, HAC t {_s(t_v, 2)} (Newey-West lag {nw_lag(bx.size)}), p {_f(p_v, 4)})",
-             None if p_v is None else bool(reg["beta"] > 0 and p_v < ALPHA), bool(t_v is not None and t_v < -_N.inv_cdf(1 - ALPHA)))]
+    zc = -_N.inv_cdf(1 - ALPHA)
+    allw = np.ones(len(ws), bool)
+    rows_oos, rows_dsr, rows_vix, rd = [], [], [], {}
+    for nm, cv in reads:
+        xr = cell(cv)["net"]
+        h = hac_mean(xr[~ins])
+        rows_oos.append((f"{nm} {_pc(h['mean'], 3)}/week, t {_s(h['t'], 2)}, p {_f(h['p'], 4)}, Newey-West lag {h['lag']}, "
+                         f"{h['n']} weeks", None if h["p"] is None else bool(h["mean"] > 0 and h["p"] < ALPHA),
+                         bool(h["t"] is not None and h["t"] < zc)))
+        row_full, info_full = dsr_bound(xr, full_sh, n_trials, f"{nm}, 2007-2026 series")
+        row_oos, info_oos = dsr_bound(xr[~ins], oos_sh, n_trials, f"{nm}, out-of-sample series")
+        rows_dsr += [row_full, row_oos]
+        bv = (cv[0], cv[1], False)                       # the formation without doubling (doubling would inflate it)
+        b = cell(bv)
+        hi = np.array([vixt.level(int(q)) > vixt.trailing(int(q), 0.5) for q in b["q"]])
+        vo, vf = vix_slope(b["net"], hi, ~ins), vix_slope(b["net"], hi, allw)
+        rows_vix.append((f"{nm} {_pc(vo['beta'] if vo else None, 3)}/week, HAC t {_s(vo['t'] if vo else None, 2)} (Newey-West "
+                         f"lag {vo['lag'] if vo else 'n/a'}), p {_f(vo['p'] if vo else None, 4)}, {vo['n'] if vo else 0} weeks",
+                         None if vo is None or vo["p"] is None else bool(vo["beta"] > 0 and vo["p"] < ALPHA),
+                         bool(vo is not None and vo["t"] is not None and vo["t"] < zc)))
+        rd[nm] = {"cell": list(cv), "oos": h, "dsr_full": info_full, "dsr_oos": info_oos, "vix_cell": list(bv), "vix_oos": vo,
+                  "vix_full_diagnostic": vf}
+    h, info_full, info_oos = rd[reads[0][0]]["oos"], rd[reads[0][0]]["dsr_full"], rd[reads[0][0]]["dsr_oos"]
+    crit = [_rule12(rows_oos, f"out-of-sample ({split[:4]}-2026) net mean > 0 with HAC p < 0.05"),
+            _rule12(rows_dsr, f"DSR >= {DSR_PASS} over the {n_trials} declared cells"),
+            _rule12(rows_vix, f"higher when VIX is above its 1-year median, out of sample ({split[:4]}-2026; selected formation "
+                              f"without doubling, HAC slope of net return on the VIX-above-trailing-252-median dummy, p < 0.05)")]
     v, why = _decide(crit, len(ws), min_n, "weeks")
     pbo = _pbo([o["net"] for o in out.values()])
     yrs = {y: _sub_mean(x, labels, f"{y}-01-01", f"{y}-12-31") for y in T462_YEARS}
     n0 = int(((dp["first"] <= int(e[ws[0]]) - 1 - T462_MIN_BACK) & dp["real"][e[ws[0]]]).sum()) if len(ws) else 0
     n1 = int(((dp["first"] <= int(e[ws[-1]]) - 1 - T462_MIN_BACK) & dp["real"][e[ws[-1]]]).sum()) if len(ws) else 0
     return {"n": int(len(ws)), "n_oos": int((~ins).sum()), "labels": labels, "selected": sel, "is_sharpe": is_sh,
-            "oos": h, "dsr_full": info_full, "dsr_oos": info_oos, "vix_diff": {"beta": reg["beta"] if reg else None, "t": t_v,
-            "p": p_v, "high_share": float(hi.mean()) if hi.size else None}, "pbo_etf_cells": pbo, "years": yrs,
+            "oos": h, "dsr_full": info_full, "dsr_oos": info_oos, "readings": rd, "pbo_etf_cells": pbo, "years": yrs,
             "full_mean": float(x.mean()), "names_first": n0, "names_last": n1,
             "cell_sharpe_ann": {"|".join(map(str, k)): _sr_ann(o["net"], 52.0) for k, o in out.items()},
             "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
@@ -1644,8 +1806,18 @@ def b6c_xs_reversal_vix_liquidity(archive):
         cmc = []
     cmc_note = (f"{len(cmc)} cmc-daily-listings bundles are archived but the crypto cells are not implemented here"
                 if cmc else f"the 10 crypto cells need {CMC_NAME}, not archived")
-    s, o = j["selected"], j["oos"]
-    vd = j["vix_diff"]
+    s = j["selected"]
+
+    def rtxt(nm, x):
+        o, vo, vf = x["oos"], x["vix_oos"] or {}, x["vix_full_diagnostic"] or {}
+        return (f"{nm} ({'|'.join(map(str, x['cell']))}): out-of-sample {_pc(o['mean'], 3)}/week over {o['n']} weeks (HAC t "
+                f"{_s(o['t'], 2)}, p {_f(o['p'], 4)}); DSR at 18 trials at most {_f(x['dsr_full'].get('dsr_upper_bound'))} "
+                f"(2007-2026 series) / {_f(x['dsr_oos'].get('dsr_upper_bound'))} (out-of-sample); VIX conditioning on "
+                f"{'|'.join(map(str, x['vix_cell']))}, VIX above its trailing 252-session median in "
+                f"{_f(None if vo.get('high_share') is None else vo['high_share'] * 100, 1)}% of the out-of-sample weeks: "
+                f"high-minus-low {_pc(vo.get('beta'), 3)}/week out of "
+                f"sample (HAC t {_s(vo.get('t'), 2)}, p {_f(vo.get('p'), 4)}); 2007-2026 diagnostic (includes the selection "
+                f"sample, not a criterion) {_pc(vf.get('beta'), 3)}/week (HAC t {_s(vf.get('t'), 2)})")
     reason = (f"declared T-420/T-462 ETF list ({len(U68)} ETFs: the 26 archived ETFs with history by 2006 plus the 42 of "
               f"mandel.data.market_history.ETF60_EXTRA; survivor-drawn, as volume-conditioned-momentum states; an ETF joins "
               f"once it has 22 sessions: {j['names_first']} eligible in the first week, {j['names_last']} in the last), "
@@ -1654,17 +1826,20 @@ def b6c_xs_reversal_vix_liquidity(archive):
               f"Selected on 2007-2016 net Sharpe among the 8 ETF cells: lookback {s[0]}, skip {'on' if s[1] else 'off'}, VIX "
               f"doubling {'on' if s[2] else 'off'} (in-sample weekly Sharpes "
               + "; ".join(f"{'|'.join(map(str, k))} {_s(v, 3)}" for k, v in j["is_sharpe"].items())
-              + f"). Out-of-sample {_pc(o['mean'], 3)}/week over {j['n_oos']} weeks (HAC t {_s(o['t'], 2)}, p {_f(o['p'], 4)}); "
-              f"DSR at 18 trials: 2007-2026 series at most {_f(j['dsr_full'].get('dsr_upper_bound'))}, out-of-sample at most "
-              f"{_f(j['dsr_oos'].get('dsr_upper_bound'))} ({cmc_note}); VIX above its trailing 252-session median "
-              f"({_pc(vd['high_share'], 1)} of weeks): high-minus-low {_pc(vd['beta'], 3)}/week (HAC t {_s(vd['t'], 2)}). "
+              + f"). Rule 12: "
+              + ("the selected cell has no skip day, so it reads its formation and VIX at the fill close (the live proxy) "
+                 "and is also read at the previous close (its skip-1 counterpart); every selected-cell criterion must agree "
+                 "under both readings. " if s[1] == 0 else "the selected cell skips a day, so its formation and VIX are "
+                 "known at the previous close (one reading). ")
+              + "; ".join(rtxt(nm, x) for nm, x in j["readings"].items())
+              + f" ({cmc_note}). "
               f"Reported: PBO over the 8 ETF cells {_f(j['pbo_etf_cells']['pbo'] if j['pbo_etf_cells'] else None, 2)} (the "
               f"declared 18-cell PBO needs the crypto cells); 2008 {_pc((j['years']['2008'] or {}).get('mean'), 3)}, 2020 "
               f"{_pc((j['years']['2020'] or {}).get('mean'), 3)}/week; annualised cell Sharpes {_fmt_family(j['cell_sharpe_ann'])} — "
               + j["why"])
     stat = {"n_weeks": j["n"], "n_oos_weeks": j["n_oos"], "window": [j["labels"][0], j["labels"][-1]], "selected": list(s),
-            "is_sharpe": {"|".join(map(str, k)): v for k, v in j["is_sharpe"].items()}, "oos": o, "dsr_full": j["dsr_full"],
-            "dsr_oos": j["dsr_oos"], "vix_diff": vd, "pbo_etf_cells": j["pbo_etf_cells"], "years": j["years"],
+            "is_sharpe": {"|".join(map(str, k)): v for k, v in j["is_sharpe"].items()}, "oos": j["oos"], "dsr_full": j["dsr_full"],
+            "dsr_oos": j["dsr_oos"], "readings": j["readings"], "pbo_etf_cells": j["pbo_etf_cells"], "years": j["years"],
             "cell_sharpe_ann": j["cell_sharpe_ann"], "cells": [list(c) for c in T462_CELLS], "n_trials": T462_N_TRIALS,
             "crypto_cells": cmc_note, "universe": list(U68), "criteria": j["criteria"],
             "rule10": "weekly calendar named by the claim (the Friday close, rule 10(a))"}

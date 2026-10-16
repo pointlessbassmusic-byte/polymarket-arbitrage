@@ -7452,11 +7452,15 @@
     "pass": "Mean > 0 with 95% interval excluding 0, above the permutation 95th percentile, DSR > 0.95",
     "controls": "Look-ahead: 252-day window ends at t inclusive, trade at t+1; survivorship: ETFs named ex ante; costs: 5 bps per side ETFs, 50 bps a year borrow on shorts; dividends: adjclose (price-only nearness penalises high-yield bond ETFs after each ex-date); multiple testing: 8 trials; regime: by decade"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_xs_fifty_two_week_high"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-2e07740e"
+   ],
    "notes": "from the underlying-library library: 52-week-high proximity (George-Hwang) as a trend signal; harness suggestion: trend.py nearness_52w(prices) and reuse xs_momentum ranking machinery; harness fifty_two_week_vs_12_1. | verifier: corrected claim/trial"
   },
   {
@@ -7571,11 +7575,15 @@
     "pass": "Mean > 0 with 95% interval excluding 0, above the permutation 95th percentile, DSR > 0.95, positive in both sub-periods",
     "controls": "Look-ahead: ranks at t, trades at t+1; survivorship: universe picked from 2026 survivors (delisted commodity ETNs such as several iPath notes excluded; list exclusions in the result); costs: 10-20 bps per side on thin names plus 1-3% a year borrow for UNG/USO shorts; multiple testing: 12 trials; regime: report ex-energy (USO, UNG, DBE removed) since energy dominates 2014-16 and 2020-22; USO 2020 restructuring flagged"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_xs_commodity_etf_momentum"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1fe91bd6"
+   ],
    "notes": "from the underlying-library library: Cross-sectional commodity momentum via commodity ETF proxies (futures version blocked); harness suggestion: collect_history for the ETF list; reuse xs_momentum; harness xs_commodity_etf with an exclusion list recorded in the result for the survivorship control. | verifier: corrected claim/trial"
   },
   {
@@ -7742,11 +7750,15 @@
     "pass": "bootstrap 95% lower bound of mean net weekly return > 0 AND DSR > 0.95 AND PBO < 0.5 AND same sign in both halves",
     "controls": "Look-ahead: formation ends at close t-1 and the trade is at close t; a next-open variant is reported. Yahoo back-adjustment for dividends does not leak future information into returns. Survivorship: the ETF universe is clean; the stock variant lacks delisted members and is reported only as a biased upper bound. Asynchrony: country ETFs trade after their home markets close, so part of any reversal is ETF premium reversion (still tradable on ETF prices; flagged). Costs: 10 bps/leg/trade plus 50 bps/yr borrow; break-even cost reported. Multiple testing: DSR/PBO over all variants. Regime: halves and VIX terciles."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_xs_weekly_etf_reversal"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f552ce8e"
+   ],
    "notes": "from the underlying-library library: Cross-sectional short-term reversal (1-week and 1-month); harness suggestion: xs_reversal_walkforward: ranks trailing returns per universe, builds decile L/S, applies cost model, feeds dsr_pbo_harness | verifier: corrected claim/trial"
   },
   {
@@ -7801,11 +7813,15 @@
     "pass": "net mean > 0 with 95% interval excluding 0 AND mean exceeds the 95th percentile of the random-pair control AND DSR > 0.95",
     "controls": "Look-ahead: an ETF enters the universe only after 12 months of history. Yahoo back-adjustment scales all earlier prices by a constant, so normalized formation indices are unaffected (this replaces the old dividend-timing note, which was not a look-ahead issue). Survivorship: the ETF universe has no delistings; the stock variant is biased. Costs: 15 bps/leg/trade plus borrow. Multiple testing: DSR/PBO. Regime: 2008-2014 vs 2015-2026."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pairs_distance"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b1d9defb"
+   ],
    "notes": "from the underlying-library library: Pairs trading, distance method (Gatev-Goetzmann-Rouwenhorst); harness suggestion: pairs_distance_harness: formation/trading windows, SSD ranking, spread rules, cost model; outputs monthly series to dsr_pbo_harness | verifier: corrected claim/trial"
   },
   {
@@ -7827,11 +7843,15 @@
     "pass": "95% lower bound of the persistence share > 50% AND > random-pair share + 20 percentage points",
     "controls": "Look-ahead: beta, mean, sd and thresholds frozen at formation end. Critical values: MacKinnon EG tables, since naive DF values over-reject. Survivorship: ETF universe clean. Costs: 15 bps/leg (ETFs), 40 bps/leg (crypto) for the secondary Sharpe. Multiple testing: the number of candidate pairs is the trial count; the persistence share is the FDR measure. Regime: 2008-2009, 2020 and 2022 windows reported separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pairs_cointegration"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-4761369a"
+   ],
    "notes": "from the underlying-library library: Pairs trading, cointegration method (Engle-Granger / Johansen spread); harness suggestion: pairs_coint_harness: ADF/Johansen with numpy-only implementation, rolling persistence counter, spread z trading; shares the cost model with pairs_distance_harness | verifier: corrected claim/trial"
   },
   {
@@ -7853,11 +7873,15 @@
     "pass": "mean difference > 0 with 95% interval excluding 0 in both 2008-2016 and 2017-2026, and DSR of the Kalman variant > 0.95",
     "controls": "Look-ahead: forward filter, formation-only parameters. Costs include extra hedge-leg rebalancing (15 bps/leg ETFs, 40 bps crypto). Multiple testing: delta x threshold grid counts as trials. Regime: halves; 2020 and 2022 breaks reported."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pairs_kalman"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-fb57378c"
+   ],
    "notes": "from the underlying-library library: Pairs trading with a Kalman-filter (state-space) hedge ratio; harness suggestion: pairs_kalman_harness: numpy Kalman filter with EM, paired against pairs_coint_harness output | verifier: corrected claim/trial"
   },
   {
@@ -7912,11 +7936,15 @@
     "pass": "95% lower bound of mean monthly net return > 0 at 3%/yr borrow AND DSR > 0.95 over the 8 trials",
     "controls": "Look-ahead: none (mechanical). Structural changes: SVXY and UVXY leverage changes on 2018-02-28 modelled as breaks; reverse splits handled by split-adjusted closes. Costs: borrow is time-varying and spikes in stress (sensitivity grid); FINRA leveraged-ETF short margin (roughly leverage x standard requirement, up to ~90-100% for 3x) means forced covering in drawdowns, modelled with a margin-call stop at 2x initial margin. Regime: 2010-2019 vs 2020-2026; the 2022 trend year reported. Multiple testing: 8 trials."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_macro_letf_pair_decay"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5aa9cbcc"
+   ],
    "notes": "from the underlying-library library: Leveraged ETF volatility decay: short both legs of a +3x/-3x pair; harness suggestion: letf_short_pair_sim: daily simulator with borrow/financing inputs and realized-variance regression; outputs borrow break-even | verifier: corrected claim/trial"
   },
   {
@@ -9302,11 +9330,15 @@
     "pass": "Test-window Sharpe difference > 0.15 with bootstrap p < 0.05, and DSR > 0.95 with n_trials = 4.",
     "controls": "FRED constant-maturity par yields only approximate TLT's roll-down. TLT expense ratio 15 bp. Costs 2 bp per switch. Survivorship: none. Look-ahead: month-end yields used for next-month positions. Regime: ZIRP, 2022 hikes. 4 trials."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_rates_treasury_carry_rolldown"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-99dd2004"
+   ],
    "notes": "from the underlying-library library: Treasury curve carry and roll-down; harness suggestion: mandel/experiments/carry.py: bond_carry_timing() reusing turn_of_month bootstrap utilities | verifier: corrected claim/trial"
   },
   {
@@ -9406,11 +9438,15 @@
     "pass": "|Mean| < 10 bp with HAC 95% CI inside +/-15 bp, and SD < 20 bp.",
     "controls": "Discount-to-yield conversion; SGOV holds 0-3 month bills, so the curve-slope difference vs 3-month bills is reported; Yahoo adjusted close assumes reinvestment; day-count. Single trial."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_rates_tbill_ladder_sgov"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0b61007d"
+   ],
    "notes": "from the underlying-library library: T-bill ladder and cash sweep as the risk-free leg; harness suggestion: mandel/experiments/carry.py: tracking_difference(etf, rf); becomes the shared rf leg for all carry harnesses | verifier: corrected claim/trial"
   },
   {
@@ -9517,11 +9553,15 @@
     "pass": "Bootstrap lower 95% bound of the composite Sharpe > 0.6 is not required; the pass is point Sharpe > 0.6 with lower bound > 0.2, and DSR > 0.95 with n_trials = 3 plus every sleeve trial.",
     "controls": "Inherits each sleeve's controls. Trailing-only weights. The DSR counts all sleeve variants as trials. Regime reporting by NBER recession dates (FRED USREC)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_rates_cross_asset_carry"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f35fc78f"
+   ],
    "notes": "from the underlying-library library: Cross-asset carry composite (crypto basis, FX, bonds, commodities, VIX); harness suggestion: mandel/experiments/carry.py: composite(sleeve_returns) with risk parity and DSR over total trials | verifier: corrected claim/trial"
   },
   {
@@ -10008,11 +10048,15 @@
     "pass": "Slope t <= -2 with overlapping-return correction over >= 250 quarters AND negative slope in both halves (1952-1989, 1990-2026).",
     "controls": "Look-ahead: release-date lag; Z.1 revisions (prefer vintages). Survivorship: none (aggregate). Costs: quarterly rebalance at 1 bp; leverage financing for 150%. Multiple testing: 4 variants. Regime: 1987, 2008, 2020 flow spikes; report ex-crisis."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_macro_fund_flow_dumb_money"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7eefd024"
+   ],
    "notes": "from the underlying-library library: Fund-flow momentum and dumb money (aggregate and ETF flows); harness suggestion: data/ici.py (.xls loader via xlrd); predictive-regression harness with overlapping-return correction, reusable by the aggregate-short-interest variant. | verifier: corrected claim/trial"
   },
   {
@@ -10861,11 +10905,15 @@
     "pass": "Sharpe > 0.3 with bootstrap lower bound > 0 in 2013-2026, and DSR > 0.95 with n_trials = 4.",
     "controls": "Look-ahead: trailing median only, 1-day publication lag. Duration ratio from published fund durations (fixed ex ante). Costs 5 bp per switch plus expense ratios. Regime: 2008, March 2020 ETF discount dislocation, 2022. Survivorship: none. 4 trials."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_rates_credit_spread_timing"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3e56d2d8"
+   ],
    "notes": "from the underlying-library library: Credit carry: corporate spread timing (LQD/HYG vs duration-matched Treasuries); harness suggestion: mandel/experiments/carry.py: spread_timing(signal, long_etf, hedge_etf, hedge_ratio). Add BAA10Y to the FRED list and LQD/HYG/IEF/IEI to daily-history. | added by the verifier pass"
   },
   {
@@ -10918,11 +10966,15 @@
     "pass": "Test Sharpe > 0.3 with bootstrap lower bound > 0, and DSR > 0.95 with n_trials = 4.",
     "controls": "Survivorship: fixed 1996 list; any closed ETF kept until its last price. Lumpy (semiannual or annual) distributions smoothed by a trailing 12-month sum. Look-ahead: distributions counted from the ex-date; rates lagged. EZ/GB rate staleness after 2026-01 flagged. Costs 10 bp plus borrow. Regime: 2008, 2020, euro crisis 2011-12. 4 trials."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_rates_equity_country_carry"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-6a6e92e3"
+   ],
    "notes": "from the underlying-library library: Equity-country carry (dividend yield minus local rate) via country ETFs; harness suggestion: mandel/experiments/carry.py: cross_sectional_carry() with a carry function equity_carry(div_series, price, local_rate). Add the country ETFs with dividends to daily-history. | added by the verifier pass"
   },
   {
@@ -10944,11 +10996,15 @@
     "pass": "Test Sharpe > 0.3 with bootstrap lower bound > 0, the US synthetic-vs-IEF correlation > 0.9, and DSR > 0.95 with n_trials = 3.",
     "controls": "OECD series are monthly averages, not month-end values, which introduces timing error (both legs lagged one month to avoid look-ahead). The duration approximation misses convexity. Stale EZ/GB 3-month rates flagged. Costs 5 bp. Regime: negative rates 2014-2021, 2022. 3 trials."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_rates_global_bond_carry"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5aa4029e"
+   ],
    "notes": "from the underlying-library library: Global government bond carry (cross-country, FX-hedged); harness suggestion: mandel/experiments/carry.py: synthetic_bond_returns(y10, duration) plus cross_sectional_carry(). Add the IRLTLT01 series to the FRED list. | added by the verifier pass"
   },
   {
@@ -11686,11 +11742,15 @@
     "pass": "At least 400 monthly observations. Out-of-sample R^2 > 0 with Clark-West p < 0.05 after deflation. Net Sharpe of the long-short > 0.3.",
     "controls": "Look-ahead: FRED dates monthly observations at the first of the month, but UMCSENT final values are released near the end of that month. Mandel's FRED rule (observation date + 1 day) would leak about a month, so available_at = first day of the next month (or ALFRED vintages). Survivorship: indices. Costs: 5 bps per leg. Multiple testing: 12 cells. Regime: recessions."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_macro_sentiment_size_premium"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-af59b520"
+   ],
    "notes": "from the underlying-library library: Consumer confidence and the small-minus-large premium; harness suggestion: fred_series in mandel/data/options.py needs per-series release lags (monthly survey series: next month start). Predictive regression in mandel/experiments/underlying2.py with Clark-West. | added by the verifier pass"
   },
   {
@@ -11788,11 +11848,15 @@
     "pass": "At least 500 weeks. Out-of-sample net mean > 0 with p < 0.05. DSR >= 0.95.",
     "controls": "Look-ahead: ranks from returns known at formation. Survivorship: as in volume-conditioned-momentum. Costs: 10 bps per ETF leg; 50-100 bps crypto. Multiple testing: 18 cells. Regime: VIX conditioning is the hypothesis; 2008 and 2020 reported."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_xs_reversal_vix_liquidity"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-25c17354"
+   ],
    "notes": "from the underlying-library library: Short-term reversal as liquidity provision (weekly cross-section); harness suggestion: Shares the cross-sectional engine with volume-conditioned-momentum in mandel/experiments/underlying.py. | added by the verifier pass"
   },
   {
@@ -11918,11 +11982,15 @@
     "pass": "95% lower bound of pooled mean net return per trade > 0 AND DSR > 0.95",
     "controls": "Look-ahead: bar closes only; execution at the closing auctions that follow. Synchronicity: a stale FX quote can create fake deviations, so the hourly bar's last FX print is required and a 1-bar-lag FX placebo is run. Costs: 3 bps per leg per trade plus 2 bps FX (Norbert's gambit takes days). Survivorship: current large caps only. Regime: 2024-2026 only (short)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_macro_interlisted_parity"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-826972ac"
+   ],
    "notes": "from the underlying-library library: Cross-listed parity reversion (Canadian interlisted stocks NYSE vs TSX); harness suggestion: cross_listed_parity: hourly aligner for equity pairs plus FX, deviation z-rule, FX-lag placebo; shares code with cross_venue_gap | added by the verifier pass"
   },
   {
@@ -11944,11 +12012,15 @@
     "pass": "95% lower bound of mean net return per trade > 0 AND at least 20 trades AND same sign in at least 2 of 3 sub-periods",
     "controls": "Maturity mismatch: Brent's front contract expires about a month earlier than WTI's, so the front-front spread mixes delivery months; masked around rolls and checked against the ETF-implied spread. USO and BNO roll differently and USO changed its roll schedule in 2020 (structural break flagged). Negative WTI print 2020-04-20 excluded. Costs: 5 bps/leg plus borrow. Regime: sub-periods. Multiple testing: 3 variants."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pairs_brent_wti"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1021d8c2"
+   ],
    "notes": "from the underlying-library library: Crude oil spread mean reversion (Brent-WTI); harness suggestion: reuse underlying.ratio_reversion with a roll-window mask and ETF P&L legs | added by the verifier pass"
   },
   {
@@ -12005,11 +12077,15 @@
     "pass": "95% lower bound of pooled mean net return per trade > 0 AND positive in at least 6 of 10 pairs AND DSR > 0.95",
     "controls": "Look-ahead: trailing windows; next-close execution. Dividends: adjusted closes, since some classes pay different dividends; voting-premium drift (e.g. around GOOG-class buybacks) is absorbed by the trailing mean and reported. Survivorship: pairs that unified or delisted before 2026 are absent from Yahoo; the declared list is current pairs only (biased toward survivors). Costs: 5 bps/leg (25+ bps for thin classes like BF-A, LEN-B, HEI-A). Multiple testing: 5 variants x 10 pairs pooled. Regime: halves."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pairs_dual_class"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-45f5e60a"
+   ],
    "notes": "from the underlying-library library: Dual-class share spread reversion (GOOG/GOOGL, BRK-A/BRK-B and others); harness suggestion: reuse twin_spread_halflife / underlying.ratio_reversion with a share-ratio constant k and a pooled per-trade bootstrap | added by the verifier pass"
   },
   {
@@ -12031,11 +12107,15 @@
     "pass": "95% lower bound of mean monthly net return > 0 AND same sign in both halves AND DSR > 0.95",
     "controls": "Look-ahead: formation ends at t-12 and the trade is at month-end t. Survivorship: none of the 21 ETFs delisted. Overlap: cohorts overlap, so the block length is 12 months. Costs: 10 bps/leg plus borrow; country ETFs have wider spreads (3-15 bps). Low power: about 27 years with a 3-year half-life gives fewer than 10 independent reversion cycles. Multiple testing: 4 variants. Regime: 2008 and 2020."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_xs_country_long_reversal"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-ba0aaeda"
+   ],
    "notes": "from the underlying-library library: Long-horizon reversal across country equity ETFs (De Bondt-Thaler / Balvers-Wu-Gilliland); harness suggestion: reuse xs_reversal_walkforward with monthly formation windows and overlapping cohorts | added by the verifier pass"
   },
   {
@@ -12109,11 +12189,15 @@
     "pass": "95% lower bound of mean net return per trade > 0 AND at least 30 trades AND DSR > 0.95",
     "controls": "Look-ahead: FRED yields used only from their availability date; ETF trades at the next close. Duration drift: fixed durations introduce residual level/slope exposure, so a regression of P&L on yield-level and slope changes is reported. Costs: 3 bps/leg plus borrow. Regime: ZLB, 2022 hiking. Multiple testing: 4 variants."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_rates_treasury_butterfly"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-cbd10dc5"
+   ],
    "notes": "from the underlying-library library: Treasury curve butterfly (2s5s10s) mean reversion; harness suggestion: curve_fly_harness: FRED yield fly with available_at lag, DV01-weighted ETF P&L, z-rule, residual-exposure regression | added by the verifier pass"
   },
   {
@@ -12168,11 +12252,15 @@
     "pass": "Mean > 0 with 95% interval excluding 0, above the permutation 95th percentile, DSR > 0.95",
     "controls": "Look-ahead: scores use years before the current one only; survivorship: fixed ETF set; costs: 5 bps per side SPDRs, 10 bps commodity ETFs, borrow on shorts; multiple testing: 8 trials; regime: by decade and ex-energy"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_xs_return_seasonality"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-ea341756"
+   ],
    "notes": "from the underlying-library library: Return seasonality (same-calendar-month momentum) on sector and commodity ETFs; harness suggestion: underlying.py seasonal_score(adj_monthly, min_years, max_years) feeding xs_momentum; harness return_seasonality_etf. | added by the verifier pass"
   },
   {
@@ -12250,11 +12338,15 @@
     "pass": "Sharpe difference > 0 with 95% interval excluding 0, DSR > 0.95, PBO < 0.5",
     "controls": "Look-ahead: month-end scores, next-day trades; survivorship: ETFs named ex ante by the authors (but chosen after seeing history: stated); costs: 5 bps per side, turnover reported; multiple testing: 4 trials plus threshold; regime: 2008, 2020, 2022 and post-2018"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_macro_daa_canary"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-13bf7026"
+   ],
    "notes": "from the underlying-library library: Breadth momentum with a canary universe (Keller-Keuning DAA); harness suggestion: underlying.py score_13612w() and daa_weights(); harness daa_vs_rotation with pbo_cscv. | added by the verifier pass"
   },
   {
@@ -12338,11 +12430,15 @@
     "pass": "Difference > 0 with 95% interval excluding 0, DSR > 0.95, sign holds without crypto",
     "controls": "Look-ahead: formation through t, trade t+1; survivorship: fixed panel; costs: 5 bps ETFs, 25+10 bps crypto; multiple testing: 4 trials; regime: by decade"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_xs_frog_in_the_pan"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f2054bba"
+   ],
    "notes": "from the underlying-library library: Frog-in-the-pan: continuity of information as a momentum filter (ETF and crypto panel); harness suggestion: underlying.py information_discreteness(daily_returns, window); harness frog_in_pan_panel. | added by the verifier pass"
   },
   {
@@ -12364,11 +12460,15 @@
     "pass": "Mean log difference > 0 with 95% interval excluding 0, DSR > 0.95, SSO 2006-2026 point estimate same sign",
     "controls": "Look-ahead: one-bar delay; survivorship: n/a; costs: 2 bps per switch SPY, 5 bps SSO, financing at T-bill + 50 bps; multiple testing: 6 trials plus T-58; regime: 2018-Q4, 2020-03 and 2022 whipsaws reported"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_macro_leverage_sma200"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-d8b319d5"
+   ],
    "notes": "from the underlying-library library: Leverage for the long run: 2x S&P exposure above the 200-day SMA, T-bills below; harness suggestion: underlying.py leveraged_sma(adj, dtb3, lev, length); harness leverage_long_run. | added by the verifier pass"
   },
   {

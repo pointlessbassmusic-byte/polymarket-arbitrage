@@ -4,8 +4,9 @@ Batch 6c, group ``rates``: seven carry, curve and bill claims on Treasury, credi
 
 Each claim is tested on its own wording, trial.pass and trial.min_n (house rules, MANDEL.md section 2):
   * T-373  TLT held only when 20-year carry + roll-down (DGS20, DGS10, DTB3) is positive, else cash, hold months
-           2002-08..2026-09 (min_n 280 months): test-window (2014-01..2026-09) Sharpe(timed) - Sharpe(buy-and-hold) on
-           monthly excess returns > 0.15 with paired block-bootstrap p < 0.05, and DSR > 0.95 at 4 trials.
+           2002-08..2026-09 (min_n 280 months): Sharpe(timed) > Sharpe(buy-and-hold) over the claim's window (the claim's
+           "earns a higher Sharpe"), test-window (2014-01..2026-09) Sharpe(timed) - Sharpe(buy-and-hold) on monthly excess
+           returns > 0.15 with paired block-bootstrap p < 0.05, and DSR > 0.95 at 4 trials.
   * T-377  SGOV monthly total return minus the DTB3 investment-yield accrual, 2020-07..2026-09 (min_n 70 months):
            |annualised mean| < 10 bp, its HAC 95% CI inside +/-15 bp, annualised SD < 20 bp.
   * T-381  equal-risk composite of the FX, global-bond, equity-country and credit carry sleeves with trailing 36-month
@@ -41,8 +42,9 @@ Conventions
     calendar days at the continuous rate -ln(1 - d 91/360)/(91/365), the print dated strictly before each day
     (batch6b_bw.Bills). T-377 names its own construction (the investment yield i = 365 d / (360 - 91 d), accrued daily
     actual/365) and is judged under it AND the rule-7 continuous rate (rule 11 spirit: both readings must pass); the raw
-    discount reading is reported. T-373's carry compares the bill with DGS20, a bond-equivalent par yield, so its signal
-    uses the bill's bond-equivalent yield (the raw-discount signal's disagreements are counted). Sharpe ratios are on
+    discount reading is reported. T-373's carry compares the bill with DGS20, a bond-equivalent par yield, so the
+    rule-7 reading converts the bill to its bond-equivalent yield; the claim writes DTB3 itself, so the raw-discount
+    reading is judged too and every T-373 criterion needs both (rule 11 spirit). Sharpe ratios are on
     monthly excess returns x sqrt(12) (T-474's sleeve: daily x sqrt(252)). Zero-investment books (T-432, T-433, T-474,
     the duration-hedged T-430 position) are excess returns by construction.
   * Calendars (rule 10(a)). Every claim names month-end decisions or a signal rule: T-373 decides on the last session's
@@ -58,7 +60,8 @@ Conventions
     20:00 UTC, before the next open); T-430's BAA10Y print dated on the month-end day is known the next day and trades
     at that session's close; T-432's dividend yield, rate and 60-day volatility use data through the month-end close;
     T-474's z uses yields dated before the entry session and trades at its close; T-381's volatility weights use only
-    the 36 sleeve months before each month.
+    the 36 sleeve months before each month, and for the bond sleeve (whose T-433 x(t) opens at the start of t-1, as
+    above) the 36 months ending t-2, with its drawdown halving also decided at the end of t-2.
   * Costs (rule 9) as each claim states: T-373 2 bps per switch (TLT <-> cash; 1 bp per side of each unit traded in the
     cross-maturity variant); T-430 5 bps per switch; T-432 10 bps per side on drift-adjusted turnover + 50 bps/yr borrow
     on the short notional; T-433 5 bps per unit of notional traded; T-474 3 bps per leg at entry and at exit + 30 bps/yr
@@ -67,6 +70,11 @@ Conventions
     with 12-month blocks, 5,000 resamples per seed, interval ends and p-values averaged over 5 seeds with their Monte
     Carlo s.e. (25 seeds when 5 cannot resolve a bound). A single Sharpe is studentized through its delta-method
     influence function; T-373's difference is paired (batch6b_bw.sharpe_diff_test; the Ledoit-Wolf test is reported).
+    The timed and buy-and-hold series differ only in cash and switch months (2 of 137 in 2002-2013), so every resample
+    that draws none of them has zero s.e. and _stud drops it, which inflates the studentized upper end; each T-373
+    difference therefore reports how many months differ, and when that is under two blocks' worth or more than 1% of the
+    resamples have zero s.e., the percentile CBB on the same resamples (interval and p = P*(d* <= 0)) is judged instead,
+    with the studentized numbers kept as '*_stud' (sharpe_pair).
     "Lower bound" is the lower end of the two-sided 95% interval. T-377 names a HAC CI: Newey-West (Bartlett, lag
     floor(4 (n/100)^(2/9))), normal 95%. T-474's trades do not overlap: per-trade means use a studentized bootstrap of
     trades (block 1), and the trial's null is a block shift of the position path against the returns by every multiple
@@ -100,10 +108,11 @@ from typing import Callable, Optional, Sequence
 import numpy as np
 
 from mandel.experiments import batch5_fx as fxm
-from mandel.experiments.batch6b_bw import (Bills, _ci_crit, _clean, _decide, _mean_stat, _stud, all_constructions,
-                                           lw_test, mc_escalate, resolve, sharpe_diff_test, spy_dividends)
+from mandel.experiments import batch6b_bw as _bw
+from mandel.experiments.batch6b_bw import (Bills, _boot_idx, _chunks, _ci_crit, _clean, _decide, _mean_stat,
+                                           _sr_diff_stat, _stud, all_constructions, lw_test, mc_escalate, mc_reps, resolve,
+                                           sharpe_diff_test, spy_dividends)
 from mandel.experiments.batch6c_mom import dsr_row, family_dsr, month_grid
-from mandel.experiments.batch6c_xs import book, hac_mean, nw_lag, rank_weights
 from mandel.experiments.underlying2 import _verdict
 from mandel.validation.backtest_eval import _hac_var, sharpe_ratio
 
@@ -414,6 +423,66 @@ def _sr_stat(X, bw):
     return m / np.sqrt(v), np.sqrt(_hac_var(z, bw) / n)
 
 
+def nw_lag(n: int) -> int:
+    """Newey-West lag floor(4 (n/100)^(2/9)), at least 1."""
+    return max(1, int(math.floor(4.0 * (n / 100.0) ** (2.0 / 9.0))))
+
+
+def hac_mean(x, lag: Optional[int] = None) -> dict:
+    """Mean with a Newey-West (Bartlett) s.e.; t and one-sided p (H0: mean <= 0)."""
+    x = np.asarray(x, float)
+    n = x.size
+    if n < 3:
+        return {"mean": float(x.mean()) if n else None, "se": None, "t": None, "p": None, "lag": None, "n": int(n)}
+    L = nw_lag(n) if lag is None else int(lag)
+    u = x - x.mean()
+    s = float(u @ u) / n
+    for l in range(1, min(L, n - 1) + 1):
+        s += 2.0 * (1.0 - l / (L + 1.0)) * float(u[l:] @ u[:-l]) / n
+    se = math.sqrt(max(s, 1e-300) / n)
+    t = float(x.mean() / se)
+    return {"mean": float(x.mean()), "se": se, "t": t, "p": 1.0 - _N.cdf(t), "lag": L, "n": int(n)}
+
+
+def rank_weights(score: np.ndarray, elig: np.ndarray, k: int) -> np.ndarray:
+    """One month's long/short weights: +1/k on the k highest scores, -1/k on the k lowest among eligible names (stable
+    order on ties); zeros when fewer than 2k names are eligible."""
+    w = np.zeros(score.size)
+    idx = np.flatnonzero(elig & np.isfinite(score))
+    if k < 1 or idx.size < 2 * k:
+        return w
+    o = idx[np.argsort(-score[idx], kind="stable")]
+    w[o[:k]] = 1.0 / k
+    w[o[-k:]] = -1.0 / k
+    return w
+
+
+def book(W, R, cost, borrow=None, hold_days=None) -> dict:
+    """Net returns of a zero-investment book (one unit long, one short) with target weights W (T, N) on hold returns R
+    (T, N): gross = sum W R; borrow (N,) a year on the short notional over ``hold_days`` (T,) calendar days; turnover
+    against the previous weights drifted over their hold; net = (1 - cost x turnover)(1 + gross - borrow) - 1, ``cost``
+    (N,) per side per unit traded."""
+    W = np.asarray(W, float)
+    R = np.asarray(R, float)
+    if ((W != 0) & ~np.isfinite(R)).any():
+        raise ValueError("a held name has no hold return")
+    R0 = np.where(np.isfinite(R), R, 0.0)
+    T = W.shape[0]
+    gross = (W * R0).sum(axis=1)
+    bor = np.zeros(T)
+    if borrow is not None:
+        bor = (np.maximum(-W, 0.0) * np.asarray(borrow, float)[None, :]).sum(axis=1) * np.asarray(hold_days, float) / 365.0
+    pre = gross - bor
+    prev = np.zeros_like(W)
+    if T > 1:
+        den = 1.0 + pre[:-1]
+        den = np.where(np.abs(den) < 1e-12, 1e-12, den)
+        prev[1:] = W[:-1] * (1.0 + R0[:-1]) / den[:, None]
+    to = np.abs(W - prev)
+    c = (to * np.asarray(cost, float)[None, :]).sum(axis=1)
+    return {"net": (1.0 - c) * (1.0 + pre) - 1.0, "gross": gross, "borrow": bor, "cost": c, "turnover": to.sum(axis=1)}
+
+
 def _sr_pp(x) -> Optional[float]:
     x = np.asarray(x, float)
     x = x[np.isfinite(x)]
@@ -454,11 +523,81 @@ def mean_ci(x, block: int = BLOCK, reps: Optional[int] = None, seed: int = SEED,
                        REPS if reps is None else reps, seed)
 
 
+PAIR_MIN_DIFF_BLOCKS = 2       # the paired series must differ in at least two blocks' worth of months ...
+PAIR_MAX_ZERO_SE = 0.01        # ... and at most this share of resamples may have zero s.e., else the studentized CBB is degenerate
+
+
+def _pair_once(a, b, block: int, seed: int) -> dict:
+    """``sharpe_diff_test`` for one seed plus, on the very same resamples (batch6b_bw._stud's index stream: same seed,
+    chunks and blocks), the share of resamples with zero s.e. (none of the months where the two series differ was drawn:
+    _stud drops them) and the percentile p-values P*(d* <= 0) (H0: diff <= 0) and P*(d* >= 0) (H0: diff >= 0), stored as
+    one-element lists so ``mc_reps`` averages them over seeds."""
+    t = sharpe_diff_test(a, b, PPY, block, N_BOOT, seed)
+    n, bl = a.size, t.get("block")
+    nz = nle = nge = tot = 0
+    if bl is not None:
+        rng = np.random.default_rng(seed)
+        for k in _chunks(N_BOOT, 2 * n):
+            idx = _boot_idx(rng, n, bl, k)
+            d, se = _sr_diff_stat(a[idx], b[idx], bl)
+            nz, nle, nge, tot = nz + int(np.sum(se <= 1e-14)), nle + int(np.sum(d <= 0)), nge + int(np.sum(d >= 0)), tot + d.size
+    t["zero_se_share"] = [nz / tot if tot else None]
+    t["p_pct"] = [(nle + 1) / (tot + 1) if tot else None]
+    t["p_lt_pct"] = [(nge + 1) / (tot + 1) if tot else None]
+    return t
+
+
+def _pair_construction(t: dict, n_diff: int) -> dict:
+    """Pick the paired construction. The studentized CBB is degenerate when the two series differ in fewer than
+    PAIR_MIN_DIFF_BLOCKS blocks' worth of months or more than PAIR_MAX_ZERO_SE of its resamples have zero s.e. (they are
+    dropped, which inflates its upper end: T-373's 2002-2013 window differs in 2 of 137 months). Then the interval and the
+    p-values judged are the percentile CBB's on the same resamples; the studentized ones are kept under '*_stud'."""
+    n, bl = t.get("n"), t.get("block") or BLOCK
+    zs = (t.get("zero_se_share") or [None])[0]
+    t["n_differ"] = int(n_diff)
+    why = []
+    if n_diff < PAIR_MIN_DIFF_BLOCKS * bl:
+        why.append(f"the series differ in {n_diff} of {n} months, fewer than {PAIR_MIN_DIFF_BLOCKS} x {bl}")
+    if zs is not None and zs > PAIR_MAX_ZERO_SE:
+        why.append(f"{zs:.1%} of resamples have zero s.e. (> {PAIR_MAX_ZERO_SE:.0%})")
+    pct = t.get("ci_pct") or [None, None]
+    p_pct, p_lt_pct = (t.get("p_pct") or [None])[0], (t.get("p_lt_pct") or [None])[0]
+    if not why or n_diff == 0 or None in pct or p_pct is None:
+        # n_diff == 0: identical series, difference exactly 0 (the studentized early return, ci [0, 0], p 1) stands
+        t["construction"], t["degenerate"] = "studentized CBB", ("; ".join(why) if why else None)
+        return t
+    t.update(ci_stud=t.get("ci"), ci_stud_mc_se=t.get("ci_mc_se"), p_stud=t.get("p"), p_stud_mc_se=t.get("p_mc_se"),
+             p_lt_stud=t.get("p_lt"))
+    t.update(ci=list(pct), ci_mc_se=t.get("ci_pct_mc_se"), p=p_pct, p_mc_se=(t.get("p_pct_mc_se") or [0.0])[0], p_lt=p_lt_pct,
+             construction="percentile CBB", degenerate="; ".join(why))
+    return t
+
+
 def sharpe_pair(a, b, check: Optional[Callable] = None, block: int = BLOCK, reps: Optional[int] = None, seed: int = SEED) -> dict:
-    """Paired studentized CBB of Sharpe(a) - Sharpe(b) (batch6b_bw.sharpe_diff_test) over ``reps`` seeds."""
+    """Paired CBB of Sharpe(a) - Sharpe(b) over ``reps`` seeds (escalated to REPS_MAX when ``check`` is unresolved): the
+    studentized CBB (batch6b_bw.sharpe_diff_test), or the percentile CBB on the same resamples when the studentized one
+    is degenerate (``_pair_construction``). Reports 'n_differ', the months in which the two series differ."""
     a, b = np.asarray(a, float), np.asarray(b, float)
-    return mc_escalate(lambda seed: sharpe_diff_test(a, b, PPY, block, N_BOOT, seed),
-                       check or (lambda t: _ci_crit(t, "gt", 0.0, "")[1]), REPS if reps is None else reps, seed)
+    n_diff = int(np.sum(np.abs(a - b) > 1e-12)) if a.size == b.size else 0
+    if a.size < 8:
+        t = sharpe_diff_test(a, b, PPY, block, N_BOOT, seed)
+        t.update(n_differ=n_diff, construction="n/a (fewer than 8 months)", degenerate=None)
+        return t
+    check = check or (lambda t: _ci_crit(t, "gt", 0.0, "")[1])
+    keys = ("ci", "ci_pct", "zero_se_share", "p_pct", "p_lt_pct")
+    r = REPS if reps is None else reps
+    t = _pair_construction(mc_reps(lambda seed: _pair_once(a, b, block, seed), r, seed, keys), n_diff)
+    if check(t) is None and _bw.REPS_MAX > r:
+        t = _pair_construction(mc_reps(lambda seed: _pair_once(a, b, block, seed), _bw.REPS_MAX, seed, keys), n_diff)
+    return t
+
+
+def _pair_txt(t: dict, ci_name: bool = True) -> str:
+    """'k of n months differ; <construction> CI lo to hi' (+ why the studentized CBB was replaced)."""
+    t = t or {}
+    deg = f" (studentized CBB degenerate: {t['degenerate']})" if t.get("construction") == "percentile CBB" else ""
+    con = (t.get("construction") or "CBB") + " " if ci_name else ""
+    return f"{t.get('n_differ', 'n/a')} of {t.get('n', 'n/a')} months differ; {con}{_ci(t.get('ci'))}{deg}"
 
 
 def ols_nw(y, X, lag: int) -> dict:
@@ -696,35 +835,58 @@ def curve_carry(px: dict, ylds: dict, bills: Bills, start: str = T373_START, end
     return out
 
 
+T373_READINGS = (("ex_timed", "BEY reading"), ("ex_timed_disc", "raw-DTB3 reading"))
+
+
 def judge_curve_carry(res: dict, min_n: int = T373_MIN_N, test_from: str = T373_TEST, full: tuple = (T373_START, T373_END)) -> dict:
+    """Criteria (rule 1: the claim's full-window 'higher Sharpe', the pass's test-window difference > 0.15, p < 0.05 and
+    DSR > 0.95 at 4 trials), each judged under both signal readings (rule 7 / rule 11): the carry term with the bill's
+    bond-equivalent yield (BEY(DTB3), comparable with the par yield DGS20) and the as-worded raw discount DTB3. A
+    criterion passes only when both readings pass and is undecided when they disagree."""
     lab = res["labels"]
     fw = _window(lab, *full)
     n = int(fw.sum())
     te = fw & np.array([l >= test_from for l in lab], bool)
-    xa, xb = res["ex_timed"][te], res["ex_bh"][te]
+    xb, xb_f = res["ex_bh"][te], res["ex_bh"][fw]
     chk = lambda t: resolve(t.get("p"), t.get("p_mc_se"), ALPHA, "lt")[0]
-    sh = sharpe_pair(xa, xb, check=chk)
-    ok_p, note = resolve(sh.get("p"), sh.get("p_mc_se"), ALPHA, "lt")
-    crit = [_pt_row(f"test window {lab[np.flatnonzero(te)[0]] if te.any() else 'n/a'}..: Sharpe(timed) - Sharpe(buy-and-hold) "
-                    f"> {T373_DIFF_THR} ({int(te.sum())} months)", sh.get("diff"), T373_DIFF_THR, sh.get("ci")),
-            (f"paired block-bootstrap p < 0.05 (H0: difference <= 0; p {_f(sh.get('p'), 4)}){note}", ok_p,
-             sh.get("p_lt") is not None and sh["p_lt"] < ALPHA)]
-    fam_s = [res["ex_timed"][te], res["ex_ief_timed"][te], res["ex_cross"][te], res["ex_mom"][te]]
-    fam_d = [res["ex_timed"][te] - res["ex_bh"][te], res["ex_ief_timed"][te] - res["ex_ief_bh"][te], res["ex_cross"][te],
-             res["ex_mom"][te] - res["ex_bh"][te]]
-    fam_s = [x[np.isfinite(x)] for x in fam_s]
-    fam_d = [x[np.isfinite(x)] for x in fam_d]
-    d_s = family_dsr(xa, _fam(fam_s), T373_N_TRIALS)
-    d_d = family_dsr(xa - xb, _fam(fam_d), T373_N_TRIALS)
-    crit.append(_dsr_pair([(d_s, "DSR of the timed excess returns"), (d_d, "DSR of the timed-minus-buy-and-hold differences")],
-                          f"DSR > {DSR_PASS} at {T373_N_TRIALS} trials on the test window, both readings"))
+    t0 = lab[np.flatnonzero(te)[0]] if te.any() else "n/a"
+    full_rows, diff_rows, p_rows, dsr_rows, tests, fulls = [], [], [], [], {}, {}
+    fam_other_s = [res["ex_ief_timed"][te], res["ex_cross"][te], res["ex_mom"][te]]
+    fam_other_d = [res["ex_ief_timed"][te] - res["ex_ief_bh"][te], res["ex_cross"][te], res["ex_mom"][te] - xb]
+    for key, nm in T373_READINGS:
+        xa = res[key][te]
+        sh = sharpe_pair(xa, xb, check=chk)
+        fa = sharpe_pair(res[key][fw], xb_f, check=lambda t: True, reps=1)
+        tests[key], fulls[key] = sh, fa
+        full_rows.append(_pt_row(f"{nm} {_s(fa.get('diff'))} (Sharpe {_f(fa.get('sharpe_a'))} vs {_f(fa.get('sharpe_b'))}; "
+                                 f"{fa.get('n_differ')} of {fa.get('n')} months differ; {fa.get('construction')})",
+                                 fa.get("diff"), 0.0, fa.get("ci")))
+        diff_rows.append(_pt_row(f"{nm} (Sharpe {_f(sh.get('sharpe_a'))} vs {_f(sh.get('sharpe_b'))}; {sh.get('n_differ')} of "
+                                 f"{sh.get('n')} months differ; {sh.get('construction')})", sh.get("diff"),
+                                 T373_DIFF_THR, sh.get("ci")))
+        ok_p, note = resolve(sh.get("p"), sh.get("p_mc_se"), ALPHA, "lt")
+        deg = f", studentized degenerate: {sh['degenerate']}" if sh.get("construction") == "percentile CBB" else ""
+        p_rows.append((f"{nm} p {_f(sh.get('p'), 4)} ({sh.get('construction')}{deg}){note}", ok_p,
+                       sh.get("p_lt") is not None and sh["p_lt"] < ALPHA))
+        fs = [x[np.isfinite(x)] for x in [xa] + fam_other_s]
+        fd = [x[np.isfinite(x)] for x in [xa - xb] + fam_other_d]
+        dsr_rows.append((family_dsr(xa, _fam(fs), T373_N_TRIALS), f"{nm}, timed excess returns"))
+        dsr_rows.append((family_dsr(xa - xb, _fam(fd), T373_N_TRIALS), f"{nm}, timed-minus-buy-and-hold differences"))
+    crit = [all_constructions(full_rows, f"{full[0]}..{full[1]} ({n} months): Sharpe(timed) - Sharpe(buy-and-hold) > 0"),
+            all_constructions(diff_rows, f"test window {t0}.. ({int(te.sum())} months): Sharpe(timed) - Sharpe(buy-and-hold) "
+                                         f"> {T373_DIFF_THR}"),
+            all_constructions(p_rows, "paired block-bootstrap p < 0.05 (H0: difference <= 0)"),
+            _dsr_pair(dsr_rows, f"DSR > {DSR_PASS} at {T373_N_TRIALS} trials on the test window, every reading")]
     v, why = _decide(crit, n, min_n, "months")
     isw = fw & ~te
-    ins = sharpe_diff_test(res["ex_timed"][isw], res["ex_bh"][isw], PPY, BLOCK, N_BOOT, SEED) if isw.sum() >= 8 else None
+    ins = sharpe_pair(res["ex_timed"][isw], res["ex_bh"][isw], check=lambda t: True, reps=1) if isw.sum() >= 8 else None
+    xa = res["ex_timed"][te]
     lw = lw_test(xa, xb, PPY, BLOCK, N_BOOT, SEED) if xa.size >= 8 else None
-    disc = sharpe_diff_test(res["ex_timed_disc"][te], xb, PPY, BLOCK, N_BOOT, SEED) if xa.size >= 8 else None
-    return {"n": n, "n_test": int(te.sum()), "test": sh, "dsr_strategy": d_s, "dsr_difference": d_d, "in_sample": ins,
-            "lw": lw, "disc_signal": disc, "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why,
+    fam_s = [x[np.isfinite(x)] for x in [xa] + fam_other_s]
+    return {"n": n, "n_test": int(te.sum()), "test": tests["ex_timed"], "test_disc": tests["ex_timed_disc"],
+            "full": fulls["ex_timed"], "full_disc": fulls["ex_timed_disc"], "dsr": {nm: d for d, nm in dsr_rows},
+            "dsr_strategy": dsr_rows[0][0], "dsr_difference": dsr_rows[1][0], "in_sample": ins, "lw": lw,
+            "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why,
             "family_sharpe_ann": {"tlt_base": _sr_ann(fam_s[0]), "ief": _sr_ann(fam_s[1]), "cross_maturity": _sr_ann(fam_s[2]),
                                   "momentum_filter": _sr_ann(fam_s[3])}}
 
@@ -753,31 +915,39 @@ def b6c_rates_treasury_carry_rolldown(archive):
         r2 = curve_carry(px, ylds, bills, **kw)
         t2 = _window(r2["labels"], T373_TEST, T373_END)
         sens[nm] = _sr_ann(r2["ex_timed"][t2]) - _sr_ann(r2["ex_bh"][t2]) if t2.sum() > 2 else None
-    t, ins = j["test"], j["in_sample"]
+    t, td, ins = j["test"], j["test_disc"], j["in_sample"]
+    fu, fd = j["full"], j["full_disc"]
     lab = res["labels"]
     srcs = {s: int(sum(1 for x in res["cash_src"] if x == s)) for s in ("SGOV", "BIL", "DTB3")}
     cash_m = int((res["pos"] == 0).sum())
     cash_te = int((res["pos"][te] == 0).sum())
     missing_v = [nm for nm, k in (("IEF (DGS7)", "ex_ief_timed"), ("cross-maturity", "ex_cross"), ("momentum", "ex_mom"))
                  if not np.isfinite(res[k][te]).any()]
-    reason = (f"TLT long/flat on (DGS20 - BEY(DTB3))/12 + 17 (DGS20 - DGS10)/10/12 > 0 at the month-end close, filled at the "
-              f"next open, cash = SGOV/BIL/DTB3 accrual, 2 bps per switch ({res['n_switch']} switches; in cash {cash_m} of "
-              f"{len(lab)} months, {cash_te} of {j['n_test']} test months), hold months {lab[0]}..{lab[-1]} ({j['n']}). Test "
+    dsr_txt = "; ".join(f"{nm} {_f(d.get('dsr'))}" for nm, d in j["dsr"].items())
+    reason = (f"TLT long/flat on (DGS20 - DTB3)/12 + 17 (DGS20 - DGS10)/10/12 > 0 at the month-end close (DTB3 read two "
+              f"ways, both judged: as its bond-equivalent yield BEY(DTB3), rule 7, and as the raw discount yield the claim "
+              f"writes; {res['signal_disagree']} months differ), filled at the next open, cash = SGOV/BIL/DTB3 accrual, 2 bps per "
+              f"switch ({res['n_switch']} switches; in cash {cash_m} of {len(lab)} months, {cash_te} of {j['n_test']} test months), "
+              f"hold months {lab[0]}..{lab[-1]} ({j['n']}). Paired intervals are the studentized CBB unless it is degenerate "
+              f"(the two series differ in fewer than {PAIR_MIN_DIFF_BLOCKS} blocks' worth of months, or more than "
+              f"{PAIR_MAX_ZERO_SE:.0%} of resamples have zero s.e. and would be dropped): then the percentile CBB on the same "
+              f"resamples, interval and p. Full window: Sharpe difference {_s(fu.get('diff'))} (BEY; timed "
+              f"{_f(fu.get('sharpe_a'))} vs buy-and-hold {_f(fu.get('sharpe_b'))}; {_pair_txt(fu)}) and {_s(fd.get('diff'))} "
+              f"(raw; {_pair_txt(fd)}), need > 0. Test "
               f"{T373_TEST}..: Sharpe timed {_f(t.get('sharpe_a'))} vs buy-and-hold {_f(t.get('sharpe_b'))}, difference "
-              f"{_s(t.get('diff'))} (need > {T373_DIFF_THR}; studentized CBB {_ci(t.get('ci'))}, p {_f(t.get('p'), 4)}, need < "
-              f"0.05; Ledoit-Wolf (reported) {_ci((j['lw'] or {}).get('ci'))}, p {_f((j['lw'] or {}).get('p'), 3)}); DSR at "
-              f"{T373_N_TRIALS} trials {_f(j['dsr_strategy']['dsr'])} (timed series) and {_f(j['dsr_difference']['dsr'])} "
-              f"(difference series). In-sample {lab[0]}..2013-12 difference {_s((ins or {}).get('diff'))} "
-              f"({_ci((ins or {}).get('ci'))}). Sensitivities: next-close fills {_s(sens['next_close'])}; DTB3-accrual cash "
-              f"{_s(sens['dtb3_cash'])}; raw-discount signal {_s((j['disc_signal'] or {}).get('diff'))} ({res['signal_disagree']} "
-              f"months change sign). Cash legs used: {srcs}. Variant Sharpes (test, annualised): "
+              f"{_s(t.get('diff'))} (BEY; {_pair_txt(t)}; p {_f(t.get('p'), 4)}) and {_s(td.get('diff'))} (raw; "
+              f"{_pair_txt(td)}; p {_f(td.get('p'), 4)}), need > {T373_DIFF_THR} with p < 0.05 (Ledoit-Wolf, reported, BEY: "
+              f"{_ci((j['lw'] or {}).get('ci'))}, p {_f((j['lw'] or {}).get('p'), 3)}); DSR at {T373_N_TRIALS} trials: {dsr_txt}. "
+              f"In-sample {lab[0]}..2013-12 difference {_s((ins or {}).get('diff'))} ({_pair_txt(ins)}). "
+              f"Sensitivities (BEY): next-close fills {_s(sens['next_close'])}; DTB3-accrual cash {_s(sens['dtb3_cash'])}. Cash "
+              f"legs used: {srcs}. Variant Sharpes (test, annualised): "
               + ", ".join(f"{k} {_f(v, 2)}" for k, v in j["family_sharpe_ann"].items())
               + (f"; variants not computable: {missing_v}" if missing_v else "") + " — " + j["why"])
-    stat = {"n_months": j["n"], "n_test_months": j["n_test"], "window": [lab[0], lab[-1]], "test": t, "in_sample": ins,
-            "ledoit_wolf": j["lw"], "dsr_strategy": j["dsr_strategy"], "dsr_difference": j["dsr_difference"],
+    stat = {"n_months": j["n"], "n_test_months": j["n_test"], "window": [lab[0], lab[-1]], "test": t, "test_raw_dtb3": td,
+            "full": fu, "full_raw_dtb3": fd, "in_sample": ins, "ledoit_wolf": j["lw"], "dsr": j["dsr"],
             "family_sharpe_ann": j["family_sharpe_ann"], "n_switch": res["n_switch"], "months_in_cash": cash_m,
             "cash_sources": srcs, "sens_next_close_diff": sens["next_close"], "sens_dtb3_cash_diff": sens["dtb3_cash"],
-            "sens_discount_signal_diff": (j["disc_signal"] or {}).get("diff"), "signal_disagree_months": res["signal_disagree"],
+            "signal_disagree_months": res["signal_disagree"],
             "skipped_months": res["skipped"], "criteria": j["criteria"], "durations": T373_D,
             "last_signal": {"decision": res["dec"][-1], "signal_pct_per_month": float(res["sig"][-1]), "in_tlt": bool(res["pos"][-1])},
             "rule10": "month-end calendar named by the claim (rule 10(a))"}
@@ -1105,8 +1275,8 @@ class Vintages:
 
     def latest(self, D: str, back: int = 13) -> tuple:
         """(observation month, value) of the most recent month known at D (searching ``back`` months before D's month: ALFRED
-        recorded no OECD vintage between 2014-02-03 and 2014-10-01, so for those decisions the latest known print is up to
-        nine months old; the staleness is reported)."""
+        recorded no OECD vintage between 2014-02-03 and 2014-11-03, so for decisions in that gap the latest known print is
+        up to ten months old; the staleness is reported)."""
         for k in range(1, back + 1):
             m = _month_add(D[:7], -k)
             v = self.known(m, D)
@@ -1288,6 +1458,12 @@ def b6c_rates_global_bond_carry(archive):
     stale_txt = ", ".join(f"{cc} in {a_}..{b_} (up to {f_} months)" for cc, (a_, b_, f_) in sorted(stale_t.items())) or "none"
     lab = [l for l, m in zip(res["labels"], tw) if m]
     t = j["test"]
+    end_note = ""
+    if lab[-1] < T433_TEST[1]:
+        cap = str(getattr(archive.get(fr(T433_SID["US"])), "created_at", "") or "")[:16]
+        end_note = (f"; the window ends {lab[-1]}, not {T433_TEST[1]}: the later OECD monthly values are stamped available "
+                    f"(ALFRED realtime_start, end of day) after the bundles' capture ({cap} UTC), so the house filter leaves "
+                    f"them out")
     reason = (f"Synthetic FX-hedged excess return (y10(t-1) - r3m(t-1))/12 - 8 (y10(t) - y10(t-1)) on OECD monthly averages, "
               f"long top 3 / short bottom 3 of 10 markets on 10y - 3m carry, 5 bps per unit traded; decision at the end of month "
               f"t-2 on the OECD prints released by then (ALFRED; mean observation lag {_f(res['obs_lag_months']['mean'], 1)} "
@@ -1300,8 +1476,7 @@ def b6c_rates_global_bond_carry(archive):
               f"computable: OECD MEI has no 2-year yields). Reported: as-worded timing (decision at the end of t-1 on t-2 "
               f"averages) Sharpe {_f(wst.get('sharpe'))}; top 2 {_f(_sr_ann(top2['net'][t2]))}; 1990-2009 in-sample "
               f"{_f(_sr_ann(res['net'][fw]))} ({int(fw.sum())} months); " + ", ".join(f"{k} {_pc(v['total'])}" for k, v in reg.items())
-              + f"; stale 3-month rates forward-filled (EUR/GBP end 2026-01, JPY 2026-07): {stale_txt}; FRED/ALFRED values "
-                f"of 2026-09 were released after capture, so the window ends {lab[-1]} — " + j["why"])
+              + f"; stale 3-month rates forward-filled (EUR/GBP end 2026-01, JPY 2026-07): {stale_txt}" + end_note + " — " + j["why"])
     stat = {"n_months": j["n"], "window": [lab[0], lab[-1]], "test": t, "dsr": j["dsr"], "corr_us_ief": corr,
             "corr_us_ief_avgprice": corr_avg, "worded_timing_sharpe": wst.get("sharpe"), "top2_sharpe": _sr_ann(top2["net"][t2]),
             "fit_window_sharpe": _sr_ann(res["net"][fw]), "fit_window_months": int(fw.sum()), "regimes": reg,
@@ -1403,7 +1578,7 @@ def country_book(P: dict, score: str = "carry", k: int = T432_K, weighting: str 
                  cost: float = T432_COST, borrow: float = T432_BORROW) -> dict:
     """Long the k highest scores, short the k lowest among eligible ETFs (finite score, volatility and hold return):
     equal 1/k per leg or inverse-volatility within each leg; a zero-investment book with ``cost`` per side on drift-adjusted
-    turnover and ``borrow`` a year on the short notional (batch6c_xs.book). Months with fewer than 2k names hold nothing."""
+    turnover and ``borrow`` a year on the short notional (``book``). Months with fewer than 2k names hold nothing."""
     S, R, V = P[score], P[ret], P["vol"]
     T, N = S.shape
     W = np.zeros((T, N))
@@ -1543,18 +1718,21 @@ T474_SHIFT = 60
 T474_LEGS = {"IEI": 1.0, "SHY": -(T474_DUR["IEI"] / 2.0) / T474_DUR["SHY"], "IEF": -(T474_DUR["IEI"] / 2.0) / T474_DUR["IEF"]}
 
 
-def fly_series(ylds: dict, kind: str = "fixed", win: int = T474_WIN) -> tuple:
+def fly_series(ylds: dict, kind: str = "fixed", win: int = T474_WIN, incl: bool = True) -> tuple:
     """(dates, z) of the 2s5s10s signal on the days all three yields print. 'fixed': fly = 2 DGS5 - DGS2 - DGS10, z over
-    the trailing ``win`` observations including the current; 'pca': the third principal component (curvature, positive
-    5-year loading) of the trailing ``win`` yield levels, its current score over the window's score sd."""
+    the trailing ``win`` observations including the current (``incl=False``: the ``win`` before it, a reported
+    sensitivity); 'pca': the third principal component (curvature, positive 5-year loading) of the trailing ``win``
+    yield levels, its current score over the window's score sd."""
     ds = sorted(set(ylds["DGS2"]) & set(ylds["DGS5"]) & set(ylds["DGS10"]))
     Y = np.array([[ylds["DGS2"][d], ylds["DGS5"][d], ylds["DGS10"][d]] for d in ds], float).reshape(-1, 3)
     z = np.full(len(ds), np.nan)
     if kind == "fixed":
         f = 2 * Y[:, 1] - Y[:, 0] - Y[:, 2]
         c1, c2 = np.r_[0.0, np.cumsum(f)], np.r_[0.0, np.cumsum(f * f)]
-        for t in range(win - 1, len(ds)):
-            s1, s2 = c1[t + 1] - c1[t + 1 - win], c2[t + 1] - c2[t + 1 - win]
+        sh = 0 if incl else 1
+        for t in range(win - 1 + sh, len(ds)):
+            hi = t + 1 - sh
+            s1, s2 = c1[hi] - c1[hi - win], c2[hi] - c2[hi - win]
             m = s1 / win
             v = (s2 - win * m * m) / (win - 1)
             z[t] = (f[t] - m) / math.sqrt(v) if v > 1e-12 else np.nan
@@ -1708,6 +1886,8 @@ def b6c_rates_treasury_butterfly(archive):
         return _out({"n": 0}, 0, v, f"no butterfly trades in {T474_START}..{T474_END} — {why}")
     pd_, pz = fly_series(ylds, "pca")
     pca = fly_trades(px, pd_, pz, bills)
+    xd, xz = fly_series(ylds, "fixed", incl=False)
+    excl = fly_trades(px, xd, xz, bills)
     wk = _fomc_weeks(archive)
     fomc = None
     if wk is not None:
@@ -1748,7 +1928,8 @@ def b6c_rates_treasury_butterfly(archive):
               f"sleeve, annualised Sharpe {_f(_sr_ann(sim['daily'], 252), 2)}); variants: PCA {pca['net'].size} trades mean "
               f"{_pc(float(pca['net'].mean()) if pca['net'].size else None, 3)}, skip-FOMC "
               f"{(fomc['net'].size if fomc else 'n/a')} trades mean {_pc(float(fomc['net'].mean()) if fomc and fomc['net'].size else None, 3)}, "
-              f"5s10s30s not computable (DGS30 not archived). Reported: ZLB 2009-2015 {len(zlb)} trades mean "
+              f"5s10s30s not computable (DGS30 not archived). Reported: z window excluding the current print "
+              f"{excl['net'].size} trades mean {_pc(float(excl['net'].mean()) if excl['net'].size else None, 3)}; ZLB 2009-2015 {len(zlb)} trades mean "
               f"{_pc(float(np.mean(zlb)) if zlb else None, 3)}, post-2022 {len(post)} trades mean "
               f"{_pc(float(np.mean(post)) if post else None, 3)}; residual exposure per 1 pp (level, slope) "
               f"{', '.join(_s(c, 4) for c in (reg.get('coef') or [None, None, None])[1:])} (NW t "
@@ -1758,7 +1939,9 @@ def b6c_rates_treasury_butterfly(archive):
             "trades": [{"entry": sess[e], "exit": sess[x], "sign": int(sg), "net": float(v)} for (e, x, sg), v in zip(tr, sim["net"])],
             "variants": {"pca": {"n": int(pca["net"].size), "mean": float(pca["net"].mean()) if pca["net"].size else None},
                          "skip_fomc": {"n": int(fomc["net"].size), "mean": float(fomc["net"].mean()) if fomc["net"].size else None} if fomc else None,
-                         "5s10s30s": "not computable: fred-DGS30 not archived"},
+                         "5s10s30s": "not computable: fred-DGS30 not archived",
+                         "z_excluding_current": {"n": int(excl["net"].size),
+                                                 "mean": float(excl["net"].mean()) if excl["net"].size else None}},
             "zlb_2009_2015": {"n": len(zlb), "mean": float(np.mean(zlb)) if zlb else None},
             "post_2022": {"n": len(post), "mean": float(np.mean(post)) if post else None}, "exposure": reg,
             "open_trade_dropped": sim["open_trade"], "legs": T474_LEGS, "criteria": j["criteria"],
@@ -1782,20 +1965,36 @@ T381_N_TRIALS = 3 + sum(T381_SLEEVE_TRIALS.values())                          # 
 T381_N_TRIALS_EX_CRYPTO = T381_N_TRIALS - T381_SLEEVE_TRIALS["T-362 crypto-cme-cash-and-carry"]   # 24
 
 
+T381_BONDS = "global bonds (T-433)"
+T381_LAG = {T381_BONDS: 1}     # T-433's x(t) is built on monthly averages: its window opens at the start of t-1 (rule 4)
+
+
 def carry_composite(sleeves: dict, start: str = T381_TEST[0], end: str = T381_TEST[1], target: float = T381_TARGET,
-                    lb: int = T381_LB, derisk: bool = False, dd: float = T381_DD) -> dict:
+                    lb: int = T381_LB, derisk: bool = False, dd: float = T381_DD, lag: Optional[dict] = None) -> dict:
     """Equal-risk composite of monthly sleeve excess returns ({name: {month: return}}): each sleeve scaled to ``target``
     annualised volatility with the sd of its ``lb`` months before the month (trailing only), summed. A month counts only
     when every sleeve has it and its full trailing window. ``derisk``: exposure halved in a month when the composite's
-    drawdown over its trailing 3 months exceeds ``dd``."""
+    drawdown over its trailing 3 months exceeds ``dd``.
+
+    ``lag`` ({sleeve: L}, rule 4): a sleeve whose month-t return window opens L months before month t is decided at the
+    end of month t-1-L, so its weight uses the sd of the ``lb`` months ending t-1-L and its de-risking the composite's
+    drawdown on the composite months through t-1-L. 'halved' lists the months the unlagged sleeves were halved,
+    'halved_lag' those a lagged sleeve was."""
     names = list(sleeves)
-    lab, ret, wts, dropped, halved = [], [], [], [], []
-    wealth = [1.0]
+    lag = {s: int(v) for s, v in (lag or {}).items() if s in sleeves and int(v) > 0}
+    lab, ret, wts, dropped, halved, halved_lag = [], [], [], [], [], []
+    path = [(None, 1.0)]                       # (composite month, wealth after it)
+
+    def in_drawdown(t: str, L: int) -> bool:
+        cut = _month_add(t, -1 - L)
+        w = [v for mo, v in path if mo is None or mo <= cut]
+        return len(w) >= 2 and w[-1] / max(w[-4:]) - 1.0 < -dd
+
     for t in _months(start, end):
         ws, ok = {}, True
         for s in names:
-            ser = sleeves[s]
-            past = [ser.get(_month_add(t, -j)) for j in range(1, lb + 1)]
+            ser, L = sleeves[s], lag.get(s, 0)
+            past = [ser.get(_month_add(t, -j)) for j in range(1 + L, lb + 1 + L)]
             if ser.get(t) is None or any(p is None for p in past):
                 ok = False
                 break
@@ -1804,17 +2003,18 @@ def carry_composite(sleeves: dict, start: str = T381_TEST[0], end: str = T381_TE
         if not ok:
             dropped.append(t)
             continue
-        r = sum(ws[s] * sleeves[s][t] for s in names)
-        if derisk and len(wealth) >= 2:
-            peak = max(wealth[-4:])
-            if wealth[-1] / peak - 1.0 < -dd:
-                r *= 0.5
-                halved.append(t)
-        wealth.append(wealth[-1] * (1.0 + r))
+        h = {L: (derisk and in_drawdown(t, L)) for L in {0, *lag.values()}}
+        r = sum((0.5 if h[lag.get(s, 0)] else 1.0) * ws[s] * sleeves[s][t] for s in names)
+        if h[0]:
+            halved.append(t)
+        if any(h[L] for L in lag.values()):
+            halved_lag.append(t)
+        path.append((t, path[-1][1] * (1.0 + r)))
         lab.append(t)
         ret.append(r)
         wts.append(ws)
-    return {"labels": lab, "ret": np.array(ret, float), "weights": wts, "dropped": dropped, "halved": halved}
+    return {"labels": lab, "ret": np.array(ret, float), "weights": wts, "dropped": dropped, "halved": halved,
+            "halved_lag": halved_lag, "lag": lag}
 
 
 def judge_composite(comp: dict, comp_dr: dict, fam: dict, min_n: int = T381_MIN_N) -> dict:
@@ -1852,7 +2052,10 @@ def _fx_books(archive, months: Sequence[str]) -> dict:
 
 
 def b6c_rates_cross_asset_carry(archive):
-    """T-381: equal-risk composite of the FX, global-bond, equity-country and credit carry sleeves, 2013-01..2026-09."""
+    """T-381: equal-risk composite of the FX, global-bond, equity-country and credit carry sleeves, 2013-01..2026-09.
+    Rule 4: the bond sleeve's month-t return (T-433's synthetic x(t) on OECD monthly averages) opens at the start of t-1,
+    so its volatility weight (trailing 36 months ending t-2) and its drawdown halving are set at the end of t-2
+    (T381_LAG); the other sleeves' windows open at their month-end fills and are weighted at the end of t-1."""
     need = ([SPOT_B, RATES_B, DTB3_B, dh("IEF"), dh("LQD"), fr("BAA10Y")] + [al(s) for s in T433_SID.values()]
             + [fr(s) for s in T433_SID.values()] + [dh(s) for s in T432_ETFS] + [de(s) for s in T432_ETFS if s != "SPY"])
     miss = _missing(archive, need)
@@ -1861,7 +2064,7 @@ def b6c_rates_cross_asset_carry(archive):
     warm = _month_add(T381_TEST[0], -T381_LB)
     fx = _fx_books(archive, _months(warm, T381_TEST[1]))
     vint, y_out, r3m = _t433_inputs(archive)
-    bonds = bond_carry(vint, y_out, r3m, _months(warm, T381_TEST[1]))
+    bonds = bond_carry(vint, y_out, r3m, _months(_month_add(warm, -max(T381_LAG.values())), T381_TEST[1]))
     series, divs, rates, spot = _t432_inputs(archive)
     P = country_panel(series, divs, rates, T432_ETFS, T432_FIT[0], T381_TEST[1])
     wt = choose_weighting(P)["chosen"]
@@ -1872,11 +2075,11 @@ def b6c_rates_cross_asset_carry(archive):
     for m in set(fx["fx_g10"]["series"]) & set(fx["fx_em"]["series"]):
         fxs[m] = 0.5 * (fx["fx_g10"]["series"][m] + fx["fx_em"]["series"][m])
     sleeves = {"FX (mean of the T-368 and T-431 books)": fxs,
-               "global bonds (T-433)": dict(zip(bonds["labels"], [float(x) for x in bonds["net"]])),
+               T381_BONDS: dict(zip(bonds["labels"], [float(x) for x in bonds["net"]])),
                "equity-country (T-432)": dict(zip(eq["labels"], [float(x) for x in eq["net"]])),
                "credit (T-430)": dict(zip(cr["labels"], [float(x) for x in cr["ex_base"]]))}
-    comp = carry_composite(sleeves)
-    comp_dr = carry_composite(sleeves, derisk=True)
+    comp = carry_composite(sleeves, lag=T381_LAG)
+    comp_dr = carry_composite(sleeves, derisk=True, lag=T381_LAG)
     if comp["ret"].size < 8:
         v, why = _decide([("enough composite months", None)], int(comp["ret"].size), T381_MIN_N, "months")
         return _out({"n": int(comp["ret"].size), "dropped": comp["dropped"]}, int(comp["ret"].size), v,
@@ -1896,26 +2099,35 @@ def b6c_rates_cross_asset_carry(archive):
                     ("G10 and EM as two sleeves", {"G10": fx["fx_g10"]["series"], "EM": fx["fx_em"]["series"]})):
         s2 = {k: v for k, v in sleeves.items() if not k.startswith("FX")}
         s2.update(sub)
-        alts[nm] = _sr_ann(carry_composite(s2)["ret"])
+        alts[nm] = _sr_ann(carry_composite(s2, lag=T381_LAG)["ret"])
     rec = None
     if _has(archive, USREC_B):
         us = _monthly_series(archive, USREC_B)
         rm = [i for i, m in enumerate(lab) if us.get(m) == 1.0]
         rec = {"months": [lab[i] for i in rm], "composite_total": float(np.prod(1 + comp["ret"][rm]) - 1) if rm else None}
+    maxw = {k.split(" (")[0]: float(max(w[k] for w in comp["weights"])) for k in sleeves}
+    worst = int(np.argmin(comp["ret"]))
+    sr_wo_worst = _sr_ann(np.delete(comp["ret"], worst))
     corr = np.corrcoef(np.array(list(sl_test.values())))
     names = list(sl_test)
     mean_corr = float(np.mean([corr[a, b] for a in range(len(names)) for b in range(a + 1, len(names))]))
     t0, t1 = j["tests"]["equal-risk composite (the claim)"], j["tests"]["with the rule's drawdown de-risking"]
     reason = (f"Composite of 4 carry sleeves (FX = mean of the T-368 G10 and T-431 G10+MXN+ZAR books with their frozen "
               f"walk-forward weights; T-433 bonds; T-432 country ETFs ({wt} weights); T-430 credit), each scaled to 5% a year "
-              f"by its trailing 36-month sd, summed; {lab[0]}..{lab[-1]} ({j['n']} months{', dropped ' + str(len(comp['dropped'])) if comp['dropped'] else ''}): "
+              f"by its trailing 36-month sd, summed (rule 4: the bond sleeve's x(t) is built on monthly averages, so its "
+              f"weight uses the 36 months ending t-2 and its halving the drawdown at the end of t-2; the other sleeves' "
+              f"weights use the 36 months ending t-1); {lab[0]}..{lab[-1]} ({j['n']} months{', dropped ' + str(len(comp['dropped'])) if comp['dropped'] else ''}): "
               f"Sharpe {_f(t0.get('sharpe'))} (need > {T381_SHARPE_THR}), 95% {_ci(t0.get('ci'))} (lower need > {T381_LB_THR}); "
-              f"with the rule's 3-month 10% drawdown halving ({len(comp_dr['halved'])} months halved) Sharpe "
+              f"with the rule's 3-month 10% drawdown halving ({len(comp_dr['halved'])} months halved, the bond sleeve "
+              f"{len(comp_dr['halved_lag'])}) Sharpe "
               f"{_f(t1.get('sharpe'))}, {_ci(t1.get('ci'))}; DSR {_f(j['dsr']['dsr'])} at {T381_N_TRIALS} trials "
               f"({_f(j['dsr_ex_crypto']['dsr'])} at {T381_N_TRIALS_EX_CRYPTO} without the crypto sleeve's 10). Reported: sleeve "
               f"Sharpes " + ", ".join(f"{k.split(' (')[0]} {_f(v, 2)}" for k, v in sl_sr.items())
               + f"; diversification gain over the average sleeve {_s(div_gain, 2)}; mean pairwise sleeve correlation "
                 f"{_f(mean_corr, 2)}; FX-sleeve alternatives " + ", ".join(f"{k} {_f(v, 2)}" for k, v in alts.items())
+              + f"; largest trailing-volatility weight per sleeve " + ", ".join(f"{k} {v:.2f}" for k, v in maxw.items())
+              + f" (a timing sleeve that sat in cash has a small trailing sd and a large weight); worst month {lab[worst]} "
+                f"{_pc(float(comp['ret'][worst]))}, Sharpe without it {_f(sr_wo_worst)}"
               + f"; NBER recession months in the window {len((rec or {}).get('months', []))} (composite "
                 f"{_pc((rec or {}).get('composite_total'))}); the crypto basis sleeve (T-362, from 2018) is not in the claim's "
                 f"composite and is not computed; FX weights were chosen on 2002-05..2012-12, which overlaps the 2010-2012 "
@@ -1924,7 +2136,9 @@ def b6c_rates_cross_asset_carry(archive):
             "dsr_ex_crypto": j["dsr_ex_crypto"], "n_trials": T381_N_TRIALS, "sleeve_trials": T381_SLEEVE_TRIALS,
             "sleeve_sharpe_ann": sl_sr, "diversification_gain": div_gain, "mean_sleeve_corr": mean_corr,
             "fx_alternatives_sharpe": alts, "fx_books": {k: v["book"] for k, v in fx.items()}, "equity_weighting": wt,
-            "halved_months": comp_dr["halved"], "dropped_months": comp["dropped"], "nber": rec,
+            "halved_months": comp_dr["halved"], "halved_months_bond_sleeve": comp_dr["halved_lag"],
+            "sleeve_decision_lag_months": comp["lag"], "dropped_months": comp["dropped"], "nber": rec, "max_weight": maxw,
+            "worst_month": {"month": lab[worst], "ret": float(comp["ret"][worst]), "sharpe_without": sr_wo_worst},
             "last_weights": comp["weights"][-1], "criteria": j["criteria"],
             "rule10": "calendar months of the sleeves (each sleeve's calendar is named by its claim)"}
     return _out(stat, j["n"], j["verdict"], reason)

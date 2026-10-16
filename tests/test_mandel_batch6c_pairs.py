@@ -368,6 +368,63 @@ def test_kalman_study_end_to_end_runs_on_selected_pair_windows():
     assert len(j["criteria"]) == 3 and j["n_pair_windows"] == fr["k"].size
 
 
+def test_raw_over_adj_and_split_sources():
+    # T-323 point-in-time levels: the raw close of a day is Yahoo's split-adjusted close times every later split
+    days = ["2008-07-22", "2008-07-23", "2008-07-24", "2008-07-25"]
+    close = np.array([10.0, 10.0, 10.0, 10.0])                     # split-adjusted (raw 20, 20, 10, 10)
+    adj = np.array([9.0, 9.0, 10.0, 10.0])                         # a dividend also goes ex on 07-24
+    np.testing.assert_allclose(m.raw_over_adj(days, close, adj, {"2008-07-24": 2.0}), [20 / 9, 20 / 9, 1.0, 1.0])
+    np.testing.assert_allclose(m.raw_over_adj(days, close, adj, None), close / adj)
+    ev = [{"available_at": "2016-11-07T14:30:00+00:00", "kind": "split",
+           "value": {"type": "split", "ex_date": "2016-11-07", "numerator": 1.0, "denominator": 4.0}},
+          {"available_at": "2016-12-20T14:30:00+00:00", "kind": "dividend",
+           "value": {"type": "dividend", "ex_date": "2016-12-20", "amount": 0.1}}]
+    arc = FakeArchive({"daily-events-EWJ": ev})
+    assert m._splits(arc, "EWJ") == {"2016-11-07": 0.25}
+    assert m._splits(arc, "SLV") == {"2008-07-24": 10.0}            # old-convention bundle without events: hard-coded
+    assert m._splits(arc, "SPY") is None
+
+
+def _later_snapshot(P, rng):
+    """The same history seen from a later snapshot: a later split s_j divides every earlier close and adjusted close,
+    later dividends multiply every earlier adjusted close by g_j."""
+    s = np.array([(1.0, 2.0, 4.0)[j % 3] for j in range(P.shape[1])])
+    g = rng.uniform(0.6, 0.95, P.shape[1])
+    return P / s, P * g / s, s
+
+
+def test_pw_frame_kalman_inputs_are_point_in_time():
+    # T-323 regression (rule 4): the isotropic-noise Kalman filter is not scale-invariant, so its inputs must not move
+    # with dividends or splits after the formation end. A later snapshot of the same history gives the same frames and
+    # the same Kalman z; the archived log adjusted level (the inputs before the fix) does not. The static spread is
+    # unchanged either way.
+    rng = np.random.default_rng(31)
+    days, P = _coint_panel(rng, True, n_clusters=2, size=3, first="2000-01-03", last="2002-12-31")
+    C2, A2, s = _later_snapshot(P, rng)
+    N = P.shape[1]
+    L1 = np.log(np.column_stack([m.raw_over_adj(days, P[:, j], P[:, j], None) for j in range(N)]))
+    L2 = np.log(np.column_stack([m.raw_over_adj(days, C2[:, j], A2[:, j], {"2003-06-02": s[j]}) for j in range(N)]))
+    sc1 = m.coint_scan(days, P, first="2001-01", end="2002-12-31")
+    sc2 = m.coint_scan(days, A2, first="2001-01", end="2002-12-31")
+    sel1, sel2 = sc1["rows"]["sel"].astype(bool), sc2["rows"]["sel"].astype(bool)
+    assert sel1.sum() > 0 and np.array_equal(sel1, sel2)
+    f1 = m.pw_frame(sc1, sel1, "etf", days, P, days, L1)
+    f2 = m.pw_frame(sc2, sel2, "etf", days, A2, days, L2)
+    assert np.abs(f2["cy"]).max() > 0.3 and np.abs(f1["cy"]).max() == 0.0
+    for key in ("Yf", "Xf", "Yt", "Xt", "a"):
+        np.testing.assert_allclose(f1[key], f2[key], atol=1e-9, err_msg=key)
+    old = m.pw_frame(sc2, sel2, "etf", days, A2, days)               # the archived level, as before the fix
+    rule = (2.0, 0.5, 4.0)
+    for fr in (f2, old):
+        np.testing.assert_allclose(m.static_sim(fr, rule)["pnl"], m.static_sim(f1, rule)["pnl"], atol=1e-12)
+    for delta in (None, 1e-4):
+        k1, k2 = m.kalman_frame(f1, delta, 3), m.kalman_frame(f2, delta, 3)
+        np.testing.assert_allclose(k1["z"], k2["z"], atol=1e-6, equal_nan=True)
+        np.testing.assert_allclose(k1["delta"], k2["delta"], rtol=1e-6)
+    k1, k0 = m.kalman_frame(f1, 1e-4, 3), m.kalman_frame(old, 1e-4, 3)
+    assert not np.allclose(k0["z"], k1["z"], atol=1e-3, equal_nan=True)
+
+
 # ---------------------------------------------------------------------------------------------- per-trade rule --
 
 def test_trade_rule_fills_next_close_time_stop_and_costs():
@@ -484,6 +541,46 @@ def test_dual_class_thin_cost_reading_must_agree():
     assert g["controls: 25 bps on BF-A/LEN-B/HEI-A legs"]["mean"] == g["claim: 5 bps per leg"]["mean"]
 
 
+def test_split_check_undoes_a_spurious_record_and_leaves_genuine_ones():
+    # T-470 regression (rule 9): Yahoo's daily-events-BF-A carries a 1339:1000 'split' on 2018-02-07 that BF-B lacks
+    # and BF-A's raw price never made. Planted: such a record (B's earlier history divided by the ratio) is found and
+    # undone, and the pair then trades exactly as on clean data; uncorrected, the fake jump is traded. Null: a genuine
+    # one-class split (raw price moved, adjusted history continuous) is left alone, as are tiny records and records
+    # outside the pair's span; a class without records is not checked.
+    rng = np.random.default_rng(33)
+    days = wdays("2014-01-02", "2017-06-30")
+    n = len(days)
+    pb = _rw(rng, n, 0.015, 50.0)
+    pa = pb * np.exp(_ou(rng, n, 0.7, 0.01))
+    vol = rng.uniform(1e5, 1e6, n)
+    A = {"days": days, "adj": pa, "close": pa, "vol": vol}
+    B = {"days": days, "adj": pb, "close": pb, "vol": vol}
+    pre = np.arange(n) < 400
+    ex = days[400]
+    bad = {"days": days, "adj": np.where(pre, pb / 1.339, pb), "close": np.where(pre, pb / 1.339, pb),
+           "vol": np.where(pre, vol * 1.339, vol)}
+    A2, B2, rows = m.split_check("A", "B", A, bad, {}, {ex: 1.339})
+    assert len(rows) == 1 and rows[0]["verdict"].startswith("spurious") and rows[0]["classes"] == ["B"]
+    assert rows[0]["relative_move"] == pytest.approx(-math.log(1.339), abs=0.06)
+    for key in ("adj", "close", "vol"):
+        np.testing.assert_allclose(B2[key], B[key], rtol=1e-12)
+    assert bad["close"][0] == pytest.approx(pb[0] / 1.339)          # the input is not modified
+    kw = dict(costs=(0.0005, 0.0005), end="2017-06-30")
+    clean, fixed, raw = (m.dual_pair(a_, b_, 1.0, "", **kw) for a_, b_ in ((A, B), (A2, B2), (A, bad)))
+    assert [t["entry"] for t in fixed["trades"]] == [t["entry"] for t in clean["trades"]]
+    assert [t["pnl"] for t in fixed["trades"]] == pytest.approx([t["pnl"] for t in clean["trades"]])
+    near = days[400:403]                                             # uncorrected: the fake jump is traded
+    assert any(t["decided"] in near and t["side"] == "long A/short B" and t["reason"] == "time stop" for t in raw["trades"])
+    assert [(t["decided"], t["side"]) for t in raw["trades"]] != [(t["decided"], t["side"]) for t in clean["trades"]]
+    _, B3, rows3 = m.split_check("A", "B", A, B, {}, {ex: 2.0})      # genuine: Yahoo's adjusted history is continuous
+    assert rows3[0]["verdict"].startswith("genuine") and B3["close"] is B["close"]
+    _, _, rows4 = m.split_check("A", "B", A, B, {days[300]: 1.002}, {days[10]: 1.5, days[500]: 2.0}, first=days[20])
+    assert [r["date"] for r in rows4] == [days[300], days[500]]      # days[10] is before the pair's first session
+    assert rows4[0]["verdict"].startswith("too small") and rows4[1]["verdict"].startswith("genuine")
+    _, _, rows5 = m.split_check("A", "B", A, B, None, {})
+    assert rows5 == [{"note": "split records not archived for A: not checked"}]
+
+
 # ---------------------------------------------------------------------------------------------- harnesses --
 
 @pytest.mark.parametrize("name", sorted(m.HARNESSES))
@@ -534,3 +631,72 @@ def test_oil_and_dual_class_harnesses_run_on_a_fake_archive():
     arc2 = FakeArchive({m.dh(t): _yahoo(d["days"], d["close"], d["adj"], d["vol"]) for t, d in data.items()})
     stat, n, verdict, reason = _json_ok(m.b6c_pairs_dual_class(arc2))
     assert verdict == "inconclusive" and stat["missing_pairs"] == ["LBRDK/LBRDA"] and "LBRDK" in reason
+
+
+def _snapshot_bundles(b1, later="2009-03-02"):
+    """b1 seen from a later snapshot: every fund but SLV gets an events file with a later split (1, 2 or 4 for 1)
+    dividing its earlier closes, and later dividends scale every adjusted close; SLV keeps no events file (hard-coded
+    split) and only the dividend scaling."""
+    b2 = dict(b1)
+    for j, s in enumerate(m.UNIVERSE):
+        sp = 1.0 if s == "SLV" else (1.0, 2.0, 4.0)[j % 3]
+        g = 0.6 + 0.35 * (j % 7) / 6
+        b2[m.dh(s)] = [{**r, "value": {**r["value"], "close": r["value"]["close"] / sp,
+                                       "adjclose": r["value"]["adjclose"] * g / sp}} for r in b1[m.dh(s)]]
+        if s != "SLV":
+            b2[m.de(s)] = [] if sp == 1.0 else [{"available_at": later + "T14:30:00+00:00", "kind": "split",
+                                                  "value": {"type": "split", "ex_date": later, "numerator": sp,
+                                                            "denominator": 1.0}}]
+    return b2
+
+
+def test_kalman_harness_is_invariant_to_a_later_snapshot(monkeypatch):
+    # T-323 regression at the harness level: the archive's later dividends and splits must not change the result.
+    rng = np.random.default_rng(32)
+    b1 = _etf_archive(rng)
+    s1 = _json_ok(m.b6c_pairs_kalman(FakeArchive(b1)))[0]
+    assert s1["n_pair_windows"] > 0
+    m._CACHE.clear()
+    stat, n, verdict, reason = _json_ok(m.b6c_pairs_kalman(FakeArchive(_snapshot_bundles(b1))))
+    assert stat["pit_levels"]["abs_shift_max"] > 0.5 and "re-levelled to its raw close" in reason
+    assert stat["pit_levels"]["split_source"]["SLV"] == "hard-coded"
+    assert stat["n_pair_windows"] == s1["n_pair_windows"] and stat["opens_kalman"] == s1["opens_kalman"]
+    for c in m.T323_KCELLS:
+        assert stat["cells"][c]["mean_diff"] == pytest.approx(s1["cells"][c]["mean_diff"], rel=1e-6, abs=1e-9)
+    m._CACHE.clear()                                                # before the fix: the archived level itself
+    zero = lambda a: {"L": np.zeros_like(m._etf_data(a)["P"]), "source": {s: "none recorded" for s in m.UNIVERSE}}
+    monkeypatch.setattr(m, "_etf_levels", zero)
+    s0 = m.b6c_pairs_kalman(FakeArchive(_snapshot_bundles(b1)))[0]
+    assert any(abs(s0["cells"][c]["mean_diff"] - s1["cells"][c]["mean_diff"]) > 1e-6 for c in m.T323_KCELLS)
+
+
+def test_dual_class_harness_undoes_a_spurious_split_record():
+    # T-470 regression at the harness level: a BF-A-only 1339:1000 record whose raw price never moved gives the same
+    # per-pair results as clean data once undone, and the treatment is listed in the stat and the reason.
+    rng = np.random.default_rng(34)
+    data = _dual_data(rng, True, drop=("LBRDK", "LBRDA"))
+    ex = "2018-02-07"
+
+    def bundles(spurious):
+        b = {m.dh(t): _yahoo(d["days"], d["close"], d["adj"], d["vol"]) for t, d in data.items()}
+        b.update({m.de(t): [] for t in data})
+        if spurious:
+            d = data["BF-A"]
+            pre = np.array([x < ex for x in d["days"]])
+            b[m.dh("BF-A")] = _yahoo(d["days"], np.where(pre, d["close"] / 1.339, d["close"]),
+                                     np.where(pre, d["adj"] / 1.339, d["adj"]), np.where(pre, d["vol"] * 1.339, d["vol"]))
+            b[m.de("BF-A")] = [{"available_at": ex + "T14:30:00+00:00", "kind": "split",
+                                "value": {"type": "split", "ex_date": ex, "numerator": 1339.0, "denominator": 1000.0}}]
+        return b
+    s0 = _json_ok(m.b6c_pairs_dual_class(FakeArchive(bundles(False))))[0]
+    assert all(v == [] for v in s0["split_checks"].values())
+    m._CACHE.clear()
+    stat, n, verdict, reason = _json_ok(m.b6c_pairs_dual_class(FakeArchive(bundles(True))))
+    assert stat["split_checks"]["BF-B/BF-A"][0]["verdict"].startswith("spurious")
+    assert "BF-B/BF-A 2018-02-07 (BF-A x1.339" in reason and "undone" in reason
+    for nm, v in s0["per_pair"].items():
+        if v is None:
+            continue
+        for r_, x in v.items():
+            assert stat["per_pair"][nm][r_]["n"] == x["n"]
+            assert stat["per_pair"][nm][r_]["mean"] == pytest.approx(x["mean"], rel=1e-9)

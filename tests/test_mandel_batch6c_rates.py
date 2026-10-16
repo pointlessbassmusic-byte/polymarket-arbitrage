@@ -92,7 +92,8 @@ def test_vintages_point_in_time():
     assert v.known("2013-01", "2013-03-10") is None          # before the lag-rule day
     assert v.known("2013-01", "2013-03-20") == 2.0           # pre-ALFRED: first-vintage value from lag_rule_at
     assert v.known("2013-01", "2014-03-01") == 2.1           # the vintage in force
-    assert v.latest("2014-04-11") == ("2013-01", 2.1)
+    assert v.latest("2014-04-11") == (None, None)            # 2013-01 is beyond the default 13-month search
+    assert v.latest("2014-04-11", back=16) == ("2013-01", 2.1)
     assert v.latest("2014-04-30") == ("2014-03", 3.0)
     assert v.latest_vintage("2013-01") == 2.1
 
@@ -175,10 +176,99 @@ def test_t373_null_fails():
     assert j["verdict"] != "supported"
 
 
+def test_t373_readings_must_agree():
+    """Rule 7 / rule 11: the carry judged with BEY(DTB3) and with the raw discount DTB3; returns that follow only the BEY
+    signal pass under one reading and fail under the other, so the criteria are undecided, never supported."""
+    rng = np.random.default_rng(9)
+    days = bdays("2002-07-01")
+    ms = months_of(days)
+    neg = {mo: bool(rng.random() < 0.3) for mo in ms}
+    rets = [rng.normal(-0.03, 0.01) if (i and neg[ms[i - 1]]) else rng.normal(0.008, 0.02) for i, mo in enumerate(ms)]
+    px = {"TLT": px_from_levels(days, monthly_levels(ms, rets))}
+    y = {"DGS20": {}, "DGS10": {}, "DTB3": {}}
+    for d in days:                                              # 5.00 - BEY(4.95) < 0 < 5.00 - 4.95
+        a, b, c = (5.0, 5.0, 4.95) if neg[d[:7]] else (5.0, 4.5, 2.0)
+        y["DGS20"][d], y["DGS10"][d], y["DTB3"][d] = a, b, c
+    res = m.curve_carry(px, y, m.Bills(y["DTB3"]))
+    assert res["signal_disagree"] > 50
+    j = m.judge_curve_carry(res)
+    assert j["test"]["diff"] > 0.15 and abs(j["test_disc"]["diff"]) < 1e-9
+    assert j["verdict"] == "inconclusive", j["why"]
+    assert any("disagree" in c[0] and c[1] is None for c in j["criteria"])
+
+
+def test_t373_full_window_criterion():
+    px, y = _t373(True)
+    j = m.judge_curve_carry(m.curve_carry(px, y, m.Bills(y["DTB3"])))
+    assert j["full"]["diff"] > 0 and j["criteria"][0][1] is True and "Sharpe(timed) - Sharpe(buy-and-hold) > 0" in j["criteria"][0][0]
+
+
 def test_t373_below_min_n_never_supported():
     px, y = _t373(True)
     j = m.judge_curve_carry(m.curve_carry(px, y, m.Bills(y["DTB3"])), min_n=400)
     assert j["verdict"] == "inconclusive"
+
+
+def _two_month_pair(n=137, seed=3):
+    """A timed series equal to buy-and-hold except one cash month and the switch back (T-373's 2002-2013 shape)."""
+    rng = np.random.default_rng(seed)
+    b = rng.normal(0.004, 0.03, n)
+    a = b.copy()
+    a[52] = 0.0004                                              # in cash
+    a[53] = b[53] - m.T373_SWITCH                               # the switch back
+    return a, b
+
+
+def test_t373_pair_degenerate_uses_percentile():
+    """Regression (T-373 in-sample 'CI -0.006 to +1.780'): two series differing in 2 of 137 months leave most resamples
+    with zero s.e., which batch6b_bw._stud drops; the percentile CBB on the same resamples is judged and reported, the
+    studentized numbers are kept, and the zero-s.e. share is counted on _stud's own resamples."""
+    a, b = _two_month_pair()
+    t = m.sharpe_pair(a, b, check=lambda t: True, reps=1)
+    assert t["n_differ"] == 2 and t["construction"] == "percentile CBB"
+    assert "2 of 137 months" in t["degenerate"] and "zero s.e." in t["degenerate"]
+    assert t["ci"] == t["ci_pct"] and t["p"] == t["p_pct"][0] and t["p_lt"] == t["p_lt_pct"][0]
+    assert t["ci_stud"][1] > t["ci"][1] and t["p_stud"] is not None
+    rng, nz, tot = np.random.default_rng(m.SEED), 0, 0
+    for k in bw._chunks(m.N_BOOT, 2 * a.size):
+        idx = bw._boot_idx(rng, a.size, t["block"], k)
+        se = bw._sr_diff_stat(a[idx], b[idx], t["block"])[1]
+        nz, tot = nz + int((se <= 1e-14).sum()), tot + se.size
+    assert nz > 0.2 * tot and t["zero_se_share"][0] == pytest.approx(nz / tot)
+    txt = m._pair_txt(t)
+    assert "2 of 137 months differ" in txt and "percentile CBB" in txt and "degenerate" in txt
+
+
+def test_t373_pair_nondegenerate_keeps_studentized():
+    """A difference spread over most months keeps the studentized CBB unchanged (the same numbers as before the fix)."""
+    rng = np.random.default_rng(4)
+    a, b = rng.normal(0.006, 0.03, 153), rng.normal(0.002, 0.03, 153)
+    t = m.sharpe_pair(a, b, check=lambda t: True)
+    ref = bw.mc_reps(lambda seed: bw.sharpe_diff_test(a, b, 12, 12, m.N_BOOT, seed), m.REPS, m.SEED)
+    assert t["construction"] == "studentized CBB" and t["degenerate"] is None and t["n_differ"] == 153
+    assert t["ci"] == pytest.approx(ref["ci"]) and t["p"] == pytest.approx(ref["p"]) and "ci_stud" not in t
+
+
+def test_t373_judge_reports_months_differ_and_degenerate_construction():
+    """Regression: every T-373 difference states how many months the paired series differ in; a sparse-cash path (the
+    signal negative in 2 test months) is judged on the percentile CBB and the criterion says why."""
+    px, y = _t373(True)
+    j = m.judge_curve_carry(m.curve_carry(px, y, m.Bills(y["DTB3"])))
+    assert all("months differ" in c[0] for c in j["criteria"][:2]) and j["test"]["construction"] == "studentized CBB"
+    days = bdays("2002-07-01")
+    ms = months_of(days)
+    rng = np.random.default_rng(5)
+    px = {"TLT": px_from_levels(days, monthly_levels(ms, rng.normal(0.004, 0.03, len(ms))))}
+    neg = {"2005-04", "2016-04", "2021-08"}
+    y = {"DGS20": {}, "DGS10": {}, "DTB3": {}}
+    for d in days:
+        a, b_, c = (4.0, 4.3, 6.0) if d[:7] in neg else (5.0, 4.5, 2.0)
+        y["DGS20"][d], y["DGS10"][d], y["DTB3"][d] = a, b_, c
+    j = m.judge_curve_carry(m.curve_carry(px, y, m.Bills(y["DTB3"])))
+    assert j["test"]["n_differ"] <= 4 and j["test"]["construction"] == "percentile CBB"
+    assert j["in_sample"]["n_differ"] <= 2 and j["in_sample"]["construction"] == "percentile CBB"
+    assert "percentile CBB, studentized degenerate" in j["criteria"][2][0]
+    assert j["verdict"] != "supported"
 
 
 # ======================================================================================= T-377 ==
@@ -269,16 +359,15 @@ def _t433(planted, seed=4):
     rng = np.random.default_rng(seed)
     ms = m._months("1988-01", "2026-09")
     cc = m.T433_CC
-    lvl = {c: 0.5 * i for i, c in enumerate(cc)}                    # persistent carry ranking: NZ highest
+    lvl = {c: 0.5 * i for i, c in enumerate(cc)}                    # persistent carry ranking: NZ highest, US lowest
     y = {c: {} for c in cc}
-    cur = {c: 3.0 + lvl[c] for c in cc}
+    e = {c: 0.0 for c in cc}
     for mo in ms:
-        for i, c in enumerate(cc):
-            if planted:
-                drift = -0.03 if i >= 7 else (0.03 if i < 3 else 0.0)
-                cur[c] += drift + rng.normal(0, 0.03)
-                y[c][mo] = cur[c]
-            else:
+        for c in cc:
+            if planted:                                             # stationary yields: the carry itself is the edge
+                e[c] = 0.8 * e[c] + rng.normal(0, 0.03)
+                y[c][mo] = 3.0 + lvl[c] + e[c]
+            else:                                                   # iid yields: the known carry says nothing
                 y[c][mo] = 3.0 + rng.normal(0, 0.5)
     r3m = {m.T433_CCY[c]: {mo: 2.0 for mo in ms} for c in cc}
     vint = {}
@@ -302,7 +391,7 @@ def test_t433_pit_uses_released_prints_only():
 def test_t433_planted_passes():
     vint, y, r3m = _t433(True)
     res = m.bond_carry(vint, y, r3m, m._months("1990-01", "2026-09"))
-    assert res["long"][-1] == ["NZ", "NO", "SE"] and res["short"][-1] == ["DE", "GB", "US"][::-1] or set(res["short"][-1]) == {"US", "DE", "GB"}
+    assert res["long"][-1] == ["NZ", "NO", "SE"] and set(res["short"][-1]) == {"US", "DE", "GB"}
     top2 = m.bond_carry(vint, y, r3m, m._months("1990-01", "2026-09"), k=2)
     tw = m._window(res["labels"], *m.T433_TEST)
     fam = {"top3": res["net"][tw], "top2": top2["net"][m._window(top2["labels"], *m.T433_TEST)]}
@@ -451,6 +540,9 @@ def test_t474_fly_z_and_known_day():
     j = zd.index(sim["sess"][e])
     assert abs(zv[j - 1]) > 2 and np.sign(zv[j - 1]) == sg      # the z of the print dated before the entry session
     assert all(x2 - e2 <= m.T474_MAX_HOLD for e2, x2, _ in sim["trades"])
+    xd, xz = m.fly_series(ylds, incl=False)                      # the reported sensitivity: the 250 prints before t
+    w0 = f[300 - 250:300]
+    assert np.isnan(xz[:250]).all() and xz[300] == pytest.approx((f[300] - w0.mean()) / w0.std(ddof=1))
 
 
 def test_t474_planted_passes():
@@ -499,7 +591,7 @@ def test_t474_block_shift_zero_shift_is_observed():
 def _sleeves(mu, seed=7, names=("fx", "bonds", "eq", "credit")):
     rng = np.random.default_rng(seed)
     ms = m._months("2009-01", "2026-09")
-    return {nm: {mo: float(rng.normal(mu, 0.01 * (k + 1))) for mo in ms} for k, nm in enumerate(names)}
+    return {nm: {mo: float(rng.normal(mu * (k + 1), 0.01 * (k + 1))) for mo in ms} for k, nm in enumerate(names)}
 
 
 def test_t381_trailing_weights():
@@ -522,6 +614,44 @@ def test_t381_derisk_halves_after_drawdown():
     s["a"]["2013-02"] = 0.01
     c = m.carry_composite(s, derisk=True)
     assert "2013-02" in c["halved"]
+
+
+def test_t381_lagged_sleeve_weight_uses_months_ending_t_minus_2():
+    """Regression (rule 4): the bond sleeve's x(t) opens at the start of t-1, so its weight is the sd of the 36 months
+    ending t-2; the other sleeves keep the 36 months ending t-1, and the lagged sleeve needs one more warm-up month."""
+    s = _sleeves(0.002)
+    c = m.carry_composite(s, lag={"bonds": 1})
+    t = c["labels"].index("2015-06")
+    past2 = [s["bonds"][m._month_add("2015-06", -j)] for j in range(2, 38)]
+    past1 = [s["eq"][m._month_add("2015-06", -j)] for j in range(1, 37)]
+    assert c["weights"][t]["bonds"] == pytest.approx(0.05 / (np.std(past2, ddof=1) * math.sqrt(12)))
+    assert c["weights"][t]["eq"] == pytest.approx(0.05 / (np.std(past1, ddof=1) * math.sqrt(12)))
+    assert c["labels"][0] == "2013-01" and c["lag"] == {"bonds": 1}
+    s["bonds"].pop("2009-12")
+    assert m.carry_composite(s)["labels"][0] == "2013-01"
+    assert m.carry_composite(s, lag={"bonds": 1})["labels"][0] == "2013-02"
+    assert m.T381_LAG == {m.T381_BONDS: 1}
+
+
+def test_t381_lagged_sleeve_derisk_decided_at_t_minus_2():
+    """Regression (rule 4): after a deep composite loss in 2013-01 the unlagged sleeve is halved from 2013-02 (decided at
+    the end of 2013-01), the lagged sleeve only from 2013-03 (decided at the end of 2013-02)."""
+    ms = m._months("2009-01", "2026-09")
+    s = {"a": {mo: 0.0 for mo in ms}, "b": {mo: 0.0 for mo in ms}}
+    for mo in m._months("2009-01", "2012-12"):
+        s["a"][mo] = s["b"][mo] = 0.01 * (1 if int(mo[5:7]) % 2 else -1)
+    s["a"]["2013-01"] = -0.2
+    for mo in ("2013-02", "2013-03"):
+        s["a"][mo] = s["b"][mo] = 0.01
+    c = m.carry_composite(s, derisk=True, lag={"b": 1})
+    assert "2013-02" in c["halved"] and "2013-02" not in c["halved_lag"] and "2013-03" in c["halved_lag"]
+    i = c["labels"].index("2013-02")
+    w = c["weights"][i]
+    assert c["ret"][i] == pytest.approx(0.5 * w["a"] * 0.01 + w["b"] * 0.01)
+    i = c["labels"].index("2013-03")
+    assert c["ret"][i] == pytest.approx(0.5 * c["weights"][i]["a"] * 0.01 + 0.5 * c["weights"][i]["b"] * 0.01)
+    c0 = m.carry_composite(s, derisk=True)                         # no lag: both sleeves halved from 2013-02
+    assert c0["halved_lag"] == [] and "2013-02" in c0["halved"]
 
 
 def test_t381_planted_passes():
@@ -657,6 +787,16 @@ def test_optional_bundles_are_optional(fake):
         m._CACHE.clear()
         stat, n, verdict, reason = m.HARNESSES[name](arch)
         assert "missing_bundles" not in stat and n > 0
+
+
+def test_t381_harness_lags_bond_sleeve_and_t373_reports_differ(fake):
+    """Harness-level regressions: T-381 runs the bond sleeve one month earlier (its decision lag) and keeps 2013-01;
+    T-373's reason states the months each paired difference rests on."""
+    stat, n, verdict, reason = m.HARNESSES["b6c_rates_cross_asset_carry"](fake)
+    assert stat["sleeve_decision_lag_months"] == {m.T381_BONDS: 1} and stat["window"][0] == "2013-01"
+    assert "36 months ending t-2" in reason
+    stat, n, verdict, reason = m.HARNESSES["b6c_rates_treasury_carry_rolldown"](fake)
+    assert reason.count("months differ") >= 5 and stat["test"]["n_differ"] is not None
 
 
 def test_maps_consistent():
