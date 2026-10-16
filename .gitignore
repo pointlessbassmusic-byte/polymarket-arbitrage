@@ -563,3 +563,6 @@ mandel/archive/data/deribit-option-trades-near-*.jsonl.gz
 mandel/archive/data/polymarket-events-btc-above.jsonl.gz
 mandel/archive/data/polymarket-events-macro.jsonl.gz
 mandel/archive/data/polymarket-fetch-log.jsonl.gz
+# batch-6c fetches in progress (local only)
+mandel/archive/data/kalshi-fetch-log.jsonl.gz
+mandel/archive/data/pm-kalshi-pairs.jsonl.gz

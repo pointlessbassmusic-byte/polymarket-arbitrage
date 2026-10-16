@@ -33,13 +33,19 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            (block bootstrap over window months, 12-month blocks; Ledoit-Wolf (2008) test on the aggregate daily
            portfolios, rule 11) and DSR of the Kalman variant > 0.95 at the 4-cell delta x threshold grid. min_n 100
            pair-windows (non-overlapping equivalents).
-  * T-468  s = ln(BZ=F) - ln(CL=F) front-month closes, z on the trailing 250 sessions (masked days excluded from the
-           statistics), roll windows (+-5 sessions around each scheduled last trading day of either contract) and April
-           2020 masked from signals; z > 2: long USO / short BNO, z < -2 the reverse, equal dollars at the next close;
-           exit at z = 0 or after 60 sessions; 5 bps per leg per trade, 50 bps/yr borrow; entries 2011-01.., all closed
-           by 2026-09-30. Pass: 95% lower bound of the mean net return per trade > 0 (trade bootstrap AND the trial's
-           block-shifted signal null with block 60, rule 11), >= 20 trades, positive mean in >= 2 of 2011-2014,
-           2015-2019 and 2020-2026. DSR over the 3 runnable variants is reported (procedure, not pass). min_n 20 trades.
+  * T-468  s = ln(BZ=F) - ln(CL=F) front-month closes, z on the trailing 250 sessions over unmasked values; the roll
+           windows (+-5 around each scheduled last trading day of either contract: CL 3 business days before the 25th
+           of the prior month, BZ the last business day of the second prior month from the March 2016 contract, earlier
+           the business day before the 15th day before the contract month) and April 2020 are masked from the statistics
+           and from every decision (entries and z exits; the time stop still runs); z > 2: long USO / short BNO, z < -2
+           the reverse, equal dollars at the next close; exit at z = 0 or after 60 sessions; 5 bps per leg per trade,
+           50 bps/yr borrow; entries 2011-01.., all closed by 2026-09-30. Pass: 95% lower bound of the mean net return
+           per trade > 0 (trade bootstrap AND the trial's block-shifted signal null with block 60, rule 11), >= 20
+           trades, positive mean in >= 2 of 2011-2014, 2015-2019 and 2020-2026. The claim's '+-5-day' window admits two
+           readings (sessions, calendar days; 79% and 59% of sessions masked on the archive), so the claim is judged
+           under each reading and the two verdicts must agree (disagreement is undecided). The trailing window needs 20
+           unmasked values (a guard only: the session reading leaves about 48 of 250 once Brent expires at month end).
+           DSR over the 3 runnable variants is reported (procedure, not pass). min_n 20 trades.
   * T-470  Ten declared dual-class pairs, x = ln(A) - ln(k B) on adjusted closes, z on the trailing 60 sessions, |z| > 2:
            long the cheap class, short the rich class, equal dollars at the next close, exit at z = 0 or after 20
            sessions; 5 bps per leg per trade (the claim; the controls' 25 bps for the thin classes BF-A, LEN-B and HEI-A
@@ -53,9 +59,11 @@ Conventions
   * Data. Every bundle is read through ``archive.load``; a row is used only when its ``available_at`` is not after the
     bundle's capture time. Yahoo bars are keyed by the UTC date of their timestamp (ETF and stock bars 13:30/14:30 UTC,
     futures 04:00 UTC: the trading date; crypto 00:00 UTC: the UTC day). ETF and stock legs use ``adjclose`` (total
-    return; Yahoo back-adjustment scales history by a constant, so normalized indices, log-price regressions on
-    formation-rebased prices and z-scores are unaffected); the futures signal uses ``close`` (settlement). The ETF panel
-    is on SPY's session calendar; a missing bar after a fund's first bar carries the previous close (flagged by count).
+    return; Yahoo back-adjustment scales history by a constant, so normalized indices, OLS spreads (the constant moves
+    only the intercept) and z-scores are unaffected; the Kalman model with isotropic state noise is not scale-invariant
+    and runs on the archived log adjusted closes, the rule's log P); the futures signal uses ``close`` (settlement).
+    The ETF panel is on SPY's session calendar; a missing bar after a fund's first bar carries the previous close
+    (counted per fund).
   * Point in time (rules 4, 12). Every formation statistic (SSD, sd, beta, alpha, EM parameters, the filter state) uses
     closes up to the formation-end close; every z-score is trailing or frozen; a decision at close t (its bar is
     stamped available the next session, before the next close) fills at close t + 1, the GGR one-day wait. An ETF
@@ -77,6 +85,9 @@ Conventions
     short leg's value (calendar days); T-322/T-323 15 bps (ETFs) and 40 bps (crypto) per leg per trade including every
     hedge-leg rebalance, no borrow (none stated); T-468 5 bps + 50 bps/yr; T-470 5 bps (or 25 bps on BF-A, LEN-B, HEI-A
     legs) + 50 bps/yr. Returns are per $1 per leg (equal-dollar rules) or per $(1 + |beta|) of gross capital (hedged).
+  * Sharpe (rule 7). Every book here is self-financing (a long leg funded by a short leg, no cash position), so its P&L on
+    committed capital is already an excess return and Sharpe ratios take no bill adjustment; 252 sessions a year for
+    funds and stocks, 365 for the crypto pair.
   * Below trial.min_n (rule 5) the verdict is never supported and a failing criterion counts only when it fails
     decisively (its interval wholly on the wrong side). Verdicts use ``underlying2._verdict`` through
     ``batch6b_bw._decide``.
@@ -85,10 +96,8 @@ Conventions
 from __future__ import annotations
 
 import bisect
-import functools
 import math
 from datetime import date, datetime, timedelta, timezone
-from statistics import NormalDist
 from typing import Callable, Optional, Sequence
 
 import numpy as np
@@ -105,7 +114,6 @@ SEED = 0
 DSR_PASS = 0.95
 N_RANDOM = 1000                # the trials' 1,000 random-pair draws
 END = "2026-09-30"
-Z95 = NormalDist().inv_cdf(0.975)
 
 SECTORS = ["XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY"]
 COUNTRY21 = ["EWA", "EWC", "EWD", "EWG", "EWH", "EWI", "EWJ", "EWK", "EWL", "EWM", "EWN", "EWO", "EWP", "EWQ", "EWS", "EWT",
@@ -334,6 +342,16 @@ def _sr_pp(x) -> Optional[float]:
 def _sr_ann(x, ppy: float) -> Optional[float]:
     x = np.asarray(x, float)
     return float(sharpe_ratio(x, ppy)) if x.size > 2 and x.std() > 0 else None
+
+
+def _mn(v: Sequence) -> Optional[float]:
+    v = [x for x in v if x is not None]
+    return min(v) if v else None
+
+
+def _mx(v: Sequence) -> Optional[float]:
+    v = [x for x in v if x is not None]
+    return max(v) if v else None
 
 
 def _q(x: np.ndarray, lv: float) -> float:
@@ -806,7 +824,7 @@ def ggr_run(days: Sequence[str], P: np.ndarray, names: Sequence[str], cls: Seque
     for k in range(max(T321_FORM, k_first - (T321_HOLD - 1)), k_end + 1):
         f0, f1 = mfirst[k - T321_FORM], mlast[k - 1]
         tr0, tr1 = mfirst[k], mlast[min(k + T321_HOLD - 1, k_end)]
-        elig = np.where(np.isfinite(P[f0]) & np.isfinite(P[tr1]))[0]
+        elig = np.where(np.isfinite(P[f0]))[0]           # listed by the formation's first session (point in time)
         if elig.size < top + 2:
             continue
         Nf = P[f0:f1 + 1, elig] / P[f0, elig]
@@ -950,7 +968,9 @@ def coint_scan(days: Sequence[str], P: np.ndarray, cdays: Optional[Sequence[str]
     """Engle-Granger selection and out-of-sample persistence for every window whose 6 trading months start at first..
     and end by ``end``'s month. Candidates: every pair (i < j in universe order; log i on log j) of the funds with a bar
     on the formation's first session, plus ETH on BTC (crypto calendar C: (Tc, 2) [ETH, BTC]) when both cover the
-    formation. Log prices are rebased at the formation's first close. Returns per-window counts and the EG-passing
+    formation. A candidate also needs bars through its 6 trading months, which its out-of-sample test needs (no declared
+    fund delisted, so this never binds). Log prices are the log adjusted closes themselves (the rule's log P; a constant
+    scale only moves the OLS intercept). Returns per-window counts and the EG-passing
     pair-windows (with the half-life flag) for trading."""
     labels, mi, mf, ml = month_bounds(days)
     k_first = labels.index(first)
@@ -968,13 +988,13 @@ def coint_scan(days: Sequence[str], P: np.ndarray, cdays: Optional[Sequence[str]
         parts = []
         if elig.size >= 2:
             I0, J0 = np.triu_indices(elig.size, 1)
-            LP = np.log(P[f0:tr1 + 1][:, elig] / P[f0, elig])
+            LP = np.log(P[f0:tr1 + 1][:, elig])
             parts.append(("etf", elig[I0], elig[J0], LP[:nf, I0], LP[:nf, J0], LP[nf:, I0], LP[nf:, J0]))
         if cpos is not None and labels[k - T322_FORM] in cpos and labels[k + T322_HOLD - 1] in cpos:
             c0, c1 = cmf[cpos[labels[k - T322_FORM]]], cml[cpos[labels[k - 1]]]
             c3 = cml[cpos[labels[k + T322_HOLD - 1]]]
             if cdays[c0].endswith("-01") and np.isfinite(C[c0]).all() and np.isfinite(C[c3]).all():
-                LC = np.log(C[c0:c3 + 1] / C[c0])
+                LC = np.log(C[c0:c3 + 1])
                 n_c = c1 - c0 + 1
                 parts.append(("crypto", np.array([0]), np.array([1]), LC[:n_c, :1], LC[:n_c, 1:2], LC[n_c:, :1], LC[n_c:, 1:2]))
         rec = {"k": k, "month": labels[k], "K": 0, "Q": 0, "n_sel": 0, "n_sel_per": 0, "n_eg": 0, "n_eg_per": 0,
@@ -1074,8 +1094,8 @@ def persistence_judge(sc: dict, min_n: int = T322_MIN_N, n_random: Optional[int]
 
 
 def pw_frame(sc: dict, mask: np.ndarray, cal: str, days: Sequence[str], P: np.ndarray, etf_days: Sequence[str]) -> Optional[dict]:
-    """Arrays of the pair-windows ``mask`` (on the calendar ``cal`` with prices P on ``days``): formation log prices rebased
-    at the formation's first close, left-padded so every formation ends at column F - 1 (Yf, Xf, Vf); trading log prices,
+    """Arrays of the pair-windows ``mask`` (on the calendar ``cal`` with prices P on ``days``): formation log adjusted
+    closes, left-padded so every formation ends at column F - 1 (Yf, Xf, Vf); trading log prices,
     leg returns, calendar-day gaps (Yt, Xt, RA, RB, DT, Vt; right-padded); the ETF-session index of every trading column
     (crypto days map to the first ETF session on or after them); OLS a, b, the formation residual sd, window k."""
     r = sc["rows"]
@@ -1114,8 +1134,8 @@ def pw_frame(sc: dict, mask: np.ndarray, cal: str, days: Sequence[str], P: np.nd
     for q, (f0, f1, tr0, tr1) in enumerate(spans):
         i, j = I[q], J[q]
         nf, nt = f1 - f0 + 1, tr1 - tr0 + 1
-        ly = np.log(P[f0:tr1 + 1, i] / P[f0, i])
-        lx = np.log(P[f0:tr1 + 1, j] / P[f0, j])
+        ly = np.log(P[f0:tr1 + 1, i])
+        lx = np.log(P[f0:tr1 + 1, j])
         Yf[q, F - nf:] = ly[:nf]
         Xf[q, F - nf:] = lx[:nf]
         Vf[q, F - nf:] = True
@@ -1168,7 +1188,7 @@ T323_N_TRIALS = 4               # delta (EM, 1e-4) x entry (2, 1 innovation sd)
 T323_KCELLS = {"EM, 2/0.5/4": ("em", (2.0, 0.5, 4.0)), "EM, 1/0": ("em", (1.0, 0.0, np.inf)),
                "delta 1e-4, 2/0.5/4": ("fixed", (2.0, 0.5, 4.0)), "delta 1e-4, 1/0": ("fixed", (1.0, 0.0, np.inf))}
 T323_PRIMARY = "EM, 2/0.5/4"
-T323_CHUNK = 3000
+T323_CHUNK = 6000
 
 
 def kalman_pass(Y, X, V, w, R, m0, p0: float = T323_P0, store: bool = False) -> dict:
@@ -1418,7 +1438,8 @@ def trade_stats(trades: list) -> dict:
 T468_MIN_N = 20
 T468_START = "2011-01-01"
 T468_L = 250
-T468_MIN_OBS = 50              # unmasked values required in the trailing 250-session window
+T468_MIN_OBS = 20              # unmasked values required in the trailing 250-session window (a guard only: the
+                               # +-5-session reading leaves about 48 of 250 after Brent moved its expiry to month end)
 T468_ENTRY, T468_EXIT, T468_MAX_HOLD = 2.0, 0.0, 60
 T468_COST = 0.0005
 T468_BORROW = 0.005
@@ -1463,20 +1484,26 @@ def bz_last_trade(y: int, m: int) -> date:
     return _weekday_before(d15, 1)
 
 
-def roll_mask(days: Sequence[str], window: int = T468_ROLL_WIN) -> np.ndarray:
-    """True on the sessions within +-``window`` sessions of the scheduled last trading day of either front contract."""
+def roll_mask(days: Sequence[str], window: int = T468_ROLL_WIN, unit: str = "sessions") -> np.ndarray:
+    """True on the sessions within +-``window`` sessions (unit 'sessions') or calendar days (unit 'days') of the scheduled
+    last trading day of either front contract (CL and BZ, every contract month)."""
     n = len(days)
     fl = np.zeros(n, bool)
     if not n:
         return fl
+    od = np.array([_ord(d) for d in days])
     y0, y1 = int(days[0][:4]), int(days[-1][:4]) + 1
     for y in range(y0, y1 + 1):
         for m in range(1, 13):
             for fn in (cl_last_trade, bz_last_trade):
-                ltd = fn(y, m).isoformat()
-                if ltd < days[0] or ltd > days[-1]:
+                ltd = fn(y, m)
+                if unit == "days":
+                    fl |= np.abs(od - ltd.toordinal()) <= window
                     continue
-                j = bisect.bisect_right(days, ltd) - 1
+                lt = ltd.isoformat()
+                if lt < days[0] or lt > days[-1]:
+                    continue
+                j = bisect.bisect_right(days, lt) - 1
                 fl[max(0, j - window):min(n, j + window + 1)] = True
     return fl
 
@@ -1498,34 +1525,16 @@ def _shift_null(ed: Sequence[str], z: np.ndarray, rA, rB, kw: dict, block: int) 
     return {"means": np.array(means), "n_shifts": n // block - 1}
 
 
-def brent_wti(fut: dict, etf: dict, uga: Optional[tuple] = None, min_n: int = T468_MIN_N, start: str = T468_START,
-              end: str = END) -> dict:
-    """T-468 core. fut: {'BZ': (days, close), 'CL': (days, close)}; etf: {'USO': (days, adjclose), 'BNO': (days, adjclose)};
-    uga: (days, adjclose) for the crack-spread variant. Signal on futures sessions, trades on the funds' common sessions
-    (a decision on fund session D uses the futures z dated D; a session without a futures bar takes no decision)."""
-    fd, (bz, cl) = _common(fut["BZ"], fut["CL"])
-    okp = (bz > 0) & (cl > 0)
-    excl = np.array([T468_EXCLUDE[0] <= d <= T468_EXCLUDE[1] for d in fd], bool)
-    rm = roll_mask(fd)
+T468_READINGS = (("+-5 sessions", "sessions"), ("+-5 calendar days", "days"))
+
+
+def _t468_reading(fd, s, okp, excl, unit: str, ed, onto: Callable, rBn, rU, kw: dict) -> dict:
+    """One reading of the roll mask: z from unmasked values only, decisions (entries and z exits) on unmasked sessions."""
+    rm = roll_mask(fd, T468_ROLL_WIN, unit)
     ok = okp & ~excl & ~rm
-    with np.errstate(invalid="ignore", divide="ignore"):
-        s = np.where(okp, np.log(np.where(okp, bz, 1.0) / np.where(okp, cl, 1.0)), np.nan)
     zf = trailing_z_masked(s, ok, T468_L, T468_MIN_OBS)
-    zf_all = trailing_z_masked(s, okp & ~excl, T468_L, T468_MIN_OBS)          # sensitivity: stats over every session
-    zf_all = np.where(ok, zf_all, np.nan)
-    sd_ = np.where(okp, bz - cl, np.nan)
-    zf_usd = trailing_z_masked(sd_, ok, T468_L, T468_MIN_OBS)
-    ed, (uso, bno) = _common(etf["USO"], etf["BNO"])
-    fpos = {d: i for i, d in enumerate(fd)}
-
-    def onto(zz):
-        return np.array([zz[fpos[d]] if d in fpos else np.nan for d in ed], float)
-
     ze = onto(zf)
-    rU, rBn = _rets(uso), _rets(bno)
-    kw = dict(entry=T468_ENTRY, exit_z=T468_EXIT, max_hold=T468_MAX_HOLD, cost_a=T468_COST, cost_b=T468_COST,
-              borrow=T468_BORROW, start=start, end=end)
-    prim = trade_rule(ed, ze, rBn, rU, **kw)            # A = BNO (Brent leg), B = USO (WTI leg): z > 2 -> long USO / short BNO
+    prim = trade_rule(ed, ze, rBn, rU, **kw)
     tr = prim["trades"]
     pn = np.array([t["pnl"] for t in tr], float)
     n_tr = int(pn.size)
@@ -1538,25 +1547,66 @@ def brent_wti(fut: dict, etf: dict, uga: Optional[tuple] = None, min_n: int = T4
     nul = _shift_null(ed, ze, rBn, rU, kw, T468_SHIFT_BLOCK)
     nm = nul["means"]
     p_null = float((1 + np.sum(nm >= mean)) / (1 + nm.size)) if (nm.size and mean is not None) else None
-    okn = None if p_null is None else p_null < 0.05
-    decn = p_null is not None and p_null >= 0.95
-    c1 = all_constructions([(f"trade bootstrap (percentile, {n_tr} trades): two-sided lower {_bp(tb['ci'][0], 1)}, one-sided "
-                             f"lower {_bp((tb.get('ci1') or [None])[0], 1)}{note1}", ok1, dec1),
-                            (f"block-shifted signal null (every multiple of {T468_SHIFT_BLOCK} sessions, {nm.size} shifts "
-                             f"with trades): one-sided p {_f(p_null)} < 0.05", okn, decn)],
-                           f"95% lower bound of the mean net return per trade {_bp(mean, 1)} > 0")
-    c2 = (f"at least 20 trades ({n_tr})", n_tr >= 20, n_tr < 20)
     subs = {}
     for a_, b_ in T468_SUBS:
         p_ = [t["pnl"] for t in tr if a_ <= t["entry"][:4] <= b_]
         subs[f"{a_}-{b_}"] = {"n": len(p_), "mean": float(np.mean(p_)) if p_ else None}
-    npos = sum(1 for v_ in subs.values() if v_["mean"] is not None and v_["mean"] > 0)
-    nund = sum(1 for v_ in subs.values() if v_["mean"] is None)
-    ok3 = True if npos >= 2 else (False if npos + nund < 2 else None)
-    c3 = ("positive mean per trade in >= 2 of 3 sub-periods (" + ", ".join(
-        f"{k_} {_bp(v_['mean'], 1)} ({v_['n']} trades)" for k_, v_ in subs.items()) + ")", ok3, False)
-    v, why = _decide([c1, c2, c3], n_tr, min_n, "trades")
-    fam = {"USO/BNO on the log futures spread (primary)": prim["pnl"]}
+    return {"unit": unit, "mask": rm, "ok": ok, "zf": zf, "ze": ze, "prim": prim, "trades": tr, "n": n_tr, "mean": mean,
+            "boot": tb, "lb": (ok1, dec1, note1), "p_null": p_null, "null_mean": float(nm.mean()) if nm.size else None,
+            "n_null": int(nm.size), "subs": subs, "mask_share": float(rm.mean()), "n_signal_sessions": int(ok.sum()),
+            "reasons": _tally(tr)}
+
+
+def brent_wti(fut: dict, etf: dict, uga: Optional[tuple] = None, min_n: int = T468_MIN_N, start: str = T468_START,
+              end: str = END) -> dict:
+    """T-468 core. fut: {'BZ': (days, close), 'CL': (days, close)}; etf: {'USO': (days, adjclose), 'BNO': (days, adjclose)};
+    uga: (days, adjclose) for the crack-spread variant. Signal on futures sessions, trades on the funds' common sessions
+    (a decision on fund session D uses the futures z dated D; a session without a futures bar takes no decision). The
+    claim's '+-5-day' roll window is read in sessions and in calendar days; every criterion is judged under both readings
+    and decided only when they agree (rule 11's standard for a wording that admits two constructions)."""
+    fd, (bz, cl) = _common(fut["BZ"], fut["CL"])
+    okp = (bz > 0) & (cl > 0)
+    excl = np.array([T468_EXCLUDE[0] <= d <= T468_EXCLUDE[1] for d in fd], bool)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        s = np.where(okp, np.log(np.where(okp, bz, 1.0) / np.where(okp, cl, 1.0)), np.nan)
+    ed, (uso, bno) = _common(etf["USO"], etf["BNO"])
+    fpos = {d: i for i, d in enumerate(fd)}
+
+    def onto(zz):
+        return np.array([zz[fpos[d]] if d in fpos else np.nan for d in ed], float)
+
+    rU, rBn = _rets(uso), _rets(bno)
+    kw = dict(entry=T468_ENTRY, exit_z=T468_EXIT, max_hold=T468_MAX_HOLD, cost_a=T468_COST, cost_b=T468_COST,
+              borrow=T468_BORROW, start=start, end=end)
+    rd = {lab: _t468_reading(fd, s, okp, excl, unit, ed, onto, rBn, rU, kw) for lab, unit in T468_READINGS}
+    rows, crit_all = [], {}
+    for lab, R_ in rd.items():
+        ok1, dec1, note1 = R_["lb"]
+        tb = R_["boot"]
+        pn_ = R_["p_null"]
+        c1 = all_constructions(
+            [(f"trade bootstrap (percentile): two-sided lower {_bp(tb['ci'][0], 1)}, one-sided lower "
+              f"{_bp((tb.get('ci1') or [None])[0], 1)}{note1}", ok1, dec1),
+             (f"block-shifted signal null (every multiple of {T468_SHIFT_BLOCK} sessions, {R_['n_null']} shifts with trades): "
+              f"one-sided p {_f(pn_)} < 0.05", None if pn_ is None else pn_ < 0.05, pn_ is not None and pn_ >= 0.95)],
+            f"95% lower bound of the mean net return per trade ({_bp(R_['mean'], 1)}, {R_['n']} trades) > 0")
+        c2 = (f"at least 20 trades in the claim's whole window, 2011-01..2026-09, fully covered ({R_['n']})", R_["n"] >= 20,
+              R_["n"] < 20)
+        npos = sum(1 for v_ in R_["subs"].values() if v_["mean"] is not None and v_["mean"] > 0)
+        nund = sum(1 for v_ in R_["subs"].values() if v_["mean"] is None)
+        c3 = ("positive mean per trade in >= 2 of 3 sub-periods (" + ", ".join(
+            f"{k_} {_bp(v_['mean'], 1)} ({v_['n']})" for k_, v_ in R_["subs"].items()) + ")",
+              True if npos >= 2 else (False if npos + nund < 2 else None), False)
+        v_r, why_r = _decide([c1, c2, c3], R_["n"], min_n, "trades")
+        crit_all[lab] = [(c[0], c[1]) for c in (c1, c2, c3)] + [("verdict", v_r)]
+        rows.append((f"{lab}: {v_r} ({why_r})", {"supported": True, "not_supported": False}.get(v_r), True))
+    comb = all_constructions(rows, "the claim under both readings of the '+-5-day' roll window")
+    v, why = _verdict([(comb[0], comb[1])])
+    n_tr = min(R_["n"] for R_ in rd.values())
+    P0 = rd[T468_READINGS[0][0]]
+    fam = {"USO/BNO on the log futures spread (primary)": P0["prim"]["pnl"]}
+    sd_ = np.where(okp, bz - cl, np.nan)
+    zf_usd = trailing_z_masked(sd_, P0["ok"], T468_L, T468_MIN_OBS)
     usd = trade_rule(ed, onto(zf_usd), rBn, rU, **kw)
     fam["USO/BNO on the dollar futures spread"] = usd["pnl"]
     var_uga = None
@@ -1567,28 +1617,33 @@ def brent_wti(fut: dict, etf: dict, uga: Optional[tuple] = None, min_n: int = T4
         rg = trade_rule(gd, zg, _rets(ug), _rets(us2), **kw)
         fam["UGA/USO crack-spread proxy"] = rg["pnl"]
         var_uga = trade_stats(rg["trades"])
-    ds = dsr_family(prim["pnl"], [_sr_pp(x) for x in fam.values()], T468_N_TRIALS)
+    ds = dsr_family(P0["prim"]["pnl"], [_sr_pp(x) for x in fam.values()], T468_N_TRIALS)
+    zf_all = np.where(P0["ok"], trailing_z_masked(s, okp & ~excl, T468_L, T468_MIN_OBS), np.nan)
     sens = trade_stats(trade_rule(ed, onto(zf_all), rBn, rU, **kw)["trades"])
+    unm = trade_stats(trade_rule(ed, onto(trailing_z_masked(s, okp & ~excl, T468_L, T468_MIN_OBS)), rBn, rU, **kw)["trades"])
     hl = {}
     for a_, b_ in T468_SUBS:
-        kk = np.array([a_ <= d[:4] <= b_ for d in fd], bool) & ok
+        kk = np.array([a_ <= d[:4] <= b_ for d in fd], bool) & okp & ~excl
         x_ = s[kk]
         if x_.size > 30:
             hl[f"{a_}-{b_}"] = float(half_life(x_[:, None])[0])
     s_etf = np.log(bno / uso)
     epos = {d: i for i, d in enumerate(ed)}
     both = [d for d in fd if d in epos]
-    zfe = np.array([zf[fpos[d]] for d in both])
+    zfe = np.array([P0["zf"][fpos[d]] for d in both])
     ze2 = trailing_z_masked(s_etf, np.ones(len(ed), bool), T468_L, T468_MIN_OBS)
     zee = np.array([ze2[epos[d]] for d in both])
     m_ = np.isfinite(zfe) & np.isfinite(zee)
     corr = float(np.corrcoef(zfe[m_], zee[m_])[0, 1]) if m_.sum() > 10 else None
-    return {"n": n_tr, "mean": mean, "boot": tb, "p_null": p_null, "null_mean": float(nm.mean()) if nm.size else None,
-            "trades": tr, "subs": subs, "dsr": ds, "family": {k_: {"sharpe_pp": _sr_pp(x)} for k_, x in fam.items()},
+    per = {lab: {k_: R_[k_] for k_ in ("n", "mean", "p_null", "null_mean", "n_null", "subs", "mask_share", "n_signal_sessions",
+                                        "reasons")} | {"boot": {k_: R_["boot"].get(k_) for k_ in ("est", "ci", "ci1", "ci_mc_se", "ci1_mc_se")},
+                                                       "trades": R_["trades"]}
+           for lab, R_ in rd.items()}
+    return {"n": n_tr, "readings": per, "dsr": ds, "family": {k_: {"sharpe_pp": _sr_pp(x)} for k_, x in fam.items()},
             "usd_variant": trade_stats(usd["trades"]), "uga_variant": var_uga, "sens_stats_all_sessions": sens,
-            "half_life": hl, "corr_z_futures_vs_etf": corr, "mask_share": float(rm.mean()), "n_signal_sessions": int(ok.sum()),
-            "window": (prim["days"][0], prim["days"][-1]) if prim["days"] else None, "reasons": _tally(tr),
-            "criteria": [(c[0], c[1]) for c in (c1, c2, c3)], "verdict": v, "why": why}
+            "unmasked": unm, "half_life": hl, "corr_z_futures_vs_etf": corr,
+            "window": (P0["prim"]["days"][0], P0["prim"]["days"][-1]) if P0["prim"]["days"] else None,
+            "criteria": crit_all, "verdict": v, "why": why}
 
 
 def _tally(trades: list) -> dict:
@@ -1791,14 +1846,16 @@ def coint_secondary(sc: dict, frames: Sequence[dict], n_days: int) -> dict:
     return {"cells": {k: {kk: vv for kk, vv in v.items() if kk != "x"} for k, v in cells.items()}, "dsr": ds}
 
 
-def kalman_study(sc: dict, frames: Sequence[dict], n_days: int, min_n: int = T323_MIN_N, em_iters: int = T323_EM_ITERS) -> dict:
-    """T-323 on the selected pair-windows (frames): per-window paired net-Sharpe differences (Kalman minus static, same
-    rule), judged in 2008-2016 and 2017-2026 under the window-month block bootstrap and the Ledoit-Wolf test on the
-    aggregate daily portfolios (rule 11), and the DSR of the primary Kalman variant over the 4-cell grid."""
+T323_HALVES = (("2008-2016", lambda lab: lab < T323_SPLIT), ("2017-2026", lambda lab: lab >= T323_SPLIT))
+
+
+def kalman_study(sc: dict, frames: Sequence[dict], n_days: int, min_n: int = T323_MIN_N, em_iters: Optional[int] = None) -> dict:
+    """T-323 on the selected pair-windows (frames): simulate the static and Kalman cells, then ``kalman_judge``."""
+    em_iters = T323_EM_ITERS if em_iters is None else int(em_iters)
     labels = sc["labels"]
     rules = sorted({rule for _, rule in T323_KCELLS.values()})
-    K_, SRs, SRk, PN_S, PN_K, V_, DI_, deltas, reb, opk, ops = [], {r: [] for r in rules}, {c: [] for c in T323_KCELLS}, \
-        {r: [] for r in rules}, {c: [] for c in T323_KCELLS}, [], [], [], 0, 0, 0
+    K_, SRs, SRk, PN_S, PN_K, deltas, reb, opk, ops = [], {r: [] for r in rules}, {c: [] for c in T323_KCELLS}, \
+        {r: [] for r in rules}, {c: [] for c in T323_KCELLS}, [], 0, 0, 0
     for fr in frames:
         kf = {"em": kalman_frame(fr, None, em_iters), "fixed": kalman_frame(fr, T323_DELTA_FIXED, em_iters)}
         deltas.append(kf["em"]["delta"])
@@ -1816,38 +1873,15 @@ def kalman_study(sc: dict, frames: Sequence[dict], n_days: int, min_n: int = T32
                 reb += int(km["n_rebalance"].sum())
                 opk += int(km["n_open"].sum())
         K_.append(fr["k"])
-        V_.append(fr["Vt"])
-        DI_.append(fr["DI"])
     if not frames:
         v, why = _decide([("pair-windows selected", None)], 0, min_n, "pair-windows")
         return {"n": 0, "criteria": [], "verdict": v, "why": why}
     kk = np.concatenate(K_)
-    n_rows = int(kk.size)
-    n = int(round(n_rows / T322_HOLD))
-    dcell = {}
-    for c, (mode, r) in T323_KCELLS.items():
-        dcell[c] = np.concatenate(SRk[c]) - np.concatenate(SRs[r])
-    d = dcell[T323_PRIMARY]
+    dcell = {c: np.concatenate(SRk[c]) - np.concatenate(SRs[r]) for c, (mode, r) in T323_KCELLS.items()}
     rp = T323_KCELLS[T323_PRIMARY][1]
-    wk = np.array([w["k"] for w in sc["windows"]], int)
-    wlab = [w["month"] for w in sc["windows"]]
-    halves = {}
-    crit = []
-    for hn, test in (("2008-2016", lambda lab: lab < T323_SPLIT), ("2017-2026", lambda lab: lab >= T323_SPLIT)):
-        wm = np.array([test(l_) for l_ in wlab], bool)
-        ks = wk[wm]
-        num = np.array([d[kk == k_].sum() for k_ in ks], float)
-        den = np.array([(kk == k_).sum() for k_ in ks], float)
+    series = {}
+    for hn, test in T323_HALVES:
         rm = np.array([test(labels[k_]) for k_ in kk], bool)
-
-        def chk(t):
-            lo = (t.get("ci") or [None])[0]
-            return resolve(lo, (t.get("ci_mc_se") or [0.0])[0], 0.0, "gt")[0]
-        tb = _mc(lambda seed: cbb_ratio(num, den, T322_BLOCK, seed=seed), chk) if den.sum() >= 8 else {"est": None, "ci": [None, None]}
-        lo, hi = tb.get("ci") or (None, None)
-        se = tb.get("ci_mc_se") or [0.0, 0.0]
-        okb, nb = resolve(lo, se[0], 0.0, "gt")
-        decb = hi is not None and resolve(hi, se[1], 0.0, "lt")[0] is True
         parts_k, parts_s = [], []
         off = 0
         for fr, pk, ps in zip(frames, PN_K[T323_PRIMARY], PN_S[rp]):
@@ -1855,11 +1889,51 @@ def kalman_study(sc: dict, frames: Sequence[dict], n_days: int, min_n: int = T32
             off += fr["k"].size
             parts_k.append((pk[m], fr["Vt"][m], fr["DI"][m]))
             parts_s.append((ps[m], fr["Vt"][m], fr["DI"][m]))
-        ak, ck = aggregate(parts_k, n_days)
-        as_, cs = aggregate(parts_s, n_days)
+        ak, _ = aggregate(parts_k, n_days)
+        as_, _ = aggregate(parts_s, n_days)
         both = np.isfinite(ak) & np.isfinite(as_)
-        xk, xs = ak[both], as_[both]
-        if xk.size >= 8:
+        series[hn] = (ak[both], as_[both])
+    fam = {}
+    for c in T323_KCELLS:
+        a_, _ = aggregate([(pk, fr["Vt"], fr["DI"]) for fr, pk in zip(frames, PN_K[c])], n_days)
+        fam[c] = a_[np.isfinite(a_)]
+    wins = [(w["k"], w["month"]) for w in sc["windows"]]
+    j = kalman_judge(kk, dcell, labels, wins, series, fam, min_n)
+    dl = np.concatenate(deltas)
+    j.update(delta_em_median=float(np.median(dl)), delta_em_q=[float(np.quantile(dl, .1)), float(np.quantile(dl, .9))],
+             rebalances=reb, opens_kalman=opk, opens_static=ops)
+    return j
+
+
+def kalman_judge(kk: np.ndarray, dcell: dict, labels: Sequence[str], wins: Sequence[tuple], series: dict, fam: dict,
+                 min_n: int = T323_MIN_N) -> dict:
+    """T-323's criteria. kk: window index of every pair-window; dcell: {cell: per-pair-window net-Sharpe difference};
+    wins: [(k, 'YYYY-MM')] of every scanned window in time order; series: {half: (aggregate Kalman, aggregate static)
+    daily returns on shared sessions}; fam: {cell: aggregate Kalman daily returns}. Each half: the mean difference > 0
+    with the 95% CI excluding 0 under the window-month block bootstrap AND the Ledoit-Wolf test (rule 11); the DSR of
+    the primary Kalman variant > 0.95 at the grid's trial count."""
+    n_rows = int(kk.size)
+    n = int(round(n_rows / T322_HOLD))
+    d = dcell[T323_PRIMARY]
+    wk = np.array([w[0] for w in wins], int)
+    wlab = [w[1] for w in wins]
+    halves, crit = {}, []
+
+    def chk(t):
+        lo = (t.get("ci") or [None])[0]
+        return resolve(lo, (t.get("ci_mc_se") or [0.0])[0], 0.0, "gt")[0]
+    for hn, test in T323_HALVES:
+        wm = np.array([test(l_) for l_ in wlab], bool)
+        ks = wk[wm]
+        num = np.array([d[kk == k_].sum() for k_ in ks], float)
+        den = np.array([(kk == k_).sum() for k_ in ks], float)
+        tb = _mc(lambda seed: cbb_ratio(num, den, T322_BLOCK, seed=seed), chk) if den.sum() >= 8 else {"est": None, "ci": [None, None]}
+        lo, hi = tb.get("ci") or (None, None)
+        se = tb.get("ci_mc_se") or [0.0, 0.0]
+        okb, nb = resolve(lo, se[0], 0.0, "gt")
+        decb = hi is not None and resolve(hi, se[1], 0.0, "lt")[0] is True
+        xk, xs = series.get(hn, (np.zeros(0), np.zeros(0)))
+        if xk.size >= 8 and xk.std() > 0 and xs.std() > 0:
             tl = _mc(lambda seed: lw_test(xk, xs, 252, T323_LW_BLOCK, N_BOOT, seed), chk, keys=("ci",))
         else:
             tl = {"diff": None, "ci": [None, None]}
@@ -1871,33 +1945,25 @@ def kalman_study(sc: dict, frames: Sequence[dict], n_days: int, min_n: int = T32
         crit.append(all_constructions(
             [(f"window-month block bootstrap ({T322_BLOCK}-month blocks, {int(den.sum())} pair-windows): mean "
               f"{_s(tb.get('est'), 3)} {_ci(tb.get('ci'), 3)}{nb}", okb if tb.get("est") is not None else None, decb),
-             (f"{'Ledoit-Wolf (2008) test'} on the aggregate daily portfolios ({xk.size} sessions, block {T323_LW_BLOCK}): Sharpe "
+             (f"Ledoit-Wolf (2008) test on the aggregate daily portfolios ({xk.size} sessions, block {T323_LW_BLOCK}): Sharpe "
               f"{_s(tl.get('diff'), 3)} {_ci(tl.get('ci'), 3)}{nl}", okl, decl)],
             f"{hn}: mean paired net-Sharpe difference (Kalman - static) > 0 with 95% CI excluding 0"))
         halves[hn] = {"n_rows": int(den.sum()), "mean": tb.get("est"), "ci": tb.get("ci"), "ci_mc_se": tb.get("ci_mc_se"),
                       "lw": {k_: tl.get(k_) for k_ in ("diff", "ci", "ci_mc_se", "p", "se")},
                       "sharpe_kalman_agg": _sr_ann(xk, 252), "sharpe_static_agg": _sr_ann(xs, 252)}
-    fam = {}
-    for c in T323_KCELLS:
-        parts = [(pk, fr["Vt"], fr["DI"]) for fr, pk in zip(frames, PN_K[c])]
-        a_, _ = aggregate(parts, n_days)
-        fam[c] = a_[np.isfinite(a_)]
     xprim = fam[T323_PRIMARY]
-    ds = dsr_family(xprim, [_sr_pp(x) for x in fam.values()], T323_N_TRIALS) if xprim.size > 3 else {"dsr": None, "psr0": None,
-                                                                                                    "n_trials": T323_N_TRIALS,
-                                                                                                    "var_trials_sr": 0.0}
+    ds = dsr_family(xprim, [_sr_pp(x) for x in fam.values()], T323_N_TRIALS) if xprim.size > 3 else \
+        {"dsr": None, "psr0": None, "n_trials": T323_N_TRIALS, "var_trials_sr": 0.0}
     crit.append(dsr_row(ds, f"DSR of the Kalman variant > {DSR_PASS} at {T323_N_TRIALS} trials (delta EM / 1e-4 x entry 2 / 1 sd)"))
     v, why = _decide(crit, n, min_n, "pair-windows (non-overlapping equivalents: pooled pair-windows / 6)")
     yrs = {}
     for y in ("2020", "2022"):
         m = np.array([labels[k_][:4] == y for k_ in kk], bool)
         yrs[y] = {"n_rows": int(m.sum()), "mean_diff": float(d[m].mean()) if m.any() else None}
-    dl = np.concatenate(deltas)
-    return {"n": n, "n_pair_windows": n_rows, "mean_diff": float(d.mean()), "halves": halves, "dsr": ds,
-            "cells": {c: {"mean_diff": float(x.mean()), "sharpe_kalman_agg": _sr_ann(fam[c], 252)} for c, x in dcell.items()},
-            "breaks": yrs, "delta_em_median": float(np.median(dl)), "delta_em_q": [float(np.quantile(dl, .1)), float(np.quantile(dl, .9))],
-            "rebalances": reb, "opens_kalman": opk, "opens_static": ops,
-            "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
+    return {"n": n, "n_pair_windows": n_rows, "mean_diff": float(d.mean()) if d.size else None, "halves": halves, "dsr": ds,
+            "cells": {c: {"mean_diff": float(x.mean()) if x.size else None, "sharpe_kalman_agg": _sr_ann(fam[c], 252)}
+                      for c, x in dcell.items()},
+            "breaks": yrs, "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
 
 
 # ===================================================================================================== harnesses ==
@@ -1953,9 +2019,13 @@ def b6c_pairs_distance(archive):
         return miss
     e = _etf_data(archive)
     res = ggr_run(e["days"], e["P"], UNIVERSE, [ASSET_CLASS[s] for s in UNIVERSE])
+    if not len(res["x"]):
+        v, why = _verdict([(f"monthly returns in {T321_FIRST}..{END[:7]} (none: the archived histories do not cover a "
+                            f"formation and trading window)", None)])
+        return _out({"n_months": 0}, 0, v, "no portfolio could be formed and traded in the claim's window — " + why)
     j = ggr_judge(res)
     t6, t12 = j["stud"][6], j["stud"][12]
-    ph = [p["mean"] for p in res["phases"].values() if p["mean"] is not None]
+    ph = [p["mean"] for p in res["phases"].values() if p["mean"] is not None] or [None]
     reason = (f"GGR distance rule on the declared 51 ETFs ({res['universe'][0]}..{res['universe'][1]} eligible per formation; "
               f"{res['n_portfolios']} portfolios, one starting each month, 12-month formation on total-return indices, 20 "
               f"smallest-SSD pairs, open beyond 2 formation sds of the spread rebased at the formation-end close, one-day wait "
@@ -1968,8 +2038,8 @@ def b6c_pairs_distance(archive):
               + ", ".join(f"{k} {_bp(v['mean'], 1)}" for k, v in j["family"].items())
               + f"); CSCV PBO {_f((j['pbo'] or {}).get('pbo'))} (16 partitions, {len(j['family'])} cells). Regimes: "
               + ", ".join(f"{k} {_bp(v['mean'], 1)} (Sharpe {_s(v['sharpe_ann'], 2)})" for k, v in j["regimes"].items())
-              + f". Per-phase range (each of the six non-overlapping start phases alone; reported): {_bp(min(ph), 1)} to "
-              f"{_bp(max(ph), 1)}. Pairs traded: {_f(res['opens_per_pair'], 2)} openings per nominated pair, "
+              + f". Per-phase range (each of the six non-overlapping start phases alone; reported): {_bp(_mn(ph), 1)} to "
+              f"{_bp(_mx(ph), 1)}. Pairs traded: {_f(res['opens_per_pair'], 2)} openings per nominated pair, "
               f"{_pu(res['share_pairs_traded'])} of pairs opened at least once. Most selected (near-twins dominate the SSD "
               f"ranking; not same-index twins, so the declaration keeps them): "
               + ", ".join(f"{k} {v}" for k, v in res["top_pairs"][:6]) + " — " + j["why"])
@@ -1991,11 +2061,15 @@ def b6c_pairs_cointegration(archive):
     if miss:
         return miss
     sc = _coint(archive)
+    if not sc["windows"]:
+        v, why = _decide([("windows with a 12-month formation and 6 trading months in 2008-01..2026-09 (none archived)", None)],
+                         0, T322_MIN_N, "selected pairs")
+        return _out({"n": 0}, 0, v, "no formation/trading window is covered by the archived histories — " + why)
     j = persistence_judge(sc)
     e = _etf_data(archive)
     sec = _cached(archive, ("coint_secondary",), lambda: coint_secondary(sc, _frames(archive, "eg"), len(e["days"])))
     t = j["boot"]
-    ph = [p["share"] for p in j["phases"].values() if p["share"] is not None]
+    ph = [p["share"] for p in j["phases"].values() if p["share"] is not None] or [None]
     pc = sec["cells"]["half-life filter on, 2/0.5/4"]
     reason = (f"Engle-Granger on the declared 51 ETFs plus ETH/BTC, windows starting every month "
               f"{sc['windows'][0]['month']}..{sc['windows'][-1]['month']} ({j['n_windows']} windows; 12-month formation on "
@@ -2007,7 +2081,7 @@ def b6c_pairs_cointegration(archive):
               f"one-sided lower {_pu((t.get('ci1') or [None])[0])}); random-pair share {_pu(j['random_share'])} (95th pct "
               f"{_pu(j['random_q95'])}), all candidates {_pu(j['candidate_share'])}; selected minus random "
               f"{_pu((j['diff_vs_random'] or {}).get('est'))} {_ci((j['diff_vs_random'] or {}).get('ci'), 3)}. Per-phase "
-              f"range (the six semiannual grids; reported): {_pu(min(ph))} to {_pu(max(ph))}. Regimes: "
+              f"range (the six semiannual grids; reported): {_pu(_mn(ph))} to {_pu(_mx(ph))}. Regimes: "
               + ", ".join(f"{k} {_pu(v['share'])} of {v['n_sel']}" for k, v in j["regimes"].items())
               + f". Sensitivities: without the half-life filter {_pu(j['share_no_hl_filter'])} of {j['n_eg']}; with the "
               f"2-variable critical value out of sample {_pu(j['share_n2_crit'])}. Secondary (not a pass condition): static "
@@ -2072,28 +2146,33 @@ def b6c_pairs_brent_wti(archive):
         uga = (ug["days"], ug["adj"])
     j = brent_wti({"BZ": (bz["days"], bz["close"]), "CL": (cl["days"], cl["close"])},
                   {"USO": (us["days"], us["adj"]), "BNO": (bn["days"], bn["adj"])}, uga)
-    tb = j["boot"]
-    reason = (f"s = ln(BZ=F) - ln(CL=F) front-month closes; z on the trailing {T468_L} sessions over unmasked values (roll "
-              f"windows +-{T468_ROLL_WIN} sessions around each scheduled CL and BZ last trading day, and April 2020, masked: "
-              f"{_pu(j['mask_share'])} of sessions masked, {j['n_signal_sessions']} signal sessions); z > 2 long USO / short "
-              f"BNO, z < -2 the reverse, equal dollars at the next close; exit at z = 0 or after {T468_MAX_HOLD} sessions; "
-              f"5 bps per leg per trade, 50 bps/yr borrow; window {j['window'][0]}..{j['window'][1]}. {j['n']} trades "
-              f"({', '.join(f'{k} {v}' for k, v in j['reasons'].items())}), mean net per trade {_bp(j['mean'], 1)} "
-              f"({_ci(tb.get('ci'), 1, 1e4, ' bp')}); block-shifted null mean {_bp(j['null_mean'], 1)}, p {_f(j['p_null'])}. "
-              f"Sub-periods: " + ", ".join(f"{k} {_bp(v['mean'], 1)} ({v['n']})" for k, v in j["subs"].items())
-              + f". Reported: DSR {_f(j['dsr'].get('dsr'))} over {T468_N_TRIALS} variants (dollar spread: "
-              f"{j['usd_variant']['n']} trades, {_bp(j['usd_variant']['mean'], 1)}; UGA/USO: "
-              f"{(j['uga_variant'] or {}).get('n')} trades, {_bp((j['uga_variant'] or {}).get('mean'), 1)}); trailing statistics "
-              f"over every session instead: {j['sens_stats_all_sessions']['n']} trades, "
-              f"{_bp(j['sens_stats_all_sessions']['mean'], 1)}; AR(1) half-life of s by sub-period "
+    if j["window"] is None:
+        v, why = _verdict([("fund sessions in 2011-01..2026-09 (none archived)", None)])
+        return _out({"n": 0}, 0, v, "the archived USO/BNO histories do not reach the claim's window — " + why)
+    rtxt = []
+    for lab, R_ in j["readings"].items():
+        tb = R_["boot"]
+        rtxt.append(f"{lab} ({_pu(R_['mask_share'])} of sessions masked, {R_['n_signal_sessions']} signal sessions): {R_['n']} "
+                    f"trades ({', '.join(f'{k} {v}' for k, v in R_['reasons'].items())}), mean net per trade "
+                    f"{_bp(R_['mean'], 1)} ({_ci(tb.get('ci'), 1, 1e4, ' bp')}), block-shifted null mean "
+                    f"{_bp(R_['null_mean'], 1)}, p {_f(R_['p_null'])}; sub-periods "
+                    + ", ".join(f"{k} {_bp(v['mean'], 1)} ({v['n']})" for k, v in R_["subs"].items()))
+    reason = (f"s = ln(BZ=F) - ln(CL=F) front-month closes; z on the trailing {T468_L} sessions over unmasked values (the "
+              f"scheduled CL and BZ last trading days +-5, and April 2020, are masked from the statistics and from every "
+              f"decision); z > 2 long USO / short BNO, z < -2 the reverse, equal dollars at the next close; exit at z = 0 or "
+              f"after {T468_MAX_HOLD} sessions; 5 bps per leg per trade, 50 bps/yr borrow; window {j['window'][0]}.."
+              f"{j['window'][1]}. The claim's '+-5-day' window is read both ways and each criterion is decided only when they "
+              f"agree. " + ". ".join(rtxt)
+              + f". Reported: DSR {_f(j['dsr'].get('dsr'))} over {T468_N_TRIALS} runnable variants (dollar spread "
+              f"{j['usd_variant']['n']} trades {_bp(j['usd_variant']['mean'], 1)}; UGA/USO {(j['uga_variant'] or {}).get('n')} "
+              f"trades {_bp((j['uga_variant'] or {}).get('mean'), 1)}); sensitivities on the session mask: trailing statistics "
+              f"over every session {j['sens_stats_all_sessions']['n']} trades {_bp(j['sens_stats_all_sessions']['mean'], 1)}, "
+              f"no roll mask {j['unmasked']['n']} trades {_bp(j['unmasked']['mean'], 1)}; AR(1) half-life of s by sub-period "
               + ", ".join(f"{k} {v:.0f}" for k, v in j["half_life"].items())
               + f" sessions; z(futures) vs z(ln BNO/USO) correlation {_f(j['corr_z_futures_vs_etf'], 2)}. USO's 2020 roll-"
               f"schedule change is a flagged structural break inside 2020-2026 — " + j["why"])
-    stat = {k: j[k] for k in ("n", "mean", "p_null", "null_mean", "subs", "dsr", "family", "usd_variant", "uga_variant",
-                              "sens_stats_all_sessions", "half_life", "corr_z_futures_vs_etf", "mask_share",
-                              "n_signal_sessions", "window", "reasons", "criteria")}
-    stat["boot"] = {k: tb.get(k) for k in ("est", "ci", "ci1", "ci_mc_se", "ci1_mc_se", "reps")}
-    stat["trades"] = j["trades"]
+    stat = {k: j[k] for k in ("n", "readings", "dsr", "family", "usd_variant", "uga_variant", "sens_stats_all_sessions",
+                              "unmasked", "half_life", "corr_z_futures_vs_etf", "window", "criteria")}
     stat["rule10"] = "daily state machine on trailing statistics (no grid phase)"
     return _out(stat, j["n"], j["verdict"], reason)
 
