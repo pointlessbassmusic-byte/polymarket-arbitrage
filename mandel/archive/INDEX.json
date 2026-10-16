@@ -28106,10 +28106,10 @@
    "name": "polymarket-fetch-log",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-fetch-log.jsonl.gz",
-   "created_at": "2026-10-16T02:51:41.258422+00:00",
-   "rows": 20794,
-   "bytes": 1165504,
-   "sha256": "2d7e3379f693e1d72dec921fe0096a645a40596c4c5e470bf21b69e2d19ff19d",
+   "created_at": "2026-10-16T02:54:57.920253+00:00",
+   "rows": 21134,
+   "bytes": 1190742,
+   "sha256": "496a7a73df9afc6fd33e98c5c8969d9005d1e48f5a59b074933f5e2d5d35d9a4",
    "tags": [
     "complete",
     "fetch-log",
@@ -66917,6 +66917,27 @@
    "parked_reason": "",
    "in_git": false,
    "schema": "kind fact: value = {cik, taxonomy, tag, unit, start, end, val, accn, fy, fp, form, filed, frame}: dei cover shares and public float, us-gaap CommonStockSharesOutstanding and basic weighted shares from every form; the F-score and book-equity concepts from annual forms (10-K, 20-F, 40-F and amendments) only; available_at = min(acceptance of the accession from sec-submissions, filed date 22:00 ET) | kind coverage: value = {bucket, ciks, status per cik}"
+  },
+  "polymarket-price-history-hourly-2025-11": {
+   "name": "polymarket-price-history-hourly-2025-11",
+   "kind": "data",
+   "path": "mandel/archive/data/polymarket-price-history-hourly-2025-11.jsonl.gz",
+   "created_at": "2026-10-16T02:54:57.161007+00:00",
+   "rows": 70914,
+   "bytes": 964942,
+   "sha256": "375ddcf92bf709f885a4f5e3d05a56147ea5d1fdfcf1f4fd0038e888c9417a8f",
+   "tags": [
+    "2025-11",
+    "complete",
+    "history",
+    "hourly",
+    "polymarket",
+    "prices"
+   ],
+   "recipe": "GET https://clob.polymarket.com/prices-history?market=<YES token>&startTs=<s>&endTs=<e>&fidelity=60 in 14-day windows (longer spans answer 400 'interval is too long') over [listing, resolution] of the targets of mandel.data.pm_history.hourly_targets(sets=['btc_above', 'pairs', 'top']): BTC-above daily / weekly markets (polymarket-events-btc-above, hourly-ET variants excluded), the Polymarket legs of pm-kalshi-pairs, and the legacy polymarket-price-history-daily markets over their last 56 days. available_at = t (snapshot). Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {market_id, token (the YES / first-outcome CLOB token), p, t (unix)} (as polymarket-price-history-daily); observed_at = available_at = t: a point is the price prevailing at t"
   }
  }
 }
