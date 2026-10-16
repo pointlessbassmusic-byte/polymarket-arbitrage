@@ -10208,12 +10208,18 @@
     "pass": "HAC t >= 2 over >= 1000 weeks AND positive slope in both halves (2005-2015, 2016-2026); otherwise parked as 'flows follow price'.",
     "controls": "Look-ahead: holdings published after the close; use t+1 availability. Survivorship: none. Costs: GLD 0.40% fee (GLDM 0.10%), 1 bp spread. Multiple testing: 5 variants. Regime: 2013 outflows, 2020 inflow surge, 2022-2026 central-bank-led rally; real-yield control (FRED DFII10)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pub_gld_flows"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "parked",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Gold ETF flows vs gold price (GLD tonnes, WGC flows); harness suggestion: data/gold.py (SPDR archive + WGC Excel); predictive-regression harness; Granger test utility. | verifier: corrected claim/trial"
+   "results": [
+    "X-abb887f5"
+   ],
+   "notes": "from the underlying-library library: Gold ETF flows vs gold price (GLD tonnes, WGC flows); harness suggestion: data/gold.py (SPDR archive + WGC Excel); predictive-regression harness; Granger test utility. | verifier: corrected claim/trial",
+   "status_before_park": "not_supported",
+   "parked_reason": "flows follow price (the trial's own park rule): next-week GLD return on the 52-week z of the 4-week tonnes change, NW t -0.10 over 1,087 weeks; contemporaneous slope t +5.07; Granger returns->flows p < 0.0001, flows->returns p 0.99"
   },
   {
    "id": "T-405",
@@ -10234,12 +10240,18 @@
     "pass": "CI excludes zero with >= 50 extreme weeks of each sign AND slope t <= -2; if either tail has < 50 weeks, report 'insufficient extremes' and park.",
     "controls": "Look-ahead: release date (3-day lag). Survivorship: none. Costs: GLD 1 bp, low turnover. Multiple testing: 5 variants; threshold fixed at 2. Regime: real yields (DFII10) as control; 2013 and 2020 regimes."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pub_gold_cot_extremes"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "parked",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Gold and silver COT positioning extremes; harness suggestion: data/cftc.py (annual zip loader, contract code mapping: gold 088691, silver 084691, BTC 133741); regime-conditional forward-return harness with release-date alignment. | verifier: corrected claim/trial"
+   "results": [
+    "X-d5f4ff4a"
+   ],
+   "notes": "from the underlying-library library: Gold and silver COT positioning extremes; harness suggestion: data/cftc.py (annual zip loader, contract code mapping: gold 088691, silver 084691, BTC 133741); regime-conditional forward-return harness with release-date alignment. | verifier: corrected claim/trial",
+   "status_before_park": "not_supported",
+   "parked_reason": "insufficient extremes (the trial's own park rule): 872 point-in-time COT weeks 2009-10..2026-09 give only 20 weeks with z > 2 (50 needed; at most 16 more reports fit in the window); difference +0.04% (CI -2.90..+2.70), slope NW t +0.55"
   },
   {
    "id": "T-406",
@@ -11282,11 +11294,15 @@
     "pass": "Excess > 10 bps with p < 0.05 and both halves positive; placebo not significant.",
     "controls": "Look-ahead: auction schedules are announced in advance and the auction date is known at entry. Survivorship: n/a. Costs: about 24 round trips/yr at 1-2 bps (TLT). Multiple testing: 6 variants Holm. Regime: halves; 2008, the 2020 dash for cash and the 2022 bond bear flagged; overlap with CPI weeks reported."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pub_treasury_auction_cycle"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-ef7cb82d"
+   ],
    "notes": "from the underlying-library library: Treasury auction cycle (pre-auction concession, post-auction recovery); harness suggestion: data/fetch.py: treasury_auctions(terms=('10-Year','30-Year','9-Year 11-Month','29-Year 11-Month')) cached as 'treasury-auctions'; events.py: event_window_effect(days, closes, event_days, start=0, end=3, cluster='week') reusing block_bootstrap_pvalue. | added by the verifier pass"
   },
   {
@@ -12137,11 +12153,15 @@
     "pass": "95% lower bound of mean net return per trade > 0 AND at least 30 trades AND same sign in 2012-2019 and 2020-2026",
     "controls": "Look-ahead: NAV is struck after the close, so execute at the next close; trailing windows only; the disclosed descriptive peek is counted as a trial. Costs: PHYS spread ~3-5 bps, 10 bps/leg modelled, GLD borrow, fee differential (0.39% vs 0.40%) negligible. Tax: PHYS is a PFIC for US holders (QEF election), outside the return calculation. Regime: 2020 stress and the 2022-2026 drift. Multiple testing: 4 variants."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pub_phys_discount_reversion"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7c8bbcdc"
+   ],
    "notes": "from the underlying-library library: Physical bullion trust discount reversion (PHYS vs GLD); harness suggestion: trust_discount_reversion: Sprott page scraper (Highcharts data arrays), trailing-mean-relative z rule, per-trade bootstrap; generic for any premium/NAV series | added by the verifier pass"
   },
   {

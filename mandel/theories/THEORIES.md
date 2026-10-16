@@ -1,6 +1,6 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `6d0b26822e334fc1`). 477 theories. supported 50, not_supported 215, inconclusive 36, untested 43, blocked 121, parked 12.
+Rendered from `registry.json` (hash `f5dbc78aaf0aa1b4`). 477 theories. supported 50, not_supported 217, inconclusive 36, untested 39, blocked 121, parked 14.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
@@ -815,7 +815,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-a7f44bf6: supported — short variance struck at VIX^2, settled on SPY close-to-close returns; rule 10 (no entry calendar in the claim): 8460 daily entries 1993-01-29..2026-09-14 = 403 cycles: POOLED over all 21 grid offsets (8460 overlapping daily entries = 403 distinct 21-day holds; studentized circular block bootstrap, block 126 days): mean +8.12 %^2/month (CI +1.43 to +11.22); per grid offset (21 non-overlapping grids, n 401-403, block 6 cycles): mean +7.23 to +8.95, lower bound -0.95 to +3.84, 17/21 offsets pass; skew -7.60, kurtosis 93.0, worst cycle -630.8 entered 2020-02-26; ex-worst: pooled without the 41 entries overlapping it +9.44 (CI +4.54 to +12.30), per offset without its own worst cycle +8.60 to +10.36; units sensitivity (strike (VIX/100)^2 x 30/365 vs the un-annualised sum of 21 squared returns, %^2): pooled +7.62 (CI +0.91 to +10.78), 15/21 offsets pass; dividend-adjusted SPY basis +8.23 (pooled, 8460 entries); ^GSPC (SPX vs SPY) basis +8.81 (pooled, 8460 entries); close-to-close vs intraday RV (BTZ use 5-minute RV; not archived): on hourly SPY bars 2023-11-14..2026-09-14 (709 entries) intraday-only RV is 0.56 x close-to-close and the mean P&L +15.84 vs +7.09: close-to-close RV runs higher, so this test is conservative on the control; overlapping daily windows (T-48 vol units) VRP +2.45 vol pts, p 0.0140 (reported) — all criteria pass
 - note: from the options-library library: Variance Swap Replication (long / short variance via 1/K^2 strip); harness suggestion: Extend 'vrp_spx' (mandel/experiments/volatility.variance_risk_premium) with a variance-unit, non-overlapping mode and tail statistics; the same mode for vrp_btc and vrp_gold. | added by the verifier pass | 2026-10-15 re-run: supported pooled over all 21 start offsets (+8.12 %^2/month, CI +1.43 to +11.22); 17 of 21 single grids pass; worst cycle -630.8 entered 2020-02-26 (skew -7.6, kurtosis 93): the tail is the point, as the trial says.
 
-## Not Supported (215)
+## Not Supported (217)
 
 ### T-02 · longshot-bias
 
@@ -3616,6 +3616,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-9a79b1c6: not_supported — Nov-Apr minus May-Oct +40 bps/month over 98 years (p=0.051), 2002-11..2026-09 +26 (144 winter / 143 summer months) — failed: difference > 50 bps/month; p < 0.05
 - note: from the underlying-library library: Sell in May / Halloween indicator; harness suggestion: events.py: half_year_effect(days, closes, start_month=11, end_month=4, cash=dtb3) -> monthly means, block-bootstrap p, switching Sharpe; month_of_year_grid(days, closes) with Bonferroni over 12. | verifier-corrected restatement of T-352, whose verdict tested the earlier wording and stands
 
+### T-442 · treasury-auction-cycle
+
+**Claim.** Over 2002-2026, TLT's mean return from the close of a 10- or 30-year auction day to the close three trading days later exceeds its unconditional mean 3-day return by at least 10 bps, with both halves positive.
+
+- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://ideas.repec.org/a/oup/rfinst/v26y2013i8p1891-1912.html, https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query
+- statistic: Mean 3-day post-auction TLT return minus the unconditional mean 3-day TLT return (bps), per auction-week cluster.
+- null: No auction effect. Block bootstrap of the daily series (block 10) with event flags held fixed; placement placebo with clusters moved to random non-auction weeks.
+- procedure: Fetch auction dates and merge them into weekly clusters. Halves 2002-2013 / 2014-2026. The DGS10 1990-2026 variant uses yield changes in bps (sign-flipped). 6 variants Holm.
+- data: fiscaldata.treasury.gov /v1/accounting/od/auctions_query (keyless, verified; filter security_term 10-Year/30-Year and the 9-Year 11-Month/29-Year 11-Month reopening terms); daily-history-TLT (stored); IEF via Yahoo (2002-07-30, verified); fred-DGS10 (stored). · min n: 200
+- pass: Excess > 10 bps with p < 0.05 and both halves positive; placebo not significant.
+- controls: Look-ahead: auction schedules are announced in advance and the auction date is known at entry. Survivorship: n/a. Costs: about 24 round trips/yr at 1-2 bps (TLT). Multiple testing: 6 variants Holm. Regime: halves; 2008, the 2020 dash for cash and the 2022 bond bear flagged; overlap with CPI weeks reported.
+- harness: b6c_pub_treasury_auction_cycle
+- result X-ef7cb82d: not_supported — 486 held nominal 9/10/29/30-Year auctions inside TLT's history (652 since 1979-10-31; TIPS and FRNs out) merged into 264 ISO-week clusters dated at the week's last auction (0 weeks inside TLT's span without an auction on a TLT session dropped; 0 cluster dates not announced before the entry close); 264 clusters 2002-08-07..2026-10-08 inside TLT's history. TLT close of the cluster day -> close 3 sessions later: mean +12.9 bps vs the unconditional 3-session mean +5.0 bps, excess +7.9 bps (net of 1/2 bps a round trip +6.9 bps/+5.9 bps); flags-fixed bootstrap p 0.1823 (vs 10 bps 0.5940), placement p 0.2875 over 999 non-auction weeks; halves +35.1 bps / -10.5 bps; variants: V2_tlt_pre -27.6 bps over 264 clusters (p 0.0022 / placement 0.0005); V3_ief_10y +6.3 bps over 264 clusters (p 0.0617 / placement 0.0380); V4_dgs10_10y +1.10 bps over 317 clusters (p 0.0202 / placement 0.0042); V5_reopen_vs_new -10.5 bps over 264 clusters (p 0.5817 / placement 0.5630); V6_ex_cpi_fomc +15.8 bps over 126 clusters (p 0.1120 / placement 0.1650). Reported: 121 clusters in CPI weeks, 36 in FOMC weeks; 2008 +95.9 bps (9), 2020-03 -287.0 bps (1), 2022 -143.0 bps (12) — failed: excess > 10 bps (+7.9 bps = cluster mean +12.9 bps - unconditional +5.0 bps); p < 0.05 (raw and Holm over the 6 declared variants) under both named nulls: daily block bootstrap (block 10), event flags fixed: p 0.1823, Holm-adjusted 0.3646 over 6 variants; placement in random non-auction weeks (2000 per seed): p 0.2875, Holm-adjusted 0.5749 over 6 variants; both halves positive (2002-2013 +35.1 bps, 2014-2026 -10.5 bps)
+- note: from the underlying-library library: Treasury auction cycle (pre-auction concession, post-auction recovery); harness suggestion: data/fetch.py: treasury_auctions(terms=('10-Year','30-Year','9-Year 11-Month','29-Year 11-Month')) cached as 'treasury-auctions'; events.py: event_window_effect(days, closes, event_days, start=0, end=3, cluster='week') reusing block_bootstrap_pvalue. | added by the verifier pass
+
 ### T-443 · turn-of-month-replication
 
 **Claim.** The SPY turn-of-month premium (T-59, window -4..+3) replicates with a positive, block-bootstrap-significant (p < 0.05) difference with both halves positive in at least three of the five assets QQQ, IWM, TLT, GLD and BTC-USD over their full histories.
@@ -3819,6 +3834,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: b6c_xs_country_long_reversal
 - result X-ba0aaeda: not_supported — 21 iShares country ETFs (none delisted; an ETF joins once it has a month-end 36 months back: 17 names in the first month, late entries EWT 2003-07, EWY 2003-06, EWZ 2003-08, EZA 2006-03), month-end trades, signal = total return from month-end t-36 to t-12, long the bottom quartile and short the top quartile (floor(n/4) names), 12 overlapping monthly cohorts, hold months 1999-04..2026-09 (330 months), 10 bps per leg per trade (+0.025%/month) + 50 bps/yr borrow on the short leg: net mean -0.089%/month (CI -0.439% to +0.417%, studentized CBB, 12-month blocks, 5,000 draws x 5 seeds), annualised Sharpe -0.08; halves 1999-2012 -0.181%, 2013-2026 +0.004%; DSR over the 4 declared variants (36-12, 36-0 with 36 overlapping cohorts, Balvers parametric, long-only bottom quartile minus equal weight) 0.077 (trial-Sharpe var 3.04e-03; observed 8.20e-04, floor 1/(T-1) 3.04e-03). Reported: PBO over the 4 variants 0.14; 2008 +0.314%, 2020 +0.347%/month; variant means 36-12 -0.089%; 36-0 +0.011%; parametric +0.234%; long-only +0.032%. LOW POWER: about 27 years against a 3-year half-life (fewer than 10 independent reversion cycles) — failed: 95% lower bound of the mean monthly net return > 0 (studentized CBB, 12-month blocks) (lower -0.439%); same sign in both halves: 1999-2012 -0.181%, 2013-2026 +0.004%; DSR > 0.95 over the 4 declared variants (0.077 at 4 trials; var(trial SR) 3.04e-03 = the 1/(T-1) floor (house convention; it exceeds the observed variance); observed 8.20e-04 over 4 computed trials, floor 1/(T-1) 3.04e-03; with the observed variance 0.174)
 - note: from the underlying-library library: Long-horizon reversal across country equity ETFs (De Bondt-Thaler / Balvers-Wu-Gilliland); harness suggestion: reuse xs_reversal_walkforward with monthly formation windows and overlapping cohorts | added by the verifier pass
+
+### T-472 · bullion-trust-discount-reversion
+
+**Claim.** From 2012-01 to 2026-09, long PHYS / short GLD opened when PHYS's discount is more than 1 percentage point below its trailing 250-day mean, and closed at that mean or after 60 trading days, earns a positive mean net return per trade after 10 bps per leg per trade and 50 bps/yr GLD borrow.
+
+- kind: underlying-strategy · origin: underlying-library:mean-reversion-statarb, https://sprott.com/investment-strategies/exchange-listed-products/physical-bullion-funds/gold/, https://doi.org/10.2307/2946710
+- statistic: mean net return per trade (and per day held) with bootstrap interval; diagnostics: AR(1) half-life of d_t minus its trailing mean, trade count
+- null: mean net return per trade = 0 (trades resampled in monthly clusters; block-shift of the signal series as a second null)
+- procedure: Scrape Sprott's embedded daily premium/discount series (4,228 points since 2010-02 in the page's Highcharts data). Join PHYS and GLD Yahoo closes. Trailing statistics only. Simulate the rule. Bootstrap. Count the 4 runnable variants in DSR. Disclose that the 2015-2026 descriptive statistics were seen before registration.
+- data: Sprott PHYS page (embedded daily premium/discount since 2010-02, verified 2026-10-14); Yahoo PHYS, GLD, PSLV, SLV daily closes · min n: 30
+- pass: 95% lower bound of mean net return per trade > 0 AND at least 30 trades AND same sign in 2012-2019 and 2020-2026
+- controls: Look-ahead: NAV is struck after the close, so execute at the next close; trailing windows only; the disclosed descriptive peek is counted as a trial. Costs: PHYS spread ~3-5 bps, 10 bps/leg modelled, GLD borrow, fee differential (0.39% vs 0.40%) negligible. Tax: PHYS is a PFIC for US holders (QEF election), outside the return calculation. Regime: 2020 stress and the 2022-2026 drift. Multiple testing: 4 variants.
+- harness: b6c_pub_phys_discount_reversion
+- result X-7c8bbcdc: not_supported — Sprott PHYS premium/discount (2010-02-25..2026-10-14, 4229 days) vs its trailing 250-observation mean; signal known the next morning, long PHYS / short GLD at the next NYSE close, exit at the next close after the discount is back at its rolling mean or after 60 sessions; entries 2012-01-01..2026-09-30: 27 trades 2012-02-06..2026-04-22, median hold 38 sessions; gross mean +0.328%; net mean +0.059% at 20 bps a trade (one-sided 95% lower bound -0.198%), -0.141% at 40 bps (lower bound -0.398%), 50 bps/yr GLD borrow; block-shift p 0.058; per session held +0.0099%; AR(1) of d minus its trailing mean 0.925 (half-life 8.9 days); DSR at 5 trials 0.192 (reported, not in the pass). Variants: z_lt_m2 23 trades, mean +0.016%; fixed_m2_m1 24 trades, mean +0.377%; mean_excl_today 27 trades, mean +0.059%; exit_at_entry_mean 27 trades, mean +0.044%; pslv_slv 54 trades, mean -0.156% — failed: at least 30 trades (27 closed; the entry window has closed, so the count cannot grow) (not implemented: mean net return per trade > 0 (both cost readings, both named nulls): [20bps_per_trade (10 bps per leg per round trip)] monthly-cluster studentized bootstrap: mean +0.059%, one-sided 95% lower bound -0.198% > 0 (two-sided 95% -0.255% to +0.323%); [20bps_per_trade (10 bps per leg per round trip)] block-shift null (every 60-session shift of the signal, 68 shifts): p 0.058 < 0.05; [40bps_per_trade (10 bps per leg per side)] monthly-cluster studentized bootstrap: mean -0.141%, one-sided 95% lower bound -0.398% > 0 (two-sided 95% -0.455% to +0.123%); [40bps_per_trade (10 bps per leg per side)] block-shift null (every 60-session shift of the signal, 68 shifts): p 0.058 < 0.05 [fails, not decisively, below min_n]; same sign in 2012-2019 and 2020-2026: [20bps_per_trade (10 bps per leg per round trip)] 2012-2019 mean -0.042% (13 trades), 2020-2026 mean +0.153% (14 trades); [40bps_per_trade (10 bps per leg per side)] 2012-2019 mean -0.242% (13 trades), 2020-2026 mean -0.047% (14 trades) [the named constructions disagree: undecided under rule 11]; n >= trial min_n (27 of 30 trades))
+- note: from the underlying-library library: Physical bullion trust discount reversion (PHYS vs GLD); harness suggestion: trust_discount_reversion: Sprott page scraper (Highcharts data arrays), trailing-mean-relative z rule, per-trade bootstrap; generic for any premium/NAV series | added by the verifier pass
 
 ### T-474 · treasury-butterfly-reversion
 
@@ -4806,7 +4836,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-66a6cce7: inconclusive — COR1M averages 37.1 vs realised equal-weight average pairwise correlation of the 9 sector SPDRs (XLB/XLE/XLF/XLI/XLK/XLP/XLU/XLV/XLY) 55.7. POOLED over all 21 grid offsets (5206 daily starts 2006-01-03..2026-09-14 = 248 distinct 21-session holds; studentized circular block bootstrap, block 126 sessions): mean gap -18.6 pts (95% CI -20.8 to -16.1), halves -19.0/-18.2. Per grid offset (21 non-overlapping grids, n 247 to 248 windows, block 6): mean gap -19.4 to -17.5 pts, lower bound -21.7 to -19.8 pts, 0/21 offsets with the lower bound > 0. Proxy verdict: NOT an acceptable stand-in under the claim's wording ('the index constituents'): sector baskets diversify away idiosyncratic risk, so their pairwise correlation is far above single-stock correlation (the gap above is dominated by that bias, not by the correlation premium); XLC/XLRE and cap weights are also missing, so the verdict is capped at inconclusive — implemented criteria pass; not implemented: proxy (9 sector SPDRs) POOLED lower 95% CI bound > 0 (a sector proxy bounds the claim from one side only: sector correlations exceed constituent ones, so a proxy shortfall is not a failure); realised average correlation of the index constituents (COR1M's top-50 S&P 500 names, cap-weighted): constituent closes and weights are not archived; vega-neutral short-index / long-constituent straddle book has positive mean P&L: needs index and single-stock chain history
 - note: from the options-library library: Dispersion Trade (short index vol, long constituent vol); harness suggestion: Harness 'implied_vs_realised_correlation' in mandel/experiments/volatility.py with bundles ['cboe-COR1M-history','daily-history-XL*']. | added by the verifier pass
 
-## Untested (43)
+## Untested (39)
 
 ### T-12 · volume-improves-calibration
 
@@ -5133,32 +5163,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: one-day lag, daily estimates only. Survivorship: none. Costs: 10-40 bp per switch. Multiple testing: 4 variants into DSR. Regime: 2021 China mining ban produced a mechanical signal.
 - note: from the underlying-library library: Hash ribbons / miner capitulation buy signal; harness suggestion: Event-study variant of the crypto regime harness; the signal is sparse, so report effective n prominently. | verifier: corrected claim/trial
 
-### T-404 · gold-etf-flows-vs-price
-
-**Claim.** The 4-week change in GLD gold holdings predicts the next week's GLD return positively over 2005-2026.
-
-- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.spdrgoldshares.com/usa/historical-data/ (fetched), https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows (fetched)
-- statistic: Predictive regression slope of next-week GLD return on the 4-week flow z (HAC t); contemporaneous slope and two-way Granger tests reported alongside.
-- null: Slope <= 0.
-- procedure: Parse the SPDR archive XLSX (sheet 'US GLD Historical Archive', column 'Tonnes of Gold'); weekly non-overlapping returns; walk-forward by year.
-- data: SPDR GLD historical archive (api.spdrgoldshares.com historical-archive, XLSX, 2004-11-18-); WGC ETF flows (page fetched); Yahoo GLD/IAU/SLV. · min n: 1000
-- pass: HAC t >= 2 over >= 1000 weeks AND positive slope in both halves (2005-2015, 2016-2026); otherwise parked as 'flows follow price'.
-- controls: Look-ahead: holdings published after the close; use t+1 availability. Survivorship: none. Costs: GLD 0.40% fee (GLDM 0.10%), 1 bp spread. Multiple testing: 5 variants. Regime: 2013 outflows, 2020 inflow surge, 2022-2026 central-bank-led rally; real-yield control (FRED DFII10).
-- note: from the underlying-library library: Gold ETF flows vs gold price (GLD tonnes, WGC flows); harness suggestion: data/gold.py (SPDR archive + WGC Excel); predictive-regression harness; Granger test utility. | verifier: corrected claim/trial
-
-### T-405 · gold-silver-cot-positioning
-
-**Claim.** Weeks with extreme managed-money net long positioning in COMEX gold (z > 2) are followed by lower 4-week GLD returns than weeks with extreme net short positioning (z < -2) over 2006-2026.
-
-- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalCompressed/index.htm (fetched), https://www.cftc.gov/files/dea/history/fut_disagg_txt_2024.zip (reachable, 200)
-- statistic: Difference in mean 4-week forward GLD return (z < -2 weeks minus z > 2 weeks); block bootstrap (block 8 weeks); predictive slope with HAC t as secondary.
-- null: Difference <= 0.
-- procedure: CFTC disaggregated history (2006-2016 combined file and annual files, verified 200) plus legacy for 1986-; z on trailing 156 weeks to t; release-date alignment; walk-forward by year.
-- data: CFTC historical compressed COT files; Yahoo GLD, SLV, GDX, BTC-USD; FRED DFII10 control. · min n: 50
-- pass: CI excludes zero with >= 50 extreme weeks of each sign AND slope t <= -2; if either tail has < 50 weeks, report 'insufficient extremes' and park.
-- controls: Look-ahead: release date (3-day lag). Survivorship: none. Costs: GLD 1 bp, low turnover. Multiple testing: 5 variants; threshold fixed at 2. Regime: real yields (DFII10) as control; 2013 and 2020 regimes.
-- note: from the underlying-library library: Gold and silver COT positioning extremes; harness suggestion: data/cftc.py (annual zip loader, contract code mapping: gold 088691, silver 084691, BTC 133741); regime-conditional forward-return harness with release-date alignment. | verifier: corrected claim/trial
-
 ### T-408 · pm-hourly-reversal
 
 **Claim.** On Kalshi, fading 3-hour YES-mid moves of at least 5 cents (buying the side that fell, at the ask, and holding 3 hours) earns a positive mean net return per trade after the taker fee.
@@ -5276,19 +5280,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: execution at the close of the minute after the trigger. Survivorship: not applicable. Costs: Coinbase and Kraken taker/maker by tier; transfer fees; inventory capital. Multiple testing: 8 cells. Regime: volatility spikes (|hourly return| > 3%) vs calm.
 - note: from the underlying-library library: Cross-exchange BTC price discovery (Coinbase vs Kraken premium); harness suggestion: coinbase_candles() and kraken_ohlc() in mandel/data/fetch.py; information-share estimator shared across lead-lag entries; arbitrage trigger simulation with fee tiers as inputs in backtest_eval. | verifier: corrected claim/trial
 
-### T-442 · treasury-auction-cycle
-
-**Claim.** Over 2002-2026, TLT's mean return from the close of a 10- or 30-year auction day to the close three trading days later exceeds its unconditional mean 3-day return by at least 10 bps, with both halves positive.
-
-- kind: underlying-strategy · origin: underlying-library:Event and calendar strategies on the underlying, https://ideas.repec.org/a/oup/rfinst/v26y2013i8p1891-1912.html, https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/od/auctions_query
-- statistic: Mean 3-day post-auction TLT return minus the unconditional mean 3-day TLT return (bps), per auction-week cluster.
-- null: No auction effect. Block bootstrap of the daily series (block 10) with event flags held fixed; placement placebo with clusters moved to random non-auction weeks.
-- procedure: Fetch auction dates and merge them into weekly clusters. Halves 2002-2013 / 2014-2026. The DGS10 1990-2026 variant uses yield changes in bps (sign-flipped). 6 variants Holm.
-- data: fiscaldata.treasury.gov /v1/accounting/od/auctions_query (keyless, verified; filter security_term 10-Year/30-Year and the 9-Year 11-Month/29-Year 11-Month reopening terms); daily-history-TLT (stored); IEF via Yahoo (2002-07-30, verified); fred-DGS10 (stored). · min n: 200
-- pass: Excess > 10 bps with p < 0.05 and both halves positive; placebo not significant.
-- controls: Look-ahead: auction schedules are announced in advance and the auction date is known at entry. Survivorship: n/a. Costs: about 24 round trips/yr at 1-2 bps (TLT). Multiple testing: 6 variants Holm. Regime: halves; 2008, the 2020 dash for cash and the 2022 bond bear flagged; overlap with CPI weeks reported.
-- note: from the underlying-library library: Treasury auction cycle (pre-auction concession, post-auction recovery); harness suggestion: data/fetch.py: treasury_auctions(terms=('10-Year','30-Year','9-Year 11-Month','29-Year 11-Month')) cached as 'treasury-auctions'; events.py: event_window_effect(days, closes, event_days, start=0, end=3, cluster='week') reusing block_bootstrap_pvalue. | added by the verifier pass
-
 ### T-451 · piotroski-fscore-value
 
 **Claim.** Within the top book-to-market quintile, stocks with F-score 8-9 outperform stocks with F-score 0-2 over the 12 months after their 10-K acceptance, over 2011-2026.
@@ -5340,19 +5331,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - pass: At least 20,000 hourly observations. Incremental R^2 >= 2% with t > 3. DM p < 0.05 out of sample.
 - controls: Look-ahead: buckets closed before the forecast hour. Survivorship: not applicable. Costs: not applicable for the forecast. Multiple testing: 8 cells. Regime: weekends vs weekdays.
 - note: from the underlying-library library: VPIN flow toxicity predicts crypto volatility; harness suggestion: VPIN builder in a crypto microstructure module. HAR and QLIKE shared with social-volume-volatility. | added by the verifier pass
-
-### T-472 · bullion-trust-discount-reversion
-
-**Claim.** From 2012-01 to 2026-09, long PHYS / short GLD opened when PHYS's discount is more than 1 percentage point below its trailing 250-day mean, and closed at that mean or after 60 trading days, earns a positive mean net return per trade after 10 bps per leg per trade and 50 bps/yr GLD borrow.
-
-- kind: underlying-strategy · origin: underlying-library:mean-reversion-statarb, https://sprott.com/investment-strategies/exchange-listed-products/physical-bullion-funds/gold/, https://doi.org/10.2307/2946710
-- statistic: mean net return per trade (and per day held) with bootstrap interval; diagnostics: AR(1) half-life of d_t minus its trailing mean, trade count
-- null: mean net return per trade = 0 (trades resampled in monthly clusters; block-shift of the signal series as a second null)
-- procedure: Scrape Sprott's embedded daily premium/discount series (4,228 points since 2010-02 in the page's Highcharts data). Join PHYS and GLD Yahoo closes. Trailing statistics only. Simulate the rule. Bootstrap. Count the 4 runnable variants in DSR. Disclose that the 2015-2026 descriptive statistics were seen before registration.
-- data: Sprott PHYS page (embedded daily premium/discount since 2010-02, verified 2026-10-14); Yahoo PHYS, GLD, PSLV, SLV daily closes · min n: 30
-- pass: 95% lower bound of mean net return per trade > 0 AND at least 30 trades AND same sign in 2012-2019 and 2020-2026
-- controls: Look-ahead: NAV is struck after the close, so execute at the next close; trailing windows only; the disclosed descriptive peek is counted as a trial. Costs: PHYS spread ~3-5 bps, 10 bps/leg modelled, GLD borrow, fee differential (0.39% vs 0.40%) negligible. Tax: PHYS is a PFIC for US holders (QEF election), outside the return calculation. Regime: 2020 stress and the 2022-2026 drift. Multiple testing: 4 variants.
-- note: from the underlying-library library: Physical bullion trust discount reversion (PHYS vs GLD); harness suggestion: trust_discount_reversion: Sprott page scraper (Highcharts data arrays), trailing-mean-relative z rule, per-trade bootstrap; generic for any premium/NAV series | added by the verifier pass
 
 ### T-473 · pca-etf-residual-statarb
 
@@ -7041,7 +7019,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - blocked on: 30 forward event days after 2026-10-15 (0 of 30 on 2026-10-15; about 20 a year)
 - note: pre-registered forward test of an in-sample observation; the in-sample result is evidence for registering it, not for supporting it
 
-## Parked (12)
+## Parked (14)
 
 ### T-03 · edge-sign-consistent-across-scales
 
@@ -7192,6 +7170,38 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-085a4b7a: not_supported — Mkt-RF/SMB/HML/RMW/CMA/UMD 1968-01..2026-08 (n=704 months; quarterly rebalance pooled over its 3 phases, one third of capital each, house rule 10): 60-month z tilt Sharpe 1.08 vs static 1.11, pooled difference -0.03 (95% studentized block-12 CI -0.11 to +0.04); per phase difference -0.03 to -0.03, lower bounds -0.12 to -0.11, 0 of 3 phases pass the lower bound (Jan/Apr/Jul/Oct -0.03 [-0.12, +0.04]; Feb/May/Aug/Nov -0.03 [-0.11, +0.04]; Mar/Jun/Sep/Dec -0.03 [-0.11, +0.04]); pooled DSR 0.102 over 5 trials (per phase 0.056 to 0.153) not decided: value-spread trial not computable (6_Portfolios_2x3 BE/ME not archived), so only 4 of the 5 trial Sharpes are in the variance (reported only); annualised Sharpe of each pooled timed-minus-static series z60_all -0.11, z60_exHML -0.11, z36_all -0.07, z36_exHML -0.01 — failed: lower 95% bound of the Sharpe difference > 0 (not implemented: DSR > 0.95 over 5 trials (value-spread trial not computable))
 - parked (was not_supported): contrarian factor timing adds nothing beyond static exposure (the trial's own park rule, the expected outcome): 60-month z tilt minus static Sharpe -0.03 (CI -0.11..+0.04) pooled over the 3 quarterly phases, 704 months 1968-2026
 - note: from the underlying-library library: Contrarian factor timing (value-spread / long-term factor reversal); harness suggestion: Small addition to the factor-momentum harness: z-score tilt vs static baseline, same bootstrap. | verifier: corrected claim/trial
+
+### T-404 · gold-etf-flows-vs-price
+
+**Claim.** The 4-week change in GLD gold holdings predicts the next week's GLD return positively over 2005-2026.
+
+- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.spdrgoldshares.com/usa/historical-data/ (fetched), https://www.gold.org/goldhub/data/gold-etfs-holdings-and-flows (fetched)
+- statistic: Predictive regression slope of next-week GLD return on the 4-week flow z (HAC t); contemporaneous slope and two-way Granger tests reported alongside.
+- null: Slope <= 0.
+- procedure: Parse the SPDR archive XLSX (sheet 'US GLD Historical Archive', column 'Tonnes of Gold'); weekly non-overlapping returns; walk-forward by year.
+- data: SPDR GLD historical archive (api.spdrgoldshares.com historical-archive, XLSX, 2004-11-18-); WGC ETF flows (page fetched); Yahoo GLD/IAU/SLV. · min n: 1000
+- pass: HAC t >= 2 over >= 1000 weeks AND positive slope in both halves (2005-2015, 2016-2026); otherwise parked as 'flows follow price'.
+- controls: Look-ahead: holdings published after the close; use t+1 availability. Survivorship: none. Costs: GLD 0.40% fee (GLDM 0.10%), 1 bp spread. Multiple testing: 5 variants. Regime: 2013 outflows, 2020 inflow surge, 2022-2026 central-bank-led rally; real-yield control (FRED DFII10).
+- harness: b6c_pub_gld_flows
+- result X-abb887f5: not_supported — SPDR GLD archive (2004-11-18..2026-10-14, 5509 trust days): tonnes known at each week's last close (available the next morning, so Thursday's for a Friday decision), 4-week change, z on 52 weeks to t; next week's GLD return from the first open of the following week to the first open of the week after; 1087 decision weeks 2005-12-09..2026-10-02. Full-sample slope -0.00008 per unit z (NW t -0.10); 2005-2015 -0.00102 (t -0.77), 2016-2026 +0.00088 (t +1.08). PARK CONDITION HOLDS: the trial parks the claim as flows follow price. Reported: Monday-open information set (Friday's holdings) t -0.01; Friday-close-to-Friday-close return t +0.08; raw 4-week tonnes change t -0.45; contemporaneous (same-week return on the flow z through that Friday, not point in time) slope +0.00310, t +5.07; Granger (4 weekly lags, HC0 Wald) flows -> returns p 0.9862, returns -> flows p 0.0000; positive slope in 11 of 21 calendar years; DFII10-controlled z t -0.30; costs (GLD 0.40% fee inside the price, 1 bp spread) do not enter a slope — failed: predictive slope HAC t >= 2 over >= 1000 weeks (slope -0.00008 per unit z, NW t -0.10 with 6 lags, 1087 weeks); positive slope in both halves (2005-2015 -0.00102, t -0.77, 526 weeks; 2016-2026 +0.00088, t +1.08, 561 weeks)
+- parked (was not_supported): flows follow price (the trial's own park rule): next-week GLD return on the 52-week z of the 4-week tonnes change, NW t -0.10 over 1,087 weeks; contemporaneous slope t +5.07; Granger returns->flows p < 0.0001, flows->returns p 0.99
+- note: from the underlying-library library: Gold ETF flows vs gold price (GLD tonnes, WGC flows); harness suggestion: data/gold.py (SPDR archive + WGC Excel); predictive-regression harness; Granger test utility. | verifier: corrected claim/trial
+
+### T-405 · gold-silver-cot-positioning
+
+**Claim.** Weeks with extreme managed-money net long positioning in COMEX gold (z > 2) are followed by lower 4-week GLD returns than weeks with extreme net short positioning (z < -2) over 2006-2026.
+
+- kind: underlying-strategy · origin: underlying-library:Factor, fundamental and flow, https://www.cftc.gov/MarketReports/CommitmentsofTraders/HistoricalCompressed/index.htm (fetched), https://www.cftc.gov/files/dea/history/fut_disagg_txt_2024.zip (reachable, 200)
+- statistic: Difference in mean 4-week forward GLD return (z < -2 weeks minus z > 2 weeks); block bootstrap (block 8 weeks); predictive slope with HAC t as secondary.
+- null: Difference <= 0.
+- procedure: CFTC disaggregated history (2006-2016 combined file and annual files, verified 200) plus legacy for 1986-; z on trailing 156 weeks to t; release-date alignment; walk-forward by year.
+- data: CFTC historical compressed COT files; Yahoo GLD, SLV, GDX, BTC-USD; FRED DFII10 control. · min n: 50
+- pass: CI excludes zero with >= 50 extreme weeks of each sign AND slope t <= -2; if either tail has < 50 weeks, report 'insufficient extremes' and park.
+- controls: Look-ahead: release date (3-day lag). Survivorship: none. Costs: GLD 1 bp, low turnover. Multiple testing: 5 variants; threshold fixed at 2. Regime: real yields (DFII10) as control; 2013 and 2020 regimes.
+- harness: b6c_pub_gold_cot_extremes
+- result X-d5f4ff4a: not_supported — CFTC disaggregated F&O combined report, COMEX gold 088691: managed-money net / open interest, z over the trailing 156 reports; GLD entered at the first open after the release (Friday 15:30 ET or its Socrata/schedule time), 4-week forward return to the first open 28 days later. Point in time: 168 backcast weeks (2006-06-13..2009-08-25, released 2009-10-20) and 7 weeks whose 156-week window needed them before they were public (2009-09-01..2009-10-13) are dropped, 10 reports superseded by a later report released no later (2013-10-08, 2013-10-15, 2013-10-22, 2022-06-07, 2022-06-14, 2022-06-21, 2022-06-28, 2022-07-05, 2022-07-12, 2022-07-19; 8 live-stamped rows 2022-06-07..2022-07-26 carry the Socrata bulk-load time 2022-08-01T18:54:48.615Z as available_at, later than their Friday schedule release: kept as stamped (conservative); on schedule times the tails are 20/65), 0 warm-up weeks; 872 signal weeks 2009-10-20..2026-09-08 (4 without a complete forward window). Tails: z > 2 20 weeks (mean +0.31%; 2016-03-29..2024-08-27), z < -2 62 weeks (mean +0.35%); difference +0.04% (95% CI -2.90% to +2.70%); slope +0.00126 per unit z (NW t +0.55). PARK CONDITION HOLDS: insufficient extremes (a tail below 50 weeks), the trial parks the claim. Reported: as-if-live with backcasts (NOT point in time) 20/65 weeks z > 2 / z < -2; raw net contracts 47/49; futures-only 28/75; silver/SLV 31/41 (difference +0.58%); DFII10-controlled slope t +0.40; GLD 1 bp a side cancels in the difference — failed: >= 50 extreme weeks of each sign (z > 2: 20, z < -2: 62; the tails need 30 more extreme weeks in all (a week is in at most one tail) and at most 16 more weekly reports fit in the claim's window, so both tails cannot reach 50) (not implemented: mean 4-week GLD return after z < -2 minus after z > 2 (+0.04%): two-sided 95% CI (8-week blocks) excludes zero (lower -2.90%) [fails, not decisively, below min_n]; predictive slope of the 4-week return on z, Newey-West t <= -2 (t +0.55, 8 lags, 872 weeks) [fails, not decisively, below min_n]; n >= trial min_n (20 of 50 extreme weeks (the smaller tail)))
+- parked (was not_supported): insufficient extremes (the trial's own park rule): 872 point-in-time COT weeks 2009-10..2026-09 give only 20 weeks with z > 2 (50 needed; at most 16 more reports fit in the window); difference +0.04% (CI -2.90..+2.70), slope NW t +0.55
+- note: from the underlying-library library: Gold and silver COT positioning extremes; harness suggestion: data/cftc.py (annual zip loader, contract code mapping: gold 088691, silver 084691, BTC 133741); regime-conditional forward-return harness with release-date alignment. | verifier: corrected claim/trial
 
 ### T-445 · accruals-anomaly
 
