@@ -1,0 +1,527 @@
+<title>Mandel Signal Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen instrument. Header strip, a canvas stage with concentric rings
+   (substrate outside, decision centres at the core), and a reading panel that sits
+   to the right on wide screens and becomes a bottom sheet on phones. Dark-first:
+   signals read best as light on ink. */
+:root {
+  --bg: #0B1020;            /* ink */
+  --surface: #121a30;
+  --surface-2: #19233f;
+  --line: #2a3658;
+  --fg: #e6e9f2;
+  --fg-2: #a9b2c9;
+  --fg-3: #717c99;
+  --accent: #d2a64a;
+  --ring: rgba(120, 140, 190, 0.16);
+  --l0: #B8862B;            /* substrate: sources, children, streams */
+  --l1: #3F7FD9;            /* concepts */
+  --l2: #2E9E86;            /* principles */
+  --l3: #B85FAE;            /* decision centres */
+  --pos: #4A86E8;           /* correlated / supports / flows */
+  --neg: #D2762B;           /* inverse / tension / held loosely */
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F6F5F0; --surface: #ffffff; --surface-2: #ecebe4; --line: #d6d4ca;
+    --fg: #1a1d26; --fg-2: #4a5062; --fg-3: #7d8496; --accent: #8a5e10; --ring: rgba(60, 70, 110, 0.14);
+    --l0: #946716; --l1: #2F62B8; --l2: #2B8A58; --l3: #A03A8F; --pos: #2F62B8; --neg: #B35A14;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #F6F5F0; --surface: #ffffff; --surface-2: #ecebe4; --line: #d6d4ca;
+  --fg: #1a1d26; --fg-2: #4a5062; --fg-3: #7d8496; --accent: #8a5e10; --ring: rgba(60, 70, 110, 0.14);
+  --l0: #946716; --l1: #2F62B8; --l2: #2B8A58; --l3: #A03A8F; --pos: #2F62B8; --neg: #B35A14;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px;
+  display: flex; flex-direction: column; min-height: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0;
+}
+* { box-sizing: border-box; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header { display: flex; align-items: center; gap: 14px; padding-block: 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+#logo { width: 72px; height: 48px; border-radius: 4px; background: var(--surface); flex: none; }
+.title-block { display: flex; flex-direction: column; min-width: 0; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: 26px; margin: 0; line-height: 1.1; letter-spacing: 0.005em; text-wrap: balance; }
+.sub { color: var(--fg-2); font-size: 12.5px; }
+.stats { margin-left: auto; display: flex; gap: 14px; font-family: var(--font-mono); font-size: 12px; color: var(--fg-2); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.stats b { color: var(--fg); font-weight: 500; }
+.search { display: flex; align-items: center; gap: 6px; }
+.search input { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; width: 190px; max-width: 48vw; }
+.search input::placeholder { color: var(--fg-3); }
+
+main { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; min-height: 0; padding-block: 12px; }
+#stage { position: relative; min-width: 0; min-height: 0; background: radial-gradient(ellipse at center, var(--surface) 0%, var(--bg) 72%); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+canvas#c { display: block; width: 100%; height: 100%; }
+#tip { position: absolute; pointer-events: none; background: var(--surface-2); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; font-size: 12px; max-width: 260px; line-height: 1.35; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+#tip .k { color: var(--fg-3); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.stage-controls { position: absolute; left: 10px; top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.stage-controls button, .panel button.act { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; font-size: 12px; cursor: pointer; }
+.stage-controls button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.stage-note { position: absolute; right: 10px; bottom: 8px; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-3); text-align: right; max-width: 60%; }
+
+aside#panel { min-width: 0; min-height: 0; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 16px; }
+.panel h2 { font-family: var(--font-display); font-weight: 400; font-size: 20px; margin: 0 0 4px; line-height: 1.15; text-wrap: balance; }
+.eyebrow { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12.5px; }
+.kv .k { color: var(--fg-3); }
+.kv .v { font-family: var(--font-mono); font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+.conn { display: flex; flex-direction: column; gap: 4px; }
+.conn button { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 5px 6px; cursor: pointer; font-size: 12.5px; }
+.conn button:hover { background: var(--surface-2); border-color: var(--line); }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.conn .w { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.conn .lab { color: var(--fg-2); font-size: 11.5px; display: block; }
+.grain { border-left: 2px solid var(--line); padding: 4px 0 4px 10px; font-size: 12.5px; line-height: 1.4; color: var(--fg-2); }
+.grain .src { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-3); display: block; margin-top: 2px; }
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 12px; }
+.legend .row { display: flex; align-items: center; gap: 8px; }
+.swatch { width: 12px; height: 12px; border-radius: 50%; border: 2px solid transparent; flex: none; }
+.swatch.ring { background: transparent !important; }
+.line-s { width: 22px; height: 0; border-top: 2px solid var(--pos); flex: none; }
+.line-d { width: 22px; height: 0; border-top: 2px dashed var(--neg); flex: none; }
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 12.5px; }
+.filters label { display: flex; align-items: center; gap: 6px; }
+.filters input[type="range"] { width: 100%; }
+.filters .wide { grid-column: 1 / -1; }
+.muted { color: var(--fg-3); font-size: 12px; line-height: 1.45; }
+.pulse-box { display: flex; flex-direction: column; gap: 8px; }
+.pulse-box select { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; max-width: 100%; }
+.pulse-result { font-family: var(--font-mono); font-size: 12px; color: var(--fg-2); line-height: 1.5; }
+.pill { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; font-size: 11px; font-family: var(--font-mono); color: var(--fg-2); }
+@media (max-width: 899px) {
+  main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(300px, 56vh) auto; }
+  aside#panel { max-height: 44vh; }
+  .stats { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .stage-controls button#btn-ambient { display: none; } }
+</style>
+
+<header>
+  <canvas id="logo" width="144" height="96" aria-label="Mandelbrot set, Mandel's namesake"></canvas>
+  <div class="title-block">
+    <h1>Mandel Signal Map</h1>
+    <div class="sub">How sources, concepts and principles flow into the decision centres, and back out as guidance.</div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="search"><input id="search" type="search" placeholder="Find a concept, source or principle" aria-label="Search nodes"></div>
+</header>
+
+<main>
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="tip" hidden></div>
+    <div class="stage-controls">
+      <button id="btn-ambient" aria-pressed="true" title="Ambient signals flow along every visible edge">Ambient flow</button>
+      <button id="btn-fit" title="Re-run the layout for this screen">Re-layout</button>
+      <button id="btn-clear" title="Clear selection and search">Clear</button>
+    </div>
+    <div class="stage-note" id="stage-note"></div>
+  </div>
+
+  <aside id="panel" class="panel" aria-live="polite">
+    <section id="detail">
+      <div class="eyebrow">Reading</div>
+      <h2>Pick a node</h2>
+      <p class="muted">Hover to see what a node is. Click to read its connections and the grains of text behind it. Sources sit on the outer ring; decision centres at the core. Solid lines are correlated or supporting links; dashed lines are tensions, inverse associations, or ideas a source holds loosely.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">Pulse</div>
+      <div class="pulse-box">
+        <select id="pulse-src" aria-label="Pulse from"></select>
+        <div><button class="act" id="btn-pulse">Send a signal inward</button></div>
+        <div class="pulse-result" id="pulse-result"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">Filters</div>
+      <div class="filters">
+        <label><input type="checkbox" id="f-provenance" checked> Provenance</label>
+        <label><input type="checkbox" id="f-cooccur" checked> Co-occurrence</label>
+        <label><input type="checkbox" id="f-supports" checked> Supports</label>
+        <label><input type="checkbox" id="f-skeptical" checked> Held loosely</label>
+        <label><input type="checkbox" id="f-tension" checked> Tension</label>
+        <label><input type="checkbox" id="f-flow" checked> Loop flow</label>
+        <label class="wide">Sign
+          <select id="f-sign" aria-label="Edge sign"><option value="all">all</option><option value="pos">correlated only</option><option value="neg">inverse only</option></select>
+        </label>
+        <label class="wide">Min weight <input type="range" id="f-minw" min="0" max="4" step="0.5" value="0"></label>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">Legend</div>
+      <div class="legend">
+        <div class="row"><span class="swatch" style="background: var(--l0)"></span>Substrate</div>
+        <div class="row"><span class="swatch" style="background: var(--l1)"></span>Concept</div>
+        <div class="row"><span class="swatch" style="background: var(--l2)"></span>Principle</div>
+        <div class="row"><span class="swatch" style="background: var(--l3)"></span>Decision centre</div>
+        <div class="row"><span class="line-s"></span>Correlated / supports</div>
+        <div class="row"><span class="line-d"></span>Inverse / tension</div>
+      </div>
+      <p class="muted" id="method-note"></p>
+    </section>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  const GRAPH = /*__GRAPH_JSON__*/;
+  const $ = (id) => document.getElementById(id);
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- tokens ----------
+  let T = {};
+  function readTokens() {
+    const cs = getComputedStyle(document.documentElement);
+    const g = (n) => cs.getPropertyValue(n).trim();
+    T = { bg: g('--bg'), fg: g('--fg'), fg2: g('--fg-2'), fg3: g('--fg-3'), line: g('--line'), ring: g('--ring'),
+          accent: g('--accent'), layer: [g('--l0'), g('--l1'), g('--l2'), g('--l3')], pos: g('--pos'), neg: g('--neg') };
+  }
+  readTokens();
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { readTokens(); drawLogo(); });
+  new MutationObserver(() => { readTokens(); drawLogo(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // ---------- data ----------
+  const nodes = GRAPH.nodes.map(n => ({ ...n }));
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const links = GRAPH.edges.map((e, i) => ({ ...e, i, source: byId.get(e.s), target: byId.get(e.t) })).filter(l => l.source && l.target);
+  const DIRECTED = new Set(['provenance', 'skeptical', 'supports', 'flow']);
+  const adj = new Map(nodes.map(n => [n.id, []]));
+  links.forEach(l => { adj.get(l.s).push(l); adj.get(l.t).push(l); });
+
+  const st = GRAPH.stats;
+  $('stats').innerHTML = `<span><b>${st.nodes}</b> nodes</span><span><b>${st.edges}</b> edges</span><span><b>${st.documents}</b> knowledge files</span>`;
+  $('method-note').textContent = `Co-occurrence edges are computed from ${st.documents} knowledge files (positive PMI, or never-together for common concepts). With this few documents they are suggestive, not proof. Provenance and held-loosely edges come straight from each file's sections; supports and loop-flow edges are the engine's own structure.`;
+  $('stage-note').textContent = `${st.layers.substrate} substrate · ${st.layers.concepts} concepts · ${st.layers.principles} principles · ${st.layers.centres} centres`;
+
+  // ---------- state ----------
+  const state = { hover: null, selected: null, query: '', ambient: !reduced, pulse: null,
+                  filters: { types: new Set(['provenance', 'cooccur', 'supports', 'skeptical', 'tension', 'flow']), sign: 'all', minw: 0 } };
+
+  function edgeVisible(l) {
+    const f = state.filters;
+    if (!f.types.has(l.type)) return false;
+    if (f.sign === 'pos' && l.sign < 0) return false;
+    if (f.sign === 'neg' && l.sign > 0) return false;
+    if (l.w < f.minw) return false;
+    return true;
+  }
+  function nodeMatches(n) { return !state.query || n.label.toLowerCase().includes(state.query) || n.id.toLowerCase().includes(state.query); }
+
+  // ---------- canvas ----------
+  const stage = $('stage'), canvas = $('c'), ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = 1, CX = 0, CY = 0, R = 0;
+  const RING = [0.93, 0.64, 0.38, 0.14];
+  function radiusFor(layer) { return R * RING[layer]; }
+  function nodeR(n) { return Math.max(3.5, 2.2 + n.size * (W < 600 ? 1.6 : 2.1)); }
+
+  // Deterministic radial ordering: centres in loop order; each outer layer is placed at the
+  // circular mean angle of what it connects to in the layer just inside it, then spaced evenly.
+  function circMean(angles) { let sx = 0, sy = 0; angles.forEach(a => { sx += Math.cos(a); sy += Math.sin(a); }); return Math.atan2(sy, sx); }
+  function assignAngles() {
+    const L3 = nodes.filter(n => n.layer === 3);
+    L3.forEach((n, i) => { n.theta = -Math.PI / 2 + i * 2 * Math.PI / L3.length; });
+    for (const L of [2, 1, 0]) {
+      const layer = nodes.filter(n => n.layer === L);
+      layer.forEach(n => {
+        const nb = adj.get(n.id).map(l => l.s === n.id ? l.target : l.source).filter(o => o.layer === L + 1 && o.theta != null);
+        n.pref = nb.length ? circMean(nb.map(o => o.theta)) : null;
+      });
+      layer.forEach((n, i) => {
+        if (n.pref == null) {
+          const same = layer.filter(o => o.pref != null && o.group === n.group);
+          n.pref = same.length ? circMean(same.map(o => o.pref)) + 0.05 * (i % 3) : ((i * 2.399) % (2 * Math.PI)) - Math.PI;
+        }
+      });
+      layer.sort((a, b) => a.pref - b.pref);
+      const k = layer.length, step = 2 * Math.PI / k;
+      let bestOff = 0, bestCost = 1e18;
+      for (let s = 0; s < k; s++) {
+        const off = layer[s].pref - s * step; let cost = 0;
+        layer.forEach((n, i) => { const d = Math.abs(((n.pref - (off + i * step)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI); cost += d; });
+        if (cost < bestCost) { bestCost = cost; bestOff = off; }
+      }
+      layer.forEach((n, i) => { n.theta = bestOff + i * step; });
+    }
+  }
+  assignAngles();
+
+  const sim = d3.forceSimulation(nodes)
+    .force('radial', d3.forceRadial(d => radiusFor(d.layer), 0, 0).strength(1))
+    .force('collide', d3.forceCollide(d => nodeR(d) + 4).iterations(2))
+    .stop();
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    W = Math.max(200, Math.floor(r.width)); H = Math.max(200, Math.floor(r.height));
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.floor(W * DPR); canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    CX = W / 2; CY = H / 2; R = Math.min(W, H) / 2 - (W < 600 ? 26 : 40);
+    sim.force('radial').radius(d => radiusFor(d.layer));
+    sim.force('collide').radius(d => nodeR(d) + 4);
+    layout(60);
+  }
+  function layout(ticks) {
+    nodes.forEach(n => { const rr = radiusFor(n.layer); n.x = rr * Math.cos(n.theta); n.y = rr * Math.sin(n.theta); n.vx = 0; n.vy = 0; });
+    sim.alpha(1);
+    for (let i = 0; i < ticks; i++) sim.tick();
+    rebuildParticles();
+  }
+  new ResizeObserver(() => resize()).observe(stage);
+
+  // ---------- particles (the signals) ----------
+  let particles = [];
+  function rebuildParticles() {
+    particles = [];
+    if (reduced) return;
+    links.forEach(l => {
+      const k = l.w >= 2.5 ? 2 : 1;
+      for (let j = 0; j < k; j++) {
+        const dir = DIRECTED.has(l.type) ? 1 : (j % 2 === 0 ? 1 : -1);
+        particles.push({ l, t: (j + 0.37 * (l.i % 7)) / k % 1, dir, v: 0.0022 * (0.55 + Math.min(l.w, 4) / 4) });
+      }
+    });
+  }
+
+  // ---------- pulse (BFS inward along directed edges) ----------
+  function startPulse(srcId) {
+    const src = byId.get(srcId); if (!src) return;
+    const hopN = new Map([[srcId, 0]]), hopE = new Map();
+    let frontier = [srcId];
+    for (let h = 1; h <= 6 && frontier.length; h++) {
+      const next = [];
+      frontier.forEach(id => adj.get(id).forEach(l => {
+        if (!edgeVisible(l)) return;
+        const forward = l.s === id && DIRECTED.has(l.type);
+        const undirected = !DIRECTED.has(l.type);
+        if (!forward && !undirected) return;
+        const other = l.s === id ? l.t : l.s;
+        const otherN = byId.get(other);
+        if (undirected && otherN.layer > byId.get(id).layer) return; // undirected edges only carry inward or sideways
+        if (!hopE.has(l.i)) hopE.set(l.i, h);
+        if (!hopN.has(other)) { hopN.set(other, h); next.push(other); }
+      }));
+      frontier = next;
+    }
+    const reached = [...hopN.keys()].map(id => byId.get(id));
+    const count = (L) => reached.filter(n => n.layer === L && n.id !== srcId).length;
+    const damp = [...hopE.keys()].filter(i => links[i].sign < 0).length;
+    state.pulse = { src: srcId, hopN, hopE, t0: performance.now() };
+    const maxHop = Math.max(...hopN.values());
+    $('pulse-result').textContent = `From ${src.label}: ${count(1)} concepts, ${count(2)} principles, ${count(3)} decision centres reached in ${maxHop} hops. ${damp} of the edges crossed are held loosely or inverse (signal dampened).`;
+  }
+
+  // ---------- drawing ----------
+  const conceptSizes = nodes.filter(n => n.layer === 1).map(n => n.size).sort((a, b) => b - a);
+  const conceptTopSize = conceptSizes[Math.min(9, conceptSizes.length - 1)] || 0;
+  function hexA(hex, a) {
+    const h = hex.replace('#', '');
+    const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  function related(n) { return state.selected ? (n.id === state.selected.id || adj.get(state.selected.id).some(l => (l.s === n.id || l.t === n.id) && edgeVisible(l))) : true; }
+
+  function draw(now) {
+    ctx.save(); ctx.scale(DPR, DPR); ctx.clearRect(0, 0, W, H); ctx.translate(CX, CY);
+    // rings
+    ctx.lineWidth = 1; ctx.strokeStyle = T.ring; ctx.setLineDash([]);
+    const ringLabel = ['Substrate', 'Concepts', 'Principles', 'Decision centres'];
+    for (let L = 0; L < 4; L++) {
+      ctx.beginPath(); ctx.arc(0, 0, radiusFor(L), 0, Math.PI * 2); ctx.stroke();
+      if (W >= 600) { ctx.fillStyle = T.fg3; ctx.font = `10.5px ${getComputedStyle(document.body).getPropertyValue('--font-mono')}`; ctx.textAlign = 'left'; ctx.fillText(ringLabel[L].toUpperCase(), 6, -radiusFor(L) - 5); }
+    }
+    const sel = state.selected, hov = state.hover, q = state.query;
+    const pulse = state.pulse, pt = pulse ? (now - pulse.t0) / 650 : 0; // hops per 650ms
+    // edges
+    links.forEach(l => {
+      if (!edgeVisible(l)) return;
+      const a = l.source, b = l.target;
+      const isRel = sel ? (l.s === sel.id || l.t === sel.id) : (hov ? (l.s === hov.id || l.t === hov.id) : false);
+      const dim = (sel || q) && !isRel && !(q && nodeMatches(a) && nodeMatches(b));
+      let alpha = dim ? 0.05 : (isRel ? 0.9 : 0.16 + Math.min(l.w, 4) * 0.06);
+      let width = isRel ? 1.6 : 0.6 + Math.min(l.w, 4) * 0.25;
+      const col = l.sign < 0 ? T.neg : (l.type === 'flow' ? T.layer[3] : T.pos);
+      if (pulse && pulse.hopE.has(l.i)) { const h = pulse.hopE.get(l.i); if (pt >= h - 1) { alpha = Math.max(alpha, 0.95 - Math.max(0, pt - h) * 0.08); width = Math.max(width, 2); } }
+      ctx.strokeStyle = hexA(col, alpha); ctx.lineWidth = width; ctx.setLineDash(l.sign < 0 ? [4, 4] : []);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    // particles
+    if (state.ambient && !reduced) {
+      particles.forEach(p => {
+        const l = p.l; if (!edgeVisible(l)) return;
+        const isRel = sel ? (l.s === sel.id || l.t === sel.id) : true;
+        if ((sel || q) && !isRel) return;
+        p.t += p.v * p.dir; if (p.t > 1) p.t -= 1; if (p.t < 0) p.t += 1;
+        const x = l.source.x + (l.target.x - l.source.x) * p.t, y = l.source.y + (l.target.y - l.source.y) * p.t;
+        const col = l.sign < 0 ? T.neg : T.pos;
+        ctx.fillStyle = hexA(col, 0.95); ctx.shadowColor = col; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(x, y, isRel && sel ? 2.4 : 1.7, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.shadowBlur = 0;
+    }
+    // pulse glow on nodes
+    if (pulse) {
+      pulse.hopN.forEach((h, id) => {
+        const n = byId.get(id); const age = pt - h; if (age < 0) return;
+        const r = nodeR(n) + 4 + Math.min(age, 1.2) * 14, a = Math.max(0, 0.7 - age * 0.35);
+        if (a <= 0) return;
+        ctx.strokeStyle = hexA(T.accent, a); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.stroke();
+      });
+      if (pt > 9) state.pulse = null;
+    }
+    // nodes
+    const mono = getComputedStyle(document.body).getPropertyValue('--font-mono');
+    const topSize = conceptTopSize;
+    nodes.forEach(n => {
+      const r = nodeR(n), col = T.layer[n.layer];
+      const match = nodeMatches(n), rel = related(n);
+      const dim = (q && !match) || (sel && !rel);
+      ctx.fillStyle = hexA(col, dim ? 0.18 : 0.95);
+      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
+      if (n.layer === 0 && n.kind !== 'source') { ctx.strokeStyle = hexA(T.fg, dim ? 0.15 : 0.6); ctx.lineWidth = 1; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]); }
+      if (sel && n.id === sel.id) { ctx.strokeStyle = T.accent; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(n.x, n.y, r + 4, 0, Math.PI * 2); ctx.stroke(); }
+      else if (hov && n.id === hov.id) { ctx.strokeStyle = hexA(T.fg, 0.8); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(n.x, n.y, r + 3, 0, Math.PI * 2); ctx.stroke(); }
+      // labels: radial, with a halo in the background colour for legibility
+      const topConcept = n.layer === 1 && n.size >= topSize;
+      const showLabel = !dim && (n.layer >= 2 || (n.layer === 0 && (W >= 600 || n.kind !== 'source' || (sel && rel))) || (W >= 900 && topConcept) || (hov && hov.id === n.id) || (sel && rel) || (q && match));
+      if (showLabel) {
+        const txt = n.layer === 0 ? shortLabel(n) : (n.layer === 2 ? (n.meta.short || n.label) : n.label);
+        ctx.font = `${n.layer === 3 ? 500 : 400} ${n.layer === 3 ? 11.5 : (n.layer === 2 ? 10.5 : 10)}px ${mono}`;
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 3; ctx.strokeStyle = hexA(T.bg, 0.85); ctx.fillStyle = hexA(T.fg, n.layer >= 2 ? 0.95 : 0.88);
+        if (n.layer === 3) {
+          ctx.textAlign = 'center'; ctx.strokeText(txt, n.x, n.y + r + 11); ctx.fillText(txt, n.x, n.y + r + 11);
+        } else {
+          const th = Math.atan2(n.y, n.x), flip = Math.cos(th) < 0;
+          ctx.save(); ctx.translate(n.x, n.y); ctx.rotate(flip ? th + Math.PI : th);
+          const off = r + 5;
+          ctx.textAlign = flip ? 'right' : 'left';
+          const x = flip ? -off : off;
+          ctx.strokeText(txt, x, 0); ctx.fillText(txt, x, 0);
+          ctx.restore();
+        }
+      }
+    });
+    ctx.restore();
+    requestAnimationFrame(draw);
+  }
+  function shortLabel(n) { if (n.kind === 'source') { const m = n.id.match(/(\d{2}|A\d+)$/); return (m ? m[1] + ' ' : '') + n.label.split(/[:|(—–-]/)[0].trim().slice(0, 22); } return n.label; }
+
+  // ---------- interaction ----------
+  function pick(mx, my) {
+    const x = mx - CX, y = my - CY; let best = null, bd = 1e9;
+    nodes.forEach(n => { const d = Math.hypot(n.x - x, n.y - y); if (d < nodeR(n) + 6 && d < bd) { bd = d; best = n; } });
+    return best;
+  }
+  const tip = $('tip');
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect(); const n = pick(e.clientX - r.left, e.clientY - r.top);
+    state.hover = n; canvas.style.cursor = n ? 'pointer' : 'default';
+    if (n) {
+      tip.hidden = false;
+      tip.innerHTML = `<span class="k">${['substrate', 'concept', 'principle', 'decision centre'][n.layer]}${n.detail ? ' · ' + esc(n.detail) : ''}</span><br>${esc(n.label)}<br><span class="k">${adj.get(n.id).filter(edgeVisible).length} visible links</span>`;
+      const tx = Math.min(e.clientX - r.left + 14, W - 270), ty = Math.max(6, e.clientY - r.top - 10);
+      tip.style.left = tx + 'px'; tip.style.top = ty + 'px';
+    } else tip.hidden = true;
+  });
+  canvas.addEventListener('mouseleave', () => { state.hover = null; tip.hidden = true; });
+  canvas.addEventListener('click', e => { const r = canvas.getBoundingClientRect(); select(pick(e.clientX - r.left, e.clientY - r.top)); });
+  canvas.addEventListener('touchend', e => { if (!e.changedTouches.length) return; const t = e.changedTouches[0]; const r = canvas.getBoundingClientRect(); const n = pick(t.clientX - r.left, t.clientY - r.top); if (n) { e.preventDefault(); select(n); } }, { passive: false });
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  function select(n) {
+    state.selected = n;
+    const d = $('detail');
+    if (!n) {
+      d.innerHTML = `<div class="eyebrow">Reading</div><h2>Pick a node</h2><p class="muted">Hover to see what a node is. Click to read its connections and the grains of text behind it.</p>`;
+      return;
+    }
+    const kindName = ['Substrate', 'Concept', 'Principle', 'Decision centre'][n.layer];
+    const conns = adj.get(n.id).filter(edgeVisible).sort((a, b) => b.w - a.w);
+    const kv = [];
+    if (n.kind === 'source') { kv.push(['file', n.meta.file || n.detail]); if (n.meta.coverage != null) kv.push(['coverage confidence', n.meta.coverage]); if (n.meta.quality) kv.push(['evidence', n.meta.quality]); if (n.meta.words) kv.push(['words', n.meta.words]); }
+    if (n.kind === 'concept') { kv.push(['group', n.detail]); kv.push(['mentions', n.meta.mentions]); kv.push(['files', n.meta.documents]); }
+    if (n.kind === 'centre') kv.push(['module', n.meta.module]);
+    if (n.kind === 'child') { kv.push(['domain', n.detail]); kv.push(['status', n.meta.status]); kv.push(['reports', n.meta.report_count]); }
+    if (n.kind === 'principle') kv.push(['from', 'MANDEL.md §2']);
+    let html = `<div class="eyebrow">${kindName}</div><h2>${esc(n.label)}</h2>`;
+    if (kv.length) html += `<div class="kv">${kv.map(([k, v]) => `<span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>`).join('')}</div>`;
+    if (n.layer <= 1) html += `<p style="margin:10px 0 0"><button class="act" id="btn-pulse-here">Send a signal inward from here</button></p>`;
+    html += `<p class="eyebrow" style="margin:14px 0 6px">${conns.length} connections</p><div class="conn">`;
+    conns.slice(0, 40).forEach(l => {
+      const other = l.s === n.id ? l.target : l.source;
+      const arrow = DIRECTED.has(l.type) ? (l.s === n.id ? '→' : '←') : '↔';
+      html += `<button data-id="${esc(other.id)}"><span class="dot" style="background:${l.sign < 0 ? 'var(--neg)' : 'var(--pos)'}"></span><span><span>${arrow} ${esc(other.label)}</span><span class="lab">${esc(l.type)}${l.label ? ' · ' + esc(l.label) : ''}</span></span><span class="w">${l.sign < 0 ? '−' : '+'}${l.w.toFixed(1)}</span></button>`;
+    });
+    if (conns.length > 40) html += `<div class="muted">${conns.length - 40} more not shown</div>`;
+    html += `</div>`;
+    const ex = (n.meta && n.meta.excerpts) || [];
+    if (ex.length) {
+      html += `<p class="eyebrow" style="margin:14px 0 6px">Grains: where the files say it</p>`;
+      ex.forEach(g => { html += `<div class="grain">${esc(g.text)}<span class="src">${esc(g.src)}</span></div>`; });
+    }
+    d.innerHTML = html;
+    d.querySelectorAll('button[data-id]').forEach(b => b.addEventListener('click', () => select(byId.get(b.dataset.id))));
+    const ph = $('btn-pulse-here'); if (ph) ph.addEventListener('click', () => startPulse(n.id));
+    if (window.innerWidth < 900) d.scrollIntoView({ block: 'nearest' });
+  }
+
+  // controls
+  $('btn-ambient').addEventListener('click', e => { state.ambient = !state.ambient; e.currentTarget.setAttribute('aria-pressed', String(state.ambient)); });
+  $('btn-fit').addEventListener('click', () => layout(200));
+  $('btn-clear').addEventListener('click', () => { $('search').value = ''; state.query = ''; state.pulse = null; select(null); });
+  $('search').addEventListener('input', e => { state.query = e.target.value.trim().toLowerCase(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { select(null); } if (e.key === '/' && document.activeElement !== $('search')) { e.preventDefault(); $('search').focus(); } });
+  ['provenance', 'cooccur', 'supports', 'skeptical', 'tension', 'flow'].forEach(t => $('f-' + t).addEventListener('change', e => { if (e.target.checked) state.filters.types.add(t); else state.filters.types.delete(t); if (state.selected) select(state.selected); }));
+  $('f-sign').addEventListener('change', e => { state.filters.sign = e.target.value; if (state.selected) select(state.selected); });
+  $('f-minw').addEventListener('input', e => { state.filters.minw = parseFloat(e.target.value); if (state.selected) select(state.selected); });
+  const ps = $('pulse-src');
+  nodes.filter(n => n.layer === 0).sort((a, b) => a.id.localeCompare(b.id)).forEach(n => { const o = document.createElement('option'); o.value = n.id; o.textContent = shortLabel(n); ps.appendChild(o); });
+  $('btn-pulse').addEventListener('click', () => startPulse(ps.value));
+
+  // ---------- logo: the namesake ----------
+  function drawLogo() {
+    const lc = $('logo'), g = lc.getContext('2d'), w = lc.width, h = lc.height, img = g.createImageData(w, h);
+    const cols = [T.layer[1], T.layer[2], T.layer[0], T.layer[3]].map(hex => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; });
+    const bgN = parseInt((T.bg.startsWith('#') ? T.bg : '#0B1020').slice(1), 16), bg = [(bgN >> 16) & 255, (bgN >> 8) & 255, bgN & 255];
+    for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+      const cx = -2.1 + (px / w) * 2.8, cy = -1.05 + (py / h) * 2.1; let x = 0, y = 0, k = 0;
+      while (k < 48 && x * x + y * y < 4) { const xt = x * x - y * y + cx; y = 2 * x * y + cy; x = xt; k++; }
+      const i = (py * w + px) * 4;
+      if (k >= 48) { img.data[i] = bg[0] * 0.6; img.data[i + 1] = bg[1] * 0.6; img.data[i + 2] = bg[2] * 0.6; }
+      else { const c = cols[Math.min(3, Math.floor(k / 6))], f = 0.35 + 0.65 * Math.min(1, k / 24); img.data[i] = bg[0] + (c[0] - bg[0]) * f; img.data[i + 1] = bg[1] + (c[1] - bg[1]) * f; img.data[i + 2] = bg[2] + (c[2] - bg[2]) * f; }
+      img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }
+
+  // ---------- boot ----------
+  drawLogo();
+  resize();
+  requestAnimationFrame(draw);
+  // open on something worth reading: the most connected concept
+  const start = nodes.filter(n => n.layer === 1).sort((a, b) => adj.get(b.id).length - adj.get(a.id).length)[0];
+  if (start) select(start);
+})();
+</script>
