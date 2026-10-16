@@ -37396,10 +37396,10 @@
    "name": "cmc-daily-listings-2019",
    "kind": "data",
    "path": "mandel/archive/data/cmc-daily-listings-2019.jsonl.gz",
-   "created_at": "2026-10-16T02:04:41.764285+00:00",
-   "rows": 180360,
-   "bytes": 16507267,
-   "sha256": "39704f5c730664c4145ea1393e6ab760fb0ce941f21794d13dcc9576ab7ad521",
+   "created_at": "2026-10-16T02:04:55.526374+00:00",
+   "rows": 182865,
+   "bytes": 16737512,
+   "sha256": "6710df52ead207e43d4055b0813c09fe6f7f6a81f87b7231ad847cbf95a8ef49",
    "tags": [
     "T-420",
     "T-462",
@@ -37526,6 +37526,750 @@
    "parked_reason": "",
    "in_git": false,
    "schema": "kind fact: value = {cik, taxonomy, tag, unit, start, end, val, accn, fy, fp, form, filed, frame}: dei cover shares and public float, us-gaap CommonStockSharesOutstanding and basic weighted shares from every form; the F-score and book-equity concepts from annual forms (10-K, 20-F, 40-F and amendments) only; available_at = min(acceptance of the accession from sec-submissions, filed date 22:00 ET) | kind coverage: value = {bucket, ciks, status per cik}"
+  },
+  "daily-history-AAL": {
+   "name": "daily-history-AAL",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AAL.jsonl.gz",
+   "created_at": "2026-10-16T02:05:45.928053+00:00",
+   "rows": 5295,
+   "bytes": 203814,
+   "sha256": "d9edec62336301982aa42d706213d8e20de3549e8432b5c64f66a8710b8b9b8b",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AAL?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AAL; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1127827800, \"instrumentType\": \"EQUITY\", \"longName\": \"American Airlines Group Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AAL": {
+   "name": "daily-events-AAL",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AAL.jsonl.gz",
+   "created_at": "2026-10-16T02:05:46.073208+00:00",
+   "rows": 23,
+   "bytes": 609,
+   "sha256": "b7b36785f3204d94a0a5689e0e31e47cfd057d408309ce11a7d6697800019e8a",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AAL?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AAL); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1127827800, \"instrumentType\": \"EQUITY\", \"longName\": \"American Airlines Group Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-ABI": {
+   "name": "daily-history-ABI",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ABI.jsonl.gz",
+   "created_at": "2026-10-16T02:05:49.667051+00:00",
+   "rows": 328,
+   "bytes": 9127,
+   "sha256": "cdd9a1e5ef862914bd3499de165e33a2169830b75ab792a7639497cb4b80ef75",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ABI?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-ABI; meta {\"currency\": \"USD\", \"exchangeName\": \"NGM\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1750944600, \"instrumentType\": \"ETF\", \"longName\": \"VictoryShares Pioneer Asset-Based Inc ETF\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-ABI": {
+   "name": "daily-events-ABI",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-ABI.jsonl.gz",
+   "created_at": "2026-10-16T02:05:49.732641+00:00",
+   "rows": 16,
+   "bytes": 518,
+   "sha256": "3badb4d81c9bcc665376622df0b51882963a5b841907d0be216f003c9c10bb93",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ABI?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-ABI); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NGM\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1750944600, \"instrumentType\": \"ETF\", \"longName\": \"VictoryShares Pioneer Asset-Based Inc ETF\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-ABT": {
+   "name": "daily-history-ABT",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ABT.jsonl.gz",
+   "created_at": "2026-10-16T02:05:54.160391+00:00",
+   "rows": 11740,
+   "bytes": 508077,
+   "sha256": "f316cdb9665b54a1b32941c233396a664aa5ee83dc2b21e4f7a5ce0749d9a6ad",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ABT?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-ABT; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Abbott Laboratories\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-ABT": {
+   "name": "daily-events-ABT",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-ABT.jsonl.gz",
+   "created_at": "2026-10-16T02:05:54.220497+00:00",
+   "rows": 184,
+   "bytes": 3436,
+   "sha256": "7c9dc4186e36aa7dcd8a7a76c103ef8b6d720cccc9c7daa86f28505c58d9bfb6",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ABT?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-ABT); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Abbott Laboratories\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-ABX": {
+   "name": "daily-history-ABX",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ABX.jsonl.gz",
+   "created_at": "2026-10-16T02:05:55.739128+00:00",
+   "rows": 1529,
+   "bytes": 48705,
+   "sha256": "6a46787a331ec5bf965466cc1d2029455935eef792e7307eb222ff3682466440",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ABX?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-ABX; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1600090200, \"instrumentType\": \"EQUITY\", \"longName\": \"Abacus Global Management, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-ABX": {
+   "name": "daily-events-ABX",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-ABX.jsonl.gz",
+   "created_at": "2026-10-16T02:05:55.792262+00:00",
+   "rows": 1,
+   "bytes": 207,
+   "sha256": "84b205cad1b4a258eb8f993d805aa428ac07be88120d1bd7316fe48e90ade418",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ABX?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-ABX); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1600090200, \"instrumentType\": \"EQUITY\", \"longName\": \"Abacus Global Management, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-ACV": {
+   "name": "daily-history-ACV",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ACV.jsonl.gz",
+   "created_at": "2026-10-16T02:05:59.922407+00:00",
+   "rows": 2867,
+   "bytes": 112160,
+   "sha256": "8f742db37c65b05044a5cbf77f12b0ba4570557969f1e0784f3833057f7a1a97",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ACV?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-ACV; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1432215000, \"instrumentType\": \"EQUITY\", \"longName\": \"Virtus Diversified Income & Convertible Fund\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-ACV": {
+   "name": "daily-events-ACV",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-ACV.jsonl.gz",
+   "created_at": "2026-10-16T02:05:59.994061+00:00",
+   "rows": 140,
+   "bytes": 2411,
+   "sha256": "cae943dbc5c28edc8cdc489c41b9d94aa50f61499b4661db048fa355cf206eb2",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ACV?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-ACV); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1432215000, \"instrumentType\": \"EQUITY\", \"longName\": \"Virtus Diversified Income & Convertible Fund\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-ADM": {
+   "name": "daily-history-ADM",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ADM.jsonl.gz",
+   "created_at": "2026-10-16T02:06:02.142947+00:00",
+   "rows": 11740,
+   "bytes": 435273,
+   "sha256": "1cc341cc204ce7896bcda9c45e35e15080c2bee2782c2b71fc0cab99c83a712b",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ADM?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-ADM; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Archer-Daniels-Midland Company\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-ADM": {
+   "name": "daily-events-ADM",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-ADM.jsonl.gz",
+   "created_at": "2026-10-16T02:06:02.199506+00:00",
+   "rows": 200,
+   "bytes": 3934,
+   "sha256": "4130b968b290933ebe1ca450b7c041262e74fa493ebfff4faa15eb96a15076df",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ADM?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-ADM); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Archer-Daniels-Midland Company\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-ADP": {
+   "name": "daily-history-ADP",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ADP.jsonl.gz",
+   "created_at": "2026-10-16T02:06:04.240645+00:00",
+   "rows": 11740,
+   "bytes": 504321,
+   "sha256": "1777be4fd68d45c2cadaa3cc728365ca33f05ba4f4e53886e4ca34ac8cf2574a",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ADP?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-ADP; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Automatic Data Processing, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-ADP": {
+   "name": "daily-events-ADP",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-ADP.jsonl.gz",
+   "created_at": "2026-10-16T02:06:04.297651+00:00",
+   "rows": 182,
+   "bytes": 3586,
+   "sha256": "b856f065d13e37e828d5eabc52304b79885bed8af24ef143a12b4e56276330d8",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ADP?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-ADP); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Automatic Data Processing, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-ADSK": {
+   "name": "daily-history-ADSK",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ADSK.jsonl.gz",
+   "created_at": "2026-10-16T02:06:06.137322+00:00",
+   "rows": 10403,
+   "bytes": 355490,
+   "sha256": "a36da5d18af09919ed8bb8af48d890886bcace045b8b00fe1e8c462cc708ae52",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ADSK?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-ADSK; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 488813400, \"instrumentType\": \"EQUITY\", \"longName\": \"Autodesk, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-ADSK": {
+   "name": "daily-events-ADSK",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-ADSK.jsonl.gz",
+   "created_at": "2026-10-16T02:06:06.195014+00:00",
+   "rows": 67,
+   "bytes": 1482,
+   "sha256": "5c2f09aca9d00a802dfc50e2a29445cdf8bc861aea75943ddce59e2f56ef6ae4",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ADSK?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-ADSK); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 488813400, \"instrumentType\": \"EQUITY\", \"longName\": \"Autodesk, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "cmc-daily-listings-2020": {
+   "name": "cmc-daily-listings-2020",
+   "kind": "data",
+   "path": "mandel/archive/data/cmc-daily-listings-2020.jsonl.gz",
+   "created_at": "2026-10-16T02:06:07.774153+00:00",
+   "rows": 30060,
+   "bytes": 2769377,
+   "sha256": "29390ff4cfb5057213a1da686b2ea21287384736d5b4d5f9b54c68c89e24b751",
+   "tags": [
+    "T-420",
+    "T-462",
+    "coinmarketcap",
+    "crypto",
+    "daily",
+    "listings",
+    "point-in-time"
+   ],
+   "recipe": "GET https://api.coinmarketcap.com/data-api/v3/cryptocurrency/listings/historical?date=<YYYY-MM-DD>&start=1&limit=500&convertId=2781 for every day of 2020 from 2017-11-01 (keyless data-api), merged by date via mandel.data.crypto_history.fetch_cmc_daily_listings. Licence: CoinMarketCap data-api (undocumented, keyless): CMC's terms forbid redistribution without a licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind listing: value = {date (snapshot day), id, symbol, slug, name, cmcRank, price, volume24h, marketCap (USD), circulatingSupply, totalSupply, maxSupply, percentChange24h, percentChange7d, dateAdded, lastUpdated, platform (the token's chain, or None), flags (that snapshot's CMC tags marking stablecoins, wrapped, tokenized, staked or bridged assets)}; dead coins included (point-in-time ranking); price = the day's close (it equals CMC's daily OHLC close for the date; lastUpdated reads 23:59 UTC in 2017-2019 snapshots and 00:00 of the date in 2026 ones, a label quirk); observed_at = the date 23:59:59 UTC; available_at = the next day 00:00 UTC | kind snapshot: value = {date, n, limit}, one per date. Each date holds the top `limit` by cmcRank (MARKET CAP), not by volume: a volume ranking built from it can still miss very small-cap, wash-traded coins below that market-cap depth, and a coin that drops below the depth has no row (no exit price) that day (use cmc-coin-daily-<id> for it). FLAGS ARE SNAPSHOT-DATED and mostly empty before about 2020 (2018-06-10: 106 of 500 coins tagged, USDT and TUSD flags = []; 2021-05-16: WBTC tagged stablecoin), so exclusions must use a declared list of CMC ids (cmc_flags_latest drafts one from the newest tags; not point in time). CMC prices are cross-exchange VWAPs, volume24h includes wash trades, and CMC can revise history: near point in time, not vintage-stamped"
+  },
+  "daily-history-AEE": {
+   "name": "daily-history-AEE",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AEE.jsonl.gz",
+   "created_at": "2026-10-16T02:06:07.986206+00:00",
+   "rows": 7240,
+   "bytes": 275730,
+   "sha256": "f866a219b0c8d8d538ba4fdfcd0b1ecba313d447a1649ddff7323992877e41ea",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AEE?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AEE; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 883751400, \"instrumentType\": \"EQUITY\", \"longName\": \"Ameren Corporation\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AEE": {
+   "name": "daily-events-AEE",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AEE.jsonl.gz",
+   "created_at": "2026-10-16T02:06:08.096623+00:00",
+   "rows": 115,
+   "bytes": 2152,
+   "sha256": "e578719b838c335d121b3d2ae4aefa0683d6a1ca857cab10a163f2f8c5515c3e",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AEE?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AEE); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 883751400, \"instrumentType\": \"EQUITY\", \"longName\": \"Ameren Corporation\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-AEP": {
+   "name": "daily-history-AEP",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AEP.jsonl.gz",
+   "created_at": "2026-10-16T02:06:10.411312+00:00",
+   "rows": 16305,
+   "bytes": 498457,
+   "sha256": "a4c0ed35df953901b6895b84d5f8424ddb2f355fa5a6e8f94aac829755e8146b",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AEP?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AEP; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": -252322200, \"instrumentType\": \"EQUITY\", \"longName\": \"American Electric Power Company, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AEP": {
+   "name": "daily-events-AEP",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AEP.jsonl.gz",
+   "created_at": "2026-10-16T02:06:10.468441+00:00",
+   "rows": 255,
+   "bytes": 4353,
+   "sha256": "9aeb02e9bad3f4a22b9ecca6f5cfe1cb064c7b65e7b82254ba2e774b61db1873",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AEP?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AEP); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": -252322200, \"instrumentType\": \"EQUITY\", \"longName\": \"American Electric Power Company, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-AIG": {
+   "name": "daily-history-AIG",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AIG.jsonl.gz",
+   "created_at": "2026-10-16T02:06:20.425257+00:00",
+   "rows": 13560,
+   "bytes": 492164,
+   "sha256": "1e80cdbf8f21875ff18d7a1db1ae1d04db2f7b0925fe74c8603ee9161fc90f40",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AIG?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AIG; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 94833000, \"instrumentType\": \"EQUITY\", \"longName\": \"American International Group, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AIG": {
+   "name": "daily-events-AIG",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AIG.jsonl.gz",
+   "created_at": "2026-10-16T02:06:20.484898+00:00",
+   "rows": 164,
+   "bytes": 3328,
+   "sha256": "1c53bc36c3fa4e29f227173fa068943cd040e81c4d84e9351f34ee6b5fe5d3ed",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AIG?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AIG); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 94833000, \"instrumentType\": \"EQUITY\", \"longName\": \"American International Group, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-AIT": {
+   "name": "daily-history-AIT",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AIT.jsonl.gz",
+   "created_at": "2026-10-16T02:06:22.145431+00:00",
+   "rows": 11740,
+   "bytes": 417325,
+   "sha256": "508cf2d19ffec791ff901c9619318c0b3f2b7a3558037d7e668219eeb52db145",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AIT?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AIT; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Applied Industrial Technologies, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AIT": {
+   "name": "daily-events-AIT",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AIT.jsonl.gz",
+   "created_at": "2026-10-16T02:06:22.208192+00:00",
+   "rows": 162,
+   "bytes": 2971,
+   "sha256": "9798faab678c1eaf5e1bb71486f999de16ac12364e59c45099c5d388f29db953",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AIT?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AIT); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Applied Industrial Technologies, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-ALL": {
+   "name": "daily-history-ALL",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-ALL.jsonl.gz",
+   "created_at": "2026-10-16T02:06:26.047958+00:00",
+   "rows": 8399,
+   "bytes": 319141,
+   "sha256": "f221183fb8bb874e19f6b25664457175eae1dc67e89c39790e213bd98d7faa63",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ALL?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-ALL; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 739114200, \"instrumentType\": \"EQUITY\", \"longName\": \"The Allstate Corporation\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-ALL": {
+   "name": "daily-events-ALL",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-ALL.jsonl.gz",
+   "created_at": "2026-10-16T02:06:26.107251+00:00",
+   "rows": 134,
+   "bytes": 2554,
+   "sha256": "4fd7f968e9704ad51b520f9383fef0babc35a38f205c14afb78f6c279593e509",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/ALL?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-ALL); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 739114200, \"instrumentType\": \"EQUITY\", \"longName\": \"The Allstate Corporation\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-AM": {
+   "name": "daily-history-AM",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AM.jsonl.gz",
+   "created_at": "2026-10-16T02:06:27.819120+00:00",
+   "rows": 2375,
+   "bytes": 93315,
+   "sha256": "e5e50d133c466956bca2faf1e318bf8601684e6af21ca51487156e7be8fb02ca",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AM?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AM; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1493904600, \"instrumentType\": \"EQUITY\", \"longName\": \"Antero Midstream Corporation\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AM": {
+   "name": "daily-events-AM",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AM.jsonl.gz",
+   "created_at": "2026-10-16T02:06:27.910860+00:00",
+   "rows": 37,
+   "bytes": 866,
+   "sha256": "672a9599675be81a7da2b7c04f8a07629a20c3ff5635306e2f04d0452dfbbd06",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AM?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AM); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1493904600, \"instrumentType\": \"EQUITY\", \"longName\": \"Antero Midstream Corporation\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-AMAT": {
+   "name": "daily-history-AMAT",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AMAT.jsonl.gz",
+   "created_at": "2026-10-16T02:06:30.148077+00:00",
+   "rows": 11740,
+   "bytes": 427317,
+   "sha256": "68fd7640e5ed787b7181f889db231d6308a6c30b1bb50ddc4fa32058b9dc7d8c",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMAT?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AMAT; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Applied Materials, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AMAT": {
+   "name": "daily-events-AMAT",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AMAT.jsonl.gz",
+   "created_at": "2026-10-16T02:06:30.205691+00:00",
+   "rows": 95,
+   "bytes": 1961,
+   "sha256": "711d1a9a6d2cdd07f095314c845e06cca5711d34927702b95ed821b8f6b96072",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMAT?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AMAT); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Applied Materials, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-AMD": {
+   "name": "daily-history-AMD",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AMD.jsonl.gz",
+   "created_at": "2026-10-16T02:06:32.109792+00:00",
+   "rows": 11740,
+   "bytes": 353737,
+   "sha256": "44eb1465f83e327dc98a621f84c330b50881984867c3f307edad28a602b95dca",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMD?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AMD; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Advanced Micro Devices, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AMD": {
+   "name": "daily-events-AMD",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AMD.jsonl.gz",
+   "created_at": "2026-10-16T02:06:32.209699+00:00",
+   "rows": 4,
+   "bytes": 313,
+   "sha256": "75a0a1c99a77091293efdb49bbf71a35541cd5578b26aeb7d4a62d0f929e7454",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMD?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AMD); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 322151400, \"instrumentType\": \"EQUITY\", \"longName\": \"Advanced Micro Devices, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-AMGN": {
+   "name": "daily-history-AMGN",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AMGN.jsonl.gz",
+   "created_at": "2026-10-16T02:06:34.088656+00:00",
+   "rows": 10917,
+   "bytes": 403769,
+   "sha256": "b6f182000a05e3d9178a70dd19ba9af03f67ca0ed9c2c8ebf0a8e5e0293a1f30",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMGN?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AMGN; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 424704600, \"instrumentType\": \"EQUITY\", \"longName\": \"Amgen Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AMGN": {
+   "name": "daily-events-AMGN",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AMGN.jsonl.gz",
+   "created_at": "2026-10-16T02:06:34.149129+00:00",
+   "rows": 66,
+   "bytes": 1455,
+   "sha256": "2ea0d6e0a34ed1237d18a5c8f147520e956c9d05eb7b4b4cffcbaf402cd309f0",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMGN?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AMGN); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NMS\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 424704600, \"instrumentType\": \"EQUITY\", \"longName\": \"Amgen Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-AMH": {
+   "name": "daily-history-AMH",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AMH.jsonl.gz",
+   "created_at": "2026-10-16T02:06:35.921608+00:00",
+   "rows": 3321,
+   "bytes": 126347,
+   "sha256": "62d767569f76cc889dbb9940d53d17f5bde90a3e5b4bc43bec00bc55bf088151",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMH?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AMH; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1375363800, \"instrumentType\": \"EQUITY\", \"longName\": \"American Homes 4 Rent\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AMH": {
+   "name": "daily-events-AMH",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AMH.jsonl.gz",
+   "created_at": "2026-10-16T02:06:35.979390+00:00",
+   "rows": 52,
+   "bytes": 1053,
+   "sha256": "a1055df0bfcb0fd81aff3c7f2ca34bc2c4f8bac6c3fac5c1fb3ded929f2c4493",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMH?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AMH); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1375363800, \"instrumentType\": \"EQUITY\", \"longName\": \"American Homes 4 Rent\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
+  },
+  "daily-history-AMP": {
+   "name": "daily-history-AMP",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-history-AMP.jsonl.gz",
+   "created_at": "2026-10-16T02:06:37.944783+00:00",
+   "rows": 5303,
+   "bytes": 219471,
+   "sha256": "13de5b524df5c1a8b79af222909b73e3b077f1e97a0f8c5e50671c2b34f862b2",
+   "tags": [
+    "daily",
+    "history",
+    "prices"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMP?period1=-1400000000 (1925)&period2=now&interval=1d&events=div|split (available_at = bar time + 24h: a daily close is usable the next day); via mandel.data.market_history.fetch_daily_histories (query1, query2 fallback); bars not yet available at the fetch are left out; dividends and splits in daily-events-AMP; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1126791000, \"instrumentType\": \"EQUITY\", \"longName\": \"Ameriprise Financial, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t, open, high, low, close (split-adjusted), volume, adjclose (split and dividend adjusted, when Yahoo provides it)}"
+  },
+  "daily-events-AMP": {
+   "name": "daily-events-AMP",
+   "kind": "data",
+   "path": "mandel/archive/data/daily-events-AMP.jsonl.gz",
+   "created_at": "2026-10-16T02:06:38.004848+00:00",
+   "rows": 84,
+   "bytes": 1688,
+   "sha256": "afbc71ee3f70354aa872fd6bd02e9de3058507791075718725b2b86fe34a4463",
+   "tags": [
+    "daily",
+    "dividends",
+    "events",
+    "prices",
+    "splits"
+   ],
+   "recipe": "yahoo /v8/finance/chart/AMP?period1=-1400000000&period2=now&interval=1d&events=div|split, chart.result[0].events (dividends, splits; the same call as daily-history-AMP); available_at = the ex-date bar time; meta {\"currency\": \"USD\", \"exchangeName\": \"NYQ\", \"exchangeTimezoneName\": \"America/New_York\", \"firstTradeDate\": 1126791000, \"instrumentType\": \"EQUITY\", \"longName\": \"Ameriprise Financial, Inc.\"}. Yahoo Finance data: no redistribution licence (Yahoo terms of service), local disk only, never in git",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind dividend: value = {symbol, type, t (ex-date bar time, unix), ex_date, amount (per share as Yahoo shows it today, adjusted for later splits)}; kind split: value = {symbol, type, t, ex_date, numerator, denominator, ratio}; observed_at = available_at = the ex-date bar time (declared earlier, so conservative)"
   }
  }
 }
