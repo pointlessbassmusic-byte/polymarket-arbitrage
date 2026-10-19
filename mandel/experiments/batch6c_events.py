@@ -38,20 +38,41 @@ Conventions
     ex-dates are not revised, so a prior-year schedule is point in time).
   * Membership (T-334, T-394). Point-in-time S&P 500 members are the fja05680 change-date snapshots (available at the
     change day's 09:30 ET); changes after the file's last date (2026-08-18) come from the Wikipedia changes table.
-    Additions are fja first appearances confirmed by a Wikipedia change row adding the same ticker within 10 calendar
-    days (the claim's cross-check against S&P press releases); a Wikipedia row that records a rename or a merger
-    rename (reason naming a ticker / name change) is not an addition; unconfirmed first appearances (renames, the
-    GOOG class split) are listed in the stat.
+    Additions are fja first appearances (the trial's 'additions = first appearance') confirmed by a Wikipedia change
+    row adding the same ticker within 10 calendar days (the claim's cross-check against S&P press releases), or adding
+    it under another spelling (fja uses later tickers: DLPH = APTV, UA = UAA, Q = IQV, JOYG = JOY, ANR = ANRZQ; matched
+    on the company name, or as the replacement of the same leaver); before 2010-06, where the Wikipedia table is
+    incomplete, fja joins are accepted unconfirmed (NRG, URBN, BRK.B, DISCA, OKE). A ticker change of one company is
+    not an addition: it is judged on the tickers, never on the free-text reason, which often describes the company
+    that LEFT (Allergan's row adds American Airlines; Fossil's adds Willis Towers Watson; Navient's adds Evergy). A
+    row is a ticker change when its removed and added names match (DuPont / DuPont, WLTW / WTW), or when its removed
+    ticker is the fja change's only unexplained leaver and its added ticker joins (Questar / QEP, Dow Chemical /
+    DowDuPont, Ceridian / Dayforce), unless the leaver's own Yahoo history trades on across the change (Fossil,
+    Navient); a row whose reason says the company 'remained in the index' is not an addition (Howmet: Arconic Inc.
+    renamed). Unconfirmed first appearances (renames, the GOOG class split) are listed in the stat.
   * Renames. Yahoo keeps a renamed company's history under its new ticker (FB is META; FB itself is now an ETF), so a
-    ticker of the past is priced from its own bundle when that has traded bars on the dates, else from its successor's:
-    rename edges are same-change-date fja leave/join pairs that the Wikipedia table does not explain (one-to-one, or
-    matched through the current member's Wikipedia date-added), plus Wikipedia ticker-change rows, from 2010-06 (the
-    Wikipedia table is incomplete before). A successor's bars are used only for dates before the rename and only when
-    Yahoo's longName for it matches the index's name for it (Equity Residential's successor VMRK resolves on Yahoo to
-    AvalonBay's history and is rejected).
+    ticker of the past is priced from its own bundle when that has traded bars on the dates, else from its successor's.
+    Rename edges, from 2010-06 (the Wikipedia table is incomplete before): Wikipedia rows that are ticker changes of one
+    company by the rule above; same-change-date fja leave/join pairs that the Wikipedia table does not explain, when
+    the index's names for the two tickers match or Yahoo's history for the new ticker covers the old one's join and the
+    old ticker does not trade on as itself (QLogic / Noble is neither: Noble replaced QLogic); ambiguous groups matched
+    through the current member's Wikipedia date-added; a join nothing explains on a change where Wikipedia adds a new
+    company under a ticker already in the index (IR -> TT: Gardner Denver renamed Ingersoll Rand Inc. took IR in
+    2020; Ingersoll-Rand plc continues as TT); and a leave nothing explains paired with an earlier unexplained join
+    whose Yahoo history covers the leaver's join (KORS -> CPRI). A ticker's own bars before a rename out of it are not
+    used when its own Yahoo history starts after its join (a later listing re-using the ticker: Yahoo's IR is Gardner
+    Denver from 2017). A successor's bars are used only for dates before the rename, only when its volume is continuous
+    across it, and (T-334) only when Yahoo's longName for it matches the index's name for it. Yahoo's longName is not
+    always right: VMRK's reads 'AvalonBay Communities', but its bars are Equity Residential's (first trade 1993-08-12,
+    EQR's IPO; EQR's price level, not AvalonBay's), so T-394 lets FINRA's volume decide identity (per spell) and T-334,
+    which has no volume reference, refuses VMRK (EQR is no addition, only a placebo-pool name). T-394 judges each spell
+    piece of a resolved history (between the root ticker's rename and join dates) and refuses only a failing piece,
+    whose dates the successor chain then fills.
   * Survivorship (rule 9). Yahoo answers 404 for delisted and acquired names, so they are ABSENT. T-374's universe is
-    the current members, as the claim states, so its criteria stand (the current members without an archived history
-    are named). T-334's additions and T-394's point-in-time members include names that have since left and been
+    the current members, as the claim states; the current members without an archived history are named, and every
+    criterion that involves them (the three stock criteria and the DSR, which is computed on the stock panel; not the
+    ETF-only one) is kept only when no plausible data for them could change it, under every reading the criterion
+    conjoins (gross and net): otherwise it is undecided (None). T-334's additions and T-394's point-in-time members include names that have since left and been
     delisted: every event is counted from the membership tables (and, for T-394, from the FINRA files, which list
     delisted symbols), the priced share is measured and reported, and a criterion that needs the absent names' returns
     is not implemented (None) unless every event in the claim's universe is priced. The survivor-subset statistics
@@ -591,7 +612,10 @@ def spelling_pairs(snaps: Sequence[tuple], changes: Sequence[dict], refs: dict, 
     (fja uses later tickers): {(fja ticker, join epoch day): (Wikipedia row, how)}. The confirming row is an 'orphan'
     add within ``tol`` days (its ticker is not an fja member around either date) whose added_security name-matches the
     fja ticker's index names (UA = UAA, JOYG = JOY), or, the only such orphan for the change's only unexplained join,
-    one whose removed ticker leaves fja within ``tol`` days (DLPH = APTV, Q = IQV, ANR = ANRZQ)."""
+    one whose removed ticker leaves fja on this same change (DLPH = APTV, ANR = ANRZQ) or, when this change has no
+    leaver, on a change within ``tol`` days that has no joiner (fja splits Whole Foods' leave and IQVIA's join over
+    2017-08-28 / 2017-08-29: Q = IQV). Bemis's row, which replaces Mattel on the 2019-06-07 change where Amcor joins,
+    does not confirm L3Harris's 2019-06-01 join, a rename of Harris."""
     s_ed = _ed(start)
     eds = [s[0] for s in snaps]
     rows = [(w, _ed(w["effective_date"])) for w in changes if w.get("effective_date") and ntick(w.get("added_ticker"))]
@@ -604,6 +628,7 @@ def spelling_pairs(snaps: Sequence[tuple], changes: Sequence[dict], refs: dict, 
         if e1 < s_ed:
             continue
         J = s1 - snaps[k - 1][1]
+        L = snaps[k - 1][1] - s1
         un = sorted(t for t in J if not any(abs(e - e1) <= tol for e in adds.get(t, [])))
         if not un:
             continue
@@ -617,9 +642,15 @@ def spelling_pairs(snaps: Sequence[tuple], changes: Sequence[dict], refs: dict, 
                 out[(t, e1)] = (orph[hit[0]][0], "names match")
                 used.add(hit[0])
                 un.remove(t)
+        def same_leaver(r):
+            if r in L:
+                return True
+            if L:
+                return False
+            return any(abs(snaps[q][0] - e1) <= tol and r in snaps[q - 1][1] - snaps[q][1] and not (snaps[q][1] - snaps[q - 1][1])
+                       for q in range(max(1, k - 20), min(len(snaps), k + 21)))
         left = [i for i, (w, _) in enumerate(orph) if i not in used and ntick(w.get("removed_ticker"))
-                and _in_fja(snaps, eds, ntick(w["removed_ticker"]), e1 - tol, e1 - tol)
-                and not _in_fja(snaps, eds, ntick(w["removed_ticker"]), e1 + tol, e1 + tol)]
+                and same_leaver(ntick(w["removed_ticker"]))]
         if len(un) == 1 and len(left) == 1:
             out[(un[0], e1)] = (orph[left[0]][0], "replaces the same leaver")
     return out
@@ -681,7 +712,8 @@ def rename_edges(snaps: Sequence[tuple], changes: Sequence[dict], current: dict,
             x, y = ntick(w.get("removed_ticker")), ntick(w.get("added_ticker"))
             if _rename_candidate(w) and x in L and y in J:
                 others = {ntick(v.get("removed_ticker")) for v in near if v is not w}
-                ok, _why = same_company(x, y, w.get("removed_security"), w.get("added_security"), L, others, facts, e1)
+                ok, _why = same_company(x, y, w.get("removed_security"), w.get("added_security"), L, J, others,
+                                        facts=facts, e1=e1)
                 if ok:
                     edges.append((e1, x, y, "wikipedia ticker change"))
                     L.discard(x)
@@ -1375,8 +1407,9 @@ def b6c_events_dividend_month(archive):
     et = stat["etf"]
     reason = (f"T-374 current S&P 500 dividend payers ({len(payers)} of {len(syms)} constituents of the {snap} Wikipedia "
               f"list have an ex-date in the year to it; {len(absent)} constituents have no archived Yahoo history: "
-              f"{', '.join(absent) or 'none'}; the universe is current members, as the claim states, so survivorship is "
-              f"the claim's own; {len(P['syms'])} firms with both kinds of month, {len(P['one_kind_firms'])} monthly or "
+              f"{', '.join(absent) or 'none'}; the universe is current members, as the claim states, and each criterion that "
+              f"involves the absent members (the stock criteria under gross and net, the DSR) is kept only when no plausible "
+              f"data for them could change it; {len(P['syms'])} firms with both kinds of month, {len(P['one_kind_firms'])} monthly or "
               f"one-kind payers out), 2010-01..2026-09: {j['n']} predicted dividend firm-months vs "
               f"{stat['n_nondividend_firm_months']} non-dividend firm-months (run-up span: previous month-end close to the "
               f"close before the predicted ex-date; market-adjusted vs SPY). Difference gross {_bp(dn['full']['gross'])}, "
@@ -1465,7 +1498,7 @@ def addition_events(snaps: Sequence[tuple], changes: Sequence[dict], fja_last: O
                     if _rename_candidate(w):
                         others = {ntick(v.get("removed_ticker")) for v in near if v is not w}
                         same, why = same_company(w.get("removed_ticker"), t, w.get("removed_security"), w.get("added_security"),
-                                                 L, others, facts, e1)
+                                                 L, J, others, facts=facts, e1=e1)
                         if same:
                             renamed.append({"ticker": t, "date": _iso(e1), "reason": reason[:120], "why": why})
                             continue
@@ -1663,6 +1696,9 @@ def b6c_events_index_addition_reversal(archive):
     no_hist = [e for e in unpriced if e["status"] == "no_history"]
     no_bar = [e for e in unpriced if e["status"] == "no_bar"]
     own_refused = {(e["ticker"], e["date"]) for e in unpriced if _has(archive, f"daily-history-{ysym(e['ticker'])}")}
+    no_404 = [e for e in no_hist if (e["ticker"], e["date"]) not in own_refused]       # Yahoo has nothing under the ticker
+    no_ident = [e for e in no_hist if (e["ticker"], e["date"]) in own_refused]         # the ticker now names another company
+    lst = lambda es: ", ".join(f"{e['ticker']} {e['date']}" for e in es) or "none"
     stat = {"events_confirmed": len(A["events"]), "confirmation": dict(conf),
             "confirmed_by_spelling": [{"ticker": e["ticker"], "date": e["date"], "how": e["confirmed"]} for e in A["events"]
                                       if e["confirmed"].startswith("Wikipedia adds")],
@@ -1673,6 +1709,7 @@ def b6c_events_index_addition_reversal(archive):
             "unpriced": [{"ticker": e["ticker"], "date": e["date"], "status": e["status"], "current_member": e["ticker"] in cur,
                           "own_bundle_archived": (e["ticker"], e["date"]) in own_refused} for e in unpriced],
             "unpriced_no_longer_members": len(gone), "unpriced_no_history": len(no_hist), "unpriced_no_bar": len(no_bar),
+            "unpriced_yahoo_404": len(no_404), "unpriced_own_ticker_reissued": [f"{e['ticker']} {e['date']}" for e in no_ident],
             "complete_universe": complete,
             "priced_via_rename": [{"ticker": e["ticker"], "date": e["date"], "via": e["via"]} for e in via_rename],
             "unconfirmed_first_appearances": A["unconfirmed"], "rename_row_additions": A["rename_rows"],
@@ -1705,12 +1742,13 @@ def b6c_events_index_addition_reversal(archive):
               f"reads like a rename kept as additions because the tickers are different companies), "
               f"{status.get('window_open', 0)} with the 20-session window still open; SURVIVORSHIP: {len(ok)} of "
               f"{len(measurable)} measurable additions priced ({_share(stat['priced_share'])}; {len(via_rename)} through a "
-              f"rename or a later listing's successor), {len(unpriced)} unpriced: {len(no_hist)} with no archived Yahoo "
-              f"history even through renames ({sum(1 for e in no_hist if e['ticker'] not in cur)} of them names that have "
-              f"since left the index, delisted or acquired: Yahoo answers 404) and {len(no_bar)} with an archived history but "
-              f"no traded bar on the event dates ({len(own_refused)} of the {len(unpriced)} have an own Yahoo bundle; Yahoo "
-              f"series or spans refused on identity or as later listings: {len(book.rejected)}), so every criterion on the "
-              f"mean needs absent names' returns (the absent additions would need a mean net excess of "
+              f"rename or a later listing's successor: " + lst(via_rename) + f"), {len(unpriced)} unpriced: {len(no_404)} "
+              f"with no Yahoo history under the ticker or any successor (Yahoo answers 404: delisted or acquired; "
+              f"{sum(1 for e in no_404 if e['ticker'] not in cur)} of them no longer in the index), {len(no_ident)} whose "
+              f"ticker Yahoo now gives to another company, with no successor history to fall back on (refused on identity: "
+              + lst(no_ident) + f") and {len(no_bar)} with a Yahoo history but no traded bar on the entry or exit date ("
+              + lst(no_bar) + f"; Yahoo series or spans refused on identity or as later listings in all: {len(book.rejected)}), "
+              f"so every criterion on the mean needs absent names' returns (the absent additions would need a mean net excess of "
               f"{_pc(an['upper_bound_below_0'], 2)} for the "
               f"20-bps upper bound to fall below 0, or {_pc(an['mean_above_minus_0.2pct'], 2)} for the mean to miss -0.2%). "
               f"Survivor subset: mean 20-day excess gross {_pc(_mean(x), 3)}, net {_pc(stat['mean_excess_net'][first], 3)} "
@@ -1962,9 +2000,14 @@ def b6c_events_short_volume_ratio(archive):
                 break
             refuse = refuse + tuple(new)
             r = book.resolved(s, refuse=refuse)
-            refilled.append({"symbol": s, "refused": [[x[0], _iso(x[1]), _iso(x[2] - 1)] for x in new],
-                             "sources_now": [] if r is None else
-                             sorted({r["names"][q] for q in set(r["src"][r["src"] >= 0].tolist())})})
+            fills = {}                                     # member sessions of each refused span now priced by another source
+            for nm, a_, b_ in new:
+                span = (cal >= a_) & (cal < b_)
+                got = span & np.isfinite(r["adj"]) if r is not None else np.zeros(cal.size, bool)
+                if r is not None:
+                    got &= np.array([r["names"][q] != nm if q >= 0 else False for q in r["src"]], bool)
+                fills[f"{nm} {_iso(a_)}..{_iso(b_ - 1)}"] = sorted({r["names"][q] for q in r["src"][got].tolist()}) if got.any() else []
+            refilled.append({"symbol": s, "refused": [[x[0], _iso(x[1]), _iso(x[2] - 1)] for x in new], "refilled_from": fills})
         if r is None or not np.isfinite(r["open"]).any():
             no_hist.append(s)
             continue
@@ -2024,9 +2067,14 @@ def b6c_events_short_volume_ratio(archive):
               f"z (trailing {T394_WIN} file days, t included) > 2 gives {n_all} events ({n_meas} with a closed 5-session "
               f"window); SURVIVORSHIP: {n_ok} priced ({_share(stat['priced_share'])}), "
               f"{n_meas - n_ok} lack Yahoo returns ({up_no_hist} on {len([s for s in up_syms if s in hist_set])} symbols with no "
-              f"Yahoo history even through renames, {up_gone} on names no longer in the index; {len(id_fail)} Yahoo spell pieces "
+              f"Yahoo history even through renames, {n_meas - n_ok - up_no_hist} on symbols whose Yahoo history misses those "
+              f"dates or was refused there, {up_gone} on names no longer in the index; own Yahoo tickers that are later "
+              f"listings, replaced by the successor's history before the rename: "
+              + (", ".join(k for k in sorted(book.rejected) if "<" in k) or "none") + f"; {len(id_fail)} Yahoo spell pieces "
               f"refused because their volume does not match FINRA's on the symbol's member days, their dates handed to the "
-              f"successor chain ({sum(1 for x in refilled if x['sources_now'])} symbols re-priced that way); "
+              f"successor chain ({sum(1 for x in refilled if any(x['refilled_from'].values()))} of {len(refilled)} symbols "
+              f"re-priced that way; refused: " + (", ".join(f"{x['symbol']} via {x['yahoo']} {x['from']}..{x['to']}" for x in id_fail) or "none")
+              + f"); "
               f"{len(book.name_overruled)} successors whose Yahoo longName disagrees with the index's kept for the volume "
               f"check to decide), so the return criteria need absent names (the absent "
               f"events would need a mean cost-adjusted abnormal return of {_bp(need)} for the 10-bps upper bound to fall below "
