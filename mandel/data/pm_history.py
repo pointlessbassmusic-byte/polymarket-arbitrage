@@ -1600,10 +1600,13 @@ def trade_targets(archive, n_markets: int = PM_TRADES_MARKETS, first_day: str = 
                   samples_out: Optional[dict] = None) -> dict[str, dict[str, dict]]:
     """{month: {market_id: {market_id, condition_id, volumeNum, reason}}}: every Polymarket pair leg ending on or after
     ``first_day`` plus, per COMPLETE closed-markets month from ``first_day``, the first ``quota`` markets of the month's
-    daily ``sample`` in hash order (so each has its daily history too). A partial month gets no sample yet (its hash order
-    would shift as markets are added). The quota of a month is the one logged when it was first sampled ('trades-sample:<M>'
-    in ``plog``), else ``trades_quota``; ``samples_out`` receives {month: {quota, candidates, sampled, sample_rate}} (the
-    rate within the daily sample: multiply by the daily 'daily-sample:<M>' rate for the month's population)."""
+    daily ``sample`` in hash order (so each has its daily history too), plus every closed 'Bitcoin above' market of
+    ``polymarket-events-btc-above`` that has an hourly CLOB series (the non-hourly-ET two-token markets ``fetch_pm_hourly``
+    takes; T-337's liquidity rule needs their taker volume). A partial month gets no sample yet (its hash order would
+    shift as markets are added). The quota of a month is the one logged when it was first sampled ('trades-sample:<M>' in
+    ``plog``), else ``trades_quota``; ``samples_out`` receives {month: {quota, candidates, sampled, sample_rate}} (the rate
+    within the daily sample: multiply by the daily 'daily-sample:<M>' rate for the month's population; the btc-above
+    markets are added after the sample and leave its accounting unchanged)."""
     out: dict[str, dict[str, dict]] = defaultdict(dict)
     plog = plog or {}
     f0 = _day_ts(first_day)
@@ -1629,6 +1632,16 @@ def trade_targets(archive, n_markets: int = PM_TRADES_MARKETS, first_day: str = 
         if samples_out is not None:
             samples_out[M] = {"quota": quota, "candidates": len(pool), "sampled": picked,
                               "sample_rate": round(min(quota, len(pool)) / len(pool), 6) if pool else 1.0}
+    t_closed = _day_ts(_yesterday()) + DAY                 # T-337: the 'Bitcoin above' markets fetch_pm_hourly takes, once closed
+    for r in _stored_rows(archive, "polymarket-events-btc-above"):
+        ev = r.get("value") or {}
+        if is_hourly_et(ev.get("slug")):
+            continue
+        for m in ev.get("markets") or []:
+            e = _ts(m.get("endDate") or ev.get("endDate"))
+            if m.get("conditionId") and len(_tokens(m)) == 2 and e is not None and f0 <= e < t_closed:
+                out[_month_of(e)].setdefault(str(m["id"]), {"market_id": str(m["id"]), "condition_id": m["conditionId"],
+                                                            "volumeNum": _f(m.get("volumeNum")), "reason": "btc-above"})
     return dict(out)
 
 
@@ -1725,8 +1738,9 @@ def fetch_pm_trades(store=None, n_markets: int = PM_TRADES_MARKETS, max_pages: i
                 _put(archive, name, rows,
                      _recipe(f"GET {DATA}/trades?market=<conditionId>&limit={PM_TRADE_PAGE}&takerOnly=true&end=<oldest timestamp seen> "
                              f"(newest first, at most {max_pages} pages per market) for mandel.data.pm_history.trade_targets(n_markets="
-                             f"{n_markets}, first_day={first_day}): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily "
-                             "'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated "
+                             f"{n_markets}, first_day={first_day}): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily "
+                             "'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every "
+                             "closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated "
                              "to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry "
                              f"the aggressor side. A market whose taker sum is off volumeNum by more than {PM_SHARES_TOL:.0%} is logged "
                              "complete False with history_short (data-api holds part of its history) and tags the month partial.", "polymarket"),

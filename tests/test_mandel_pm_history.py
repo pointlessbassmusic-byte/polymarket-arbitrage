@@ -1013,3 +1013,26 @@ def test_fetch_all_lists_again_before_freezing_when_a_listing_failed(fake, tmp_p
     assert rep["_listing_retries"][0]["kalshi_markets"]["kalshi-settled-markets-KXCPI"]["stored"] is False
     assert rep["pairs"][m.PAIRS]["pairs"] == 4 and rep["pairs"][m.PAIRS]["price_bundles_at_freeze"] == 0
     assert m.LISTING_RETRY_PAUSE in f.sleeps and a.get("kalshi-candles-hourly-KXFEDDECISION").rows == 50
+
+
+def test_trade_targets_take_every_closed_btc_above_market(tmp_path):
+    """T-337's liquidity rule needs hourly taker volume for the 'Bitcoin above' markets the harness trades, so trade_targets
+    adds every closed non-hourly-ET two-token market of polymarket-events-btc-above (reason btc-above) after the pair legs and
+    the hash sample, which keep their reasons and accounting; hourly-ET events, future ends and token-less markets are not taken."""
+    a = _archive(tmp_path)
+    fetched = "2026-10-15T00:00:00+00:00"
+    world = [e for e in _btc_world() if e["slug"] != "bitcoin-up-or-down-on-september-2-2026"]   # the fetch drops up-or-down
+    world[3]["markets"][0]["clobTokenIds"] = json.dumps(["onlyone"])            # hourly-ET anyway: excluded by the slug
+    world[2]["markets"][1]["clobTokenIds"] = json.dumps(["onlyone"])            # one token: no hourly CLOB series to trade
+    world[5]["endDate"] = "2099-01-01T00:00:00Z"                                # the open event: its end is still ahead
+    for x in world[5]["markets"]:
+        x["endDate"] = "2099-01-01T00:00:00Z"
+    a.store("polymarket-events-btc-above", "data", [m._event_row(e, fetched) for e in world], recipe="t", tags=["complete"], in_git=False)
+    pair_leg = {"market_id": "11", "condition_id": "0xpair", "end": "2024-03-22T07:00:00Z", "start": "2024-03-17T21:14:27Z", "volumeNum": 5.0}
+    a.store(m.PAIRS, "data", [m._row("polymarket", "pair", "p1", "2024-03-22T07:00:00Z", fetched, {"pm": [pair_leg]})], recipe="t", in_git=False)
+    t = m.trade_targets(a, n_markets=68)
+    assert t["2024-03"]["11"]["reason"] == "pair"                               # the pair leg keeps its reason (event 1's market 10 is btc-above)
+    assert t["2024-03"]["10"] == {"market_id": "10", "condition_id": "0xc10", "volumeNum": 50000.0, "reason": "btc-above"}
+    assert t["2024-03"]["20"]["reason"] == "btc-above"
+    assert set(t["2026-09"]) == {"30"}                                          # event 3's second market has one token; events 4-5 hourly-ET
+    assert "2099-01" not in t and "2026-10" not in t                            # event 7 ends after yesterday (open), event 8 has no markets

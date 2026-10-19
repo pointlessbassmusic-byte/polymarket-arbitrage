@@ -28106,10 +28106,10 @@
    "name": "polymarket-fetch-log",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-fetch-log.jsonl.gz",
-   "created_at": "2026-10-19T16:15:36.191971+00:00",
-   "rows": 28125,
-   "bytes": 1727660,
-   "sha256": "2a5adc21caa33772d77df187d2cb8c6110a635d49423f6c781b8b2c5c9383ae5",
+   "created_at": "2026-10-19T22:02:41.680125+00:00",
+   "rows": 28156,
+   "bytes": 1730517,
+   "sha256": "1dacbf990a5aa7c5e57dba6ac01991e43306bb3978a4d461b8a0e95e6e75be7c",
    "tags": [
     "complete",
     "fetch-log",
@@ -68439,10 +68439,10 @@
    "name": "polymarket-volume-hourly-2024-03",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-volume-hourly-2024-03.jsonl.gz",
-   "created_at": "2026-10-16T03:45:14.694431+00:00",
-   "rows": 3616,
-   "bytes": 143538,
-   "sha256": "adf9ef3ff22ef8be13a566ea1e031d1a4f02c00891cf15b03f449dd137355efc",
+   "created_at": "2026-10-19T22:02:03.686639+00:00",
+   "rows": 3907,
+   "bytes": 156872,
+   "sha256": "96e04d5d5a5333245273d32ef8f4c1e513b3c6af5b15e0e08defd7754b3af06c",
    "tags": [
     "2024-03",
     "complete",
@@ -68451,7 +68451,7 @@
     "trades",
     "volume"
    ],
-   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours (a market capped by max_pages starts at its first full hour after complete_from, polymarket-fetch-log)"
@@ -68460,10 +68460,10 @@
    "name": "polymarket-volume-hourly-2024-04",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-volume-hourly-2024-04.jsonl.gz",
-   "created_at": "2026-10-16T03:45:38.707851+00:00",
-   "rows": 2515,
-   "bytes": 102690,
-   "sha256": "0779438c68c69e43a3a2ded5f0b3940f4bce7fc96bf0128cd9ddd242a64b834e",
+   "created_at": "2026-10-19T22:02:05.169370+00:00",
+   "rows": 2598,
+   "bytes": 106429,
+   "sha256": "17e7c7372e7f9160273de3326c4b7633a664e9dd16366cfc89ec227e109c739f",
    "tags": [
     "2024-04",
     "complete",
@@ -68472,7 +68472,7 @@
     "trades",
     "volume"
    ],
-   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours (a market capped by max_pages starts at its first full hour after complete_from, polymarket-fetch-log)"
@@ -68481,10 +68481,10 @@
    "name": "polymarket-volume-hourly-2024-05",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-volume-hourly-2024-05.jsonl.gz",
-   "created_at": "2026-10-16T03:46:04.878192+00:00",
-   "rows": 3440,
-   "bytes": 141960,
-   "sha256": "3b59e2dfb8949ff0515d51afa76e54b5d61226241d637f53cc36df7ce4030c25",
+   "created_at": "2026-10-19T22:02:08.316121+00:00",
+   "rows": 3907,
+   "bytes": 163526,
+   "sha256": "bc4c3fc0073d9c8276870d27e68dc9b2928a6c9fc54d98d4764755804d966a49",
    "tags": [
     "2024-05",
     "complete",
@@ -68493,7 +68493,7 @@
     "trades",
     "volume"
    ],
-   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours (a market capped by max_pages starts at its first full hour after complete_from, polymarket-fetch-log)"
@@ -68545,10 +68545,10 @@
    "name": "polymarket-volume-hourly-2024-06",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-volume-hourly-2024-06.jsonl.gz",
-   "created_at": "2026-10-16T03:46:35.441410+00:00",
-   "rows": 6074,
-   "bytes": 253063,
-   "sha256": "4f47fbdb3dd8095cedcf012a150eadf6f4753722ba5cb126b9a9cced9436838b",
+   "created_at": "2026-10-19T22:02:10.484932+00:00",
+   "rows": 6345,
+   "bytes": 266719,
+   "sha256": "122645bf9229dca8e3a15149771bf9373b4d5bc82db545904181e3efc12a65b0",
    "tags": [
     "2024-06",
     "complete",
@@ -68557,7 +68557,7 @@
     "trades",
     "volume"
    ],
-   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours (a market capped by max_pages starts at its first full hour after complete_from, polymarket-fetch-log)"
@@ -68566,10 +68566,10 @@
    "name": "polymarket-volume-hourly-2024-07",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-volume-hourly-2024-07.jsonl.gz",
-   "created_at": "2026-10-16T03:47:06.568133+00:00",
-   "rows": 9206,
-   "bytes": 402196,
-   "sha256": "b833b631246d2d99daf560e108ecfbe5be073d1b7c621928ad4dc484b9c26826",
+   "created_at": "2026-10-19T22:02:14.463627+00:00",
+   "rows": 9782,
+   "bytes": 433896,
+   "sha256": "a3b4bbb7ed1584adff6454646be77da28ae79af9d905ca8bbd5683fb4dd044fe",
    "tags": [
     "2024-07",
     "complete",
@@ -68578,7 +68578,7 @@
     "trades",
     "volume"
    ],
-   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours (a market capped by max_pages starts at its first full hour after complete_from, polymarket-fetch-log)"
@@ -68587,10 +68587,10 @@
    "name": "polymarket-volume-hourly-2024-08",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-volume-hourly-2024-08.jsonl.gz",
-   "created_at": "2026-10-16T03:47:39.115768+00:00",
-   "rows": 11486,
-   "bytes": 589712,
-   "sha256": "3529cab240b0fc59e25922f2b67cc215834439ba30579f076a95380224114400",
+   "created_at": "2026-10-19T22:02:20.311679+00:00",
+   "rows": 12322,
+   "bytes": 650691,
+   "sha256": "73531684530fc4708b695752b3e9f7d81887ccfc707d0363ca2dad8523d1eba3",
    "tags": [
     "2024-08",
     "complete",
@@ -68599,7 +68599,7 @@
     "trades",
     "volume"
    ],
-   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours (a market capped by max_pages starts at its first full hour after complete_from, polymarket-fetch-log)"
@@ -68608,10 +68608,10 @@
    "name": "polymarket-volume-hourly-2024-09",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-volume-hourly-2024-09.jsonl.gz",
-   "created_at": "2026-10-16T03:48:14.921081+00:00",
-   "rows": 10498,
-   "bytes": 549300,
-   "sha256": "98d5fd06f3f415f2e8bdcfc5a4775723cb828a5e8a08b7d9403bcd745a8b492e",
+   "created_at": "2026-10-19T22:02:23.590699+00:00",
+   "rows": 10837,
+   "bytes": 576423,
+   "sha256": "9643c930656d838808ec666cc2330deae27fa3d1fc30ed2ff98e5c88466b1437",
    "tags": [
     "2024-09",
     "complete",
@@ -68620,7 +68620,7 @@
     "trades",
     "volume"
    ],
-   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours (a market capped by max_pages starts at its first full hour after complete_from, polymarket-fetch-log)"
@@ -68629,10 +68629,10 @@
    "name": "polymarket-volume-hourly-2024-10",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-volume-hourly-2024-10.jsonl.gz",
-   "created_at": "2026-10-16T03:48:43.500717+00:00",
-   "rows": 7873,
-   "bytes": 378196,
-   "sha256": "409bc11af460c0c282ea8190ad801df18ee9459edf10bf3a67fdf7650492051f",
+   "created_at": "2026-10-19T22:02:30.438412+00:00",
+   "rows": 9092,
+   "bytes": 463212,
+   "sha256": "b928706e0e4552da78d0664830e560c13bb057546cd97182016773628b70f734",
    "tags": [
     "2024-10",
     "complete",
@@ -68641,7 +68641,7 @@
     "trades",
     "volume"
    ],
-   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours (a market capped by max_pages starts at its first full hour after complete_from, polymarket-fetch-log)"
@@ -68673,10 +68673,10 @@
    "name": "polymarket-volume-hourly-2024-11",
    "kind": "data",
    "path": "mandel/archive/data/polymarket-volume-hourly-2024-11.jsonl.gz",
-   "created_at": "2026-10-16T03:50:41.853846+00:00",
-   "rows": 19850,
-   "bytes": 1129141,
-   "sha256": "bfbf7550d6cd83a2763f328b203c193cdb6e836e7174a75f50a0523672cb02e2",
+   "created_at": "2026-10-19T22:02:40.854962+00:00",
+   "rows": 20698,
+   "bytes": 1205358,
+   "sha256": "222812f5255e2eda4880f3ce382a43488a5a549a9e59dc5941c00866e158ed4a",
    "tags": [
     "2024-11",
     "complete",
@@ -68685,7 +68685,7 @@
     "trades",
     "volume"
    ],
-   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs plus a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>'); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "recipe": "GET https://data-api.polymarket.com/trades?market=<conditionId>&limit=10000&takerOnly=true&end=<oldest timestamp seen> (newest first, at most 5 pages per market) for mandel.data.pm_history.trade_targets(n_markets=1500, first_day=2024-01-01): the Polymarket legs of pm-kalshi-pairs, a hash sample of the daily 'sample' markets of complete months (quota and rate in polymarket-fetch-log 'trades-sample:<M>') and every closed non-hourly-ET 'Bitcoin above' market of polymarket-events-btc-above (reason btc-above); aggregated to hours. Taker-only rows: one per taker order, their sizes sum to Gamma's volumeNum (probed), and they carry the aggressor side. A market whose taker sum is off volumeNum by more than 1% is logged complete False with history_short (data-api holds part of its history) and tags the month partial. Licence: Polymarket Gamma / CLOB / data-api public endpoints: Polymarket's terms of use grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "kind volume: value = {market_id, condition_id, t (hour start, unix), n (taker trades), shares (sum of taker size = Gamma's volume unit), usd (sum of size x price), o0 / o1 (outcome index 0 / 1): {n_buy, n_sell, buy, sell (taker shares bought / sold), buy_usd, sell_usd, last_p}}; observed_at = t, available_at = t + 1 h; only complete hours (a market capped by max_pages starts at its first full hour after complete_from, polymarket-fetch-log)"
@@ -70246,6 +70246,52 @@
     "trades"
    ],
    "recipe": "GET https://api.kraken.com/0/public/Trades?pair=XBTUSD&since=<ns cursor, from 2024-02-01T00:00:00Z>&count=1000, paged on result.last until a trade at or after 2024-03-01T00:00:00Z; trades de-duplicated by trade id and aggregated with mandel.data.crypto_history.MinuteAgg via fetch_kraken_trades_1m (Kraken's OHLC endpoint keeps only 720 bars, so history comes from Trades). Licence: Kraken public market data: Kraken's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t (minute start, unix s), open, high, low, close (first / last trade by time and id), volume, vwap, n, buy_vol, sell_vol, n_buy, n_sell (aggressor side: buy = buyer-initiated), buy_hi, buy_lo, sell_hi, sell_lo (price range of each side's prints), mkt_vol (market-order volume; None when the venue does not say), first_ts, last_ts (unix s, fractional), last_id, ticks (minute HH:59 only: every trade [time, price, volume, side b/s, ordertype m/l, trade_id], so the last trade at or before an hour mark minus s seconds is exact)}; minutes without trades are absent; observed_at = minute start; available_at = minute end"
+  },
+  "kraken-trades-1m-XBTUSD-2024-03": {
+   "name": "kraken-trades-1m-XBTUSD-2024-03",
+   "kind": "data",
+   "path": "mandel/archive/data/kraken-trades-1m-XBTUSD-2024-03.jsonl.gz",
+   "created_at": "2026-10-19T21:32:32.356244+00:00",
+   "rows": 44543,
+   "bytes": 4536923,
+   "sha256": "cf49c4cfa050fe309ef5123c72db3be3bab439c4b5c6f597eb9c736e9e7c4f4f",
+   "tags": [
+    "1m",
+    "2024-03",
+    "complete",
+    "crypto",
+    "kraken",
+    "signed-volume",
+    "span:2024-03-01..2024-03-31",
+    "trades"
+   ],
+   "recipe": "GET https://api.kraken.com/0/public/Trades?pair=XBTUSD&since=<ns cursor, from 2024-03-01T00:00:00Z>&count=1000, paged on result.last until a trade at or after 2024-04-01T00:00:00Z; trades de-duplicated by trade id and aggregated with mandel.data.crypto_history.MinuteAgg via fetch_kraken_trades_1m (Kraken's OHLC endpoint keeps only 720 bars, so history comes from Trades). Licence: Kraken public market data: Kraken's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t (minute start, unix s), open, high, low, close (first / last trade by time and id), volume, vwap, n, buy_vol, sell_vol, n_buy, n_sell (aggressor side: buy = buyer-initiated), buy_hi, buy_lo, sell_hi, sell_lo (price range of each side's prints), mkt_vol (market-order volume; None when the venue does not say), first_ts, last_ts (unix s, fractional), last_id, ticks (minute HH:59 only: every trade [time, price, volume, side b/s, ordertype m/l, trade_id], so the last trade at or before an hour mark minus s seconds is exact)}; minutes without trades are absent; observed_at = minute start; available_at = minute end"
+  },
+  "kraken-trades-1m-XBTUSD-2024-04": {
+   "name": "kraken-trades-1m-XBTUSD-2024-04",
+   "kind": "data",
+   "path": "mandel/archive/data/kraken-trades-1m-XBTUSD-2024-04.jsonl.gz",
+   "created_at": "2026-10-19T21:49:08.228623+00:00",
+   "rows": 42468,
+   "bytes": 4110179,
+   "sha256": "0fa2c9c9e8520c9725edbe95183bc6d18b014294a3aa8da92e79e05ec21431c8",
+   "tags": [
+    "1m",
+    "2024-04",
+    "complete",
+    "crypto",
+    "kraken",
+    "signed-volume",
+    "span:2024-04-01..2024-04-30",
+    "trades"
+   ],
+   "recipe": "GET https://api.kraken.com/0/public/Trades?pair=XBTUSD&since=<ns cursor, from 2024-04-01T00:00:00Z>&count=1000, paged on result.last until a trade at or after 2024-05-01T00:00:00Z; trades de-duplicated by trade id and aggregated with mandel.data.crypto_history.MinuteAgg via fetch_kraken_trades_1m (Kraken's OHLC endpoint keeps only 720 bars, so history comes from Trades). Licence: Kraken public market data: Kraken's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "value = {symbol, t (minute start, unix s), open, high, low, close (first / last trade by time and id), volume, vwap, n, buy_vol, sell_vol, n_buy, n_sell (aggressor side: buy = buyer-initiated), buy_hi, buy_lo, sell_hi, sell_lo (price range of each side's prints), mkt_vol (market-order volume; None when the venue does not say), first_ts, last_ts (unix s, fractional), last_id, ticks (minute HH:59 only: every trade [time, price, volume, side b/s, ordertype m/l, trade_id], so the last trade at or before an hour mark minus s seconds is exact)}; minutes without trades are absent; observed_at = minute start; available_at = minute end"
