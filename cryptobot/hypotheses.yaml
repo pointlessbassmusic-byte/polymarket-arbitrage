@@ -850,10 +850,10 @@
   test: "At the read, from state/hype/*.jsonl: events = coin-hours in the top 10% of the score among hours before them (expanding, no look-ahead), at most one per coin per 72 hours; outcome from Coinbase public candles fetched at read time; t clustered by event day; halves by date. Trials: 2 horizons (24 h, 72 h)."
   success: "Written before reading: CANDIDATE if a horizon nets >= +1% per event at t >= 2.5 over >= 30 events with both halves positive; then a paper rule on the Kalshi perps for 30 events. KILLED if the mean is >= 0 at both horizons (no fade). Otherwise inconclusive."
   data: "state/hype (desk hype scanner, hourly), Coinbase candles at read time"
-  result: "PRE-REGISTERED 2026-10-19; collecting; read on or after 2027-01-12 (90 days)"
+  result: "PRE-REGISTERED 2026-10-19; collecting; read on or after 2027-01-12 (90 days). Clarified 2026-10-19, before any data was read: top 10% means strictly above the 90th percentile of prior scores, so ties at the cut do not all count as events"
   verdict: inconclusive
   regime: "collecting"
-  rerun: "python -m cryptobot.hype_study --scratch <dir>  # the forward read is added to hype_study at read time, per this entry"
+  rerun: "python -m cryptobot.hype_forward --state state  # written 2026-10-19 before any data was read; no verdict before 2027-01-12"
   preregistered: true
   trials_run: 0
 
