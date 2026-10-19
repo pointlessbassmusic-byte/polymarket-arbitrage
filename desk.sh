@@ -19,6 +19,7 @@
 #   ./desk.sh webhook URL      the Discord/Slack webhook, no prompts, then restart
 #   ./desk.sh check            Kalshi's raw answers to the preflight questions (no secrets printed)
 #   ./desk.sh rotate      new dashboard token (after the old one was shown somewhere), then restart
+#   ./desk.sh review      weekly: live bounce-short vs its backtest, and every forward test's read date
 #   ./desk.sh polyus      your Polymarket US API key id and secret (typed hidden, stored in .env)
 #   ./desk.sh polyhistory your Polymarket US record: where the losses came from, and the opposite side
 #
@@ -352,8 +353,9 @@ case "${1:-}" in
   webhook) cmd_webhook "${2:-}" ;;
   check) dc run --rm desk python -m cryptobot.execution.kalshi_perps --check ;;
   rotate) cmd_rotate ;;
+  review) dc run --rm desk python -m cryptobot.review --state /data ;;
   polyus) cmd_polyus ;;
   polyhistory) dc run --rm desk python -m cryptobot.polymarket_us_history --out /data/polymarket_us_record.json ;;
   digest) dc run --rm desk python -m cryptobot.desk --digest --state-dir /data ;;
-  *) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
