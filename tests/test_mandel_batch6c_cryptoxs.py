@@ -175,15 +175,19 @@ def sim_hash(planted, seed=0, start="2009-01-03", end="2026-10-14"):
     return {"a": hb, "b": hc}, dict(zip(days, np.exp(lp)))
 
 
-def sim_pools(apy_level, seed=0):
+def sim_pools(apy_level, seed=0, cut=False):
+    """Pools at their archived chart starts. Default: each launches small (TVL ramping from 0.5% of its level over 90
+    days, so every first point is a launch); cut=True: Maple and Spark savings open at full TVL ($2.8B, $0.3B), the
+    archived charts' shape (live before their first point: cut off)."""
     rng = np.random.default_rng(seed)
     out = {}
     spans = {m.AAVE: ("2023-02-06", 2e8), m.MAPLE: ("2025-07-28", 2.8e9), m.SPARK_SAV: ("2025-12-22", 3e8),
              m.SPARKLEND: ("2023-08-11", 5e6)}
     for p, (a, tvl) in spans.items():
         pts = {}
-        for d in cdays(a, "2026-10-16"):
-            pts[d] = (float(apy_level + rng.normal(0, 0.3)), float(tvl * (1 + rng.normal(0, 0.01))), d + "T23:01:00+00:00")
+        for k, d in enumerate(cdays(a, "2026-10-16")):
+            ramp = 1.0 if (cut and p in (m.MAPLE, m.SPARK_SAV)) else min(1.0, 0.005 + k / 90.0)
+            pts[d] = (float(apy_level + rng.normal(0, 0.3)), float(ramp * tvl * (1 + rng.normal(0, 0.01))), d + "T23:01:00+00:00")
         out[p] = pts
     return out
 
@@ -522,6 +526,32 @@ def test_t402_null_fails():
     assert j["verdict"] == "not_supported"
 
 
+def test_walk_forward_years_expanding_window():
+    """Regression (T-402 skeptic 2): the procedure's 'walk-forward by year' fits on the days whose forward window closed
+    before 1 January and predicts the year out of sample; the in-year slopes are only in-sample descriptions."""
+    rng = np.random.default_rng(21)
+    D = cdays("2018-01-01", "2023-12-31")
+    X = rng.normal(0, 0.02, len(D))
+    for b, want in ((3.0, "planted"), (0.0, "null")):
+        Y = b * X + rng.normal(0, 0.03, len(D))
+        wf = m.walk_forward_years(X, Y, D, 30)
+        assert list(wf["years"]) == ["2019", "2020", "2021", "2022", "2023"]
+        w19 = wf["years"]["2019"]
+        assert w19["n_train"] == sum(1 for d in D if d <= "2018-12-01") and w19["n_test"] == 365
+        if want == "planted":
+            assert wf["pooled_oos_r2"] > 0.3 and wf["n_negative_r2"] == 0
+            assert all(abs(w["slope"] - 3.0) < 0.6 for w in wf["years"].values())
+            assert all(w["hit_rate"] > w["hit_rate_mean"] - 0.02 for w in wf["years"].values())
+        else:
+            assert wf["pooled_oos_r2"] < 0.01
+    # the fit never sees the test year: changing 2021's returns leaves 2021's fitted slope unchanged
+    Y = 3.0 * X + rng.normal(0, 0.03, len(D))
+    Y2 = Y.copy()
+    Y2[[d[:4] == "2021" for d in D]] += 1.0
+    a, b = m.walk_forward_years(X, Y, D, 30)["years"]["2021"], m.walk_forward_years(X, Y2, D, 30)["years"]["2021"]
+    assert a["slope"] == pytest.approx(b["slope"]) and a["oos_r2"] != pytest.approx(b["oos_r2"])
+
+
 # ------------------------------------------------------------------------------------------------ core: T-403 --
 
 def test_t403_planted_signal_passes():
@@ -535,6 +565,50 @@ def test_t403_null_fails():
     h, p = sim_hash(False, seed=12)
     j = m.hash_ribbons(h, p)
     assert j["verdict"] != "supported"
+
+
+def test_ribbon_variants_entries_and_exits():
+    """The declared variants: no confirmation enters at the recovery close, the MVRV exit holds until the first close
+    whose previous-day MVRV exceeds 3, the difficulty variant has no data (None)."""
+    n = 600
+    H = np.full(n, 100.0)
+    H[200:260] = 70.0
+    P = np.full(n, 100.0)
+    P[300:] = 100.0 * np.exp(0.01 * np.arange(1, n - 299))          # momentum from close 300 on (live reading)
+    mv = np.full(n, 2.0)
+    mv[450:] = 3.5
+    sig, rec = m.ribbon_signals(H, P, "live")
+    assert len(rec) == 1 and len(sig) == 1 and rec[0] < 300 and sig[0] == 300
+    v = m.ribbon_variants(H, P, mv, 0, 90)
+    assert v[m.T403_VARIANTS[3]] is None
+    prim, noc, mvx = v[m.T403_VARIANTS[0]], v[m.T403_VARIANTS[1]], v[m.T403_VARIANTS[2]]
+    assert prim["signals"] == noc["signals"] == mvx["signals"] == 1
+    assert prim["held_share"] == pytest.approx(90 / (n - 1)) and noc["held_share"] == pytest.approx(90 / (n - 1))
+    # MVRV exit: entry at close sig, exit at close 451 (MVRV of day 450 > 3): held days sig+1..451
+    assert mvx["held_share"] == pytest.approx((451 - sig[0]) / (n - 1))
+    lr = np.log(P[1:] / P[:-1])
+    held = np.zeros(n - 1, bool)
+    held[rec[0]:rec[0] + 90] = True                                     # days rec+1..rec+90 on the lr index (day t -> t-1)
+    assert noc["mean_daily"] == pytest.approx(held.mean() * (lr[held].mean() - lr.mean()))
+    assert m.ribbon_variants(H, P, None, 0, 90)[m.T403_VARIANTS[2]] is None
+
+
+def test_t403_reports_dsr_over_the_four_declared_variants():
+    """Regression (T-403 skeptic 2): the controls' '4 variants into DSR' is computed and reported (not in the pass); the
+    difficulty variant is named as not implemented."""
+    h, p = sim_hash(True, seed=11)
+    mv = {d: (3.5 if (i // 500) % 3 == 2 else 1.5) for i, d in enumerate(sorted(p))}
+    j = m.hash_ribbons(h, p, mvrv=mv)
+    assert j["dsr"]["n_trials"] == 4 and j["dsr"]["n_family_computed"] == 3
+    assert j["variants"][m.T403_VARIANTS[3]] is None
+    assert all(j["variants"][k]["sharpe_daily"] > 0 for k in m.T403_VARIANTS[:3])
+    assert j["dsr"]["dsr"] > 0.95 and j["variants"][m.T403_VARIANTS[0]]["fwd_diff"] == pytest.approx(
+        j["res"]["a, momentum read at close t (live proxy)"]["est"])
+    assert not any("DSR" in c[0] for c in j["criteria"])                # reported, not a pass criterion
+    # entries are taken on the claim's signal window (a full forward window), so the primary counts what the criterion counts
+    assert j["variants"][m.T403_VARIANTS[0]]["signals"] == j["res"]["a, momentum read at close t (live proxy)"]["n"]
+    jn = m.hash_ribbons(*sim_hash(False, seed=12))
+    assert jn["dsr"]["n_family_computed"] == 2 and jn["dsr"]["dsr"] < 0.95
 
 
 # ------------------------------------------------------------------------------------------------ core: T-367 --
@@ -553,6 +627,85 @@ def test_t367_carry_null_fails():
     j = m.defi_carry(sim_pools(8.0, seed=14), _bill)
     assert j["verdict"] == "not_supported"
     assert any(v["venue_carry"] for v in j["venues"].values())
+
+
+def _pt(apy, tvl, d):
+    return (apy, tvl, d + "T23:01:00+00:00")
+
+
+def test_chart_starts_cut_off_vs_launch():
+    """Regression (T-367 skeptic 2): a chart opening with large TVL is a cut-off history (a data gap), not a launch."""
+    pools = {m.AAVE: {"2023-02-06": _pt(1.8, 6.9e6, "2023-02-06"), "2023-08-11": _pt(2.0, 23.6e6, "2023-08-11"),
+                      "2025-07-28": _pt(5.0, 594.6e6, "2025-07-28"), "2025-12-22": _pt(4.0, 1166.8e6, "2025-12-22")},
+             m.SPARKLEND: {"2023-08-11": _pt(0.0, 0.0, "2023-08-11"), "2025-07-28": _pt(4.0, 0.4e6, "2025-07-28")},
+             m.MAPLE: {"2025-07-28": _pt(6.92, 2163.7e6, "2025-07-28"), "2025-12-22": _pt(6.5, 2662.2e6, "2025-12-22")},
+             m.SPARK_SAV: {"2025-12-22": _pt(4.0, 194.9e6, "2025-12-22")}}
+    st = m.chart_starts(pools)
+    assert not st[m.AAVE]["cut"] and st[m.AAVE]["share_of_set"] is None          # the only member that day: a launch
+    assert not st[m.SPARKLEND]["cut"]                                             # $0 at its first point
+    assert st[m.MAPLE]["cut"] and st[m.MAPLE]["gap"] == ["2023-02-01", "2025-07-27"]
+    assert st[m.MAPLE]["share_of_set"] == pytest.approx(2163.7 / (2163.7 + 594.6 + 0.4), rel=1e-3)
+    assert st[m.SPARK_SAV]["cut"] and st[m.SPARK_SAV]["share_of_set"] < 0.10      # cut by the $50M rule alone
+    assert st[m.SPARK_SAV]["gap"] == ["2023-02-01", "2025-12-21"]
+    # the share rule alone: $20M is under $50M but 15% of the set's TVL that day
+    p2 = {k: dict(v) for k, v in pools.items()}
+    p2[m.SPARK_SAV] = {"2025-12-22": _pt(4.0, 20e6, "2025-12-22")}
+    p2[m.AAVE] = dict(pools[m.AAVE], **{"2025-12-22": _pt(4.0, 60e6, "2025-12-22")})
+    p2[m.MAPLE] = dict(pools[m.MAPLE], **{"2025-12-22": _pt(6.5, 53e6, "2025-12-22")})
+    s2 = m.chart_starts(p2)[m.SPARK_SAV]
+    assert s2["cut"] and s2["tvl"] < m.T367_CUT_TVL and s2["share_of_set"] > m.T367_CUT_SHARE
+    # a chart opening before the window has no in-window gap; a pool without chart points is missing over the window
+    p3 = {k: dict(v) for k, v in pools.items()}
+    p3[m.MAPLE]["2022-12-01"] = _pt(6.0, 1e9, "2022-12-01")
+    del p3[m.SPARK_SAV]
+    s3 = m.chart_starts(p3)
+    assert not s3[m.MAPLE]["cut"] and s3[m.SPARK_SAV]["cut"] and s3[m.SPARK_SAV]["gap"] == list(m.T367_WIN)
+
+
+def test_t367_cut_off_chart_caps_at_inconclusive_and_names_the_span():
+    """Regression (T-367 skeptic 2): the planted no-carry pools pass on the observed pool-days, but Maple and Spark savings
+    open live, so their missing history is a None criterion each and the verdict is inconclusive, not supported."""
+    j = m.defi_carry(sim_pools(4.8, seed=13, cut=True), _bill)
+    assert j["verdict"] == "inconclusive", j["criteria"]
+    names = [c[0] for c in j["criteria"]]
+    oks = dict(j["criteria"])
+    assert oks[names[0]] is True and "on the observed pool-days" in names[0]
+    gaps = [k for k, ok in j["criteria"] if ok is None and "cut off" in k]
+    assert len(gaps) == 2
+    assert any(k.startswith("Maple syrupUSDC TVL and base APY 2023-02..2025-07-27 (live at its first DefiLlama point 2025-07-28") for k in gaps)
+    assert any(k.startswith("Spark savings USDC TVL and base APY 2023-02..2025-12-21") for k in gaps)
+    assert j["gap_scenarios"] == {}                    # no share price given: no fill scenario
+
+
+def test_implied_share_price_and_gap_scenarios():
+    """The share price at a cut-off pool's first point is backed out from the token's CMC price and the compounded base
+    APY; the gap fills bracket the outcome: a large high-yield Maple history fails, a small one does not."""
+    pools = sim_pools(4.8, seed=13, cut=True)
+    apy = {d: v[0] for d, v in pools[m.MAPLE].items()}
+    first = "2025-07-28"
+    cmc = {}
+    for d in cdays("2025-10-28", "2026-10-15"):
+        cmc[d] = 1.115 * m._compound(apy, first, d)
+    sp = m.implied_share_price(apy, first, cmc)
+    assert sp["consistent"] and sp["pps_first"] == pytest.approx(1.115, rel=1e-9)
+    assert sp["cmc_first"] == "2025-10-28" and sp["chart_growth"] == pytest.approx(sp["cmc_growth"], rel=1e-9)
+    bad = {d: (x if d < "2026-04-01" else x * 1.05) for d, x in cmc.items()}            # a token that is not the share
+    assert not m.implied_share_price(apy, first, bad)["consistent"]
+    # the gap fill: constant APY from the implied inception, TVL ramping from 0 to the first point's TVL
+    f = m.gap_fill(pools[m.MAPLE], first, "2025-07-18", 10.0, 1e9)
+    assert f["2025-07-27"][:2] == (10.0, pytest.approx(0.9e9)) and "2025-07-18" not in f and f[first] == pools[m.MAPLE][first]
+    j = m.defi_carry(pools, _bill, share_prices={m.MAPLE: sp})
+    assert j["verdict"] == "inconclusive"
+    assert any("share price about 1.115" in c[0] for c in j["criteria"] if c[1] is None)
+    sc = j["gap_scenarios"]["Maple syrupUSDC"]["scenarios"]
+    assert len(sc) == len(m.T367_SCEN_RATES) + len(m.T367_SCEN_RAMPS)
+    by = {(s["rate"], s["ramp_end_frac"]): s for s in sc}
+    inc10 = date.fromisoformat(first).toordinal() - round(math.log(1.115) / math.log(1.10) * 365)
+    assert by[(0.10, 1.0)]["inception"] == date.fromordinal(inc10).isoformat()
+    assert by[(0.12, 1.0)]["outcome"] == "fail" and by[(0.10, 0.05)]["outcome"] == "pass"
+    assert by[(0.12, 1.0)]["ub95_min"] > by[(0.10, 0.05)]["ub95_max"]
+    j2 = m.defi_carry(pools, _bill, share_prices={m.MAPLE: m.implied_share_price(apy, first, bad)})
+    assert j2["gap_scenarios"] == {} and not any("share price about" in c[0] for c in j2["criteria"])
 
 
 # ------------------------------------------------------------------------------------------------- harnesses --
@@ -611,6 +764,36 @@ def test_harness_t367_fake_archive():
     A = FakeArchive({m.LLAMA_B: rows, m.DTB3_B: _fred_rows(bdays("2022-01-03"))})
     stat, n, v, reason = _check(m.b6c_cryptoxs_defi_yield_carry(A))
     assert v == "supported" and n >= 900
+    assert "Data gaps" not in reason and "taken as the launch" in reason and not any(s["cut"] for s in stat["starts"].values())
+
+
+def test_harness_t367_cut_off_charts_are_data_gaps():
+    """Regression (T-367 skeptic 2): the harness no longer reads 'Maple syrupUSDC from 2025-07-28' as a launch; the
+    cut-off spans are named, the share price comes from the optional CMC daily bundle, and the fill sensitivity is reported."""
+    pools = sim_pools(4.8, seed=13, cut=True)
+    rows = [{"kind": "chart", "available_at": ts, "value": {"pool": p, "timestamp": ts, "apyBase": a, "tvlUsd": tv}}
+            for p, pts in pools.items() for d, (a, tv, ts) in pts.items() if d <= "2026-10-15"]
+    apy = {d: v[0] for d, v in pools[m.MAPLE].items()}
+    cmc = {y: [] for y in (2025, 2026)}
+    for d in cdays("2025-10-28", "2026-10-14"):
+        cmc[int(d[:4])].append({"kind": "listing", "available_at": nxt(d) + "T00:00:00+00:00",
+                                "value": {"date": d, "id": 38779, "symbol": "SYRUPUSDC", "price": 1.115 * m._compound(apy, "2025-07-28", d)}})
+        cmc[int(d[:4])].append({"kind": "listing", "available_at": nxt(d) + "T00:00:00+00:00",
+                                "value": {"date": d, "id": 1, "symbol": "BTC", "price": 1e5}})
+    A = FakeArchive({m.LLAMA_B: rows, m.DTB3_B: _fred_rows(bdays("2022-01-03")),
+                     m.CMC_D_PREFIX + "2025": cmc[2025], m.CMC_D_PREFIX + "2026": cmc[2026]})
+    stat, n, v, reason = _check(m.b6c_cryptoxs_defi_yield_carry(A))
+    assert v == "inconclusive" and n >= 900
+    assert "Maple syrupUSDC from 2025-07-28" not in reason
+    assert "Data gaps (rule 9)" in reason and "CUT OFF, live before it" in reason
+    assert "Maple syrupUSDC TVL and base APY 2023-02..2025-07-27 (live at its first DefiLlama point 2025-07-28: $2.8" in reason
+    assert "share price about 1.115" in reason and "Spark savings USDC TVL and base APY 2023-02..2025-12-21" in reason
+    assert "Sensitivity: Maple syrupUSDC gap filled" in reason and "(fail)" in reason and "(pass)" in reason
+    assert stat["share_prices"][m.MAPLE]["consistent"] and len(stat["gap_scenarios"]["Maple syrupUSDC"]["scenarios"]) == 7
+    # without the CMC bundle the gaps are still named; only the sensitivity is absent
+    A2 = FakeArchive({m.LLAMA_B: rows, m.DTB3_B: _fred_rows(bdays("2022-01-03"))})
+    stat2, _, v2, reason2 = _check(m.b6c_cryptoxs_defi_yield_carry(A2))
+    assert v2 == "inconclusive" and "Maple syrupUSDC TVL and base APY 2023-02..2025-07-27" in reason2 and "Sensitivity" not in reason2
 
 
 def test_harness_t402_fake_archive():
@@ -621,15 +804,24 @@ def test_harness_t402_fake_archive():
     b[m.BTC_Y] = _yahoo_rows(p)
     stat, n, v, reason = _check(m.b6c_cryptoxs_stablecoin_supply_growth(FakeArchive(b)))
     assert v == "supported"
+    assert "walk-forward by year (expanding window" in reason and "in-sample slope within each year" in reason
+    assert "Reported: by year" not in reason
+    wf = stat["walk_forward"]
+    assert list(wf["years"])[0] == "2019" and wf["pooled_oos_r2"] > 0 and stat["years_label"].startswith("in-sample")
 
 
 def test_harness_t403_fake_archive():
     h, p = sim_hash(True, seed=11)
     hr = [{"available_at": nxt(d) + "T00:00:00+00:00", "value": {"day": d, "hash_rate_ths": x}} for d, x in sorted(h["a"].items())]
-    b = {m.HASH_B: hr, m.cm_b("btc"): _cm_rows("btc", {"HashRate": h["b"], "PriceUSD": p}),
+    mv = {d: (3.5 if (i // 500) % 3 == 2 else 1.5) for i, d in enumerate(sorted(p))}
+    b = {m.HASH_B: hr, m.cm_b("btc"): _cm_rows("btc", {"HashRate": h["b"], "PriceUSD": p, "CapMVRVCur": mv}),
          m.BTC_Y: _yahoo_rows({d: x for d, x in p.items() if d >= "2014-09-17"})}
     stat, n, v, reason = _check(m.b6c_cryptoxs_hash_ribbons(FakeArchive(b)))
     assert v == "supported" and n >= 15
+    assert "DSR over the 4 declared variants" in reason and "the primary's DSR" in reason
+    assert "difficulty drop >= 5% as capitulation: not implemented (no Bitcoin difficulty series is archived" in reason
+    assert "hold until MVRV > 3: " in reason and "(a diagnostic, not a declared variant)" in reason
+    assert stat["dsr"]["n_trials"] == 4 and stat["variants_not_implemented"] == [m.T403_VARIANTS[3]]
     # the cost label: 40 bps per switch is an 80 bps round trip; the 10 bps-per-switch end is reported too
     assert "a round trip at 40 bps per switch (80 bps) costs -0.0080" in reason and "10 bps per switch (20 bps) -0.0020" in reason
     assert "a 40 bps round trip" not in reason

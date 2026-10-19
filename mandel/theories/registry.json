@@ -9394,7 +9394,9 @@
     "pass": "Mean underperformance > 0.83% per month with p < 0.05 in both equal- and value-weighted versions, and the same sign in at least 5 of 7 calendar years. DSR with n_trials = 3.",
     "controls": "Days-to-cover is a proxy for the fee; actual fees need IBKR shortable-stock files captured daily (start now) or paid data. Survivorship: the FINRA file includes later-delisted names, but Yahoo lacks their prices; delisting returns are set to -30% as a sensitivity. Publication lag respected. Costs 10 bp. The 2021 meme squeeze is flagged and reported with and without."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_stockxs_lending_dtc_deciles"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -9921,7 +9923,9 @@
     "pass": "Lower 95% bound > 0 over >= 150 release dates AND alpha t >= 2 AND holds excluding the 2021 squeeze window.",
     "controls": "Look-ahead: publication date, not settlement; shares outstanding point-in-time from filings, not Yahoo's current quoteSummary. Survivorship: universe rebuilt each date from all filers; delisted names flagged. Costs: 1% generic borrow on the short leg (higher for DTC 5-10), 5 bp per side. Multiple testing: 5 variants. Regime: 2021 squeezes; 2022 bear market."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_stockxs_short_interest_dtc"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -11590,7 +11594,9 @@
     "pass": "Lower 95% bound > 0 over >= 150 months AND FF5 alpha t >= 2.",
     "controls": "Look-ahead: acceptance date; facts restricted to the filing's own accession. Survivorship: delisted names missing from Yahoo (value-distressed names delist often: strong upward bias; sensitivity with delisting returns). Costs: 10-20 bp per side. Multiple testing: 4 variants. Regime: 2020-2021 junk rally."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_stockxs_piotroski_value"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12195,7 +12201,9 @@
     "pass": "95% lower bound of net Sharpe > 0 AND DSR > 0.95 AND PBO < 0.5",
     "controls": "Look-ahead: trailing estimation; trade at the next close after the signal close. Survivorship: delisted members are missing from Yahoo, so the read is a biased upper bound; the clean read needs CRSP/Norgate. Costs: 5 bps per side per trade plus 50 bps/yr borrow. Multiple testing: DSR/PBO. Regime: halves; 2020-03 and 2022 reported."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_stockxs_avellaneda_lee"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",

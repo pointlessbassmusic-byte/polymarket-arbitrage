@@ -1891,9 +1891,11 @@ T403_VARIANTS = ("30/60 cross + price confirmation (primary)", "no price confirm
 T403_MVRV_EXIT = 3.0
 
 
-def ribbon_variants(H: np.ndarray, P: np.ndarray, mv: Optional[np.ndarray], ix0: int, horizon: int = T403_H) -> dict:
+def ribbon_variants(H: np.ndarray, P: np.ndarray, mv: Optional[np.ndarray], ix0: int, horizon: int = T403_H,
+                    last: Optional[int] = None) -> dict:
     """The 4 declared variants as daily-timeline event strategies on one calendar (H hash rate, P price, mv MVRV by day
-    or None; signals from index ix0): {variant: {signals, held-day share, daily series x, Sharpe}} or None when the
+    or None; entries on indices ix0..last, the claim's signal window): {variant: {signals, held-day share, daily series x,
+    Sharpe}} or None when the
     variant cannot be computed. x[t] = lr[t] - mean(lr) on held days, 0 otherwise, lr[t] = log(P[t] / P[t-1]) over
     the window ix0 + 1..; a signal at close s holds days s+1..s+horizon (fixed exit) or s+1..e, e the first close after s
     with MVRV of day e - 1 above 3 (MVRV exit; held to the end when it never comes)."""
@@ -1905,7 +1907,8 @@ def ribbon_variants(H: np.ndarray, P: np.ndarray, mv: Optional[np.ndarray], ix0:
     win &= np.isfinite(lr)
     mu = float(lr[win].mean())
     sig, rec = ribbon_signals(H, P, "live")
-    sig, rec = [s for s in sig if s >= ix0], [r for r in rec if r >= ix0]
+    last = T - 1 if last is None else last
+    sig, rec = [s for s in sig if ix0 <= s <= last], [r for r in rec if ix0 <= r <= last]
 
     def fixed(ss):
         h = np.zeros(T, bool)
@@ -2005,7 +2008,21 @@ def hash_ribbons(hashes: dict, price: dict, start: str = T403_START, horizon: in
     s7 = [s for s in s7 if base[s]]
     if s7:
         caps7 = {"n": len(s7), "est": float(y[s7].mean() - uncond)}
+    # the controls' 'Multiple testing: 4 variants into DSR' (reported): the declared variants as daily event strategies
+    mv_arr = np.array([mvrv.get(d, np.nan) for d in cal], float) if mvrv else None
+    vr = ribbon_variants(H0, P, mv_arr, ix0, horizon, last=int(np.flatnonzero(base)[-1]))
+    s0, r0 = ribbon_signals(H0, P, "live")
+    for nm_, ss in ((T403_VARIANTS[0], s0), (T403_VARIANTS[1], r0)):
+        ss = [s for s in ss if base[s]]
+        if vr.get(nm_) is not None:
+            vr[nm_]["fwd_diff"] = float(y[ss].mean() - uncond) if ss else None
+    pv = vr[T403_VARIANTS[0]]
+    dsr = family_dsr(pv["x"], [x["sharpe_daily"] for x in vr.values() if x is not None], len(T403_VARIANTS)) if pv else None
+    for x in vr.values():
+        if x is not None:
+            x.pop("x", None)
     return {"n": int(n), "window": [cal[ix0], cal[int(np.flatnonzero(base)[-1])]], "uncond": uncond, "res": res, "agree": agree,
+            "variants": vr, "dsr": dsr, "variant_source": srcs[0],
             "china_signals": [d for d in sg if T403_CHINA[0] <= d <= T403_CHINA[1]], "without_china_est": wo_est,
             "in_sample_est": float(np.mean([prim["fwd"][d] for d in ins]) - uncond) if ins else None,
             "post_est": float(np.mean([prim["fwd"][d] for d in sg if d >= pub]) - uncond) if any(d >= pub for d in sg) else None,
@@ -2028,7 +2045,7 @@ def b6c_cryptoxs_hash_ribbons(archive):
     cm = _cm(archive, "btc")
     hashes = {"blockchain.info": bci, "Coin Metrics HashRate": _metric(cm, "HashRate")}
     price = splice_price(_metric(cm, "PriceUSD"), _closes(archive, BTC_Y), "2014-09-17")
-    j = hash_ribbons(hashes, price)
+    j = hash_ribbons(hashes, price, mvrv=_metric(cm, "CapMVRVCur") or None)
     if j.get("too_short"):
         return _too_short(j["n"], T403_MIN_N, "signals", "hash-ribbon signals 2011..")
     rs = "; ".join(f"{k}: {r['n']} signals, mean after signal {_s(r['mean_signal'])}, difference {_s(r['est'])} "
@@ -2036,6 +2053,16 @@ def b6c_cryptoxs_hash_ribbons(archive):
                    f"{_f(None if r['post_share_positive'] is None else r['post_share_positive'] * 100, 0)}% positive"
                    for k, r in j["res"].items())
     ag = j["agree"]
+    dd = j["dsr"]
+    vtxt = (f"DSR over the {len(T403_VARIANTS)} declared variants (controls; reported, not in the pass; {j['variant_source']} hash rate, "
+            f"momentum at close t; daily event strategies: BTC log return minus its unconditional daily mean on held days, gross): "
+            + "; ".join(f"{k}: " + ("not implemented (no Bitcoin difficulty series is archived; it enters the DSR only through the "
+                                    "trial count)" if k == T403_VARIANTS[3] else "not computed (no MVRV series)") if x is None else
+                        f"{k}: {x['signals']} entries, held {x['held_share'] * 100:.0f}% of days, Sharpe {_s(x['sharpe_ann'], 2)} a year"
+                        + (f", 90-day forward difference {_s(x['fwd_diff'])}" if x.get("fwd_diff") is not None else "")
+                        for k, x in j["variants"].items())
+            + (f"; the primary's DSR {_f(dd['dsr'])} at {dd['n_trials']} trials (var(trial SR) {dd['var_trials_sr']:.2e} = "
+               f"{dd['var_used']}; {dd['n_family_computed']} variants computed)" if dd and dd.get("dsr") is not None else "; DSR n/a"))
     reason = (f"Hash ribbons (30/60-day calendar SMAs of the daily hash rate, data through t-1) recovery after a capitulation, "
               f"entry at the first close with the 10-day price SMA above the 20-day; BTC price Coin Metrics PriceUSD to "
               f"2014-09-16, Yahoo BTC-USD from 2014-09-17; forward {T403_H}-day log return from the entry close; days "
@@ -2044,12 +2071,14 @@ def b6c_cryptoxs_hash_ribbons(archive):
                  f"of the {ag['n_a']} blockchain.info recoveries ({ag['n_b']} Coin Metrics); " if ag else "")
               + f"2011-2019-07 (author's in-sample) difference {_s(j['in_sample_est'])}, post-publication {_s(j['post_est'])}; "
               f"China mining-ban signals {j['china_signals'] or 'none'} (difference without them {_s(j['without_china_est'])}); "
-              f"capitulations >= 7 days: {j['cap7']['n'] if j['cap7'] else 0} signals, difference {_s(j['cap7']['est'] if j['cap7'] else None)}; "
+              f"capitulations >= 7 days (a diagnostic, not a declared variant): {j['cap7']['n'] if j['cap7'] else 0} signals, "
+              f"difference {_s(j['cap7']['est'] if j['cap7'] else None)}; {vtxt}; "
               f"a round trip at 40 bps per switch (80 bps) costs {j['round_trip_cost_log']:+.4f} in log return and one at 10 bps "
               f"per switch (20 bps) {j['round_trip_cost_log_10']:+.4f}; hash rates are the providers' current "
               f"estimates (near point in time with the one-day lag, as the triage says) — " + j["why"])
     stat = {k: j[k] for k in ("n", "window", "uncond", "res", "agree", "china_signals", "without_china_est", "in_sample_est", "post_est",
-                              "cap7", "round_trip_cost_log", "round_trip_cost_log_10", "criteria")}
+                              "cap7", "round_trip_cost_log", "round_trip_cost_log_10", "variants", "dsr", "variant_source", "criteria")}
+    stat["variants_not_implemented"] = [k for k, x in j["variants"].items() if x is None]
     return _out(stat, j["n"], j["verdict"], reason)
 
 
