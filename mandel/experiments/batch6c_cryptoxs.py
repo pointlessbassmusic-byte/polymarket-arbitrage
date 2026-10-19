@@ -24,7 +24,8 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            (2019-08-) signals positive.
   * T-367  TVL-weighted mean spread of the 7-day base APY of the Ethereum USDC lending pools (Aave v3, Spark, Maple)
            over DTB3, 2023-02..2026-09: one-sided 95% upper bound below the 1.5% risk charge (block bootstrap, 30-day
-           blocks, 5,000 draws) over >= 900 days.
+           blocks, 5,000 draws) over >= 900 days, and every named pool's history inside the window archived: a pool
+           whose DefiLlama chart opens already live (cut off) is a data gap, a None criterion (rule 9).
 
 Conventions
   * Data. Every bundle is read through ``archive.load``; a row is used only when its ``available_at`` is not after the
@@ -124,11 +125,23 @@ Claim-specific choices (declared before any result)
     MVRV scaled by 0.9 and by 1.1 (an assumed restatement band): each passes or fails only when every scaling agrees,
     so a failure counts only when no plausible restatement could reverse it.
   * T-402: aggregate growth = sum over the coins present on both days of SplyCur(t-1) / SplyCur(t-31) - 1 (a coin's
-    first appearance is not growth); decision days 2018-01-01.. with a complete 30-day forward window.
+    first appearance is not growth); decision days 2018-01-01.. with a complete 30-day forward window. The procedure's
+    'walk-forward by year' is reported (not in the pass): expanding window, the slope fitted on the days whose 30-day
+    forward window closed before 1 January of year y, predicting every day of y; out-of-sample R2 against the training
+    mean and the sign hit rate per year, pooled OOS R2. The slopes fitted within each year are in-sample descriptions and
+    are labelled so.
   * T-403: hash ribbons = 30- and 60-day calendar SMAs of the daily hash rate (>= 80% of days present); capitulation
     while SMA30 < SMA60 (data through t - 1); a recovery is the first day after a capitulation with SMA30 >= SMA60;
     the signal is the first day from the recovery on which the 10-day price SMA exceeds the 20-day one, cancelled by a
-    new capitulation first; one signal per recovery; 'positive' = forward 90-day log return > 0.
+    new capitulation first; one signal per recovery; 'positive' = forward 90-day log return > 0. The controls' 'Multiple
+    testing: 4 variants into DSR' (the library's variants: 30/60 cross + price confirmation = the primary; no price
+    confirmation = entry at the recovery close; hold until MVRV > 3 = the primary's entries held until the first close
+    whose MVRV of the day before exceeds 3; difficulty drop >= 5% as the capitulation) is reported (not in the pass): each
+    variant is a daily-timeline event strategy on blockchain.info hash rate with the live momentum reading, whose daily
+    return is the BTC log return minus its unconditional daily mean over the window on held days and 0 otherwise (gross;
+    its mean is the share of held days x (held-day mean - unconditional mean), the claim's comparison), and the
+    primary's DSR is batch6c_mom.family_dsr at 4 trials (house 1/(T-1) floor). No Bitcoin difficulty series is archived,
+    so the difficulty variant is not computed: it enters the DSR only through the trial count (named in the reason).
   * T-367: pools fixed from the 2026-10-16 snapshot (mandel.data.crypto_history.LLAMA_POOLS): Aave v3 USDC, Spark
     savings USDC (the library's 'Spark savings USDC') and Maple syrupUSDC; SparkLend USDC in place of Spark savings is
     the second reading (both must pass). 7-day base APY = mean of the last 7 daily apyBase points (>= 5 present).
@@ -136,7 +149,19 @@ Claim-specific choices (declared before any result)
     day's tvlUsd and days weigh equally (the mean of daily TVL-weighted spreads), and every pool-day weighs by its tvlUsd
     (sum tvl x spread / sum tvl over all pool-days: a ratio of means, studentized through its linearised influence).
     DTB3 = the latest print available at the chart timestamp. DefiLlama's tvlUsd for a lending pool is its available
-    liquidity, as the trial's chart field gives it.
+    liquidity, as the trial's chart field gives it. Chart starts: DefiLlama's chart of a pool begins when DefiLlama
+    began tracking it, not necessarily at launch. A pool whose first chart point falls inside the window and already
+    holds more than $50M TVL, or more than 10% of its set's TVL that day (when other members hold TVL), was live before
+    it: its history from the window start to the day before is MISSING, a None criterion naming the span (rule 9), not
+    'not yet launched'. A pool with no chart point in the window is missing over the whole window. Below both
+    thresholds the first point is taken as the launch (Aave v3 USDC: $6.9M on 2023-02-06; SparkLend: $0 on 2023-08-11).
+    The observed-data readings are still computed and judged. Sensitivity (reported): for a cut-off pool whose share
+    token CMC prices (T367_SHARE_TOKENS: syrupUSDC), the share price at the first chart point is backed out from the
+    first CMC price and the chart's base APY compounded between them (used only when the compounded APY matches the CMC
+    price growth over the CMC span within 1%); the gap is then filled with a constant APY r from the inception the share
+    price implies (price 1 at inception) and TVL ramping linearly from 0 to the first point's TVL (r = 6/8/10/12%; at
+    10% also to 25/10/5% of it), and every reading's one-sided bound is recomputed (one seed, at most 1,000 draws).
+    Other gaps stay unfilled in the scenarios.
 
 Verdicts use ``underlying2._verdict`` through ``batch6b_bw._decide``: any implemented criterion failing -> not_supported;
 any criterion not implemented (None) -> at best inconclusive; supported needs every criterion implemented and passing.
@@ -1661,6 +1686,33 @@ def supply_growth(supply: dict, day: str, lag_days: int = 30, ex: Sequence[str] 
     return (s1 / s0 - 1.0) if k and s0 > 0 else None
 
 
+def walk_forward_years(X: np.ndarray, Y: np.ndarray, D: Sequence[str], horizon: int = T402_H, min_train: int = 100) -> dict:
+    """The trial's 'walk-forward by year' (expanding window): for every calendar year y after the first, OLS of Y on X
+    fitted on the decision days whose forward window closed before y-01-01 (d + horizon < y-01-01), predicting every
+    decision day of y. Per year: the fitted slope, out-of-sample R2 against the training mean (Campbell-Thompson), and the
+    sign hit rate (forecast and realised return of the same sign; the training mean's hit rate alongside). Pooled: the
+    out-of-sample R2 over every predicted day."""
+    D = list(D)
+    years = sorted({d[:4] for d in D})
+    out, sm, sb = {}, 0.0, 0.0
+    for y in years[1:]:
+        tr = np.array([_day_add(d, horizon) < f"{y}-01-01" for d in D])
+        te = np.array([d[:4] == y for d in D])
+        if tr.sum() < min_train or te.sum() < 30:
+            continue
+        b, a = np.polyfit(X[tr], Y[tr], 1)
+        pred, bench = a + b * X[te], float(Y[tr].mean())
+        em, eb = float(np.sum((Y[te] - pred) ** 2)), float(np.sum((Y[te] - bench) ** 2))
+        sm, sb = sm + em, sb + eb
+        out[y] = {"n_train": int(tr.sum()), "n_test": int(te.sum()), "slope": float(b), "oos_r2": (1.0 - em / eb) if eb > 0 else None,
+                  "hit_rate": float(np.mean(np.sign(pred) == np.sign(Y[te]))),
+                  "hit_rate_mean": float(np.mean(np.sign(bench) == np.sign(Y[te])))}
+    r2 = [v["oos_r2"] for v in out.values() if v["oos_r2"] is not None]
+    return {"years": out, "pooled_oos_r2": (1.0 - sm / sb) if sb > 0 else None, "n_years": len(out),
+            "n_negative_r2": int(sum(1 for v in r2 if v < 0)),
+            "slope_range": [min(v["slope"] for v in out.values()), max(v["slope"] for v in out.values())] if out else None}
+
+
 def stablecoin_predict(supply: dict, price: dict, start: str = T402_START, horizon: int = T402_H, min_n: int = T402_MIN_N,
                        mcap: Optional[dict] = None) -> dict:
     """T-402 core: supply {coin: {day: SplyCur}}, price {day: BTC close}."""
@@ -1707,11 +1759,12 @@ def stablecoin_predict(supply: dict, price: dict, start: str = T402_START, horiz
     crit.append(("positive slope in both halves (" + "; ".join(f"{k} {_s(h['beta'] if h else None)} (t {_s(h['t'] if h else None, 2)})"
                                                              for k, h in halves.items()) + ")", hrow_ok, False))
     v, why = _decide(crit, n_weeks, min_n, "weekly observations (the shortest weekday grid)")
-    years = {}
+    years = {}                                   # in-sample slope within each year (descriptive, not the walk-forward)
     for y in sorted({d[:4] for d in D}):
         m = np.array([d[:4] == y for d in D])
         if m.sum() > 100:
             years[y] = float(np.polyfit(X[m], Y[m], 1)[0])
+    wf = walk_forward_years(X, Y, D, horizon)
     m_ex = np.array([not (d[:7] in ("2022-05", "2023-03")) for d in D])
     ex_o = ols_kernel(Y[m_ex], X[m_ex], T402_NW_LAG, "bartlett")
     Xu = []
@@ -1739,7 +1792,7 @@ def stablecoin_predict(supply: dict, price: dict, start: str = T402_START, horiz
     ts = [p["t"] for p in phases.values() if p["t"] is not None]
     return {"n": int(n_weeks), "n_days": int(X.size), "window": [D[0], D[-1]], "nw": nw, "hh": hh, "phases": phases,
             "phase_t_range": [min(ts), max(ts)] if ts else None, "phases_passing": int(sum(1 for t in ts if t >= T402_T)),
-            "halves": halves, "years": years, "without_2022_05_2023_03": ex_o, "ex_usdt": exu, "ssr_z": ssr,
+            "halves": halves, "years": years, "walk_forward": wf, "without_2022_05_2023_03": ex_o, "ex_usdt": exu, "ssr_z": ssr,
             "x_mean": float(X.mean()), "x_sd": float(X.std()), "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
 
 
@@ -1755,20 +1808,27 @@ def b6c_cryptoxs_stablecoin_supply_growth(archive):
         return _too_short(j["n"], T402_MIN_N, "weekly observations", "decision days 2018..")
     ph = "; ".join(f"{k} {p['beta']:+.3f} (t {_s(p['t'], 2)}, {p['n']})" for k, p in j["phases"].items())
     yrs = ", ".join(f"{k} {v:+.2f}" for k, v in j["years"].items())
+    wf = j["walk_forward"]
+    wft = "; ".join(f"{y} slope {w['slope']:+.3f}, OOS R2 {_s(w['oos_r2'], 3)}, hit {w['hit_rate'] * 100:.0f}% (mean-only "
+                    f"{w['hit_rate_mean'] * 100:.0f}%)" for y, w in wf["years"].items())
     reason = (f"Aggregate SplyCur of USDT, USDC, DAI, BUSD, TUSD (Coin Metrics, same-coin 30-day growth to day t-1; UST is not in "
               f"the community API), BTC next-30-day log return from close t (Yahoo BTC-USD), days {j['window'][0]}..{j['window'][1]} "
               f"({j['n_days']} days; growth mean {_pc(j['x_mean'], 2)}, sd {_pc(j['x_sd'], 2)}). Pooled all-start slope "
               f"{j['nw']['beta']:+.3f} (Newey-West lag {T402_NW_LAG} t {_s(j['nw']['t'], 2)}; Hansen-Hodrick lag {T402_HH_LAG} t "
               f"{_s(j['hh']['t'], 2)}); weekday grids (slope, t, weeks): {ph}; {j['phases_passing']}/7 grids have t >= 2. Halves: "
               + "; ".join(f"{k} {_s(h['beta'] if h else None)} (t {_s(h['t'] if h else None, 2)})" for k, h in j["halves"].items())
-              + f". Reported: by year {yrs}; without 2022-05 and 2023-03 slope {j['without_2022_05_2023_03']['beta']:+.3f} (t "
+              + f". Reported: walk-forward by year (expanding window: the slope fitted on the days whose 30-day forward window "
+              f"closed before 1 January, predicting the year; out-of-sample R2 against the training mean): {wft}; pooled OOS R2 "
+              f"{_s(wf['pooled_oos_r2'], 3)}, negative in {wf['n_negative_r2']} of {wf['n_years']} years; in-sample slope within each "
+              f"year {yrs}; without 2022-05 and 2023-03 slope {j['without_2022_05_2023_03']['beta']:+.3f} (t "
               f"{_s(j['without_2022_05_2023_03']['t'], 2)}); ex-USDT growth "
               + (f"{j['ex_usdt']['beta']:+.3f} (t {_s(j['ex_usdt']['t'], 2)})" if j["ex_usdt"] else "n/a")
               + (f"; SSR z-score (365-day) slope {j['ssr_z']['beta']:+.4f} (t {_s(j['ssr_z']['t'], 2)}; the dry-powder reading "
                  f"predicts a negative sign)" if j["ssr_z"] else "") + " — " + j["why"])
     stat = {k: j[k] for k in ("n", "n_days", "window", "nw", "hh", "phases", "phase_t_range", "phases_passing", "halves", "years",
-                              "without_2022_05_2023_03", "ex_usdt", "ssr_z", "x_mean", "x_sd", "criteria")}
+                              "walk_forward", "without_2022_05_2023_03", "ex_usdt", "ssr_z", "x_mean", "x_sd", "criteria")}
     stat["rule10"] = "pooled all-start (daily) regression; the seven weekday grids reported"
+    stat["years_label"] = "in-sample slope within each year (descriptive); the walk-forward is under walk_forward"
     return _out(stat, j["n"], j["verdict"], reason)
 
 
@@ -1826,9 +1886,61 @@ def ribbon_signals(hash_by_day: np.ndarray, P: np.ndarray, reading: str, min_cap
     return sig, rec
 
 
+T403_VARIANTS = ("30/60 cross + price confirmation (primary)", "no price confirmation", "hold until MVRV > 3",
+                  "difficulty drop >= 5% as capitulation")
+T403_MVRV_EXIT = 3.0
+
+
+def ribbon_variants(H: np.ndarray, P: np.ndarray, mv: Optional[np.ndarray], ix0: int, horizon: int = T403_H) -> dict:
+    """The 4 declared variants as daily-timeline event strategies on one calendar (H hash rate, P price, mv MVRV by day
+    or None; signals from index ix0): {variant: {signals, held-day share, daily series x, Sharpe}} or None when the
+    variant cannot be computed. x[t] = lr[t] - mean(lr) on held days, 0 otherwise, lr[t] = log(P[t] / P[t-1]) over
+    the window ix0 + 1..; a signal at close s holds days s+1..s+horizon (fixed exit) or s+1..e, e the first close after s
+    with MVRV of day e - 1 above 3 (MVRV exit; held to the end when it never comes)."""
+    T = P.size
+    with np.errstate(invalid="ignore", divide="ignore"):
+        lr = np.concatenate([[np.nan], np.log(P[1:] / P[:-1])])
+    win = np.zeros(T, bool)
+    win[ix0 + 1:] = True
+    win &= np.isfinite(lr)
+    mu = float(lr[win].mean())
+    sig, rec = ribbon_signals(H, P, "live")
+    sig, rec = [s for s in sig if s >= ix0], [r for r in rec if r >= ix0]
+
+    def fixed(ss):
+        h = np.zeros(T, bool)
+        for s in ss:
+            h[s + 1:s + 1 + horizon] = True
+        return h
+
+    def mvrv_exit(ss):
+        h = np.zeros(T, bool)
+        for s in ss:
+            e = s + 1
+            while e < T and not (np.isfinite(mv[e - 1]) and mv[e - 1] > T403_MVRV_EXIT):
+                e += 1
+            h[s + 1:min(e, T - 1) + 1] = True
+        return h
+
+    holds = {T403_VARIANTS[0]: (sig, fixed(sig)), T403_VARIANTS[1]: (rec, fixed(rec)),
+             T403_VARIANTS[2]: (sig, mvrv_exit(sig)) if mv is not None else None, T403_VARIANTS[3]: None}
+    out = {}
+    for nm, hv in holds.items():
+        if hv is None:
+            out[nm] = None
+            continue
+        ss, h = hv
+        x = np.where(h & win, lr - mu, 0.0)[win]
+        out[nm] = {"signals": len(ss), "held_share": float((h & win)[win].mean()), "x": x,
+                   "mean_daily": float(x.mean()), "sharpe_daily": _sr_pp(x),
+                   "sharpe_ann": (_sr_pp(x) * math.sqrt(365.0)) if _sr_pp(x) is not None else None}
+    return out
+
+
 def hash_ribbons(hashes: dict, price: dict, start: str = T403_START, horizon: int = T403_H, min_n: int = T403_MIN_N,
-                 pub: str = T403_PUB) -> dict:
-    """T-403 core: hashes {source: {day: hash rate}}, price {day: BTC close}."""
+                 pub: str = T403_PUB, mvrv: Optional[dict] = None) -> dict:
+    """T-403 core: hashes {source: {day: hash rate}}, price {day: BTC close}, mvrv {day: MVRV} (optional: the MVRV-exit
+    variant of the reported DSR)."""
     days_p = sorted(price)
     if not days_p:
         return {"too_short": True, "n": 0}
@@ -1953,6 +2065,152 @@ MAPLE = "43641cf5-a92e-416b-bce9-27113d3c0db6"
 SPARKLEND = "65ce8276-b4d9-41ba-9f6f-21fc374cf9bc"
 POOL_NAMES = {AAVE: "Aave v3 USDC", SPARK_SAV: "Spark savings USDC", MAPLE: "Maple syrupUSDC", SPARKLEND: "SparkLend USDC"}
 T367_SETS = {"Spark = Spark savings USDC": (AAVE, SPARK_SAV, MAPLE), "Spark = SparkLend USDC": (AAVE, SPARKLEND, MAPLE)}
+T367_CUT_TVL = 50e6            # a first in-window chart point holding > $50M TVL ...
+T367_CUT_SHARE = 0.10          # ... or > 10% of its set's TVL that day was live before it: a cut-off chart (a data gap)
+T367_SHARE_TOKENS = {MAPLE: 38779}          # CMC id of the share token (syrupUSDC: its CMC price is the vault share price)
+T367_SCEN_RATES = (0.06, 0.08, 0.10, 0.12)  # sensitivity: constant accrual / APY in the missing span
+T367_SCEN_RAMPS = (0.25, 0.10, 0.05)        # ... and, at 10%/yr, TVL ramps ending at these fractions of the first point's TVL
+T367_SCEN_BOOT = 1000
+
+
+def chart_starts(pools: dict, sets: dict = T367_SETS, win: tuple = T367_WIN, cut_tvl: float = T367_CUT_TVL,
+                 cut_share: float = T367_CUT_SHARE) -> dict:
+    """{pool: start} for every member of every set: the first chart point, its TVL, base APY and largest share of a set's
+    TVL that day (None when no other member holds TVL then), and whether the chart is CUT OFF (the pool was live before
+    its first point, so its history from the window start to the day before is missing) rather than starting at launch."""
+    out = {}
+    for p in [q for q in POOL_NAMES if any(q in m for m in sets.values())]:
+        pts = {d: v for d, v in pools.get(p, {}).items() if d <= win[1]}
+        if not pts:
+            out[p] = {"first": None, "tvl": None, "apy": None, "share_of_set": None, "cut": True, "gap": [win[0], win[1]]}
+            continue
+        first = min(pts)
+        tvl, apy = pts[first][1], pts[first][0]
+        shares = []
+        for m in sets.values():
+            if p in m:
+                others = sum((pools.get(q, {}).get(first) or (0.0, 0.0))[1] or 0.0 for q in m if q != p)
+                if others > 0:
+                    shares.append(tvl / (tvl + others))
+        share = max(shares) if shares else None
+        cut = first > win[0] and (tvl > cut_tvl or (share is not None and share > cut_share))
+        out[p] = {"first": first, "tvl": tvl, "apy": apy, "share_of_set": share, "cut": bool(cut),
+                  "gap": [win[0], _day_add(first, -1)] if cut else None}
+    return out
+
+
+def _compound(apy_pts: dict, a: str, b: str) -> float:
+    """Growth of a share accruing the chart's daily base APY (% a year, the last point carried over missing days) over
+    the days (a, b]."""
+    g, last = 1.0, None
+    for d in _cal(_day_add(a, 1), b) if b > a else []:
+        last = apy_pts.get(d, last)
+        if last is not None:
+            g *= (1.0 + last / 100.0) ** (1.0 / 365.0)
+    return g
+
+
+def implied_share_price(apy_pts: dict, first: str, cmc_px: dict, tol: float = 0.01) -> Optional[dict]:
+    """The share price on the pool's first chart day, backed out from the share token's first CMC price and the chart's
+    base APY compounded in between; usable only when the compounded APY matches the CMC price growth over the CMC span
+    within ``tol`` (the CMC price is the share price)."""
+    ds = sorted(d for d in cmc_px if d >= first)
+    if len(ds) < 2:
+        return None
+    d0, d1 = ds[0], ds[-1]
+    cg, lg = cmc_px[d1] / cmc_px[d0], _compound(apy_pts, d0, d1)
+    return {"cmc_first": d0, "cmc_last": d1, "cmc_price_first": cmc_px[d0], "cmc_growth": cg, "chart_growth": lg,
+            "consistent": bool(abs(lg / cg - 1.0) <= tol), "pps_first": cmc_px[d0] / _compound(apy_pts, first, d0)}
+
+
+def gap_fill(pts: dict, first: str, inception: str, apy_pct: float, end_tvl: float) -> dict:
+    """``pts`` with the days from ``inception`` to the day before ``first`` filled: constant base APY, TVL ramping
+    linearly from 0 at inception to ``end_tvl`` at ``first`` (a scenario, not data)."""
+    out = dict(pts)
+    span = _ord(first) - _ord(inception)
+    for k in range(1, span + 1):
+        d = _day_add(first, -k)
+        tvl = end_tvl * (span - k) / span
+        if tvl > 0:
+            out[d] = (float(apy_pct), float(tvl), d + "T23:01:00+00:00")
+    return out
+
+
+def _set_series(pools: dict, members: Sequence[str], days: Sequence[str], bill_asof: Callable) -> tuple:
+    """A pool set's daily series: (days, TVL-weighted 7-day base APY, DTB3 discount yield at the chart timestamp,
+    sum TVL x APY, sum TVL)."""
+    apy_pts = {p: {d: v[0] for d, v in pools.get(p, {}).items()} for p in members}
+    ser, dl = [], []
+    for d in days:
+        num = den = 0.0
+        ts = None
+        for p in members:
+            pt = pools.get(p, {}).get(d)
+            if pt is None:
+                continue
+            a = apy7(apy_pts[p], d)
+            if a is None or not pt[1] or pt[1] <= 0:
+                continue
+            num += pt[1] * a
+            den += pt[1]
+            ts = max(ts or pt[2], pt[2])
+        if den <= 0:
+            continue
+        b = bill_asof(ts)
+        if b is None:
+            continue
+        ser.append((num / den, b, num, den))
+        dl.append(d)
+    arr = np.array(ser, float).reshape(-1, 4)
+    return dl, arr[:, 0], arr[:, 1], arr[:, 2], arr[:, 3]
+
+
+def _light_bounds(pools: dict, bill_asof: Callable, days: Sequence[str], sets: dict, n_boot: int) -> dict:
+    """Every reading's mean and one-sided 95% upper bound (one seed, ``n_boot`` draws): the gap-scenario sensitivity."""
+    out = {}
+    for sn, members in sets.items():
+        dl, A, Bd, NA, DN = _set_series(pools, members, days, bill_asof)
+        if not dl:
+            continue
+        for cn, fn in T367_CONV.items():
+            bl_ = np.array([fn(x) for x in Bd])
+            sp = A - bl_
+            out[f"{sn}, DTB3 {cn}"] = {"mean": float(sp.mean()),
+                                       "ub95": _stud(_mean_stat, [sp], T367_BLOCK, n_boot, SEED, level=0.90)["ci"][1]}
+            r = _stud(_ratio_stat, [NA - DN * bl_, DN], T367_BLOCK, n_boot, SEED, level=0.90)
+            out[f"{sn}, DTB3 {cn}, pool-days weighted"] = {"mean": r["est"], "ub95": r["ci"][1]}
+    return out
+
+
+def gap_scenarios(pools: dict, bill_asof: Callable, starts: dict, share_prices: dict, win: tuple = T367_WIN,
+                  charge: float = T367_CHARGE, sets: dict = T367_SETS) -> dict:
+    """Sensitivity of every reading to the missing history of each cut-off pool with a usable share price: the gap
+    filled from the inception the share price implies (price 1 at inception, accruing r a year) with a constant APY r and
+    TVL ramping from 0 to the first point's TVL (r in T367_SCEN_RATES), and at 10%/yr with ramps ending at
+    T367_SCEN_RAMPS of it. Outcome: 'pass' when every reading's bound is below the charge, 'fail' when none is."""
+    days = _cal(*win)
+    nb = min(N_BOOT, T367_SCEN_BOOT)
+    out = {}
+    for p, sp in share_prices.items():
+        st = starts.get(p) or {}
+        if not st.get("cut") or not st.get("first") or not sp or not sp.get("consistent") or sp["pps_first"] <= 1.0:
+            continue
+        first, tvl0 = st["first"], st["tvl"]
+        scen = [(r, 1.0) for r in T367_SCEN_RATES] + [(0.10, f) for f in T367_SCEN_RAMPS]
+        rows = []
+        for r, frac in scen:
+            inc = _day_add(first, -int(round(math.log(sp["pps_first"]) / math.log(1.0 + r) * 365.0)))
+            filled = dict(pools)
+            filled[p] = gap_fill(pools[p], first, inc, 100.0 * r, frac * tvl0)
+            b = _light_bounds(filled, bill_asof, days, sets, nb)
+            ubs = [x["ub95"] for x in b.values() if x["ub95"] is not None]
+            out_ = ("pass" if ubs and all(u < charge for u in ubs) else "fail" if ubs and all(u >= charge for u in ubs)
+                    else "undecided")
+            rows.append({"rate": r, "inception": inc, "ramp_end_tvl": frac * tvl0, "ramp_end_frac": frac,
+                         "ub95_min": min(ubs) if ubs else None, "ub95_max": max(ubs) if ubs else None, "outcome": out_,
+                         "readings": b})
+        out[POOL_NAMES[p]] = {"pps_first": sp["pps_first"], "draws": nb, "scenarios": rows}
+    return out
 
 
 def bey(d_pct: float) -> float:
@@ -1973,41 +2231,32 @@ def apy7(points: dict, day: str, min_present: int = 5) -> Optional[float]:
     return float(np.mean(vals)) if len(vals) >= min_present else None
 
 
+T367_CONV = {"bond-equivalent": bey, "effective annual": eff_annual}
+
+
+def gap_label(p: str, st: dict, sp: Optional[dict] = None) -> str:
+    """The None criterion naming a cut-off pool's missing span."""
+    nm = POOL_NAMES.get(p, p)
+    if st.get("first") is None:
+        return f"{nm} TVL and base APY {st['gap'][0]}..{st['gap'][1]} (no DefiLlama chart point archived in the window)"
+    sh = "" if st.get("share_of_set") is None else f", {st['share_of_set'] * 100:.0f}% of its set's TVL"
+    pp = (f", share price about {sp['pps_first']:.3f}" if sp and sp.get("consistent") else "")
+    return (f"{nm} TVL and base APY {st['gap'][0][:7]}..{st['gap'][1]} (live at its first DefiLlama point {st['first']}: "
+            f"${st['tvl'] / 1e9:.2f}B TVL{sh}, base APY {st['apy']:.2f}%{pp}; the chart is cut off, the history before it "
+            f"is not archived)")
+
+
 def defi_carry(pools: dict, bill_asof: Callable, win: tuple = T367_WIN, charge: float = T367_CHARGE, min_n: int = T367_MIN_N,
-               sets: dict = T367_SETS, eth: Optional[dict] = None) -> dict:
-    """T-367 core: pools {pool: {day: (apyBase %, tvlUsd, timestamp)}}, bill_asof(timestamp) -> DTB3 discount yield %."""
+               sets: dict = T367_SETS, eth: Optional[dict] = None, share_prices: Optional[dict] = None) -> dict:
+    """T-367 core: pools {pool: {day: (apyBase %, tvlUsd, timestamp)}}, bill_asof(timestamp) -> DTB3 discount yield %,
+    share_prices {pool: implied_share_price(...)} for the gap sensitivity (optional)."""
     days = _cal(*win)
-    conv = {"bond-equivalent": bey, "effective annual": eff_annual}
+    conv = T367_CONV
     rows, out = [], {}
     for sn, members in sets.items():
-        apy_pts = {p: {d: v[0] for d, v in pools.get(p, {}).items()} for p in members}
-        ser, dl = [], []
-        for d in days:
-            num = den = 0.0
-            ts = None
-            for p in members:
-                pt = pools.get(p, {}).get(d)
-                if pt is None:
-                    continue
-                a = apy7(apy_pts[p], d)
-                if a is None or not pt[1] or pt[1] <= 0:
-                    continue
-                num += pt[1] * a
-                den += pt[1]
-                ts = max(ts or pt[2], pt[2])
-            if den <= 0:
-                continue
-            b = bill_asof(ts)
-            if b is None:
-                continue
-            ser.append((num / den, b, num, den))
-            dl.append(d)
-        if not ser:
+        dl, A, Bd, NA, DN = _set_series(pools, members, days, bill_asof)
+        if not dl:
             continue
-        A = np.array([s[0] for s in ser], float)
-        Bd = np.array([s[1] for s in ser], float)
-        NA = np.array([s[2] for s in ser], float)
-        DN = np.array([s[3] for s in ser], float)
         for cn, fn in conv.items():
             bl_ = np.array([fn(x) for x in Bd])
             sp = A - bl_
@@ -2033,9 +2282,16 @@ def defi_carry(pools: dict, bill_asof: Callable, win: tuple = T367_WIN, charge: 
     if not rows:
         return {"too_short": True, "n": 0}
     n = min(o["n"] for o in out.values())
-    crit = [all_constructions(rows, f"one-sided 95% bootstrap upper bound of the TVL-weighted mean spread < {charge:g}% (studentized "
-                                    f"CBB, {T367_BLOCK}-day blocks; every weighting reading, Spark reading and bill conversion)")]
+    crit = [all_constructions(rows, f"one-sided 95% bootstrap upper bound of the TVL-weighted mean spread < {charge:g}% on the "
+                                    f"observed pool-days (studentized CBB, {T367_BLOCK}-day blocks; every weighting reading, Spark "
+                                    f"reading and bill conversion)")]
+    starts = chart_starts(pools, sets, win)
+    share_prices = share_prices or {}
+    for p, st in starts.items():             # rule 9: a named pool's missing in-window history is a data gap, not a launch
+        if st["cut"]:
+            crit.append((gap_label(p, st, share_prices.get(p)), None, False))
     v, why = _decide(crit, n, min_n, "days")
+    scen = gap_scenarios(pools, bill_asof, starts, share_prices, win, charge, sets) if any(s["cut"] for s in starts.values()) else {}
     prim = out[f"{list(sets)[0]}, DTB3 bond-equivalent"]
     venues, ps = {}, {}
     for p, nm in POOL_NAMES.items():
@@ -2099,7 +2355,7 @@ def defi_carry(pools: dict, bill_asof: Callable, win: tuple = T367_WIN, charge: 
         o.pop("days", None)
         o.pop("spread", None)
     return {"n": int(n), "out": out, "venues": venues, "holm": hp, "eth": eth_rep, "ex_maple": ex_maple, "criteria": [(c[0], c[1]) for c in crit],
-            "verdict": v, "why": why}
+            "starts": starts, "share_prices": share_prices, "gap_scenarios": scen, "verdict": v, "why": why}
 
 
 def b6c_cryptoxs_defi_yield_carry(archive):
@@ -2125,9 +2381,41 @@ def b6c_cryptoxs_defi_yield_carry(archive):
         return fr[k][1] if k >= 0 else None
 
     eth = _closes(archive, ETH_Y) if _has(archive, ETH_Y) else None           # optional: the reported ETH splits
-    j = defi_carry(dict(pools), bill_asof, eth=eth)
+    pools = dict(pools)
+    share_prices = {}
+    for p, st in chart_starts(pools).items():       # optional: the share price of a cut-off pool's token (the gap sensitivity)
+        cid = T367_SHARE_TOKENS.get(p)
+        if not st["cut"] or cid is None or st["first"] is None:
+            continue
+        px = {}
+        for y in CMC_D_YEARS:
+            if y >= int(st["first"][:4]) and _has(archive, f"{CMC_D_PREFIX}{y}"):
+                for r in _iter(archive, f"{CMC_D_PREFIX}{y}"):
+                    v = r.get("value") or {}
+                    if r.get("kind") == "listing" and v.get("id") == cid and _num(v.get("price")) and v.get("date"):
+                        px[v["date"]] = float(v["price"])
+        sp = implied_share_price({d: x[0] for d, x in pools[p].items()}, st["first"], px)
+        if sp:
+            share_prices[p] = sp
+    j = defi_carry(pools, bill_asof, eth=eth, share_prices=share_prices)
     if j.get("too_short"):
         return _too_short(j["n"], T367_MIN_N, "days", "pool days 2023-02..2026-09")
+    st_txt = "; ".join(
+        f"{POOL_NAMES[p]} " + ("no chart point in the window" if st["first"] is None else
+                               f"chart from {st['first']} (${st['tvl'] / 1e6:,.1f}M TVL at its first point"
+                               + ("" if st["share_of_set"] is None else f", {st['share_of_set'] * 100:.0f}% of its set")
+                               + (": CUT OFF, live before it, history from the window start missing)" if st["cut"]
+                                  else ": taken as the launch)" if st["first"] > T367_WIN[0] else ")"))
+        for p, st in j["starts"].items())
+    spt = "; ".join(f"{POOL_NAMES[p]} share token (CMC id {T367_SHARE_TOKENS[p]}) {x['cmc_price_first']:.4f} on {x['cmc_first']}, "
+                    f"growth to {x['cmc_last']} {x['cmc_growth']:.4f} vs the chart's compounded base APY {x['chart_growth']:.4f} "
+                    + (f"(consistent): share price at the first chart point about {x['pps_first']:.4f}" if x["consistent"]
+                       else "(inconsistent: not used)") for p, x in j["share_prices"].items())
+    sct = []
+    for nm, g in j["gap_scenarios"].items():
+        sct.append(f"{nm} gap filled (one seed, {g['draws']} draws; other gaps unfilled): " + "; ".join(
+            f"{s_['rate'] * 100:.0f}%/yr from {s_['inception']}, TVL ramp to ${s_['ramp_end_tvl'] / 1e9:.2f}B: bounds "
+            f"{_pp(s_['ub95_min'], 3)} to {_pp(s_['ub95_max'], 3)} ({s_['outcome']})" for s_ in g["scenarios"]))
     o = j["out"]
     ot = "; ".join(f"{k}: mean {x['mean']:+.3f} pp"
                    + (f" (APY {x['mean_apy']:.2f}% vs bill {x['mean_bill']:.2f}%)" if "mean_apy" in x else "")
@@ -2137,9 +2425,14 @@ def b6c_cryptoxs_defi_yield_carry(archive):
     vt = "; ".join(f"{k} {x['mean']:+.2f} pp over {x['n']} days (lower bound {_pp(x['lb95_one_sided'], 2)}"
                    f"{', venue-specific carry' if x['venue_carry'] else ''})" for k, x in j["venues"].items())
     et = j["eth"]
-    reason = (f"Ethereum USDC lending pools fixed from the 2026-10-16 DefiLlama snapshot (Aave v3 from 2023-02-06, Maple syrupUSDC "
-              f"from 2025-07-28, Spark savings from 2025-12-22, SparkLend from 2023-08-11), 7-day mean base APY (no rewards), "
-              f"TVL-weighted each day, minus DTB3 known at the chart timestamp: {ot}. Reported (first reading): two-sided 97.5% "
+    reason = (f"Ethereum USDC lending pools fixed from the 2026-10-16 DefiLlama snapshot ({st_txt}), 7-day mean base APY (no "
+              f"rewards), TVL-weighted each day, minus DTB3 known at the chart timestamp; observed pool-days: {ot}. "
+              + (f"Data gaps (rule 9): a first chart point above ${T367_CUT_TVL / 1e6:.0f}M TVL or {T367_CUT_SHARE * 100:.0f}% of its "
+                 f"set's TVL means the pool was already live, so its history inside the window before that point is missing: "
+                 + "; ".join(gap_label(p, st, j["share_prices"].get(p)) for p, st in j["starts"].items() if st["cut"])
+                 + (f". Share price: {spt}" if spt else "")
+                 + (f". Sensitivity: {'; '.join(sct)}" if sct else "") + ". " if any(st["cut"] for st in j["starts"].values()) else "")
+              + f"Reported (first reading): two-sided 97.5% "
               f"end {_pp(p0.get('ub975_two_sided_block30'), 3)}; one-sided 95% bound with 60- / 120-day blocks "
               + " / ".join(_pp(v_, 3) for v_ in (p0.get("ub95_by_block") or {}).values())
               + (f" [FRAGILE: longer blocks than the trial's {T367_BLOCK} days put the bound above {T367_CHARGE:g}%; the spread is "
@@ -2152,7 +2445,7 @@ def b6c_cryptoxs_defi_yield_carry(archive):
                  f"{_pp(et['up_mean'])} ({et['up_quarters']}), down {_pp(et['down_mean'])} ({et['down_quarters']})" if et else "")
               + (f"; without Maple (BEY, pools weighted within each day) {_pp(j['ex_maple']['mean'], 3)}" if j.get("ex_maple") else "")
               + "; posted APY is not realised APY and dead pools are absent from /pools (survivorship) — " + j["why"])
-    stat = {k: j[k] for k in ("n", "out", "venues", "holm", "eth", "ex_maple", "criteria")}
+    stat = {k: j[k] for k in ("n", "out", "venues", "holm", "eth", "ex_maple", "criteria", "starts", "share_prices", "gap_scenarios")}
     stat.update(charge_pct=T367_CHARGE, window=list(T367_WIN), pools=POOL_NAMES,
                 fragile_block_length=bool(any(v_ is not None and v_ >= T367_CHARGE for v_ in (p0.get("ub95_by_block") or {}).values())))
     return _out(stat, j["n"], j["verdict"], reason)

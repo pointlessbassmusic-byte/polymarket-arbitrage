@@ -23,7 +23,12 @@ capture time)
   * Prices: Yahoo ``daily-history-<TICKER>`` (open/high/low/close split-adjusted, adjclose split and dividend adjusted:
     total return) with splits from ``daily-events-<TICKER>``. Raw prices (the $5 filters, dollar volume) are close x
     the product of the split ratios with an ex-date after the bar. Market cap = split-adjusted close x reported shares x
-    the split factor after the shares' as-of date (so a split between the cover date and the decision is honoured). A
+    the split factor after the shares' as-of date (so a split between the cover date and the decision is honoured). The
+    SEC cover count sums an issuer's share classes, so for T-375 and T-393 each listed class (the FINRA stock rows of
+    the same CIK) gets an equal part of it at its own price (GOOG and GOOGL are not each counted at Alphabet's cap), and
+    no cap when the issuer's classes trade more than 2x apart (BRK-A / BRK-B). A stock without a usable cap is never
+    given a silent zero weight or dropped from a ranking: it leaves T-375's VW criteria and every T-393 criterion NOT
+    JUDGED (rule 9), like an unpriced name. A
     Yahoo series is a stock only when its recipe meta says instrumentType EQUITY (13 reused S&P tickers now name ETFs:
     FB, EMC, INFO, ...). The session calendar is SPY's bars.
   * SURVIVORSHIP. Yahoo answers 404 for delisted tickers, so only the names still quoted have prices (about 640 single
@@ -46,7 +51,9 @@ capture time)
   * FINRA short interest (``finra-short-interest-<settlement>``): days to cover = currentShortPositionQuantity /
     averageDailyVolumeQuantity, the library's definition (FINRA's own daysToCoverQuantity is floored at 1.00 and capped
     at 999.99). Stocks = the fetcher's company market classes (NYSE, Nasdaq tiers, NYSE American, TXSE; Arca, BZX and
-    IEX listings are funds) minus fund/warrant/unit/right/note/preferred names. Available at the end of the 8th NYSE
+    IEX listings are funds) minus fund/warrant/unit/right/note/preferred names (fund sponsors that also name operating
+    companies, Invesco and Vanguard, mark a fund only as the first word of a name without a corporate ending, so
+    Invesco Ltd and American Vanguard stay stocks). Available at the end of the 8th NYSE
     business day after settlement (the fetcher's rule, one day after FINRA's usual publication), so the first fill is
     the close of the next session; the filters and value weights use the previous close and the shares known at that
     session's open (one information set, rule 12). The expected settlement dates come from the fetcher's own calendar
@@ -99,8 +106,9 @@ Claim-specific choices (declared before any result)
     preferred stock. Entry at the first close after acceptance, price >= $5 at the previous close; top quintile =
     B/M at or above the 80th percentile of the priced 10-K filers' B/M at the previous month-end (latest 10-K book
     equity, positive only). Hold 12 months; a newer 10-K of the same firm replaces the position. Calendar-time legs
-    are equal-weight daily (cost per side charged on entry and exit days, none for a firm that stays in its leg); a
-    month is an observation when both legs hold at least one name on every session of the month.
+    are equal-weight daily (cost per side charged on entry and exit days, none for a firm that stays in its leg; the
+    short position's costs are added to the short leg's return, so both legs' costs lower the L/S); a month is an
+    observation when both legs hold at least one name on every session of the month.
   * T-473: daily on each signal close t: OLS of each member's last 60 daily returns on its sector SPDR's (intercept
     included, so the cumulative residual X ends at 0), AR(1) X_{k+1} = a + b X_k on the 60 points, kappa = -ln(b) x 252,
     m = a/(1-b), sigma_eq = sqrt(var(zeta)/(1-b^2)), s = (X_t - (m - mean m))/sigma_eq (cross-sectional mean of m over
@@ -170,11 +178,16 @@ FACTS_PREFIX = "sec-companyfacts-"
 SUBS_PREFIX = "sec-submissions-"
 SEC_BUCKET = 50_000
 SHARES_MAX_AGE = 456          # days: cover shares older than about 15 months are stale
+CLASS_PRICE_RATIO = 2.0       # an issuer's cover count is split across its listed classes only when they trade this close
 CAL_START = "2008-01-01"
 SECTOR_ETFS = ("XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY", "XLRE", "XLC")
 FF5_COLS = ("Mkt-RF", "SMB", "HML", "RMW", "CMA")
 NOT_STOCK = re.compile(r"(?i)\b(ETF|ETN|FUND|FD|WARRANTS?|WTS?|RIGHTS?|UNITS?|PREFERRED|PFD|NOTES?|DEBENTURES?|BONDS?|"
-                       r"TRUST UNITS|INDEX|ISHARES|PROSHARES|DIREXION|INVESCO|SPDR|VANGUARD)\b|%")
+                       r"TRUST UNITS|INDEX|ISHARES|PROSHARES|DIREXION|SPDR)\b|%")
+# Fund sponsors whose name is also an operating company's (Invesco Ltd, Invesco Mortgage Capital Inc., American Vanguard
+# Corp): a fund marker only as the name's first word and when the name does not end in a corporate form (FINRA's
+# 30-character names truncate the fund words: 'Invesco BulletShares 2025 Corp', 'Vanguard Scottsdale Funds Vang').
+FUND_SPONSOR = re.compile(r"(?i)^\W*(INVESCO|VANGUARD)\b(?!.*\b(INC|INCORPORATED|LTD|LIMITED|PLC)\W*$)")
 
 
 def _safe(sym: str) -> str:
@@ -655,16 +668,21 @@ def _num(x) -> float:
 
 
 def is_stock_row(cls: str, name: str) -> bool:
-    return cls in FINRA_COMPANY_CLASSES and not NOT_STOCK.search(name or "")
+    return cls in FINRA_COMPANY_CLASSES and not NOT_STOCK.search(name or "") and not FUND_SPONSOR.search(name or "")
+
+
+def _finra_cands(sym: str) -> list:
+    """Yahoo / SEC spellings of a FINRA symbol (class shares BRKB -> BRK-B)."""
+    cands = [ysym(sym)]
+    if len(sym) >= 3 and sym[-1] in "ABCK" and "-" not in sym and "." not in sym:
+        cands.append(sym[:-1] + "-" + sym[-1])
+    return cands
 
 
 def match_symbol(panel: Panel, sym: str, issue: str, i: int, aliases: Optional[dict] = None) -> tuple:
     """(column or -1, why) of a FINRA row in the price panel at session i: the symbol (class shares BRKB -> BRK-B), a
     Yahoo EQUITY series with a bar at i, and the FINRA issue name agreeing with a name the instrument has carried."""
-    cands = [ysym(sym)]
-    if len(sym) >= 3 and sym[-1] in "ABCK" and "-" not in sym and "." not in sym:
-        cands.append(sym[:-1] + "-" + sym[-1])
-    for c in cands:
+    for c in _finra_cands(sym):
         j = panel.col.get(c)
         if j is None:
             continue
@@ -958,12 +976,15 @@ def _out(stat: dict, n: int, verdict: str, reason: str):
     return _clean(stat), int(n), verdict, reason
 
 
-def _gate(rows: list, covered: bool, why: str) -> list:
-    """Criteria rows whose answers depend on unpriced names: None unless the universe is covered (the reason states the
-    coverage once, in full)."""
+def _gate(rows: list, covered: bool, why: str, label: str = "universe not fully priced") -> list:
+    """Criteria rows whose answers depend on unpriced names (or names without a market cap): None unless the universe is
+    covered (the reason states the coverage once, in full)."""
     if covered:
         return rows
-    return [(f"{name} [NOT JUDGED: universe not fully priced]", None, False) for name, _, _ in rows]
+    return [(f"{name} [NOT JUDGED: {label}]", None, False) for name, _, _ in rows]
+
+
+NOCAP_LABEL = "priced stocks without a usable market cap"
 
 
 def _too_short(n: int, min_n: int, unit: str, what: str):
@@ -984,8 +1005,11 @@ def _priced_ciks(archive, panel: Panel) -> frozenset:
 def finra_formations(archive, panel: Panel, dates: Sequence[str], need_mcap: bool = True) -> tuple:
     """One formation per archived settlement date: fill e = the first session closing after the publication
     (available_at), q = the session before (filters, weights), tau = e's 09:30 ET (shares known by then). Candidate names
-    = every FINRA stock row; a candidate is priced when matched to a Yahoo EQUITY series with bars at q and e. Returns
-    (formations, coverage rows); cached per date list."""
+    = every FINRA stock row; a candidate is priced when matched to a Yahoo EQUITY series with bars at q and e. Market cap
+    per security: the issuer's SEC cover count (all classes summed) is split equally across its listed classes (the
+    FINRA stock rows of the same CIK, priced or not), class cap = own price x that part; NaN when the issuer's priced
+    classes trade more than CLASS_PRICE_RATIO apart or no usable shares are known. Returns (formations, coverage rows);
+    cached per date list."""
     return _cached(archive, ("finra_forms", tuple(dates), need_mcap),
                    lambda: _finra_formations(archive, panel, dates, need_mcap))
 
@@ -1008,21 +1032,29 @@ def _finra_formations(archive, panel: Panel, dates: Sequence[str], need_mcap: bo
             continue
         q = e - 1
         tau = float(cal.open[e])
-        cols, dtc, chg, price, adv, mc, names = [], [], [], [], [], [], []
+        cols, dtc, chg, price, adv, mc, names, mcik = [], [], [], [], [], [], [], []
         n_stock = n_priced = n_adv = n_adv_priced = 0
         why = {"no series": 0, "no bar": 0, "name": 0}
-        for sym, nm, cls, si, advq, cp in f["rows"]:
+        matched = [match_symbol(panel, r[0], r[1], q, aliases) for r in f["rows"]]
+        # listed classes per issuer: the SEC cover count covers every class, so each class gets an equal part of it
+        n_cls: dict = {}
+        if need_mcap:
+            for (sym, nm, *_), (j, _w) in zip(f["rows"], matched):
+                ck = tick.get(panel.syms[j]) if j >= 0 else next(
+                    (tick[c] for c in _finra_cands(sym) if c in tick and names_match(nm, tick[c][1]) is not False), None)
+                if ck:
+                    n_cls[ck[0]] = n_cls.get(ck[0], 0) + 1
+        for (sym, nm, cls, si, advq, cp), (j, w) in zip(f["rows"], matched):
             n_stock += 1
             big = advq >= 1e6
             n_adv += int(big)
-            j, w = match_symbol(panel, sym, nm, q, aliases)
             if j < 0 or not panel.real[e, j]:
                 why[w if j < 0 else "no bar"] = why.get(w if j < 0 else "no bar", 0) + 1
                 continue
             n_priced += 1
             n_adv_priced += int(big)
             px = float(panel.RAW[q, j])
-            m = float("nan")
+            m, mk = float("nan"), None
             if need_mcap:
                 ck = tick.get(panel.syms[j])
                 if ck:
@@ -1030,7 +1062,8 @@ def _finra_formations(archive, panel: Panel, dates: Sequence[str], need_mcap: bo
                         sh_cache[ck[0]] = shares_series(facts.get(ck[0], ()))
                     sa = shares_at(sh_cache[ck[0]], tau, cal.days[q])
                     if sa:
-                        m = panel.mcap(j, q, sa[0], sa[1])
+                        m, mk = panel.mcap(j, q, sa[0], sa[1]) / max(1, n_cls.get(ck[0], 1)), ck[0]
+            mcik.append(mk)
             cols.append(j)
             dtc.append(si / advq if advq > 0 else float("nan"))
             chg.append(cp)
@@ -1038,9 +1071,18 @@ def _finra_formations(archive, panel: Panel, dates: Sequence[str], need_mcap: bo
             adv.append(advq * px if advq > 0 else 0.0)
             mc.append(m)
             names.append(sym)
+        mc = np.array(mc, float)
+        price_a = np.array(price, float)
+        n_split = 0
+        for ck in {c for c in mcik if c is not None and n_cls.get(c, 1) > 1}:
+            ii = [k for k, c in enumerate(mcik) if c == ck]
+            n_split += len(ii)
+            p = price_a[ii]
+            if p.max() > CLASS_PRICE_RATIO * p.min():
+                mc[ii] = np.nan       # classes priced far apart (BRK-A / BRK-B): the summed cover count cannot be split
         forms.append({"settle": d, "label": cal.days[e], "e": e, "q": q, "cols": np.array(cols, int), "dtc": np.array(dtc, float),
-                      "chg": np.array(chg, float), "price": np.array(price, float), "adv_usd": np.array(adv, float),
-                      "mcap": np.array(mc, float), "syms": names})
+                      "chg": np.array(chg, float), "price": price_a, "adv_usd": np.array(adv, float),
+                      "mcap": mc, "syms": names, "n_split": n_split})
         cover.append({"settle": d, "fill": cal.days[e], "stocks": n_stock, "priced": n_priced,
                       "missing_share": 1.0 - n_priced / n_stock if n_stock else None, "adv1m": n_adv,
                       "adv1m_priced": n_adv_priced, "why": why})
@@ -1140,10 +1182,13 @@ def year_signs(x: np.ndarray, years: np.ndarray, want: Sequence[int]) -> dict:
     return {"by_year": by, "positive": pos, "observed": len(by), "expected": len(want)}
 
 
-def t375_judge(core: dict, fam: dict, covered: bool, why: str, n: int, min_n: int = T375_MIN_N) -> tuple:
+def t375_judge(core: dict, fam: dict, covered: bool, why: str, n: int, min_n: int = T375_MIN_N,
+               covered_vw: Optional[bool] = None) -> tuple:
     """Criteria rows (name, ok, decisive) and the mean tests. ``core``: t375_periods of the primary; ``fam``: {member:
-    periods} of the 3-member DSR family (EW and VW x series)."""
+    periods} of the 3-member DSR family (EW and VW x series). ``covered``: every FINRA stock priced (all criteria);
+    ``covered_vw``: also every eligible stock has a usable market cap (the VW criteria; default = covered)."""
     rows, tests = [], {}
+    wts = []                                   # the weighting of each row, for the gate
     lag = max(2, nw_lag(n))
     for w in ("ew", "vw"):
         x = core[f"x_{w}"]
@@ -1161,6 +1206,7 @@ def t375_judge(core: dict, fam: dict, covered: bool, why: str, n: int, min_n: in
                 cb.get("p_lt") is not None and cb["p_lt"] < ALPHA)
         rows.append(all_constructions([r_nw, r_cb], f"{w.upper()} mean (bottom - top) net - 0.83%/month "
                                       f"{_pc(nw['est'], 3)} > 0 with p < 0.05"))
+        wts.append(w)
     ys = {w: year_signs(core[f"x_{w}"], core["year"], T375_YEARS) for w in ("ew", "vw")}
     tests["years"] = ys
     for w in ("ew", "vw"):
@@ -1169,6 +1215,7 @@ def t375_judge(core: dict, fam: dict, covered: bool, why: str, n: int, min_n: in
         rows.append((f"{w.upper()} same sign (x > 0) in >= 5 of 7 calendar years ({y['positive']} of {y['observed']} observed)",
                      y["positive"] >= 5 if miss == 0 else (True if y["positive"] >= 5 else None),
                      y["positive"] + miss < 5))
+        wts.append(w)
     tests["dsr"] = {}
     for w in ("ew", "vw"):
         sh = [float(sharpe_ratio(v[np.isfinite(v)])) if np.isfinite(v).sum() > 2 else None for v in
@@ -1177,7 +1224,17 @@ def t375_judge(core: dict, fam: dict, covered: bool, why: str, n: int, min_n: in
         d = family_dsr(x[np.isfinite(x)], sh, 3)
         tests["dsr"][w] = d
         rows.append(dsr_row(d, f"{w.upper()} DSR > 0.95 over the 3 declared trials"))
-    return _gate(rows, covered, why), tests
+        wts.append(w)
+    cov_vw = covered if covered_vw is None else (covered and covered_vw)
+    out = []
+    for w, r in zip(wts, rows):
+        if not covered:
+            out += _gate([r], False, why)
+        elif w == "vw" and not cov_vw:
+            out += _gate([r], False, why, NOCAP_LABEL)
+        else:
+            out.append(r)
+    return out, tests
 
 
 FINRA_ALL = ("2017-12-01", "2026-09-30")      # one formation set shared by T-375 and T-393 (each filters its window)
@@ -1211,7 +1268,18 @@ def b6c_stockxs_lending_dtc_deciles(archive):
            f"{_pc(cs['missing_share_min'], 1)}..{_pc(cs['missing_share_max'], 1)} over {cs['dates']} dates; "
            f"{_pc(cs['missing_share_adv1m_mean'], 1)} of the names trading >= 1m shares a day): Yahoo serves no delisted "
            "or non-archived names, so the decile breakpoints and both legs depend on the missing names")
-    rows, tests = t375_judge(core, fam, covered, why, n)
+    # value weights: an eligible stock without a usable class market cap leaves the VW criteria NOT JUDGED (never a
+    # silent zero weight)
+    nocap = [int(((f["price"] > T375_PRICE_MIN) & (f["adv_usd"] > T375_ADV_MIN)
+                  & ~(np.isfinite(f["mcap"]) & (f["mcap"] > 0))).sum()) for f in forms]
+    nsplit = [int(f.get("n_split", 0)) for f in forms]
+    covered_vw = covered and max(nocap, default=0) == 0
+    why_vw = (f"{_f(float(np.mean(nocap)) if nocap else None, 1)} eligible priced stocks per formation (max "
+              f"{max(nocap, default=0)}) have no usable point-in-time market cap (no non-dimensional SEC cover shares within "
+              f"15 months, or share classes trading more than {CLASS_PRICE_RATIO:g}x apart); "
+              f"{_f(float(np.mean(nsplit)) if nsplit else None, 1)} priced share-class rows per formation split their "
+              "issuer's cover count equally")
+    rows, tests = t375_judge(core, fam, covered, why, n, covered_vw=covered_vw)
     v, expl = _decide(rows, n, T375_MIN_N, "formation dates")
     sq = np.array([not (T375_SQUEEZE[0] <= l <= T375_SQUEEZE[1]) for l in core["label"]], bool)
     ex_sq = {w: float(np.nanmean(core[f"x_{w}"][sq])) for w in ("ew", "vw")}
@@ -1220,7 +1288,8 @@ def b6c_stockxs_lending_dtc_deciles(archive):
     head = ("SURVIVOR-ONLY DIAGNOSTIC (not the claim's universe)" if not covered else
             "the point-in-time FINRA stock universe is fully priced")
     tail = ("Every return criterion is therefore NOT JUDGED (rule 9: a data limit is inconclusive)" if not covered else
-            "every criterion is judged")
+            "The EW criteria are judged; the VW criteria are NOT JUDGED (rule 9: a stock without a market cap is never "
+            "given a silent zero weight)" if not covered_vw else "every criterion is judged")
     reason = (f"{head}: {n} FINRA formations with fills "
               f"{core['label'][0]}..{core['label'][-1]} (fill = first close after the end of the 8th NYSE business day after "
               f"settlement), stocks priced > $5 with ADV > $5m at the previous close among the {_f(cs['priced_mean'], 0)} "
@@ -1234,9 +1303,11 @@ def b6c_stockxs_lending_dtc_deciles(archive):
               f"{t['years']['vw']['observed']}; DSR (3 trials) EW {_f(t['dsr']['ew'].get('dsr'))}, VW "
               f"{_f(t['dsr']['vw'].get('dsr'))}; without the Jan-Mar 2021 fills x EW {_pc(ex_sq['ew'], 3)}, VW "
               f"{_pc(ex_sq['vw'], 3)}; -30% delisting sensitivity x EW {_pc(float(np.nanmean(dl['x_ew'])), 3)}. "
-              f"Universe coverage: {why}. {tail} — {expl}")
+              f"Universe coverage: {why}. Value weights: {why_vw}. {tail} — {expl}")
     stat = {"label": "SURVIVOR-ONLY" if not covered else "FULL UNIVERSE", "n_formations": n, "fills": [core["label"][0], core["label"][-1]], "tests": tests,
-            "coverage": cs, "covered": covered, "ex_squeeze_x": ex_sq,
+            "coverage": cs, "covered": covered, "covered_vw": covered_vw,
+            "vw_caps": {"nocap_eligible_mean": float(np.mean(nocap)) if nocap else None, "nocap_eligible_max": max(nocap, default=0),
+                        "split_class_rows_mean": float(np.mean(nsplit)) if nsplit else None}, "ex_squeeze_x": ex_sq,
             "delist30_x_ew": float(np.nanmean(dl["x_ew"])), "family": {m: {"mean_x_ew": float(np.nanmean(v["x_ew"])),
                                                                              "mean_x_vw": float(np.nanmean(v["x_vw"])),
                                                                              "n": len(v["label"])} for m, v in fam.items()},
@@ -1335,7 +1406,8 @@ def period_factors(cal: Cal, ff: dict, e: np.ndarray, x: np.ndarray) -> np.ndarr
     return out
 
 
-def t393_judge(book: dict, F: np.ndarray, covered: bool, why: str, n: int, min_n: int = T393_MIN_N) -> tuple:
+def t393_judge(book: dict, F: np.ndarray, covered: bool, why: str, n: int, min_n: int = T393_MIN_N,
+               label: str = "universe not fully priced") -> tuple:
     net = book["net"]
     ci = mean_ci(net, T393_BLOCK)
     sq = np.array([not (ed <= T393_SQUEEZE[1] and xd >= T393_SQUEEZE[0]) for ed, xd in zip(book["e_days"], book["x_days"])], bool)
@@ -1352,7 +1424,7 @@ def t393_judge(book: dict, F: np.ndarray, covered: bool, why: str, n: int, min_n
     tests = {"mean": {k: ci.get(k) for k in ("est", "ci", "ci_mc_se", "p", "block", "reps")},
              "ex_squeeze": {k: ci_x.get(k) for k in ("est", "ci", "ci_mc_se", "p", "block", "reps")}, "alpha": reg,
              "hit_rate": float(np.mean(net > 0)) if net.size else None}
-    return _gate(rows, covered, why), tests
+    return _gate(rows, covered, why, label), tests
 
 
 def b6c_stockxs_short_interest_dtc(archive):
@@ -1375,25 +1447,33 @@ def b6c_stockxs_short_interest_dtc(archive):
     cal = panel.cal
     F = period_factors(cal, _ff5(archive), book["e"], book["x"])
     cs = _cover_summary(cover)
-    n_mc = []
+    n_mc, nocap = [], []
     for f in forms:
-        ok = (f["price"] >= T393_PRICE_MIN) & np.isfinite(f["mcap"]) & (f["mcap"] > 0)
+        hasp = f["price"] >= T393_PRICE_MIN
+        ok = hasp & np.isfinite(f["mcap"]) & (f["mcap"] > 0)
         n_mc.append(int(ok.sum()))
+        nocap.append(int((hasp & ~ok).sum()))
     bound = max(0.0, 1.0 - max(n_mc) / T393_TOP) if n_mc else None
-    covered = cs["missing_share_max"] is not None and cs["missing_share_max"] <= 0.0
+    # the ranking needs every stock's market cap: a priced stock without a usable class cap is uncovered, never dropped
+    priced_all = cs["missing_share_max"] is not None and cs["missing_share_max"] <= 0.0
+    covered = priced_all and max(nocap, default=0) == 0
     why = (f"the top-1000 ranking needs the market cap of every US stock, but {_pc(cs['missing_share_mean'], 1)} of the "
-           f"FINRA stock universe has no archived price (at most {max(n_mc) if n_mc else 0} stocks per date have a price and "
-           f"point-in-time SEC shares, so at least {_pc(bound, 1)} of every date's top 1000 is unpriced): the universe, the "
-           "deciles and both legs depend on the missing names")
-    rows, tests = t393_judge(book, F, covered, why, n)
+           f"FINRA stock universe has no archived price and {_f(float(np.mean(nocap)) if nocap else None, 1)} priced stocks "
+           f">= $5 per date (max {max(nocap, default=0)}) have no usable point-in-time market cap (no non-dimensional SEC "
+           f"cover shares within 15 months, or share classes trading more than {CLASS_PRICE_RATIO:g}x apart; an issuer's "
+           f"cover count is split equally across its listed classes). At most {max(n_mc) if n_mc else 0} stocks per date "
+           f"have a price and a market cap, so at least {_pc(bound, 1)} of every date's top 1000 is unknown: the universe, "
+           "the deciles and both legs depend on the missing names")
+    rows, tests = t393_judge(book, F, covered, why, n, label="universe not fully priced" if not priced_all else NOCAP_LABEL)
     v, expl = _decide(rows, n, T393_MIN_N, "release dates")
     alt = {}
     for nm, b_hi in (("borrow_hi_1pct", T393_BORROW), ("borrow_hi_10pct", 0.10)):
         bb = t393_book(panel, forms, borrow_hi=b_hi)
         alt[nm] = float(np.mean(bb["net"])) if len(bb["net"]) else None
     t = tests
-    head = ("SURVIVOR-ONLY DIAGNOSTIC (not the claim's universe)" if not covered else
-            "the point-in-time FINRA stock universe is fully priced")
+    head = ("SURVIVOR-ONLY DIAGNOSTIC (not the claim's universe)" if not priced_all else
+            "DIAGNOSTIC WITH INCOMPLETE MARKET CAPS (the FINRA stock universe is fully priced)" if not covered else
+            "the point-in-time FINRA stock universe is fully priced with market caps")
     tail = "Every criterion is therefore NOT JUDGED (rule 9)" if not covered else "every criterion is judged"
     reason = (f"{head}: {n} release periods with fills "
               f"{book['label'][0]}..{book['label'][-1]} (first close after publication, held to the next fill), the largest "
@@ -1406,8 +1486,10 @@ def b6c_stockxs_short_interest_dtc(archive):
               f"without Jan-Mar 2021 {_pc(t['ex_squeeze']['est'], 3)} ({_ci(t['ex_squeeze'].get('ci'), 3, 100, '%')}); "
               f"DTC 5-10 borrow at 1%/yr {_pc(alt['borrow_hi_1pct'], 3)}, at 10%/yr {_pc(alt['borrow_hi_10pct'], 3)}. "
               f"Universe coverage: {why}. {tail} — {expl}")
-    stat = {"label": "SURVIVOR-ONLY" if not covered else "FULL UNIVERSE", "n_periods": n, "fills": [book["label"][0], book["label"][-1]], "tests": tests,
-            "coverage": cs, "covered": covered, "top1000_unpriced_lower_bound": bound, "names_mean": float(np.mean(book["n"])),
+    stat = {"label": "SURVIVOR-ONLY" if not priced_all else "INCOMPLETE CAPS" if not covered else "FULL UNIVERSE", "n_periods": n, "fills": [book["label"][0], book["label"][-1]], "tests": tests,
+            "coverage": cs, "covered": covered, "top1000_unpriced_lower_bound": bound,
+            "nocap_priced_mean": float(np.mean(nocap)) if nocap else None, "nocap_priced_max": max(nocap, default=0),
+            "names_mean": float(np.mean(book["n"])),
             "gross_mean": float(np.mean(book["gross"])), "cost_mean": float(np.mean(book["cost"])),
             "borrow_mean": float(np.mean(book["borrow"])), "borrow_sensitivity": alt,
             "criteria": [(r[0], r[1]) for r in rows]}
@@ -1535,7 +1617,9 @@ def calendar_ls(panel: Panel, positions: Sequence[tuple], months: Sequence[str],
     """Calendar-time equal-weight legs. positions: (col, e, x, leg) with leg +1 long / -1 short, held over the sessions
     e+1..x; cost per side is charged on the first held session (entry) and on x (exit), except where the same firm
     continues in the same leg. Monthly leg returns compound the daily ones; a month is observed when both legs hold a
-    name on every session. Returns {months, ls, long, short, n_long, n_short}."""
+    name on every session. ``long`` is the long position's return net of its costs; ``short`` is the shorted stocks'
+    return plus the short position's costs (what the short loses), so ls = long - short pays the costs of both legs.
+    Returns {months, ls, long, short, long_gross, short_gross (the legs' stock returns before costs), n_long, n_short}."""
     cal = panel.cal
     D, N = panel.A.shape
     with np.errstate(invalid="ignore", divide="ignore"):
@@ -1554,7 +1638,8 @@ def calendar_ls(panel: Panel, positions: Sequence[tuple], months: Sequence[str],
             Cst[leg][e + 1, j] += cost
         if not next_same:
             Cst[leg][x, j] += cost
-    out = {"months": [], "ls": [], "long": [], "short": [], "n_long": [], "n_short": []}
+    out = {"months": [], "ls": [], "long": [], "short": [], "long_gross": [], "short_gross": [], "n_long": [],
+           "n_short": []}
     mi = {}
     for i, d in enumerate(cal.days):
         mi.setdefault(d[:7], []).append(i)
@@ -1567,15 +1652,17 @@ def calendar_ls(panel: Panel, positions: Sequence[tuple], months: Sequence[str],
         if not (np.all(nl > 0) and np.all(ns > 0)):
             continue
         rl = (M[1][ii] * (R[ii] - Cst[1][ii])).sum(axis=1) / nl
-        rs = (M[-1][ii] * (R[ii] - Cst[-1][ii])).sum(axis=1) / ns
+        rs = (M[-1][ii] * (R[ii] + Cst[-1][ii])).sum(axis=1) / ns      # a short pays its costs too: they raise S
         L, S = float(np.prod(1.0 + rl) - 1.0), float(np.prod(1.0 + rs) - 1.0)
         out["months"].append(m)
         out["long"].append(L)
         out["short"].append(S)
         out["ls"].append(L - S)
+        out["long_gross"].append(float(np.prod(1.0 + (M[1][ii] * R[ii]).sum(axis=1) / nl) - 1.0))
+        out["short_gross"].append(float(np.prod(1.0 + (M[-1][ii] * R[ii]).sum(axis=1) / ns) - 1.0))
         out["n_long"].append(float(nl.mean()))
         out["n_short"].append(float(ns.mean()))
-    for k in ("ls", "long", "short", "n_long", "n_short"):
+    for k in ("ls", "long", "short", "long_gross", "short_gross", "n_long", "n_short"):
         out[k] = np.array(out[k], float)
     return out
 
@@ -1733,10 +1820,13 @@ def b6c_stockxs_piotroski_value(archive):
     have = sum(len(sec["filers"][y] & priced) for y in yrs)
     miss_share = 1.0 - have / tot if tot else None
     covered = miss_share is not None and miss_share <= 0.0
+    lg, sg = float(np.mean(r0["long_gross"])), float(np.mean(r0["short_gross"]))
     why = (f"{_pc(miss_share, 1)} of the 10-K filer-years {yrs[0] if yrs else '?'}..{yrs[-1] if yrs else '?'} in the "
            f"archived SEC XBRL facts ({tot} filer-years, {have} with a Yahoo price) have no archived price: the B/M "
-           "breakpoints and both legs depend on the missing names (value-distressed names delist often, so the "
-           "survivor-only read is biased upward)")
+           "breakpoints and both legs depend on the missing names. The survivor-only bias of the L/S has no known sign: "
+           "distressed delistings fall mainly in the F 0-2 short leg, where dropping them raises the leg's return and so "
+           "lowers the L/S, while long-leg delistings (acquisitions, failures) move it either way (survivor legs before "
+           f"costs: long F 8-9 {_pc(lg, 3)}/month, short F 0-2 {_pc(sg, 3)}/month)")
     rows, tests = t451_judge(runs, Fm, covered, why, n)
     v, expl = _decide(rows, n, T451_MIN_N, "months")
     t0 = tests[f"{T451_COSTS[0] * 1e4:.0f}bp"]
@@ -1757,7 +1847,7 @@ def b6c_stockxs_piotroski_value(archive):
             "events": info, "priced_ciks": len(colmap), "filer_years": tot, "filer_years_priced": have,
             "missing_share": miss_share, "covered": covered, "facts_buckets_absent": sec["absent"],
             "names_long_mean": float(np.mean(r0["n_long"])), "names_short_mean": float(np.mean(r0["n_short"])),
-            "criteria": [(r[0], r[1]) for r in rows]}
+            "leg_gross_mean": {"long": lg, "short": sg}, "criteria": [(r[0], r[1]) for r in rows]}
     return _out(stat, n, v, reason)
 
 

@@ -128,6 +128,18 @@ def test_names_match_rejects_reused_tickers_and_keeps_renames():
     assert m.names_ok("El Paso Corporation", ["Empire Petroleum Corporation"]) is False
 
 
+def test_not_stock_keeps_sponsor_named_operating_companies():
+    """Regression (T-375/T-393): Invesco Ltd (IVZ), Invesco Mortgage Capital and American Vanguard are stocks; the
+    sponsors' funds (with FINRA's 30-character truncation) are not."""
+    for nm in ("Invesco LTD", "Invesco Ltd", "Invesco Mortgage Capital Inc.", "American Vanguard Corporation", "Apple Inc."):
+        assert m.is_stock_row("NYSE", nm), nm
+    for nm in ("Invesco QQQ Trust, Series 1", "Invesco BulletShares 2025 Corp", "Invesco Exchange-Traded Self-I",
+               "INVESCO VALUE MUNICIPAL INCOME", "Vanguard Scottsdale Funds Vang", "Vanguard Total Bond Market ETF",
+               "Vanguard International Equity", "iShares Trust iShares MSCI UAE", "Zions Bancorporation Warrants"):
+        assert not m.is_stock_row("NNM", nm), nm
+    assert not m.is_stock_row("ARCA", "Invesco LTD")                               # not a company market class
+
+
 def test_split_factor_raw_price_and_market_cap():
     days = bdays("2020-03-02", "2020-08-31")
     adj = np.full(len(days), 50.0)                                 # Yahoo's split-adjusted close: 50 throughout
@@ -414,6 +426,25 @@ def test_calendar_ls_continuing_firm_pays_no_round_trip():
     assert np.allclose(r["long"], 0.0) and np.allclose(r["short"], 0.0)
 
 
+def test_calendar_ls_short_leg_costs_lower_the_spread():
+    """Regression (T-451): a short position's costs must lower the L/S. Flat prices, one long and one short entered on
+    the last February session and exited on the last March session: L/S pays four sides, (1-c)^2 - (1+c)^2 = -4c."""
+    days = bdays("2015-01-01", "2015-12-31")
+    cal = m.Cal(days)
+    P = m.Panel(cal, [ser("A", days, np.full(len(days), 10.0)), ser("B", days, np.full(len(days), 10.0))])
+    e, x = cal.on_or_before("2015-02-27"), cal.on_or_before("2015-03-31")
+    runs = {c: m.calendar_ls(P, [(0, e, x, 1), (1, e, x, -1)], ["2015-03"], c) for c in (0.0, 10e-4, 20e-4)}
+    for c, r in runs.items():
+        assert r["ls"][0] == pytest.approx(-4.0 * c, abs=1e-12)
+    for r in runs.values():
+        assert r["long_gross"][0] == pytest.approx(0.0) and r["short_gross"][0] == pytest.approx(0.0)
+    # a short-only round trip in March (the long held through): the spread falls with the cost, never rises
+    pos2 = [(0, cal.on_or_after("2015-01-05"), cal.on_or_after("2015-12-01"), 1), (1, e, x, -1)]
+    ls = [m.calendar_ls(P, pos2, ["2015-03"], c)["ls"][0] for c in (0.0, 10e-4, 20e-4)]
+    assert ls[0] == pytest.approx(0.0) and ls[1] == pytest.approx(1.0 - (1.0 + 10e-4) ** 2)
+    assert ls[2] < ls[1] < ls[0]
+
+
 def test_t451_positions_value_quintile_and_legs():
     days = bdays("2014-01-01", "2016-12-31")
     cal = m.Cal(days)
@@ -571,8 +602,9 @@ def test_missing_bundles_inconclusive(name):
     assert set(m.THEORY_MAP.values()) == set(m.HARNESSES)
 
 
-def finra_fake(monkeypatch, unpriced=0, N=30, seed=0):
-    """A fake archive for T-375/T-393 over 2024 with N priced FINRA stocks (+ ``unpriced`` names without prices)."""
+def finra_fake(monkeypatch, unpriced=0, N=30, seed=0, noshares=()):
+    """A fake archive for T-375/T-393 over 2024 with N priced FINRA stocks (+ ``unpriced`` names without prices); stocks
+    whose index is in ``noshares`` have no SEC shares (no market cap)."""
     monkeypatch.setattr(m, "T375_START", "2024-01-01")
     monkeypatch.setattr(m, "T375_END", "2024-12-31")
     monkeypatch.setattr(m, "T393_START", "2024-01-01")
@@ -592,7 +624,7 @@ def finra_fake(monkeypatch, unpriced=0, N=30, seed=0):
         add_stock(fa, sym, days, A[:, i], name=f"{sym} Industries Inc.")
         tick.append({"available_at": CAP, "value": {"cik": 100 + i, "name": f"{sym} INDUSTRIES INC", "ticker": sym,
                                                     "exchange": "NYSE"}})
-        for q in ("2023-06-30", "2023-12-31", "2024-06-30", "2024-12-31"):
+        for q in (() if i in noshares else ("2023-06-30", "2023-12-31", "2024-06-30", "2024-12-31")):
             av = _iso(_t(q) + 30 * 86400)
             facts.append({"kind": "fact", "available_at": av, "value": {
                 "cik": 100 + i, "taxonomy": "dei", "tag": "EntityCommonStockSharesOutstanding", "unit": "shares", "start": None,
@@ -638,6 +670,76 @@ def test_t393_harness_fake_archive(monkeypatch):
     m._CACHE.clear()
     stat2, n2, v2, _ = _json_ok(m.b6c_stockxs_short_interest_dtc(fa2))
     assert stat2["covered"] is True and v2 in ("not_supported", "inconclusive", "supported")
+
+
+def _add_class(fa, days, sym, finra_sym, cik, adj=None, priced=True):
+    """A second listed share class of an existing issuer: a FINRA row on every settlement date, the SEC ticker and
+    (when ``priced``) a Yahoo series."""
+    if priced:
+        add_stock(fa, sym, days, adj, name=f"{sym.split('-')[0]} Industries Inc.")
+    fa.b[m.SEC_TICK_B].rows.append({"available_at": CAP, "value": {"cik": cik, "name": f"{sym.split('-')[0]} INDUSTRIES INC",
+                                                                   "ticker": sym, "exchange": "NYSE"}})
+    for name, b in fa.b.items():
+        if name.startswith(m.FINRA_PREFIX):
+            r0 = b.rows[0]
+            b.rows.append({"kind": "short-interest", "available_at": r0["available_at"], "value": {
+                **r0["value"], "symbolCode": finra_sym, "issueName": f"{sym.split('-')[0]} Industries Inc. Class B"}})
+
+
+def test_finra_formations_split_class_caps(monkeypatch):
+    """Regression (T-375 VW, T-393 ranking): an issuer's SEC cover count (all classes) is split equally across its
+    listed classes, priced or not; classes trading more than 2x apart get no cap; single-class names are unchanged."""
+    fa = finra_fake(monkeypatch, unpriced=0, N=6)
+    days = bdays("2023-06-01", "2025-06-30")
+    A0 = np.array([r["value"]["adjclose"] for r in fa.b[m.dh("AAA")].rows])
+    A2 = np.array([r["value"]["adjclose"] for r in fa.b[m.dh("AAC")].rows])
+    _add_class(fa, days, "AAA-B", "AAAB", 100, adj=A0 * 1.1)          # GOOG / GOOGL-like: both priced, near prices
+    _add_class(fa, days, "AAB-B", "AABB", 101, priced=False)          # a listed sibling class without a price
+    _add_class(fa, days, "AAC-B", "AACB", 102, adj=A2 * 5.0)          # BRK-A / BRK-B-like: prices far apart
+    panel = m._equity_panel(fa)
+    d = m.finra_expected("2024-01-01", "2024-12-31")[5]
+    forms, cover = m.finra_formations(fa, panel, [d])
+    f = forms[0]
+    q = f["q"]
+    mc = {s: float(v) for s, v in zip(f["syms"], f["mcap"])}
+    raw = lambda s: float(panel.RAW[q, panel.col[s]])
+    assert mc["AAA"] == pytest.approx(raw("AAA") * 1e7 / 2) and mc["AAAB"] == pytest.approx(raw("AAA-B") * 1e7 / 2)
+    assert mc["AAB"] == pytest.approx(raw("AAB") * 2e7 / 2)
+    assert np.isnan(mc["AAC"]) and np.isnan(mc["AACB"])
+    assert mc["AAD"] == pytest.approx(raw("AAD") * 4e7)
+    assert f["n_split"] == 5 and cover[0]["priced"] == 8 and cover[0]["stocks"] == 9
+
+
+def test_t375_vw_not_judged_without_market_caps(monkeypatch):
+    """Regression (T-375): a fully priced universe with an eligible stock lacking a market cap judges EW but leaves every
+    VW criterion NOT JUDGED (no silent zero weight)."""
+    P, forms = dtc_world("2020-05-04", planted=True)
+    forms = [f for f in forms if f["label"] <= "2026-09-30"]
+    core = m.t375_periods(P, forms)
+    fam = {"dtc_1m": core, "dtc_to_next": m.t375_periods(P, forms, hold="next"), "chg_1m": m.t375_periods(P, forms, sort="chg")}
+    n = len(core["label"])
+    rows, _ = m.t375_judge(core, fam, True, "", n, covered_vw=False)
+    vw = [r for r in rows if r[0].startswith("VW ")]
+    ew = [r for r in rows if r[0].startswith("EW ")]
+    assert len(vw) == 3 and all(r[1] is None and m.NOCAP_LABEL in r[0] for r in vw)
+    assert len(ew) == 3 and all(r[1] is True for r in ew)
+    assert bw._decide(rows, n, m.T375_MIN_N, "formation dates")[0] == "inconclusive"
+    # end to end on the fake archive: stock AAD has no SEC shares
+    fa = finra_fake(monkeypatch, unpriced=0, noshares=(3,))
+    stat, n2, v, reason = _json_ok(m.b6c_stockxs_lending_dtc_deciles(fa))
+    assert stat["covered"] is True and stat["covered_vw"] is False and stat["vw_caps"]["nocap_eligible_max"] == 1
+    crit = [c[0] for c in stat["criteria"]]
+    assert len(crit) == 6 and all(m.NOCAP_LABEL in c for c in crit if c.startswith("VW "))
+    assert not any("NOT JUDGED" in c for c in crit if c.startswith("EW "))
+    assert v == "not_supported"                                    # EW is judged and fails (random DTC)
+
+
+def test_t393_priced_stock_without_cap_is_not_judged(monkeypatch):
+    """Regression (T-393): the top-1000 ranking needs every stock's cap; a priced stock without one is uncovered."""
+    fa = finra_fake(monkeypatch, unpriced=0, noshares=(3,))
+    stat, n, v, reason = _json_ok(m.b6c_stockxs_short_interest_dtc(fa))
+    assert stat["covered"] is False and stat["label"] == "INCOMPLETE CAPS" and stat["nocap_priced_max"] == 1
+    assert v == "inconclusive" and all(m.NOCAP_LABEL in c[0] and c[1] is None for c in stat["criteria"])
 
 
 def test_finra_reused_ticker_is_unpriced(monkeypatch):
@@ -688,6 +790,9 @@ def test_t451_harness_fake_archive(monkeypatch):
     stat, n, v, reason = _json_ok(m.b6c_stockxs_piotroski_value(fa))
     assert stat["events"]["fscored"] > 0 and stat["events"]["long"] > 0 and stat["events"]["short"] > 0
     assert stat["missing_share"] > 0 and v == "inconclusive" and "NOT JUDGED" in reason
+    # regression: the survivor-only bias is not claimed to be upward; the leg means are reported
+    assert "biased upward" not in reason and "no known sign" in reason and "short F 0-2" in reason
+    assert set(stat["leg_gross_mean"]) == {"long", "short"}
 
 
 def test_t473_harness_fake_archive(monkeypatch):
