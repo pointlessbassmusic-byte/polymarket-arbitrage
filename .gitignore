@@ -2046,3 +2046,5 @@ mandel/archive/data/polymarket-open-markets.jsonl.gz
 mandel/archive/data/polymarket-open-price-history-daily.jsonl.gz
 # Binance BTCUSDT 1-minute resolution windows (Binance terms: no redistribution): local only
 mandel/archive/data/binance-1m-BTCUSDT-btc-above.jsonl.gz
+# stocktwits intensity merge
+mandel/archive/data/stocktwits-anchors.jsonl.gz
