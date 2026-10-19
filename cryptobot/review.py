@@ -36,7 +36,7 @@ FORWARD = (
     ("btc-leads-us500-intraday", "BTC perp leads the US500 perp hour to hour", dt.date(2026, 10, 30), "500 shared hours"),
     ("kalshi-book-imbalance", "order-book imbalance on 8 perps", dt.date(2026, 11, 12), "30 days of books"),
     ("kalshi-btc-daily-favourite-oos", "daily BTC favourite at 11:00 ET", dt.date(2026, 12, 13), "60 independent days"),
-    ("hype mention-rate test", "hype scanner, mention rates (to be registered)", dt.date(2027, 1, 12), "90 days of snapshots"),
+    ("hype-mention-fade", "attention spikes fade on the Kalshi coins", dt.date(2027, 1, 12), "90 days of hype snapshots"),
     ("kalshi-btc-carry-etf-hedge", "short BTC perp vs long IBIT while funding > 4%/yr", dt.date(2027, 2, 12), "120 days"),
     ("btc-vrp-ladder-oos", "IBIT option ladder, out of sample", dt.date(2027, 10, 1), "12 months of IBIT rows"),
     ("orb-qqq-pilot", "QQQ opening-range paper pilot", None, "60 traded sessions"),

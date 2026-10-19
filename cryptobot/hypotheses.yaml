@@ -797,7 +797,7 @@
   result: "PRE-REGISTERED 2026-10-14; forward from 2026-10-15; read 2027-02"
   verdict: inconclusive
   regime: "collecting"
-  rerun: "python -m cryptobot.carry_forward (fetches Kalshi funding history, the perp's 16:00 ET closes and IBIT closes at read time; refuses a verdict before 2027-02-12)"
+  rerun: "python -m cryptobot.carry_forward  # fetches Kalshi funding history, the perp 16:00 ET closes and IBIT closes at read time; no verdict before 2027-02-12"
   preregistered: true
   trials_run: 0
 
@@ -842,6 +842,20 @@
   rerun: "python -m cryptobot.weather_study --scratch <dir> --fetch"
   preregistered: true
   trials_run: 2
+
+- id: hype-mention-fade
+  title: "Forward test: does a spike in online attention (StockTwits message rate, meme-coin volume, CoinGecko trending) predict a fade on the Kalshi-listed coins?"
+  source: "meme-froth-2026-10 (volume-shock froth fades on small Hyperliquid alts, not on the Kalshi-listed coins; volume predicts range, not direction); operator direction 2026-10-13 (hype / froth / mentions); the desk's hourly hype scanner (cryptobot.hype_scanner), running since about 2026-10-14; registered 2026-10-19 before any of its data was read"
+  claim: "For the tracked coins Kalshi lists as perps (DOGE, SHIB, BTC, ETH, SOL, XRP, HYPE, ZEC, WLD, SUI), an hour whose froth score (log message rate vs its own 7-day median + log 24h volume vs its 7-day median + 0.5 if trending) is in the top 10% of all coin-hours to date predicts a negative return relative to BTC (BTC itself relative to ETH) over the next 24 and 72 hours, so a hedged short nets > 0 after 18 bp a round trip and 10%/yr of funding. Also reported, not a trial: whether the score predicts the next 24 hours' range."
+  test: "At the read, from state/hype/*.jsonl: events = coin-hours in the top 10% of the score among hours before them (expanding, no look-ahead), at most one per coin per 72 hours; outcome from Coinbase public candles fetched at read time; t clustered by event day; halves by date. Trials: 2 horizons (24 h, 72 h)."
+  success: "Written before reading: CANDIDATE if a horizon nets >= +1% per event at t >= 2.5 over >= 30 events with both halves positive; then a paper rule on the Kalshi perps for 30 events. KILLED if the mean is >= 0 at both horizons (no fade). Otherwise inconclusive."
+  data: "state/hype (desk hype scanner, hourly), Coinbase candles at read time"
+  result: "PRE-REGISTERED 2026-10-19; collecting; read on or after 2027-01-12 (90 days)"
+  verdict: inconclusive
+  regime: "collecting"
+  rerun: "python -m cryptobot.hype_study --scratch <dir>  # the forward read is added to hype_study at read time, per this entry"
+  preregistered: true
+  trials_run: 0
 
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
