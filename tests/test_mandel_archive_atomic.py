@@ -51,3 +51,11 @@ def test_concurrent_writer_does_not_write_back_a_stale_entry(tmp_path):
     fresh = Archive(root=root, ledger=led)
     assert fresh.get("x").sha256 == eb.sha256 and fresh.get("x").rows == 7 and fresh.verify("x")
     assert a.get("x").sha256 == eb.sha256 and fresh.get("y").rows == 1
+
+
+def test_index_mismatches_reports_a_stale_entry(tmp_path):
+    a = _archive(tmp_path)
+    a.store("x", kind="data", rows=_rows(3), recipe="r", in_git=False)
+    assert a.index_mismatches() == []
+    a._entries["x"].bytes -= 1                                         # an INDEX entry that no longer describes the file
+    assert [m["bundle"] for m in a.index_mismatches()] == ["x"]

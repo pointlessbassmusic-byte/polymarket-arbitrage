@@ -153,6 +153,16 @@ class Archive:
             h.update(json.dumps(r, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8"))
         return h.hexdigest() == entry.sha256
 
+    def index_mismatches(self) -> list[dict]:
+        """Bundles on this machine whose file size differs from their INDEX entry (cheap; a full content check is
+        ``verify``). Bundles not on this machine (local-only elsewhere) are skipped."""
+        out = []
+        for e in self._entries.values():
+            p = self._abs(e.path)
+            if p.exists() and p.stat().st_size != e.bytes:
+                out.append({"bundle": e.name, "index_bytes": e.bytes, "file_bytes": p.stat().st_size})
+        return out
+
     def entries(self, kind: Optional[str] = None, tag: Optional[str] = None) -> list[BundleEntry]:
         out = [e for e in self._entries.values() if (kind is None or e.kind == kind) and (tag is None or tag in e.tags)]
         return sorted(out, key=lambda e: e.created_at)

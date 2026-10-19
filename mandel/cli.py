@@ -132,7 +132,12 @@ def cmd_verify(args) -> int:
         print("reconcile:", p)
     if not problems:
         print("reconcile: proposals, insights and forecasts agree with the ledger")
-    return 0 if ok and not problems else 1
+    stale = Archive(ledger=c.ledger).index_mismatches()
+    for m in stale:
+        print(f"archive: {m['bundle']} INDEX says {m['index_bytes']} bytes, file has {m['file_bytes']}")
+    if not stale:
+        print("archive: every bundle on this machine matches its INDEX size")
+    return 0 if ok and not problems and not stale else 1
 
 
 def cmd_ledger(args) -> int:
