@@ -33,7 +33,7 @@ COST = 0.0018
 
 # (registry id, what, read when) - kept in step with cryptobot/hypotheses.yaml
 FORWARD = (
-    ("btc-leads-us500-intraday", "BTC perp leads the US500 perp hour to hour", dt.date(2026, 10, 30), "500 shared hours"),
+    ("btc-leads-us500-intraday", "BTC perp leads the US500 perp hour to hour", dt.date(2026, 11, 5), "500 consecutive shared hours (about 16 a day)"),
     ("kalshi-book-imbalance", "order-book imbalance on 8 perps", dt.date(2026, 11, 12), "30 days of books"),
     ("kalshi-btc-daily-favourite-oos", "daily BTC favourite at 11:00 ET", dt.date(2026, 12, 13), "60 independent days"),
     ("hype-mention-fade", "attention spikes fade on the Kalshi coins", dt.date(2027, 1, 12), "90 days of hype snapshots"),
