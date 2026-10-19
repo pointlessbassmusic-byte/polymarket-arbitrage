@@ -7605,12 +7605,16 @@
     "pass": "Mean > 0 with 95% interval excluding 0 after 40 bps per side plus 10 bps slippage, DSR > 0.95, above the permutation 95th percentile",
     "controls": "Look-ahead: snapshot ranks and prices as of t, trade t+1; survivorship: point-in-time universe mandatory, delisted coins held until their last snapshot price (a coin that vanishes is marked at its last price minus 50% as a stress case); costs: 40+10 bps per side; multiple testing: 24 trials; regime: per cycle (2018-20, 2021-22, 2023-26)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptoxs_xs_momentum_weekly"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Cross-sectional crypto momentum (1-4 week, Liu-Tsyvinski-Wu factor); harness suggestion: New fetcher for dated top-N lists (CoinMarketCap historical snapshot scrape, or CoinGecko coins/markets saved daily from now on as a growing bundle); trend.py xs_momentum reused on weekly bars; harness xs_crypto_momentum with the survivorship sensitivity reported as a statistic. | verifier: corrected claim/trial"
+   "results": [
+    "X-814a53e0"
+   ],
+   "notes": "from the underlying-library library: Cross-sectional crypto momentum (1-4 week, Liu-Tsyvinski-Wu factor); harness suggestion: New fetcher for dated top-N lists (CoinMarketCap historical snapshot scrape, or CoinGecko coins/markets saved daily from now on as a growing bundle); trend.py xs_momentum reused on weekly bars; harness xs_crypto_momentum with the survivorship sensitivity reported as a statistic. | verifier: corrected claim/trial | 2026-10-19 batch 6c: not_supported on a survivorship-aware point-in-time CMC top-30 universe: -0.48%/week net vs BTC (CI -1.25..+0.37), DSR 0 over 24 trials; the same strategy on today's top 30 shows +0.66%/week, a +1.14%/week survivorship inflation. The 2020-11-30 CMC snapshot is corrupt (id swap) and is treated as missing."
   },
   {
    "id": "T-315",
@@ -8022,12 +8026,18 @@
     "pass": "95% lower bound of mean net return per trade > 0 at 0.85% cost; else park as 'premium within AP cost band'",
     "controls": "Look-ahead: synthetic NAV uses only the candle ending 16:00 ET; trailing z. Costs: 0.85% retail and 0.25% high-tier sensitivity. Sponsor-fee drift modelled. Settlement mismatch: T+1 equities vs immediate crypto needs capital on both venues. Regime: launch period excluded; 2025-2026 reported separately. Multiple testing: 6 variants."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptovenue_ibit_premium_fade"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "parked",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Spot bitcoin ETF premium/discount to BTC (IBIT, FBTC) reversion; harness suggestion: etf_vs_spot_premium: synthetic-NAV builder (hourly spot x holdings per share) + AR(1) + z rule; shares code with trust_discount_reversion | verifier: corrected claim/trial"
+   "results": [
+    "X-220f99d4"
+   ],
+   "notes": "from the underlying-library library: Spot bitcoin ETF premium/discount to BTC (IBIT, FBTC) reversion; harness suggestion: etf_vs_spot_premium: synthetic-NAV builder (hourly spot x holdings per share) + AR(1) + z rule; shares code with trust_discount_reversion | verifier: corrected claim/trial | 2026-10-19 batch 6c: parked under the trial's own rule ('premium within AP cost band'): 25 |z| > 2 IBIT premium fades 2024-04..2026-09, gross +0.185% per trade, net -0.665% at the 0.85% round trip (lower bound -0.69%), decisive below min_n 30; the premium's AR(1) is 0.36 (half-life 0.7 sessions).",
+   "status_before_park": "not_supported",
+   "parked_reason": "premium within AP cost band (the trial's own park rule): 25 IBIT |z|>2 premium fades 2024-04..2026-09, gross +0.185% per trade against the 0.85% round trip, net -0.665% (one-sided lower bound -0.69%); break-even cost inside the band"
   },
   {
    "id": "T-329",
@@ -8079,11 +8089,15 @@
     "pass": "95% lower bound of mean net return per episode > 0 with at least 10 episodes; if fewer than 10, verdict 'inconclusive (too few events)'",
     "controls": "Look-ahead: enter at the close after the signal close. Composite prices overstate executable depth, so the venue re-pricing is the clean read. Costs: 0.40% round trip (Kraken stablecoin schedule); 1.2% Coinbase taker sensitivity. Survivorship: failed pegs reported in the appendix. Power: expect only ~5-20 episodes; the earlier min_n of 20 was likely unattainable. Regime: 2022 (UST), 2023-03 (SVB)."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptovenue_stablecoin_peg_reversion"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-541a468d"
+   ],
    "notes": "from the underlying-library library: Stablecoin peg deviation reversion (USDT, USDC); harness suggestion: peg_event_harness: event detector on daily lows, repeg counter, per-event P&L with venue fee inputs | verifier: corrected claim/trial"
   },
   {
@@ -9113,12 +9127,16 @@
     "pass": "Lower 90% CI of the mean net return > 0 with at least 15 non-overlapping post-Shapella episodes. With fewer than 15 episodes, record 'insufficient events' (the expected outcome) rather than a verdict. DSR with n_trials = 4.",
     "controls": "Yahoo stETH is a composite exchange price, not the Curve pool, so the two-day confirmation filters glitches. Costs: 30 bp plus gas. Survivorship: none. Look-ahead: none (close-to-close). Regime: pre/post Shapella and the 2025 exit-queue episode reported. 4 trials."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptovenue_steth_discount_carry"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Liquid-staking-token discount carry (stETH / cbETH); harness suggestion: mandel/experiments/carry.py: discount_episodes(ratio_series, threshold, horizon) | verifier: corrected claim/trial"
+   "results": [
+    "X-62d64270"
+   ],
+   "notes": "from the underlying-library library: Liquid-staking-token discount carry (stETH / cbETH); harness suggestion: mandel/experiments/carry.py: discount_episodes(ratio_series, threshold, horizon) | verifier: corrected claim/trial | 2026-10-19 batch 6c: inconclusive: no post-Shapella stETH discount episode reached the 1.5% threshold (maximum 1.30% on 2024-01-29; 0 of min_n 15 episodes under every threshold). The pre-Shapella regime (31 episodes, +1.05% net) is reported, not pooled: withdrawals changed the mechanism."
   },
   {
    "id": "T-366",
@@ -9139,12 +9157,16 @@
     "pass": "Slope in [1.5%, 3.5%] with HAC 95% CI excluding 0. A slope below 1.5% means the market discount ate the yield and fails the claim.",
     "controls": "Discount noise handled by using the full-sample slope, not endpoints. Look-ahead: none. Survivorship: none. Costs: one round trip of about 30-50 bp amortized over the holding period. Single trial plus 1 robustness check."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptovenue_cbeth_staking_drift"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Proof-of-stake staking yield as carry; harness suggestion: mandel/experiments/carry.py: ratio_drift(a, b) with HAC SE | verifier: corrected claim/trial"
+   "results": [
+    "X-adc486b0"
+   ],
+   "notes": "from the underlying-library library: Proof-of-stake staking yield as carry; harness suggestion: mandel/experiments/carry.py: ratio_drift(a, b) with HAC SE | verifier: corrected claim/trial | 2026-10-19 batch 6c: supported, but it is a descriptive drift, not a trading edge: the Coinbase CBETH/ETH ratio rose +2.79%/yr (HAC CI +2.70..+2.88, inside the claimed 1.5-3.5% net staking band) over 1,261 days; the refuter could not move it under any lag, price field, sampling day or estimator. It says the market discount did not eat the staking yield; capturing it requires holding cbETH, which is the staking yield itself."
   },
   {
    "id": "T-367",
@@ -9165,12 +9187,16 @@
     "pass": "Bootstrap 95% upper bound of the mean spread < 1.5%: claim supported (no carry). A venue whose own lower bound is above 1.5% is recorded as a venue-specific carry, and counted as a trial.",
     "controls": "Posted APY is not realized APY (bad debt, utilization spikes); use base APY only, no token rewards. Survivorship: the /pools endpoint lists current pools, so fix pool IDs from a dated snapshot and note that dead pools may be missing. Look-ahead: APY known at the timestamp. Costs: gas $1-10 per move. Multiple testing: 5 trials. US-access filter applied per venue."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptoxs_defi_yield_carry"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Stablecoin and tokenized-treasury yield as carry (US access); harness suggestion: mandel/data/social.py: defillama_yields(pool_ids) into store; mandel/experiments/carry.py: spread_over_rf() | verifier: corrected claim/trial"
+   "results": [
+    "X-bc267bb3"
+   ],
+   "notes": "from the underlying-library library: Stablecoin and tokenized-treasury yield as carry (US access); harness suggestion: mandel/data/social.py: defillama_yields(pool_ids) into store; mandel/experiments/carry.py: spread_over_rf() | verifier: corrected claim/trial | 2026-10-19 batch 6c: inconclusive: DefiLlama's Maple syrupUSDC and Spark savings charts open live at full TVL (2025-07-28 and 2025-12-22), so their earlier history is missing and the two gap criteria are None; all 8 observed readings put the DeFi-over-bill carry below 1.5 pp, and filling the Maple gap at 8%/yr or more would fail the claim."
   },
   {
    "id": "T-368",
@@ -9398,10 +9424,12 @@
     "b6c_stockxs_lending_dtc_deciles"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Securities-lending yield on hard-to-borrow stocks; harness suggestion: mandel/data/social.py: finra_short_interest(); mandel/experiments/carry.py: decile_sort(signal, returns) shared with other cross-sectional tests; start daily capture of IBKR usa.txt shortable file | verifier: corrected claim/trial"
+   "results": [
+    "X-371fc97a"
+   ],
+   "notes": "from the underlying-library library: Securities-lending yield on hard-to-borrow stocks; harness suggestion: mandel/data/social.py: finra_short_interest(); mandel/experiments/carry.py: decile_sort(signal, returns) shared with other cross-sectional tests; start daily capture of IBKR usa.txt shortable file | verifier: corrected claim/trial | 2026-10-19 batch 6c: inconclusive for want of data, not evidence: 90.9% of the point-in-time FINRA stock universe has no free price history (Yahoo 404s delisted names) and 63 eligible priced stocks per formation have no usable market cap. On the survivor subset alone the EW spread is +0.36%/month net against the 0.83% bar (NW t -1.30), 3 of 7 years positive."
   },
   {
    "id": "T-376",
@@ -9927,10 +9955,12 @@
     "b6c_stockxs_short_interest_dtc"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Short interest and days-to-cover cross-section; harness suggestion: data/finra.py (Query API pagination with partition filters: the API refuses global sorts, so query by settlementDate) + cross-sectional decile harness in underlying.py. | verifier: corrected claim/trial"
+   "results": [
+    "X-a4df2c9f"
+   ],
+   "notes": "from the underlying-library library: Short interest and days-to-cover cross-section; harness suggestion: data/finra.py (Query API pagination with partition filters: the API refuses global sorts, so query by settlementDate) + cross-sectional decile harness in underlying.py. | verifier: corrected claim/trial | 2026-10-19 batch 6c: inconclusive: at least 38% of every date's top-1000-by-cap universe is unpriced (delisted names absent from the free source), so the decile ranks cannot be formed. Survivor-only net -0.05% per period (CI -0.37..+0.29), FF5 alpha t -1.0."
   },
   {
    "id": "T-394",
@@ -10120,12 +10150,16 @@
     "pass": "CI excludes zero AND >= 4 distinct episodes of each regime AND the rule beats buy-and-hold Sharpe in held-out cycles; else 'insufficient independent episodes' (parked, revisit each cycle).",
     "controls": "Look-ahead: one-day lag; store CoinMetrics vintage (realized cap can be restated). Survivorship: none. Costs: 10-60 bp per switch depending on venue. Multiple testing: 4 variants; PBO via CSCV. Regime: halving cycles; post-ETF (2024) structural shift."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptoxs_mvrv_regime"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Bitcoin MVRV regime (market value to realized value); harness suggestion: data/coinmetrics.py (paged community API); regime-conditional forward-return harness in underlying.py with episode counting; reuse the deflated-Sharpe threshold search from T-58. | verifier: corrected claim/trial"
+   "results": [
+    "X-c450403e"
+   ],
+   "notes": "from the underlying-library library: Bitcoin MVRV regime (market value to realized value); harness suggestion: data/coinmetrics.py (paged community API); regime-conditional forward-return harness in underlying.py with episode counting; reuse the deflated-Sharpe threshold search from T-58. | verifier: corrected claim/trial | 2026-10-19 batch 6c: not_supported: MVRV < 1 minus MVRV > 3 forward 90-day return -0.21 (CI -0.81..+0.31) under every band scaling; the park rule (fewer than 4 episodes) does not trigger (7/7 and 5/5). Coin Metrics serves only the current MVRV vintage, so the point-in-time control is not implemented."
   },
   {
    "id": "T-401",
@@ -10172,11 +10206,15 @@
     "pass": "HAC t >= 2 over >= 400 weekly observations AND positive slope in both halves (2018-2021, 2022-2026).",
     "controls": "Look-ahead: one-day lag. Survivorship: include defunct BUSD/TUSD; UST missing from the free API (note bias). Costs: weekly 10 bp. Multiple testing: 3 variants. Regime: UST collapse and USDC depeg outliers."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptoxs_stablecoin_supply_growth"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7733f62f"
+   ],
    "notes": "from the underlying-library library: Stablecoin supply ratio (dry-powder) for BTC/ETH; harness suggestion: data/coinmetrics.py; predictive-regression harness with HH correction shared with fund-flow entry. | verifier: corrected claim/trial"
   },
   {
@@ -10198,11 +10236,15 @@
     "pass": "CI excludes zero over >= 15 signals AND >= 60% of post-publication signals positive.",
     "controls": "Look-ahead: one-day lag, daily estimates only. Survivorship: none. Costs: 10-40 bp per switch. Multiple testing: 4 variants into DSR. Regime: 2021 China mining ban produced a mechanical signal."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptoxs_hash_ribbons"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e0672102"
+   ],
    "notes": "from the underlying-library library: Hash ribbons / miner capitulation buy signal; harness suggestion: Event-study variant of the crypto regime harness; the signal is sparse, so report effective n prominently. | verifier: corrected claim/trial"
   },
   {
@@ -10629,11 +10671,15 @@
     "pass": "At least 800 events. Mean abnormal return >= 50 bps with p < 0.01. Calendar-time net Sharpe > 0.5 after 5 bps round trip. Same sign in the ETF and crypto buckets. DSR >= 0.95.",
     "controls": "Look-ahead: trailing-50-day percentiles only; entry at the next open. Market-wide volume days hit every ETF at once, which inflates the event count; idiosyncratic volume and calendar-time portfolios fix that. Survivorship: the ETF list is 2026 survivors; add dead ETFs where Yahoo keeps history. Costs: 2-10 bps ETFs, 50-100 bps crypto at retail. Multiple testing: 36 cells. Regime: VIX > 30 separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptovenue_high_volume_premium"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b4c92cb5"
+   ],
    "notes": "from the underlying-library library: High-volume return premium; harness suggestion: Add volume parsing to price_closes-style helpers in mandel/experiments/volatility.py and an event-study function in mandel/experiments/underlying.py; use block-shift placebo via block_bootstrap_pvalue; grid into pbo_cscv. | verifier: corrected claim/trial"
   },
   {
@@ -10655,11 +10701,15 @@
     "pass": "At least 200 monthly observations. Out-of-sample spread difference >= 1 point a quarter with p < 0.05. DSR >= 0.95. PBO < 0.3.",
     "controls": "Look-ahead: skip-month convention; turnover from past data only. Survivorship: the ETF list is chosen from survivors (add dead ETFs Yahoo still serves); the crypto top-20 must be point-in-time, not the 2026 ranking. Costs: 5-10 bps per ETF leg, 50-100 bps crypto. Multiple testing: 72 cells. Regime: momentum crashes (2009, 2020) reported."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptoxs_volume_conditioned_momentum"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-ac8a9fbf"
+   ],
    "notes": "from the underlying-library library: Volume-conditioned momentum; harness suggestion: Cross-sectional monthly engine in mandel/experiments/underlying.py (new function) reusing _series(); pbo_cscv over the grid and deflated_sharpe_ratio; register plain momentum as the baseline trial. | verifier: corrected claim/trial"
   },
   {
@@ -10769,11 +10819,15 @@
     "pass": "At least 20,000 out-of-sample hourly bars. Net Sharpe > 0.5 with bootstrap p < 0.05. DSR >= 0.95.",
     "controls": "Look-ahead: strictly lagged BTC bar; UTC candle alignment; basket membership from trailing data only. Survivorship: point-in-time listing and ranking, not 2026 survivors. Costs: 50 bps round trip default (Kraken 0.26% and Coinbase retail taker per side); a maker-only variant at 30 bps. Multiple testing: 14 cells. Regime: 2021 bull vs 2022 bear."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_cryptovenue_btc_leads_alts"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-9563b748"
+   ],
    "notes": "from the underlying-library library: Bitcoin leads altcoins (cross-asset lead-lag in crypto); harness suggestion: Add coinbase_candles() backfill to mandel/data/fetch.py; lead-lag regression and follow-rule P&L in a new mandel/experiments/leadlag.py shared with the futures and venue entries; block_bootstrap_pvalue and deflated_sharpe_ratio from backtest_eval.py. | verifier: corrected claim/trial"
   },
   {
@@ -11598,10 +11652,12 @@
     "b6c_stockxs_piotroski_value"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Piotroski F-score within value stocks; harness suggestion: data/edgar.py fundamentals mapper (standard tag fallbacks); calendar-time harness in flow_events.py. | added by the verifier pass"
+   "results": [
+    "X-0040d3a6"
+   ],
+   "notes": "from the underlying-library library: Piotroski F-score within value stocks; harness suggestion: data/edgar.py fundamentals mapper (standard tag fallbacks); calendar-time harness in flow_events.py. | added by the verifier pass | 2026-10-19 batch 6c: inconclusive: 83.4% of 10-K filer-years in SEC XBRL have no free price history; value-distressed names delist most, so the survivor-only L/S (-2.7%/month, n 71 months of 150) has no known sign of bias. Needs a survivorship-free price panel (CRSP-like), which no free source provides."
   },
   {
    "id": "T-452",
@@ -12205,10 +12261,12 @@
     "b6c_stockxs_avellaneda_lee"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Residual (PCA / sector-ETF factor) statistical arbitrage (Avellaneda-Lee s-score); harness suggestion: residual_statarb: rolling regression/PCA factor model, OU s-score, threshold state machine, cost model; feeds overfit.pbo_cscv | added by the verifier pass"
+   "results": [
+    "X-216a585e"
+   ],
+   "notes": "from the underlying-library library: Residual (PCA / sector-ETF factor) statistical arbitrage (Avellaneda-Lee s-score); harness suggestion: residual_statarb: rolling regression/PCA factor model, OU s-score, threshold state machine, cost model; feeds overfit.pbo_cscv | added by the verifier pass | 2026-10-19 batch 6c: not_supported, decisive: Avellaneda-Lee residual stat-arb on point-in-time S&P 500 members earns a gross excess Sharpe +0.42 that turnover costs of 8.1-8.2%/yr turn into -0.61 (CI -1.13..-0.13) under both cost accountings; DSR 0."
   },
   {
    "id": "T-474",

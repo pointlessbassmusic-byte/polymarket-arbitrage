@@ -31226,10 +31226,10 @@
    "name": "kalshi-fetch-log",
    "kind": "data",
    "path": "mandel/archive/data/kalshi-fetch-log.jsonl.gz",
-   "created_at": "2026-10-19T16:53:22.530628+00:00",
-   "rows": 11574,
-   "bytes": 177749,
-   "sha256": "5b670c5885c3a8c15a8a0e02e9d16e42c30416c6c0678eba40967e77fa5267af",
+   "created_at": "2026-10-19T16:58:56.518481+00:00",
+   "rows": 11682,
+   "bytes": 183004,
+   "sha256": "76dfdce5740270c4c85ac285733c10ff738ca3c703898ca02042f39d83ac5024",
    "tags": [
     "complete",
     "fetch-log",
@@ -69775,6 +69775,89 @@
     "trades"
    ],
    "recipe": "GET https://api.elections.kalshi.com/trade-api/v2/historical/trades?ticker=<T>&limit=1000&cursor=<c> for prints before the trades cutoff (2026-08-20T00:00:00Z) and GET https://api.elections.kalshi.com/trade-api/v2/markets/trades?ticker=<T> after it (both when a market spans it), at most 15 pages per route, read newest first (the historical route only when the live route ended before its cap), for the markets of kalshi-settled-markets-KXU3 chosen by mandel.data.pm_history.kalshi_trade_select (a capped market is complete from complete_from on: kalshi-fetch-log). Licence: Kalshi trade-api v2 public market data: Kalshi's terms grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = raw Kalshi trade {trade_id, ticker, created_time, yes_price_dollars, no_price_dollars, count_fp, taker_side, taker_outcome_side, taker_book_side, is_block_trade}; observed_at = available_at = created_time"
+  },
+  "kalshi-trades-KXWTAMATCH": {
+   "name": "kalshi-trades-KXWTAMATCH",
+   "kind": "data",
+   "path": "mandel/archive/data/kalshi-trades-KXWTAMATCH.jsonl.gz",
+   "created_at": "2026-10-19T16:57:50.886041+00:00",
+   "rows": 212541,
+   "bytes": 8538843,
+   "sha256": "cd4c072bf163af2db7970caa28fb121234c90f08c6f7588d6766e4e79eb3948f",
+   "tags": [
+    "KXWTAMATCH",
+    "complete",
+    "history",
+    "kalshi",
+    "trades"
+   ],
+   "recipe": "GET https://api.elections.kalshi.com/trade-api/v2/historical/trades?ticker=<T>&limit=1000&cursor=<c> for prints before the trades cutoff (2026-08-20T00:00:00Z) and GET https://api.elections.kalshi.com/trade-api/v2/markets/trades?ticker=<T> after it (both when a market spans it), at most 15 pages per route, read newest first (the historical route only when the live route ended before its cap), for the markets of kalshi-settled-markets-KXWTAMATCH chosen by mandel.data.pm_history.kalshi_trade_select (a capped market is complete from complete_from on: kalshi-fetch-log). Licence: Kalshi trade-api v2 public market data: Kalshi's terms grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = raw Kalshi trade {trade_id, ticker, created_time, yes_price_dollars, no_price_dollars, count_fp, taker_side, taker_outcome_side, taker_book_side, is_block_trade}; observed_at = available_at = created_time"
+  },
+  "kraken-trades-1m-XBTUSD-2022-10": {
+   "name": "kraken-trades-1m-XBTUSD-2022-10",
+   "kind": "data",
+   "path": "mandel/archive/data/kraken-trades-1m-XBTUSD-2022-10.jsonl.gz",
+   "created_at": "2026-10-19T16:58:04.688912+00:00",
+   "rows": 43880,
+   "bytes": 3818158,
+   "sha256": "77885cc9b6a3ee04e7a4d1581c359725789146c33e880afb07f41d20882c45ae",
+   "tags": [
+    "1m",
+    "2022-10",
+    "complete",
+    "crypto",
+    "kraken",
+    "signed-volume",
+    "span:2022-10-01..2022-10-31",
+    "trades"
+   ],
+   "recipe": "GET https://api.kraken.com/0/public/Trades?pair=XBTUSD&since=<ns cursor, from 2022-10-01T00:00:00Z>&count=1000, paged on result.last until a trade at or after 2022-11-01T00:00:00Z; trades de-duplicated by trade id and aggregated with mandel.data.crypto_history.MinuteAgg via fetch_kraken_trades_1m (Kraken's OHLC endpoint keeps only 720 bars, so history comes from Trades). Licence: Kraken public market data: Kraken's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t (minute start, unix s), open, high, low, close (first / last trade by time and id), volume, vwap, n, buy_vol, sell_vol, n_buy, n_sell (aggressor side: buy = buyer-initiated), buy_hi, buy_lo, sell_hi, sell_lo (price range of each side's prints), mkt_vol (market-order volume; None when the venue does not say), first_ts, last_ts (unix s, fractional), last_id, ticks (minute HH:59 only: every trade [time, price, volume, side b/s, ordertype m/l, trade_id], so the last trade at or before an hour mark minus s seconds is exact)}; minutes without trades are absent; observed_at = minute start; available_at = minute end"
+  },
+  "kalshi-trades-POPVOTE": {
+   "name": "kalshi-trades-POPVOTE",
+   "kind": "data",
+   "path": "mandel/archive/data/kalshi-trades-POPVOTE.jsonl.gz",
+   "created_at": "2026-10-19T16:58:21.524485+00:00",
+   "rows": 30000,
+   "bytes": 1343461,
+   "sha256": "1e72fed566fa450527e4941bcbc4f7f7585fcc462bfeca83548d3926edc685c6",
+   "tags": [
+    "POPVOTE",
+    "complete",
+    "history",
+    "kalshi",
+    "trades"
+   ],
+   "recipe": "GET https://api.elections.kalshi.com/trade-api/v2/historical/trades?ticker=<T>&limit=1000&cursor=<c> for prints before the trades cutoff (2026-08-20T00:00:00Z) and GET https://api.elections.kalshi.com/trade-api/v2/markets/trades?ticker=<T> after it (both when a market spans it), at most 15 pages per route, read newest first (the historical route only when the live route ended before its cap), for the markets of kalshi-settled-markets-POPVOTE chosen by mandel.data.pm_history.kalshi_trade_select (a capped market is complete from complete_from on: kalshi-fetch-log). Licence: Kalshi trade-api v2 public market data: Kalshi's terms grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = raw Kalshi trade {trade_id, ticker, created_time, yes_price_dollars, no_price_dollars, count_fp, taker_side, taker_outcome_side, taker_book_side, is_block_trade}; observed_at = available_at = created_time"
+  },
+  "kalshi-trades-PRES": {
+   "name": "kalshi-trades-PRES",
+   "kind": "data",
+   "path": "mandel/archive/data/kalshi-trades-PRES.jsonl.gz",
+   "created_at": "2026-10-19T16:58:56.131707+00:00",
+   "rows": 30651,
+   "bytes": 1470435,
+   "sha256": "c5db91d571b0a4e7dcdc21be3b7f2e7702cdff66beb1dddff65434b98c705ae9",
+   "tags": [
+    "PRES",
+    "complete",
+    "history",
+    "kalshi",
+    "trades"
+   ],
+   "recipe": "GET https://api.elections.kalshi.com/trade-api/v2/historical/trades?ticker=<T>&limit=1000&cursor=<c> for prints before the trades cutoff (2026-08-20T00:00:00Z) and GET https://api.elections.kalshi.com/trade-api/v2/markets/trades?ticker=<T> after it (both when a market spans it), at most 15 pages per route, read newest first (the historical route only when the live route ended before its cap), for the markets of kalshi-settled-markets-PRES chosen by mandel.data.pm_history.kalshi_trade_select (a capped market is complete from complete_from on: kalshi-fetch-log). Licence: Kalshi trade-api v2 public market data: Kalshi's terms grant no redistribution right and no open data licence. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
    "parked_reason": "",
    "in_git": false,
    "schema": "value = raw Kalshi trade {trade_id, ticker, created_time, yes_price_dollars, no_price_dollars, count_fp, taker_side, taker_outcome_side, taker_book_side, is_block_trade}; observed_at = available_at = created_time"
