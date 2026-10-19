@@ -8193,11 +8193,15 @@
     "pass": "mean 20-day excess < -0.2% net with 95% upper bound < 0 AND placebo centred on zero",
     "controls": "Look-ahead: trade only on dates the membership change is public; using later-known membership as the universe is forbidden. Survivorship: additions are listed at entry and rarely delist within 20 days, so they are the clean read; deletions often delist and are missing from Yahoo (biased). Costs: 10 bps/leg. Regime: 5-year buckets show the Greenwood-Sammon decline. Multiple testing: 5 variants."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_events_index_addition_reversal"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b49ccc70"
+   ],
    "notes": "from the underlying-library library: Index-rebalance reversal (S&P 500 additions/deletions, Russell reconstitution, month-end flows); harness suggestion: index_event_study: event-date loader, excess-return windows, placebo sampler; month_end_flow for the calendar variant on SPY | verifier: corrected claim/trial"
   },
   {
@@ -9360,11 +9364,15 @@
     "pass": "Difference >= 20 bp with clustered p < 0.01 in both halves, holding on the ETF-only robustness. DSR with n_trials = 4.",
     "controls": "Survivorship: the current-constituent universe biases upward; the claim stands only if the ETF robustness agrees. Market adjustment with SPY. Look-ahead: predicted schedule from prior-year ex-dates only. Costs 5 bp. Tax: holdings under 61 days make dividends non-qualified (noted, not modeled). 4 trials."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_events_dividend_month"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3ac4830c"
+   ],
    "notes": "from the underlying-library library: Dividend capture and the dividend-month premium; harness suggestion: mandel/experiments/carry.py: dividend_month_premium(prices, dividends) and ex_day_drop(); Yahoo dividend events into the observation store | verifier: corrected claim/trial"
   },
   {
@@ -9939,11 +9947,15 @@
     "pass": "Lower... upper 95% bound of mean abnormal return < 0 net of costs over >= 5000 events AND same sign in both halves (2019-2022, 2023-2026); otherwise parked as 'daily SVR not informative'.",
     "controls": "Look-ahead: next-day open. Survivorship: point-in-time membership. Costs: 5 bp per side; daily turnover makes costs decisive. Multiple testing: 4 trials. Regime: 2021 meme period. Definitional: off-exchange only, not total short volume."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_events_short_volume_ratio"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0bc4c55f"
+   ],
    "notes": "from the underlying-library library: FINRA daily short-volume ratio; harness suggestion: data/finra.py daily file loader + the generic cross-sectional event harness; add gross-vs-net reporting since turnover is daily. | verifier: corrected claim/trial"
   },
   {
