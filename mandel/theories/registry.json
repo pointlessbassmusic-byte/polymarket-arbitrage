@@ -359,12 +359,16 @@
     "pass": "monotone increase, top-bottom gap interval excludes 0",
     "controls": "volume is end-of-life volume (not point in time) - a known leak to fix before trusting"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmcal_volume_calibration"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "harness not yet written: calibration_by_volume"
+   "results": [
+    "X-d6b6a6f4"
+   ],
+   "notes": "harness not yet written: calibration_by_volume | 2026-10-19 batch 6c: not_supported as worded (strict monotonicity fails: Q4 0.69 < Q3 0.72), but the point-in-time volume gap is real: Brier skill vs coin 0.23 in the lowest taker-volume quartile against 0.69 in the highest (Q4-Q1 0.45, CI 0.30..0.59) on the fetcher's unbiased hash sample of 655 markets. Confounds named: Q1 is mostly resting-book quotes with no trade before the decision, and volume correlates 0.44 with market age. The leaky end-of-life Gamma volume quartiles show no gap (0.11, CI -0.06..+0.28): the earlier T-01/T-12 readings on that field were not measuring volume."
   },
   {
    "id": "T-13",
@@ -820,11 +824,15 @@
     "pass": "difference < 0, interval excludes 0",
     "controls": "embargo; volume leak (end-of-life volume) must be fixed first"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmcal_mlp_vs_logit"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-85b63f4b"
+   ],
    "notes": "harness not yet written: logit_vs_mlp_walkforward (numpy only)"
   },
   {
@@ -846,12 +854,16 @@
     "pass": "effective rank < 0.1 n and top eigenvalue outside MP bound",
     "controls": "missing-data alignment; markets of the same event are mechanically correlated (exclude same-event pairs)"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmcal_low_rank"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "harness not yet written: low_rank_structure"
+   "results": [
+    "X-9f1b8578"
+   ],
+   "notes": "harness not yet written: low_rank_structure | 2026-10-19 batch 6c: not_supported: Polymarket market returns are far from low-rank (effective rank 0.73 n against the claimed < 0.1 n; top eigenvalue 1.22x the Marchenko-Pastur edge)."
   },
   {
    "id": "T-34",
@@ -7668,11 +7680,15 @@
     "pass": "Mean > 0.02 with 95% interval excluding 0 and exceeding matched controls, DSR > 0.95, Kalshi replication sign agrees",
     "controls": "Look-ahead: shock at day t, entry at day t+1 price; variant B must use the endDate as first published, but the closed-markets snapshot was taken 2026-10-14 (available_at) so endDate may have been revised after the fact: restrict B to markets whose endDate is within 1 day of the actual close, or drop B; survivorship: the 399-market history set was selected by volume ex post (stated leak); costs: 2 cents Polymarket, Kalshi fee formula; multiple testing: 36 trials incl. T-10; regime: by category and days-to-resolution bucket"
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmcal_shock_continuation"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-dbdf48e1"
+   ],
    "notes": "from the underlying-library library: Prediction-market price momentum revisited: event-time, shock-conditioned and cross-outcome versions; harness suggestion: mandel/experiments/pm_momentum.py: shock_continuation(series_by_market, sd_mult, hold) with matched controls; event_time_momentum(...) using listing/resolution dates from closed-markets; cross_outcome(...) grouping markets by event id (Gamma 'events' field); register as theories T-48..T-50 with T-10 named as the superseded search. | verifier: corrected claim/trial"
   },
   {
@@ -8263,12 +8279,16 @@
     "pass": "lower Wilson bound of the halving rate > 70% with at least 50 episodes; secondary: convergence-trade mean net return per episode > 0",
     "controls": "Matching errors (resolution source, timing, strike definition) are the main false positive, so every pair is audited by hand. Fees per venue. Point-in-time joins on observed_at; hourly candles from both venues aligned to the same UTC hour. Capital lock to resolution for the pure-arb variant. Regime: release windows vs quiet periods."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmxv_cross_venue_convergence"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Polymarket vs Kalshi cross-venue convergence (templated events); harness suggestion: cross_venue_match: template matcher (series ticker <-> slug regex), hourly gap series, episode/halving counter, lead-lag permutation test | verifier: corrected claim/trial"
+   "results": [
+    "X-00316661"
+   ],
+   "notes": "from the underlying-library library: Polymarket vs Kalshi cross-venue convergence (templated events); harness suggestion: cross_venue_match: template matcher (series ticker <-> slug regex), hourly gap series, episode/halving counter, lead-lag permutation test | verifier: corrected claim/trial | 2026-10-19 batch 6c: inconclusive: the automated Polymarket-Kalshi pair table (1,025 templated pairs, 991 passing rule checks) is not the hand-audited table the trial requires (audited=False for every pair), and the BTC family has no 24-hour windows; the CPI/FOMC convergence episodes are measured and reported, not judged."
   },
   {
    "id": "T-337",
@@ -8289,12 +8309,16 @@
     "pass": "95% lower bound of mean net return per trade > 0 under both smile fits AND same sign in 2024-2025 and 2026",
     "controls": "Look-ahead: only option trades and Polymarket prices with timestamps <= decision time; resolution excluded from inputs. Model risk: two smile fits, difference used as an error bar; sparse-trade hours flagged. Risk-premium confound: tails excluded from the primary read. Fees: Polymarket crypto taker 0.07; makers free. Resolution-source mismatch: Binance vs Deribit index basis applied. Regime: weekends, macro-release days. Multiple testing: 7 variants in DSR."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmxv_pm_vs_deribit_digital"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Polymarket BTC threshold contracts vs Deribit option-implied digital probabilities; harness suggestion: digital_vs_rn_harness: smile fitter + Breeden-Litzenberger integrator, gap store, fade simulator, proper-score comparison reusing scoring.py | verifier: corrected claim/trial"
+   "results": [
+    "X-6aab305c"
+   ],
+   "notes": "from the underlying-library library: Polymarket BTC threshold contracts vs Deribit option-implied digital probabilities; harness suggestion: digital_vs_rn_harness: smile fitter + Breeden-Litzenberger integrator, gap store, fade simulator, proper-score comparison reusing scoring.py | verifier: corrected claim/trial | 2026-10-19 batch 6c: inconclusive with every implemented criterion passing: fading |gap| > 5 points between Polymarket 'Bitcoin above' prices and the Deribit risk-neutral digital (SVI smile from near-expiry trades) nets +4.7 cents per contract after the 0.07 p(1-p) fee each way (4,987 trades, one-sided lower +4.2; cubic smile +5.1), gap half-life 1.4 h, DSR 1.0 at 7 variants. Capped because the resolution criterion needs Binance BTCUSDT klines, which are not archived. Follow-up: fetch the resolution klines and re-run; this is the one prediction-market claim with an apparent edge."
   },
   {
    "id": "T-338",
@@ -8925,11 +8949,15 @@
     "pass": "Slope > 0 with clustered p < 0.05, the same sign in both halves, and placebo slope indistinguishable from 0; min_n counts distinct event dates.",
     "controls": "Look-ahead: p taken 3 days before the scheduled end date; end dates can be edited on Polymarket (hasReviewedDates), so markets whose end date moved after the event are flagged; tagging frozen first. Survivorship: resolved markets only; voided markets counted. Costs: 1-2 bps per SPY round trip. Multiple testing: 6 variants Holm. Regime: halves; 2020 and the 2022 hiking cycle flagged."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmxv_event_uncertainty_premium"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-62ab0104"
+   ],
    "notes": "from the underlying-library library: Scheduled binary-event uncertainty premium in SPY, scaled by prediction-market odds; harness suggestion: experiments/markets.py: tag_scheduled_events(markets, categories, min_volume) -> list of (event_date, p_minus_3d); events.py: event_window_regression(days, closes, events, window=2) with date-clustered bootstrap and the U-shuffle placebo. | verifier: corrected claim/trial"
   },
   {
@@ -8951,12 +8979,16 @@
     "pass": "Mean net return > 0 with cluster-bootstrap p < 0.05, calibration slope > 1, both halves agreeing, and beating the day-14 entry.",
     "controls": "Look-ahead: prices taken before the scheduled end date; Polymarket end dates can be edited (hasReviewedDates), so edited markets are flagged and excluded in a sensitivity. Survivorship: resolved only; voids counted. Costs: spread, fee fields, and capital locked during UMA disputes. Multiple testing: 6 variants plus categories. Regime: halves; sports dominance of recent volume reported."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmcal_late_favorite"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Prediction-market resolution-date effects (favorite drift into expiry, post-outcome gap, known vs open-ended dates); harness suggestion: experiments/markets.py: late_favorite_returns(markets, histories, days_before=(1,2,3), p_lo=0.90, p_hi=0.98, spread=0.01) with Bernoulli(p) parametric bootstrap and market-cluster bootstrap; horizon contrast at day -14; post_outcome_gap(markets) using end_date vs resolved_at. | verifier: corrected claim/trial"
+   "results": [
+    "X-a5f1fba5"
+   ],
+   "notes": "from the underlying-library library: Prediction-market resolution-date effects (favorite drift into expiry, post-outcome gap, known vs open-ended dates); harness suggestion: experiments/markets.py: late_favorite_returns(markets, histories, days_before=(1,2,3), p_lo=0.90, p_hi=0.98, spread=0.01) with Bernoulli(p) parametric bootstrap and market-cluster bootstrap; horizon contrast at day -14; post_outcome_gap(markets) using end_date vs resolved_at. | verifier: corrected claim/trial | 2026-10-19 batch 6c: not_supported: late favourites at 0.949 mean price return -0.13% net per dollar (CI -0.98..+0.72); the day-14 rule earns no more; the 'calibration slope > 1' criterion reads 0.994. Polymarket favourites are priced fairly in the final 3 days."
   },
   {
    "id": "T-360",
@@ -8977,12 +9009,16 @@
     "pass": "Mean net P&L > 0 with cluster-bootstrap p < 0.05 and both halves positive, Holm over 5; min_n counts releases with at least one qualifying trade.",
     "controls": "Look-ahead: the archive vintage is assumed to be real-time and not re-estimated after model changes (unconfirmed; test by snapshotting the JSON daily from now and comparing future vintages); sigma uses past releases only. Survivorship: all releases included. Costs: Kalshi fee formula plus spreads of 2-5c in thin thresholds. Multiple testing: 5 variants. Regime: 2021-2023 high-inflation vs 2024-2026; the delayed autumn-2025 releases flagged."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmxv_kalshi_cpi_nowcast"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Kalshi macro-contract settlement convergence vs nowcasts; harness suggestion: data/fetch.py: cleveland_nowcast() daily snapshot stored with available_at (start accumulating now); experiments/markets.py: kalshi_bucket_calibration(markets, candles, release_dates) which runs today without the nowcast (variant 5) and gains the nowcast join later. | verifier: corrected claim/trial"
+   "results": [
+    "X-57e63c0f"
+   ],
+   "notes": "from the underlying-library library: Kalshi macro-contract settlement convergence vs nowcasts; harness suggestion: data/fetch.py: cleveland_nowcast() daily snapshot stored with available_at (start accumulating now); experiments/markets.py: kalshi_bucket_calibration(markets, candles, release_dates) which runs today without the nowcast (variant 5) and gains the nowcast join later. | verifier: corrected claim/trial | 2026-10-19 batch 6c: not_supported: a Cleveland Fed nowcast-vs-Kalshi CPI threshold rule loses 3.7 cents per contract (153 contracts, release bootstrap p 0.85); the nowcast history is current-vintage, so the real-time criterion is a stand-in."
   },
   {
    "id": "T-361",
@@ -9506,12 +9542,16 @@
     "pass": "Bootstrap lower 95% bound of the mean net annualized excess over the hurdle > 0 in the pooled sample, no single event cluster contributing more than half of gross profit, and DSR > 0.95 with n_trials = 12.",
     "controls": "Look-ahead: first entry into the bin, never last; prices point-in-time. Pseudo-replication: one observation per market per bucket. Survivorship: the Polymarket closed set is volume-selected (largest markets), so report Kalshi separately. Fees per venue and category; Kalshi APY credited; disputed or voided markets treated as losses (sensitivity: as refunds). Regime: 2022-2023 vs 2024-2026 and pre/post Polymarket fees. 12 trials."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmcal_near_certain_carry"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Event-contract near-certain YES carry (buying 0.95-0.99) and its tail; harness suggestion: extend mandel/experiments/markets.py market_calibration with a price-bin x horizon x side table and net-return accounting; reuse T-47 longshot harness | verifier: corrected claim/trial"
+   "results": [
+    "X-d8389daa"
+   ],
+   "notes": "from the underlying-library library: Event-contract near-certain YES carry (buying 0.95-0.99) and its tail; harness suggestion: extend mandel/experiments/markets.py market_calibration with a price-bin x horizon x side table and net-return accounting; reuse T-47 longshot harness | verifier: corrected claim/trial | 2026-10-19 batch 6c: not_supported on the DSR (0.81 at 12 trials) although the pooled excess over the box+2% hurdle is positive (+0.19/yr, event- and day-clustered CIs above 0): 3% of observations (holds of 2 days or less, mean excess 5.0/yr annualised) contribute 0.15 of the 0.19 mean; longer holds earn 0.04/yr, and the dollar-weighted excess is -0.007. Kalshi alone is negative (-0.17). Eligibility and horizon buckets now use the resolution date known at t (rule 4)."
   },
   {
    "id": "T-379",
@@ -10382,12 +10422,16 @@
     "pass": "On out-of-sample Kalshi markets, bootstrap p < 0.01 for mean net return > 0 in the headline cell, AND PBO < 0.2, AND DSR >= 0.95 over the 108 cells (plus the 21 daily rules). The Polymarket replication has the same sign.",
     "controls": "Look-ahead: the signal uses the mid at candle close; the fill uses the ask at the same close, never the mid. Bid-ask bounce: Kalshi signals only from bid/ask mids. Survivorship: all settled markets, including zero-volume hours (flagged). Costs: Kalshi taker fee 0.07 x C x P(1-P); Polymarket fee formula by category plus the assumed half-spread. Multiple testing: 108 cells plus the 21 daily rules. Regime: by category and hours-to-resolution; 2024 vs 2025-26."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmmicro_hourly_reversal"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Hourly anti-persistence (intraday mean reversion) on Kalshi/Polymarket prices; harness suggestion: New mandel/experiments/intraday_pm.py: reuse kalshi_candles(period=60) rows from the store and polymarket_price_history(fidelity=60); P&L builder patterned on ma_rule_returns in mandel/experiments/underlying.py; pbo_cscv from mandel/experiments/overfit.py; deflated_sharpe_ratio and block_bootstrap_pvalue from mandel/validation/backtest_eval.py. | verifier: corrected claim/trial"
+   "results": [
+    "X-26fb4505"
+   ],
+   "notes": "from the underlying-library library: Hourly anti-persistence (intraday mean reversion) on Kalshi/Polymarket prices; harness suggestion: New mandel/experiments/intraday_pm.py: reuse kalshi_candles(period=60) rows from the store and polymarket_price_history(fidelity=60); P&L builder patterned on ma_rule_returns in mandel/experiments/underlying.py; pbo_cscv from mandel/experiments/overfit.py; deflated_sharpe_ratio and block_bootstrap_pvalue from mandel/validation/backtest_eval.py. | verifier: corrected claim/trial | 2026-10-19 batch 6c: not_supported: hourly reversal on Kalshi non-crypto markets nets -2.8 cents per contract out of sample (5,248 trades); the mid reverts +0.6 cents but entry and exit half-spreads (0.65 + 0.95) and fees (2.6 cents) eat it."
   },
   {
    "id": "T-409",
@@ -10408,11 +10452,15 @@
     "pass": "At least 40 pairs with >= 200 overlapping hours and >= 300 follow trades in total. Out-of-sample mean net return > 0 with pairs-bootstrap 95% CI excluding zero. DSR >= 0.95 over the 32 cells.",
     "controls": "Look-ahead: strictly lagged leader change, both series stamped at candle end. Survivorship: rule-mismatched and differently resolved pairs are kept. Costs: both fee formulas, the Kalshi quoted spread, and an assumed Polymarket spread from captured books. The arbitrage variant carries capital lock-up at the T-bill rate. Multiple testing: 32 cells. Regime: 2024 election vs 2025-26; low-volume pairs separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmxv_leadlag"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-dcbbf3fe"
+   ],
    "notes": "from the underlying-library library: Kalshi vs Polymarket price-discovery lead-lag; harness suggestion: New mandel/experiments/venues_leadlag.py with a pairs.json registry; re-use polymarket_price_history and kalshi_candles from mandel/data/fetch.py; implement Hasbrouck information share (VECM via numpy OLS) and Granger F; P&L with the cost inputs already used by bundle_arb_scan. | verifier: corrected claim/trial"
   },
   {
@@ -10460,11 +10508,15 @@
     "pass": "At least 1,500 market-days. Mean daily net P&L > 0 with bootstrap p < 0.01. Positive in each of the 3 largest categories. DSR >= 0.95 over 27 cells. Paper-trading realised spread within 50% of the replay before any capital.",
     "controls": "Look-ahead: quotes come from the candle closed before the trade; markout mids from later candles. Survivorship: include markets that resolved against inventory. Costs: Kalshi maker fees where charged; rewards and rebates excluded from the headline. Multiple testing: 27 cells. Regime: news hours vs quiet hours; near-resolution reported separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmmicro_market_making"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7de80894"
+   ],
    "notes": "from the underlying-library library: Passive liquidity provision on Polymarket/Kalshi CLOBs with adverse-selection controls; harness suggestion: Add trade-print capture to mandel/data/fetch.py (Kalshi get-trades with cursor; Polymarket data-api /trades); new mandel/experiments/mm_replay.py with Avellaneda-Stoikov quotes, conservative fill rule, markout computation; score daily P&L with block_bootstrap_pvalue and sharpe_ratio from backtest_eval.py. | verifier: corrected claim/trial"
   },
   {
@@ -11968,11 +12020,15 @@
     "pass": "At least 3,000 out-of-sample trades. Mean net > 0 with bootstrap p < 0.01. DSR >= 0.95. PBO < 0.3.",
     "controls": "Look-ahead: flow up to the hour close; fills at the next candle's ask. Survivorship: all settled markets except KXMVE combos. Costs: fee formulas plus quoted spread. Multiple testing: 16 cells plus the book-imbalance grid. Regime: by category; final 48h separately."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_pmmicro_flow_imbalance"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f2e6f009"
+   ],
    "notes": "from the underlying-library library: Signed trade-flow imbalance on Kalshi/Polymarket; harness suggestion: kalshi_trades() in mandel/data/fetch.py. Flow aggregation and P&L in mandel/experiments/intraday_pm.py next to the hourly-reversal harness, sharing its cost model. | added by the verifier pass"
   },
   {
