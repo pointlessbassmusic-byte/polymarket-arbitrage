@@ -58,8 +58,14 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            payoff - cost - 0.07 x p(1-p) at entry and at an early exit - 1 point haircut. Pass: one-sided 95% lower bound
            of the mean net return per trade > 0 (studentized market-cluster bootstrap) under BOTH fits AND the same
            sign in 2024-2025 and 2026 (both fits); min_n 300 trades. The resolution-source basis control (Binance BTCUSDT
-           vs the Deribit index) needs Binance klines that are NOT archived: that criterion is None (rule 9); the
-           sensitivity to a +/-0.2% strike shift is reported instead.
+           vs the Deribit index) reads ``binance-1m-BTCUSDT-btc-above`` (``mandel.data.binance_klines``: Binance 1-minute
+           klines around every resolution time): the basis ln(Binance close / Deribit index) is measured at each
+           resolution time from the latest Deribit trade before it against the Binance close of the minute holding that
+           trade, every decision hour H shifts the strike by exp(-median of the bases known by H) (point in time), the
+           fades are re-run under both fits, and the criterion passes when both one-sided 95% lower bounds stay > 0;
+           the Gamma outcomes are audited against the Binance close under both readings of 'the 1 minute candle for
+           12:00'. When the bundle is not archived that criterion is None (rule 9) and the sensitivity to a +/-0.2%
+           strike shift is reported instead.
   * T-358  SPY's two-session return into scheduled binary events against ex-ante uncertainty U = p(1-p) three sessions
            before. Frozen tagging rule (built before SPY is read): Kalshi KXCPI / KXFED / KXFEDDECISION / KXPAYROLLS
            settled markets and the PRES-2024 race; Polymarket FOMC and CPI event families (``polymarket-events-macro``)
@@ -144,6 +150,7 @@ EMP_REL_B = "macro-release-employment-situation"
 FOMC_B = "fomc-meetings"
 SPY_B, TLT_B, GLD_B, BTC_B = "daily-history-SPY", "daily-history-TLT", "daily-history-GLD", "daily-history-BTC-USD"
 HBTC_B = "hourly-BTC-USD"                # T-337's point-in-time forward (bar start t, close, available_at = t + 1 h)
+BNC_B = "binance-1m-BTCUSDT-btc-above"   # T-337's resolution source: Binance 1-minute closes around every resolution time (optional)
 DTB3_B = "fred-DTB3"
 KS = "kalshi-settled-markets-"
 KH = "kalshi-candles-hourly-"
@@ -1684,6 +1691,78 @@ def _hourly_spot(archive, name: str = HBTC_B) -> dict:
     return _cached(archive, ("hourly_spot", name), load)
 
 
+def _binance_minutes(archive, name: str = BNC_B) -> dict:
+    """{minute start t: close} of the Binance BTCUSDT 1-minute klines archived around the 'Bitcoin above' resolution times
+    (``mandel.data.binance_klines``; kind bar1m, available at the minute's end). Empty when the bundle is not archived
+    (optional: the resolution-source basis criterion is then None)."""
+    if not _has(archive, name):
+        return {}
+
+    def load():
+        out = {}
+        for r in _rows(archive, name):
+            if r.get("kind") != "bar1m":
+                continue
+            v = r.get("value") or {}
+            t, c = _num(v.get("t")), _num(v.get("close"))
+            if t is not None and c is not None and c > 0:
+                out[int(t) - int(t) % 60] = c
+        return out
+    return _cached(archive, ("binance_minutes", name), load)
+
+
+def resolution_basis(t_res_set: Sequence[int], minutes: dict, last_idx: dict) -> dict:
+    """{t_res: ln(Binance close / Deribit index)} at each resolution time: the index price of the latest Deribit trade in
+    the hour before t_res (``_deribit_groups``'s last_idx) against the Binance close of the minute holding that trade
+    (both known by t_res: the minute closes before the hour does). Only resolution times with both observations."""
+    out = {}
+    for t in t_res_set:
+        li = last_idx.get((int(t) - 1) // HOUR)
+        if li is None or li[0] // 1000 >= t or not li[1] or li[1] <= 0:
+            continue
+        c = minutes.get(int(li[0] // 1000) // 60 * 60)
+        if c is not None:
+            out[int(t)] = math.log(c / li[1])
+    return out
+
+
+def basis_by_hour(basis: dict):
+    """H -> median of the resolution-time bases known by H (t_res <= H x 3600), None before the first; the point-in-time
+    strike shift of the resolution-source control."""
+    ts = sorted(basis)
+    vals = np.array([basis[t] for t in ts])
+    cache: dict = {}
+
+    def at(H: int) -> Optional[float]:
+        k = bisect.bisect_right(ts, H * HOUR)
+        if k == 0:
+            return None
+        if k not in cache:
+            cache[k] = float(np.median(vals[:k]))
+        return cache[k]
+    return at
+
+
+def resolution_audit(specs: Sequence[dict], minutes: dict) -> dict:
+    """Gamma outcomes against the Binance close under both readings of 'the 1 minute candle for 12:00' (the candle opening
+    at t_res; the candle closing at t_res, which is also the hour candle's close for the 5 pm variant), per variant."""
+    out: dict = {}
+    for s in specs:
+        if s["outcome"] is None:
+            continue
+        for lab, t in (("candle_opening_at_t_res", s["t_res"]), ("candle_closing_at_t_res", s["t_res"] - 60)):
+            c = minutes.get(t)
+            if c is None:
+                continue
+            d = out.setdefault(s["variant"], {}).setdefault(lab, {"n": 0, "agree": 0})
+            d["n"] += 1
+            d["agree"] += int((c > s["strike"]) == bool(s["outcome"]))
+    for v in out.values():
+        for d in v.values():
+            d["rate"] = round(d["agree"] / d["n"], 4) if d["n"] else None
+    return out
+
+
 def b6c_pmxv_pm_vs_deribit_digital(archive):
     """T-337."""
     months = _names(archive, DRB)
@@ -1697,10 +1776,14 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
     groups, expiry_ts, n_trades, last_idx = _deribit_groups(archive, [n[len(DRB):] for n in months])
     spot = _hourly_spot(archive, HBTC_B)                               # optional: the point-in-time forward at H
     book = SmileBook(groups, expiry_ts, forward=spot, last_idx=last_idx)
+    minutes = _binance_minutes(archive, BNC_B)                         # optional: the resolution-source basis control
+    basis = resolution_basis(sorted({s["t_res"] for s in specs}), minutes, last_idx) if minutes else {}
+    basis_at = basis_by_hour(basis)
     trades = {"svi": [], "cubic": []}
+    adj = {"svi": [], "cubic": []}
     shifted = {"+0.2%": [], "-0.2%": []}
     gap_rows, brier = [], {"svi": [], "cubic": [], "poly": []}
-    n_dec, n_skipped, n_markets_used = 0, 0, 0
+    n_dec, n_skipped, n_markets_used, n_unshifted = 0, 0, 0, 0
     for s in specs:
         hs, ps = pm_series[s["token"]]
         keep = (hs * HOUR) < s["t_res"] - HOUR
@@ -1708,6 +1791,7 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
         if hs.size == 0:
             continue
         prn = {"svi": np.full(hs.size, np.nan), "cubic": np.full(hs.size, np.nan)}
+        prn_adj = {"svi": np.full(hs.size, np.nan), "cubic": np.full(hs.size, np.nan)}
         prn_shift = {"+0.2%": np.full(hs.size, np.nan), "-0.2%": np.full(hs.size, np.nan)}
         for i, H in enumerate(hs):
             r = book.p_rn(int(H), s["strike"], s["t_res"])
@@ -1716,6 +1800,12 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
                 n_skipped += 1
                 continue
             prn["svi"][i], prn["cubic"][i] = r["svi"], r["cubic"]
+            if minutes:                                                  # the basis control: K on the Deribit index = K x exp(-basis known at H)
+                b = basis_at(int(H))
+                n_unshifted += b is None
+                ra = r if b is None else book.p_rn(int(H), s["strike"] * math.exp(-b), s["t_res"])
+                if ra is not None:
+                    prn_adj["svi"][i], prn_adj["cubic"][i] = ra["svi"], ra["cubic"]
             if 0 < ps[i] < 1:
                 gap_rows.append((s["market_id"], int(H), 100.0 * (ps[i] - r["svi"])))
                 if s["outcome"] is not None:
@@ -1730,6 +1820,8 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
             n_markets_used += 1
         for kind in ("svi", "cubic"):
             trades[kind] += fade_trades(hs, ps, prn[kind], s["t_res"], s["outcome"], s["market_id"])
+            if minutes:
+                adj[kind] += fade_trades(hs, ps, prn_adj[kind], s["t_res"], s["outcome"], s["market_id"])
         for lab in shifted:
             shifted[lab] += fade_trades(hs, ps, prn_shift[lab], s["t_res"], s["outcome"], s["market_id"])
     res = {}
@@ -1789,9 +1881,35 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
     crit.append(("same sign of the mean net return in 2024-2025 and 2026 under both fits: "
                  + "; ".join(f"{k} {_s(res[k].get('mean_2024_2025'))} ({res[k].get('n_2024_2025', 0)}) / {_s(res[k].get('mean_2026'))} "
                              f"({res[k].get('n_2026', 0)})" for k in ("svi", "cubic")), same_sign, False))
-    crit.append((f"resolution-source basis control (Binance BTCUSDT vs the Deribit index) applied: Binance klines are not archived "
-                 f"(sensitivity: strikes +0.2% -> mean {_s(sens['+0.2%']['mean'])} cents over {sens['+0.2%']['n']} trades, -0.2% -> "
-                 f"{_s(sens['-0.2%']['mean'])} over {sens['-0.2%']['n']})", None, False))
+    res_adj = {}
+    for kind, tr in adj.items():
+        if tr:
+            x = np.array([t["net"] for t in tr]) * 100.0
+            cs = cluster_stud(x, [t["market_id"] for t in tr], N_BOOT)
+            res_adj[kind] = {"n": int(x.size), "markets": cs.get("clusters"), "mean": cs["est"], "ci90": cs["ci90"], "lower95_one_sided": cs["ci90"][0]}
+        else:
+            res_adj[kind] = {"n": 0, "mean": None, "ci90": [None, None], "lower95_one_sided": None}
+    bvals = np.array(list(basis.values())) * 100.0 if basis else np.array([])
+    basis_stat = {"bundle": BNC_B if minutes else None, "minutes": len(minutes), "n_resolutions": len(basis), "of_resolution_times": len({s["t_res"] for s in specs}),
+                  "median_pct": float(np.median(bvals)) if bvals.size else None, "mean_pct": float(bvals.mean()) if bvals.size else None,
+                  "iqr_pct": [float(np.percentile(bvals, 25)), float(np.percentile(bvals, 75))] if bvals.size else None,
+                  "decisions_unshifted_before_first_basis": n_unshifted, "fits": res_adj,
+                  "resolution_audit": resolution_audit(specs, minutes) if minutes else None,
+                  "rule": "basis = ln(Binance close of the minute holding the latest Deribit trade before t_res / that trade's index); at decision hour H "
+                          "the strike is K x exp(-median of the bases of resolution times <= H); fades re-run under both fits"}
+    if minutes:
+        lbs = {k: res_adj[k]["lower95_one_sided"] for k in ("svi", "cubic")}
+        ok = None if any(v is None for v in lbs.values()) else all(v > 0 for v in lbs.values())
+        dec = any(res_adj[k]["ci90"][1] is not None and res_adj[k]["ci90"][1] < 0 for k in ("svi", "cubic"))
+        crit.append((f"resolution-source basis control (Binance BTCUSDT vs the Deribit index) applied: {BNC_B} basis ln(Binance / Deribit) median "
+                     f"{_s(basis_stat['median_pct'], 3)}% (IQR {_f((basis_stat['iqr_pct'] or [None])[0], 3)}..{_f((basis_stat['iqr_pct'] or [None, None])[1], 3)}%) over "
+                     f"{len(basis)} of {basis_stat['of_resolution_times']} resolution times; strikes shifted by the point-in-time trailing median "
+                     f"({n_unshifted} decisions before the first basis unshifted) -> one-sided 95% lower bound > 0 under both fits: SVI {_s(lbs['svi'])} "
+                     f"({res_adj['svi']['n']} trades), cubic {_s(lbs['cubic'])} ({res_adj['cubic']['n']})", ok, dec))
+    else:
+        crit.append((f"resolution-source basis control (Binance BTCUSDT vs the Deribit index) applied: Binance klines are not archived ({BNC_B}; "
+                     f"sensitivity: strikes +0.2% -> mean {_s(sens['+0.2%']['mean'])} cents over {sens['+0.2%']['n']} trades, -0.2% -> "
+                     f"{_s(sens['-0.2%']['mean'])} over {sens['-0.2%']['n']})", None, False))
     verdict, why = _decide(crit, n, 300, "trades")
     stale = book.staleness() or {}
     sq = stale.get("abs_ln_pct_quantiles", {})
@@ -1810,8 +1928,13 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
               f"{_s(res['svi'].get('lower95_one_sided'))}; {res['svi'].get('by_exit')}); cubic {res['cubic'].get('n', 0)} trades mean "
               f"{_s(res['cubic'].get('mean'))} (lower {_s(res['cubic'].get('lower95_one_sided'))}). AR(1) half-life of the gap "
               f"{_f(half_life, 1)} h; paired Brier p_RN - p_poly: SVI {_s(brier_diff['svi'], 4)}, cubic {_s(brier_diff['cubic'], 4)}; "
-              f"DSR at the trial's 7 variants {_f(dsr7)} — {why}")
-    stat = {"n_trades": n, "fits": res, "sensitivity_strike_shift": sens, "n_markets": len(specs), "n_markets_with_smile": n_markets_used,
+              f"DSR at the trial's 7 variants {_f(dsr7)}. Resolution-source basis control: "
+              + (f"{BNC_B} archived ({len(minutes)} minutes; basis median {_s(basis_stat['median_pct'], 3)}% over {len(basis)} resolution times; "
+                 f"outcome audit {json.dumps(basis_stat['resolution_audit'], sort_keys=True)}); basis-shifted SVI {res_adj['svi']['n']} trades mean "
+                 f"{_s(res_adj['svi']['mean'])} (lower {_s(res_adj['svi']['lower95_one_sided'])}), cubic mean {_s(res_adj['cubic']['mean'])} "
+                 f"(lower {_s(res_adj['cubic']['lower95_one_sided'])})" if minutes else f"{BNC_B} not archived, criterion None")
+              + f" — {why}")
+    stat = {"n_trades": n, "fits": res, "sensitivity_strike_shift": sens, "basis": basis_stat, "n_markets": len(specs), "n_markets_with_smile": n_markets_used,
             "variants": dict(Counter(s["variant"] for s in specs)), "deribit": {"trades": n_trades, "months": len(months), "fits": book.n_fits, "sparse": book.n_sparse},
             "forward": {"rule": "point in time at H: hourly spot close of the bar ending at H, else the latest Deribit trade index before H; smile in k = ln(K / F_H)",
                         "spot_bundle": HBTC_B if spot else None, "spot_hours": len(spot),

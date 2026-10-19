@@ -70114,6 +70114,49 @@
    "parked_reason": "",
    "in_git": false,
    "schema": "value = {symbol, t (minute start, unix s), open, high, low, close (first / last trade by time and id), volume, vwap, n, buy_vol, sell_vol, n_buy, n_sell (aggressor side: buy = buyer-initiated), buy_hi, buy_lo, sell_hi, sell_lo (price range of each side's prints), mkt_vol (market-order volume; None when the venue does not say), first_ts, last_ts (unix s, fractional), last_id, ticks (minute HH:59 only: every trade [time, price, volume, side b/s, ordertype m/l, trade_id], so the last trade at or before an hour mark minus s seconds is exact)}; minutes without trades are absent; observed_at = minute start; available_at = minute end"
+  },
+  "kraken-trades-1m-XBTUSD-2023-10": {
+   "name": "kraken-trades-1m-XBTUSD-2023-10",
+   "kind": "data",
+   "path": "mandel/archive/data/kraken-trades-1m-XBTUSD-2023-10.jsonl.gz",
+   "created_at": "2026-10-19T20:08:17.191820+00:00",
+   "rows": 44405,
+   "bytes": 3952568,
+   "sha256": "bb30469587cbf4c916a870be1a38da4790eeb0fa3ce66cefb068f79e59873866",
+   "tags": [
+    "1m",
+    "2023-10",
+    "complete",
+    "crypto",
+    "kraken",
+    "signed-volume",
+    "span:2023-10-01..2023-10-31",
+    "trades"
+   ],
+   "recipe": "GET https://api.kraken.com/0/public/Trades?pair=XBTUSD&since=<ns cursor, from 2023-10-01T00:00:00Z>&count=1000, paged on result.last until a trade at or after 2023-11-01T00:00:00Z; trades de-duplicated by trade id and aggregated with mandel.data.crypto_history.MinuteAgg via fetch_kraken_trades_1m (Kraken's OHLC endpoint keeps only 720 bars, so history comes from Trades). Licence: Kraken public market data: Kraken's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t (minute start, unix s), open, high, low, close (first / last trade by time and id), volume, vwap, n, buy_vol, sell_vol, n_buy, n_sell (aggressor side: buy = buyer-initiated), buy_hi, buy_lo, sell_hi, sell_lo (price range of each side's prints), mkt_vol (market-order volume; None when the venue does not say), first_ts, last_ts (unix s, fractional), last_id, ticks (minute HH:59 only: every trade [time, price, volume, side b/s, ordertype m/l, trade_id], so the last trade at or before an hour mark minus s seconds is exact)}; minutes without trades are absent; observed_at = minute start; available_at = minute end"
+  },
+  "binance-1m-BTCUSDT-btc-above": {
+   "name": "binance-1m-BTCUSDT-btc-above",
+   "kind": "data",
+   "path": "mandel/archive/data/binance-1m-BTCUSDT-btc-above.jsonl.gz",
+   "created_at": "2026-10-19T20:13:02.130795+00:00",
+   "rows": 83692,
+   "bytes": 5713548,
+   "sha256": "e1aed2afcb3e51ae37df1ce358dbb837488d377b2f0b9c3097bd0f48f5aa0df8",
+   "tags": [
+    "1m",
+    "binance",
+    "btc-above",
+    "prices",
+    "resolution"
+   ],
+   "recipe": "GET https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1m&startTime=<t_res - 60 min, ms>&endTime=<t_res + 60 min + 59,999 ms>&limit=1000 for every distinct resolution time t_res of the 'Bitcoin above' markets in polymarket-events-btc-above (mandel.experiments.batch6c_pmxv.btc_market_spec: noon ET daily / weekly, 17:00 ET -5pm-et variant; barrier and range markets excluded); via mandel.data.binance_klines.fetch_binance_resolution_klines. Licence: Binance public market data: Binance's terms of use grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "kind bar1m: value = {symbol, t (open, unix s), open, high, low, close, volume (BTC), quote_volume (USDT), trades, taker_buy_volume, taker_buy_quote_volume, close_time (ms), res (the resolution time this window serves, unix s)}; observed_at = open; available_at = open + 60 s (the candle is known at its close) | kind window: value = {res, res_iso, et (HH:MM America/New_York), variant, markets, start, end (opens of the first and last bar), bars_expected, bars, missing (opens of absent minutes), complete, calls} (fetch metadata); observed_at = res; available_at = end + 60 s"
   }
  }
 }

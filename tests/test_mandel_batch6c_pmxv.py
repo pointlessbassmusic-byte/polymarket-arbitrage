@@ -969,3 +969,78 @@ def test_maps_and_helpers():
     assert hs == pytest.approx(0.02) and "median" in src
     assert m.pm_half_spread(FakeArchive({}))[0] == m.PM_HALF_SPREAD_DEFAULT
     assert m._outcome_of_market({"outcomePrices": '["1", "0"]'}) == 1 and m._outcome_of_market({"outcomePrices": '["0", "1"]'}) == 0
+
+
+def test_harness_t337_basis_control_reads_the_binance_bundle():
+    """T-337 regression: with ``binance-1m-BTCUSDT-btc-above`` archived the resolution-source basis criterion is decided (the
+    basis is measured minute-matched at the resolution times known by each decision hour, the strikes shifted, both fits
+    re-run, the Gamma outcomes audited against the Binance close); without it the criterion stays None and names the bundle."""
+    rng = np.random.default_rng(9)
+    ets = {"2025-03-07": int(datetime(2025, 3, 7, 8, tzinfo=UTC).timestamp()), "2025-03-08": int(datetime(2025, 3, 8, 8, tzinfo=UTC).timestamp())}
+    H0 = ets["2025-03-07"] // H - 40
+    hours = np.arange(H0, H0 + 30)
+    F = 100000.0
+    drb = []
+    for h in range(H0 - 3, H0 + 31):
+        for e in ets:
+            for K in (94000, 96000, 98000, 99000, 100000, 101000, 102000, 104000, 106000):
+                drb.append(row({"trade_id": f"{h}{K}", "timestamp": int(h * H * 1000 + 1000), "iv": 50.0, "index_price": F, "expiry": e, "strike": float(K)}, kind="option-trade"))
+    t_res_a = (H0 + 20) * H                                   # group A resolves inside the decision grid: its basis is known to later hours
+    t_res_b = ets["2025-03-07"] + 12 * H                      # group B resolves after the grid (the fixture of test_harness_t337_on_fake_archive)
+    prem = 1.001                                              # Binance BTCUSDT prints 0.1% above the Deribit index
+    bnc = []
+    for t_res in (t_res_a, t_res_b):
+        for t in range(t_res - 3600, t_res + 3600 + 60, 60):
+            c = F * prem if t != t_res - 60 else F * 1.006    # the candle closing at t_res sits above every strike: the two readings disagree for group B
+            bnc.append(row({"symbol": "BTCUSDT", "t": t, "close": c, "open": c, "res": t_res}, iso(t), iso(t + 60), kind="bar1m"))
+        bnc.append(row({"res": t_res, "complete": True}, iso(t_res), iso(t_res + 3660), kind="window"))
+    # group B's Polymarket price sits ON p_RN until group A's basis is known (hour H0 + 20) and 5.5 points above it afterwards:
+    # unshifted fades enter there (gap 5.5 > 5); with the strike shifted by the 0.1% basis p_RN rises ~1.1 points and they do not
+    groups, ets_ts, _, last_idx = m._deribit_groups(FakeArchive({m.DRB + "2025-03": drb}), ["2025-03"])
+    book = m.SmileBook(groups, ets_ts, forward={}, last_idx=last_idx)
+    markets, pm_rows = [], []
+    for i in range(40):
+        tok = f"b{i}"
+        grp_a = i < 20
+        t_res = t_res_a if grp_a else t_res_b
+        strike = 100000.0 if grp_a else 100500.0
+        outcome = int(F * prem > strike)                      # the Gamma outcome follows the candle opening at t_res
+        hs = hours[(hours * H) < t_res - H]
+        if grp_a:
+            ps = np.clip(0.5 + 0.10 + rng.normal(0, 0.005, hs.size), 0.02, 0.98)
+        else:
+            ps = np.array([book.p_rn(int(h), strike, t_res)["svi"] + (0.055 if h >= H0 + 20 else 0.0) for h in hs])
+        pm_rows += hourly_rows(tok, 9000 + i, hs, ps, "2025-03")
+        slug = "bitcoin-above-on-march-6-2025" if grp_a else "bitcoin-above-on-march-7-2025"
+        markets.append(gamma_market(9000 + i, tok, f"Will the price of Bitcoin be above ${strike:,.0f}?", iso(t_res), slug, outcome=outcome, fees=True,
+                                    fee_type="crypto_fees_v2", group=f"{strike:,.0f}",
+                                    desc=f"BTC/USDT {datetime.fromtimestamp(t_res, ET).strftime('%-d %b %y %H:%M').replace(' 25 ', ' ' + chr(39) + '25 ')} in the ET timezone"))
+    ev = [row({"id": "ev", "slug": "bitcoin-above-on-march-7-2025", "endDate": iso(t_res_b), "markets": markets, "description": ""}, kind="event")]
+    base = {m.EV_BTC_B: ev, m.EV_MACRO_B: [], m.PMH + "2025-03": pm_rows, m.DRB + "2025-03": drb}
+    specs = [m.btc_market_spec(dict(mk, _event_slug="bitcoin-above-on-march-7-2025", _event_end=iso(t_res_b), _event_description="")) for mk in markets]
+    assert sorted({s["t_res"] for s in specs}) == [t_res_a, t_res_b]
+    stat, n, verdict, reason = m.b6c_pmxv_pm_vs_deribit_digital(FakeArchive(dict(base, **{m.BNC_B: bnc})))
+    assert_json(stat, n, verdict, reason)
+    b = stat["basis"]
+    assert b["bundle"] == m.BNC_B and b["minutes"] == 2 * 121 and b["of_resolution_times"] == 2
+    assert b["n_resolutions"] == 1                            # group B's hour before resolution has no Deribit trade on this tape: unmeasured
+    assert b["median_pct"] == pytest.approx(100 * math.log(prem), abs=1e-9) and b["iqr_pct"] == pytest.approx([100 * math.log(prem)] * 2, abs=1e-9)
+    assert b["decisions_unshifted_before_first_basis"] > 0 and b["fits"]["svi"]["n"] > 0 and b["fits"]["cubic"]["n"] > 0
+    crit = dict(stat["criteria"])
+    key = next(k for k in crit if k.startswith("resolution-source basis control"))
+    assert crit[key] is not None and m.BNC_B in key and "strikes shifted by the point-in-time trailing median" in key
+    assert m.BNC_B in reason and "basis median" in reason
+    # the outcome audit: every market agrees with the candle opening at t_res; group B disagrees with the candle closing at t_res
+    au = b["resolution_audit"]["noon"]
+    assert au["candle_opening_at_t_res"] == {"n": 40, "agree": 40, "rate": 1.0} and au["candle_closing_at_t_res"] == {"n": 40, "agree": 20, "rate": 0.5}
+    # the shift is applied: group B's entries at hour H0 + 20 (gap 5.5 points) vanish once the strike is divided by the known 0.1% basis
+    assert stat["fits"]["svi"]["n"] == 40 and b["fits"]["svi"]["n"] == 20 and stat["fits"]["cubic"]["n"] == 40 and b["fits"]["cubic"]["n"] == 20
+    assert b["decisions_unshifted_before_first_basis"] == 20 * 19 + 20 * 20            # group A's hours and group B's hours before H0 + 20
+    at = m.basis_by_hour({t_res_a: math.log(prem)})
+    assert at(H0 + 19) is None and at(H0 + 20) == pytest.approx(math.log(prem))
+    # without the bundle: None, naming it
+    stat2, n2, verdict2, reason2 = m.b6c_pmxv_pm_vs_deribit_digital(FakeArchive(base))
+    assert stat2["basis"]["bundle"] is None and stat2["basis"]["n_resolutions"] == 0 and stat2["basis"]["resolution_audit"] is None
+    key2 = next(k for k in dict(stat2["criteria"]) if k.startswith("resolution-source basis control"))
+    assert dict(stat2["criteria"])[key2] is None and f"Binance klines are not archived ({m.BNC_B}" in key2 and f"{m.BNC_B} not archived" in reason2
+    assert stat2["fits"]["svi"]["n"] == stat["fits"]["svi"]["n"]                                   # the primary read is untouched by the control
