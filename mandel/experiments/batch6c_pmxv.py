@@ -65,7 +65,17 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            fades are re-run under both fits, and the criterion passes when both one-sided 95% lower bounds stay > 0;
            the Gamma outcomes are audited against the Binance close under both readings of 'the 1 minute candle for
            12:00'. When the bundle is not archived that criterion is None (rule 9) and the sensitivity to a +/-0.2%
-           strike shift is reported instead.
+           strike shift is reported instead. Polymarket validity (the Conventions' liquidity rule, rule 4): the CLOB
+           serves a placeholder for a market nobody trades (the midpoint of an empty or one-sided book: 0.50 at listing,
+           held for hours), and a fade 'entered' there books the snap to the first real quote, not a price a
+           participant could hit; so an entry or an early exit counts only at an hour in which the market had taker
+           volume in the previous 24 h (``polymarket-volume-hourly``), markets without hourly volume data are excluded
+           from the primary read and counted (a data limit: fetch_pm_trades targets), the ungated run (every CLOB value
+           taken as a price) is reported by market age at entry and by |gap|, and the price-only proxy (entries from the
+           market's first mid change on, never at 0.50) is reported by age with its calibration against the rule on the
+           covered markets; it is never the primary because it re-admits the book-forming hours the rule rejects. Fills
+           are the CLOB hourly mid less the claim's 1-point haircut (no historical book is archived); the mean under a
+           2-point haircut is reported.
   * T-358  SPY's two-session return into scheduled binary events against ex-ante uncertainty U = p(1-p) three sessions
            before. Frozen tagging rule (built before SPY is read): Kalshi KXCPI / KXFED / KXFEDDECISION / KXPAYROLLS
            settled markets and the PRES-2024 race; Polymarket FOMC and CPI event families (``polymarket-events-macro``)
@@ -99,10 +109,10 @@ Conventions
   * Data. Every bundle through ``archive.load``; bundles a harness only probes for (book snapshots, fee flags) are
     optional. Hours are UTC hour indices (unix // 3600). Kalshi candles use either field naming (close / close_dollars,
     volume / volume_fp); inactive hours are forward-filled (a quote older than 7 days is stale and invalid); an hour
-    whose quote fails the spread filter (wider than 10 points, or bid 0 / ask 1) is invalid. Liquidity (T-336, T-409):
-    the CLOB serves a placeholder price for a market nobody trades (0.50 for days), so an hour is valid only when every
-    Polymarket leg had taker volume in the previous 24 hours (``polymarket-volume-hourly``, available at the hour end);
-    pairs whose Polymarket legs have no hourly volume data (pre-2024 markets) are excluded and counted.
+    whose quote fails the spread filter (wider than 10 points, or bid 0 / ask 1) is invalid. Liquidity (T-336, T-409,
+    T-337): the CLOB serves a placeholder price for a market nobody trades (0.50 for days), so an hour is valid only when
+    every Polymarket leg had taker volume in the previous 24 hours (``polymarket-volume-hourly``, available at the hour
+    end); pairs (T-336 / T-409) and markets (T-337) whose Polymarket legs have no hourly volume data are excluded and counted.
   * Fees (rule 9): Kalshi 0.07 x P(1-P) per contract per taker side (library formula); Polymarket by the Gamma fee flag
     (crypto 0.07, economics 0.05, sports 0.04 x p(1-p); 0 when fees are disabled), always 0.07 for T-337 as the claim
     states; the Polymarket half-spread is assumed (no historical book).
@@ -1515,17 +1525,103 @@ class SmileBook:
         return out
 
 
+def pm_liquid_hours(hours: np.ndarray, vol: Optional[dict], window: int = 24) -> np.ndarray:
+    """T-337's Polymarket validity mask (the module's liquidity rule, as ``align_pair`` applies it to T-336 / T-409): hour h
+    is valid only when the market had taker volume in some hour of [h - window, h - 1] (an hour's volume is available at
+    its end, so the hour's own volume never validates it). ``vol``: {hour: shares} from ``_pm_volume_hourly``; None (no
+    hourly volume data for the market) gives an all-False mask."""
+    hours = np.asarray(hours, dtype=np.int64)
+    out = np.zeros(hours.size, dtype=bool)
+    if not vol:
+        return out
+    traded = np.array(sorted(h for h, v in vol.items() if v and v > 0), dtype=np.int64)
+    if traded.size == 0:
+        return out
+    j = np.searchsorted(traded, hours, side="left") - 1                 # the latest traded hour strictly before h
+    ok = j >= 0
+    out[ok] = (hours[ok] - traded[j[ok]]) <= window
+    return out
+
+
+def placeholder_proxy(p_poly: np.ndarray) -> np.ndarray:
+    """The price-only stand-in for the liquidity rule where no hourly volume is archived (reported, never the primary):
+    an hour is admitted only from the market's first observed mid change on (the CLOB holds its listing value until a
+    book forms) and never at the 0.50 placeholder of an empty book."""
+    p = np.asarray(p_poly, dtype=float)
+    out = np.zeros(p.size, dtype=bool)
+    if p.size:
+        changed = np.flatnonzero(p != p[0])
+        if changed.size:
+            out[changed[0]:] = True
+        out &= p != 0.5
+    return out
+
+
+AGE_BUCKETS = (("0 h", 0, 1), ("1-6 h", 1, 7), ("7-24 h", 7, 25), ("25-72 h", 25, 73), ("73+ h", 73, math.inf))
+GAP_BUCKETS = (("5-10", 5, 10), ("10-20", 10, 20), ("20-30", 20, 30), ("30+", 30, math.inf))
+
+
+def _by_bucket(trades: Sequence[dict], value_fn, buckets) -> dict:
+    """{label: {n, mean (cents), share_of_pnl}} of the trades whose value_fn lies in [lo, hi) per bucket."""
+    tot = sum(t["net"] for t in trades) * 100.0
+    out = {}
+    for lab, lo, hi in buckets:
+        x = np.array([t["net"] for t in trades if lo <= value_fn(t) < hi]) * 100.0
+        out[lab] = {"n": int(x.size), "mean": float(x.mean()) if x.size else None,
+                    "share_of_pnl": float(x.sum() / tot) if x.size and tot else None}
+    return out
+
+
+def _bucket_txt(b: Optional[dict]) -> str:
+    if not b:
+        return "n/a"
+    return ", ".join(f"{lab} {_s(v['mean'])} ({v['n']}" + (f", {v['share_of_pnl'] * 100:+.0f}% of P&L)" if v.get("share_of_pnl") is not None else ")")
+                     for lab, v in b.items() if v["n"]) or "none"
+
+
+def _tag_age(trades: list, first_hour: int) -> list:
+    """Stamps each fade with ``age_h``: hours between the market's first hourly CLOB point and the entry."""
+    for t in trades:
+        t["age_h"] = int(t["hour"] - first_hour)
+    return trades
+
+
+def _fade_stats(tr: Sequence[dict]) -> dict:
+    """The claim's statistics on a fade list: market-cluster studentized bootstrap of the mean net (cents), the 2024-2025 /
+    2026 means, exits, sides, and the decomposition by market age at entry and by |gap|."""
+    if not tr:
+        return {"n": 0, "markets": 0, "mean": None, "ci90": [None, None], "ci": [None, None], "p": None, "lower95_one_sided": None,
+                "mean_2024_2025": None, "mean_2026": None, "n_2024_2025": 0, "n_2026": 0, "by_exit": {}, "by_side": {}, "by_age": None, "by_gap": None}
+    x = np.array([t["net"] for t in tr]) * 100.0
+    cs = cluster_stud(x, [t["market_id"] for t in tr], N_BOOT)
+    yrs = np.array([datetime.fromtimestamp(t["hour"] * HOUR, UTC).year for t in tr])
+    return {"n": int(x.size), "markets": cs.get("clusters"), "mean": cs["est"], "ci90": cs["ci90"], "ci": cs["ci"], "p": cs.get("p"),
+            "lower95_one_sided": cs["ci90"][0],
+            "mean_2024_2025": float(x[yrs <= 2025].mean()) if (yrs <= 2025).any() else None,
+            "mean_2026": float(x[yrs >= 2026].mean()) if (yrs >= 2026).any() else None,
+            "n_2024_2025": int((yrs <= 2025).sum()), "n_2026": int((yrs >= 2026).sum()),
+            "by_exit": dict(Counter(t["exit"] for t in tr)), "by_side": dict(Counter(t["side"] for t in tr)),
+            "by_age": _by_bucket(tr, lambda t: t.get("age_h", -1), AGE_BUCKETS) if all("age_h" in t for t in tr) else None,
+            "by_gap": _by_bucket(tr, lambda t: abs(t["gap"]), GAP_BUCKETS)}
+
+
 def fade_trades(hours: np.ndarray, p_poly: np.ndarray, p_rn: np.ndarray, t_res: int, outcome: Optional[int], market_id: str,
-                gap_in: float = 5.0, gap_out: float = 1.0, lo: float = 0.05, hi: float = 0.95, fee: float = 0.07, haircut: float = 0.01) -> list:
+                gap_in: float = 5.0, gap_out: float = 1.0, lo: float = 0.05, hi: float = 0.95, fee: float = 0.07, haircut: float = 0.01,
+                valid: Optional[np.ndarray] = None) -> list:
     """T-337 fades on one market: at hour t with |gap| = |p_poly - p_RN| > gap_in points and p_RN in [lo, hi], buy NO
     (gap > 0) or YES (gap < 0) at p_poly; exit at the first later hour with |gap| < gap_out (taker fee again) or at
     resolution on ``outcome`` (None: unresolved, the trade is dropped). Net per share = payoff - cost - fees - haircut.
-    One position per market at a time."""
+    One position per market at a time. ``valid`` (the liquidity mask, ``pm_liquid_hours``): an entry and an early exit
+    count only at a valid hour (the CLOB value of an untraded hour is a placeholder, not a price); the resolution exit
+    is unaffected. None: every hour valid (the ungated run)."""
     out = []
     n = len(hours)
     i = 0
     while i < n:
         q, r = p_poly[i], p_rn[i]
+        if valid is not None and not valid[i]:
+            i += 1
+            continue
         if not (np.isfinite(q) and np.isfinite(r)) or not (lo <= r <= hi) or not (0 < q < 1):
             i += 1
             continue
@@ -1540,6 +1636,9 @@ def fade_trades(hours: np.ndarray, p_poly: np.ndarray, p_rn: np.ndarray, t_res: 
         exit_val, exit_kind, exit_i = None, None, None
         while j < n:
             qj, rj = p_poly[j], p_rn[j]
+            if valid is not None and not valid[j]:
+                j += 1
+                continue
             if np.isfinite(qj) and np.isfinite(rj) and abs(100.0 * (qj - rj)) < gap_out:
                 exit_val = (1 - qj) if side == "no" else qj
                 fees += fee * qj * (1 - qj)
@@ -1779,17 +1878,28 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
     minutes = _binance_minutes(archive, BNC_B)                         # optional: the resolution-source basis control
     basis = resolution_basis(sorted({s["t_res"] for s in specs}), minutes, last_idx) if minutes else {}
     basis_at = basis_by_hour(basis)
-    trades = {"svi": [], "cubic": []}
+    vol = _pm_volume_hourly(archive, {s["market_id"] for s in specs})   # the liquidity rule's data: hourly taker volume per market
+    trades = {"svi": [], "cubic": []}                                  # primary: covered markets at valid hours only
     adj = {"svi": [], "cubic": []}
     shifted = {"+0.2%": [], "-0.2%": []}
+    ungated = {"svi": [], "cubic": []}                                 # every CLOB value taken as a price (reported)
+    proxied = {"svi": [], "cubic": []}                                 # the price-only proxy (reported)
     gap_rows, brier = [], {"svi": [], "cubic": [], "poly": []}
     n_dec, n_skipped, n_markets_used, n_unshifted = 0, 0, 0, 0
+    cov = Counter()                                                    # volume coverage and the proxy's calibration against the rule
     for s in specs:
         hs, ps = pm_series[s["token"]]
         keep = (hs * HOUR) < s["t_res"] - HOUR
         hs, ps = hs[keep], ps[keep]
         if hs.size == 0:
             continue
+        first_h = int(hs[0])                                           # the market's first hourly CLOB point (listing)
+        vm = vol.get(s["market_id"])
+        covered = vm is not None
+        valid = pm_liquid_hours(hs, vm) if covered else None
+        prox = placeholder_proxy(ps)
+        cov["markets_with_hours"] += 1
+        cov["covered_" + s["variant"]] += int(covered)
         prn = {"svi": np.full(hs.size, np.nan), "cubic": np.full(hs.size, np.nan)}
         prn_adj = {"svi": np.full(hs.size, np.nan), "cubic": np.full(hs.size, np.nan)}
         prn_shift = {"+0.2%": np.full(hs.size, np.nan), "-0.2%": np.full(hs.size, np.nan)}
@@ -1816,29 +1926,45 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
                 rs = book.p_rn(int(H), s["strike"] * mult, s["t_res"])
                 if rs is not None:
                     prn_shift[lab][i] = rs["svi"]
-        if np.isfinite(prn["svi"]).any():
+        usable = np.isfinite(prn["svi"])
+        if usable.any():
             n_markets_used += 1
+        if covered:                                                    # the proxy against the rule, where both are observable
+            young = usable & ((hs - first_h) <= 6)
+            cov["dec_hours"] += int(usable.sum())
+            cov["dec_valid"] += int((usable & valid).sum())
+            cov["dec_proxy"] += int((usable & prox).sum())
+            cov["dec_proxy_not_valid"] += int((usable & prox & ~valid).sum())
+            cov["young_hours"] += int(young.sum())
+            cov["young_valid"] += int((young & valid).sum())
+            cov["young_proxy"] += int((young & prox).sum())
         for kind in ("svi", "cubic"):
-            trades[kind] += fade_trades(hs, ps, prn[kind], s["t_res"], s["outcome"], s["market_id"])
-            if minutes:
-                adj[kind] += fade_trades(hs, ps, prn_adj[kind], s["t_res"], s["outcome"], s["market_id"])
-        for lab in shifted:
-            shifted[lab] += fade_trades(hs, ps, prn_shift[lab], s["t_res"], s["outcome"], s["market_id"])
-    res = {}
-    for kind, tr in trades.items():
-        if tr:
-            x = np.array([t["net"] for t in tr]) * 100.0
-            cs = cluster_stud(x, [t["market_id"] for t in tr], N_BOOT)
-            yrs = np.array([datetime.fromtimestamp(t["hour"] * HOUR, UTC).year for t in tr])
-            m_early = float(x[yrs <= 2025].mean()) if (yrs <= 2025).any() else None
-            m_late = float(x[yrs >= 2026].mean()) if (yrs >= 2026).any() else None
-            res[kind] = {"n": int(x.size), "markets": cs.get("clusters"), "mean": cs["est"], "ci90": cs["ci90"], "ci": cs["ci"], "p": cs.get("p"),
-                         "lower95_one_sided": cs["ci90"][0], "mean_2024_2025": m_early, "mean_2026": m_late,
-                         "n_2024_2025": int((yrs <= 2025).sum()), "n_2026": int((yrs >= 2026).sum()),
-                         "by_exit": dict(Counter(t["exit"] for t in tr)), "by_side": dict(Counter(t["side"] for t in tr))}
-        else:
-            res[kind] = {"n": 0, "mean": None, "ci90": [None, None], "lower95_one_sided": None, "mean_2024_2025": None, "mean_2026": None}
+            ungated[kind] += _tag_age(fade_trades(hs, ps, prn[kind], s["t_res"], s["outcome"], s["market_id"]), first_h)
+            proxied[kind] += _tag_age(fade_trades(hs, ps, prn[kind], s["t_res"], s["outcome"], s["market_id"], valid=prox), first_h)
+            if covered:
+                trades[kind] += _tag_age(fade_trades(hs, ps, prn[kind], s["t_res"], s["outcome"], s["market_id"], valid=valid), first_h)
+                if minutes:
+                    adj[kind] += _tag_age(fade_trades(hs, ps, prn_adj[kind], s["t_res"], s["outcome"], s["market_id"], valid=valid), first_h)
+        if covered:
+            for lab in shifted:
+                shifted[lab] += fade_trades(hs, ps, prn_shift[lab], s["t_res"], s["outcome"], s["market_id"], valid=valid)
+    res = {kind: _fade_stats(tr) for kind, tr in trades.items()}
+    res_ungated = {kind: _fade_stats(tr) for kind, tr in ungated.items()}
+    res_proxy = {kind: _fade_stats(tr) for kind, tr in proxied.items()}
     sens = {lab: {"n": len(tr), "mean": float(np.mean([t["net"] for t in tr]) * 100.0) if tr else None} for lab, tr in shifted.items()}
+    n_cov = {v: sum(1 for s in specs if s["variant"] == v and s["market_id"] in vol) for v in sorted({s["variant"] for s in specs})}
+    n_covered = sum(n_cov.values())
+    n_uncovered = len(specs) - n_covered
+    liquidity = {"rule": "an entry or an early exit counts only at an hour in which the market had taker volume in the previous 24 h "
+                         f"({PMV}<M>, available at the hour end); markets without hourly volume data are excluded from the primary read and counted",
+                 "markets_with_volume": n_covered, "by_variant": n_cov, "markets_without_volume": n_uncovered,
+                 "markets_with_decision_hours": cov["markets_with_hours"], "covered_with_decision_hours": {v: cov["covered_" + v] for v in n_cov},
+                 "covered_decision_hours": cov["dec_hours"], "covered_valid_hours": cov["dec_valid"],
+                 "proxy": {"rule": "entries from the market's first observed mid change on, never at 0.50 (price only; reported, never primary)",
+                           "covered_hours_proxy_valid": cov["dec_proxy"], "covered_hours_proxy_valid_but_rule_invalid": cov["dec_proxy_not_valid"],
+                           "listing_window_hours_(age<=6h)": cov["young_hours"], "listing_window_rule_valid": cov["young_valid"],
+                           "listing_window_proxy_valid": cov["young_proxy"]},
+                 "fetch": "mandel.data.pm_history.fetch_pm_trades (data-api taker trades per market, aggregated to hours)"}
     # diagnostics: AR(1) half-life of the gap, paired Brier difference
     half_life = None
     if len(gap_rows) > 50:
@@ -1881,14 +2007,7 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
     crit.append(("same sign of the mean net return in 2024-2025 and 2026 under both fits: "
                  + "; ".join(f"{k} {_s(res[k].get('mean_2024_2025'))} ({res[k].get('n_2024_2025', 0)}) / {_s(res[k].get('mean_2026'))} "
                              f"({res[k].get('n_2026', 0)})" for k in ("svi", "cubic")), same_sign, False))
-    res_adj = {}
-    for kind, tr in adj.items():
-        if tr:
-            x = np.array([t["net"] for t in tr]) * 100.0
-            cs = cluster_stud(x, [t["market_id"] for t in tr], N_BOOT)
-            res_adj[kind] = {"n": int(x.size), "markets": cs.get("clusters"), "mean": cs["est"], "ci90": cs["ci90"], "lower95_one_sided": cs["ci90"][0]}
-        else:
-            res_adj[kind] = {"n": 0, "mean": None, "ci90": [None, None], "lower95_one_sided": None}
+    res_adj = {kind: _fade_stats(tr) for kind, tr in adj.items()}
     bvals = np.array(list(basis.values())) * 100.0 if basis else np.array([])
     basis_stat = {"bundle": BNC_B if minutes else None, "minutes": len(minutes), "n_resolutions": len(basis), "of_resolution_times": len({s["t_res"] for s in specs}),
                   "median_pct": float(np.median(bvals)) if bvals.size else None, "mean_pct": float(bvals.mean()) if bvals.size else None,
@@ -1919,14 +2038,36 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
                f"), else the latest Deribit trade index before H ({src.get('deribit_last_trade', 0)} fits; {src.get('mean_index', 0)} fell back to the "
                f"two-hour mean index); the two-hour mean index is stale against F_H by |ln| median {_f(sq.get('0.5'))}%, 90% {_f(sq.get('0.9'))}%, "
                f"99% {_f(sq.get('0.99'))}%")
+    n_cov_hours = sum(cov["covered_" + v] for v in n_cov)
+    pct_unobs = 100.0 * n_uncovered / len(specs) if specs else 0.0
+    hc2 = {k: (r_["mean"] - 1.0 if r_["mean"] is not None else None) for k, r_ in res.items()}
+    hc2.update({"ungated_" + k: (r_["mean"] - 1.0 if r_["mean"] is not None else None) for k, r_ in res_ungated.items()})
+    fill = ("CLOB hourly mid less the claim's 1-point haircut (no historical book is archived; the mid of an empty or one-sided book is a "
+            "placeholder, hence the liquidity rule)")
     reason = (f"{len(specs)} 'Bitcoin above' markets with hourly CLOB prices ({dict(Counter(s['variant'] for s in specs))}; barrier / range "
               f"markets excluded), {n_markets_used} with a Deribit smile at some hour; Deribit near-expiry trades {n_trades} in {len(months)} "
               f"monthly bundles ({months[0][len(DRB):] if months else 'n/a'}..{months[-1][len(DRB):] if months else 'n/a'}), {book.n_fits} "
               f"(hour, expiry) smiles fitted, {book.n_sparse} sparse (< 6 strikes); {n_dec} decision hours, {n_skipped} without a usable "
-              f"p_RN (sparse or outside the strike range); {fwd_txt}. Fades |gap| > 5 points, p_RN in [0.05, 0.95], 0.07 p(1-p) taker fee each way, "
-              f"1-point haircut: SVI {res['svi'].get('n', 0)} trades mean {_s(res['svi'].get('mean'))} cents (one-sided 95% lower "
-              f"{_s(res['svi'].get('lower95_one_sided'))}; {res['svi'].get('by_exit')}); cubic {res['cubic'].get('n', 0)} trades mean "
-              f"{_s(res['cubic'].get('mean'))} (lower {_s(res['cubic'].get('lower95_one_sided'))}). AR(1) half-life of the gap "
+              f"p_RN (sparse or outside the strike range); {fwd_txt}. Polymarket validity (the module's liquidity rule, rule 4): an entry or an "
+              f"early exit counts only at an hour in which the market had taker volume in the previous 24 h ({PMV}<M>); hourly volume is archived "
+              f"for {n_covered} of {len(specs)} markets ({n_cov}; {cov['markets_with_hours']} markets carry decision hours, {n_cov_hours} of them "
+              f"covered), the {n_uncovered} without it are excluded from the primary read: hourly liquidity is unobserved for {pct_unobs:.1f}% of "
+              f"the markets (data limit: {liquidity['fetch']}); on the covered markets {cov['dec_valid']} of {cov['dec_hours']} decision hours "
+              f"with a p_RN are valid. Fades |gap| > 5 points, p_RN in [0.05, 0.95], 0.07 p(1-p) taker fee each way, 1-point haircut, filled at the "
+              f"{fill}; a 2-point haircut lowers every mean by 1 cent. PRIMARY (covered markets, valid hours): SVI {res['svi']['n']} trades mean "
+              f"{_s(res['svi']['mean'])} cents (one-sided 95% lower {_s(res['svi']['lower95_one_sided'])}; {res['svi']['by_exit']}; by market age "
+              f"at entry {_bucket_txt(res['svi']['by_age'])}); cubic {res['cubic']['n']} trades mean {_s(res['cubic']['mean'])} (lower "
+              f"{_s(res['cubic']['lower95_one_sided'])}). UNGATED (every CLOB value taken as a price, the earlier read): SVI "
+              f"{res_ungated['svi']['n']} trades mean {_s(res_ungated['svi']['mean'])} (lower {_s(res_ungated['svi']['lower95_one_sided'])}), by "
+              f"market age at entry {_bucket_txt(res_ungated['svi']['by_age'])}, by |gap| {_bucket_txt(res_ungated['svi']['by_gap'])}; cubic "
+              f"{res_ungated['cubic']['n']} mean {_s(res_ungated['cubic']['mean'])} (lower {_s(res_ungated['cubic']['lower95_one_sided'])}), by "
+              f"age {_bucket_txt(res_ungated['cubic']['by_age'])}. PRICE-ONLY PROXY (entries from the first mid change on, never at 0.50; "
+              f"reported, not primary): SVI {res_proxy['svi']['n']} mean {_s(res_proxy['svi']['mean'])} (lower "
+              f"{_s(res_proxy['svi']['lower95_one_sided'])}), by age {_bucket_txt(res_proxy['svi']['by_age'])}; cubic {res_proxy['cubic']['n']} "
+              f"mean {_s(res_proxy['cubic']['mean'])} (lower {_s(res_proxy['cubic']['lower95_one_sided'])}), by age "
+              f"{_bucket_txt(res_proxy['cubic']['by_age'])}; on the covered markets the proxy admits {cov['young_proxy']} of the "
+              f"{cov['young_hours']} listing-window hours (age <= 6 h) against {cov['young_valid']} under the rule, and {cov['dec_proxy_not_valid']} "
+              f"of its {cov['dec_proxy']} admitted hours are invalid under the rule: not a substitute. AR(1) half-life of the gap "
               f"{_f(half_life, 1)} h; paired Brier p_RN - p_poly: SVI {_s(brier_diff['svi'], 4)}, cubic {_s(brier_diff['cubic'], 4)}; "
               f"DSR at the trial's 7 variants {_f(dsr7)}. Resolution-source basis control: "
               + (f"{BNC_B} archived ({len(minutes)} minutes; basis median {_s(basis_stat['median_pct'], 3)}% over {len(basis)} resolution times; "
@@ -1934,7 +2075,8 @@ def b6c_pmxv_pm_vs_deribit_digital(archive):
                  f"{_s(res_adj['svi']['mean'])} (lower {_s(res_adj['svi']['lower95_one_sided'])}), cubic mean {_s(res_adj['cubic']['mean'])} "
                  f"(lower {_s(res_adj['cubic']['lower95_one_sided'])})" if minutes else f"{BNC_B} not archived, criterion None")
               + f" — {why}")
-    stat = {"n_trades": n, "fits": res, "sensitivity_strike_shift": sens, "basis": basis_stat, "n_markets": len(specs), "n_markets_with_smile": n_markets_used,
+    stat = {"n_trades": n, "fits": res, "liquidity": liquidity, "ungated": res_ungated, "proxy": res_proxy, "fill": fill,
+            "haircut_sensitivity": {"2_points": hc2}, "sensitivity_strike_shift": sens, "basis": basis_stat, "n_markets": len(specs), "n_markets_with_smile": n_markets_used,
             "variants": dict(Counter(s["variant"] for s in specs)), "deribit": {"trades": n_trades, "months": len(months), "fits": book.n_fits, "sparse": book.n_sparse},
             "forward": {"rule": "point in time at H: hourly spot close of the bar ending at H, else the latest Deribit trade index before H; smile in k = ln(K / F_H)",
                         "spot_bundle": HBTC_B if spot else None, "spot_hours": len(spot),

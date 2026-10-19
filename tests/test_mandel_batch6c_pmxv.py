@@ -5,7 +5,10 @@ Breeden-Litzenberger digital, the resolution-time parser, the nowcast sigma and 
 harness runs JSON-safe on a fake archive, and missing bundles give inconclusive. Regression tests cover the skeptic fixes:
 T-336's secondary under both named constructions (exit rule vs pure arb held to settlement with the point-in-time T-bill
 carry), T-409's DTB3 rate at each entry hour, T-337's point-in-time forward (hourly spot close, else the latest Deribit
-trade index) and T-360's entry threshold as worded. No archive, no network."""
+trade index), T-337's Polymarket validity (the module's 24-h taker-volume rule: a listing-hour or empty-book CLOB value is a
+placeholder, not a price; markets without hourly volume are excluded from the primary read and counted as a named data
+limit; the ungated run and the price-only proxy are reported by market age) and T-360's entry threshold as worded. No
+archive, no network."""
 
 import json
 import math
@@ -576,6 +579,13 @@ def hourly_rows(token, mid, hours, ps, month):
     return [row({"market_id": str(mid), "token": token, "p": float(p), "t": int(h * H + 3)}, iso(h * H + 3), kind="price") for h, p in zip(hours, ps)]
 
 
+def btc_volume_rows(mids, h0, h1, shares=5.0):
+    """polymarket-volume-hourly rows (one taker-traded hour per hour in [h0, h1)) for the T-337 fakes: every hour from h0 + 1
+    on is valid under the module's liquidity rule."""
+    return [row({"market_id": str(mid), "condition_id": "0x", "t": int(h * H), "n": 1, "shares": shares, "usd": shares / 2}, iso(h * H), iso(h * H + H), kind="volume")
+            for mid in mids for h in range(h0, h1)]
+
+
 def candle_rows(ticker, hours, bids, asks, vols, period=60):
     return [row({"ticker": ticker, "period": period, "candle": {"end_period_ts": int(h * H), "volume": str(v), "open_interest": "1",
                                                               "price": {"close": None}, "yes_bid": {"close": f"{b:.4f}"}, "yes_ask": {"close": f"{a:.4f}"}}},
@@ -812,7 +822,8 @@ def test_harness_t337_forward_from_hourly_spot_on_fake_archive():
         markets.append(gamma_market(9000 + i, tok, "Will the price of Bitcoin be above $100,000 on March 7?", iso(t_res), "bitcoin-above-on-march-7-2025", outcome=int(rng.random() < 0.5),
                                     fees=True, fee_type="crypto_fees_v2", group="100,000", desc='BTC/USDT 12:00 in the ET timezone (noon) on the date specified in the title'))
     ev = [row({"id": "ev", "slug": "bitcoin-above-on-march-7-2025", "endDate": iso(t_res), "markets": markets, "description": ""}, kind="event")]
-    base = {m.EV_BTC_B: ev, m.EV_MACRO_B: [], m.PMH + "2025-03": pm_rows, m.DRB + "2025-03": drb}
+    base = {m.EV_BTC_B: ev, m.EV_MACRO_B: [], m.PMH + "2025-03": pm_rows, m.DRB + "2025-03": drb,
+            m.PMV + "2025-03": btc_volume_rows([9000 + i for i in range(30)], H0 - 24, H0 + 30)}       # every market liquid throughout
     stat, n, verdict, reason = m.b6c_pmxv_pm_vs_deribit_digital(FakeArchive(dict(base, **{m.HBTC_B: spot_rows})))
     assert_json(stat, n, verdict, reason)
     fw = stat["forward"]
@@ -883,7 +894,8 @@ def test_harness_t337_on_fake_archive():
         markets.append(gamma_market(9000 + i, tok, "Will the price of Bitcoin be above $100,000 on March 7?", iso(t_res), "bitcoin-above-on-march-7-2025", outcome=int(rng.random() < 0.5),
                                     fees=True, fee_type="crypto_fees_v2", group="100,000", desc='BTC/USDT 12:00 in the ET timezone (noon) on the date specified in the title'))
     ev = [row({"id": "ev", "slug": "bitcoin-above-on-march-7-2025", "endDate": iso(t_res), "markets": markets, "description": ""}, kind="event")]
-    a = FakeArchive({m.EV_BTC_B: ev, m.EV_MACRO_B: [], m.PMH + "2025-03": pm_rows, m.DRB + "2025-03": drb})
+    a = FakeArchive({m.EV_BTC_B: ev, m.EV_MACRO_B: [], m.PMH + "2025-03": pm_rows, m.DRB + "2025-03": drb,
+                     m.PMV + "2025-03": btc_volume_rows([9000 + i for i in range(40)], H0 - 24, H0 + 30)})   # every market liquid throughout
     stat, n, verdict, reason = m.b6c_pmxv_pm_vs_deribit_digital(a)
     assert_json(stat, n, verdict, reason)
     assert n >= 40 and stat["fits"]["svi"]["n"] == stat["fits"]["cubic"]["n"] and stat["n_markets"] == 40
@@ -1016,7 +1028,8 @@ def test_harness_t337_basis_control_reads_the_binance_bundle():
                                     fee_type="crypto_fees_v2", group=f"{strike:,.0f}",
                                     desc=f"BTC/USDT {datetime.fromtimestamp(t_res, ET).strftime('%-d %b %y %H:%M').replace(' 25 ', ' ' + chr(39) + '25 ')} in the ET timezone"))
     ev = [row({"id": "ev", "slug": "bitcoin-above-on-march-7-2025", "endDate": iso(t_res_b), "markets": markets, "description": ""}, kind="event")]
-    base = {m.EV_BTC_B: ev, m.EV_MACRO_B: [], m.PMH + "2025-03": pm_rows, m.DRB + "2025-03": drb}
+    base = {m.EV_BTC_B: ev, m.EV_MACRO_B: [], m.PMH + "2025-03": pm_rows, m.DRB + "2025-03": drb,
+            m.PMV + "2025-03": btc_volume_rows([9000 + i for i in range(40)], H0 - 24, H0 + 30)}       # every market liquid throughout
     specs = [m.btc_market_spec(dict(mk, _event_slug="bitcoin-above-on-march-7-2025", _event_end=iso(t_res_b), _event_description="")) for mk in markets]
     assert sorted({s["t_res"] for s in specs}) == [t_res_a, t_res_b]
     stat, n, verdict, reason = m.b6c_pmxv_pm_vs_deribit_digital(FakeArchive(dict(base, **{m.BNC_B: bnc})))
@@ -1044,3 +1057,144 @@ def test_harness_t337_basis_control_reads_the_binance_bundle():
     key2 = next(k for k in dict(stat2["criteria"]) if k.startswith("resolution-source basis control"))
     assert dict(stat2["criteria"])[key2] is None and f"Binance klines are not archived ({m.BNC_B}" in key2 and f"{m.BNC_B} not archived" in reason2
     assert stat2["fits"]["svi"]["n"] == stat["fits"]["svi"]["n"]                                   # the primary read is untouched by the control
+
+
+# ------------------------------------------------------------------------------------- T-337 refutation fixes --
+
+def test_pm_liquid_hours_and_fade_mask_skip_placeholder_hours():
+    """T-337 fix 1: the CLOB value of an untraded hour is a placeholder, not a price. ``pm_liquid_hours`` is the module's
+    liquidity rule (taker volume in the previous 24 h; an hour's own volume never validates it) and ``fade_trades`` takes
+    the mask: no entry and no early exit at an invalid hour, the resolution exit unaffected."""
+    hs = np.arange(100, 130)
+    v = m.pm_liquid_hours(hs, {100: 5.0, 103: 0.0})                        # a zero-share hour never validates
+    assert v.tolist() == [False] + [True] * 24 + [False] * 5               # hours 101..124
+    assert not m.pm_liquid_hours(hs, None).any() and not m.pm_liquid_hours(hs, {}).any() and not m.pm_liquid_hours(hs, {131: 2.0}).any()
+    # a 0.50 placeholder for three hours while p_RN is 0.10, then the real quote 0.12: ungated the fade 'buys NO at 0.50'
+    # and books the snap (+47 cents on a NO resolution); under the rule (first taker trade in hour 3) nothing is tradable
+    hs = np.arange(6)
+    p, r = np.array([0.5, 0.5, 0.5, 0.12, 0.12, 0.12]), np.full(6, 0.10)
+    ug = m.fade_trades(hs, p, r, int(10 * H), 0, "x")
+    assert len(ug) == 1 and ug[0]["hour"] == 0 and ug[0]["side"] == "no" and ug[0]["net"] == pytest.approx(1 - 0.5 - 0.07 * 0.25 - 0.01)
+    valid = m.pm_liquid_hours(hs, {3: 1.0})
+    assert valid.tolist() == [False, False, False, False, True, True]
+    assert m.fade_trades(hs, p, r, int(10 * H), 0, "x", valid=valid) == []
+    # early exits only at valid hours: entry at hour 4 (gap 8), the gap closes at hour 5 (invalid: skipped) and at hour 6 (valid)
+    hs = np.arange(10)
+    p, r = np.array([0.5, 0.5, 0.5, 0.5, 0.18, 0.105, 0.105, 0.105, 0.3, 0.3]), np.full(10, 0.10)
+    valid = np.array([False, False, False, False, True, False, True, True, True, True])
+    tr = m.fade_trades(hs, p, r, int(20 * H), 0, "x", valid=valid)
+    assert len(tr) == 2 and tr[0]["hour"] == 4 and tr[0]["exit"] == "gap<1" and tr[0]["hours_held"] == 2
+    assert tr[1]["hour"] == 8 and tr[1]["exit"] == "resolution"
+    ug = m.fade_trades(hs, p, r, int(20 * H), 0, "x", valid=None)              # ungated: the listing placeholder is 'traded'
+    assert len(ug) == 2 and ug[0]["hour"] == 0 and ug[0]["hours_held"] == 5
+
+
+def test_placeholder_proxy_and_buckets():
+    """T-337 fix 1 (the price-only stand-in, reported never primary): hours from the first mid change on, never at 0.50;
+    the age / |gap| bucket decomposition used by the reports."""
+    assert m.placeholder_proxy(np.array([0.5, 0.5, 0.5, 0.93, 0.93, 0.5, 0.9])).tolist() == [False, False, False, True, True, False, True]
+    assert m.placeholder_proxy(np.array([0.495, 0.495, 0.9])).tolist() == [False, False, True]
+    assert not m.placeholder_proxy(np.array([0.3, 0.3, 0.3])).any() and m.placeholder_proxy(np.array([])).size == 0
+    b = m._by_bucket([{"net": 0.1, "age_h": 0}, {"net": -0.05, "age_h": 3}, {"net": 0.0, "age_h": 100}], lambda t: t["age_h"], m.AGE_BUCKETS)
+    assert b["0 h"] == {"n": 1, "mean": pytest.approx(10.0), "share_of_pnl": pytest.approx(2.0)}
+    assert b["1-6 h"]["n"] == 1 and b["7-24 h"]["n"] == 0 and b["7-24 h"]["mean"] is None and b["73+ h"]["n"] == 1
+    assert "0 h +10.00 (1, +200% of P&L)" in m._bucket_txt(b) and m._bucket_txt(None) == "n/a"
+
+
+def listing_fixture(rng, n_markets=40, n_covered=20, placeholder_hours=3, offset=0.08):
+    """T-337 fake with the listing artefact: every market's first ``placeholder_hours`` CLOB points are the 0.50 placeholder
+    while p_RN sits near 0.2 (strike 3% above the forward), then the real quote p_RN + ``offset`` (a planted mispricing a
+    fader can hit; outcomes NO with probability 0.85). Markets 0..n_covered-1 have hourly taker volume from the hour the
+    book forms (their first taker trade); the others have no hourly volume data at all."""
+    ets = {"2025-03-07": int(datetime(2025, 3, 7, 8, tzinfo=UTC).timestamp()), "2025-03-08": int(datetime(2025, 3, 8, 8, tzinfo=UTC).timestamp())}
+    H0 = ets["2025-03-07"] // H - 40
+    hours = np.arange(H0, H0 + 30)
+    F, strike = 100000.0, 103000.0
+    drb = []
+    for h in range(H0 - 3, H0 + 31):
+        for e in ets:
+            for K in (94000, 96000, 98000, 99000, 100000, 101000, 102000, 104000, 106000):
+                drb.append(row({"trade_id": f"{h}{K}", "timestamp": int(h * H * 1000 + 1000), "iv": 50.0, "index_price": F, "expiry": e, "strike": float(K)}, kind="option-trade"))
+    groups, ets_ts, _, last_idx = m._deribit_groups(FakeArchive({m.DRB + "2025-03": drb}), ["2025-03"])
+    book = m.SmileBook(groups, ets_ts, forward={}, last_idx=last_idx)
+    t_res = ets["2025-03-07"] + 12 * H
+    prn = np.array([book.p_rn(int(h), strike, t_res)["svi"] for h in hours])
+    assert 0.1 < prn.min() and prn.max() < 0.25
+    markets, pm_rows, vol_rows = [], [], []
+    for i in range(n_markets):
+        tok = f"b{i}"
+        ps = prn + offset
+        ps[:placeholder_hours] = 0.5
+        pm_rows += hourly_rows(tok, 9000 + i, hours, ps, "2025-03")
+        if i < n_covered:
+            vol_rows += btc_volume_rows([9000 + i], H0 + placeholder_hours, H0 + 30)
+        markets.append(gamma_market(9000 + i, tok, "Will the price of Bitcoin be above $103,000 on March 7?", iso(t_res), "bitcoin-above-on-march-7-2025",
+                                    outcome=int(rng.random() < 0.15), fees=True, fee_type="crypto_fees_v2", group="103,000",
+                                    desc='BTC/USDT 12:00 in the ET timezone (noon) on the date specified in the title'))
+    ev = [row({"id": "ev", "slug": "bitcoin-above-on-march-7-2025", "endDate": iso(t_res), "markets": markets, "description": ""}, kind="event")]
+    bundles = {m.EV_BTC_B: ev, m.EV_MACRO_B: [], m.PMH + "2025-03": pm_rows, m.DRB + "2025-03": drb}
+    if vol_rows:
+        bundles[m.PMV + "2025-03"] = vol_rows
+    return bundles
+
+
+def test_harness_t337_listing_hour_is_not_a_price():
+    """T-337 fixes 2 and 4: ungated, every fade enters at the market's first hourly point (the 0.50 placeholder 30 points
+    from p_RN) and that bucket carries the whole P&L; the primary read admits entries only at hours valid under the
+    liquidity rule, so it never trades the listing window, and both runs are decomposed by market age and |gap|."""
+    stat, n, verdict, reason = m.b6c_pmxv_pm_vs_deribit_digital(FakeArchive(listing_fixture(np.random.default_rng(21))))
+    assert_json(stat, n, verdict, reason)
+    for kind in ("svi", "cubic"):
+        ug, pr = stat["ungated"][kind], stat["fits"][kind]
+        assert ug["n"] == 40 and ug["by_age"]["0 h"]["n"] == 40 and ug["by_age"]["0 h"]["share_of_pnl"] == pytest.approx(1.0) and ug["mean"] > 20
+        assert ug["by_gap"]["20-30"]["n"] + ug["by_gap"]["30+"]["n"] == 40 and ug["by_exit"] == {"resolution": 40}
+        assert pr["n"] == 20 and pr["by_age"]["0 h"]["n"] == 0 and pr["by_age"]["1-6 h"]["n"] == 20 and pr["by_side"] == {"no": 20}
+        assert pr["by_gap"]["5-10"]["n"] == 20 and pr["mean"] < ug["mean"] - 10
+    assert n == 20 and "PRIMARY (covered markets, valid hours): SVI 20 trades" in reason and "UNGATED (every CLOB value taken as a price" in reason
+    assert "by market age at entry 0 h +" in reason and "(40, +100% of P&L)" in reason
+
+
+def test_harness_t337_liquidity_coverage_is_a_named_data_limit():
+    """T-337 fix 5: markets without hourly taker volume cannot be gated, so they are excluded from the primary read and
+    counted, the reason states the share of markets whose liquidity is unobserved and names the fetch, and below min_n
+    the verdict is inconclusive (not supported on the placeholder, not refuted without the data)."""
+    bundles = listing_fixture(np.random.default_rng(22))
+    stat, n, verdict, reason = m.b6c_pmxv_pm_vs_deribit_digital(FakeArchive(bundles))
+    liq = stat["liquidity"]
+    assert liq["markets_with_volume"] == 20 and liq["markets_without_volume"] == 20 and liq["by_variant"] == {"noon": 20}
+    assert liq["markets_with_decision_hours"] == 40 and liq["covered_with_decision_hours"] == {"noon": 20}
+    assert liq["covered_decision_hours"] == 600 and liq["covered_valid_hours"] == 20 * 26           # hours 4..29 of each covered market
+    assert verdict == "inconclusive" and "n >= trial min_n (20 of 300 trades)" in reason
+    assert "hourly volume is archived for 20 of 40 markets" in reason and "excluded from the primary read" in reason
+    assert "hourly liquidity is unobserved for 50.0% of the markets" in reason and "fetch_pm_trades" in reason and m.PMV in reason
+    # no volume bundle at all: nothing is tradable under the rule, the ungated read is still reported, the verdict inconclusive
+    b2 = {k: v for k, v in bundles.items() if k != m.PMV + "2025-03"}
+    stat2, n2, verdict2, reason2 = m.b6c_pmxv_pm_vs_deribit_digital(FakeArchive(b2))
+    assert n2 == 0 and verdict2 == "inconclusive" and stat2["liquidity"]["markets_with_volume"] == 0 and stat2["fits"]["svi"]["n"] == 0
+    assert stat2["ungated"]["svi"]["n"] == 40 and "hourly volume is archived for 0 of 40 markets" in reason2 and "100.0% of the markets" in reason2
+
+
+def test_harness_t337_proxy_is_reported_with_its_calibration_never_primary():
+    """T-337 fix 1 (the proxy): the price-only stand-in (from the first mid change on, never at 0.50) is reported by age
+    and calibrated against the rule on the covered markets; it admits the book-forming hour the rule rejects, so the
+    primary read never uses it even where it would admit every market."""
+    stat, n, verdict, reason = m.b6c_pmxv_pm_vs_deribit_digital(FakeArchive(listing_fixture(np.random.default_rng(23))))
+    px = stat["proxy"]["svi"]
+    assert px["n"] == 40 and px["by_age"]["0 h"]["n"] == 0 and px["by_age"]["1-6 h"]["n"] == 40          # entries at the first real quote (age 3)
+    cal = stat["liquidity"]["proxy"]
+    assert cal["covered_hours_proxy_valid"] == 20 * 27 and cal["covered_hours_proxy_valid_but_rule_invalid"] == 20   # hour 3 of each covered market
+    assert cal["listing_window_hours_(age<=6h)"] == 20 * 7 and cal["listing_window_rule_valid"] == 20 * 3 and cal["listing_window_proxy_valid"] == 20 * 4
+    assert n == 20 and stat["fits"]["svi"]["n"] == 20                                                    # the proxy's 40 never enter the primary
+    assert "PRICE-ONLY PROXY" in reason and "admits 80 of the 140 listing-window hours (age <= 6 h) against 60 under the rule" in reason
+    assert "20 of its 540 admitted hours are invalid under the rule: not a substitute" in reason
+
+
+def test_harness_t337_fill_at_the_mid_is_named_with_the_haircut_sensitivity():
+    """T-337 fix 3: the fill is the CLOB hourly mid less the claim's 1-point haircut (no historical book is archived); the
+    reason says so and the mean under a 2-point haircut is reported for the primary and the ungated reads."""
+    stat, n, verdict, reason = m.b6c_pmxv_pm_vs_deribit_digital(FakeArchive(listing_fixture(np.random.default_rng(24))))
+    assert stat["fill"].startswith("CLOB hourly mid less the claim's 1-point haircut") and "no historical book is archived" in reason
+    assert "a 2-point haircut lowers every mean by 1 cent" in reason
+    hc = stat["haircut_sensitivity"]["2_points"]
+    assert hc["svi"] == pytest.approx(stat["fits"]["svi"]["mean"] - 1.0) and hc["cubic"] == pytest.approx(stat["fits"]["cubic"]["mean"] - 1.0)
+    assert hc["ungated_svi"] == pytest.approx(stat["ungated"]["svi"]["mean"] - 1.0)
