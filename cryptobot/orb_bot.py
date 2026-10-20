@@ -261,7 +261,19 @@ async def check(bot: "OrbBot") -> list[tuple[str, bool, str]]:
         c = await ex.close(bot.symbol, f.qty, mid)
         return f"paper: bought {f.qty:.0f} at {f.price:.2f}, sold at {c.price:.2f}"
 
-    for name, fn in (("account", account), ("clock", clock), ("daily bars", daily),
+    async def positions():
+        p = await ex.positions()
+        return ", ".join(f"{k} {v:+.0f} shares" for k, v in p.items()) or "none"
+
+    async def orders():
+        rows = await ex._request("GET", "/v2/orders", params={"status": "all", "limit": 10, "direction": "desc"})
+        if not rows:
+            return "none"
+        return " | ".join(f"{(r.get('submitted_at') or '')[:19]} {r.get('symbol')} {r.get('side')} {r.get('qty')} "
+                          f"{r.get('type')}/{r.get('time_in_force')} limit {r.get('limit_price')} -> {r.get('status')}, "
+                          f"filled {r.get('filled_qty')} at {r.get('filled_avg_price')}" for r in rows)
+
+    for name, fn in (("account", account), ("open positions", positions), ("last 10 orders", orders), ("clock", clock), ("daily bars", daily),
                      ("09:30 five-minute bar", first_bar), ("quote", quote), ("paper order", order)):
         await step(name, fn)
     return out

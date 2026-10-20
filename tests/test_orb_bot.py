@@ -137,6 +137,13 @@ def test_check_reports_each_call_and_the_failing_one(tmp_path):
     day = dt.date(2026, 10, 14)
 
     class Ex(FakeExec):
+        async def positions(self):
+            return {}
+
+        async def _request(self, method, path, params=None):
+            return [{"submitted_at": "2026-10-19T13:35:10Z", "symbol": "QQQ", "side": "buy", "qty": "139", "type": "limit",
+                     "time_in_force": "ioc", "limit_price": "720.1", "status": "canceled", "filled_qty": "0"}]
+
         async def balance(self):
             return {"mode": "paper", "status": "ACTIVE", "total_usd_balance": 1e5, "available_margin": 2e5,
                     "shorting_enabled": True, "pattern_day_trader": False, "daytrade_count": 0}
@@ -150,6 +157,7 @@ def test_check_reports_each_call_and_the_failing_one(tmp_path):
     res = {n: (ok, m) for n, ok, m in asyncio.run(O.check(bot))}
     assert all(ok for ok, _ in res.values())
     assert res["paper order"][1].startswith("paper: bought 1")
+    assert "-> canceled" in res["last 10 orders"][1] and res["open positions"][1] == "none"
     bot = _bot(tmp_path, BadFeed(day, 400.0, 401.0), Ex([401.0]), _times(day, (10, 0)))
     res = {n: (ok, m) for n, ok, m in asyncio.run(O.check(bot))}
     assert res["09:30 five-minute bar"] == (False, "RuntimeError: alpaca data /v2/stocks/bars -> 403: forbidden")
