@@ -152,7 +152,7 @@ def _days_since(d: Optional[str], today: date) -> Optional[int]:
     return (today - date.fromisoformat(d)).days if d else None
 
 
-def build(today: date, journal_path: Path) -> list[dict]:
+def build(today: date, journal_path: Path, out: Path = OUT) -> list[dict]:
     reg = _registry()
     journal = _journal(journal_path)
     bundles = _bundles()
@@ -167,11 +167,13 @@ def build(today: date, journal_path: Path) -> list[dict]:
                "source": "theory registry"}
         if tid == "T-559":
             row.update(n_now=cal["n_now"], fills=cal["fills"], pnl_usd=cal["pnl_usd"], capital_usd=None,
-                       status="running" if cal["n_now"] else "waiting on the Linode install",
-                       next_step="run deploy/paper/install.sh on the Linode" if not cal["n_now"] else "reconcile fills daily",
+                       status="running" if cal["n_now"] else ("installed: first close orders at the next 3:44 pm ET close" if journal
+                                                               else "waiting on the Linode install"),
+                       next_step="run deploy/paper/install.sh on the Linode" if not (cal["n_now"] or journal) else "reconcile fills daily",
                        started=None if not cal["n_now"] else REGISTERED[tid], source="paper journal")
         elif tid == "T-560":
-            row.update(n_now=spr["n_now"], status="running" if spr["opened"] else "waiting on the Linode install",
+            row.update(n_now=spr["n_now"], status="running" if spr["opened"] else ("installed: waiting for a qualifying spread"
+                                                                                   if journal else "waiting on the Linode install"),
                        next_step=spr["last_plan"] or "first plan at 15:20 ET once installed",
                        started=None if not spr["opened"] else REGISTERED[tid], source="paper journal")
         elif tid == "T-542":
@@ -182,8 +184,10 @@ def build(today: date, journal_path: Path) -> list[dict]:
             row.update(n_now=0, status=f"stalled: {arch['T-541']['captures']} capture days, last {arch['T-541']['last']}",
                        next_step="restart the daily options capture; first settlements follow the Nov VIX expiry", source="archive captures")
         elif tid in ("T-565", "T-566", "T-567", "T-568", "T-573", "T-576"):
-            row.update(n_now=0, status="waiting on the Linode capture install",
-                       next_step="run deploy/capture/install.sh on the Linode", started=None, source="capture box (not yet installed)")
+            installed = (out / "capture_status.json").exists()
+            row.update(n_now=0, status="installed: first record after tonight's run" if installed else "waiting on the Linode capture install",
+                       next_step="none: runs on its timers" if installed else "run deploy/capture/install.sh on the Linode",
+                       started=None, source="capture box" if installed else "capture box (not yet installed)")
         elif tid == "T-543":
             row.update(n_now=arch["T-543"]["n_now"], status="recording",
                        next_step=f"next FOMC {arch['T-543']['next_fomc']}", source="archive calendars")

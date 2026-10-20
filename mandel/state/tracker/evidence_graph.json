@@ -7,7 +7,7 @@
    "owner": "Mandel",
    "label": "Calendar sleeve (overnight QQQM, IBS, turn of month)",
    "mode": "paper",
-   "state": "waiting"
+   "state": "stalled"
   },
   {
    "id": "signal:overnight-gap",
@@ -60,7 +60,7 @@
    "owner": "Mandel",
    "label": "XSP put credit spread, trend-filtered",
    "mode": "paper",
-   "state": "waiting"
+   "state": "stalled"
   },
   {
    "id": "signal:trend-10m-sma",
@@ -197,7 +197,7 @@
    "owner": "Mandel",
    "label": "Shadow: HMM regime filter for putwriting",
    "mode": "forward",
-   "state": "waiting"
+   "state": "stalled"
   },
   {
    "id": "signal:hmm-vol-regime",
@@ -225,7 +225,7 @@
    "owner": "Mandel",
    "label": "Shadow: HMM volatility scaling of QQQM overnight",
    "mode": "forward",
-   "state": "waiting"
+   "state": "stalled"
   },
   {
    "id": "T-573",
@@ -233,7 +233,7 @@
    "owner": "Mandel",
    "label": "Shadow: EWMA volatility scaling of QQQM overnight",
    "mode": "forward",
-   "state": "waiting"
+   "state": "stalled"
   },
   {
    "id": "signal:ewma-vol",
@@ -246,7 +246,7 @@
    "owner": "Mandel",
    "label": "IEF over the month's last session (Treasury month-end)",
    "mode": "paper",
-   "state": "waiting"
+   "state": "stalled"
   },
   {
    "id": "signal:treasury-month-end",
@@ -270,7 +270,7 @@
    "owner": "Mandel",
    "label": "Pre-holiday IWM (1-day hold)",
    "mode": "paper",
-   "state": "waiting"
+   "state": "stalled"
   },
   {
    "id": "signal:pre-holiday",
@@ -283,7 +283,7 @@
    "owner": "Mandel",
    "label": "GLD / TLT / USO put spreads (9-24 day holds)",
    "mode": "paper",
-   "state": "waiting"
+   "state": "stalled"
   },
   {
    "id": "factor:gold-beta",

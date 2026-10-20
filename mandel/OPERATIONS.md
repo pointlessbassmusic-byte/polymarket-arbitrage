@@ -202,3 +202,9 @@ goes in `WIRING` in mandel/live/evidence_graph.py.
   evidence graph, which then reads stream freshness from the box.
 The paper runner's journal push now runs `deploy/paper/push_journal.sh` (the earlier inline command was mangled by
 systemd's `$` and `%` expansion); re-running deploy/paper/install.sh installs it without changing the runner's code.
+
+### Importing the Linode's results
+
+`python -m mandel.live.import_linode` fetches branches `paper/journal` and `capture/status` (pushed nightly by the
+Linode with the deploy key `~/.ssh/mandel_journal`), copies them to `state/linode/`, and rebuilds the tracker and the
+evidence graph from them. Then re-upload `state/tracker/*.json` to the dashboard.
