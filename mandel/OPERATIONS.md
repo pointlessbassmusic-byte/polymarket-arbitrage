@@ -173,3 +173,13 @@ Sleeve capital: the runner trades a fixed `MANDEL_PAPER_CAPITAL` (default 5000; 
 change), never the account's equity, and the calendar slot never borrows (capped by cash plus its own SPLG/QQQM). The
 first install landed on a paper account shared with the crypto child's QQQ/XLF pilots; a dedicated Alpaca paper account
 keeps the two forward records apart.
+
+### Evidence graph
+
+`python -m mandel.live.evidence_graph` (after the tracker) maps every tracked strategy to the signals it reads, the
+data streams behind them, its venue, account and risk factors, and writes `state/tracker/{evidence_graph,alerts,
+dependencies,next_tests}.json` for the dashboard: stale streams with everything downstream (strategies and blocked
+theories), shared accounts and factor exposure against caps, conflicting measured results, tests at their decision
+point, and a value-of-information ranking of what to test next. It recommends only; `checkpoint_size` (quarter Kelly
+shrunk by the deflated Sharpe, capped) is applied only at a pre-registered decision point. Wiring for a new strategy
+goes in `WIRING` in mandel/live/evidence_graph.py.

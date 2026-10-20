@@ -49,6 +49,22 @@
     <div class="pt-tile"><div class="lab">Next read</div><div class="val dash-skeleton" data-source="summary" data-field="next_read">—</div><div class="sub" data-source="summary" data-field="next_read_name">—</div></div>
   </section>
 
+  <section class="pt-card" id="alerts">
+    <h2>Alerts from the evidence graph</h2>
+    <p class="note pt-alert-note">What every strategy depends on, checked daily: stale data, shared accounts and risk, conflicting results, decision points. These recommend; none of them places or changes an order.</p>
+    <div class="pt-tablebox" style="max-height: 26rem">
+      <table class="pt-table pt-alerts" data-source="alerts" data-row-key="id">
+        <thead><tr>
+          <th data-field="severity">Severity</th>
+          <th data-field="message">What</th>
+          <th data-field="affected" class="pt-hide-narrow">Strategies</th>
+          <th data-field="action">Next step</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <div class="pt-grid">
     <section class="pt-card" id="progress">
       <h2>Progress to decision</h2>
@@ -67,6 +83,42 @@
     <p class="note pt-hist-note">Mean share of the decision sample reached, by owner, one point per tracker refresh.</p>
     <div class="pt-chart" id="history-chart" data-source="history"></div>
   </section>
+
+  <div class="pt-grid">
+    <section class="pt-card" id="dependencies">
+      <h2>Shared dependencies</h2>
+      <p class="note">Each data stream, venue, account and risk factor, with the strategies that rely on it. One failure here reaches every strategy in its row.</p>
+      <div class="pt-tablebox" style="max-height: 26rem">
+        <table class="pt-table pt-deps" data-source="dep_targets" data-row-key="target_key">
+          <thead><tr>
+            <th data-field="target_kind">Kind</th>
+            <th data-field="target">Depends on</th>
+            <th data-field="n" class="num">Strategies</th>
+            <th data-field="health">Health</th>
+            <th data-field="strategies" class="pt-hide-narrow">Which</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="pt-card" id="next-tests">
+      <h2>What to test next</h2>
+      <p class="note">Untested, blocked and inconclusive theories ranked by how ready their data is and how cheaply a test decides them. An inconclusive theory scores low until new data arrives.</p>
+      <div class="pt-tablebox" style="max-height: 26rem">
+        <table class="pt-table pt-next" data-source="next_tests" data-row-key="id">
+          <thead><tr>
+            <th data-field="id">Theory</th>
+            <th data-field="status">Status</th>
+            <th data-field="score" class="num">Score</th>
+            <th data-field="data_ready" class="num">Data ready</th>
+            <th data-field="missing" class="pt-hide-narrow">Missing</th>
+            <th data-field="claim" class="pt-hide-narrow">Claim</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 
   <section class="pt-card" id="all-tests">
     <h2>Every test</h2>
@@ -343,4 +395,66 @@
     }));
   }
   dash.onData(drawTable);
+</script>
+
+<script>
+  const SEV_COLOR = { critical: 'var(--cds-chart-status-critical)', action: dash.colors[1], warning: dash.colors[2], info: 'var(--cds-chart-muted)' };
+  const HEALTH_COLOR = { ok: dash.colors[0], broker: dash.colors[0], child: 'var(--cds-chart-muted)', stale: 'var(--cds-chart-status-critical)', missing: 'var(--cds-chart-status-critical)' };
+
+  dash.calc('dep_targets', {
+    title: 'Dependencies by target',
+    description: 'Each stream, venue, account or factor with the number of strategies relying on it and its health.',
+    inputs: ['dependencies'],
+    fn: (dependencies) => {
+      const g = d3.groups(dependencies, (d) => d.target_kind + ':' + d.target);
+      return g.map(([k, v]) => ({ target_key: k, target_kind: v[0].target_kind, target: v[0].target, n: new Set(v.map((d) => d.strategy)).size,
+        health: v[0].health || '', strategies: Array.from(new Set(v.map((d) => d.strategy))).join(', ') }))
+        .sort((a, b) => b.n - a.n || a.target_key.localeCompare(b.target_key));
+    }
+  });
+
+  const fillTable = (sel, id, cols, cell) => {
+    const tbody = document.querySelector(sel + ' tbody');
+    const d = dash.data(id);
+    if (d.status !== 'ok') { tbody.replaceChildren(); return; }
+    tbody.replaceChildren(...d.data.map((r) => {
+      const tr = document.createElement('tr');
+      cols.forEach((c) => {
+        const td = document.createElement('td');
+        if (['affected', 'missing', 'claim', 'strategies'].includes(c)) td.classList.add('pt-hide-narrow');
+        if (['n', 'score', 'data_ready'].includes(c)) td.classList.add('num');
+        cell(td, c, r);
+        tr.appendChild(td);
+      });
+      return tr;
+    }));
+  };
+  const dotText = (td, color, text) => {
+    const dot = document.createElement('span'); dot.className = 'pt-dot'; dot.style.background = color;
+    td.appendChild(dot); td.appendChild(document.createTextNode(text));
+  };
+
+  dash.onData(() => {
+    fillTable('.pt-alerts', 'alerts', ['severity', 'message', 'affected', 'action'], (td, c, r) => {
+      if (c === 'severity') dotText(td, SEV_COLOR[r.severity] || 'var(--cds-chart-muted)', r.severity);
+      else td.textContent = r[c] || '—';
+    });
+    const al = dash.data('alerts');
+    if (al.status === 'ok') {
+      const n = (s) => al.data.filter((a) => a.severity === s).length;
+      document.querySelector('.pt-alert-note').textContent = d3.format(',')(n('critical')) + ' critical, ' + d3.format(',')(n('action')) + ' needing a decision, ' +
+        d3.format(',')(n('warning')) + ' warnings, ' + d3.format(',')(n('info')) + ' notes. These recommend; none of them places or changes an order.';
+    }
+    fillTable('.pt-deps', 'dep_targets', ['target_kind', 'target', 'n', 'health', 'strategies'], (td, c, r) => {
+      if (c === 'health') { if (r.health) dotText(td, HEALTH_COLOR[r.health] || 'var(--cds-chart-muted)', r.health); else td.textContent = '—'; }
+      else if (c === 'n') td.textContent = d3.format(',')(r.n);
+      else td.textContent = r[c] || '—';
+    });
+    fillTable('.pt-next', 'next_tests', ['id', 'status', 'score', 'data_ready', 'missing', 'claim'], (td, c, r) => {
+      if (c === 'score') td.textContent = d3.format('.3f')(r.score);
+      else if (c === 'data_ready') td.textContent = d3.format('.0%')(r.data_ready);
+      else if (c === 'missing') td.textContent = r.missing || (r.unblocked ? 'none: data now present, check coverage' : r.new_data ? 'none: new data since its last run' : '—');
+      else td.textContent = r[c] || '—';
+    });
+  });
 </script>
