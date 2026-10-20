@@ -2,7 +2,7 @@
 "generated_for": "Mandel signal map",
 "stats": {
 "nodes": 117,
-"edges": 1424,
+"edges": 1448,
 "documents": 31,
 "layers": {
 "substrate": 39,
@@ -13805,6 +13805,198 @@
 "sign": -1,
 "w": 1.5,
 "label": "Edge in bits as the Kelly growth rate (01) versus never betting full Kelly on an estimated probability (cand: Baker & McHale).** Resolution:"
+},
+{
+"s": "k:volume",
+"t": "k:option_flow",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Intraday momentum into the close (Gao-Han-Li-Zhou; gamma-conditioned in Baltussen et al., A6, A13) versus Mandel's confirmed intraday revers"
+},
+{
+"s": "k:volume",
+"t": "k:intraday",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Intraday momentum into the close (Gao-Han-Li-Zhou; gamma-conditioned in Baltussen et al., A6, A13) versus Mandel's confirmed intraday revers"
+},
+{
+"s": "k:volume",
+"t": "k:momentum",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Intraday momentum into the close (Gao-Han-Li-Zhou; gamma-conditioned in Baltussen et al., A6, A13) versus Mandel's confirmed intraday revers"
+},
+{
+"s": "k:option_flow",
+"t": "k:intraday",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Intraday momentum into the close (Gao-Han-Li-Zhou; gamma-conditioned in Baltussen et al., A6, A13) versus Mandel's confirmed intraday revers"
+},
+{
+"s": "k:option_flow",
+"t": "k:momentum",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Intraday momentum into the close (Gao-Han-Li-Zhou; gamma-conditioned in Baltussen et al., A6, A13) versus Mandel's confirmed intraday revers"
+},
+{
+"s": "k:intraday",
+"t": "k:momentum",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Intraday momentum into the close (Gao-Han-Li-Zhou; gamma-conditioned in Baltussen et al., A6, A13) versus Mandel's confirmed intraday revers"
+},
+{
+"s": "k:calibration",
+"t": "k:volume",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Published anomalies with large in-sample premia on earnings, short interest, size and turnover (A7, A10, A12) versus post-publication decay "
+},
+{
+"s": "k:calibration",
+"t": "k:short_interest",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Published anomalies with large in-sample premia on earnings, short interest, size and turnover (A7, A10, A12) versus post-publication decay "
+},
+{
+"s": "k:calibration",
+"t": "k:earnings",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Published anomalies with large in-sample premia on earnings, short interest, size and turnover (A7, A10, A12) versus post-publication decay "
+},
+{
+"s": "k:volume",
+"t": "k:short_interest",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Published anomalies with large in-sample premia on earnings, short interest, size and turnover (A7, A10, A12) versus post-publication decay "
+},
+{
+"s": "k:volume",
+"t": "k:earnings",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Published anomalies with large in-sample premia on earnings, short interest, size and turnover (A7, A10, A12) versus post-publication decay "
+},
+{
+"s": "k:short_interest",
+"t": "k:earnings",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Published anomalies with large in-sample premia on earnings, short interest, size and turnover (A7, A10, A12) versus post-publication decay "
+},
+{
+"s": "k:implied_vol",
+"t": "k:vrp",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "The variance risk premium as Mandel's best-supported effect (7 of 9 decided VRP theories passed) versus implied volatility inputs that add n"
+},
+{
+"s": "k:implied_vol",
+"t": "k:momentum",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "The variance risk premium as Mandel's best-supported effect (7 of 9 decided VRP theories passed) versus implied volatility inputs that add n"
+},
+{
+"s": "k:vrp",
+"t": "k:momentum",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "The variance risk premium as Mandel's best-supported effect (7 of 9 decided VRP theories passed) versus implied volatility inputs that add n"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:lead_lag",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Cross-asset lead-lag and economic links as a predictor (Hou, Cohen-Frazzini, BTC leading alts; A15, A8) versus leads that die within one bar"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:reference_price",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Cross-asset lead-lag and economic links as a predictor (Hou, Cohen-Frazzini, BTC leading alts; A15, A8) versus leads that die within one bar"
+},
+{
+"s": "k:lead_lag",
+"t": "k:reference_price",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Cross-asset lead-lag and economic links as a predictor (Hou, Cohen-Frazzini, BTC leading alts; A15, A8) versus leads that die within one bar"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:fees_slippage",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Crypto funding and basis carry as a structural premium (A8: He-Manela-Ross, BIS crypto carry) versus funding pinned at its 0.01% baseline mo"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:carry",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Crypto funding and basis carry as a structural premium (A8: He-Manela-Ross, BIS crypto carry) versus funding pinned at its 0.01% baseline mo"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:anomaly_decay",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Crypto funding and basis carry as a structural premium (A8: He-Manela-Ross, BIS crypto carry) versus funding pinned at its 0.01% baseline mo"
+},
+{
+"s": "k:fees_slippage",
+"t": "k:carry",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Crypto funding and basis carry as a structural premium (A8: He-Manela-Ross, BIS crypto carry) versus funding pinned at its 0.01% baseline mo"
+},
+{
+"s": "k:fees_slippage",
+"t": "k:anomaly_decay",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Crypto funding and basis carry as a structural premium (A8: He-Manela-Ross, BIS crypto carry) versus funding pinned at its 0.01% baseline mo"
+},
+{
+"s": "k:carry",
+"t": "k:anomaly_decay",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Crypto funding and basis carry as a structural premium (A8: He-Manela-Ross, BIS crypto carry) versus funding pinned at its 0.01% baseline mo"
 },
 {
 "s": "child:Hurst",
