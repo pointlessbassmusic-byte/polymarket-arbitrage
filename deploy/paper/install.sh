@@ -44,7 +44,11 @@ if [ ! -f /etc/mandel-paper.env ]; then
   # Read from the terminal, not stdin: under 'curl ... | bash' stdin is the script itself.
   read -r -p "   ALPACA_API_KEY_ID (paper): " KEY </dev/tty
   read -r -s -p "   ALPACA_API_SECRET_KEY (paper): " SECRET </dev/tty; echo
-  [[ "$KEY" =~ ^[A-Za-z0-9]+$ && "$SECRET" =~ ^[A-Za-z0-9]+$ ]] || { echo "refusing: the key or secret is empty or has unexpected characters"; exit 1; }
+  # Pasting can carry a carriage return or spaces: strip all whitespace. Report lengths only, never the values.
+  KEY=$(printf '%s' "$KEY" | tr -d '[:space:]'); SECRET=$(printf '%s' "$SECRET" | tr -d '[:space:]')
+  echo "   read a key id of ${#KEY} characters and a secret of ${#SECRET} characters (Alpaca: about 20 and 40)"
+  [[ "$KEY" =~ ^[A-Za-z0-9]+$ ]] || { echo "refusing: the key id is empty or has characters other than letters and digits"; exit 1; }
+  [[ "$SECRET" =~ ^[!-~]+$ ]] || { echo "refusing: the secret is empty (nothing was pasted at the hidden prompt?)"; exit 1; }
   [[ "$KEY" == PK* ]] || echo "   warning: Alpaca paper key ids usually start with PK; check you copied the PAPER key"
   sudo install -m 600 -o "$USER_NAME" /dev/null /etc/mandel-paper.env
   printf 'ALPACA_API_KEY_ID=%s\nALPACA_API_SECRET_KEY=%s\nMANDEL_PAPER_STATE=%s\nMANDEL_PAPER_LEDGER=0\n' "$KEY" "$SECRET" "$STATE" | sudo tee /etc/mandel-paper.env >/dev/null
