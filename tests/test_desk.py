@@ -168,3 +168,24 @@ def test_track_record_line_reports_psr_and_min_trl():
     closed = [{"pnl_usd": rng.gauss(2.0, 10.0), "size_usd": 100.0} for _ in range(60)]
     line = D.track_record_line(closed)
     assert line.startswith("track record: 60 trades, PSR(SR>0)=") and "MinTRL=" in line
+
+
+def test_clock_skew_from_the_date_header():
+    import asyncio
+    import email.utils
+    import time
+    import httpx
+    from cryptobot import desk as Dk
+
+    def handler(req):
+        return httpx.Response(200, headers={"date": email.utils.formatdate(time.time() + 10, usegmt=True)})
+
+    async def run():
+        c = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        try:
+            return await Dk.clock_skew_s("https://x/", client=c)
+        finally:
+            await c.aclose()
+    skew = asyncio.run(run())
+    assert -11.6 < skew < -8.4                     # this clock is 10 s behind the server
+    assert Dk.skew_check(skew)[1] is False and Dk.skew_check(0.4)[1] is True

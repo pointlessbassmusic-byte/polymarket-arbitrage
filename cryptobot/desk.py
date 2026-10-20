@@ -943,6 +943,30 @@ def attach_alerts(bots: dict):
     return alerter
 
 
+async def clock_skew_s(url: str = "https://api.elections.kalshi.com/trade-api/v2/exchange/status", client=None) -> float:
+    """This machine's clock minus the server's (from the HTTP Date header,
+    1-second resolution; the request's round trip is split evenly)."""
+    import email.utils
+    import time
+    import httpx
+    c = client or httpx.AsyncClient(timeout=10)
+    try:
+        t0 = time.time()
+        r = await c.get(url)
+        t1 = time.time()
+    finally:
+        if client is None:
+            await c.aclose()
+    server = email.utils.parsedate_to_datetime(r.headers["date"]).timestamp()
+    return (t0 + t1) / 2 - (server + 0.5)          # Date truncates to the second: its midpoint is +0.5 s
+
+
+def skew_check(skew: float) -> tuple[str, bool, str]:
+    return (f"server clock within 2 s of Kalshi's (off by {skew:+.1f} s)", abs(skew) <= 2.0,
+            "sync the clock: timedatectl set-ntp true && systemctl restart systemd-timesyncd, then timedatectl "
+            "(signed requests carry a timestamp, and the bots time bar closes and 09:35 sessions by this clock)")
+
+
 async def _main(args) -> int:
     import yaml
     cfg = yaml.safe_load(args.config.read_text()) or {}
@@ -969,6 +993,10 @@ async def _main(args) -> int:
             if env.get("CRYPTOBOT_COINBASE_KEY_NAME") and env.get("CRYPTOBOT_COINBASE_KEY_SECRET"):
                 extra = preview_checks(await order_previews(
                     env, float(cfg.get("perp", {}).get("max_trade_usd", 500))))
+        try:
+            extra.append(skew_check(await clock_skew_s()))
+        except Exception as exc:
+            logger.warning("clock check unavailable: %s", exc)
         print(render_preflight(cfg, preflight(cfg, env, balances or None, sizes) + extra))
         return 0
     args.state_dir.mkdir(parents=True, exist_ok=True)
