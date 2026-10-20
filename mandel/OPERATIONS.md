@@ -160,3 +160,11 @@ Cron on the Linode, in New York time (`CRON_TZ=America/New_York`), weekdays:
 
 Closing-auction orders must reach Alpaca by 15:50 ET and opening-auction orders by 09:28 ET. Run each phase
 with `--dry-run` once by hand first; `status` prints equity, positions and the open spread.
+
+### Paper strategy tracker
+
+`python -m mandel.live.tracker --journal <copy of the Linode's paper journal>` rebuilds
+`state/tracker/strategies.json` (one row per paper, live or forward test, Mandel's and the children's) and appends the
+day to `state/tracker/history.jsonl` / `history.json`. Those two files feed the "Paper Strategy Tracker" dashboard
+(https://claude.ai/artifact/YW11NMqwusSM59jktjYmSW): Mandel re-uploads them after each refresh. The children's rows come
+from `state/children/forward_tests.json`, their own figures; update its counts and `as_of` when a child reports again.

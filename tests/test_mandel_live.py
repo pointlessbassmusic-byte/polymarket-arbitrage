@@ -124,3 +124,21 @@ def test_runner_close_dry_run_places_nothing(monkeypatch, tmp_path, capsys):
     (tmp_path / "KILL").write_text("stop")
     with pytest.raises(SystemExit):
         R.phase_close(api, dry=True)
+
+
+def test_tracker_counts_journal_sessions_fills_and_round_trip_pnl(tmp_path):
+    from mandel.live import tracker as T
+    j = tmp_path / "journal.jsonl"
+    recs = [{"kind": "close.decision", "day": "2026-10-21"}, {"kind": "close.decision", "day": "2026-10-22"},
+            {"kind": "close.decision", "day": "2026-10-23", "dry_run": True},
+            {"kind": "order.fill", "client_order_id": "m-cls-QQQM-1", "symbol": "QQQM", "side": "buy", "filled_qty": "2",
+             "filled_avg_price": "250.0", "filled_at": "2026-10-21T20:00:00Z"},
+            {"kind": "order.fill", "client_order_id": "m-opg-QQQM-2", "symbol": "QQQM", "side": "sell", "filled_qty": "2",
+             "filled_avg_price": "251.5", "filled_at": "2026-10-22T13:30:00Z"}]
+    j.write_text("".join(json.dumps(r) + "\n" for r in recs))
+    c = T.calendar_progress(T._journal(j))
+    assert c == {"n_now": 2, "fills": 2, "rejected": 0, "pnl_usd": 3.0}
+    rows = T.build(date(2026, 10, 23), j)
+    t559 = next(r for r in rows if r["id"] == "T-559")
+    assert t559["state"] == "running" and t559["progress"] == pytest.approx(2 / 60, abs=1e-4)
+    assert {r["owner"] for r in rows} >= {"Mandel", "Hurst", "Kelly", "Brier", "Shannon"}
