@@ -365,6 +365,14 @@ def test_t425_planted_passes_every_tier_but_the_unrecorded_tier_caps_it():
     best = stat["bootstrap"][f"cb:{m.HIGHVOL_PAIR[0]}|kr:{m.HIGHVOL_PAIR[1]}|maker"]
     assert best["p"] < 0.05 and best["ci"][0] > 0
     assert stat["five_minute"]["retail"]["range"][0] <= stat["five_minute"]["retail"]["pooled_total_net"] <= stat["five_minute"]["retail"]["range"][1]
+    # where the passing necessary condition's gross comes from: the legs sum to the gross; the synthetic gap sits on the
+    # Kraken price (Coinbase is the random walk), so the Kraken leg carries it, and the reason says so by leg
+    hv = stat["cells"][f"cb:{m.HIGHVOL_PAIR[0]}|kr:{m.HIGHVOL_PAIR[1]}|maker"]
+    legs = hv["legs"]
+    assert legs["n"] == hv["triggers"] and abs(legs["coinbase_leg"] + legs["kraken_leg"] - hv["mean_gross_per_trigger"]) < 1e-9
+    assert abs(legs["coinbase_leg"]) < 0.003 and legs["kraken_leg"] > 0.03 and legs["kraken_leg_share_of_gross"] > 0.9
+    assert legs["signed_gap_at_trigger"] > 0.04 and legs["signed_gap_at_exit"] < 0.005 and legs["fill_one_minute_later"]["n"] == legs["n"]
+    assert "its gross by leg" in reason and "signed gap at trigger" in reason
 
 
 def test_t425_null_fails_the_necessary_condition():
@@ -375,8 +383,9 @@ def test_t425_null_fails_the_necessary_condition():
     best = stat0["cells"][f"cb:{m.HIGHVOL_PAIR[0]}|kr:{m.HIGHVOL_PAIR[1]}|maker"]
     assert best["total_net"] < 0 and best["total_period_costs"] < 0
     assert "not recorded" in reason0 and "necessary for any tier" in reason0
-    # cells without triggers are only the financing drag: they do not enter the DSR family variance
+    # cells without triggers are only the financing drag: they do not enter the DSR family variance, and have no legs
     assert stat0["family_sharpes_daily"]["1m|retail"] is None and stat0["family_triggers"]["1m|retail"] < m.FAMILY_MIN_N
+    assert stat0["cells"][f"cb:{m.RETAIL_PAIR[0]}|kr:{m.RETAIL_PAIR[1]}|maker"]["legs"] is None
     # on a partial window the same failure must be decisive to count: the best pair's upper bound is below 0 here
     m._CACHE.clear()
     stat1, _, verdict1, reason1 = m.b6c_kraken_inventory_arb(FakeArchive(world([M1], seed=4)))
@@ -392,6 +401,32 @@ def test_t425_unresolved_tiers_stay_inconclusive():
     worst = stat["cells"][f"cb:{m.RETAIL_PAIR[0]}|kr:{m.RETAIL_PAIR[1]}|taker"]
     assert best["triggers"] > 50 and worst["triggers"] == 0
     assert verdict == "inconclusive" and stat["criteria"][0][1] is None and stat["criteria"][1][1] is True
+
+
+def test_leg_decomposition_separates_venue_reversion_from_gap_capture():
+    """Kraken-only reversion (Coinbase flat, Kraken's stale print reverts after the fill): the Kraken leg carries the whole
+    gross and vanishes when its fill is one minute later; both venues converging half-way: the legs split the gross."""
+    n = 20
+    cb, kr = np.full(n, 100.0), np.full(n, 100.0)
+    kr[10:12] = 100.0 * math.exp(-0.03)                     # gap 3% at the trigger (10) and the fill (11), gone from 12 on
+    gap = np.log(cb / kr)
+    tr = {"entry": np.array([10]), "fill_in": np.array([11]), "exit": np.array([13])}
+    L = m.leg_decomposition(tr, gap, cb, kr)
+    assert L["n"] == 1 and abs(L["mean_gross"] - 0.03) < 1e-12 and abs(L["coinbase_leg"]) < 1e-12 and abs(L["kraken_leg"] - 0.03) < 1e-12
+    assert abs(L["kraken_leg_share_of_gross"] - 1.0) < 1e-12
+    assert abs(L["signed_gap_at_trigger"] - 0.03) < 1e-12 and abs(L["signed_gap_at_fill"] - 0.03) < 1e-12 and abs(L["signed_gap_at_exit"]) < 1e-12
+    assert abs(L["fill_one_minute_later"]["kraken_leg"]) < 1e-12 and abs(L["fill_one_minute_later"]["coinbase_leg"]) < 1e-12   # over by t+2
+    cb2, kr2 = np.full(n, 100.0), np.full(n, 100.0)
+    cb2[10:12] = 100.0 * math.exp(0.015); kr2[10:12] = 100.0 * math.exp(-0.015)
+    L2 = m.leg_decomposition(tr, np.log(cb2 / kr2), cb2, kr2)
+    assert abs(L2["coinbase_leg"] - 0.015) < 1e-12 and abs(L2["kraken_leg"] - 0.015) < 1e-12 and abs(L2["kraken_leg_share_of_gross"] - 0.5) < 1e-12
+    # the sign convention: Coinbase cheap (gap < 0) buys Coinbase and sells Kraken for the same gross
+    L3 = m.leg_decomposition(tr, -np.log(cb2 / kr2), kr2, cb2)
+    assert abs(L3["mean_gross"] - 0.03) < 1e-12 and abs(L3["signed_gap_at_trigger"] - 0.03) < 1e-12 and abs(L3["coinbase_leg"] - 0.015) < 1e-12
+    # no triggers -> None; arb_sim's empty result carries fill_in
+    empty = m.arb_sim(np.zeros(100), np.ones(100), 0.001)
+    assert empty["fill_in"].size == 0 and m.leg_decomposition(empty, np.zeros(100), np.ones(100), np.ones(100)) is None
+    assert m._legs_txt(None) == "" and "Kraken" in m._legs_txt(L)
 
 
 # --------------------------------------------------------------------------------------------------- T-459 --
@@ -505,6 +540,73 @@ def test_t459_full_grid_runs_and_the_family_spread_deflates_the_claim_cell():
     alt = stat["alternative_reading_signed_volume"]
     assert alt["out_of_sample"]["n"] > 30 and alt["out_of_sample"]["mean_net"] > 0 and alt["out_of_sample"]["stationary_p"] < 0.05
     assert "alternative reading" in reason and "alternative" not in " ".join(c[0] for c in stat["criteria"])
+
+
+def test_t459_decide_gates_both_criteria_on_the_same_minimum_evidence():
+    """Rule 5: the DSR row (an asymptotic-normal PSR) is decided only from the evidence the mean-net row needs, at least
+    MIN_TRADES_DECIDE trades on MIN_DAYS_DECIDE days, so a handful of losing trades on 2-3 days cannot decide the claim through
+    the DSR row alone; the DSR and PSR values are still reported."""
+    rng = np.random.default_rng(0)
+    few = np.array([-0.456, -0.330, -0.320, -0.164, -0.851, -0.741]) / 100          # the reproduced 6 trades on 3 days
+    days3 = ["2024-01-03", "2024-01-03", "2024-02-11", "2024-02-11", "2024-02-11", "2024-03-20"]
+    d = m.t459_decide(few, days3, [None])
+    assert d["enough"] is False and d["n_days"] == 3 and d["n"] == 6
+    assert d["dsr"]["psr0"] is not None and d["dsr"]["psr0"] < 0.05           # the PSR alone WOULD have called it decisive
+    assert d["dsr_crit"][1] is None and d["dsr_crit"][2] is False and "not decided" in d["dsr_crit"][0]
+    assert d["cs"]["p"] is None and d["sb"]["p"] is None and d["p_ok"] is None and d["p_dec"] is False and d["cs"]["clusters"] == 3
+    # 8 losing trades on 2 days: the day gate binds too (fewer than 4 clusters would give a degenerate cluster p of 0 / 1)
+    x8 = -0.004 + 0.001 * rng.normal(size=8)
+    d8 = m.t459_decide(x8, ["2024-01-03"] * 4 + ["2024-01-04"] * 4, [None])
+    assert d8["enough"] is False and d8["dsr_crit"][1] is None and d8["p_dec"] is False and d8["dsr"]["psr0"] < 0.05
+    # 40 losing trades on 20 days decide, decisively, through both rows
+    x40 = -0.004 + 0.001 * rng.normal(size=40)
+    d40 = m.t459_decide(x40, [f"2024-01-{1 + k // 2:02d}" for k in range(40)], [None])
+    assert d40["enough"] is True and d40["dsr_crit"][1] is False and d40["dsr_crit"][2] is True and d40["p_ok"] is False and d40["p_dec"] is True
+    # a planted positive mean on enough evidence passes both
+    x60 = 0.005 + 0.002 * rng.normal(size=60)
+    d60 = m.t459_decide(x60, [f"2024-02-{1 + k // 3:02d}" for k in range(60)], [None])
+    assert d60["p_ok"] is True and d60["p_dec"] is False and d60["dsr_crit"][1] is True and d60["dsr"]["dsr"] >= 0.95
+    # fewer than 4 trades: no DSR at all, still not an error
+    d2 = m.t459_decide(few[:2], days3[:2], [None])
+    assert d2["dsr"]["dsr"] is None and d2["dsr_crit"][1] is None and "n/a" in d2["dsr_crit"][0]
+
+
+def test_t459_few_days_out_of_sample_are_reported_not_decided():
+    """Harness level: losing out-of-sample trades on only two days (the null world with M2 cut to its first two days) are
+    below the minimum evidence, so neither criterion is decided and the verdict is inconclusive; the PSR alone (and the
+    degenerate 2-cluster bootstrap) would have called it a decisive failure."""
+    b = world([M1, M2], seed=7, imb_level=0.0)
+    b[m.KR_PREFIX + M2] = b[m.KR_PREFIX + M2][:2 * 1440]
+    b[m.CB_PREFIX + M2] = b[m.CB_PREFIX + M2][:2 * 1440]
+    stat, n, verdict, reason = m.b6c_kraken_flow_imbalance(FakeArchive(b))
+    json.dumps(stat, allow_nan=False)
+    assert n >= 8 and stat["oos"]["n_days"] <= 2 and stat["oos"]["minimum_evidence"]["met"] is False
+    assert stat["oos"]["mean_net"] < 0 and stat["dsr"]["psr0"] is not None and stat["dsr"]["psr0"] < 0.05
+    assert stat["oos"]["stationary_boot"]["p"] is None and stat["oos"]["cluster_boot"]["p"] is None
+    assert stat["criteria"][0][1] is None and stat["criteria"][0][2] is False and stat["criteria"][1][1] is None and stat["criteria"][1][2] is False
+    assert verdict == "inconclusive", reason
+    assert f"below the {m.MIN_TRADES_DECIDE}-trade / {m.MIN_DAYS_DECIDE}-day minimum" in reason and "not decided" in reason
+
+
+def test_t459_tercile_cutpoints_come_from_in_sample_signals(monkeypatch):
+    """The volatility-tercile cutpoints are the terciles of the in-sample SIGNAL minutes (plentiful), not of the in-sample
+    FILLED trades: with no seller printing through the bid in sample (zero in-sample fills) the control is still produced,
+    and it follows the claim cell's window."""
+    fake = FakeArchive(world([M1, M2], seed=7, flow_drift=0.0015, flow_spike=2.0, imb_level=0.0))
+    g = m.grid(fake, [M1, M2], [M1, M2])
+    a0, a1 = m._idx_range(g, M1, M1)
+    g["kr_slo"][a0:a1] = g["kr_close"][a0:a1] * 1.05        # in-sample sells print 5% above every close: no maker fill in sample
+    stat, n, verdict, reason = m.b6c_kraken_flow_imbalance(fake)
+    assert stat["in_sample_claim_cell"]["n"] == 0 and stat["in_sample_claim_cell"]["signals"] >= m.TERCILE_MIN_SIGNALS
+    cp = stat["vol_terciles_cutpoints"]
+    assert cp["n_in_sample_signals"] >= m.TERCILE_MIN_SIGNALS and cp["rv60"][0] < cp["rv60"][1] and cp["source"].startswith("in-sample signal")
+    assert set(stat["vol_terciles_oos"]) == {"low", "mid", "high"} and sum(v["n"] for v in stat["vol_terciles_oos"].values()) == n > 0
+    assert "vol terciles (cutpoints from" in reason and "n/a (fewer" not in reason
+    # the control follows the claim cell: a patched claim cell (w = 15) takes the cutpoints from ITS in-sample signals
+    monkeypatch.setattr(m, "T459_CLAIM", (15, 5, 2.0, True))
+    stat15, n15, _, reason15 = m.b6c_kraken_flow_imbalance(fake)
+    assert stat15["claim_cell"] == "w15|h5|z2|maker" and "claim cell w15|h5|z2|maker" in reason15
+    assert stat15["vol_terciles_cutpoints"]["n_in_sample_signals"] != cp["n_in_sample_signals"] and set(stat15["vol_terciles_oos"]) == {"low", "mid", "high"}
 
 
 def test_t459_without_out_of_sample_months_is_inconclusive():
