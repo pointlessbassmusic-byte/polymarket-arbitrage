@@ -49,13 +49,15 @@ MANDEL_TESTS = {
               "unit": "weighted nights", "n_target": 200, "decision": "Sharpe gain lower bound > 0 on T-559's fills"},
     "T-573": {"strategy": "Shadow: EWMA volatility scaling of QQQM overnight", "venue": "record only (Linode)", "mode": "forward",
               "unit": "weighted nights", "n_target": 200, "decision": "Sharpe gain lower bound > 0 on T-559's fills"},
+    "T-576": {"strategy": "IEF over the month's last session (Treasury month-end)", "venue": "Alpaca paper", "mode": "paper",
+              "unit": "month-end holds", "n_target": 24, "decision": "fills <= 1.5 bp at 10; mean net > 0 at 24"},
     "T-567": {"strategy": "Pre-holiday IWM (1-day hold)", "venue": "Alpaca paper", "mode": "paper",
               "unit": "holiday events", "n_target": 27, "decision": "fills <= 1.5 bp at 10 events; mean net > 0 at 27"},
     "T-568": {"strategy": "GLD / TLT / USO put spreads (9-24 day holds)", "venue": "Alpaca paper", "mode": "paper",
               "unit": "closed spreads", "n_target": 36, "decision": "mean P&L per spread > 0, no loss beyond max"},
 }
 REGISTERED = {"T-541": "2026-10-15", "T-542": "2026-10-14", "T-543": "2026-10-15", "T-559": "2026-10-20", "T-560": "2026-10-20",
-              "T-565": "2026-10-20", "T-566": "2026-10-20", "T-567": "2026-10-20", "T-568": "2026-10-20", "T-573": "2026-10-20"}
+              "T-565": "2026-10-20", "T-566": "2026-10-20", "T-567": "2026-10-20", "T-568": "2026-10-20", "T-573": "2026-10-20", "T-576": "2026-10-20"}
 
 
 def _registry() -> dict:
@@ -179,7 +181,7 @@ def build(today: date, journal_path: Path) -> list[dict]:
         elif tid == "T-541":
             row.update(n_now=0, status=f"stalled: {arch['T-541']['captures']} capture days, last {arch['T-541']['last']}",
                        next_step="restart the daily options capture; first settlements follow the Nov VIX expiry", source="archive captures")
-        elif tid in ("T-565", "T-566", "T-567", "T-568", "T-573"):
+        elif tid in ("T-565", "T-566", "T-567", "T-568", "T-573", "T-576"):
             row.update(n_now=0, status="waiting on the Linode capture install",
                        next_step="run deploy/capture/install.sh on the Linode", started=None, source="capture box (not yet installed)")
         elif tid == "T-543":

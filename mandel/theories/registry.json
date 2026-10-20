@@ -14938,7 +14938,7 @@
    "results": [
     "X-ceefbf80"
    ],
-   "notes": "pre-registered 2026-10-20: Treasury month-end index extension is the bond analogue of the supported equity turn-of-month (T-59) and is tradeable with Treasury futures."
+   "notes": "pre-registered 2026-10-20: Treasury month-end index extension is the bond analogue of the supported equity turn-of-month (T-59) and is tradeable with Treasury futures. Independent refutation 2026-10-20 (verdict stands, weakened as a trade): present in traded prices (month-end minus other days: TLT +17.0 bp p 0.0005, IEF +10.0, AGG +7.3, SHY +3.0; scales with duration), no FRED or ex-dividend artefact (raw close the same; corr with ETF returns -0.89/-0.95), builds over the last three days (2nd-last +4.8 bp) and reverses slightly on day 1, broad (top 1% of month-ends carry 13% of the excess), stronger without FOMC/pre-holiday overlaps, weak at quarter-ends; but DECAYED: synthetic month-end price return 2023-26 +2.7 bp (t 0.5), since 2022 IEF +7.0 bp (p 0.11), TLT -2.9. Net now ~+3 bp a month on IEF/ZN (low confidence). Forward paper record T-576 before any money."
   },
   {
    "id": "T-575",
@@ -14968,6 +14968,31 @@
     "X-d4d43185"
    ],
    "notes": "pre-registered 2026-10-20: FX carry and momentum failed in Mandel; a calendar flow effect is the FX analogue of the equity calendar edges that did survive."
+  },
+  {
+   "id": "T-576",
+   "slug": "ief-month-end-paper",
+   "kind": "underlying-strategy",
+   "claim": "On Alpaca paper from 2026-10, buying IEF at the closing auction of the second-to-last session of each month and selling at the last session's closing auction earns a positive mean net return per month, with fills within 1.5 bp a side of the official close.",
+   "origin": [
+    "T-574",
+    "forward tests 2026-10-20"
+   ],
+   "trial": {
+    "statistic": "(a) mean |fill - official close| per side; (b) mean net return per month-end hold",
+    "null": "(a) > 1.5 bp; (b) mean <= 0",
+    "procedure": "mandel.live.wide (pinned commit), 30% of MANDEL_WIDE_CAPITAL, whole shares, never borrowing; official closes from daily-history-IEF; decisions journalled before the auction",
+    "data": "the widened-sleeve journal (Linode), daily-history-IEF",
+    "min_n": 24,
+    "pass": "(a) at 10 months; (b) at 24 months: mean net > 0",
+    "controls": "T-574's effect decayed to ~0 since 2024 (review): this forward record decides whether it still pays; holds 1 session"
+   },
+   "experiments": [],
+   "testable_now": false,
+   "status": "blocked",
+   "blocked_on": "24 month-end holds on paper",
+   "results": [],
+   "notes": "pre-registered forward paper test 2026-10-20 after T-574's review (effect present 1990-2026, decayed since 2024)."
   }
  ]
 }

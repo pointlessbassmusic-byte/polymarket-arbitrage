@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `a4ddf5ef57cf3ed7`). 507 theories. supported 58, not_supported 251, inconclusive 49, untested 4, blocked 130, parked 15.
+Rendered from `registry.json` (hash `a006229099dbd1d9`). 510 theories. supported 59, not_supported 252, inconclusive 49, untested 4, blocked 131, parked 15.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (58)
+## Supported (59)
 
 ### T-06 · price-series-are-multifractal
 
@@ -935,7 +935,22 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-7aebfe00: supported — SPY 2003-01-02..2026-09-30 (5974 days): QLIKE yearly -8.27313 vs daily -8.29949, difference +0.02636 (p 0.0101 (MC +/-0.0020), Holm 0.0162 (MC +/-0.0025)); daily parameters drift from the January fit by a median 0.006 pts of daily high-state vol (95th pct 0.071), 0.0005 in the high-state stay probability; QQQ 2003-01-02..2026-09-30 (5974 days): QLIKE yearly -7.78344 vs daily -7.80646, difference +0.02301 (p 0.0005 (MC +/-0.0004), Holm 0.0015 (MC +/-0.0008)); daily parameters drift from the January fit by a median 0.010 pts of daily high-state vol (95th pct 0.167), 0.0008 in the high-state stay probability; IWM 2004-01-02..2026-09-30 (5722 days): QLIKE yearly -7.63070 vs daily -7.66411, difference +0.03341 (p 0.0081 (MC +/-0.0018), Holm 0.0162 (MC +/-0.0025)); daily parameters drift from the January fit by a median 0.021 pts of daily high-state vol (95th pct 0.289), 0.0006 in the high-state stay probability — all criteria pass
 - note: pre-registered on 2026-10-20: the user asked for daily per-model calibration so parameters cannot drift from what the data supports. Independent refutation 2026-10-20 (verdict stands, weakened): no look-ahead; SPY and IWM gains come from crisis days (top 1% of days carry 101% / 94%; 2008 is 76% / 79%; excluding 2008 and 2020 the gain is +0.0028 / +0.0052, still p 0.0005); QQQ's warm-started daily chain sits on a worse local optimum than the cold January fit (2.7-5.9 log-lik points), so its arm differs partly by optimum; both refits lose to EWMA(0.94) on all three ETFs (daily HMM minus EWMA QLIKE +0.055 to +0.072), daily refitting closes only 25-38% of that gap. Consequences: the live calibration challenger now keeps the better of a warm and a cold fit each day; EWMA is tracked as the benchmark and gets its own forward shadow (T-573).
 
-## Not Supported (251)
+### T-574 · treasury-month-end-extension
+
+**Claim.** From 1990-01 to 2026-09, the synthetic 10-year Treasury total return (from FRED DGS10: carry y/252 minus modified duration x daily yield change) on the last trading day of each month exceeds its mean on all other days by at least 1 bp, with both halves positive.
+
+- kind: underlying-strategy · origin: T-59 (equity turn-of-month) / T-484 (synthetic 10Y), cross-asset futures/FX sweep 2026-10-20 (month-end index-extension and hedge-rebalancing flows)
+- statistic: mean synthetic 10Y daily return on month-end days minus the mean on other days, bps
+- null: difference <= 1 bp
+- procedure: mandel.experiments.batch11_xasset: daily return = y_{t-1}/100/252 - D(y_{t-1}) (y_t - y_{t-1})/100, D = modified duration of a 10-year par bond at y_{t-1}; month-end = the last FRED observation of each calendar month; studentized circular block bootstrap of the paired day-flag series (blocks of 21 days); halves 1990-2007 / 2008-2026; reported: the 2-year note (DGS2), the last 2 and first 2 days of the month
+- data: fred-DGS10, fred-DGS2 · min n: 400
+- pass: difference >= 1 bp with one-sided p < 0.05 and both halves positive
+- controls: index-extension buying is documented in the literature for month-end; the synthetic return ignores convexity and the bid-ask of the futures/ETF that would carry it (a micro Treasury future or TLT, 1-2 bp a round trip, reported)
+- harness: b11_xasset_treasury_month_end
+- result X-ceefbf80: supported — synthetic 10Y total return (FRED DGS10, par-bond duration) 1990-01-02..2026-09-30: month-end +12.05 vs other days +1.32 bps (441 month-ends), difference +10.74 bps; halves +10.18 / +11.28; reported: 2Y note month-end difference +2.62 bps, second-to-last day +5.08, first two days -0.73 bps — all criteria pass
+- note: pre-registered 2026-10-20: Treasury month-end index extension is the bond analogue of the supported equity turn-of-month (T-59) and is tradeable with Treasury futures. Independent refutation 2026-10-20 (verdict stands, weakened as a trade): present in traded prices (month-end minus other days: TLT +17.0 bp p 0.0005, IEF +10.0, AGG +7.3, SHY +3.0; scales with duration), no FRED or ex-dividend artefact (raw close the same; corr with ETF returns -0.89/-0.95), builds over the last three days (2nd-last +4.8 bp) and reverses slightly on day 1, broad (top 1% of month-ends carry 13% of the excess), stronger without FOMC/pre-holiday overlaps, weak at quarter-ends; but DECAYED: synthetic month-end price return 2023-26 +2.7 bp (t 0.5), since 2022 IEF +7.0 bp (p 0.11), TLT -2.9. Net now ~+3 bp a month on IEF/ZN (low confidence). Forward paper record T-576 before any money.
+
+## Not Supported (252)
 
 ### T-02 · longshot-bias
 
@@ -4894,6 +4909,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-586fc4b7: not_supported — calendar sleeve slots (overnight QQQ, IBS SPY, turn-of-month SPY; 1 bp a side) 2006-01-03..2026-09-30 (5218 days): half-Kelly weights re-estimated monthly on all prior days averaged 0.27 / 0.42 / 0.30 (invested 100%) vs fixed 0.40 / 0.30 / 0.30; annual log growth +6.32% vs +6.79%, Sharpe 0.78 vs 0.81 — failed: mean daily log growth, Kelly - fixed -0.187 bps/day > 0 with p < 0.05 (p 0.8750 (MC +/-0.0065)); both halves positive (-0.044 / -0.331 bps/day)
 - note: pre-registered from the signal map on 2026-10-20: the map's Kelly / bet-sizing concept had one blocked theory; the sleeve's 40/30/30 split was a judgement call.
 
+### T-575 · usd-month-end-weakness-g10
+
+**Claim.** From 2000-01 to 2026-09, an equal-weight basket of the nine G10 currencies against the US dollar rises more on the last two trading days of each month than on other days, by at least 2 bp a day, with both halves positive.
+
+- kind: underlying-strategy · origin: T-368/T-478 (FX carry, momentum: not supported), cross-asset futures/FX sweep 2026-10-20 (month-end index-extension and hedge-rebalancing flows)
+- statistic: mean daily log change of the equal-weight G10-vs-USD basket on the last two trading days of the month minus other days, bps
+- null: difference <= 2 bp
+- procedure: mandel.experiments.batch11_xasset: basket = mean over EUR, JPY, GBP, CHF, CAD, AUD, NZD, SEK, NOK of the daily log change of USD per unit (FRED noon rates); days on which every currency has a print; studentized circular block bootstrap (21-day blocks); halves 2000-2012 / 2013-2026; per-currency signs reported
+- data: fx-spot-g10 · min n: 600
+- pass: difference >= 2 bp with one-sided p < 0.05 and both halves positive
+- controls: month-end USD selling from foreign investors' hedge rebalancing is a documented flow; FRED noon fixes are not tradeable prints (the trade would use CME FX futures or a US FX broker at ~1-2 pips); carry over two days is negligible and ignored
+- harness: b11_xasset_usd_month_end
+- result X-d4d43185: not_supported — equal-weight G10-vs-USD basket 2000-01-03..2026-09-30 (6706 days): last two days of the month +3.44 vs other days -0.37 bps, difference +3.82 bps; halves +5.07 / +2.64; per currency EUR +3.6, JPY +2.8, GBP +7.0, CHF +6.5, CAD +1.9, AUD +1.2, NZD +2.1, SEK +5.2, NOK +4.2; 9 of 9 positive — failed: flag-day minus other-day mean +3.82 bps >= 2.0 bp with one-sided p < 0.05 (p 0.1956 (MC +/-0.0078))
+- note: pre-registered 2026-10-20: FX carry and momentum failed in Mandel; a calendar flow effect is the FX analogue of the equity calendar edges that did survive.
+
 ## Inconclusive (49)
 
 ### T-01 · market-prices-beat-the-coin
@@ -5720,7 +5750,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: b6c_kraken_vpin_volatility
 - note: from the underlying-library library: VPIN flow toxicity predicts crypto volatility; harness suggestion: VPIN builder in a crypto microstructure module. HAR and QLIKE shared with social-volume-volatility. | added by the verifier pass
 
-## Blocked (130)
+## Blocked (131)
 
 ### T-05 · cross-venue-arbitrage
 
@@ -7519,6 +7549,20 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: EWMA was chosen after the T-569 / T-572 reviews found it the best variance forecaster on 2003-2026 data, so only a forward record is evidence; nothing is traded (T-559 unchanged)
 - blocked on: 200 shadow-weighted overnight nights of T-559 fills
 - note: pre-registered forward shadow on 2026-10-20: the better variance forecaster's version of T-566.
+
+### T-576 · ief-month-end-paper
+
+**Claim.** On Alpaca paper from 2026-10, buying IEF at the closing auction of the second-to-last session of each month and selling at the last session's closing auction earns a positive mean net return per month, with fills within 1.5 bp a side of the official close.
+
+- kind: underlying-strategy · origin: T-574, forward tests 2026-10-20
+- statistic: (a) mean |fill - official close| per side; (b) mean net return per month-end hold
+- null: (a) > 1.5 bp; (b) mean <= 0
+- procedure: mandel.live.wide (pinned commit), 30% of MANDEL_WIDE_CAPITAL, whole shares, never borrowing; official closes from daily-history-IEF; decisions journalled before the auction
+- data: the widened-sleeve journal (Linode), daily-history-IEF · min n: 24
+- pass: (a) at 10 months; (b) at 24 months: mean net > 0
+- controls: T-574's effect decayed to ~0 since 2024 (review): this forward record decides whether it still pays; holds 1 session
+- blocked on: 24 month-end holds on paper
+- note: pre-registered forward paper test 2026-10-20 after T-574's review (effect present 1990-2026, decayed since 2024).
 
 ## Parked (15)
 

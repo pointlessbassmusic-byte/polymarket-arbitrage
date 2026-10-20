@@ -183,6 +183,16 @@
   "action": "T-554 replicates on ETH; until it reads, neither direction is traded"
  },
  {
+  "id": "exposure:factor:rates-beta",
+  "severity": "info",
+  "kind": "exposure",
+  "node": "factor:rates-beta",
+  "message": "2 strategies carry rates-beta: $2,000 gross, $2,000 net against a $2,000 cap",
+  "affected": "T-568, T-576",
+  "n_affected": 2,
+  "action": "within the cap; they move together"
+ },
+ {
   "id": "exposure:factor:short-volatility",
   "severity": "info",
   "kind": "exposure",

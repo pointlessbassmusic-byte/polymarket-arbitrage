@@ -64,6 +64,8 @@ WIRING: dict[str, dict] = {
     "T-566": {"signals": ["hmm-vol-regime", "overnight-gap"], "streams": ["alpaca-iex-bars"], "venue": "record-only",
               "factors": {}},
     "T-573": {"signals": ["ewma-vol", "overnight-gap"], "streams": ["alpaca-iex-bars"], "venue": "record-only", "factors": {}},
+    "T-576": {"signals": ["treasury-month-end"], "streams": ["alpaca-iex-bars"], "venue": "alpaca", "account": "alpaca-paper-wide",
+              "factors": {"rates-beta": 1}, "capital_usd": 1500},
     "T-567": {"signals": ["pre-holiday"], "streams": ["alpaca-iex-bars"], "venue": "alpaca", "account": "alpaca-paper-wide",
               "factors": {"us-equity-beta": 1}, "capital_usd": 2000},
     "T-568": {"signals": ["put-premium"], "streams": ["alpaca-option-quotes"], "venue": "alpaca",
@@ -125,7 +127,7 @@ CONTRADICTIONS = [
 ]
 
 FACTOR_CAP_USD = {"us-equity-beta": 8000, "short-volatility": 3500, "crypto-beta": 1500, "gold-beta": 1000,
-                  "rates-beta": 1000, "oil-beta": 1000}   # combined, per factor
+                  "rates-beta": 2000, "oil-beta": 1000}   # combined, per factor
 
 STREAM_STALE_DAYS = 3        # an archived daily stream older than this (in days) is stale
 STREAM_STALE_OVERRIDE = {"fomc-meetings": 120, "macro-release-cpi": 40,   # calendars: refreshed monthly at most

@@ -80,6 +80,13 @@ def test_wide_close_buys_iwm_before_a_pre_holiday_and_never_borrows(monkeypatch,
     assert '"qty": "2"' in capsys.readouterr().out                        # capped by cash: 450 / 200 = 2
 
 
+def test_monthend_target_holds_ief_over_the_last_session():
+    s = _sess(date(2026, 9, 20), date(2026, 10, 10), closed=())
+    assert W.monthend_target(date(2026, 9, 29), s) is True        # next session Sep 30 is the month's last
+    assert W.monthend_target(date(2026, 9, 30), s) is False       # sell at the last close
+    assert W.monthend_target(date(2026, 9, 28), s) is False
+
+
 def test_shadow_record_from_bars_is_point_in_time():
     models = SH.load_models()
     import numpy as np

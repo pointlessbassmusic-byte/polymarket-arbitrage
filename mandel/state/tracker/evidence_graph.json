@@ -241,6 +241,30 @@
    "label": "ewma-vol"
   },
   {
+   "id": "T-576",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "IEF over the month's last session (Treasury month-end)",
+   "mode": "paper",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:treasury-month-end",
+   "kind": "signal",
+   "label": "treasury-month-end"
+  },
+  {
+   "id": "account:alpaca-paper-wide",
+   "kind": "account",
+   "label": "alpaca-paper-wide"
+  },
+  {
+   "id": "factor:rates-beta",
+   "kind": "factor",
+   "label": "rates-beta",
+   "cap_usd": 2000
+  },
+  {
    "id": "T-567",
    "kind": "strategy",
    "owner": "Mandel",
@@ -254,11 +278,6 @@
    "label": "pre-holiday"
   },
   {
-   "id": "account:alpaca-paper-wide",
-   "kind": "account",
-   "label": "alpaca-paper-wide"
-  },
-  {
    "id": "T-568",
    "kind": "strategy",
    "owner": "Mandel",
@@ -270,12 +289,6 @@
    "id": "factor:gold-beta",
    "kind": "factor",
    "label": "gold-beta",
-   "cap_usd": 1000
-  },
-  {
-   "id": "factor:rates-beta",
-   "kind": "factor",
-   "label": "rates-beta",
    "cap_usd": 1000
   },
   {
@@ -967,6 +980,34 @@
    "from": "T-573",
    "to": "venue:record-only",
    "kind": "trades_on"
+  },
+  {
+   "from": "T-576",
+   "to": "signal:treasury-month-end",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:treasury-month-end",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-576"
+  },
+  {
+   "from": "T-576",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-576",
+   "to": "account:alpaca-paper-wide",
+   "kind": "in"
+  },
+  {
+   "from": "T-576",
+   "to": "factor:rates-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 1500
   },
   {
    "from": "T-567",

@@ -10,6 +10,8 @@ Widened asset sleeves (forward tests T-567 and T-568): more assets, holds up to 
   T-567  pre-holiday IWM: buy IWM at the close of the session before the last session ahead of a scheduled NYSE holiday,
          sell it at that pre-holiday session's close (T-349: +12.3 bps vs other days, 2000-2026, p 0.048; one-day hold).
          Early-close sessions (the day before Independence Day, Christmas Eve) are handled by the 12:46 run.
+  T-576  IEF over the month's last session: bought at the close of the second-to-last session, sold at the last
+         session's close (T-574: Treasury month-end extension, +10 bp 1990-2026 in IEF, decayed to ~0 since 2024).
   T-568  one defined-risk put credit spread per underlying on GLD, TLT and USO: the standard monthly expiry 30-45 days out,
          short strike the highest listed at or below 95% of spot, long strike WIDTH lower, closed at 50% of the credit or
          at 21 days to expiry (holds 9-24 days). Basis: each asset's implied variance exceeds its realised variance
@@ -43,6 +45,7 @@ JOURNAL = STATE / "journal.jsonl"
 KILL = STATE / "KILL"
 CAPITAL = float(os.environ.get("MANDEL_WIDE_CAPITAL") or 5000)
 PREHOL_SLOT = 0.40                                  # of CAPITAL
+MONTHEND_SLOT = 0.30                                # T-576: IEF held over the month's last session
 SPREADS = {"GLD": 5.0, "TLT": 2.0, "USO": 2.0}       # underlying -> width in points
 SPREAD_BUDGET = 0.10                                # max loss per spread, of CAPITAL
 CLOSE_WINDOW_MIN = (4, 16)                          # act only this many minutes before the session's close
@@ -78,6 +81,15 @@ def prehol_target(day: date, sess: dict) -> bool:
     """Hold IWM from ``day``'s close when the next session is a pre-holiday session."""
     later = sorted(d for d in sess if d > day)
     return bool(later) and is_pre_holiday(later[0], sess)
+
+
+def monthend_target(day: date, sess: dict) -> bool:
+    """Hold IEF from ``day``'s close when the next session is the last session of its month (T-576)."""
+    later = sorted(d for d in sess if d > day)
+    if not later:
+        return False
+    nxt = later[0]
+    return not any(d > nxt and (d.year, d.month) == (nxt.year, nxt.month) for d in sess)
 
 
 def in_close_window(now: datetime, close_t: dtime) -> bool:
@@ -166,18 +178,24 @@ def phase_close(api, dry: bool, now: Optional[datetime] = None) -> None:
         print(f"outside the closing-auction window for a {sess[today]} close"); return
     acct = api.account()
     cash = float(acct.get("cash") or 0)
-    held = {p["symbol"]: int(float(p["qty"])) for p in api.positions() if p["symbol"] == "IWM"}
-    px = api.stock_snapshots(["IWM"])["IWM"]["latestTrade"]["p"]
-    hold = prehol_target(today, sess)
-    budget = min(CAPITAL * PREHOL_SLOT, cash + held.get("IWM", 0) * px)
-    want = S.shares_for(budget, px) if hold else 0
-    delta = want - held.get("IWM", 0)
-    orders = []
-    if delta:
-        orders.append(auction_order("IWM", abs(delta), "buy" if delta > 0 else "sell", "cls",
-                                    f"w-cls-IWM-{today}-{uuid.uuid4().hex[:6]}"))
-    _journal("close.decision", {"day": today, "close_time": sess[today], "pre_holiday_next": hold, "price": px,
-                                "budget": budget, "held": held, "orders": orders}, dry)
+    held = {p["symbol"]: int(float(p["qty"])) for p in api.positions() if p["symbol"] in ("IWM", "IEF")}
+    snap = api.stock_snapshots(["IWM", "IEF"])
+    plan = {"IWM": (prehol_target(today, sess), PREHOL_SLOT), "IEF": (monthend_target(today, sess), MONTHEND_SLOT)}
+    orders, budgets, prices = [], {}, {}
+    free = cash + sum(held.get(s, 0) * snap[s]["latestTrade"]["p"] for s in held)   # never borrows across both slots
+    for sym, (hold, slot) in plan.items():
+        px = snap[sym]["latestTrade"]["p"]
+        budget = min(CAPITAL * slot, free)
+        want = S.shares_for(budget, px) if hold else 0
+        free -= want * px
+        delta = want - held.get(sym, 0)
+        budgets[sym], prices[sym] = budget, px
+        if delta:
+            orders.append(auction_order(sym, abs(delta), "buy" if delta > 0 else "sell", "cls",
+                                        f"w-cls-{sym}-{today}-{uuid.uuid4().hex[:6]}"))
+    _journal("close.decision", {"day": today, "close_time": sess[today], "pre_holiday_next": plan["IWM"][0],
+                                "month_end_next": plan["IEF"][0], "prices": prices, "budgets": budgets, "held": held,
+                                "orders": orders}, dry)
     for o in orders:
         _send(api, o, dry)
 
