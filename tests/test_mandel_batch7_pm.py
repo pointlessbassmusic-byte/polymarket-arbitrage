@@ -253,13 +253,21 @@ def test_cheap_yes_rows_exclusion_and_point_in_time():
     assert cnt["excluded_t02"] == 1 and cnt["no_price_at_horizon"] == 1                 # c is > 3 days stale
 
 
+def _fetch_log_rows(markets, reason_of=lambda mid: "sample", rate=1.0, month="2024-01"):
+    rows = [{"value": {"product": "daily-sample", "id": month, "month": month, "sample_rate": rate}}]
+    for m in markets:
+        mid = m["value"]["id"]
+        rows.append({"value": {"product": "daily", "id": mid, "month": month, "reason": reason_of(mid)}})
+    return rows
+
+
 def test_t557_missing_and_harness_contract():
     stat, n, v, reason = M.b7_pm_cheap_yes_archived_panel(FakeArchive({}))
     assert v == "inconclusive" and n == 0 and "polymarket-closed-markets" in reason and " — " in reason
     markets, daily = _pm_world(True)
     legacy = [markets[0]]
     arch = FakeArchive({"polymarket-closed-markets": legacy, "polymarket-price-history-daily": [daily[0]],
-                        "polymarket-closed-markets-2024-01": markets, "polymarket-price-history-daily-2024-01": daily})
+                        "polymarket-fetch-log": _fetch_log_rows(markets), "polymarket-closed-markets-2024-01": markets, "polymarket-price-history-daily-2024-01": daily})
     PMCAL._CACHE.clear()
     stat, n, v, reason = M.b7_pm_cheap_yes_archived_panel(arch, n_boot=300)
     json.dumps(stat)
@@ -267,10 +275,57 @@ def test_t557_missing_and_harness_contract():
     assert stat["n_excluded_ids_t02"] == 1 and " — " in reason
     markets0, daily0 = _pm_world(False)
     arch0 = FakeArchive({"polymarket-closed-markets": [markets0[0]], "polymarket-price-history-daily": [],
-                         "polymarket-closed-markets-2024-01": markets0, "polymarket-price-history-daily-2024-01": daily0})
+                         "polymarket-fetch-log": _fetch_log_rows(markets0), "polymarket-closed-markets-2024-01": markets0, "polymarket-price-history-daily-2024-01": daily0})
     PMCAL._CACHE.clear()
     _, _, v0, r0 = M.b7_pm_cheap_yes_archived_panel(arch0, n_boot=300)
     assert v0 != "supported", r0
+
+
+def test_t557_primary_is_panel_weighted_regression():
+    """Regression (reporting defect): daily history covers every priority market (event family, long-lived) but only a hash
+    sample of the rest, so the unweighted mean is a property of the selection. Here the priority strata are calibrated
+    longshots that lose (YES 0%) and the 10% sample is underpriced (YES ~ p + 0.08): the panel-weighted primary, weighting
+    'sample' markets by 1 / 0.10, must pass while the unweighted all-history mean is negative; and without a fetch log
+    the harness is inconclusive, never a verdict from the unweighted mean."""
+    rng = np.random.default_rng(3)
+    t0 = datetime(2024, 1, 1, tzinfo=UTC).timestamp()
+    markets, daily, reason = [], [], {}
+    for i in range(1200):
+        end = t0 + (i % 700) * DAY
+        p = float(rng.uniform(0.01, 0.05))
+        smp = i % 4 == 0
+        o = int(rng.random() < (p + 0.10)) if smp else 0
+        mid = f"m{i}"
+        reason[mid] = "sample" if smp else ("long-lived" if i % 2 else "family:us-election")
+        markets.append({"value": _pm_market(mid, end, o, f"e{i}")})
+        for d in range(30, 0, -1):
+            daily.append({"value": {"market_id": mid, "token": "t", "p": p, "t": end - d * DAY}, "available_at": _iso(end - d * DAY)})
+    arch = FakeArchive({"polymarket-closed-markets": [], "polymarket-price-history-daily": [],
+                        "polymarket-fetch-log": _fetch_log_rows(markets, reason.get, rate=0.10),
+                        "polymarket-closed-markets-2024-01": markets, "polymarket-price-history-daily-2024-01": daily})
+    PMCAL._CACHE.clear()
+    stat, n, v, r = M.b7_pm_cheap_yes_archived_panel(arch, n_boot=300)
+    json.dumps(stat)
+    assert stat["unweighted_all_history"]["mean"] < 0
+    assert stat["primary"]["mean"] > 0 and stat["primary"]["ci"][0] > 0 and n == 1200
+    assert stat["primary"]["weight_share_sample"] == pytest.approx(300 * 10 / (300 * 10 + 900))
+    assert v == "supported" and "panel-weighted" in r and "classic longshot" not in r, r
+    w = M.panel_weights(arch)
+    assert w["m0"] == pytest.approx(10.0) and w["m1"] == 1.0
+    arch_nolog = FakeArchive({k: val for k, val in arch.b.items() if k != "polymarket-fetch-log"})
+    PMCAL._CACHE.clear()
+    _, n2, v2, r2 = M.b7_pm_cheap_yes_archived_panel(arch_nolog, n_boot=100)
+    assert v2 == "inconclusive" and "polymarket-fetch-log" in r2
+
+
+def test_t557_non_yes_no_outcomes_dropped_regression():
+    """Regression: markets whose outcomes are not ['Yes', 'No'] (Over/Under, candidate names) are not YES contracts."""
+    end = datetime(2025, 6, 1, tzinfo=UTC).timestamp()
+    outs = {k: {"outcome": 0, "close_ts": end, "end_ts": end, "closed_ts": end + 3600, "question": k} for k in ("a", "b", "c")}
+    series = {k: (np.array([end - 8 * DAY]), np.array([0.05])) for k in outs}
+    meta = {"a": {"id": "a", "outcomes": json.dumps(["Yes", "No"])}, "b": {"id": "b", "outcomes": json.dumps(["Over", "Under"])}, "c": {"id": "c", "outcomes": ["Trump", "Harris"]}}
+    rows, cnt = M.cheap_yes_rows(outs, series, meta, set())
+    assert [r["mid"] for r in rows] == ["a"] and cnt["not_yes_no_outcomes"] == 2
 
 
 def test_registry_maps():

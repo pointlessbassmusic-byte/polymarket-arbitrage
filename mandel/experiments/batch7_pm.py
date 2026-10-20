@@ -44,7 +44,12 @@ parents' in-sample numbers that motivated the successors are not evidence and ar
            history in ``polymarket-price-history-daily-<YYYY-MM>``, close in 2023-2026, MINUS every market id that
            T-02's harness reads (``polymarket-closed-markets``, the cycle-2 2,100-market bundle, and
            ``polymarket-price-history-daily``, its 400-market price bundle). Bucket: price < 0.10. Statistic:
-           mean(outcome - price), event-clustered percentile bootstrap (``batch6c_pmcal.cluster_mean``: events[0].id,
+           mean(outcome - price) over the PANEL, i.e. inverse-probability weighted: daily history exists only for the
+           fetcher's selection (``pm_history.select_daily``: every event-family and every >= 100-day market, plus a
+           hash sample of the rest at the month's rate in polymarket-fetch-log 'daily-sample:<M>'), so a 'sample'
+           market weighs 1 / sample_rate and a priority market 1 (markets with no logged reason or rate are left out
+           and counted); the unweighted all-history mean and the 'sample'-stratum mean are reported sensitivities.
+           Only markets whose outcomes are ['Yes', 'No'] are YES contracts. Event-clustered percentile bootstrap (``batch6c_pmcal.cluster_mean``: events[0].id,
            else negRiskMarketID, else the market; 2,000 draws, two-sided 95%). Pass: the 95% CI excludes 0 on the
            positive side AND at least 20 YES resolutions in the bucket; min_n 300 markets. Secondary (reported, not a
            criterion): net P&L per contract buying YES at price + 1 cent spread + the market's own fee
@@ -65,6 +70,7 @@ Conventions
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from collections import Counter, defaultdict
@@ -74,8 +80,8 @@ from typing import Callable, Optional, Sequence
 import numpy as np
 
 from mandel.experiments.batch6b_bw import _clean, _decide
-from mandel.experiments.batch6c_pmcal import (LEGACY_DAILY, LEGACY_MARKETS, MONTH_DAILY_RE, MONTH_MARKETS_RE, _bundle_names,
-                                              _closed_meta, _daily_series, _fetch_log, _outcomes, _price_before, cluster_key,
+from mandel.experiments.batch6c_pmcal import (FETCH_LOG, LEGACY_DAILY, LEGACY_MARKETS, MONTH_DAILY_RE, MONTH_MARKETS_RE, _boot_weights,
+                                              _bundle_names, _closed_meta, _daily_series, _fetch_log, _outcomes, _price_before, cluster_key,
                                               cluster_mean, pm_fee)
 from mandel.experiments.batch6c_pmxv import DRB, HBTC_B, SmileBook, _deribit_groups, _hourly_spot, kalshi_quote
 from mandel.experiments.batch6c_pub import cluster_stud
@@ -477,6 +483,59 @@ def t02_excluded_ids(archive) -> set:
     return ids
 
 
+def _is_yes_no(m: dict) -> bool:
+    """True unless the market's outcomes are known and are not ['Yes', 'No'] (Over/Under, candidate names: not YES contracts)."""
+    o = (m or {}).get("outcomes")
+    if o is None:
+        return True
+    if isinstance(o, str):
+        try:
+            o = json.loads(o)
+        except ValueError:
+            return True
+    return [str(x).strip().lower() for x in o] == ["yes", "no"]
+
+
+def panel_weights(archive) -> dict:
+    """{market id: inverse selection probability} from polymarket-fetch-log: reason 'sample' -> 1 / the month's
+    'daily-sample:<M>' sample_rate; any other logged reason (event family, long-lived) -> 1 (fetched with certainty).
+    Markets with no logged reason, or a 'sample' market whose month has no positive rate, are absent."""
+    rate, info = {}, {}
+    for r in archive.load(FETCH_LOG):
+        v = r.get("value") or {}
+        if v.get("product") == "daily-sample":
+            rate[str(v.get("month"))] = v.get("sample_rate")
+        elif v.get("product") == "daily":
+            info[str(v.get("id"))] = (str(v.get("month")), v.get("reason"))
+    out = {}
+    for mid, (mon, why) in info.items():
+        if why is None:
+            continue
+        if why == "sample":
+            rt = rate.get(mon)
+            if rt is not None and float(rt) > 0:
+                out[mid] = 1.0 / float(rt)
+        else:
+            out[mid] = 1.0
+    return out
+
+
+def weighted_cluster_mean(e: np.ndarray, w: np.ndarray, keys: Sequence, n_boot: int = N_BOOT, seed: int = SEED) -> dict:
+    """sum(w e) / sum(w) with the event-clustered percentile bootstrap (cluster multiplicities times the design weights)."""
+    e = np.asarray(e, float); w = np.asarray(w, float)
+    if e.size == 0 or w.sum() <= 0:
+        return {"n": int(e.size), "mean": None, "ci": [None, None], "p_le0": None, "n_clusters": 0}
+    boots = []
+    for bw in _boot_weights(keys, n_boot, seed):
+        ww = bw * w; s_ = ww.sum()
+        if s_ > 0:
+            boots.append(float((ww * e).sum() / s_))
+    boots = np.array(boots)
+    lo, hi = (float(x) for x in np.quantile(boots, [0.025, 0.975]))
+    return {"n": int(e.size), "mean": float((w * e).sum() / w.sum()), "ci": [lo, hi], "p_le0": float(np.mean(boots <= 0)),
+            "n_clusters": int(np.unique(np.asarray(list(keys), dtype=object).astype(str)).size)}
+
+
 def cheap_yes_rows(outcomes: dict, series: dict, meta: dict, exclude: set, horizon_days: float = 7.0, hi_p: float = 0.10,
                    max_stale: float = 3 * DAY, years: tuple = (2023, 2026), anchor: str = "t02") -> tuple:
     """Bucket rows {mid, p, o, cluster, ...} for resolved markets not in ``exclude``, closing in ``years``. anchor 't02' is
@@ -516,15 +575,21 @@ def cheap_yes_rows(outcomes: dict, series: dict, meta: dict, exclude: set, horiz
         if not (p < hi_p):
             continue
         s = meta.get(mid, {})
+        if not _is_yes_no(s):
+            cnt["not_yes_no_outcomes"] += 1
+            continue
         rows.append({"mid": mid, "p": float(min(max(p, 0.0), 1.0)), "o": int(o["outcome"]), "cluster": cluster_key(s) if s else f"market:{mid}",
                      "year": y, "category": question_category(s.get("question", o.get("question", ""))), "fee_type": str(s.get("feeType") or "none"),
                      "fees_enabled": bool(s.get("feesEnabled")), "close_ts": o["close_ts"]})
     return rows, cnt
 
 
-def cheap_yes_stats(rows: Sequence[dict], spread: float = 0.01, n_boot: int = N_BOOT, seed: int = SEED, reasons: Optional[dict] = None) -> dict:
+def cheap_yes_stats(rows: Sequence[dict], spread: float = 0.01, n_boot: int = N_BOOT, seed: int = SEED, reasons: Optional[dict] = None,
+                    weights: Optional[dict] = None) -> dict:
     """mean(outcome - price) with the event-clustered percentile bootstrap; YES count; the secondary net P&L per contract
-    (buy YES at p + spread + the market's fee); splits by category, year, fee type and the fetcher's selection reason."""
+    (buy YES at p + spread + the market's fee); splits by category, year, fee type and the fetcher's selection reason.
+    With ``weights`` ({mid: inverse selection probability}) also the panel-representative ``weighted`` estimate (and its
+    weighted net), over the rows that carry a weight, and the reason == 'sample' stratum alone."""
     if not rows:
         return {"n": 0, "yes": 0, "mean": None, "ci": [None, None], "n_events": 0, "net": None}
     e = np.array([r["o"] - r["p"] for r in rows]); keys = [r["cluster"] for r in rows]
@@ -547,13 +612,26 @@ def cheap_yes_stats(rows: Sequence[dict], spread: float = 0.01, n_boot: int = N_
         for r in rows:
             r["reason"] = reasons.get(r["mid"], "unlogged")
         res["by_selection_reason"] = split("reason")
+    if weights is not None:
+        wr = [r for r in rows if weights.get(r["mid"]) is not None]
+        we = np.array([r["o"] - r["p"] for r in wr]); ww = np.array([float(weights[r["mid"]]) for r in wr]); wk = [r["cluster"] for r in wr]
+        wn = np.array([r["o"] - (r["p"] + spread) - pm_fee(min(r["p"] + spread, 1.0), r["fee_type"] if r["fee_type"] != "none" else None, r["fees_enabled"]) for r in wr])
+        wm = weighted_cluster_mean(we, ww, wk, n_boot, seed)
+        wnet = weighted_cluster_mean(wn, ww, wk, n_boot, seed)
+        smp = [r for r in wr if r.get("reason", "sample" if weights[r["mid"]] != 1.0 else None) == "sample"]
+        sm = cluster_mean(np.array([r["o"] - r["p"] for r in smp]), [r["cluster"] for r in smp], n_boot, seed) if smp else {"mean": None, "ci": [None, None], "n_clusters": 0}
+        res["weighted"] = {"n": len(wr), "yes": int(sum(r["o"] for r in wr)), "mean": wm["mean"], "ci": wm["ci"], "p_le0": wm["p_le0"],
+                           "n_events": wm["n_clusters"], "n_unweighted_dropped": len(rows) - len(wr),
+                           "weight_share_sample": float(ww[ww != 1.0].sum() / ww.sum()) if ww.size and ww.sum() > 0 else None,
+                           "net": {"spread": spread, "mean": wnet["mean"], "ci": wnet["ci"]}}
+        res["sample_stratum"] = {"n": len(smp), "yes": int(sum(r["o"] for r in smp)), "mean": sm["mean"], "ci": sm["ci"], "n_events": sm["n_clusters"]}
     return res
 
 
-def cheap_yes_criteria(res: dict, min_n: int = 300, min_yes: int = 20) -> list:
+def cheap_yes_criteria(res: dict, min_n: int = 300, min_yes: int = 20, label: str = "") -> list:
     lo, hi = res["ci"]
     c1 = None if lo is None else bool(lo > 0)
-    return [(f"event-clustered 95% CI of mean(outcome - price) [{_s(lo, 4)}, {_s(hi, 4)}] excludes 0 on the positive side (mean {_s(res['mean'], 4)})",
+    return [(f"event-clustered 95% CI of {label}mean(outcome - price) [{_s(lo, 4)}, {_s(hi, 4)}] excludes 0 on the positive side (mean {_s(res['mean'], 4)})",
              c1, bool(hi is not None and hi < 0)),
             (f"at least {min_yes} YES resolutions in the bucket ({res['yes']})", bool(res["yes"] >= min_yes), False)]
 
@@ -572,7 +650,7 @@ def _finish557(crit: list, n: int, min_n: int, stat: dict, text: str):
 
 def b7_pm_cheap_yes_archived_panel(archive, min_n: int = 300, n_boot: int = N_BOOT, seed: int = SEED):
     """T-557: Polymarket YES < 0.10 at 7 days before the end, on archived month-panel markets absent from T-02's sample."""
-    miss = _missing(archive, [LEGACY_MARKETS, LEGACY_DAILY], ["polymarket-closed-markets-", "polymarket-price-history-daily-"])
+    miss = _missing(archive, [LEGACY_MARKETS, LEGACY_DAILY, FETCH_LOG], ["polymarket-closed-markets-", "polymarket-price-history-daily-"])
     if miss:
         return miss
     if not _bundle_names(archive, MONTH_MARKETS_RE) or not _bundle_names(archive, MONTH_DAILY_RE):
@@ -580,28 +658,43 @@ def b7_pm_cheap_yes_archived_panel(archive, min_n: int = 300, n_boot: int = N_BO
     exclude = t02_excluded_ids(archive)
     meta, outs, series = _closed_meta(archive), _outcomes(archive), _daily_series(archive)
     reasons = (_fetch_log(archive) or {}).get("daily", {})
+    weights = panel_weights(archive)
     rows, cnt = cheap_yes_rows(outs, series, meta, exclude)
-    res = cheap_yes_stats(rows, n_boot=n_boot, seed=seed, reasons=reasons)
+    res = cheap_yes_stats(rows, n_boot=n_boot, seed=seed, reasons=reasons, weights=weights)
+    prim = res.get("weighted") or {"n": 0, "yes": 0, "mean": None, "ci": [None, None], "n_events": 0}
     rows_end, cnt_end = cheap_yes_rows(outs, series, meta, exclude, anchor="end")
     res_end = cheap_yes_stats(rows_end, n_boot=min(n_boot, 1000), seed=seed)
-    n = res["n"]
-    stat = {"primary": res, "counts": dict(cnt), "n_excluded_ids_t02": len(exclude), "n_resolved_with_history": len(outs),
+    n = prim["n"]
+    stat = {"primary": prim, "unweighted_all_history": res, "counts": dict(cnt), "n_excluded_ids_t02": len(exclude), "n_resolved_with_history": len(outs),
             "sensitivity_scheduled_end_anchor": {k: res_end.get(k) for k in ("n", "yes", "mean", "ci", "n_events")}, "counts_end_anchor": dict(cnt_end),
+            "weighting": "panel-representative: reason 'sample' weighted 1 / sample_rate of its month (polymarket-fetch-log 'daily-sample:<M>'), "
+                         "priority reasons (event family, long-lived) weighted 1; unlogged markets dropped",
             "construction": "T-02: close = min(closedTime, endDate); price = last daily point <= close - 7 d, <= 3 d stale, cutoff after endDate skipped"}
-    if n == 0:
+    if res["n"] == 0:
         crit = [("event-clustered 95% CI excludes 0 on the positive side", None, False), ("at least 20 YES resolutions", None, False)]
         return _finish557(crit, 0, min_n, stat, f"no market outside T-02's sample priced < 0.10 at 7 days ({dict(cnt)})")
-    crit = cheap_yes_criteria(res, min_n)
+    if n == 0:
+        crit = [("event-clustered 95% CI of the panel-weighted mean excludes 0 on the positive side", None, False), ("at least 20 YES resolutions", None, False)]
+        return _finish557(crit, 0, min_n, stat, f"{res['n']} bucket markets, none with a logged selection reason / sample rate in {FETCH_LOG}: the panel weights are unknown")
+    crit = cheap_yes_criteria(prim, min_n, label="the panel-weighted ")
     cats = ", ".join(f"{k} {v['n']} ({v['yes']} YES, {_s(v['mean'], 4)})" for k, v in res["by_category"].items())
     yrs = ", ".join(f"{k} {v['n']} ({v['yes']} YES, {_s(v['mean'], 4)})" for k, v in res["by_year"].items())
     sel = ", ".join(f"{k} {v['n']} ({v['yes']} YES)" for k, v in (res.get("by_selection_reason") or {}).items())
     text = (f"{len(outs)} resolved binary markets with daily history; {len(exclude)} market ids read by T-02 excluded ({cnt.get('excluded_t02', 0)} of the resolved), "
             f"{cnt.get('priced', 0)} priced at 7 d (T-02's construction; {cnt.get('post_end_cutoff', 0)} post-end cutoffs and {cnt.get('no_price_at_horizon', 0)} "
             f"without a price <= 3 d stale skipped). Bucket < 0.10: {n} markets in {res['n_events']} events, mean price {_f(res['mean_price'], 4)}, "
-            f"YES rate {_f(res['yes_rate'], 4)} ({res['yes']} YES), mean(outcome - price) {_s(res['mean'], 4)} [{_s(res['ci'][0], 4)}, {_s(res['ci'][1], 4)}] "
-            f"(event-clustered 95%); {res['n_price_zero']} priced at 0. Secondary net per contract after a 1-cent spread and the market's fee "
-            f"{_s(res['net']['mean'], 4)} [{_s(res['net']['ci'][0], 4)}, {_s(res['net']['ci'][1], 4)}]. Categories (question keywords): {cats}; years: {yrs}; "
-            f"selection reasons: {sel}. Sensitivity anchored at the scheduled endDate: {res_end['n']} markets, {res_end['yes']} YES, mean "
+            f"YES rate {_f(res['yes_rate'], 4)} ({res['yes']} YES; {cnt.get('not_yes_no_outcomes', 0)} non-Yes/No markets dropped). PRIMARY "
+            f"(panel-weighted: 'sample' markets x 1 / their month's sample rate, priority markets x 1; {prim['n']} markets with weights, "
+            f"{prim.get('n_unweighted_dropped', 0)} unlogged dropped; the sample stratum carries {_f(prim.get('weight_share_sample'), 3)} of the weight): "
+            f"mean(outcome - price) {_s(prim['mean'], 4)} [{_s(prim['ci'][0], 4)}, {_s(prim['ci'][1], 4)}] (event-clustered 95%). Sensitivities: "
+            f"unweighted over all history {_s(res['mean'], 4)} [{_s(res['ci'][0], 4)}, {_s(res['ci'][1], 4)}] (dominated by the priority strata, "
+            f"so not a panel estimate); 'sample' stratum alone {(res.get('sample_stratum') or {}).get('n')} markets "
+            f"({(res.get('sample_stratum') or {}).get('yes')} YES), {_s((res.get('sample_stratum') or {}).get('mean'), 4)} "
+            f"[{_s(((res.get('sample_stratum') or {}).get('ci') or [None, None])[0], 4)}, {_s(((res.get('sample_stratum') or {}).get('ci') or [None, None])[1], 4)}]; "
+            f"{res['n_price_zero']} priced at 0. Secondary panel-weighted net per contract after a 1-cent spread and the market's fee "
+            f"{_s(prim['net']['mean'], 4)} [{_s(prim['net']['ci'][0], 4)}, {_s(prim['net']['ci'][1], 4)}] (unweighted {_s(res['net']['mean'], 4)}). "
+            f"Unweighted splits: categories (question keywords): {cats}; years: {yrs}; "
+            f"selection reasons: {sel}. Sensitivity anchored at the scheduled endDate (unweighted): {res_end['n']} markets, {res_end['yes']} YES, mean "
             f"{_s(res_end['mean'], 4)} [{_s((res_end['ci'] or [None, None])[0], 4)}, {_s((res_end['ci'] or [None, None])[1], 4)}]")
     return _finish557(crit, n, min_n, stat, text)
 

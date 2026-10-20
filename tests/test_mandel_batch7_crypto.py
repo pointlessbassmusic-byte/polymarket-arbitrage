@@ -296,3 +296,53 @@ def test_maps():
     assert set(M.THEORY_MAP.values()) == set(M.HARNESSES)
     assert all(k.startswith("b7_crypto_") for k in M.HARNESSES)
     assert set(M.THEORY_MAP) == {"T-546", "T-554", "T-556"}
+
+
+# ============================================================================================ regression: defect fixes ==
+
+def _halves_disagree_data():
+    """First half: high returns, greed far above both baselines. Second half: greed above the half's own mean but below
+    the full-sample unconditional mean, so the two readings of 'both halves positive' disagree."""
+    rng = np.random.default_rng(11)
+    n = 600
+    f = np.where(np.arange(n) % 5 == 0, 90.0, 40.0)
+    fwd = np.empty(n)
+    fwd[:300] = rng.normal(0.010, 0.001, 300)
+    fwd[300:] = rng.normal(0.000, 0.001, 300)
+    g = f >= 75
+    fwd[:300][g[:300]] += 0.05
+    fwd[300:][g[300:]] += 0.002
+    return f, fwd, [f"d{k:04d}" for k in range(n)]
+
+
+def test_greed_halves_readings_disagree_is_undecided():
+    f, fwd, dd = _halves_disagree_data()
+    j = M.greed_test(f, fwd, dd, min_n=10)
+    assert j["halves"][1] > 0                      # T-41's per-half own mean reading passes
+    assert j["halves_vs_full_mean"][1] < 0         # the claim's full-sample unconditional mean reading fails
+    crit = dict(j["criteria"])
+    key = next(k for k in crit if k.startswith("both halves positive"))
+    assert crit[key] is None and "disagree" in key
+    assert j["verdict"] != "supported", j["why"]
+
+
+def test_greed_halves_both_readings_agree_pass():
+    fng, closes = _greed_data(True)
+    f, fwd, dd = M.greed_align(fng, closes, start="2018-01-01", end="2030-01-01")
+    j = M.greed_test(f, fwd, dd, min_n=150)
+    assert all(v > 0 for v in j["halves"] + j["halves_vs_full_mean"])
+    assert j["verdict"] == "supported"
+
+
+def test_bounce_reports_coarse_cluster_lower_ends():
+    tr = _trades(0.06, 0.05)
+    j = M.bounce_test(tr, n_boot=400, reps=2)
+    bc = j["boot_coarse"]
+    months = {t["entry_day"][:7] for t in tr}
+    two = {(m[:4], (int(m[5:7]) - 1) // 2) for m in months}
+    qtr = {(m[:4], (int(m[5:7]) - 1) // 3) for m in months}
+    assert bc["two_month"]["clusters"] == len(two) and bc["quarter"]["clusters"] == len(qtr)
+    assert bc["two_month"]["lower"] is not None and bc["quarter"]["lower"] is not None
+    assert j["boot"]["clusters"] == len(months)
+    # reporting only: the month-cluster criterion still decides
+    assert len(j["criteria"]) == 3 and j["verdict"] == "supported"

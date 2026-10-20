@@ -415,14 +415,27 @@ def greed_test(f: np.ndarray, fwd: np.ndarray, dd: Sequence[str], high: float = 
     p = float((1 + np.sum(null >= d - 1e-15)) / (1 + ks.size))
     half = n // 2
 
-    def _d(lo, hi):
+    def _d(lo, hi, base=None):
         sub, m = fwd[lo:hi], g[lo:hi]
-        return float(sub[m].mean() - sub.mean()) if m.sum() >= T554_MIN_HALF else None
-    hv = [_d(0, half), _d(half, n)]
+        if m.sum() < T554_MIN_HALF:
+            return None
+        return float(sub[m].mean() - (sub.mean() if base is None else base))
+    hv = [_d(0, half), _d(half, n)]                                # T-41's helper: each half's own mean
+    hv_full = [_d(0, half, mu), _d(half, n, mu)]                   # the claim's statistic: the full-sample unconditional mean
+    # rule 1/11: the claim's "unconditional 7-day mean" is one full-sample number; T-41's per-half mean is a permitted
+    # alternative reading. The criterion passes only when both readings agree on both halves, else it is undecided.
+    if any(v_ is None for v_ in hv + hv_full):
+        h_ok = None
+    else:
+        r_own, r_full = bool(hv[0] > 0 and hv[1] > 0), bool(hv_full[0] > 0 and hv_full[1] > 0)
+        h_ok = r_own if r_own == r_full else None
+    split = dd[half] if half < len(dd) else "n/a"
     c_d = (f"mean 7-day ETH log return after F >= {high:g} minus the unconditional mean {_s(d, 4)} > 0", d > 0, False)
     c_p = (f"block-shift p {_f(p, 4)} < {ALPHA} ({ks.size} circular shifts, one-sided)", p < ALPHA, False)
-    c_h = (f"both halves positive ({_s(hv[0], 4)} / {_s(hv[1], 4)}; split {dd[half] if half < len(dd) else 'n/a'})",
-           None if (hv[0] is None or hv[1] is None) else bool(hv[0] > 0 and hv[1] > 0), False)
+    c_h = (f"both halves positive under both readings (vs each half's own mean {_s(hv[0], 4)} / {_s(hv[1], 4)}; vs the "
+           f"full-sample unconditional mean {_s(mu, 4)}: {_s(hv_full[0], 4)} / {_s(hv_full[1], 4)}; split {split}"
+           + ("; the readings disagree, undecided" if h_ok is None and None not in hv + hv_full else "") + ")",
+           h_ok, False)
     crit = [c_d, c_p, c_h]
     v, why = _decide(crit, ng, min_n, "greed days")
     phases = []
@@ -432,7 +445,7 @@ def greed_test(f: np.ndarray, fwd: np.ndarray, dd: Sequence[str], high: float = 
         if gs.sum() >= T554_MIN_HALF:
             phases.append(float(fwd[sel][gs].mean() - fwd[sel].mean()))
     out.update(d=d, mean_greed=float(fwd[g].mean()), mean_all=mu, p=p, n_shifts=int(ks.size), null_q95=float(np.quantile(null, 0.95)),
-               halves=hv, split=dd[half] if half < len(dd) else None, per_start=phases, criteria=[(c[0], c[1]) for c in crit],
+               halves=hv, halves_vs_full_mean=hv_full, split=dd[half] if half < len(dd) else None, per_start=phases, criteria=[(c[0], c[1]) for c in crit],
                verdict=v, why=why, first=dd[0], last=dd[-1])
     return out
 
@@ -457,11 +470,13 @@ def b7_crypto_eth_greed_momentum(archive):
               f"aligned; F of day t known 00:00 UTC t+1, entry close t+1, exit close t+8): {j['n_greed']} days with F >= "
               f"{T554_HIGH}; mean 7-day log return after greed {_s(j['mean_greed'], 4)} vs unconditional {_s(j['mean_all'], 4)}, "
               f"difference {_s(j['d'], 4)}; block-shift p {_f(j['p'], 4)} over {j['n_shifts']} shifts (null 95th percentile "
-              f"{_s(j['null_q95'], 4)}); halves {_s(j['halves'][0], 4)} / {_s(j['halves'][1], 4)} (split {j['split']}); "
+              f"{_s(j['null_q95'], 4)}); halves vs each half's own mean {_s(j['halves'][0], 4)} / {_s(j['halves'][1], 4)}, vs the "
+              f"full-sample unconditional mean {_s(j['halves_vs_full_mean'][0], 4)} / {_s(j['halves_vs_full_mean'][1], 4)} "
+              f"(split {j['split']}); "
               f"non-overlapping per-start range {_s(min(ps) if ps else None, 4)} to {_s(max(ps) if ps else None, 4)} over "
               f"{len(ps)} starts — " + j["why"])
     stat = {k: j.get(k) for k in ("n_aligned", "n_greed", "d", "mean_greed", "mean_all", "p", "n_shifts", "null_q95", "halves",
-                                  "split", "per_start", "first", "last", "criteria")}
+                                  "halves_vs_full_mean", "split", "per_start", "first", "last", "criteria")}
     stat.update(rule10="index days, overlapping windows handled by the block shift; per-start range reported",
                 alignment="T-41 lag_days=1: entry close(t+1), F(t) available 00:00 UTC t+1")
     return _out(stat, j["n_greed"], j["verdict"], reason)
@@ -612,6 +627,12 @@ def bounce_test(trades: Sequence[dict], coins: Sequence[str] = T556_COINS, min_n
     bt = _boot(x, months, n_boot, reps)
     c_ci = _ci_crit(bt, "gt", 0.0, f"pooled 95% CI of the mean net per trade {_pfmt(_mean(x))} excludes 0 on the positive side "
                                    f"(month-clustered studentized bootstrap)", _pfmt)
+    coarse = {}                                                    # reporting only: the pass's dependence on cluster width
+    for lab, key in (("two_month", lambda m: f"{m[:4]}-B{(int(m[5:7]) - 1) // 2}"),
+                     ("quarter", lambda m: f"{m[:4]}-Q{(int(m[5:7]) - 1) // 3}")):
+        bc = _boot(x, [key(m) for m in months], n_boot, reps)
+        coarse[lab] = {"ci": bc.get("ci"), "clusters": bc.get("clusters"),
+                       "lower": (bc.get("ci") or [None])[0]}
     per = {}
     crit = [c_ci]
     for cn in coins:
@@ -638,7 +659,7 @@ def bounce_test(trades: Sequence[dict], coins: Sequence[str] = T556_COINS, min_n
         dsr = float(deflated_sharpe_ratio(x, T556_CHILD_TRIALS))
     return {"n": n, "mean_net": _mean(x), "mean_gross": _mean([t["gross"] for t in trades]),
             "mean_net_funding_received": _mean([t["net_funding_received"] for t in trades]),
-            "boot": {k: bt.get(k) for k in ("est", "ci", "ci_mc_se", "clusters", "reps")}, "per_coin": per, "halves": halves,
+            "boot": {k: bt.get(k) for k in ("est", "ci", "ci_mc_se", "clusters", "reps")}, "boot_coarse": coarse, "per_coin": per, "halves": halves,
             "bench_mean": _mean(bench), "bench_at_barriers": at_bar, "exits": dict(Counter(t["why"] for t in trades)),
             "dsr_child_trials": dsr, "criteria": [(c[0], c[1]) for c in crit], "verdict": v, "why": why}
 
@@ -663,7 +684,11 @@ def b7_crypto_memecoin_bounce_short(archive):
               f"signal candles {T556_FIRST_SIGNAL[:4]}..{T556_LAST_SIGNAL} after the 14-day re-entry rule; next-open short, "
               f"stop-first later-bar exits: mean gross {_pfmt(j['mean_gross'])}, mean net {_pfmt(j['mean_net'])} after 18 bp and "
               f"0.01%/8h funding paid (funding received instead: {_pfmt(j['mean_net_funding_received'])}); month-clustered 95% "
-              f"{_ci_txt(bt.get('ci'))} ({bt.get('clusters')} months); "
+              f"{_ci_txt(bt.get('ci'))} ({bt.get('clusters')} months; the trial's cluster, a pass that depends on the width: "
+              f"two-month clusters lower end {_pfmt(j['boot_coarse']['two_month']['lower'])} "
+              f"({j['boot_coarse']['two_month']['clusters']} clusters), quarterly "
+              f"{_pfmt(j['boot_coarse']['quarter']['lower'])} ({j['boot_coarse']['quarter']['clusters']} clusters), "
+              f"reported not criteria); "
               + "; ".join(f"{c} {pc[c]['n']} trades {_pfmt(pc[c]['mean'])} ({_ci_txt(pc[c]['ci'])})" for c in T556_COINS)
               + f"; exits {j['exits']}; halves "
               + (f"(split {hv['split']}) {_pfmt(hv['first']['mean'])} over {hv['first']['n']} / {_pfmt(hv['second']['mean'])} over "
@@ -675,7 +700,8 @@ def b7_crypto_memecoin_bounce_short(archive):
               f"{alt['per_coin_cuts']['n']} trades {_pfmt(alt['per_coin_cuts']['mean_net'])}; DSR at the child's "
               f"{T556_CHILD_TRIALS}-trial search {_f(j['dsr_child_trials'])} (context, not a criterion) — " + j["why"])
     stat = {"n_trades": j["n"], "n_firings": len(sig), "mean_net": j["mean_net"], "mean_gross": j["mean_gross"],
-            "mean_net_funding_received": j["mean_net_funding_received"], "boot": bt, "per_coin": pc, "halves": hv,
+            "mean_net_funding_received": j["mean_net_funding_received"], "boot": bt, "boot_coarse": j["boot_coarse"],
+            "per_coin": pc, "halves": hv,
             "exits": j["exits"], "bench_mean": j["bench_mean"], "bench_at_barriers": j["bench_at_barriers"],
             "sensitivity": alt, "dsr_child_trials": j["dsr_child_trials"], "child_trials": T556_CHILD_TRIALS,
             "criteria": j["criteria"], "trades": [{k: t[k] for k in ("coin", "signal", "entry_day", "exit_day", "why", "net", "bench_net")}

@@ -150,7 +150,7 @@ def test_t545_harness_fake_archive():
 
 # ============================================================================================== T-550 ==
 
-def _cycles(n, ratio_mu, diff_mu, seed=0):
+def _cycles(n, ratio_mu, diff_mu, seed=0, observed=True):
     rng = np.random.default_rng(seed)
     out = []
     for i in range(n):
@@ -158,7 +158,8 @@ def _cycles(n, ratio_mu, diff_mu, seed=0):
         ppd_h = float(rng.normal(1e-4, 1e-4))
         rd = {}
         for r in m.READINGS:
-            rd[m._rk(r)] = {"ratio": float(rng.normal(ratio_mu, 0.02)), "ppd": ppd_h + float(rng.normal(diff_mu, 5e-5))}
+            rd[m._rk(r)] = {"ratio": float(rng.normal(ratio_mu, 0.02)), "ppd": ppd_h + float(rng.normal(diff_mu, 5e-5)),
+                            "observed": observed}
         out.append({"expiry": f"{y:04d}-{mo:02d}-15", "entry": f"{y:04d}-{mo:02d}-01", "ppd_h": ppd_h, "readings": rd})
     return out
 
@@ -202,7 +203,59 @@ def test_t550_ask_interpolation_and_exit_rules():
     assert m.exit_rule(tgt, 2.0, "linear", "first<=21") == ("target", "b", 0.9)
     assert m.exit_rule(tgt, 2.0, "linear", "last>=21") == ("target", "b", 0.9)
     assert m.exit_rule(mk([("a", 30, 1.5)]), 2.0, "linear", "first<=21") == (None, None, None)
-    assert m.exit_rule(mk([("a", 30, 1.5)]), 2.0, "linear", "last>=21") == ("21dte", "a", 1.5)
+    assert m.exit_rule(mk([("a", 30, 1.5)]), 2.0, "linear", "last>=21") == (None, None, None)
+
+
+def test_t550_last_ge21_never_exits_at_an_arbitrary_earlier_mark():
+    """Regression (2022-10-03 cycle): a lone mark at 44 DTE with no later priced listing was bought back as the
+    '21-DTE' exit two days after entry. The last>=21 exit needs a mark at >= 21 DTE whose next priced listing is < 21
+    DTE (or a mark at exactly 21); otherwise the 21-DTE exit is unobservable, never an earlier mark."""
+    mk = lambda rows: [(d, t, {"linear": c, "loglinear": c}, False) for d, t, c in rows]
+    assert m.exit_rule(mk([("a", 44, 2.4)]), 2.0, "linear", "last>=21") == (None, None, None)
+    assert m.exit_rule(mk([("a", 44, 2.4), ("b", 30, 1.8)]), 2.0, "linear", "last>=21") == (None, None, None)
+    assert m.exit_rule(mk([("a", 18, 1.5)]), 2.0, "linear", "last>=21") == (None, None, None)
+    assert m.exit_rule(mk([("a", 44, 2.4), ("b", 21, 1.8), ("c", 14, 1.2)]), 2.0, "linear", "last>=21") == ("21dte", "b", 1.8)
+    assert m.exit_rule(mk([("a", 44, 2.4), ("b", 28, 1.8), ("c", 14, 1.2)]), 2.0, "linear", "last>=21") == ("21dte", "b", 1.8)
+
+
+def test_t550_unobservable_21dte_exit_is_not_held_to_expiry():
+    """Regression: under first<=21 a cycle with no priced mark at <= 21 DTE was held to expiry in place of the 21-DTE
+    exit; it is now flagged unobservable (no P&L) and left out of that reading."""
+    day = {"quote_date": "2021-01-04", "snapshot_date": "2021-01-04", "spot": 100.0, "available_at": "",
+           "exp": {"2021-02-19": {"call": [{"strike": 110.0, "bid": 1.0, "ask": 1.1, "iv": 0.2, "delta": 0.16}],
+                                  "put": [{"strike": 90.0, "bid": 1.5, "ask": 1.6, "iv": 0.25, "delta": -0.16}]}}}
+    t, _ = m.strangle_trade(day, "2021-02-19")
+    mark = {"quote_date": "2021-01-15", "spot": 100.0,
+            "exp": {"2021-02-19": {"call": [{"strike": 110.0, "bid": 0.9, "ask": 1.0}],
+                                   "put": [{"strike": 90.0, "bid": 1.2, "ask": 1.3}]}}}
+    chain = {"2021-01-04": day, "2021-01-15": mark}
+    out = m.manage(chain, sorted(chain), t, 100.0)
+    for k, r in out["readings"].items():
+        assert r["exit"] == "unobservable" and r["pnl"] is None and r["observed"] is False, k
+    c = m._cycle(chain, sorted(chain), t, 100.0)
+    assert all(v["ratio"] is None for v in c["readings"].values())
+
+
+def test_t550_path_observed_requires_every_session_priced():
+    mk = lambda days: [(d, 0, {"linear": 1.0, "loglinear": 1.0}, False) for d in days]
+    full = [d for d in _sessions("2021-01-05", 30) if d <= "2021-01-29"]
+    assert m.path_observed(mk(full), "linear", "2021-01-04", "2021-01-29", "21dte", 21)
+    assert not m.path_observed(mk(full[::3] + [full[-1]]), "linear", "2021-01-04", "2021-01-29", "21dte", 21)
+    assert not m.path_observed(mk(full), "linear", "2021-01-04", "2021-01-29", "21dte", 14)   # not exactly 21 DTE
+    assert m.path_observed(mk(full[:5]), "linear", "2021-01-04", full[4], "target", 40)
+
+
+def test_t550_unobserved_exits_cap_at_inconclusive():
+    """Regression: with sparse marks the readings do not bracket the managed P&L, so neither criterion is decided by
+    them (rule 9): a planted effect and a planted failure are both inconclusive, naming the data limit."""
+    for mu, dmu, seed in ((0.02, 1e-4, 5), (-0.02, -1e-4, 6)):
+        r = m.strangle_claim(_cycles(80, mu, dmu, seed=seed, observed=False), n_boot=NB)
+        assert r["verdict"] == "inconclusive" and r["data_limit"] and r["n_observed"] == 0, r["why"]
+        assert "DATA LIMIT" in r["why"]
+    cs = _cycles(80, 0.02, 1e-4, seed=7)
+    cs[0]["readings"]["linear/last>=21"].update(ratio=None, ppd=None, observed=False)   # one unobservable exit
+    r = m.strangle_claim(cs, n_boot=NB)
+    assert r["verdict"] == "inconclusive" and r["per_reading"]["linear/last>=21"]["n"] == 79
 
 
 def test_t550_margin_and_settlement():

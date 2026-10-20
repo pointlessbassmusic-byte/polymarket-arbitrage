@@ -179,13 +179,15 @@ def test_open_quality_reads_first_hourly_bar():
 
 # ================================================================================================ T-558 ==
 
-def _ibs_bars(effect: float, seed: int = 0, start="2001-01-02", end="2010-12-31"):
+def _ibs_bars(effect: float, seed: int = 0, start="2001-01-02", end="2010-12-31", lags=(1, 2)):
+    """Low-IBS days are followed by ``effect`` on each day t + lag (lag 1: entry-close reading; lag 2: previous-close)."""
     days = weekdays(start, end)
     rng = np.random.default_rng(seed)
     n = len(days)
     u = rng.uniform(0.01, 0.99, n)
     r = rng.normal(0.0002, 0.01, n)
-    r[1:] += effect * (u[:-1] < 0.2)
+    for k in lags:
+        r[k:] += effect * (u[:-k] < 0.2)
     C = 100 * np.cumprod(1 + r)
     H, L = C * (1 + (1 - u) * 0.01), C * (1 - u * 0.01)
     return OHLC.Bars(days, C.copy(), H, L, C, C.copy())
@@ -201,6 +203,18 @@ def test_ibs_null_fails():
     bars = {s: _ibs_bars(0.0, 10 + k) for k, s in enumerate(M.T558_SYMS)}
     rep = M.ibs_family(bars, end="2010-12-31", n_boot=500, parent=False)
     assert rep["verdict"] == "not_supported"
+
+
+def test_ibs_rule12_entry_close_only_effect_is_undecided():
+    """Regression (rule 12): an edge present only when the IBS gate and the fill share close t passes the entry-close
+    reading but fails the previous-close reading (entry close t+1), so the criteria are undecided, never 'supported'."""
+    bars = {s: _ibs_bars(0.004, 20 + k, lags=(1,)) for k, s in enumerate(M.T558_SYMS)}
+    rep = M.ibs_family(bars, end="2010-12-31", n_boot=500, parent=False)
+    assert rep["verdict"] == "inconclusive", rep["reason"] + rep["why"]
+    holm_row = rep["criteria"][0]
+    assert holm_row[1] is None and "undecided under rule 12" in holm_row[0]
+    for s in M.T558_SYMS:
+        assert rep["per_etf"][s]["diff_bps"] > 20 and rep["per_etf"][s]["prev_close"]["diff_bps"] < 10
 
 
 # ================================================================================================ T-555 ==

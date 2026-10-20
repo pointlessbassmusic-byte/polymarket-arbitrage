@@ -48,10 +48,12 @@ Conventions
     quoted strikes on either side (at most 6% of S apart, batch6b_dolt.SLOPE_GAP): LINEAR in the ask (above a convex
     price curve, a high buy-back) and LOG-LINEAR (below it in the OTM tails); the two bracket the unquoted ask. Exit at
     the first priceable mark whose buy-back <= 50% of the credit, else the 21-DTE exit read two ways: at the first
-    priceable mark at <= 21 DTE, and at the last priceable mark at >= 21 DTE (the mark before the listing crosses 21 DTE);
-    a cycle with no qualifying mark is held to expiry (counted). Each criterion is judged on all four readings
-    (interpolation x timing): it passes only when every reading passes, fails only when every reading fails (rule 11
-    spirit: a pass must not hinge on how the missing quote is filled in). Reg-T margin of the
+    priceable mark at <= 21 DTE, and at the last priceable mark at >= 21 DTE whose next priced listing is below 21 DTE;
+    a cycle with no qualifying mark has an unobservable 21-DTE exit and is left out of that reading (never exited at an
+    earlier mark nor held to expiry instead). The readings fill unobserved days and do not bound the claim's P&L, so
+    they are sensitivities: the criteria are judged on them (all four must agree) only when every cycle's exit is
+    observed as worded (a priced mark on every session to the first <= 50% day or to exactly 21 DTE); otherwise both
+    criteria are None (rule 9 data limit) and the verdict is capped at inconclusive. Reg-T margin of the
     short strangle (CBOE rule, as batch6b_dolt's naked put): the greater of the two naked requirements (put: premium +
     max(20% S - OTM, 10% K); call: premium + max(20% S - OTM, 10% S)) plus the other leg's premium, premiums at the bid.
     P&L per day in the trade = P&L / entry spot / calendar days held (T-156's unit, bp of spot per day). Intervals:
@@ -87,10 +89,12 @@ from __future__ import annotations
 import math
 from bisect import bisect_left
 from collections import Counter
+from datetime import date, timedelta
 from typing import Optional, Sequence
 
 import numpy as np
 
+from mandel.data.dolt_options import is_trading_day
 from mandel.experiments import batch6_surf as SURF
 from mandel.experiments import batch6b_dolt as DOLT
 from mandel.experiments import batch6c_mom as MOM
@@ -357,7 +361,9 @@ def marks(chain: dict, qdays: Sequence[str], trade: dict) -> list:
 def exit_rule(mk: Sequence[tuple], credit: float, mode: str, timing: str) -> tuple:
     """(kind, day, cost) of the managed exit: the first mark whose buy-back <= 50% of the credit; else the 21-DTE exit
     at the first priceable mark at <= 21 DTE ("first<=21") or at the last priceable mark at >= 21 DTE ("last>=21":
-    the mark before the listing crosses 21 DTE, or the last mark when none follows); else (None, None, None)."""
+    a mark at >= 21 DTE whose next priceable mark is at < 21 DTE, or a mark at exactly 21 DTE). When no such mark
+    exists the 21-DTE exit is unobservable and (None, None, None) is returned: the cycle is never exited at an
+    arbitrary earlier mark nor held to expiry in place of the 21-DTE exit."""
     pm = [(d, t, c[mode]) for d, t, c, _ in mk if c[mode] is not None]
     for j, (d, t, c) in enumerate(pm):
         if c <= T550_TARGET * credit:
@@ -366,10 +372,30 @@ def exit_rule(mk: Sequence[tuple], credit: float, mode: str, timing: str) -> tup
             if t <= T550_EXIT_DTE:
                 return "21dte", d, c
         else:
+            if t < T550_EXIT_DTE:                       # no priceable mark at >= 21 DTE preceded it: unobservable
+                return None, None, None
             nxt = pm[j + 1][1] if j + 1 < len(pm) else None
-            if t <= T550_EXIT_DTE or nxt is None or nxt < T550_EXIT_DTE:
+            if t == T550_EXIT_DTE or (nxt is not None and nxt < T550_EXIT_DTE):
                 return "21dte", d, c
     return None, None, None
+
+
+def path_observed(mk: Sequence[tuple], mode: str, entry: str, exit_day: str, kind: str, exit_dte: int) -> bool:
+    """True when the claim's managed exit is observed as worded: every NYSE session after entry up to the exit day is a
+    priceable mark (so the FIRST day the buy-back <= 50% of the credit is seen) and the exit is that target day or a
+    mark at exactly 21 DTE."""
+    if kind == "target":
+        pass
+    elif kind != "21dte" or exit_dte != T550_EXIT_DTE:
+        return False
+    priced = {d for d, _, c, _ in mk if c[mode] is not None}
+    x = date.fromisoformat(entry) + timedelta(days=1)
+    end = date.fromisoformat(exit_day)
+    while x <= end:
+        if is_trading_day(x) and x.isoformat() not in priced:
+            return False
+        x += timedelta(days=1)
+    return True
 
 
 def manage(chain: dict, qdays: Sequence[str], trade: dict, s_t: float) -> dict:
@@ -382,13 +408,15 @@ def manage(chain: dict, qdays: Sequence[str], trade: dict, s_t: float) -> dict:
            "n_exact_marks": sum(1 for m in mk if m[3] and m[2]["linear"] is not None), "readings": {}}
     for r in READINGS:
         kind, d, cost = exit_rule(mk, credit, *r)
-        if kind is None:
-            kind, d, pnl = "expiry", trade["expiry"], pnl_h
-        else:
-            pnl = credit - cost
+        if kind is None:                                 # 21-DTE exit unobservable: excluded from this reading
+            out["readings"][_rk(r)] = {"exit": "unobservable", "exit_day": None, "exit_dte": None, "pnl": None,
+                                       "days": None, "observed": False}
+            continue
+        pnl = credit - cost
         days = max(DOLT._ord(d) - DOLT._ord(trade["entry"]), 1)
-        out["readings"][_rk(r)] = {"exit": kind, "exit_day": d, "exit_dte": DOLT.dte(trade["expiry"], d), "pnl": pnl,
-                                   "days": days}
+        xd = DOLT.dte(trade["expiry"], d)
+        out["readings"][_rk(r)] = {"exit": kind, "exit_day": d, "exit_dte": xd, "pnl": pnl, "days": days,
+                                   "observed": path_observed(mk, r[0], trade["entry"], d, kind, xd)}
     return out
 
 
@@ -410,9 +438,10 @@ def _cycle(chain, qdays, trade, s_t) -> dict:
     S = trade["spot"]
     rd = {}
     for k, v in m["readings"].items():
-        legs_closed = 4 if v["exit"] != "expiry" else 2
-        rd[k] = dict(v, ratio=v["pnl"] / mg, ppd=v["pnl"] / S / v["days"],
-                     ratio_comm=(v["pnl"] - DOLT.COMM * legs_closed) / mg)
+        if v["pnl"] is None:
+            rd[k] = dict(v, ratio=None, ppd=None, ratio_comm=None)
+            continue
+        rd[k] = dict(v, ratio=v["pnl"] / mg, ppd=v["pnl"] / S / v["days"], ratio_comm=(v["pnl"] - DOLT.COMM * 4) / mg)
     return {**{k: trade[k] for k in ("entry", "expiry", "dte", "spot", "late_stamp")},
             "k_call": trade["legs"][0]["strike"], "k_put": trade["legs"][1]["strike"],
             "delta_call": trade["legs"][0]["delta"], "delta_put": trade["legs"][1]["delta"], "s_t": float(s_t),
@@ -474,6 +503,9 @@ def cycle_mean_test(cycles: Sequence[dict], x, blocks: Sequence[int] = T550_BLOC
     """Mean of x over cycles with the studentized CBB 95% CI at each block (in cycles); ok robust over blocks."""
     nb = N_BOOT if n_boot is None else n_boot
     x = np.asarray(x, dtype=float)
+    if not len(cycles):
+        rows = [{"block": int(b), "ci": [None, None], "ok": None, "dec": None} for b in blocks]
+        return {"mean": None, "n": 0, "by_block": rows, "ok": None, "decisive_fail": False}
     S, N = _month_timeline(cycles, x)
     rows = []
     for b in blocks:
@@ -487,32 +519,50 @@ def cycle_mean_test(cycles: Sequence[dict], x, blocks: Sequence[int] = T550_BLOC
 def strangle_claim(cycles: Sequence[dict], *, min_n: int = T550_MIN_N, n_boot: Optional[int] = None,
                    seed: int = SEED) -> dict:
     """T-550 judge: mean managed P&L / margin > 0 and paired P&L per day (managed - hold) > 0, each with the 95% CI
-    excluding 0 robust over blocks of 2 and 4 cycles, judged on every reading (interpolation x 21-DTE timing): a
-    criterion passes only when every reading passes, fails only when every reading fails (decisively when all are
-    decisive), else undecided. n = cycles."""
+    excluding 0 robust over blocks of 2 and 4 cycles, judged on every reading (interpolation x 21-DTE timing). The
+    readings decide a criterion only when the claim's managed exit is OBSERVED on every cycle under every reading
+    (``observed``: a priceable mark on every session up to the exit, which is the first <= 50% day or a mark at exactly
+    21 DTE): then a criterion passes only when every reading passes, fails only when every reading fails. Otherwise
+    the readings fill unobserved days, do not bracket the true managed P&L, and are reported as sensitivities: both
+    criteria are None (rule 9 data limit), capping the verdict at inconclusive. Cycles whose 21-DTE exit is
+    unobservable in a reading (ratio None) are left out of that reading's sensitivity. n = cycles."""
     n = len(cycles)
     per = {}
+    n_obs = sum(1 for c in cycles if all(c["readings"][_rk(r)].get("observed", False) for r in READINGS))
     for r in READINGS:
         k = _rk(r)
-        ratio = np.array([c["readings"][k]["ratio"] for c in cycles], dtype=float)
-        diff = np.array([c["readings"][k]["ppd"] - c["ppd_h"] for c in cycles], dtype=float)
-        per[k] = {"ratio": cycle_mean_test(cycles, ratio, n_boot=n_boot, seed=seed),
-                  "ppd_diff": cycle_mean_test(cycles, diff, n_boot=n_boot, seed=seed)}
+        cs = [c for c in cycles if c["readings"][k]["ratio"] is not None]
+        ratio = np.array([c["readings"][k]["ratio"] for c in cs], dtype=float)
+        diff = np.array([c["readings"][k]["ppd"] - c["ppd_h"] for c in cs], dtype=float)
+        per[k] = {"n": len(cs), "ratio": cycle_mean_test(cs, ratio, n_boot=n_boot, seed=seed),
+                  "ppd_diff": cycle_mean_test(cs, diff, n_boot=n_boot, seed=seed)}
+    limit = n_obs < n
+    limit_txt = (f"DATA LIMIT (rule 9): the claim's exit is observed as worded (a priced mark on every session to the "
+                 f"first <= 50% day or to 21 DTE) on {n_obs} of {n} cycles under every reading: the DoltHub chains list a "
+                 f"cycle's expiry on only a few days before 21 DTE, so neither the first-day 50% target nor the 21-DTE "
+                 f"exit is observable and the four readings are sensitivities, not bounds")
 
     def crit(key, label, scale, unit, nd):
         oks = [per[_rk(r)][key]["ok"] for r in READINGS]
-        ok = DOLT._robust(oks)
-        dec = all(per[_rk(r)][key]["decisive_fail"] for r in READINGS)
-        txt = "; ".join(f"{_rk(r)} {_s(per[_rk(r)][key]['mean'] * scale, nd)} ("
+        ok = None if limit else DOLT._robust(oks)
+        dec = False if limit else all(per[_rk(r)][key]["decisive_fail"] for r in READINGS)
+        txt = "; ".join(f"{_rk(r)} n={per[_rk(r)]['n']} {_s(None if per[_rk(r)][key]['mean'] is None else per[_rk(r)][key]['mean'] * scale, nd)} ("
                         + ", ".join(f"b{row['block']} {_ci_txt(row['ci'], nd, scale)}" for row in per[_rk(r)][key]["by_block"])
                         + ")" for r in READINGS)
         note = " [the readings disagree: undecided]" if (True in oks and False in oks) else ""
+        if limit:
+            note = f" [{limit_txt}]"
         return (f"{label} > 0 with the 95% CI excluding 0 under every reading ({unit}: {txt}){note}", ok, dec)
 
     crits = [crit("ratio", "mean managed P&L per unit Reg-T margin", 1.0, "per cycle", 4),
              crit("ppd_diff", "paired P&L per day (managed - hold to expiry)", 1e4, "bp of spot/day", 3)]
     verdict, why = _decide(crits, n, min_n, "cycles")
-    return {"n": n, "per_reading": per, "verdict": verdict, "why": why}
+    return {"n": n, "n_observed": n_obs, "data_limit": limit, "per_reading": per, "verdict": verdict, "why": why}
+
+
+def _nmean(xs, scale: float = 1.0):
+    xs = [x for x in xs if x is not None]
+    return float(np.mean(xs)) * scale if xs else None
 
 
 def _sub_mean(cycles, key, pred) -> tuple:
@@ -536,8 +586,10 @@ def b7_vol_spy_strangle_quoted_exits(archive):
             f"expiries a day on a strike grid that moves with the spot, so a cycle's expiry is quoted on later days mostly "
             f"at ~25-31 and ~11-15 DTE, rarely at 21, and its exact strikes rarely; marks are the listed ask when the "
             f"strike is quoted, else the ask interpolated between the bracketing quoted strikes (linear: high; log-linear: "
-            f"low), and the 21-DTE exit is read at the first priceable mark at <= 21 DTE and at the last at >= 21 DTE: "
-            f"each criterion must hold under all four readings")
+            f"low), and the 21-DTE exit is read at the first priceable mark at <= 21 DTE and at the last at >= 21 DTE whose "
+            f"next priced listing is below 21 DTE (a cycle with no such mark has an unobservable 21-DTE exit and is left "
+            f"out of that reading). These readings fill unobserved days and do not bound the claim's P&L, so they decide "
+            f"nothing unless the exit is observed as worded on every cycle")
     stat = {"n_cycles": len(cycles), "skips": dict(skips), "data": W["info"], "label": "QUOTE-PRICED (interpolated marks)"}
     if len(cycles) < DOLT.MIN_CLUSTERS:
         v, why = _decide([("enough resolved cycles for an interval", None, False)], len(cycles), T550_MIN_N, "cycles")
@@ -559,9 +611,9 @@ def b7_vol_spy_strangle_quoted_exits(archive):
     for lab, p in (("2020-03", covid), ("2022", y22), ("other", rest)):
         cs = [c for c in cycles if p(c)]
         sub[lab] = {"n": len(cs),
-                    "ratio_managed": float(np.mean([c["readings"][pk]["ratio"] for c in cs])) if cs else None,
+                    "ratio_managed": _nmean([c["readings"][pk]["ratio"] for c in cs]),
                     "ratio_hold": float(np.mean([c["ratio_h"] for c in cs])) if cs else None,
-                    "ppd_managed_bp": float(np.mean([c["readings"][pk]["ppd"] for c in cs])) * 1e4 if cs else None,
+                    "ppd_managed_bp": _nmean([c["readings"][pk]["ppd"] for c in cs], 1e4),
                     "ppd_hold_bp": float(np.mean([c["ppd_h"] for c in cs])) * 1e4 if cs else None}
     strict = [c for c in cycles if not c["late_stamp"]]
     qdays = sorted(W["chain"])
@@ -576,6 +628,8 @@ def b7_vol_spy_strangle_quoted_exits(archive):
             if t is None:
                 continue
             cc = _cycle(W["chain"], qdays, t, c["s_t"])
+            if cc["readings"][pk]["ratio"] is None:
+                continue
             rs.append(cc["readings"][pk]["ratio"])
             ds.append(cc["readings"][pk]["ppd"] - cc["ppd_h"])
         alt[lab] = {"n": len(rs), "ratio_managed": float(np.mean(rs)) if rs else None,
@@ -591,20 +645,22 @@ def b7_vol_spy_strangle_quoted_exits(archive):
              f"mean margin {_f(mean(lambda c: c['margin'] / c['spot']) * 100)}% of S",
              f"hold to expiry: P&L/margin {_s(mean(lambda c: c['ratio_h']), 4)}, P&L/day {_s(mean(lambda c: c['ppd_h']) * 1e4, 3)} "
              f"bp of spot; managed by reading: " + "; ".join(
-                 f"{k} P&L/margin {_s(v['ratio']['mean'], 4)}, P&L/day difference {_s(v['ppd_diff']['mean'] * 1e4, 3)} bp"
+                 f"{k} (n={v['n']}) P&L/margin {_s(v['ratio']['mean'], 4)}, P&L/day difference "
+                 f"{_s(None if v['ppd_diff']['mean'] is None else v['ppd_diff']['mean'] * 1e4, 3)} bp"
                  for k, v in per.items()),
              f"separately ({pk}): " + "; ".join(
                  f"{lab} (n={v['n']}) P&L/margin managed {_s(v['ratio_managed'], 4)} / hold {_s(v['ratio_hold'], 4)}, "
                  f"P&L/day {_s(v['ppd_managed_bp'], 3)} / {_s(v['ppd_hold_bp'], 3)} bp" for lab, v in sub.items()),
-             f"with $0.65/contract per leg and side ({pk}): P&L/margin {_s(mean(lambda c: c['readings'][pk]['ratio_comm']), 4)}",
+             f"with $0.65/contract per leg and side ({pk}): P&L/margin {_s(_nmean([c['readings'][pk]['ratio_comm'] for c in cycles]), 4)}",
              f"{DOLT.SNAP_SENS} ({pk}; drops {len(cycles) - len(strict)} weekend/holiday/moved-snapshot entries): "
-             f"P&L/margin {_s(float(np.mean([c['readings'][pk]['ratio'] for c in strict])) if strict else None, 4)}, "
-             f"P&L/day difference {_s(float(np.mean([c['readings'][pk]['ppd'] - c['ppd_h'] for c in strict])) * 1e4 if strict else None, 3)} bp",
+             f"P&L/margin {_s(_nmean([c['readings'][pk]['ratio'] for c in strict]), 4)}, "
+             f"P&L/day difference {_s(_nmean([c['readings'][pk]['ppd'] - c['ppd_h'] for c in strict if c['readings'][pk]['ppd'] is not None], 1e4), 3)} bp",
              "entry-day sensitivity within 38-52 DTE (reported; the calendar is the claim's): " + "; ".join(
                  f"{lab} n={v['n']} P&L/margin {_s(v['ratio_managed'], 4)}, P&L/day difference {_s(v['ppd_diff_bp'], 3)} bp"
                  for lab, v in alt.items()),
              f"skips: {DOLT._skips_txt(skips, Counter())}"]
-    stat.update({"per_reading": per, "exits": exits, "exit_dte_21": exit_dte, "n_marks": n_marks,
+    stat.update({"per_reading": per, "n_exit_observed": core["n_observed"], "exit_data_limit": core["data_limit"],
+                 "exits": exits, "exit_dte_21": exit_dte, "n_marks": n_marks,
                  "n_exact_marks": n_exact, "mean_ratio_hold": mean(lambda c: c["ratio_h"]),
                  "mean_ppd_hold_bp": mean(lambda c: c["ppd_h"]) * 1e4, "subperiods": sub, "entry_day_sensitivity": alt,
                  "n_late_stamp": len(cycles) - len(strict),

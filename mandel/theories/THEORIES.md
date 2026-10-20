@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `1bcd69aa34036142`). 492 theories. supported 51, not_supported 241, inconclusive 45, untested 17, blocked 123, parked 15.
+Rendered from `registry.json` (hash `5026e1afcd3c538e`). 492 theories. supported 54, not_supported 246, inconclusive 49, untested 5, blocked 123, parked 15.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (51)
+## Supported (54)
 
 ### T-06 · price-series-are-multifractal
 
@@ -830,7 +830,52 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-a7f44bf6: supported — short variance struck at VIX^2, settled on SPY close-to-close returns; rule 10 (no entry calendar in the claim): 8460 daily entries 1993-01-29..2026-09-14 = 403 cycles: POOLED over all 21 grid offsets (8460 overlapping daily entries = 403 distinct 21-day holds; studentized circular block bootstrap, block 126 days): mean +8.12 %^2/month (CI +1.43 to +11.22); per grid offset (21 non-overlapping grids, n 401-403, block 6 cycles): mean +7.23 to +8.95, lower bound -0.95 to +3.84, 17/21 offsets pass; skew -7.60, kurtosis 93.0, worst cycle -630.8 entered 2020-02-26; ex-worst: pooled without the 41 entries overlapping it +9.44 (CI +4.54 to +12.30), per offset without its own worst cycle +8.60 to +10.36; units sensitivity (strike (VIX/100)^2 x 30/365 vs the un-annualised sum of 21 squared returns, %^2): pooled +7.62 (CI +0.91 to +10.78), 15/21 offsets pass; dividend-adjusted SPY basis +8.23 (pooled, 8460 entries); ^GSPC (SPX vs SPY) basis +8.81 (pooled, 8460 entries); close-to-close vs intraday RV (BTZ use 5-minute RV; not archived): on hourly SPY bars 2023-11-14..2026-09-14 (709 entries) intraday-only RV is 0.56 x close-to-close and the mean P&L +15.84 vs +7.09: close-to-close RV runs higher, so this test is conservative on the control; overlapping daily windows (T-48 vol units) VRP +2.45 vol pts, p 0.0140 (reported) — all criteria pass
 - note: from the options-library library: Variance Swap Replication (long / short variance via 1/K^2 strip); harness suggestion: Extend 'vrp_spx' (mandel/experiments/volatility.variance_risk_premium) with a variance-unit, non-overlapping mode and tail statistics; the same mode for vrp_btc and vrp_gold. | added by the verifier pass | 2026-10-15 re-run: supported pooled over all 21 start offsets (+8.12 %^2/month, CI +1.43 to +11.22); 17 of 21 single grids pass; worst cycle -630.8 entered 2020-02-26 (skew -7.6, kurtosis 93): the tail is the point, as the trial says.
 
-## Not Supported (241)
+### T-548 · halloween-country-etfs
+
+**Claim.** Pooled over the 21 iShares country ETFs, 2000-01 to 2026-09, the mean monthly return in November-April exceeds the mean in May-October, with both halves positive.
+
+- kind: underlying-strategy · origin: T-441, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: pooled mean monthly return Nov-Apr minus May-Oct
+- null: difference <= 0
+- procedure: month-end adjclose returns; equal-weight panel; block bootstrap by year; per-ETF differences reported
+- data: daily-history-<country ETF> for the 21 iShares country ETFs · min n: 200
+- pass: difference > 0 with one-sided p < 0.05, both halves positive, at least 60% of ETFs positive
+- controls: Bouman and Jacobsen (2002) report the effect internationally; none of these ETFs was used by T-352/T-441 (^GSPC +40 bps/month, p 0.051)
+- harness: b7_cal_halloween_country_etfs
+- result X-62448cfc: supported — Equal-weight panel of 21 country ETFs, month-end adjclose returns 2000-01..2026-09 (321 months, 28 season years): Nov-Apr +134.1 vs May-Oct +8.4 bps/month, difference +125.7 (season-year-clustered 95% CI +1.3..+258.1), studentized one-sided p 0.0262 (MC +/-0.0031) (3-season block sensitivity 0.0045 (MC +/-0.0029)); halves <2013-05 +144.9 bps / >=2013-05 +106.9 bps; ETFs positive 21 of 21 (need 13): EWA +90, EWC +77, EWD +204, EWG +151, EWH +94, EWI +129, EWJ +59, EWK +109, EWL +102, EWM +85, EWN +115, EWO +203, EWP +98, EWQ +128, EWS +91, EWT +165, EWU +105, EWW +146, EWY +201, EWZ +164, EZA +137 — all criteria pass
+- note: pre-registered salvage successor of T-441 on 2026-10-20: T-352/T-441 missed their 50 bp bar on ^GSPC (+40 bps, p 0.051) but the sign held post-publication; the international panel is independent data. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-549 · overnight-intraday-gap-qqq-iwm
+
+**Claim.** On QQQ (1999-03 on) and IWM (2000-05 on) to 2026-09, the mean close-to-next-open return (dividends added back on ex-dates) exceeds the mean open-to-close return, the gap is positive in both halves, and holding only overnight (buy the close, sell the open) earns a positive mean return net of 1 bp per side.
+
+- kind: underlying-strategy · origin: T-348, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: mean overnight minus mean intraday return per day; mean net overnight-only return per day
+- null: gap <= 0 or net overnight-only mean <= 0
+- procedure: T-348's construction unchanged (Yahoo open, dividends on ex-date nights); studentized block-10 bootstrap; Holm over the two ETFs; Yahoo-open quality check against the first hourly bar on the 730-day overlap
+- data: daily-history-QQQ, daily-history-IWM (dividends recovered from close / adjclose as in T-348), hourly-QQQ, hourly-IWM · min n: 2500
+- pass: for both ETFs after Holm: gap > 0 with p < 0.05, both halves positive, and net overnight-only mean > 0 with p < 0.05
+- controls: SPY (T-348) is not used; costs are the MOC/MOO half-spreads (1 bp per side) the claim states; 2 bp per side reported
+- harness: b7_cal_overnight_qqq_iwm
+- result X-3aee7d3f: supported — QQQ 1999-03-11..2026-09-30 (6932 days, 90 ex-dividend nights): overnight +5.58 vs intraday -0.02 bps/day, gap +5.60 (95% CI +2.04..+9.17; p 0.0019 (MC +/-0.0009), Holm 0.0019 (MC +/-0.0009)), halves split 2012-12-18 +8.88 / +2.32; overnight-only net of 1 bp per side +3.58 bps/day (p 0.0008 (MC +/-0.0006), Holm 0.0014 (MC +/-0.0007); 2 bp per side +1.58); Sharpe overnight net 0.63 vs buy-hold 0.52; open==close on 0.8% of days; Yahoo open vs first hourly bar on 728 days 2023-11-15..2026-10-13: median |diff| 0.4 bps, > 5 bps on 8%, gap there +6.46 (Yahoo open) vs +6.36 bps (hourly open); IWM 2000-05-30..2026-09-30 (6624 days, 107 ex-dividend nights): overnight +5.36 vs intraday -0.97 bps/day, gap +6.32 (95% CI +2.95..+9.70; p 0.0005 (MC +/-0.0004), Holm 0.0010 (MC +/-0.0006)), halves split 2013-07-31 +6.44 / +6.21; overnight-only net of 1 bp per side +3.36 bps/day (p 0.0007 (MC +/-0.0005), Holm 0.0014 (MC +/-0.0007); 2 bp per side +1.36); Sharpe overnight net 0.64 vs buy-hold 0.46; open==close on 0.4% of days; Yahoo open vs first hourly bar on 728 days 2023-11-15..2026-10-13: median |diff| 0.0 bps, > 5 bps on 8%, gap there +6.58 (Yahoo open) vs +6.13 bps (hourly open) — all criteria pass
+- note: pre-registered salvage successor of T-348 on 2026-10-20: T-348's SPY gap was +3.29 bps (lower bound +1.44) and failed only its 3 bp bar; the overnight-only holding is an exposure efficiency (similar return, half the time in market) worth replicating. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-555 · gold-futures-plus-bills-vs-gld
+
+**Claim.** From 2005-01 to 2026-09, a fully collateralised long front-month COMEX gold futures position (rolled before first notice, collateral earning DTB3) has a higher total return than holding GLD by at least 0.5% a year.
+
+- kind: underlying-strategy · origin: T-370, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: annualised mean daily return difference (futures + DTB3 accrual minus GLD total return) on sessions outside the roll windows
+- null: difference <= 0.5% a year
+- procedure: Yahoo GC=F is a continuous front series, so the +-2 sessions around each scheduled roll are masked from both legs (T-370's mask) and the excluded-session drift is reported; HAC lag 21; halves
+- data: daily-history-GC-F, daily-history-GLD, fred-DTB3 · min n: 3000
+- pass: difference >= 0.5%/yr with the HAC 95% lower bound > 0 and both halves positive
+- controls: INVERSION SALVAGE of T-370: its implied financing came out 159 bp BELOW bills (CI -185 to -133), which if real means futures + bills beat spot gold by about that much plus GLD's 0.40% fee; a realised-return test is the check, and a measurement artefact (Yahoo front-contract identification, 13:30 vs 16:00 closes) is the leading alternative; micro gold (MGC) is the US retail instrument
+- harness: b7_cal_gold_futures_bills_vs_gld
+- result X-5227f0b8: supported — GC=F (Yahoo continuous front) + DTB3 accrual minus GLD total return, 2005-01-03..2026-09-24, 4807 sessions outside T-370's roll mask (+-2 sessions around the last session before each first notice day; 654 masked): annualised difference +1.07% (HAC lag 21 95% CI +0.04%..+2.10%; needs >= 0.5% and lower > 0), legs futures +11.21% + bills +1.81% vs GLD +11.95%; halves split 2015-11-11 +0.65% / +1.49%. Artefact readings side by side (report only): masked sessions' drift +11.25% annualised per masked session, +1.34% a year in total; all sessions (continuous series, roll jumps included) +2.28% a year; 97 unmasked sessions beyond 5 robust s.d. summing -2.51% (ex-jumps +1.23%); roll profile over 131 scheduled rolls (mean difference by session offset from the last session before first notice, bps): -5 +4.99, -4 -0.36, -3 -2.05, -2 -1.63, -1 -4.15, 0 +1.48, 1 +12.64, 2 +13.85, 3 +0.73, 4 +0.43, 5 +0.84 (inside the mask +22.2 bps per roll; largest outside +5.0 bps); T-370 implied financing on the same pair: mean(i - DTB3) -159 bps (95% CI -186 bps..-133 bps, 4460 days), which read as a carry implies futures + bills - GLD of about +1.99%/yr (-(i - DTB3) + the 0.40% fee); level-free decay reading -67 bps; MGC=F (micro, 2010-10-05..2026-09-24, 3527 sessions, 1 impossible prints (|daily return| > 25%) dropped) +2.50% (HAC 95% CI +1.31%..+3.70%). Measurement limits (rule 9): Yahoo's continuous contract identity and roll days are undocumented, the COMEX settle (13:30 ET) and GLD close (16:00 ET) are asynchronous — all criteria pass
+- note: pre-registered salvage successor of T-370 on 2026-10-20: the parent claimed no excess carry and found a large one; if it survives a realised-return test it is an instrument efficiency (hold gold as futures + T-bills), if not it is a data artefact worth knowing. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+## Not Supported (246)
 
 ### T-02 · longshot-bias
 
@@ -4639,7 +4684,82 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-e6e164dc: not_supported — T-539 SPY long put ladder (long 1 40-delta put, short 1 25-delta and 1 15-delta put) (expiry nearest 45 DTE within +/-7 days, strikes by vendor delta within 0.075; DoltHub end-of-day SPY quotes 2019-02-08..2026-10-14 (1232 quote days from 1291 snapshots; 59 duplicate snapshots of a quote day dropped, 2 stale-moved kept on their quote day); settled at intrinsic on SPY's raw close on the expiry date, early exercise ignored as the claim holds to expiry; naked-leg margin = Reg-T/CBOE naked put on one uncovered short put: premium + max(20% x S - OTM amount, 10% x K), OTM = max(S - K, 0), premium at the fill, the uncovered leg being the 15-delta put (the 25-delta put is covered by the long 40-delta put)): 565 entry days (54 distinct 52-day holds), 2019-02-08..2026-08-31; mid fills (the claim): mean +0.012 (pooled over 565 entry days in 396 weeks; block 15 weeks (2x hold) CI -0.009 to +0.030; block 30 weeks (4x hold) CI -0.012 to +0.030) -> lower 95% CI > 0: no (week-weighted, reported: mean +0.012, CI -0.017 to +0.030); bid/ask fills (the pass): mean +0.011 (pooled over 565 entry days in 396 weeks; block 15 weeks (2x hold) CI -0.012 to +0.029; block 30 weeks (4x hold) CI -0.015 to +0.028) -> lower 95% CI > 0: no (week-weighted, reported: mean +0.010, CI -0.020 to +0.029); every entry uses its entry-close quotes as the live proxy (the archive stamps every dolt-chain-SPY row available at 22:00Z on its snapshot date, after the 16:15 ET fill); snapshot-date sensitivity (drops the 24 entries whose snapshot was taken on a weekend, holiday or moved day; no kept entry is point in time either): mid mean +0.012 (CI -0.009 to +0.030); exec mean +0.011 (CI -0.012 to +0.029); bid/ask per start (rule 10: 4 non-overlapping chains from the entry days of the first hold, 4 distinct, 47-48 trades each, block 2 trades): mean -0.021 to -0.019, lower bound -0.223 to -0.212, 0/4 pass; mid per start (rule 10: 4 non-overlapping chains from the entry days of the first hold, 4 distinct, 47-48 trades each, block 2 trades): mean -0.019 to -0.018, lower bound -0.221 to -0.210, 0/4 pass; stress: VIX >= 40 months with an open trade 2020-02, 2020-03, 2020-04, 2020-06, 2020-10, 2025-04; months with SPY >= 10% below its 63-session high (reported) 2020-02, 2020-03, 2020-04, 2020-05, 2022-02, 2022-03, 2022-04, 2022-05, 2022-06, 2022-07, 2022-09, 2022-10, 2022-11, 2023-10, 2025-03, 2025-04; 46 trades open across a stress session, mean bid/ask ratio -0.091, without them +0.020; worst trade (bid/ask) -1.521 entered 2020-01-29, expiry 2020-03-20; credit at mid on 40.0% of entries (mean -0.38); mean naked-leg margin 68.73 = 12.89% of S; ratio of means at bid/ask +0.012; with $0.65/contract per leg at bid/ask: mean +0.010; DTE tolerance sensitivity at bid/ask: +/-4 DTE: n 367, mean +0.016 (CI -0.001 to +0.034); +/-14 DTE: n 961, mean +0.005 (CI -0.039 to +0.025); skipped quote days: no expiry within 45 +/- 7 DTE 623; unresolved (expiry after the last archived close) 26; no usable 40-, 25- or 15-delta put 18 — failed: mid fills (the claim): lower 95% CI > 0 for the mean, robust over blocks of 2/4x the hold; bid/ask fills (the pass): lower 95% CI > 0 for the mean, robust over blocks of 2/4x the hold
 - note: from the options-library library: Ladder / Christmas Tree (long or short, call or put); harness suggestion: Harness 'ladder_skew' sharing the delta selector with 'front_ratio_skew'. | added by the verifier pass
 
-## Inconclusive (45)
+### T-544 · kalshi-kxbtcd-vs-deribit-digital
+
+**Claim.** On Kalshi KXBTCD daily 5 pm ET 'Bitcoin above' markets from 2025-01 to 2026-10, buying the side whose executable price is at least 5 points below the Deribit-implied risk-neutral digital (point-in-time smile fitted on near-expiry Deribit trades, T-337's SmileBook) and holding to settlement earns a positive mean net return per contract after Kalshi's taker fee 0.07 x P x (1-P) and a 1-point model haircut.
+
+- kind: underlying-strategy · origin: T-337, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: mean net P&L per contract in cents (first qualifying hour per market), with the market-clustered one-sided 95% lower bound
+- null: mean net P&L per contract <= 0
+- procedure: p_RN at each hourly mark H from T-337's SmileBook (SVI and cubic, forward = hourly-BTC-USD close at H); Kalshi side priced at the candle ending at H: buy YES at yes_ask when p_RN - yes_ask > 5 points + 1-point haircut, buy NO at 1 - yes_bid when (1 - p_RN) - (1 - yes_bid) > 5 + 1; valid two-sided book with spread <= 10 cents; settlement from kalshi-settled-markets result; one entry per market (the first qualifying hour); split by hours to close and by year; DSR over the declared 8 cells (threshold 5/10 x SVI/cubic x first/any qualifying hour)
+- data: kalshi-candles-hourly-KXBTCD-<YYYY-MM>, kalshi-settled-markets-KXBTCD-<YYYY-MM>, deribit-option-trades-near-BTC-<YYYY-MM>, hourly-BTC-USD · min n: 300
+- pass: one-sided 95% lower bound of the mean net P&L per contract > 0 under both SVI and cubic fits, same sign in 2025 and 2026, DSR >= 0.95 over the 8 cells
+- controls: Kalshi candles exist only for the 4 most-traded strikes per event (selection reported); Kalshi settles on a 60-second BRTI average, Deribit on its own index (basis reported, no shift); fees per docs.kalshi.com fee rounding (ceil to 6 dp); motivation: T-337 on Polymarket failed because Polymarket's hourly mids at listing were placeholder values, which Kalshi's bid/ask candles do not have; the 2026-10-20 Kalshi quant pass found the Kalshi mid better calibrated than a spot + 30-day-RV model (following that model lost 5.8 cents), so this tests the option-implied model, not that one
+- harness: b7_pm_kalshi_vs_deribit_digital
+- result X-d74ca9cb: not_supported — 20834 settled KXBTCD 'above' markets closing 2025-01..2026-10, 3034 with hourly candles (Kalshi archives candles for the 4 most-traded strikes per event only), 3004 with a decision hour; 123240 candle hours at least 1 h before the close, 26884 without a valid two-sided book (spread <= 10 cents), 1130 without a Deribit p_RN (sparse smile or strike outside the traded range), 95226 decision hours. Deribit near-expiry trades 4661713 in 23 months (2024-12..2026-10), 55566 (hour, expiry) smiles fitted, 6114 sparse; forward = hourly-BTC-USD close of the bar ending at H (55379 fits), else the latest Deribit trade index (187). Rule: buy YES at the ask when p_RN - ask > 5 + 1 points, NO at 1 - bid when bid - p_RN > 5 + 1, first qualifying hour per market, held to settlement; net = payoff - price - 0.07 P(1-P) (ceil 6 dp) - 1-point haircut. PRIMARY: SVI 1145 contracts on 464 events, mean -5.21 cents (one-sided 95% lower -7.48; event-clustered lower -7.60), mean price 0.619, mean edge 8.6 points, mean fee 1.28 cents, sides {yes: 550 @ -3.29, no: 595 @ -6.98}, by hours to close {1-3 h: 264 @ -0.03, 4-6 h: 140 @ -0.53, 7-12 h: 201 @ -6.36, 13-24 h: 387 @ -8.09, 25+ h: 153 @ -9.61}; CUBIC 1115 contracts on 457 events, mean -4.32 cents (one-sided 95% lower -6.59; event-clustered lower -6.79), mean price 0.614, mean edge 8.8 points, mean fee 1.28 cents, sides {yes: 530 @ -1.16, no: 585 @ -7.19}, by hours to close {1-3 h: 265 @ -1.37, 4-6 h: 144 @ +0.92, 7-12 h: 185 @ -5.76, 13-24 h: 368 @ -5.78, 25+ h: 153 @ -9.12}. Without the P&L haircut: SVI -4.21, cubic -3.32; per-order cent fee rounding: SVI -5.70, cubic -4.81. Other cells: thr5_svi_any n 2665 mean -5.02; thr5_cubic_any n 2531 mean -3.73; thr10_svi_first n 286 mean -4.63; thr10_svi_any n 536 mean -3.29; thr10_cubic_first n 294 mean -4.71; thr10_cubic_any n 547 mean -1.46. Settlement basis ln(Kalshi expiration_value / latest Deribit index in the hour before the close): median +0.001% over 649 of 652 closes (reported, no shift) — failed: SVI fit: one-sided 95% lower bound of the mean net P&L per contract -7.48 cents > 0 (mean -5.21 over 1145 contracts, market-clustered studentized bootstrap); CUBIC fit: one-sided 95% lower bound of the mean net P&L per contract -6.59 cents > 0 (mean -4.32 over 1115 contracts, market-clustered studentized bootstrap); DSR >= 0.95 over the declared 8 cells: SVI 0.000, cubic 0.000
+- note: pre-registered salvage successor of T-337 on 2026-10-20: T-337's model (the Deribit digital) was never tested on a venue a US trader can use; Kalshi KXBTCD has the same payoff and bid/ask candles. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-545 · rvx-vix-narrow-spread-replication
+
+**Claim.** From 2009-09 to 2026-09, after the 60-day z-score of RVX minus VIX falls below -2, the IWM-minus-SPY realised volatility spread over the next 21 trading days exceeds the entry RVX-minus-VIX spread on average (non-overlapping events).
+
+- kind: options-strategy · origin: T-237, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: mean of (RV_IWM - RV_SPY over the next 21 sessions) - (RVX - VIX at entry), vol points, over non-overlapping events
+- null: mean <= 0
+- procedure: z on the trailing 60 sessions of RVX - VIX (Cboe closes); an event at the first close with z < -2 after the previous event's 21-session hold ends; RV as annualised close-to-close log-return volatility of adjclose; studentized block bootstrap over events; halves; z-windows 40 and 120 reported
+- data: cboe-RVX-history, cboe-VIX-history, daily-history-IWM, daily-history-SPY · min n: 30
+- pass: mean > 0 with the 95% CI excluding 0, win rate > 0.6, both halves positive
+- controls: random-entry placebo with the matched count; the unconditional implied-minus-realised spread; only the narrow side is claimed (pre-declared from T-237, where the wide side failed: -0.35 vol pts, CI -1.14 to +0.43); the VXN/QQQ events of T-237 are not used
+- harness: b7_vol_rvx_narrow_spread
+- result X-64a895b7: not_supported — RVX - VIX narrow side on IWM/SPY: 61 non-overlapping events 2009-12-17..2026-07-14 (z-window 60 sessions, first close with z < -2 after the previous 21-session hold, entries 2009-09-01..2026-09-30); mean (RV_IWM - RV_SPY next 21 sessions) - (RVX - VIX at entry) +0.67 vol pts (95% CI -0.06 to +1.49, studentized block-2 bootstrap over events); win rate 0.57; halves +0.31/+1.05. Reported: z-windows 40 +0.77 (n=68, win 0.62), 120 +1.15 (n=46, win 0.67); T-237's crossing rule +0.62 (n=59); unconditional realised-minus-implied spread +0.10 vol pts (95% CI -0.33 to +0.58, 42-session blocks, 4269 days); random-entry placebo (matched count) p=0.071. Rule 10: event dates are data-determined (no grid phase) — failed: mean > 0 with the 95% CI excluding zero (mean +0.67, 95% CI -0.06 to +1.49 vol pts); win rate > 0.6 (0.57: 35 of 61)
+- note: pre-registered salvage successor of T-237 on 2026-10-20: T-237 failed as a two-sided rule, but its narrow side alone was +1.75 vol pts (95% CI +1.13 to +2.46, win 0.79) and stable across z-windows; RVX/IWM is an independent pair. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-546 · crypto-alt-high-volume-premium
+
+**Claim.** On the point-in-time top 50 Coinbase USD products by trailing 30-day dollar volume (stablecoins, wrapped and staked tokens excluded; BTC and ETH excluded because T-419 used them), 2019-2026, a top-decile idiosyncratic volume day without a 2-sigma price move is followed by a positive 10-day market-adjusted return after a 50 bp round trip.
+
+- kind: underlying-strategy · origin: T-419, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: mean 10-day return minus the equal-weight universe return, net of 50 bp, per event
+- null: mean net <= 0
+- procedure: volume surprise = log dollar volume minus its trailing 50-day mean, residualised on the universe's mean surprise; top decile among names that day, |return| < 2 trailing sigma; entry at the next UTC daily close, 10-day hold; date-clustered bootstrap; halves; placebo of random days per name
+- data: coinbase-daily-<PID> (493 products), coinbase-products-<day> · min n: 300
+- pass: date-clustered 95% CI of the mean net return excludes 0 on the positive side, placebo p < 0.05, both halves positive
+- controls: point-in-time membership from the daily bundles (dead products included); the universe excludes the two names T-419 used; costs at 50 bp round trip as in T-419's crypto cell
+- harness: b7_crypto_alt_high_volume_premium
+- result X-a46e76c8: not_supported — 492 coinbase-daily USD bundles, 471 after excluding BTC, ETH, 25 stablecoin and 22 wrapped/staked bases and 32 fx_stablecoin ids; point-in-time top 50 by trailing 30-day dollar volume, mean size 40.2, 313 products ever members; events 2019-01-01..2026-10-03: 9699 over 268 names; mean net 10-day market-adjusted return -1.80% (before the 50 bp: -1.30%; raw 10-day -1.29%); 95% CI event-date clusters CI -2.19% to -1.41% (2755 dates), 20-day blocks CI -2.60% to -0.94%; placebo p 0.9970 (null mean -1.32%); date halves (split 2022-11-17) -1.14% over 3623 / -2.20% over 6076; by year 2019 +1.09% (351), 2020 -0.78% (643), 2021 -0.32% (1253), 2022 -2.45% (1588), 2023 -2.12% (1544), 2024 -2.35% (1568), 2025 -1.12% (1615), 2026 -3.77% (1137) — failed: date-clustered 95% CI of the mean net 10-day market-adjusted return -1.80% excludes 0 on the positive side: event-date clusters (lower -2.19%); 20-day calendar blocks (lower -2.60%); random-day placebo p 0.9970 < 0.05 (2000 draws); both date halves positive (split 2022-11-17: -1.14% over 3623, -2.20% over 6076)
+- note: pre-registered salvage successor of T-419 on 2026-10-20: T-419 failed on its pooled ETF+crypto claim and deflation, but its crypto events alone were +378 bp over 460 events and its placebo p was 0.02; the altcoin universe is untouched data. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-547 · turn-of-month-country-etfs
+
+**Claim.** Pooled over the 21 iShares country ETFs, 2000-01 to 2026-09, the mean daily return in the turn-of-month window (trading days -4 to +3, T-59's window) exceeds the mean on other days by at least 3 bps net of 2 bps per round trip, with both halves positive.
+
+- kind: underlying-strategy · origin: T-344, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: pooled mean daily return in the window minus outside it, net of 2 bps per monthly round trip
+- null: difference <= 3 bps
+- procedure: T-59's window and cost convention unchanged; equal-weight panel, date-clustered (month) block bootstrap; per-ETF signs reported
+- data: daily-history-<country ETF> for the 21 iShares country ETFs of T-319/T-471 · min n: 200
+- pass: pooled difference >= 3 bps with one-sided p < 0.05, both halves positive, at least 60% of ETFs with a positive difference
+- controls: none of these ETFs was used by T-59, T-344 or T-443; US-listed ETFs trade on the US calendar (the window is in NYSE sessions)
+- harness: b7_cal_tom_country_etfs
+- result X-32fac4e3: not_supported — Equal-weight panel of 21 country ETFs, 2000-01-03..2026-09-30 (6726 sessions, 321 months): window (-4..+3) +10.99 vs other days +0.10 bps/day, gross difference +10.89, net of 2 bps per monthly round trip (0.29 bp per window day) +10.60 bps (window-clustered 95% CI +3.97..+17.91; needs >= 3); studentized p vs <= 3 bps 0.0107 (MC +/-0.0020) (12-window block sensitivity 0.0080 (MC +/-0.0039); p vs <= 0 0.0006 (MC +/-0.0005)); halves net <2013-05 +21.29 bps / >=2013-05 -0.05 bps; ETFs with a positive net difference 21 of 21 (gross 21; need 13): EWA +7.3, EWC +10.0, EWD +13.5, EWG +10.7, EWH +12.3, EWI +7.7, EWJ +7.6, EWK +11.8, EWL +7.0, EWM +6.2, EWN +9.2, EWO +13.3, EWP +9.1, EWQ +9.8, EWS +8.3, EWT +9.8, EWU +11.0, EWW +12.1, EWY +14.2, EWZ +21.5, EZA +9.4 — failed: both halves positive net (<2013-05 +21.29 bps, >=2013-05 -0.05 bps)
+- note: pre-registered salvage successor of T-344 on 2026-10-20: T-344 replicated turn-of-month on IWM and BTC but not on 3 of 5 assets; an independent international panel tests whether the effect is a global month-end flow. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-557 · cheap-yes-7d-archived-panel
+
+**Claim.** Across resolved Polymarket binary markets in the archived closed-markets panel (2023-2026) that were not in T-02's 2,100-market sample, YES contracts priced below 0.10 seven days before the scheduled end resolve YES more often than their price implies (mean outcome minus price > 0).
+
+- kind: market-structure · origin: T-02, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: mean (outcome - price) in the < 0.10 bucket at 7 days before the scheduled end; net P&L per contract after a 1-cent spread and the market's fee as secondary
+- null: mean (outcome - price) <= 0
+- procedure: T-02's construction (price = the daily history point nearest end - 7 d, no later than it) on markets absent from T-02's bundle; event-clustered bootstrap; categories reported
+- data: polymarket-closed-markets-<YYYY-MM>, polymarket-price-history-daily-<YYYY-MM> · min n: 300
+- pass: event-clustered 95% CI of the mean excludes 0 on the positive side, with at least 20 YES resolutions
+- controls: WRONG-WAY SALVAGE: T-02 claimed longshots are overpriced and found the reverse (+0.0208, CI +0.0022 to +0.0510, only 9 YES events), which T-47 restated as a forward test; this uses the archive's markets T-02 never saw; the crypto child reports the opposite sign on Kalshi crypto longshots, so the venue is part of the claim
+- harness: b7_pm_cheap_yes_archived_panel
+- result X-aaf20888: not_supported — 17627 resolved binary markets with daily history; 2100 market ids read by T-02 excluded (1071 of the resolved), 12800 priced at 7 d (T-02's construction; 0 post-end cutoffs and 3756 without a price <= 3 d stale skipped). Bucket < 0.10: 8047 markets in 3053 events, mean price 0.0156, YES rate 0.0121 (97 YES; 21 non-Yes/No markets dropped). PRIMARY (panel-weighted: 'sample' markets x 1 / their month's sample rate, priority markets x 1; 8047 markets with weights, 0 unlogged dropped; the sample stratum carries 0.636 of the weight): mean(outcome - price) -0.0043 [-0.0124, +0.0061] (event-clustered 95%). Sensitivities: unweighted over all history -0.0035 [-0.0058, -0.0011] (dominated by the priority strata, so not a panel estimate); 'sample' stratum alone 1226 markets (29 YES), -0.0031 [-0.0115, +0.0062]; 0 priced at 0. Secondary panel-weighted net per contract after a 1-cent spread and the market's fee -0.0147 [-0.0228, -0.0043] (unweighted -0.0138). Unweighted splits: categories (question keywords): crypto 404 (6 YES, -0.0036), economics 182 (4 YES, -0.0037), geopolitics 555 (3 YES, -0.0126), other 2631 (37 YES, -0.0029), politics 1473 (25 YES, +0.0003), sports 2802 (22 YES, -0.0043); years: 2023 145 (2 YES, -0.0159), 2024 1352 (20 YES, -0.0086), 2025 3200 (46 YES, -0.0000), 2026 3350 (29 YES, -0.0042); selection reasons: family:cpi 140 (4 YES), family:fomc 83 (0 YES), family:gdp 48 (2 YES), family:payrolls 31 (2 YES), family:us-election 659 (3 YES), long-lived 5860 (57 YES), sample 1226 (29 YES). Sensitivity anchored at the scheduled endDate (unweighted): 5567 markets, 59 YES, mean -0.0048 [-0.0073, -0.0019] — failed: event-clustered 95% CI of the panel-weighted mean(outcome - price) [-0.0124, +0.0061] excludes 0 on the positive side (mean -0.0043)
+- note: pre-registered salvage successor of T-02 on 2026-10-20: the only wrong-way-significant prediction-market calibration result; the archive now holds far more resolved markets than T-02 saw. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+## Inconclusive (49)
 
 ### T-01 · market-prices-beat-the-coin
 
@@ -5347,7 +5467,67 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-66a6cce7: inconclusive — COR1M averages 37.1 vs realised equal-weight average pairwise correlation of the 9 sector SPDRs (XLB/XLE/XLF/XLI/XLK/XLP/XLU/XLV/XLY) 55.7. POOLED over all 21 grid offsets (5206 daily starts 2006-01-03..2026-09-14 = 248 distinct 21-session holds; studentized circular block bootstrap, block 126 sessions): mean gap -18.6 pts (95% CI -20.8 to -16.1), halves -19.0/-18.2. Per grid offset (21 non-overlapping grids, n 247 to 248 windows, block 6): mean gap -19.4 to -17.5 pts, lower bound -21.7 to -19.8 pts, 0/21 offsets with the lower bound > 0. Proxy verdict: NOT an acceptable stand-in under the claim's wording ('the index constituents'): sector baskets diversify away idiosyncratic risk, so their pairwise correlation is far above single-stock correlation (the gap above is dominated by that bias, not by the correlation premium); XLC/XLRE and cap weights are also missing, so the verdict is capped at inconclusive — implemented criteria pass; not implemented: proxy (9 sector SPDRs) POOLED lower 95% CI bound > 0 (a sector proxy bounds the claim from one side only: sector correlations exceed constituent ones, so a proxy shortfall is not a failure); realised average correlation of the index constituents (COR1M's top-50 S&P 500 names, cap-weighted): constituent closes and weights are not archived; vega-neutral short-index / long-constituent straddle book has positive mean P&L: needs index and single-stock chain history
 - note: from the options-library library: Dispersion Trade (short index vol, long constituent vol); harness suggestion: Harness 'implied_vs_realised_correlation' in mandel/experiments/volatility.py with bundles ['cboe-COR1M-history','daily-history-XL*']. | added by the verifier pass
 
-## Untested (17)
+### T-550 · spy-short-strangle-quoted-exit-rules
+
+**Claim.** On DoltHub end-of-day SPY chains 2019-02 to 2026-10, a 45-DTE 0.16-delta short strangle sold at mid minus half the quoted spread on each standard monthly expiry and bought back at 50% of the credit or at 21 DTE (whichever first) at mid plus half the spread earns a positive mean P&L per unit of Reg-T margin, and its P&L per day in the trade exceeds holding to expiry.
+
+- kind: options-strategy · origin: T-156, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: mean P&L per unit margin per cycle; paired difference of P&L per day (target-50-or-21-DTE minus hold to expiry)
+- null: mean P&L <= 0, or the paired P&L-per-day difference <= 0
+- procedure: batch6b_dolt's chain parser and strike-by-delta selector (vendor delta within 0.075); entries on the standard monthly expiry calendar at 45 +/- 7 DTE; marks on each later quote day; settlement at intrinsic on SPY's raw close; circular block bootstrap over cycles
+- data: dolt-chain-SPY, daily-history-SPY · min n: 60
+- pass: mean P&L per unit margin > 0 with the 95% CI excluding 0 AND the paired P&L-per-day difference > 0 with the 95% CI excluding 0
+- controls: QUOTE-PRICED (the parent was model-priced at VIX: hold +1.45 vs target50 +3.69 bp of spot per day); half-spread from the same quote rows; early assignment ignored as the parents do; 2020-03 and 2022 reported separately
+- harness: b7_vol_spy_strangle_quoted_exits
+- result X-7ab327a3: inconclusive — QUOTE-PRICED SPY 45-DTE 0.16-delta short strangle on the standard monthly expiries (DoltHub end-of-day SPY quotes 2019-02-08..2026-10-14 (1232 quote days from 1291 snapshots; 59 duplicate snapshots of a quote day dropped, 2 stale-moved kept on their quote day); entry on the quote day nearest 45 DTE within +/-7, sold at the bid = mid - half spread; bought back at the ask = mid + half spread at the first mark <= 50% of the credit, else at 21 DTE; hold-to-expiry settled at intrinsic on SPY's raw close; Reg-T strangle margin = greater naked leg + the other leg's premium; every entry uses its entry-close quotes as the live proxy (the archive stamps every dolt-chain-SPY row available at 22:00Z on its snapshot date, after the 16:15 ET fill)). DATA LIMIT on the marks: DoltHub lists 3-4 expiries a day on a strike grid that moves with the spot, so a cycle's expiry is quoted on later days mostly at ~25-31 and ~11-15 DTE, rarely at 21, and its exact strikes rarely; marks are the listed ask when the strike is quoted, else the ask interpolated between the bracketing quoted strikes (linear: high; log-linear: low), and the 21-DTE exit is read at the first priceable mark at <= 21 DTE and at the last at >= 21 DTE whose next priced listing is below 21 DTE (a cycle with no such mark has an unobservable 21-DTE exit and is left out of that reading). These readings fill unobserved days and do not bound the claim's P&L, so they decide nothing unless the exit is observed as worded on every cycle: 82 cycles, entries 2019-03-01..2026-08-04 (DTE 44-52; mean call delta 0.162, put delta -0.158); 376 later listings of the cycles' expiries, 10 with both strikes quoted exactly; exits by reading: linear/first<=21 {'21dte': 37, 'target': 42, 'unobservable': 3} (21-DTE exits at DTE min/median/max [11, 14.0, 20]); linear/last>=21 {'21dte': 58, 'unobservable': 3, 'target': 21} (21-DTE exits at DTE min/median/max [25, 28.0, 44]); loglinear/first<=21 {'target': 47, '21dte': 32, 'unobservable': 3} (21-DTE exits at DTE min/median/max [11, 14.0, 20]); loglinear/last>=21 {'21dte': 55, 'target': 24, 'unobservable': 3} (21-DTE exits at DTE min/median/max [25, 28.0, 44]); mean credit 5.15 (1.149% of S), mean margin 15.72% of S; hold to expiry: P&L/margin +0.0121, P&L/day +0.347 bp of spot; managed by reading: linear/first<=21 (n=79) P&L/margin +0.0128, P&L/day difference +0.640 bp; linear/last>=21 (n=79) P&L/margin +0.0044, P&L/day difference -0.084 bp; loglinear/first<=21 (n=79) P&L/margin +0.0151, P&L/day difference +0.804 bp; loglinear/last>=21 (n=79) P&L/margin +0.0067, P&L/day difference +0.126 bp; separately (linear/first<=21): 2020-03 (n=3) P&L/margin managed -0.0032 / hold -0.3215, P&L/day -0.577 / -11.152 bp; 2022 (n=12) P&L/margin managed +0.0357 / hold +0.0266, P&L/day +1.550 / +0.551 bp; other (n=67) P&L/margin managed +0.0091 / hold +0.0245, P&L/day +0.835 / +0.825 bp; with $0.65/contract per leg and side (linear/first<=21): P&L/margin +0.0124; snapshot-date sensitivity (linear/first<=21; drops 7 weekend/holiday/moved-snapshot entries): P&L/margin +0.0152, P&L/day difference +0.683 bp; entry-day sensitivity within 38-52 DTE (reported; the calendar is the claim's): earliest in the window (longest DTE) n=78 P&L/margin +0.0164, P&L/day difference +0.644 bp; latest in the window (shortest DTE) n=78 P&L/margin +0.0131, P&L/day difference +0.786 bp; skips: no quote day at 38-52 DTE 8; unresolved (expiry after the last archived close) 2 — implemented criteria pass; not implemented: mean managed P&L per unit Reg-T margin > 0 with the 95% CI excluding 0 under every reading (per cycle: linear/first<=21 n=79 +0.0128 (b2 95% CI -0.0055 to +0.0273, b4 95% CI -0.0075 to +0.0270); linear/last>=21 n=79 +0.0044 (b2 95% CI -0.0147 to +0.0170, b4 95% CI -0.0142 to +0.0170); loglinear/first<=21 n=79 +0.0151 (b2 95% CI -0.0031 to +0.0294, b4 95% CI -0.0050 to +0.0292); loglinear/last>=21 n=79 +0.0067 (b2 95% CI -0.0125 to +0.0192, b4 95% CI -0.0117 to +0.0193)) [DATA LIMIT (rule 9): the claim's exit is observed as worded (a priced mark on every session to the first <= 50% day or to 21 DTE) on 0 of 82 cycles under every reading: the DoltHub chains list a cycle's expiry on only a few days before 21 DTE, so neither the first-day 50% target nor the 21-DTE exit is observable and the four readings are sensitivities, not bounds]; paired P&L per day (managed - hold to expiry) > 0 with the 95% CI excluding 0 under every reading (bp of spot/day: linear/first<=21 n=79 +0.640 (b2 95% CI -0.075 to +2.382, b4 95% CI -0.094 to +2.453); linear/last>=21 n=79 -0.084 (b2 95% CI -1.122 to +1.624, b4 95% CI -1.003 to +1.712); loglinear/first<=21 n=79 +0.804 (b2 95% CI +0.090 to +2.548, b4 95% CI +0.072 to +2.642); loglinear/last>=21 n=79 +0.126 (b2 95% CI -0.911 to +1.837, b4 95% CI -0.789 to +1.924)) [DATA LIMIT (rule 9): the claim's exit is observed as worded (a priced mark on every session to the first <= 50% day or to 21 DTE) on 0 of 82 cycles under every reading: the DoltHub chains list a cycle's expiry on only a few days before 21 DTE, so neither the first-day 50% target nor the 21-DTE exit is observable and the four readings are sensitivities, not bounds]
+- note: pre-registered salvage successor of T-156 on 2026-10-20: the model-priced theta family (T-156, T-103, T-109, T-57) flips sign with the pricing scale; the archived DoltHub quotes turn it into a quote-priced test, and the parent's best component was the exit rule, not the entry. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-551 · putwrite-with-trend-filter
+
+**Claim.** Over the Cboe PUT index history to 2026-09, holding PUT only in months after SPY (^GSPC before 1993) closed above its 10-month simple moving average at the prior month-end, and T-bills otherwise, reduces the maximum drawdown by at least 30% relative to always holding PUT without lowering the excess-return Sharpe ratio.
+
+- kind: options-strategy · origin: T-301, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: maximum drawdown reduction (always minus filtered, as a share of always) and the Sharpe difference
+- null: reduction < 30% or Sharpe(filtered) < Sharpe(always)
+- procedure: month-end decision on the index close, applied from the next month; DTB3 (rule 7) when out; 2 bps per switch; matched random-timing null that re-places the rule's own out-of-market spells (T-301's construction); paired block bootstrap for the Sharpe difference
+- data: cboe-PUT-history, daily-history--GSPC, daily-history-SPY, fred-DTB3 · min n: 300
+- pass: drawdown reduction >= 30% with the matched-null p < 0.05 AND the Sharpe difference's 95% lower bound > -0.05
+- controls: PUT before its 2007 launch is Cboe's back-test (reported, and the live months judged separately); the filter is the single pre-declared 10-month SMA, no grid
+- harness: b7_vol_putwrite_trend_filter
+- result X-29177533: inconclusive — Cboe PUT index (continuous daily history 2007-01-03..2026-10-14; the archived file holds only 7 scattered back-test prints before it (1991-03-04, 1991-08-07, 1994-09-27...), which cannot form monthly returns, so Cboe's pre-2007 back-test history is not in the sample) held in the month after SPY (^GSPC before SPY's own 10-month SMA exists) closed above its 10-month SMA at month-end, filled at the next session's close, DTB3 (discount-yield converted, rule 7) when out, 2 bps per switch (T-301's construction): 236 hold months after decisions 2007-01..2026-08, 79% in PUT, 32 switches, 5 months touching back-tested values (before the 2007-06-20 launch), signal sources {'SPY': 236}. full history: MDD filtered 14.2% vs always-PUT 34.6% (reduction 58.8%); matched null median 33.3%, 5th pct 21.7%, p 0.0178 (10000 paths, 16 out spells); excess Sharpe filtered +0.617 vs always +0.515, difference +0.103 (95% CI -0.358 to +0.981); live months (231): MDD filtered 14.2% vs always-PUT 34.6% (reduction 58.8%); matched null median 33.3%, 5th pct 21.4%, p 0.0205 (10000 paths, 16 out spells); excess Sharpe filtered +0.622 vs always +0.518, difference +0.104 (95% CI -0.357 to +1.006); reported: ^GSPC-only signal agrees on 98.7% of months, its reduction 58.8%, Sharpe difference +0.162; annualised mean return always 7.65% vs filtered 6.10% — implemented criteria pass; not implemented: full history: Sharpe difference (filtered - always, excess returns, +0.103) 95% lower bound > -0.05 (lower -0.358) [fails, not decisively, below min_n]; live months (from 2007-06-20): Sharpe difference (filtered - always, excess returns, +0.104) 95% lower bound > -0.05 (lower -0.357) [fails, not decisively, below min_n]; n >= trial min_n (236 of 300 months)
+- note: pre-registered salvage successor of T-301 on 2026-10-20: T-301's drawdown control was the robust part (MDD 24.3% vs 52.9%, 95 of 96 variants raw p < 0.05) while its Sharpe gain was not; putwriting is Mandel's best-supported premium; combining a robust risk control with a supported premium is the natural salvage. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-554 · eth-greed-momentum
+
+**Claim.** From 2018-02 to 2026-09, ETH-USD's forward 7-day log return after a Crypto Fear & Greed reading of 75 or more exceeds its unconditional 7-day mean, with both halves positive.
+
+- kind: underlying-strategy · origin: T-41, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: mean forward 7-day log return after F >= 75 minus the unconditional mean
+- null: difference <= 0
+- procedure: F for day t known at 00:00 UTC on t+1; entry at the close of t+1; block-shift permutation p as in T-41; halves
+- data: crypto-fear-greed-history, daily-history-ETH-USD · min n: 150
+- pass: difference > 0 with block-shift p < 0.05 and both halves positive
+- controls: WRONG-WAY SALVAGE of T-41: on BTC the greed side was the opposite of the claim (+2.29% vs the unconditional mean, one-sided p for the claim 0.955, halves +3.36% / +0.40%); ETH is a weakly independent replication (correlation with BTC ~0.8); BTC after 2026-10-20 is counted forward in the notes
+- harness: b7_crypto_eth_greed_momentum
+- result X-0cbb2606: inconclusive — crypto-fear-greed-history x daily-history-ETH-USD, signal days 2018-02-01..2026-09-30 (3160 aligned; F of day t known 00:00 UTC t+1, entry close t+1, exit close t+8): 331 days with F >= 75; mean 7-day log return after greed +0.0305 vs unconditional +0.0024, difference +0.0282; block-shift p 0.0394 over 3144 shifts (null 95th percentile +0.0259); halves vs each half's own mean +0.0440 / +0.0002, vs the full-sample unconditional mean +0.0446 / -0.0004 (split 2022-06-03); non-overlapping per-start range +0.0212 to +0.0371 over 7 starts — implemented criteria pass; not implemented: both halves positive under both readings (vs each half's own mean +0.0440 / +0.0002; vs the full-sample unconditional mean +0.0024: +0.0446 / -0.0004; split 2022-06-03; the readings disagree, undecided)
+- note: pre-registered salvage successor of T-41 on 2026-10-20: a contrarian claim that failed in the momentum direction; the momentum reading is the salvage. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-558 · ibs-reversal-replication-qqq-iwm-dia
+
+**Claim.** On QQQ, IWM and DIA from inception to 2026-09, the mean next-day close-to-close return after an internal bar strength below 0.2 exceeds the unconditional mean next-day return by more than 2 bps, after Holm over the three ETFs.
+
+- kind: underlying-strategy · origin: T-332, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: mean next-day return after IBS < 0.2 minus the unconditional mean, per ETF
+- null: difference <= 2 bps
+- procedure: T-332's construction unchanged (IBS = (close - low) / (high - low) of day t, entry at the close of t, exit at the close of t+1); studentized block bootstrap; Holm over three
+- data: daily-history-QQQ, daily-history-IWM, daily-history-DIA · min n: 1000
+- pass: at least two of three ETFs with Holm-adjusted p < 0.05 and every ETF positive in both halves
+- controls: T-332 (SPY) is one of Mandel's three executable class-A rules; SPY is not used here
+- harness: b7_cal_ibs_qqq_iwm_dia
+- result X-cf9cea40: inconclusive — QQQ 1999-03-10..2026-09-29 (6932 days, 1355 IBS<0.2 signals): entry-close reading next-day +24.98 vs unconditional +5.54 bps, difference +19.44 (block-20 95% CI +10.52..+28.53; T-332 stationary CI +10.57..+28.69), p vs <= 2 bps 0.0005 (MC +/-0.0004), Holm 0.0015 (MC +/-0.0008); halves split 2012-12-17 +22.00 / +16.91; since 2000 +20.00; previous-close reading (entry close t+1) difference +12.69 (CI +4.21..+21.59), p 0.0069 (MC +/-0.0016), Holm 0.0207 (MC +/-0.0028), halves +16.44 / +8.64; execution next-open-to-close +13.91; IWM 2000-05-26..2026-09-29 (6624 days, 1397 IBS<0.2 signals): entry-close reading next-day +18.94 vs unconditional +4.37 bps, difference +14.57 (block-20 95% CI +7.20..+22.42; T-332 stationary CI +6.79..+22.56), p vs <= 2 bps 0.0005 (MC +/-0.0004), Holm 0.0015 (MC +/-0.0008); halves split 2013-07-30 +21.48 / +6.85; since 2000 +14.57; previous-close reading (entry close t+1) difference +6.34 (CI -0.82..+13.94), p 0.1307 (MC +/-0.0066), Holm 0.2615 (MC +/-0.0086), halves +7.33 / +5.24; execution next-open-to-close +10.59; DIA 1998-01-20..2026-09-29 (7218 days, 1390 IBS<0.2 signals): entry-close reading next-day +14.88 vs unconditional +4.09 bps, difference +10.79 (block-20 95% CI +4.39..+17.15; T-332 stationary CI +5.02..+17.13), p vs <= 2 bps 0.0017 (MC +/-0.0008), Holm 0.0017 (MC +/-0.0008); halves split 2012-05-22 +15.50 / +5.64; since 2000 +11.83; previous-close reading (entry close t+1) difference +4.36 (CI -1.23..+9.81), p 0.1963 (MC +/-0.0078), Holm 0.2615 (MC +/-0.0086), halves +2.69 / +6.39; execution next-open-to-close +6.56 — implemented criteria pass; not implemented: at least 2 of 3 ETFs with Holm-adjusted p < 0.05 vs difference <= 2 bps: entry-close live proxy (QQQ 0.0015 (MC +/-0.0008), IWM 0.0015 (MC +/-0.0008), DIA 0.0017 (MC +/-0.0008)); previous-close reading (QQQ 0.0207 (MC +/-0.0028), IWM 0.2615 (MC +/-0.0086), DIA 0.2615 (MC +/-0.0086)) [the information-set readings disagree: undecided under rule 12]
+- note: pre-registered salvage successor of T-332 on 2026-10-20: not a failure salvage: the decision-centre review asks that the few executable supported rules get a replication family before anything is built on them. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+## Untested (5)
 
 ### T-331 · crypto-cross-exchange-gap
 
@@ -5405,136 +5585,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: b6c_kraken_vpin_volatility
 - note: from the underlying-library library: VPIN flow toxicity predicts crypto volatility; harness suggestion: VPIN builder in a crypto microstructure module. HAR and QLIKE shared with social-volume-volatility. | added by the verifier pass
 
-### T-544 · kalshi-kxbtcd-vs-deribit-digital
-
-**Claim.** On Kalshi KXBTCD daily 5 pm ET 'Bitcoin above' markets from 2025-01 to 2026-10, buying the side whose executable price is at least 5 points below the Deribit-implied risk-neutral digital (point-in-time smile fitted on near-expiry Deribit trades, T-337's SmileBook) and holding to settlement earns a positive mean net return per contract after Kalshi's taker fee 0.07 x P x (1-P) and a 1-point model haircut.
-
-- kind: underlying-strategy · origin: T-337, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: mean net P&L per contract in cents (first qualifying hour per market), with the market-clustered one-sided 95% lower bound
-- null: mean net P&L per contract <= 0
-- procedure: p_RN at each hourly mark H from T-337's SmileBook (SVI and cubic, forward = hourly-BTC-USD close at H); Kalshi side priced at the candle ending at H: buy YES at yes_ask when p_RN - yes_ask > 5 points + 1-point haircut, buy NO at 1 - yes_bid when (1 - p_RN) - (1 - yes_bid) > 5 + 1; valid two-sided book with spread <= 10 cents; settlement from kalshi-settled-markets result; one entry per market (the first qualifying hour); split by hours to close and by year; DSR over the declared 8 cells (threshold 5/10 x SVI/cubic x first/any qualifying hour)
-- data: kalshi-candles-hourly-KXBTCD-<YYYY-MM>, kalshi-settled-markets-KXBTCD-<YYYY-MM>, deribit-option-trades-near-BTC-<YYYY-MM>, hourly-BTC-USD · min n: 300
-- pass: one-sided 95% lower bound of the mean net P&L per contract > 0 under both SVI and cubic fits, same sign in 2025 and 2026, DSR >= 0.95 over the 8 cells
-- controls: Kalshi candles exist only for the 4 most-traded strikes per event (selection reported); Kalshi settles on a 60-second BRTI average, Deribit on its own index (basis reported, no shift); fees per docs.kalshi.com fee rounding (ceil to 6 dp); motivation: T-337 on Polymarket failed because Polymarket's hourly mids at listing were placeholder values, which Kalshi's bid/ask candles do not have; the 2026-10-20 Kalshi quant pass found the Kalshi mid better calibrated than a spot + 30-day-RV model (following that model lost 5.8 cents), so this tests the option-implied model, not that one
-- note: pre-registered salvage successor of T-337 on 2026-10-20: T-337's model (the Deribit digital) was never tested on a venue a US trader can use; Kalshi KXBTCD has the same payoff and bid/ask candles. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-545 · rvx-vix-narrow-spread-replication
-
-**Claim.** From 2009-09 to 2026-09, after the 60-day z-score of RVX minus VIX falls below -2, the IWM-minus-SPY realised volatility spread over the next 21 trading days exceeds the entry RVX-minus-VIX spread on average (non-overlapping events).
-
-- kind: options-strategy · origin: T-237, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: mean of (RV_IWM - RV_SPY over the next 21 sessions) - (RVX - VIX at entry), vol points, over non-overlapping events
-- null: mean <= 0
-- procedure: z on the trailing 60 sessions of RVX - VIX (Cboe closes); an event at the first close with z < -2 after the previous event's 21-session hold ends; RV as annualised close-to-close log-return volatility of adjclose; studentized block bootstrap over events; halves; z-windows 40 and 120 reported
-- data: cboe-RVX-history, cboe-VIX-history, daily-history-IWM, daily-history-SPY · min n: 30
-- pass: mean > 0 with the 95% CI excluding 0, win rate > 0.6, both halves positive
-- controls: random-entry placebo with the matched count; the unconditional implied-minus-realised spread; only the narrow side is claimed (pre-declared from T-237, where the wide side failed: -0.35 vol pts, CI -1.14 to +0.43); the VXN/QQQ events of T-237 are not used
-- note: pre-registered salvage successor of T-237 on 2026-10-20: T-237 failed as a two-sided rule, but its narrow side alone was +1.75 vol pts (95% CI +1.13 to +2.46, win 0.79) and stable across z-windows; RVX/IWM is an independent pair. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-546 · crypto-alt-high-volume-premium
-
-**Claim.** On the point-in-time top 50 Coinbase USD products by trailing 30-day dollar volume (stablecoins, wrapped and staked tokens excluded; BTC and ETH excluded because T-419 used them), 2019-2026, a top-decile idiosyncratic volume day without a 2-sigma price move is followed by a positive 10-day market-adjusted return after a 50 bp round trip.
-
-- kind: underlying-strategy · origin: T-419, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: mean 10-day return minus the equal-weight universe return, net of 50 bp, per event
-- null: mean net <= 0
-- procedure: volume surprise = log dollar volume minus its trailing 50-day mean, residualised on the universe's mean surprise; top decile among names that day, |return| < 2 trailing sigma; entry at the next UTC daily close, 10-day hold; date-clustered bootstrap; halves; placebo of random days per name
-- data: coinbase-daily-<PID> (493 products), coinbase-products-<day> · min n: 300
-- pass: date-clustered 95% CI of the mean net return excludes 0 on the positive side, placebo p < 0.05, both halves positive
-- controls: point-in-time membership from the daily bundles (dead products included); the universe excludes the two names T-419 used; costs at 50 bp round trip as in T-419's crypto cell
-- note: pre-registered salvage successor of T-419 on 2026-10-20: T-419 failed on its pooled ETF+crypto claim and deflation, but its crypto events alone were +378 bp over 460 events and its placebo p was 0.02; the altcoin universe is untouched data. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-547 · turn-of-month-country-etfs
-
-**Claim.** Pooled over the 21 iShares country ETFs, 2000-01 to 2026-09, the mean daily return in the turn-of-month window (trading days -4 to +3, T-59's window) exceeds the mean on other days by at least 3 bps net of 2 bps per round trip, with both halves positive.
-
-- kind: underlying-strategy · origin: T-344, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: pooled mean daily return in the window minus outside it, net of 2 bps per monthly round trip
-- null: difference <= 3 bps
-- procedure: T-59's window and cost convention unchanged; equal-weight panel, date-clustered (month) block bootstrap; per-ETF signs reported
-- data: daily-history-<country ETF> for the 21 iShares country ETFs of T-319/T-471 · min n: 200
-- pass: pooled difference >= 3 bps with one-sided p < 0.05, both halves positive, at least 60% of ETFs with a positive difference
-- controls: none of these ETFs was used by T-59, T-344 or T-443; US-listed ETFs trade on the US calendar (the window is in NYSE sessions)
-- note: pre-registered salvage successor of T-344 on 2026-10-20: T-344 replicated turn-of-month on IWM and BTC but not on 3 of 5 assets; an independent international panel tests whether the effect is a global month-end flow. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-548 · halloween-country-etfs
-
-**Claim.** Pooled over the 21 iShares country ETFs, 2000-01 to 2026-09, the mean monthly return in November-April exceeds the mean in May-October, with both halves positive.
-
-- kind: underlying-strategy · origin: T-441, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: pooled mean monthly return Nov-Apr minus May-Oct
-- null: difference <= 0
-- procedure: month-end adjclose returns; equal-weight panel; block bootstrap by year; per-ETF differences reported
-- data: daily-history-<country ETF> for the 21 iShares country ETFs · min n: 200
-- pass: difference > 0 with one-sided p < 0.05, both halves positive, at least 60% of ETFs positive
-- controls: Bouman and Jacobsen (2002) report the effect internationally; none of these ETFs was used by T-352/T-441 (^GSPC +40 bps/month, p 0.051)
-- note: pre-registered salvage successor of T-441 on 2026-10-20: T-352/T-441 missed their 50 bp bar on ^GSPC (+40 bps, p 0.051) but the sign held post-publication; the international panel is independent data. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-549 · overnight-intraday-gap-qqq-iwm
-
-**Claim.** On QQQ (1999-03 on) and IWM (2000-05 on) to 2026-09, the mean close-to-next-open return (dividends added back on ex-dates) exceeds the mean open-to-close return, the gap is positive in both halves, and holding only overnight (buy the close, sell the open) earns a positive mean return net of 1 bp per side.
-
-- kind: underlying-strategy · origin: T-348, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: mean overnight minus mean intraday return per day; mean net overnight-only return per day
-- null: gap <= 0 or net overnight-only mean <= 0
-- procedure: T-348's construction unchanged (Yahoo open, dividends on ex-date nights); studentized block-10 bootstrap; Holm over the two ETFs; Yahoo-open quality check against the first hourly bar on the 730-day overlap
-- data: daily-history-QQQ, daily-history-IWM (dividends recovered from close / adjclose as in T-348), hourly-QQQ, hourly-IWM · min n: 2500
-- pass: for both ETFs after Holm: gap > 0 with p < 0.05, both halves positive, and net overnight-only mean > 0 with p < 0.05
-- controls: SPY (T-348) is not used; costs are the MOC/MOO half-spreads (1 bp per side) the claim states; 2 bp per side reported
-- note: pre-registered salvage successor of T-348 on 2026-10-20: T-348's SPY gap was +3.29 bps (lower bound +1.44) and failed only its 3 bp bar; the overnight-only holding is an exposure efficiency (similar return, half the time in market) worth replicating. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-550 · spy-short-strangle-quoted-exit-rules
-
-**Claim.** On DoltHub end-of-day SPY chains 2019-02 to 2026-10, a 45-DTE 0.16-delta short strangle sold at mid minus half the quoted spread on each standard monthly expiry and bought back at 50% of the credit or at 21 DTE (whichever first) at mid plus half the spread earns a positive mean P&L per unit of Reg-T margin, and its P&L per day in the trade exceeds holding to expiry.
-
-- kind: options-strategy · origin: T-156, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: mean P&L per unit margin per cycle; paired difference of P&L per day (target-50-or-21-DTE minus hold to expiry)
-- null: mean P&L <= 0, or the paired P&L-per-day difference <= 0
-- procedure: batch6b_dolt's chain parser and strike-by-delta selector (vendor delta within 0.075); entries on the standard monthly expiry calendar at 45 +/- 7 DTE; marks on each later quote day; settlement at intrinsic on SPY's raw close; circular block bootstrap over cycles
-- data: dolt-chain-SPY, daily-history-SPY · min n: 60
-- pass: mean P&L per unit margin > 0 with the 95% CI excluding 0 AND the paired P&L-per-day difference > 0 with the 95% CI excluding 0
-- controls: QUOTE-PRICED (the parent was model-priced at VIX: hold +1.45 vs target50 +3.69 bp of spot per day); half-spread from the same quote rows; early assignment ignored as the parents do; 2020-03 and 2022 reported separately
-- note: pre-registered salvage successor of T-156 on 2026-10-20: the model-priced theta family (T-156, T-103, T-109, T-57) flips sign with the pricing scale; the archived DoltHub quotes turn it into a quote-priced test, and the parent's best component was the exit rule, not the entry. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-551 · putwrite-with-trend-filter
-
-**Claim.** Over the Cboe PUT index history to 2026-09, holding PUT only in months after SPY (^GSPC before 1993) closed above its 10-month simple moving average at the prior month-end, and T-bills otherwise, reduces the maximum drawdown by at least 30% relative to always holding PUT without lowering the excess-return Sharpe ratio.
-
-- kind: options-strategy · origin: T-301, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: maximum drawdown reduction (always minus filtered, as a share of always) and the Sharpe difference
-- null: reduction < 30% or Sharpe(filtered) < Sharpe(always)
-- procedure: month-end decision on the index close, applied from the next month; DTB3 (rule 7) when out; 2 bps per switch; matched random-timing null that re-places the rule's own out-of-market spells (T-301's construction); paired block bootstrap for the Sharpe difference
-- data: cboe-PUT-history, daily-history--GSPC, daily-history-SPY, fred-DTB3 · min n: 300
-- pass: drawdown reduction >= 30% with the matched-null p < 0.05 AND the Sharpe difference's 95% lower bound > -0.05
-- controls: PUT before its 2007 launch is Cboe's back-test (reported, and the live months judged separately); the filter is the single pre-declared 10-month SMA, no grid
-- note: pre-registered salvage successor of T-301 on 2026-10-20: T-301's drawdown control was the robust part (MDD 24.3% vs 52.9%, 95 of 96 variants raw p < 0.05) while its Sharpe gain was not; putwriting is Mandel's best-supported premium; combining a robust risk control with a supported premium is the natural salvage. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-554 · eth-greed-momentum
-
-**Claim.** From 2018-02 to 2026-09, ETH-USD's forward 7-day log return after a Crypto Fear & Greed reading of 75 or more exceeds its unconditional 7-day mean, with both halves positive.
-
-- kind: underlying-strategy · origin: T-41, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: mean forward 7-day log return after F >= 75 minus the unconditional mean
-- null: difference <= 0
-- procedure: F for day t known at 00:00 UTC on t+1; entry at the close of t+1; block-shift permutation p as in T-41; halves
-- data: crypto-fear-greed-history, daily-history-ETH-USD · min n: 150
-- pass: difference > 0 with block-shift p < 0.05 and both halves positive
-- controls: WRONG-WAY SALVAGE of T-41: on BTC the greed side was the opposite of the claim (+2.29% vs the unconditional mean, one-sided p for the claim 0.955, halves +3.36% / +0.40%); ETH is a weakly independent replication (correlation with BTC ~0.8); BTC after 2026-10-20 is counted forward in the notes
-- note: pre-registered salvage successor of T-41 on 2026-10-20: a contrarian claim that failed in the momentum direction; the momentum reading is the salvage. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-555 · gold-futures-plus-bills-vs-gld
-
-**Claim.** From 2005-01 to 2026-09, a fully collateralised long front-month COMEX gold futures position (rolled before first notice, collateral earning DTB3) has a higher total return than holding GLD by at least 0.5% a year.
-
-- kind: underlying-strategy · origin: T-370, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: annualised mean daily return difference (futures + DTB3 accrual minus GLD total return) on sessions outside the roll windows
-- null: difference <= 0.5% a year
-- procedure: Yahoo GC=F is a continuous front series, so the +-2 sessions around each scheduled roll are masked from both legs (T-370's mask) and the excluded-session drift is reported; HAC lag 21; halves
-- data: daily-history-GC-F, daily-history-GLD, fred-DTB3 · min n: 3000
-- pass: difference >= 0.5%/yr with the HAC 95% lower bound > 0 and both halves positive
-- controls: INVERSION SALVAGE of T-370: its implied financing came out 159 bp BELOW bills (CI -185 to -133), which if real means futures + bills beat spot gold by about that much plus GLD's 0.40% fee; a realised-return test is the check, and a measurement artefact (Yahoo front-contract identification, 13:30 vs 16:00 closes) is the leading alternative; micro gold (MGC) is the US retail instrument
-- note: pre-registered salvage successor of T-370 on 2026-10-20: the parent claimed no excess carry and found a large one; if it survives a realised-return test it is an instrument efficiency (hold gold as futures + T-bills), if not it is a data artefact worth knowing. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
 ### T-556 · memecoin-bounce-short-coinbase-check
 
 **Claim.** On Coinbase DOGE-USD and SHIB-USD daily candles from 2021 to 2026-09, shorting at the next UTC daily open after a closed day whose 1-day return is in the top tercile and whose 3-day return is in the bottom tercile of the expanding history (at least 120 days), with a -20% target, +10% stop (both on later daily highs and lows, stop first when one day touches both) and a 14-day time exit, earns a positive mean net return per trade after 18 bp per round trip and 0.01% per 8 hours of funding.
@@ -5546,33 +5596,8 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - data: coinbase-daily-DOGE-USD, coinbase-daily-SHIB-USD · min n: 60
 - pass: pooled 95% CI of the mean net return excludes 0 on the positive side and both coins positive
 - controls: an independent check of a live rule run by a sibling session (Mandel does not touch the child); the child's own diagnostics give the rule DSR 0.00 at nominal N and 0.18-0.35 at N_eff after a 4,512-trial search, and its benchmark fills sit exactly at the barriers; the trial count of the child's search is carried as the deflation context, not re-run
-- note: pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-557 · cheap-yes-7d-archived-panel
-
-**Claim.** Across resolved Polymarket binary markets in the archived closed-markets panel (2023-2026) that were not in T-02's 2,100-market sample, YES contracts priced below 0.10 seven days before the scheduled end resolve YES more often than their price implies (mean outcome minus price > 0).
-
-- kind: market-structure · origin: T-02, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: mean (outcome - price) in the < 0.10 bucket at 7 days before the scheduled end; net P&L per contract after a 1-cent spread and the market's fee as secondary
-- null: mean (outcome - price) <= 0
-- procedure: T-02's construction (price = the daily history point nearest end - 7 d, no later than it) on markets absent from T-02's bundle; event-clustered bootstrap; categories reported
-- data: polymarket-closed-markets-<YYYY-MM>, polymarket-price-history-daily-<YYYY-MM> · min n: 300
-- pass: event-clustered 95% CI of the mean excludes 0 on the positive side, with at least 20 YES resolutions
-- controls: WRONG-WAY SALVAGE: T-02 claimed longshots are overpriced and found the reverse (+0.0208, CI +0.0022 to +0.0510, only 9 YES events), which T-47 restated as a forward test; this uses the archive's markets T-02 never saw; the crypto child reports the opposite sign on Kalshi crypto longshots, so the venue is part of the claim
-- note: pre-registered salvage successor of T-02 on 2026-10-20: the only wrong-way-significant prediction-market calibration result; the archive now holds far more resolved markets than T-02 saw. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
-
-### T-558 · ibs-reversal-replication-qqq-iwm-dia
-
-**Claim.** On QQQ, IWM and DIA from inception to 2026-09, the mean next-day close-to-close return after an internal bar strength below 0.2 exceeds the unconditional mean next-day return by more than 2 bps, after Holm over the three ETFs.
-
-- kind: underlying-strategy · origin: T-332, salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: mean next-day return after IBS < 0.2 minus the unconditional mean, per ETF
-- null: difference <= 2 bps
-- procedure: T-332's construction unchanged (IBS = (close - low) / (high - low) of day t, entry at the close of t, exit at the close of t+1); studentized block bootstrap; Holm over three
-- data: daily-history-QQQ, daily-history-IWM, daily-history-DIA · min n: 1000
-- pass: at least two of three ETFs with Holm-adjusted p < 0.05 and every ETF positive in both halves
-- controls: T-332 (SPY) is one of Mandel's three executable class-A rules; SPY is not used here
-- note: pre-registered salvage successor of T-332 on 2026-10-20: not a failure salvage: the decision-centre review asks that the few executable supported rules get a replication family before anything is built on them. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+- harness: b7_crypto_memecoin_bounce_short
+- note: pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-20: harness b7_crypto_memecoin_bounce_short written and reviewed; its preview is supported (109 trades, mean net +2.55%, month-clustered CI +0.20% to +4.78%; 2-month and quarterly clusters cross 0; SHIB alone CI -1.25% to +4.79%) but the independent refutation could not run (organisation spend limit), so it is NOT run officially: no verdict is recorded until it is refuted.
 
 ## Blocked (123)
 

@@ -31,7 +31,9 @@ realised futures returns instead of an implied rate).
            two of three ETFs with Holm-adjusted p < 0.05 against the claim's 2 bps (H0: difference <= 2 bps), and every ETF
            positive in both halves; the claim sentence also puts "> 2 bps" on each of the three ETFs (rule 1: an asset the
            claim names is a criterion; the pass's two-of-three significance count does not override it). min_n 1000
-           trading days per ETF.
+           trading days per ETF. Rule 12: daily-history rows are available the next session, so each criterion is
+           scored under the entry-close live proxy (gate and fill at close t) and the previous-close reading (gate of
+           day t, entry close t+1, exit close t+2), Holm per reading, combined by ``batch6c_xs._rule12``.
   * T-555  (parent T-370, harness ``batch6c_misc.b6c_misc_metals_basis``) 2005-01..2026-09: daily return of a fully
            collateralised long GC=F position (Yahoo continuous front, F_t / F_{t-1} - 1) plus the DTB3 accrual on the
            collateral, minus GLD's total return (adjclose), on the sessions outside T-370's roll mask (``roll_flags``:
@@ -83,7 +85,7 @@ from mandel.experiments import batch6c_cal as CAL
 from mandel.experiments import batch6c_misc as MISC
 from mandel.experiments.batch5_hourly import ny_bars
 from mandel.experiments.batch6_surf import _decide, _out
-from mandel.experiments.batch6c_xs import COUNTRY21
+from mandel.experiments.batch6c_xs import COUNTRY21, _rule12
 from mandel.experiments.underlying2 import _verdict, monthly
 
 N_BOOT = 2000
@@ -566,17 +568,14 @@ def _s2(x) -> str:
 
 # ===================================================================================== T-558 IBS replication ==
 
-def ibs_one(b, end: str = T558_END, thr: float = T558_THR, bar: float = T558_BAR, block: int = T558_BLOCK,
-            n_boot: int = N_BOOT, seed: int = SEED, min_n: int = T558_MIN_N, parent: bool = True) -> dict:
-    """One ETF: T-332's construction from inception to ``end``. The paired series s_t = (1 - share) x flag_diff has mean
-    exactly mean(r | IBS < thr) - mean(r); p's are studentized circular block-bootstrap (block ``block``) vs ``bar``."""
-    H, L, C, A = (np.asarray(x, float) for x in (b.high, b.low, b.close, b.adj))
-    x = OHLC.ibs(H, L, C)
-    sd = np.array(b.days[:-1]); nd = np.array(b.days[1:])
-    r = A[1:] / A[:-1] - 1
-    idx = np.where((nd <= end) & np.isfinite(x[:-1]))[0]
-    rw, f, days = r[idx], x[idx] < thr, sd[idx]
-    n = int(idx.size)
+T558_READINGS = (("entry_close", "entry-close live proxy (IBS of day t, fill at close t, exit close t+1)"),
+                 ("prev_close", "previous-close reading (IBS of day t known next session, entry close t+1, exit close t+2)"))
+
+
+def _ibs_reading(rw, f, days, bar: float, block: int, n_boot: int, seed: int) -> dict:
+    """One information-set reading: paired series s = (1 - share) x flag_diff (mean exactly mean(r | flag) - mean(r)),
+    studentized circular block-bootstrap p vs ``bar``, block CI and median-date halves."""
+    n = int(rw.size)
     rec = {"n": n, "first": days[0] if n else None, "last": days[-1] if n else None, "n_signal": int(f.sum())}
     if f.sum() < 8 or (~f).sum() < 8:
         return rec
@@ -592,59 +591,88 @@ def ibs_one(b, end: str = T558_END, thr: float = T558_THR, bar: float = T558_BAR
     rec.update(diff_bps=diff * 1e4, p=pg, p_less=pl, p_draws=dr, ci95_bps=[c * 1e4 for c in CAL.mean_ci(s, block, n_boot, seed)],
                halves_bps=[h * 1e4 for h in halves], split=split, mean_after_signal_bps=float(rw[f].mean() * 1e4),
                mean_unconditional_bps=float(rw.mean() * 1e4), diff_since_2000_bps=None if d2000 is None else d2000 * 1e4)
-    if parent:
-        par = OHLC.ibs_reversal(b.days, H, L, C, A, opens=b.open, start=b.days[0], end=end, thr=thr, split=split,
+    return rec
+
+
+def ibs_one(b, end: str = T558_END, thr: float = T558_THR, bar: float = T558_BAR, block: int = T558_BLOCK,
+            n_boot: int = N_BOOT, seed: int = SEED, min_n: int = T558_MIN_N, parent: bool = True) -> dict:
+    """One ETF: T-332's construction from inception to ``end`` under both information-set readings (rule 12). The
+    top-level keys are the entry-close live-proxy reading (IBS_t gate, r = A[t+1]/A[t] - 1); ``prev_close`` holds the
+    previous-close reading (IBS_t gate known next session, r = A[t+2]/A[t+1] - 1, exit dates <= ``end``)."""
+    H, L, C, A = (np.asarray(x, float) for x in (b.high, b.low, b.close, b.adj))
+    x = OHLC.ibs(H, L, C)
+    days_all = np.array(b.days)
+    sd, nd = days_all[:-1], days_all[1:]
+    r = A[1:] / A[:-1] - 1
+    idx = np.where((nd <= end) & np.isfinite(x[:-1]))[0]
+    rec = _ibs_reading(r[idx], x[idx] < thr, sd[idx], bar, block, n_boot, seed)
+    r2 = A[2:] / A[1:-1] - 1
+    idx2 = np.where((days_all[2:] <= end) & np.isfinite(x[:-2]))[0]
+    rec["prev_close"] = _ibs_reading(r2[idx2], x[:-2][idx2] < thr, days_all[:-2][idx2], bar, block, n_boot, seed)
+    if "diff_bps" in rec and parent:
+        par = OHLC.ibs_reversal(b.days, H, L, C, A, opens=b.open, start=b.days[0], end=end, thr=thr, split=rec["split"],
                                 min_gap=bar, n_boot=n_boot, seed=seed, min_n=min_n, grid_sharpes=None)
         rec.update(parent_stationary_ci95_bps=par.get("ci_bps"), parent_block_shift_p=par.get("p_block_shift"),
                    rule_sharpe_net=par.get("rule_sharpe_net"), execution=par.get("execution"))
     return rec
 
 
-def ibs_family(bars: dict, end: str = T558_END, thr: float = T558_THR, bar: float = T558_BAR, block: int = T558_BLOCK,
-               min_n: int = T558_MIN_N, n_boot: int = N_BOOT, seed: int = SEED, need: int = 2, parent: bool = True) -> dict:
-    """T-558 core. ``bars``: {sym: Bars}."""
-    syms = list(bars)
-    per = {s: ibs_one(bars[s], end, thr, bar, block, n_boot, seed, min_n, parent) for s in syms}
+def _ibs_criteria(per: dict, syms: Sequence[str], thr: float, bar: float, need: int, tag: str) -> list:
+    """The three T-558 criteria (name, ok, decisive) for one reading; ``per``: {sym: reading record}; Holm within it."""
     hp = holm([per[s].get("p") for s in syms])
     dec = []
     for i, s in enumerate(syms):
         per[s]["holm_p"] = hp[i]
         dec.append(None if hp[i] is None else CAL.decide_p(hp[i], per[s]["p_draws"]))
-    if any("diff_bps" not in per[s] for s in syms):
-        crit = [(f"{s}: enough IBS < {thr} days and other days", None, False) for s in syms if "diff_bps" not in per[s]]
-    else:
-        crit = []
-    ok_count = _count_crit([d if "diff_bps" in per[s] else None for d, s in zip(dec, syms)], need)
-    n_dec_fail = sum(1 for s in syms if "diff_bps" in per[s] and CAL.decide_p(per[s]["p_less"], per[s]["p_draws"]) is True)
     have = [s for s in syms if "diff_bps" in per[s]]
-    crit += [(f"at least {need} of {len(syms)} ETFs with Holm-adjusted p < 0.05 vs difference <= {bar * 1e4:.0f} bps ("
-              + ", ".join(f"{s} {_mc(per[s]['holm_p'], per[s]['p_draws'])}" for s in have) + ")", ok_count,
-              len(syms) - n_dec_fail < need),
-             (f"every ETF difference > {bar * 1e4:.0f} bps (the claim's bound on QQQ, IWM and DIA: "
-              + ", ".join(f"{s} {per[s]['diff_bps']:+.2f}" for s in have) + ")",
-              None if len(have) < len(syms) else all(per[s]["diff_bps"] > bar * 1e4 for s in syms),
-              any(per[s]["ci95_bps"][1] is not None and per[s]["ci95_bps"][1] <= bar * 1e4 for s in have)),
-             ("every ETF positive in both halves ("
-              + ", ".join(f"{s} {_s2(per[s]['halves_bps'][0])}/{_s2(per[s]['halves_bps'][1])}" for s in have) + ")",
-              None if len(have) < len(syms) else all(all(math.isfinite(h) and h > 0 for h in per[s]["halves_bps"]) for s in syms),
-              False)]
-    n = min((per[s]["n"] for s in syms), default=0)
+    ok_count = _count_crit([d if "diff_bps" in per[s] else None for d, s in zip(dec, syms)], need)
+    n_dec_fail = sum(1 for s in have if CAL.decide_p(per[s]["p_less"], per[s]["p_draws"]) is True)
+    return [(f"{tag} (" + ", ".join(f"{s} {_mc(per[s]['holm_p'], per[s]['p_draws'])}" for s in have) + ")", ok_count,
+             len(syms) - n_dec_fail < need),
+            (f"{tag} (" + ", ".join(f"{s} {per[s]['diff_bps']:+.2f}" for s in have) + ")",
+             None if len(have) < len(syms) else all(per[s]["diff_bps"] > bar * 1e4 for s in syms),
+             any(per[s]["ci95_bps"][1] is not None and per[s]["ci95_bps"][1] <= bar * 1e4 for s in have)),
+            (f"{tag} (" + ", ".join(f"{s} {_s2(per[s]['halves_bps'][0])}/{_s2(per[s]['halves_bps'][1])}" for s in have) + ")",
+             None if len(have) < len(syms) else all(all(math.isfinite(h) and h > 0 for h in per[s]["halves_bps"]) for s in syms),
+             False)]
+
+
+def ibs_family(bars: dict, end: str = T558_END, thr: float = T558_THR, bar: float = T558_BAR, block: int = T558_BLOCK,
+               min_n: int = T558_MIN_N, n_boot: int = N_BOOT, seed: int = SEED, need: int = 2, parent: bool = True) -> dict:
+    """T-558 core. ``bars``: {sym: Bars}. Rule 12: every criterion is scored under the entry-close live-proxy reading and
+    the previous-close reading (Holm applied separately per reading) and combined with batch6c_xs._rule12: it passes only
+    when both pass, fails only when both fail, undecided otherwise."""
+    syms = list(bars)
+    per = {s: ibs_one(bars[s], end, thr, bar, block, n_boot, seed, min_n, parent) for s in syms}
+    views = {"entry_close": {s: per[s] for s in syms}, "prev_close": {s: per[s]["prev_close"] for s in syms}}
+    crit = [(f"{s}: enough IBS < {thr} days and other days ({lab})", None, False)
+            for key, lab in T558_READINGS for s in syms if "diff_bps" not in views[key][s]]
+    by = {key: _ibs_criteria(views[key], syms, thr, bar, need, lab.split(" (")[0]) for key, lab in T558_READINGS}
+    labels = (f"at least {need} of {len(syms)} ETFs with Holm-adjusted p < 0.05 vs difference <= {bar * 1e4:.0f} bps",
+              f"every ETF difference > {bar * 1e4:.0f} bps (the claim's bound on QQQ, IWM and DIA)",
+              "every ETF positive in both halves")
+    for j, lab in enumerate(labels):
+        crit.append(_rule12([by[key][j] for key, _ in T558_READINGS], lab))
+    n = min((min(per[s]["n"], per[s]["prev_close"]["n"]) for s in syms), default=0)
     v, why = _decide(crit, n, min_n, "trading days (the smallest ETF)")
     parts = []
     for s in syms:
-        r = per[s]
+        r, q = per[s], per[s]["prev_close"]
         if "diff_bps" not in r:
             parts.append(f"{s}: {r['n']} days, {r['n_signal']} signals, too few"); continue
         ex = r.get("execution") or {}
-        parts.append(f"{s} {r['first']}..{r['last']} ({r['n']} days, {r['n_signal']} IBS<{thr} signals): next-day "
-                     f"{r['mean_after_signal_bps']:+.2f} vs unconditional {r['mean_unconditional_bps']:+.2f} bps, difference "
+        parts.append(f"{s} {r['first']}..{r['last']} ({r['n']} days, {r['n_signal']} IBS<{thr} signals): entry-close reading "
+                     f"next-day {r['mean_after_signal_bps']:+.2f} vs unconditional {r['mean_unconditional_bps']:+.2f} bps, difference "
                      f"{r['diff_bps']:+.2f} (block-{block} 95% CI {r['ci95_bps'][0]:+.2f}..{r['ci95_bps'][1]:+.2f}"
                      + (f"; T-332 stationary CI {r['parent_stationary_ci95_bps'][0]:+.2f}..{r['parent_stationary_ci95_bps'][1]:+.2f}"
                         if r.get("parent_stationary_ci95_bps") else "")
                      + f"), p vs <= {bar * 1e4:.0f} bps {_mc(r['p'], r['p_draws'])}, Holm {_mc(r['holm_p'], r['p_draws'])}; halves "
                      f"split {r['split']} {_s2(r['halves_bps'][0])} / {_s2(r['halves_bps'][1])}; since 2000 {_s2(r['diff_since_2000_bps'])}"
-                     + (f"; execution next-open-to-close {_s2(ex.get('next_open_to_close_diff_bps'))}, next-close entry "
-                        f"{_s2(ex.get('next_close_entry_diff_bps'))}" if ex else ""))
+                     + (f"; previous-close reading (entry close t+1) difference {q['diff_bps']:+.2f} (CI {q['ci95_bps'][0]:+.2f}.."
+                        f"{q['ci95_bps'][1]:+.2f}), p {_mc(q['p'], q['p_draws'])}, Holm {_mc(q['holm_p'], q['p_draws'])}, halves "
+                        f"{_s2(q['halves_bps'][0])} / {_s2(q['halves_bps'][1])}" if "diff_bps" in q else
+                        f"; previous-close reading: {q['n_signal']} signals, too few")
+                     + (f"; execution next-open-to-close {_s2(ex.get('next_open_to_close_diff_bps'))}" if ex else ""))
     return {"n": n, "per_etf": per, "criteria": [[c[0], c[1]] for c in crit], "verdict": v, "why": why, "reason": "; ".join(parts)}
 
 
@@ -807,7 +835,8 @@ def b7_cal_ibs_qqq_iwm_dia(archive):
     bars = {s: OHLC._bars(archive, s) for s in T558_SYMS}
     rep = ibs_family(bars)
     reason, why = rep.pop("reason"), rep.pop("why")
-    stat = {**rep, "rule10": "every trading day (no grid phase)"}
+    stat = {**rep, "rule10": "every trading day (no grid phase)",
+            "rule12": "criteria scored under the entry-close and previous-close readings; undecided when they disagree"}
     return _out(stat, rep["n"], rep["verdict"], reason + " — " + why)
 
 

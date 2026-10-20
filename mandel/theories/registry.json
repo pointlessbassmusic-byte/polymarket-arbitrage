@@ -14089,11 +14089,15 @@
     "pass": "one-sided 95% lower bound of the mean net P&L per contract > 0 under both SVI and cubic fits, same sign in 2025 and 2026, DSR >= 0.95 over the 8 cells",
     "controls": "Kalshi candles exist only for the 4 most-traded strikes per event (selection reported); Kalshi settles on a 60-second BRTI average, Deribit on its own index (basis reported, no shift); fees per docs.kalshi.com fee rounding (ceil to 6 dp); motivation: T-337 on Polymarket failed because Polymarket's hourly mids at listing were placeholder values, which Kalshi's bid/ask candles do not have; the 2026-10-20 Kalshi quant pass found the Kalshi mid better calibrated than a spot + 30-day-RV model (following that model lost 5.8 cents), so this tests the option-implied model, not that one"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_pm_kalshi_vs_deribit_digital"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-d74ca9cb"
+   ],
    "notes": "pre-registered salvage successor of T-337 on 2026-10-20: T-337's model (the Deribit digital) was never tested on a venue a US trader can use; Kalshi KXBTCD has the same payoff and bid/ask candles. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14114,11 +14118,15 @@
     "pass": "mean > 0 with the 95% CI excluding 0, win rate > 0.6, both halves positive",
     "controls": "random-entry placebo with the matched count; the unconditional implied-minus-realised spread; only the narrow side is claimed (pre-declared from T-237, where the wide side failed: -0.35 vol pts, CI -1.14 to +0.43); the VXN/QQQ events of T-237 are not used"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_vol_rvx_narrow_spread"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-64a895b7"
+   ],
    "notes": "pre-registered salvage successor of T-237 on 2026-10-20: T-237 failed as a two-sided rule, but its narrow side alone was +1.75 vol pts (95% CI +1.13 to +2.46, win 0.79) and stable across z-windows; RVX/IWM is an independent pair. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14139,11 +14147,15 @@
     "pass": "date-clustered 95% CI of the mean net return excludes 0 on the positive side, placebo p < 0.05, both halves positive",
     "controls": "point-in-time membership from the daily bundles (dead products included); the universe excludes the two names T-419 used; costs at 50 bp round trip as in T-419's crypto cell"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_crypto_alt_high_volume_premium"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a46e76c8"
+   ],
    "notes": "pre-registered salvage successor of T-419 on 2026-10-20: T-419 failed on its pooled ETF+crypto claim and deflation, but its crypto events alone were +378 bp over 460 events and its placebo p was 0.02; the altcoin universe is untouched data. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14164,11 +14176,15 @@
     "pass": "pooled difference >= 3 bps with one-sided p < 0.05, both halves positive, at least 60% of ETFs with a positive difference",
     "controls": "none of these ETFs was used by T-59, T-344 or T-443; US-listed ETFs trade on the US calendar (the window is in NYSE sessions)"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_cal_tom_country_etfs"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-32fac4e3"
+   ],
    "notes": "pre-registered salvage successor of T-344 on 2026-10-20: T-344 replicated turn-of-month on IWM and BTC but not on 3 of 5 assets; an independent international panel tests whether the effect is a global month-end flow. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14189,11 +14205,15 @@
     "pass": "difference > 0 with one-sided p < 0.05, both halves positive, at least 60% of ETFs positive",
     "controls": "Bouman and Jacobsen (2002) report the effect internationally; none of these ETFs was used by T-352/T-441 (^GSPC +40 bps/month, p 0.051)"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_cal_halloween_country_etfs"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-62448cfc"
+   ],
    "notes": "pre-registered salvage successor of T-441 on 2026-10-20: T-352/T-441 missed their 50 bp bar on ^GSPC (+40 bps, p 0.051) but the sign held post-publication; the international panel is independent data. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14214,11 +14234,15 @@
     "pass": "for both ETFs after Holm: gap > 0 with p < 0.05, both halves positive, and net overnight-only mean > 0 with p < 0.05",
     "controls": "SPY (T-348) is not used; costs are the MOC/MOO half-spreads (1 bp per side) the claim states; 2 bp per side reported"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_cal_overnight_qqq_iwm"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3aee7d3f"
+   ],
    "notes": "pre-registered salvage successor of T-348 on 2026-10-20: T-348's SPY gap was +3.29 bps (lower bound +1.44) and failed only its 3 bp bar; the overnight-only holding is an exposure efficiency (similar return, half the time in market) worth replicating. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14239,11 +14263,15 @@
     "pass": "mean P&L per unit margin > 0 with the 95% CI excluding 0 AND the paired P&L-per-day difference > 0 with the 95% CI excluding 0",
     "controls": "QUOTE-PRICED (the parent was model-priced at VIX: hold +1.45 vs target50 +3.69 bp of spot per day); half-spread from the same quote rows; early assignment ignored as the parents do; 2020-03 and 2022 reported separately"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_vol_spy_strangle_quoted_exits"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7ab327a3"
+   ],
    "notes": "pre-registered salvage successor of T-156 on 2026-10-20: the model-priced theta family (T-156, T-103, T-109, T-57) flips sign with the pricing scale; the archived DoltHub quotes turn it into a quote-priced test, and the parent's best component was the exit rule, not the entry. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14264,11 +14292,15 @@
     "pass": "drawdown reduction >= 30% with the matched-null p < 0.05 AND the Sharpe difference's 95% lower bound > -0.05",
     "controls": "PUT before its 2007 launch is Cboe's back-test (reported, and the live months judged separately); the filter is the single pre-declared 10-month SMA, no grid"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_vol_putwrite_trend_filter"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-29177533"
+   ],
    "notes": "pre-registered salvage successor of T-301 on 2026-10-20: T-301's drawdown control was the robust part (MDD 24.3% vs 52.9%, 95 of 96 variants raw p < 0.05) while its Sharpe gain was not; putwriting is Mandel's best-supported premium; combining a robust risk control with a supported premium is the natural salvage. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14339,11 +14371,15 @@
     "pass": "difference > 0 with block-shift p < 0.05 and both halves positive",
     "controls": "WRONG-WAY SALVAGE of T-41: on BTC the greed side was the opposite of the claim (+2.29% vs the unconditional mean, one-sided p for the claim 0.955, halves +3.36% / +0.40%); ETH is a weakly independent replication (correlation with BTC ~0.8); BTC after 2026-10-20 is counted forward in the notes"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_crypto_eth_greed_momentum"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0cbb2606"
+   ],
    "notes": "pre-registered salvage successor of T-41 on 2026-10-20: a contrarian claim that failed in the momentum direction; the momentum reading is the salvage. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14364,11 +14400,15 @@
     "pass": "difference >= 0.5%/yr with the HAC 95% lower bound > 0 and both halves positive",
     "controls": "INVERSION SALVAGE of T-370: its implied financing came out 159 bp BELOW bills (CI -185 to -133), which if real means futures + bills beat spot gold by about that much plus GLD's 0.40% fee; a realised-return test is the check, and a measurement artefact (Yahoo front-contract identification, 13:30 vs 16:00 closes) is the leading alternative; micro gold (MGC) is the US retail instrument"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_cal_gold_futures_bills_vs_gld"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5227f0b8"
+   ],
    "notes": "pre-registered salvage successor of T-370 on 2026-10-20: the parent claimed no excess carry and found a large one; if it survives a realised-return test it is an instrument efficiency (hold gold as futures + T-bills), if not it is a data artefact worth knowing. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14389,12 +14429,14 @@
     "pass": "pooled 95% CI of the mean net return excludes 0 on the positive side and both coins positive",
     "controls": "an independent check of a live rule run by a sibling session (Mandel does not touch the child); the child's own diagnostics give the rule DSR 0.00 at nominal N and 0.18-0.35 at N_eff after a 4,512-trial search, and its benchmark fills sit exactly at the barriers; the trial count of the child's search is carried as the deflation context, not re-run"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_crypto_memecoin_bounce_short"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
    "results": [],
-   "notes": "pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
+   "notes": "pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-20: harness b7_crypto_memecoin_bounce_short written and reviewed; its preview is supported (109 trades, mean net +2.55%, month-clustered CI +0.20% to +4.78%; 2-month and quarterly clusters cross 0; SHIB alone CI -1.25% to +4.79%) but the independent refutation could not run (organisation spend limit), so it is NOT run officially: no verdict is recorded until it is refuted."
   },
   {
    "id": "T-557",
@@ -14414,11 +14456,15 @@
     "pass": "event-clustered 95% CI of the mean excludes 0 on the positive side, with at least 20 YES resolutions",
     "controls": "WRONG-WAY SALVAGE: T-02 claimed longshots are overpriced and found the reverse (+0.0208, CI +0.0022 to +0.0510, only 9 YES events), which T-47 restated as a forward test; this uses the archive's markets T-02 never saw; the crypto child reports the opposite sign on Kalshi crypto longshots, so the venue is part of the claim"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_pm_cheap_yes_archived_panel"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-aaf20888"
+   ],
    "notes": "pre-registered salvage successor of T-02 on 2026-10-20: the only wrong-way-significant prediction-market calibration result; the archive now holds far more resolved markets than T-02 saw. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   },
   {
@@ -14439,11 +14485,15 @@
     "pass": "at least two of three ETFs with Holm-adjusted p < 0.05 and every ETF positive in both halves",
     "controls": "T-332 (SPY) is one of Mandel's three executable class-A rules; SPY is not used here"
    },
-   "experiments": [],
+   "experiments": [
+    "b7_cal_ibs_qqq_iwm_dia"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-cf9cea40"
+   ],
    "notes": "pre-registered salvage successor of T-332 on 2026-10-20: not a failure salvage: the decision-centre review asks that the few executable supported rules get a replication family before anything is built on them. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
   }
  ]
