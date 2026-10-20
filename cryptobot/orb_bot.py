@@ -110,6 +110,11 @@ class OrbBot:
             return self._record(rec)
         side = 1 if first.close > first.open else -1
         mid = await ex.mid(self.symbol)
+        held = (await ex.positions()).get(self.symbol, 0.0) if hasattr(ex, "positions") else 0.0
+        if held:                                           # a leftover from an earlier session: flatten it first
+            out = await ex.close(self.symbol, abs(held), mid)
+            rec["flattened_leftover"] = {"shares": held, "price": out.price}
+            logger.warning("orb: flattened a leftover %s position of %+.0f shares at %.2f", self.symbol, held, out.price)
         dist = self.rule.stop_atr * a
         shares = math.floor(min(self.rule.risk_per_day * self.capital / dist, self.rule.max_leverage * self.capital / mid))
         if shares < 1:

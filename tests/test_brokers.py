@@ -250,3 +250,30 @@ def test_rank_uses_the_longer_of_hold_and_clawback():
     ranked = P.rank([locked, quick])
     assert [p.name for p, _ in ranked] == ["quick", "locked"]
     assert ranked[1][1]["annualised_on_capital"] == pytest.approx(200 / (10000 * 730) * 365)
+
+
+def test_alpaca_cancels_a_slow_ioc_and_records_the_late_partial_fill():
+    import asyncio
+    import httpx
+    from cryptobot.execution.alpaca import AlpacaConfig, AlpacaExecutor
+    calls = {"get": 0, "delete": 0}
+
+    def handler(req: httpx.Request):
+        if req.method == "POST":
+            return httpx.Response(200, json={"id": "o1", "status": "accepted", "filled_qty": "0"})
+        if req.method == "DELETE":
+            calls["delete"] += 1
+            return httpx.Response(204)
+        calls["get"] += 1
+        if calls["delete"]:                         # after the cancel the paper engine reports the late partial fill
+            return httpx.Response(200, json={"id": "o1", "status": "canceled", "filled_qty": "97", "filled_avg_price": "739.82"})
+        return httpx.Response(200, json={"id": "o1", "status": "new", "filled_qty": "0"})
+
+    async def run():
+        c = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        ex = AlpacaExecutor(AlpacaConfig(live=False, max_trade_usd=1e6, fill_polls=3, fill_poll_s=0.0), c, key_id="k", secret="s")
+        f = await ex.open_long("QQQ", 135 * 740.0, 740.0)
+        await c.aclose()
+        return f
+    f = asyncio.run(run())
+    assert calls["delete"] == 1 and f.qty == 97 and f.price == 739.82

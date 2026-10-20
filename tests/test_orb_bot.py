@@ -162,3 +162,17 @@ def test_check_reports_each_call_and_the_failing_one(tmp_path):
     res = {n: (ok, m) for n, ok, m in asyncio.run(O.check(bot))}
     assert res["09:30 five-minute bar"] == (False, "RuntimeError: alpaca data /v2/stocks/bars -> 403: forbidden")
     assert res["quote"][0]
+
+
+def test_session_flattens_a_leftover_position_first(tmp_path):
+    day = dt.date(2026, 10, 19)
+
+    class Ex(FakeExec):
+        async def positions(self):
+            return {"QQQ": 133.0}
+
+    ex = Ex([401.0, 401.0, 402.0])                                         # short from 401, stopped at 402
+    bot = _bot(tmp_path, FakeFeed(day, 400.0, 399.0), ex, _times(day, (9, 35), (9, 36), (9, 37), (9, 38)))
+    rec = asyncio.run(bot.run_session(day))
+    assert ex.orders[0] == ("close", 133.0, 401.0) and ex.orders[1][0] == "sell"
+    assert rec["flattened_leftover"]["shares"] == 133.0

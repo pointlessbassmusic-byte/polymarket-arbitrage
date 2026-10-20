@@ -55,7 +55,7 @@ class AlpacaConfig:
     max_trade_usd: float = 500.0
     max_slippage: float = 0.002       # 20 bp IOC limit from mid; large caps quote 1-2 bp wide
     timeout_s: float = 20.0
-    fill_polls: int = 10
+    fill_polls: int = 40              # the paper engine can take several seconds to fill an IOC
     fill_poll_s: float = 0.5
 
 
@@ -208,10 +208,24 @@ class AlpacaExecutor:
             if i:
                 await asyncio.sleep(self.cfg.fill_poll_s)
             d = await self._request("GET", f"/v2/orders/{order_id}") if order_id else d
+        if d.get("status") not in TERMINAL and order_id:
+            # still working: cancel what is left and wait for the final state, so a late fill
+            # can never leave a position the caller does not know about
+            logger.warning("%s %s: order %s still %s after %d polls; cancelling the rest",
+                           symbol, label, order_id, d.get("status"), self.cfg.fill_polls)
+            try:
+                await self._request("DELETE", f"/v2/orders/{order_id}")
+            except RuntimeError as exc:                # already done: the read below has the truth
+                logger.info("%s cancel %s: %s", symbol, order_id, exc)
+            for _ in range(self.cfg.fill_polls):
+                await asyncio.sleep(self.cfg.fill_poll_s)
+                d = await self._request("GET", f"/v2/orders/{order_id}")
+                if d.get("status") in TERMINAL:
+                    break
         filled = _f(d.get("filled_qty"))
         if d.get("status") not in TERMINAL:
-            logger.warning("%s %s: order %s still %s after %d polls; recording %s filled so far",
-                           symbol, label, order_id, d.get("status"), self.cfg.fill_polls, filled)
+            logger.warning("%s %s: order %s still %s after cancelling; recording %s filled so far",
+                           symbol, label, order_id, d.get("status"), filled)
         if filled <= 0:
             raise RuntimeError(f"{symbol} {label}: IOC order {order_id} did not fill (status {d.get('status')})")
         return Fill(symbol, label, filled, _f(d.get("filled_avg_price"), fallback_px), order_id=order_id)
