@@ -431,12 +431,17 @@ def test_imbalance_z_ratio_is_bounded_and_signed_is_not():
     assert ok.sum() > 10_000 and np.isnan(zr[:720]).all() and np.isfinite(zr[1440:]).all()   # >= 720 prior minutes are needed first
     # both are trailing-day z-scores: mean about 0, sd about 1 over the month
     assert abs(np.nanmean(zr)) < 0.1 and 0.8 < np.nanstd(zr) < 1.2 and abs(np.nanmean(zs)) < 0.1 and 0.8 < np.nanstd(zs) < 1.2
-    # the ratio z is a monotone function of the ratio, the signed z of buy - sell: in a minute with the same ratio but
-    # twice the volume the signed reading moves twice as far
-    i = np.flatnonzero(ok)[100]
-    assert np.sign(zr[i] - np.nanmean(zr)) == np.sign(((b - s_) / (b + s_))[i] - np.nanmean(((b - s_) / (b + s_))[ok]))
-    g2 = dict(g); g2["kr_buy"] = g["kr_buy"] * 2; g2["kr_sell"] = g["kr_sell"] * 2
-    assert np.allclose(m.imbalance_z(g2, 5)[ok], zr[ok]) and not np.allclose(m.imbalance_z(g2, 5, signed=True)[ok], zs[ok], atol=1e-3)
+    # the ratio reading is bounded: |I| <= 1, so z can never exceed (1 - mean) / sd, while the signed reading is not
+    I5 = (b - s_) / np.where(b + s_ > 0, b + s_, np.nan)
+    assert np.nanmax(np.abs(I5)) <= 1.0 + 1e-12
+    # a per-minute volume rescaling that keeps each minute's ratio leaves the 1-minute ratio z unchanged (a z-score is
+    # scale invariant and the ratio is per minute) but changes the signed-volume z, which weighs busy minutes more
+    rng = np.random.default_rng(0)
+    f = rng.lognormal(0, 1, g["N"])
+    g2 = dict(g); g2["kr_buy"] = g["kr_buy"] * f; g2["kr_sell"] = g["kr_sell"] * f
+    z1, z1s = m.imbalance_z(g, 1), m.imbalance_z(g, 1, signed=True)
+    ok1 = np.isfinite(z1) & np.isfinite(z1s)
+    assert np.allclose(m.imbalance_z(g2, 1)[ok1], z1[ok1]) and not np.allclose(m.imbalance_z(g2, 1, signed=True)[ok1], z1s[ok1], atol=1e-3)
 
 
 def test_imbalance_trades_fill_rule_and_planted_effect():
