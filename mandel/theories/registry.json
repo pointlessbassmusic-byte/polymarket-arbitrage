@@ -14433,10 +14433,12 @@
     "b7_crypto_memecoin_bounce_short"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-20: harness b7_crypto_memecoin_bounce_short written and reviewed; its preview is supported (109 trades, mean net +2.55%, month-clustered CI +0.20% to +4.78%; 2-month and quarterly clusters cross 0; SHIB alone CI -1.25% to +4.79%) but the independent refutation could not run (organisation spend limit), so it is NOT run officially: no verdict is recorded until it is refuted."
+   "results": [
+    "X-a6b47633"
+   ],
+   "notes": "pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-20: harness b7_crypto_memecoin_bounce_short written and reviewed; its preview is supported (109 trades, mean net +2.55%, month-clustered CI +0.20% to +4.78%; 2-month and quarterly clusters cross 0; SHIB alone CI -1.25% to +4.79%) but the independent refutation could not run (organisation spend limit), so it is NOT run officially: no verdict is recorded until it is refuted. | refutation 2026-10-20 05:0x UTC: independent rebuild reproduced it exactly (CI lower +0.24%, 5 seeds +0.15..+0.24%) and the pass held under every open choice (per-coin terciles, quantile method, fill conventions); recorded after refutation."
   },
   {
    "id": "T-557",

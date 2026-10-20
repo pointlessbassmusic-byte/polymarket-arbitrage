@@ -33,7 +33,9 @@ fills).
            Block-shift p as in T-41 (the index series circularly shifted against the returns by k in [h+1, n-h-2]),
            enumerated over every admissible shift (T-41 drew 2,000 of them at random; the full enumeration is the same
            null without Monte Carlo error), one-sided in the claim's direction: p = (1 + #{null d >= d}) / (1 + shifts).
-           Halves as in T-41 (index halves of the aligned sample; within each, greed mean minus that half's mean).
+           Halves on T-41's index halves, read both ways (rule 1/11): greed mean minus that half's own mean (T-41's
+           helper) and greed mean minus the claim's full-sample unconditional mean; the criterion passes only when both
+           readings are positive in both halves and is undecided when they disagree.
            Pass: d > 0 AND p < 0.05 AND both halves > 0. min_n 150 greed days.
   * T-556  independent check of the sibling session's armed live rule (cryptobot/perp_bot.py on branch
            claude/crypto-arbitrage-volatility-bot-qic8gv, read only): features of the child's ``perp_study.daily_features``

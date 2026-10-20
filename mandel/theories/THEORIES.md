@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `694a1fb60eb8b113`). 494 theories. supported 54, not_supported 246, inconclusive 49, untested 5, blocked 125, parked 15.
+Rendered from `registry.json` (hash `717fd9b472979d46`). 494 theories. supported 55, not_supported 246, inconclusive 49, untested 4, blocked 125, parked 15.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (54)
+## Supported (55)
 
 ### T-06 · price-series-are-multifractal
 
@@ -874,6 +874,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: b7_cal_gold_futures_bills_vs_gld
 - result X-5227f0b8: supported — GC=F (Yahoo continuous front) + DTB3 accrual minus GLD total return, 2005-01-03..2026-09-24, 4807 sessions outside T-370's roll mask (+-2 sessions around the last session before each first notice day; 654 masked): annualised difference +1.07% (HAC lag 21 95% CI +0.04%..+2.10%; needs >= 0.5% and lower > 0), legs futures +11.21% + bills +1.81% vs GLD +11.95%; halves split 2015-11-11 +0.65% / +1.49%. Artefact readings side by side (report only): masked sessions' drift +11.25% annualised per masked session, +1.34% a year in total; all sessions (continuous series, roll jumps included) +2.28% a year; 97 unmasked sessions beyond 5 robust s.d. summing -2.51% (ex-jumps +1.23%); roll profile over 131 scheduled rolls (mean difference by session offset from the last session before first notice, bps): -5 +4.99, -4 -0.36, -3 -2.05, -2 -1.63, -1 -4.15, 0 +1.48, 1 +12.64, 2 +13.85, 3 +0.73, 4 +0.43, 5 +0.84 (inside the mask +22.2 bps per roll; largest outside +5.0 bps); T-370 implied financing on the same pair: mean(i - DTB3) -159 bps (95% CI -186 bps..-133 bps, 4460 days), which read as a carry implies futures + bills - GLD of about +1.99%/yr (-(i - DTB3) + the 0.40% fee); level-free decay reading -67 bps; MGC=F (micro, 2010-10-05..2026-09-24, 3527 sessions, 1 impossible prints (|daily return| > 25%) dropped) +2.50% (HAC 95% CI +1.31%..+3.70%). Measurement limits (rule 9): Yahoo's continuous contract identity and roll days are undocumented, the COMEX settle (13:30 ET) and GLD close (16:00 ET) are asynchronous — all criteria pass
 - note: pre-registered salvage successor of T-370 on 2026-10-20: the parent claimed no excess carry and found a large one; if it survives a realised-return test it is an instrument efficiency (hold gold as futures + T-bills), if not it is a data artefact worth knowing. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-556 · memecoin-bounce-short-coinbase-check
+
+**Claim.** On Coinbase DOGE-USD and SHIB-USD daily candles from 2021 to 2026-09, shorting at the next UTC daily open after a closed day whose 1-day return is in the top tercile and whose 3-day return is in the bottom tercile of the expanding history (at least 120 days), with a -20% target, +10% stop (both on later daily highs and lows, stop first when one day touches both) and a 14-day time exit, earns a positive mean net return per trade after 18 bp per round trip and 0.01% per 8 hours of funding.
+
+- kind: underlying-strategy · origin: child:cryptobot (unregistered sibling session; its armed live rule), salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
+- statistic: mean net return per trade with a trade-clustered (by month) 95% CI
+- null: mean net <= 0
+- procedure: the rule as written in the child's cryptobot/perp_bot.py (expanding terciles refitted daily on history before the signal candle, min_history_days 120, re-entry after 14 days) but entered at the NEXT open and exited on later bars only (no fill at the signal candle's own close or at the barrier unless the bar trades through it); studentized block bootstrap; per coin and pooled; halves
+- data: coinbase-daily-DOGE-USD, coinbase-daily-SHIB-USD · min n: 60
+- pass: pooled 95% CI of the mean net return excludes 0 on the positive side and both coins positive
+- controls: an independent check of a live rule run by a sibling session (Mandel does not touch the child); the child's own diagnostics give the rule DSR 0.00 at nominal N and 0.18-0.35 at N_eff after a 4,512-trial search, and its benchmark fills sit exactly at the barriers; the trial count of the child's search is carried as the deflation context, not re-run
+- harness: b7_crypto_memecoin_bounce_short
+- result X-a6b47633: supported — Coinbase daily DOGE-USD 2021-06-03..2026-10-14, SHIB-USD 2021-09-09..2026-10-14; 173 rule firings (pooled expanding terciles, >= 120 days of history), 109 trades with signal candles 2021..2026-09-30 after the 14-day re-entry rule; next-open short, stop-first later-bar exits: mean gross +3.01%, mean net +2.55% after 18 bp and 0.01%/8h funding paid (funding received instead: +3.10%); month-clustered 95% CI +0.20% to +4.78% (51 months; the trial's cluster, a pass that depends on the width: two-month clusters lower end -0.10% (30 clusters), quarterly -0.06% (20 clusters), reported not criteria); DOGE-USD 55 trades +3.30% (CI +0.42% to +6.33%); SHIB-USD 54 trades +1.80% (CI -1.25% to +4.79%); exits {'time': 39, 'target': 26, 'stop': 44}; halves (split 2024-04-07) +2.50% over 51 / +2.60% over 58; the child's benchmark fills on the same signals (signal-close entry, barrier fills) mean +2.82% per trade, 26 at exactly +0.1982 and 44 at exactly -0.1018; the child's literal 120-row history 109 trades +2.55%, per-coin cuts 106 trades +2.59%; DSR at the child's 4512-trial search 0.060 (context, not a criterion) — all criteria pass
+- note: pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-20: harness b7_crypto_memecoin_bounce_short written and reviewed; its preview is supported (109 trades, mean net +2.55%, month-clustered CI +0.20% to +4.78%; 2-month and quarterly clusters cross 0; SHIB alone CI -1.25% to +4.79%) but the independent refutation could not run (organisation spend limit), so it is NOT run officially: no verdict is recorded until it is refuted. | refutation 2026-10-20 05:0x UTC: independent rebuild reproduced it exactly (CI lower +0.24%, 5 seeds +0.15..+0.24%) and the pass held under every open choice (per-coin terciles, quantile method, fill conventions); recorded after refutation.
 
 ## Not Supported (246)
 
@@ -5527,7 +5542,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-cf9cea40: inconclusive — QQQ 1999-03-10..2026-09-29 (6932 days, 1355 IBS<0.2 signals): entry-close reading next-day +24.98 vs unconditional +5.54 bps, difference +19.44 (block-20 95% CI +10.52..+28.53; T-332 stationary CI +10.57..+28.69), p vs <= 2 bps 0.0005 (MC +/-0.0004), Holm 0.0015 (MC +/-0.0008); halves split 2012-12-17 +22.00 / +16.91; since 2000 +20.00; previous-close reading (entry close t+1) difference +12.69 (CI +4.21..+21.59), p 0.0069 (MC +/-0.0016), Holm 0.0207 (MC +/-0.0028), halves +16.44 / +8.64; execution next-open-to-close +13.91; IWM 2000-05-26..2026-09-29 (6624 days, 1397 IBS<0.2 signals): entry-close reading next-day +18.94 vs unconditional +4.37 bps, difference +14.57 (block-20 95% CI +7.20..+22.42; T-332 stationary CI +6.79..+22.56), p vs <= 2 bps 0.0005 (MC +/-0.0004), Holm 0.0015 (MC +/-0.0008); halves split 2013-07-30 +21.48 / +6.85; since 2000 +14.57; previous-close reading (entry close t+1) difference +6.34 (CI -0.82..+13.94), p 0.1307 (MC +/-0.0066), Holm 0.2615 (MC +/-0.0086), halves +7.33 / +5.24; execution next-open-to-close +10.59; DIA 1998-01-20..2026-09-29 (7218 days, 1390 IBS<0.2 signals): entry-close reading next-day +14.88 vs unconditional +4.09 bps, difference +10.79 (block-20 95% CI +4.39..+17.15; T-332 stationary CI +5.02..+17.13), p vs <= 2 bps 0.0017 (MC +/-0.0008), Holm 0.0017 (MC +/-0.0008); halves split 2012-05-22 +15.50 / +5.64; since 2000 +11.83; previous-close reading (entry close t+1) difference +4.36 (CI -1.23..+9.81), p 0.1963 (MC +/-0.0078), Holm 0.2615 (MC +/-0.0086), halves +2.69 / +6.39; execution next-open-to-close +6.56 — implemented criteria pass; not implemented: at least 2 of 3 ETFs with Holm-adjusted p < 0.05 vs difference <= 2 bps: entry-close live proxy (QQQ 0.0015 (MC +/-0.0008), IWM 0.0015 (MC +/-0.0008), DIA 0.0017 (MC +/-0.0008)); previous-close reading (QQQ 0.0207 (MC +/-0.0028), IWM 0.2615 (MC +/-0.0086), DIA 0.2615 (MC +/-0.0086)) [the information-set readings disagree: undecided under rule 12]
 - note: pre-registered salvage successor of T-332 on 2026-10-20: not a failure salvage: the decision-centre review asks that the few executable supported rules get a replication family before anything is built on them. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
 
-## Untested (5)
+## Untested (4)
 
 ### T-331 · crypto-cross-exchange-gap
 
@@ -5584,20 +5599,6 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: Look-ahead: buckets closed before the forecast hour. Survivorship: not applicable. Costs: not applicable for the forecast. Multiple testing: 8 cells. Regime: weekends vs weekdays.
 - harness: b6c_kraken_vpin_volatility
 - note: from the underlying-library library: VPIN flow toxicity predicts crypto volatility; harness suggestion: VPIN builder in a crypto microstructure module. HAR and QLIKE shared with social-volume-volatility. | added by the verifier pass
-
-### T-556 · memecoin-bounce-short-coinbase-check
-
-**Claim.** On Coinbase DOGE-USD and SHIB-USD daily candles from 2021 to 2026-09, shorting at the next UTC daily open after a closed day whose 1-day return is in the top tercile and whose 3-day return is in the bottom tercile of the expanding history (at least 120 days), with a -20% target, +10% stop (both on later daily highs and lows, stop first when one day touches both) and a 14-day time exit, earns a positive mean net return per trade after 18 bp per round trip and 0.01% per 8 hours of funding.
-
-- kind: underlying-strategy · origin: child:cryptobot (unregistered sibling session; its armed live rule), salvage audit 2026-10-20 (every not_supported / inconclusive / parked record re-read for the part that measured something)
-- statistic: mean net return per trade with a trade-clustered (by month) 95% CI
-- null: mean net <= 0
-- procedure: the rule as written in the child's cryptobot/perp_bot.py (expanding terciles refitted daily on history before the signal candle, min_history_days 120, re-entry after 14 days) but entered at the NEXT open and exited on later bars only (no fill at the signal candle's own close or at the barrier unless the bar trades through it); studentized block bootstrap; per coin and pooled; halves
-- data: coinbase-daily-DOGE-USD, coinbase-daily-SHIB-USD · min n: 60
-- pass: pooled 95% CI of the mean net return excludes 0 on the positive side and both coins positive
-- controls: an independent check of a live rule run by a sibling session (Mandel does not touch the child); the child's own diagnostics give the rule DSR 0.00 at nominal N and 0.18-0.35 at N_eff after a 4,512-trial search, and its benchmark fills sit exactly at the barriers; the trial count of the child's search is carried as the deflation context, not re-run
-- harness: b7_crypto_memecoin_bounce_short
-- note: pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-20: harness b7_crypto_memecoin_bounce_short written and reviewed; its preview is supported (109 trades, mean net +2.55%, month-clustered CI +0.20% to +4.78%; 2-month and quarterly clusters cross 0; SHIB alone CI -1.25% to +4.79%) but the independent refutation could not run (organisation spend limit), so it is NOT run officially: no verdict is recorded until it is refuted.
 
 ## Blocked (125)
 
