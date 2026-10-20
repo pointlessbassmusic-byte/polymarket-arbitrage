@@ -199,6 +199,74 @@ class OrbBot:
         return report(self.state) | {"mode": self.mode, "last": self.last}
 
 
+async def check(bot: "OrbBot") -> list[tuple[str, bool, str]]:
+    """Every call a session makes, one at a time, each pass/fail with
+    Alpaca's own answer. While the market is open it also round-trips one
+    share on the PAPER account (IOC buy, then flatten), the order path the
+    09:35 session uses. Never runs against a live account."""
+    out = []
+
+    async def step(name, fn):
+        try:
+            msg = await fn()
+            out.append((name, True, msg))
+            return True
+        except Exception as exc:                          # noqa: BLE001 - report every failure
+            out.append((name, False, f"{type(exc).__name__}: {str(exc)[:300]}"))
+            return False
+
+    ex, feed = bot._executor(), bot._feed()
+    st = {}
+
+    async def account():
+        b = await ex.balance()
+        return (f"mode {b['mode']}, status {b['status']}, equity ${b['total_usd_balance']:,.0f}, buying power "
+                f"${b['available_margin']:,.0f}, shorting {'on' if b['shorting_enabled'] else 'OFF'}, "
+                f"pattern day trader {b['pattern_day_trader']}, day trades {b['daytrade_count']}")
+
+    async def clock():
+        c = await ex.clock()
+        st["open"] = bool(c.get("is_open"))
+        return f"market {'open' if st['open'] else 'closed'}, next open {c.get('next_open')}"
+
+    async def daily():
+        now = bot._now().astimezone(ET)
+        d = await feed.daily(bot.symbol, start=now - dt.timedelta(days=40))
+        d = [c for c in d if dt.datetime.fromtimestamp(c.ts, dt.timezone.utc).astimezone(ET).date() < now.date()]
+        a = atr_from_daily(d, bot.rule.atr_days)
+        if not d:
+            raise RuntimeError("no daily bars")
+        st["last_day"] = dt.datetime.fromtimestamp(d[-1].ts, dt.timezone.utc).astimezone(ET).date()
+        return f"{len(d)} daily bars to {st['last_day']}, ATR {a}"
+
+    async def first_bar():
+        day = st.get("last_day") or bot._now().astimezone(ET).date()
+        o = dt.datetime.combine(day, dt.time(9, 30), ET)
+        bars = await feed.bars(bot.symbol, "5Min", start=o, end=o + dt.timedelta(minutes=5))
+        f = next((b for b in bars if dt.datetime.fromtimestamp(b.ts, dt.timezone.utc).astimezone(ET).time() == dt.time(9, 30)), None)
+        if f is None:
+            raise RuntimeError(f"no 09:30 bar on {day} ({len(bars)} bars returned)")
+        return f"09:30 bar on {day}: open {f.open} close {f.close}"
+
+    async def quote():
+        return f"mid {await ex.mid(bot.symbol):.2f}"
+
+    async def order():
+        if not st.get("open"):
+            return "skipped: market closed (run this between 09:30 and 16:00 New York time to test orders)"
+        if getattr(ex, "mode", "") != "paper":
+            return f"skipped: mode {getattr(ex, 'mode', '?')}, orders are only tested on paper"
+        mid = await ex.mid(bot.symbol)
+        f = await ex.open_long(bot.symbol, mid * 1.01, mid)
+        c = await ex.close(bot.symbol, f.qty, mid)
+        return f"paper: bought {f.qty:.0f} at {f.price:.2f}, sold at {c.price:.2f}"
+
+    for name, fn in (("account", account), ("clock", clock), ("daily bars", daily),
+                     ("09:30 five-minute bar", first_bar), ("quote", quote), ("paper order", order)):
+        await step(name, fn)
+    return out
+
+
 # ------------------------------------------------------------------ scoring
 
 def report(state_dir: Path) -> dict:
@@ -247,7 +315,19 @@ def main(argv=None) -> int:
     ap.add_argument("--state", type=Path, default=Path("state"))
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--once", action="store_true", help="run one session now (paper or dry-run), for a manual check")
+    ap.add_argument("--check", action="store_true", help="test every Alpaca call the session makes (paper only)")
     a = ap.parse_args(argv)
+    if a.check:
+        async def chk():
+            bot = OrbBot(a.state)
+            try:
+                return await check(bot)
+            finally:
+                await bot.close()
+        res = asyncio.run(chk())
+        for name, ok, msg in res:
+            print(f"[{'ok' if ok else 'FAIL'}] {name}: {msg}")
+        return 0 if all(ok for _, ok, _ in res) else 1
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if a.once:
         async def once():

@@ -131,3 +131,26 @@ def test_next_decision_skips_weekends_and_done_days(tmp_path):
     assert nxt.date() == dt.date(2026, 10, 19) and nxt.time() == O.DECISION_ET        # Monday
     assert not bot._done_today(dt.date(2026, 10, 19))
     assert O.atr_from_daily([], 14) is None
+
+
+def test_check_reports_each_call_and_the_failing_one(tmp_path):
+    day = dt.date(2026, 10, 14)
+
+    class Ex(FakeExec):
+        async def balance(self):
+            return {"mode": "paper", "status": "ACTIVE", "total_usd_balance": 1e5, "available_margin": 2e5,
+                    "shorting_enabled": True, "pattern_day_trader": False, "daytrade_count": 0}
+
+    class BadFeed(FakeFeed):
+        async def bars(self, symbol, timeframe="5Min", start=None, end=None):
+            raise RuntimeError("alpaca data /v2/stocks/bars -> 403: forbidden")
+
+    ex = Ex([401.0])
+    bot = _bot(tmp_path, FakeFeed(day, 400.0, 401.0), ex, _times(day, (10, 0)))
+    res = {n: (ok, m) for n, ok, m in asyncio.run(O.check(bot))}
+    assert all(ok for ok, _ in res.values())
+    assert res["paper order"][1].startswith("paper: bought 1")
+    bot = _bot(tmp_path, BadFeed(day, 400.0, 401.0), Ex([401.0]), _times(day, (10, 0)))
+    res = {n: (ok, m) for n, ok, m in asyncio.run(O.check(bot))}
+    assert res["09:30 five-minute bar"] == (False, "RuntimeError: alpaca data /v2/stocks/bars -> 403: forbidden")
+    assert res["quote"][0]

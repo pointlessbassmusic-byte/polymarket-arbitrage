@@ -21,6 +21,7 @@
 #   ./desk.sh rotate      new dashboard token (after the old one was shown somewhere), then restart
 #   ./desk.sh review      weekly: live bounce-short vs its backtest, and every forward test's read date
 #   ./desk.sh polyus      your Polymarket US API key id and secret (typed hidden, stored in .env)
+#   ./desk.sh orbcheck    test every Alpaca call the ORB pilot makes (paper; one share if the market is open)
 #   ./desk.sh polyhistory your Polymarket US record: where the losses came from, and the opposite side
 #
 # `keys`, `arm` and `disarm` edit files only; the restart is skipped when
@@ -353,9 +354,10 @@ case "${1:-}" in
   webhook) cmd_webhook "${2:-}" ;;
   check) dc run --rm desk python -m cryptobot.execution.kalshi_perps --check ;;
   rotate) cmd_rotate ;;
+  orbcheck) dc run --rm desk python -m cryptobot.orb_bot --state /data --check ;;
   review) dc run --rm desk python -m cryptobot.review --state /data ;;
   polyus) cmd_polyus ;;
   polyhistory) dc run --rm desk python -m cryptobot.polymarket_us_history --out /data/polymarket_us_record.json ;;
   digest) dc run --rm desk python -m cryptobot.desk --digest --state-dir /data ;;
-  *) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac
