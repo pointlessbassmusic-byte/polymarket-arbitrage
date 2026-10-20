@@ -1,8 +1,9 @@
 """Pre-register the web sweep of 2026-10-20 (user request: strategies and asset patterns that use the learning program's
 variables or adjacent ones), from mandel/knowledge/adjacent/web_sweep_2026-10-20.json, before any of them is run.
 
-Every verified row the adversarial pass kept or fixed becomes a theory with its final registration text; rows it
-dropped are not registered (the sweep file keeps them with the reason). Testable rows are 'untested', the rest
+Every verified row the adversarial pass kept or fixed becomes a theory with its final registration text; a fixed row
+that the verifier tied to an existing theory (duplicate_of) is a materially redesigned successor and records that
+theory as its parent. Rows it dropped are not registered (the sweep file keeps them with the reason). Testable rows are 'untested', the rest
 'blocked' with the missing data named. Usage: python3 mandel/theories/register_web_sweep_2026_10_20.py
 """
 
@@ -30,7 +31,7 @@ def rows():
         research = {r["name"]: r for r in c["research"]["candidates"]}
         cross = {r["name"]: r for r in c["cross"]["rows"]}
         for v in c["verify"]["rows"]:
-            if v["decision"] == "drop" or v.get("duplicate_of"):
+            if v["decision"] == "drop":
                 continue
             yield c["cluster"], v, research.get(v["name"], {}), cross.get(v["name"], {})
 
@@ -57,7 +58,7 @@ def main():
             "origin": [f"web sweep 2026-10-20 ({cluster}): {v['name']}"] + sources[:4], "trial": trial, "experiments": [],
             "testable_now": testable, "status": "untested" if testable else "blocked",
             "blocked_on": "" if testable else (v.get("missing_data") or x.get("missing_data") or "data not archived"),
-            "results": [], "web_sweep": {"cluster": cluster, "evidence_quality": r.get("evidence_quality"),
+            "results": [], "parent": v.get("duplicate_of") or "", "web_sweep": {"cluster": cluster, "evidence_quality": r.get("evidence_quality"),
                                          "replication": r.get("replication"), "prior": x.get("prior"),
                                          "consistency": x.get("consistency"), "priority": x.get("priority"),
                                          "overlaps": x.get("overlaps"), "learnings": x.get("learnings"),
