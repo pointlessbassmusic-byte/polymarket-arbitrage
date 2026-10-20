@@ -15071,10 +15071,12 @@
     "b12_ml_ic_scan"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "pre-registered before any model was fitted or correlation computed; lockbox 2026-10-01 onward sealed."
+   "results": [
+    "X-2e6440e4"
+   ],
+   "notes": "pre-registered before any model was fitted or correlation computed; lockbox 2026-10-01 onward sealed. | Independent refutation 2026-10-20 (verdict stands; mandel.ml.ic_refute): (1) a joint sign-flip null that flips each confirmation period's IC for all 604 triples together, keeping their dependence, gives 30 confirmations on average (95th percentile 79, max 164 in 2000 draws) against 225 observed, p = 0.0005; (2) with the target started one bar (or day) later 142 of 225 confirmed triples still confirm and 218 keep their sign in discovery, so the result is not stale prints or bid-ask bounce, except the intraday cross-asset leads (VIX, QQQ, SPY, BTC), which all die at a one-bar gap; (3) the 225 triples are a handful of effects, all reversals: daily: own past price (inverse) 52 (36 survive the gap); intraday: return since the session open / VWAP (inverse) 45 (37 survive the gap); intraday: own past price (inverse) 36 (22 survive the gap); daily: other asset QQQ (inverse) 24 (18 survive the gap); daily: other asset SPY (inverse) 23 (11 survive the gap); daily: other asset GLD (inverse) 8 (6 survive the gap). A correlation is not a trade: T-577's models carried these inputs and lost the taker cost; a trading successor must be registered on its own (maker or longer-hold execution)."
   },
   {
    "id": "T-580",
