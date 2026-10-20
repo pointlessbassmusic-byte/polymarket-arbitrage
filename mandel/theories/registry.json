@@ -8135,7 +8135,9 @@
     "pass": "lower Wilson bound of the excursion share >= 0.5%; otherwise record 'no retail-tier cross-exchange edge'",
     "controls": "Look-ahead: last trade at or before the mark only. Staleness: candle closes overstate gaps, hence the 60 s staleness null. Costs: maker fees on both venues plus periodic inventory rebalancing (withdrawal fees, transfer time). Regime: stress windows separate. Multiple testing: 4 variants."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_kraken_cross_venue_gap"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -10591,11 +10593,15 @@
     "pass": "At least 1,200 symbol-days. Accuracy >= 52% with permutation p < 0.01 after deflation. IC t > 3. Same sign in both halves.",
     "controls": "Look-ahead: only messages created before 09:00 ET; entry at the 09:30 open. The window is fixed, so the 30-message page cap does not decide coverage. Survivorship: symbol list declared in advance. Costs: 1 bp SPY/QQQ, 5 bps round trip single names. Multiple testing: 16 cells. Regime: earnings days flagged; VIX split."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_stocktwits_bullish_ratio"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-4fc8a373"
+   ],
    "notes": "from the underlying-library library: StockTwits bullish ratio as a directional signal; harness suggestion: Reuse mandel/experiments/social.py daily_closes() and spearman(); add bullish-ratio derivation to mandel/data/social.py from stored messages; gate by capture-day count as social_attention does. | verifier: corrected claim/trial"
   },
   {
@@ -10617,11 +10623,15 @@
     "pass": "At least 1,500 symbol-days. c t-stat > 3 with incremental R^2 >= 2%. Out-of-sample QLIKE improvement with DM p < 0.05.",
     "controls": "Look-ahead: intensity samples taken before the close; RV from the next day's bars; IV at the same close. Survivorship: symbol list declared. Costs: none for the forecast; overlay costs belong to the options family. Multiple testing: 12 cells. Regime: earnings and FOMC days flagged."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_stocktwits_intensity_rv"
+   ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-9cf03a3d"
+   ],
    "notes": "from the underlying-library library: Social message volume predicts next-day realised volatility; harness suggestion: Extend attention_vs_abs_return in mandel/experiments/social.py into a HAR-RV regression with IV from mandel/data/options.py surface summaries; add QLIKE and Diebold-Mariano to mandel/validation/backtest_eval.py. | verifier: corrected claim/trial"
   },
   {
@@ -10902,7 +10912,9 @@
     "pass": "At least 100,000 aligned minutes. Net P&L > 0 with bootstrap p < 0.05 at the user's tier. Reported for each tier.",
     "controls": "Look-ahead: execution at the close of the minute after the trigger. Survivorship: not applicable. Costs: Coinbase and Kraken taker/maker by tier; transfer fees; inventory capital. Multiple testing: 8 cells. Regime: volatility spikes (|hourly return| > 3%) vs calm."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_kraken_inventory_arb"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -11915,7 +11927,9 @@
     "pass": "At least 20,000 out-of-sample trades. Mean net > 0 with p < 0.01. DSR >= 0.95.",
     "controls": "Look-ahead: signal from closed minutes. Maker fills only when a later trade prints through the quote. Survivorship: not applicable. Costs: Kraken maker 0.16%, taker 0.26% at the base tier. Multiple testing: 36 cells. Regime: volatility terciles."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_kraken_flow_imbalance"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -12077,7 +12091,9 @@
     "pass": "At least 20,000 hourly observations. Incremental R^2 >= 2% with t > 3. DM p < 0.05 out of sample.",
     "controls": "Look-ahead: buckets closed before the forecast hour. Survivorship: not applicable. Costs: not applicable for the forecast. Multiple testing: 8 cells. Regime: weekends vs weekdays."
    },
-   "experiments": [],
+   "experiments": [
+    "b6c_kraken_vpin_volatility"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
