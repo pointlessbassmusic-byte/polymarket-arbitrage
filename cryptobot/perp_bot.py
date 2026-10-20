@@ -479,8 +479,11 @@ class PerpBot:
                         price = fill.price
                         self.pending_closes.discard(pkey)
                         if not fill.dry_run:
+                            model_px = (pos.stop_loss if reason == "stop_loss" and pos.stop_loss
+                                        else pos.take_profit if reason == "take_profit" and pos.take_profit
+                                        else mid)      # the backtest exits at the barrier level
                             self.execlog.fill(book=book.name, coin=pos.symbol, side="close", contracts=pos.lots,
-                                              qty=fill.qty, intended=mid, filled=fill.price,
+                                              qty=fill.qty, intended=mid, filled=fill.price, model=model_px,
                                               notional=fill.qty * fill.price,
                                               fee_modelled=self._fee_side(fill.qty * fill.price, pos.lots),
                                               fee_actual=fill.fee_usd, order_id=fill.order_id, reason=reason)

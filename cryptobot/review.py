@@ -112,6 +112,30 @@ def compare(closed: list[dict], bench: dict, rng: Optional[random.Random] = None
     return out
 
 
+def fills_line(state: Path) -> str:
+    """Real fills against the price the order was sent at and the price the
+    backtest assumes (positive bp = cost). Meaningful after about 10 fills."""
+    p = Path(state) / "execution.jsonl"
+    if not p.exists():
+        return "fills: none logged yet"
+    rows = []
+    for line in p.open():
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if r.get("kind") == "fill" and r.get("book") == "real":
+            rows.append(r)
+    if not rows:
+        return "fills: none logged yet"
+    slip = [float(r.get("slippage_bps") or 0.0) for r in rows]
+    gap = [float(r.get("gap_vs_model_bps", r.get("slippage_bps")) or 0.0) for r in rows]
+    worst = max(gap)
+    note = "" if len(rows) >= 10 else f" (read after 10 fills; {len(rows)} so far)"
+    return (f"fills: {len(rows)} real, mean {statistics.fmean(slip):+.1f} bp vs the price at order time, "
+            f"mean {statistics.fmean(gap):+.1f} bp vs the backtest's price (worst {worst:+.1f} bp; positive = cost){note}")
+
+
 def render(state: Path, bench: dict, today: Optional[dt.date] = None) -> str:
     today = today or dt.date.today()
     o = [f"weekly review {today}",
@@ -131,6 +155,7 @@ def render(state: Path, bench: dict, today: Optional[dt.date] = None) -> str:
                  + f"; chance the backtest does this badly or worse {c['p_low']:.0%} -> {c['status']}")
     if per.get("real", {}).get("n") and per.get("sim", {}).get("n"):
         o.append(f"  real minus sim, per trade: {per['real']['mean'] - per['sim']['mean']:+.2%} (execution cost the paper book does not pay)")
+    o.append("  " + fills_line(state))
     o.append("forward tests:")
     for rid, what, when, need in FORWARD:
         if when:

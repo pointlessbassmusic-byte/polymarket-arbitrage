@@ -76,10 +76,16 @@ class ExecutionLog:
 
     def fill(self, *, book: str, coin: str, side: str, contracts: float, qty: float,
              intended: float, filled: float, notional: float, fee_modelled: float,
-             fee_actual: Optional[float], order_id=None, reason: str = "") -> dict:
+             fee_actual: Optional[float], order_id=None, reason: str = "",
+             model: Optional[float] = None) -> dict:
+        """`intended` is the price at order time; `model` is the price the
+        backtest assumes for the same bar (the signal close on entry, the
+        stop or target level on a barrier exit). Defaults to `intended`."""
+        model = intended if model is None else model
         return self.record("fill", book=book, coin=coin, side=side, contracts=contracts, qty=qty,
                            intended=intended, filled=filled, notional=notional,
                            slippage_bps=slippage_bps(side, intended, filled),
+                           model=model, gap_vs_model_bps=slippage_bps(side, model, filled),
                            fee_modelled=fee_modelled, fee_actual=fee_actual,
                            order_id=order_id, reason=reason)
 

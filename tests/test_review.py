@@ -57,3 +57,16 @@ def test_review_once_warns_once_and_sends_weekly(tmp_path):
     asyncio.run(R.review_once(tmp_path, a, now=monday))
     assert len(a.sent) == 2 and a.sent[1].startswith("weekly review")
     assert (tmp_path / "review_latest.txt").exists()
+
+
+def test_fills_line_reports_gap_vs_model(tmp_path):
+    from cryptobot.execlog import ExecutionLog
+    log = ExecutionLog(tmp_path / "execution.jsonl")
+    log.fill(book="real", coin="DOGE", side="short", contracts=1, qty=100, intended=0.100, filled=0.0999,
+             notional=10, fee_modelled=0.004, fee_actual=0.004)
+    # a stop meant to exit at 0.110 that filled at 0.112: about 182 bp worse than the backtest assumes
+    log.fill(book="real", coin="DOGE", side="close", contracts=1, qty=100, intended=0.1115, filled=0.112,
+             notional=11.2, fee_modelled=0.004, fee_actual=0.004, reason="stop_loss", model=0.110)
+    line = R.fills_line(tmp_path)
+    assert "2 real" in line and "worst +181.8 bp" in line and "read after 10 fills" in line
+    assert "fills:" in R.render(tmp_path, _bench())
