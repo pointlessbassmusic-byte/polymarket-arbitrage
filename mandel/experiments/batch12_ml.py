@@ -19,16 +19,31 @@ from __future__ import annotations
 
 import json
 
+from mandel.experiments import batch7_cal as B7C
 from mandel.experiments.batch6_surf import _out
 from mandel.ml import report as R
 from mandel.ml import train as TR
+
+
+# archive bundles the model runs read (the bars themselves are local vendor files, not bundles)
+INPUTS = {"T-577": ["fomc-meetings", "macro-release-cpi"], "T-578": ["fomc-meetings", "macro-release-cpi"],
+          "T-579": ["fomc-meetings", "macro-release-cpi"],
+          "T-580": ["fomc-meetings", "macro-release-cpi", "cboe-VIX-history", "cboe-VIX3M-history", "cboe-vx-futures",
+                    "deribit-dvol-BTC-history", "deribit-funding-BTC-PERPETUAL"]}
+
+
+def _inputs(archive, tid: str):
+    return B7C._missing(archive, INPUTS[tid])
 
 
 def _f(x, nd=2):
     return "n/a" if x is None or x != x else f"{x:+.{nd}f}"
 
 
-def _model_theory(tid: str):
+def _model_theory(archive, tid: str):
+    miss = _inputs(archive, tid)
+    if miss:
+        return miss
     j = R.judged(tid)
     if j["missing"]:
         return _out({"missing": j["missing"]}, 0, "inconclusive", f"result files not written yet: {', '.join(j['missing'])}")
@@ -63,21 +78,24 @@ def _model_theory(tid: str):
 
 def b12_ml_intraday(archive):
     """T-577."""
-    return _model_theory("T-577")
+    return _model_theory(archive, "T-577")
 
 
 def b12_ml_swing(archive):
     """T-578."""
-    return _model_theory("T-578")
+    return _model_theory(archive, "T-578")
 
 
 def b12_ml_implied(archive):
     """T-580."""
-    return _model_theory("T-580")
+    return _model_theory(archive, "T-580")
 
 
 def b12_ml_ic_scan(archive):
     """T-579."""
+    miss = _inputs(archive, "T-579")
+    if miss:
+        return miss
     p = TR.OUT / "ic_scan.json"
     if not p.exists():
         return _out({}, 0, "inconclusive", "ic_scan.json not written yet")
