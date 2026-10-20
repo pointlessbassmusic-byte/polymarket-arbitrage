@@ -44,7 +44,7 @@
       "Session cost": "cost_usd 1,955.74; 10,783,024 input tokens, 7,234,587 output tokens, 1.65B cache-read tokens; 682,041 of 1,000,000 context tokens used; model run claude-opus-5-5 (configured claude-fable-5, user-switched); origin iOS; created 2026-09-17 [unclear; get_session session_01Sxmv33Z3rkBy1wVC1KuN9D]"
     },
     "report_count": 1,
-    "guidance_count": 1
+    "guidance_count": 2
   },
   "Brier": {
     "name": "Brier",
@@ -140,7 +140,7 @@
       "Session cost": "cumulative cost_usd 8,246.22; output_tokens 20,446,120; input_tokens 4,802,423; context used 753,945 of 1,000,000 [unclear; get_session external_metadata.usage / context_usage]"
     },
     "report_count": 1,
-    "guidance_count": 1
+    "guidance_count": 2
   },
   "Shannon": {
     "name": "Shannon",

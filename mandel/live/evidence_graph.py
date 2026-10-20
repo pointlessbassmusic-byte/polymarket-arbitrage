@@ -85,6 +85,7 @@ WIRING: dict[str, dict] = {
                        "account": "kalshi-kelly", "factors": {}, "capital_usd": 0},
     "K-tennis-longshot-no": {"signals": ["favourite-longshot"], "streams": ["child:Kelly:kalshi-books"], "venue": "kalshi"},
     "K-thin-queue-maker": {"signals": ["touch-maker-clv", "queue-depth"], "streams": ["child:Kelly:kalshi-books"], "venue": "kalshi"},
+    "K-queue-markov-fill": {"signals": ["queue-depth", "touch-maker-clv"], "streams": ["child:Kelly:kalshi-books"], "venue": "kalshi"},
     "B-maker-pmus": {"signals": ["touch-maker-clv"], "streams": ["child:Brier:pmus-books"], "venue": "polymarket-us",
                      "account": "pmus-brier", "factors": {}, "capital_usd": 0},
     "B-paper-book": {"signals": ["model-vs-market"], "streams": ["child:Brier:polymarket-tape"], "venue": "polymarket"},

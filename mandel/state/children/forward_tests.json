@@ -400,6 +400,25 @@
    "decision": "extends the fed_watch / cb_watch record to CPI",
    "mandel_check": null,
    "source": "G-82466b5e44"
+  },
+  {
+   "id": "K-queue-markov-fill",
+   "owner": "Kelly",
+   "strategy": "Markov queue model of maker fill probability",
+   "venue": "Kalshi",
+   "mode": "forward",
+   "capital_usd": 0,
+   "started": null,
+   "unit": "days",
+   "n_now": null,
+   "n_target": 30,
+   "read_date": null,
+   "pnl_usd": null,
+   "status": "proposed by Mandel",
+   "next_step": "child to pre-register (guidance G-90c3346389)",
+   "decision": "top predicted-fill quintile fills > 3x the overall share, markout no worse",
+   "mandel_check": null,
+   "source": "G-90c3346389"
   }
  ]
 }

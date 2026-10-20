@@ -206,5 +206,13 @@
   "n_now": null,
   "progress": null,
   "pnl_usd": null
+ },
+ {
+  "day": "2026-10-20",
+  "id": "K-queue-markov-fill",
+  "owner": "Kelly",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
  }
 ]

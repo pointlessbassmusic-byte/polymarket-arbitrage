@@ -670,5 +670,31 @@
   "progress": null,
   "days_to_read": null,
   "as_of": "2026-10-20"
+ },
+ {
+  "id": "K-queue-markov-fill",
+  "owner": "Kelly",
+  "strategy": "Markov queue model of maker fill probability",
+  "venue": "Kalshi",
+  "mode": "forward",
+  "unit": "days",
+  "n_now": null,
+  "n_target": 30,
+  "read_date": null,
+  "pnl_usd": null,
+  "status": "proposed by Mandel",
+  "next_step": "child to pre-register (guidance G-90c3346389)",
+  "decision": "top predicted-fill quintile fills > 3x the overall share, markout no worse",
+  "started": null,
+  "capital_usd": 0,
+  "registry_status": null,
+  "fills": null,
+  "verified": "child's own figures as of 2026-10-20",
+  "source": "G-90c3346389",
+  "state": "proposed",
+  "group": "Forward record",
+  "progress": null,
+  "days_to_read": null,
+  "as_of": "2026-10-20"
  }
 ]

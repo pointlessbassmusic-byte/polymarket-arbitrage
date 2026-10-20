@@ -573,6 +573,14 @@
    "state": "proposed"
   },
   {
+   "id": "K-queue-markov-fill",
+   "kind": "strategy",
+   "owner": "Kelly",
+   "label": "Markov queue model of maker fill probability",
+   "mode": "forward",
+   "state": "proposed"
+  },
+  {
    "id": "T-557",
    "kind": "claim",
    "label": "T-557"
@@ -1187,6 +1195,33 @@
   },
   {
    "from": "S-macro-buckets",
+   "to": "venue:kalshi",
+   "kind": "trades_on"
+  },
+  {
+   "from": "K-queue-markov-fill",
+   "to": "signal:queue-depth",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:queue-depth",
+   "to": "stream:child:Kelly:kalshi-books",
+   "kind": "from",
+   "strategy": "K-queue-markov-fill"
+  },
+  {
+   "from": "K-queue-markov-fill",
+   "to": "signal:touch-maker-clv",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:touch-maker-clv",
+   "to": "stream:child:Kelly:kalshi-books",
+   "kind": "from",
+   "strategy": "K-queue-markov-fill"
+  },
+  {
+   "from": "K-queue-markov-fill",
    "to": "venue:kalshi",
    "kind": "trades_on"
   },

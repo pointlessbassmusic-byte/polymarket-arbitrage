@@ -351,6 +351,15 @@
   "key": "S-macro-buckets|venue:kalshi"
  },
  {
+  "strategy": "K-queue-markov-fill",
+  "owner": "Kelly",
+  "kind": "trades_on",
+  "target": "kalshi",
+  "target_kind": "venue",
+  "health": null,
+  "key": "K-queue-markov-fill|venue:kalshi"
+ },
+ {
   "strategy": "T-559",
   "owner": "Mandel",
   "kind": "reads",
@@ -556,6 +565,15 @@
   "target_kind": "stream",
   "health": "child",
   "key": "K-maker-kalshi|stream:child:Kelly:kalshi-books"
+ },
+ {
+  "strategy": "K-queue-markov-fill",
+  "owner": "Kelly",
+  "kind": "reads",
+  "target": "child:Kelly:kalshi-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "K-queue-markov-fill|stream:child:Kelly:kalshi-books"
  },
  {
   "strategy": "K-tennis-longshot-no",
