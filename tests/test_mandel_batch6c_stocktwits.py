@@ -1,7 +1,10 @@
 """Batch-6c stocktwits harnesses (T-414 pre-open bullish ratio, T-415 intensity -> next-day realised variance) on
 synthetic data only: for every core function a planted effect passes and a null does not; the pre-open window filter
-and count cross-check, the crypto 09:30 ET marks (minute bars, then Coinbase hourly, then Yahoo hourly), the permutation
-null under the StockTwits bullish skew, the strictly-trailing z-score, the session bar filter, the HAR row alignment on
+and count cross-check, the crypto 09:30 ET marks (minute bars, then Coinbase hourly, then Yahoo hourly), the pre-declared
+rule as worded (B > 0.7 and rising / B < 0.4 and falling on a point-in-time 5-session change), the cross-sectional quintile
+form, the degenerate permutation null of the level-0.5 cut under the StockTwits bullish skew (reported, not judged), the
+trailing symbol median (point in time), the intensity page spans (which streams resolve a daily intensity), the
+strictly-trailing z-score, the session bar filter, the HAR row alignment on
 the session calendar, the Driscoll-Kraay estimator, the walk-forward embargo and Diebold-Mariano, the rule-11 agreement
 rule over the judged constructions (the levels walk-forward failing under a true multiplicative effect is documented,
 which is why it is a diagnostic), and the rule-5 / data-limit paths are checked directly; every harness runs JSON-safe
@@ -97,8 +100,9 @@ def bar_row(t, o, h, l, c, vol=100):
 # ================================================================================================ T-414 world ==
 
 def t414_world(p_follow, n_days=110, seed=0, start="2025-10-01", with_1m=True):
-    """Fake archive for T-414: 14 streams x n_days sessions; the forward sign follows the pre-declared rule with
-    probability ``p_follow``."""
+    """Fake archive for T-414: 14 streams x n_days sessions; the forward sign follows the direction of B relative to 0.5
+    with probability ``p_follow`` (so the pre-declared rule's predictions, the quintile form's and the IC all carry the
+    planted effect); the truth rows carry B's 5-session change (None on the first five days)."""
     rng = np.random.default_rng(seed)
     sessions = bdays(start, n_days + 1)
     days = sessions[:n_days]
@@ -109,7 +113,7 @@ def t414_world(p_follow, n_days=110, seed=0, start="2025-10-01", with_1m=True):
     truth = []
     for si, sym in enumerate(m.ST_PREOPEN_SYMBOLS):
         B = rng.uniform(0.2, 0.9, n_days)
-        pred = np.sign(B - m.FOLLOW_CUT)
+        pred = np.sign(B - 0.5)
         follow = rng.random(n_days) < p_follow
         mag = np.abs(rng.normal(0, 0.012, n_days)) + 1e-4
         ret = np.where(follow, pred, -pred) * mag
@@ -138,7 +142,7 @@ def t414_world(p_follow, n_days=110, seed=0, start="2025-10-01", with_1m=True):
                                    "messages": len(sents), "tagged": wb + wbe, "bullish": wb, "bearish": wbe,
                                    "complete": not (si == 0 and i == 0)}})
             weeks.setdefault(iso_week(d), []).extend(rows)
-            truth.append((sym, d, float(B[i]), float(ret[i]), tagged))
+            truth.append((sym, d, float(B[i]), float(ret[i]), tagged, float(B[i] - B[i - m.RULE_LAG]) if i >= m.RULE_LAG else None))
         if sym in m.CRYPTO_PID:
             pid = m.CRYPTO_PID[sym]
             hourly, by_month = [], {}
@@ -164,7 +168,7 @@ def t414_world(p_follow, n_days=110, seed=0, start="2025-10-01", with_1m=True):
 
 
 def obs_from_truth(truth):
-    return [{"sym": s, "day": d, "B": B, "ret": r, "tagged": tg, "cost": m.COST_RT.get(s, m.COST_RT_DEFAULT)} for s, d, B, r, tg in truth]
+    return [{"sym": s, "day": d, "B": B, "dB5": db, "ret": r, "tagged": tg, "cost": m.COST_RT.get(s, m.COST_RT_DEFAULT)} for s, d, B, r, tg, db in truth]
 
 
 # ================================================================================================ T-415 world ==
@@ -244,8 +248,11 @@ def t415_world(gamma, n_days=130, seed=0, start="2025-10-01", hourly_for_all=Tru
                 ph = None if (sym == "SPY" and d == sampled[51] and k == 0) else x * (1 + rng.normal(0, 0.05))
                 hh, mm = map(int, hm.split(":"))
                 st = et_iso(d, hh, mm)
-                weeks.setdefault(iso_week(d), []).append({"kind": "intensity-sample", "available_at": st,
-                                                          "value": {"stream": sym, "day": d, "sample_time": st, "n": 30, "per_hour": ph}})
+                span_h = {"EEM": 120.0, "XLB": 48.0}.get(sym, 0.5)                   # hours the 30-message page spans
+                val = {"stream": sym, "day": d, "sample_time": st, "n": 30, "per_hour": ph}
+                if sym != "XLY":                                                       # XLY rows carry no 'oldest' (span unknown)
+                    val["oldest"] = datetime.fromtimestamp(m._ts(st) - span_h * 3600, tz=UTC).isoformat()
+                weeks.setdefault(iso_week(d), []).append({"kind": "intensity-sample", "available_at": st, "value": val})
     arch.add(m.DOLT_B, dolt)
     for w, rows in weeks.items():
         arch.add(f"{m.INTENSITY_PREFIX}{w}", rows)
@@ -335,7 +342,10 @@ def test_crypto_open_marks_prefer_minute_bars_then_hourly():
 def test_bullish_ratio_test_planted_passes_and_null_fails():
     _, truth = t414_world(0.65, n_days=100, seed=3)
     res = m.bullish_ratio_test(obs_from_truth(truth), n_perm=2000, seed=0)
-    assert res["accuracy"] > 0.6 and res["p_perm_deflated"] < 0.01
+    assert res["accuracy"] > 0.6 and res["p_perm_deflated"] < 0.01 and res["degenerate_null"] is False
+    assert 0 < res["n_short"] and 0 < res["n_long"] and res["n_predicted"] == res["n_long"] + res["n_short"] < res["n_with_lag"] == 14 * 95
+    xs = res["xs_quintile"]
+    assert xs["accuracy"] > 0.6 and xs["p_perm_deflated"] < 0.01 and xs["n_long"] == xs["n_short"] == 3 * 100 and xs["n_days"] == 100
     assert res["ic"]["pooled_t_symbol_clustered"] > 3 and res["ic"]["cross_sectional_t_nw"] > 3
     crit = m.t414_criteria(res)
     v, why = m._decide(crit, res["n"], m.T414_MIN_N, "symbol-days")
@@ -348,26 +358,109 @@ def test_bullish_ratio_test_planted_passes_and_null_fails():
     assert res0["net"]["mean_net_bps"] < res0["net"]["mean_gross_bps"]
 
 
-def test_permutation_p_is_one_under_a_pure_bullish_skew():
-    """B above 0.5 on every day predicts 'up' always: the accuracy equals the up-day share and shuffling B cannot change
-    it, so the permutation p is 1 whatever the accuracy."""
+def test_rule_pred_as_worded():
+    """The library entry's pre-declared rule: long when B > 0.7 and rising, short when B < 0.4 and falling, otherwise no
+    position; a day without the 5-session change (NaN) makes no prediction."""
+    B = np.array([0.75, 0.75, 0.75, 0.35, 0.35, 0.35, 0.55, 0.95, 0.20])
+    dB = np.array([0.10, -0.1, np.nan, -0.1, 0.10, np.nan, 0.30, 0.00, 0.00])
+    assert list(m.rule_pred(B, dB)) == [1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    assert list(m.rule_pred([0.71, 0.39], [1e-9, -1e-9])) == [1.0, -1.0]
+    assert list(m.rule_pred([0.70, 0.40], [1.0, -1.0])) == [0.0, 0.0]                  # strict thresholds
+
+
+def test_five_day_changes_use_the_window_five_sessions_earlier_point_in_time():
+    sessions = bdays("2026-01-05", 12)
+    panel = {("SPY", d): {"B": 0.5 + 0.02 * i, "complete": True} for i, d in enumerate(sessions)}
+    panel[("SPY", sessions[2])]["complete"] = False                                      # the fetcher could not complete this window
+    panel[("SPY", sessions[3])] = {"B": None, "complete": True}                          # no tagged message
+    panel[("QQQ", sessions[9])] = {"B": 0.9, "complete": True}                           # QQQ has no earlier windows
+    ch = m.five_day_changes(panel, sessions)
+    for i in (0, 1, 2, 4):
+        assert ch[("SPY", sessions[i])] == (None, None)                                   # fewer than five prior sessions
+    assert ch[("SPY", sessions[5])] == (0.5, pytest.approx(0.10))                         # lag = B on sessions[0]
+    assert ch[("SPY", sessions[7])] == (None, None)                                       # lag window incomplete
+    assert ch[("SPY", sessions[8])] == (None, None)                                       # lag window untagged
+    assert ch[("SPY", sessions[11])] == (pytest.approx(0.62), pytest.approx(0.10))
+    assert ch[("QQQ", sessions[9])] == (None, None) and ("SPY", sessions[3]) not in ch
+    # point in time: a later window cannot change an earlier day's change
+    panel[("SPY", sessions[11])]["B"] = 0.1
+    assert m.five_day_changes(panel, sessions)[("SPY", sessions[6])] == ch[("SPY", sessions[6])]
+    # the lag is the session calendar's, not the archive's: a day off the calendar has no change
+    assert m.five_day_changes({("SPY", "2026-01-10"): {"B": 0.6, "complete": True}}, sessions) == {("SPY", "2026-01-10"): (None, None)}
+
+
+def test_xs_quintile_pred_is_per_day_and_point_in_time():
+    M = np.array([[0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.15, 0.25, 0.35, 0.45, 0.55],            # 14 streams: k = 3
+                  [0.9, 0.8, 0.7, 0.6, 0.5, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],  # 5: k = 1
+                  [0.9, 0.8, 0.7, 0.6, np.nan] + [np.nan] * 9])                                                        # 4 < MIN_CS: none
+    P = m.xs_quintile_pred(M)
+    assert list(P[0]) == [1, 1, 1, 0, 0, 0, 0, -1, -1, -1, 0, 0, 0, 0]
+    assert list(P[1]) == [1, 0, 0, 0, -1] + [0] * 9
+    assert not P[2].any()
+    # ties break in stream order; a day's predictions depend on that day's row only
+    M2 = M.copy()
+    M2[1] = [0.9, 0.9, 0.9, 0.9, 0.9] + [np.nan] * 9
+    P2 = m.xs_quintile_pred(M2)
+    assert list(P2[1]) == [-1, 0, 0, 0, 1] + [0] * 9 and list(P2[0]) == list(P[0])
+
+
+def test_level_cut_is_degenerate_under_a_pure_bullish_skew_but_the_rule_is_judged():
+    """Every B above 0.5: the level cut predicts 'up' always, its accuracy is the up-day share and every within-symbol
+    shuffle reproduces the same prediction vector, so its permutation p is identically 1 (a degenerate null, reported, not
+    judged). The pre-declared rule's 'rising' condition varies under the shuffle, so its permutation p carries evidence."""
     rng = np.random.default_rng(0)
-    obs = [{"sym": s, "day": f"2026-01-{d + 1:02d}", "B": 0.6 + 0.3 * rng.random(), "ret": 0.01 if rng.random() < 0.7 else -0.01, "tagged": 30, "cost": 0}
-           for s in ("A", "B", "C", "D", "E", "F") for d in range(25)]
-    res = m.bullish_ratio_test(obs, n_perm=100, seed=0)
-    assert res["accuracy"] > 0.6 and res["p_perm"] == 1.0
+    obs = []
+    for s in ("A", "B", "C", "D", "E", "F"):
+        B = 0.55 + 0.4 * rng.random(60)
+        for d in range(60):
+            db = B[d] - B[d - 5] if d >= 5 else None
+            pred = 1.0 if (db is not None and B[d] > 0.7 and db > 0) else 0.0
+            up = rng.random() < (0.8 if pred else 0.5)
+            obs.append({"sym": s, "day": f"2026-{1 + d // 28:02d}-{1 + d % 28:02d}", "B": float(B[d]), "dB5": db, "ret": 0.01 if up else -0.01, "tagged": 30, "cost": 0})
+    res = m.bullish_ratio_test(obs, n_perm=200, seed=0)
+    lv = res["level_cut"]
+    assert lv["n_below"] == 0 and lv["degenerate_null"] is True and lv["p_perm"] == 1.0 and "degenerate null" in lv["note"]
+    assert res["xs_quintile"]["degenerate_null"] is False and res["xs_quintile"]["p_perm"] < 1.0
+    # a form with no prediction at all is empty, not degenerate
+    empty = m.bullish_ratio_test([dict(o, dB5=None) for o in obs], n_perm=20, seed=0)
+    assert empty["n_predicted"] == 0 and empty["degenerate_null"] is False and empty["accuracy"] is None
+    assert res["family"]["follow_level_0.5"]["degenerate_null"] is True
+    assert res["degenerate_null"] is False and res["n_short"] == 0 < res["n_long"] and res["accuracy"] > 0.6 and res["p_perm"] < 0.05
     crit = m.t414_criteria(res)
-    assert crit[1][1] is False and crit[1][2] is False                   # fails, never decisively
+    assert "rule raw" in crit[1][0] and "degenerate" not in crit[1][0]              # the judged cell's null is not degenerate
+    # when the rule's own predictions are identical within every symbol, its permutation criterion is not computable
+    res2 = dict(res, degenerate_null=True)
+    assert m.t414_criteria(res2)[1][1] is None and "degenerate null" in m.t414_criteria(res2)[1][0]
+
+
+def test_trailing_median_is_point_in_time():
+    day = np.array([f"2026-01-{d + 1:02d}" for d in range(12)] * 2)
+    gid = np.array([0] * 12 + [1] * 12)
+    B = np.array([0.5] * 6 + [0.9, 0.9, 0.9, 0.9, 0.9, 0.9] + [0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 0.1, 0.2, 0.3, 0.4, 0.5, 0.65])
+    pred = m.trailing_median_pred(B, day, gid, min_prior=5)
+    assert not pred[:5].any() and not pred[12:17].any()                                # fewer than five prior days: no prediction
+    assert list(pred[6:12]) == [1.0] * 6                                               # above the trailing median of 0.5s
+    assert pred[5] == 0.0                                                              # equal to the median: no prediction
+    assert list(pred[17:]) == [1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0]                 # 0.65 is above the median of the first 11 (0.6)
+    # a later B cannot change an earlier day's prediction (the old full-sample median did)
+    B2 = B.copy()
+    B2[11] = 0.01
+    assert list(m.trailing_median_pred(B2, day, gid, min_prior=5)[:11]) == list(pred[:11])
+    _, truth = t414_world(0.65, n_days=30, seed=3)
+    fam = m.bullish_ratio_test(obs_from_truth(truth), n_perm=20, seed=0)["family"]
+    assert "strictly before t" in fam["follow_symbol_trailing_median"]["note"] and fam["follow_symbol_trailing_median"]["n_predicted"] <= 14 * 25
 
 
 def test_t414_accuracy_decisive_failure_below_min_n():
-    res = {"accuracy": 0.40, "n_predicted": 400, "acc_se": math.sqrt(0.4 * 0.6 / 400), "p_perm_deflated": 0.9,
-           "ic": {"cross_sectional_t_nw": -3.2, "pooled_t_symbol_clustered": -3.5},
-           "halves": {"first": {"accuracy": 0.4, "ic_pooled": -0.1}, "second": {"accuracy": 0.41, "ic_pooled": -0.05}}}
+    xs = {"accuracy": 0.40, "n_predicted": 400, "acc_se": math.sqrt(0.4 * 0.6 / 400), "p_perm": 0.9, "p_perm_deflated": 0.99, "degenerate_null": False}
+    res = {"accuracy": 0.40, "n_predicted": 400, "acc_se": math.sqrt(0.4 * 0.6 / 400), "p_perm": 0.9, "p_perm_deflated": 0.99, "degenerate_null": False,
+           "xs_quintile": dict(xs), "ic": {"cross_sectional_t_nw": -3.2, "pooled_t_symbol_clustered": -3.5},
+           "halves": {"first": {"accuracy": 0.4, "accuracy_xs": 0.4, "ic_pooled": -0.1}, "second": {"accuracy": 0.41, "accuracy_xs": 0.42, "ic_pooled": -0.05}}}
     crit = m.t414_criteria(res)
-    assert crit[0][1] is False and crit[0][2] is True                    # 99% upper bound of 40% on 400 days is below 52%
+    assert crit[0][1] is False and crit[0][2] is True                    # both forms' 99% upper bounds of 40% on 400 days are below 52%
+    assert crit[1][1] is False
     assert crit[2][1] is False and crit[2][2] is True                    # both constructions' t < -3: decisively the wrong sign
-    assert crit[3][1] is False                                           # edge < 0 and IC < 0 in both halves: both constructions fail
+    assert crit[3][1] is False                                           # edges < 0 and IC < 0 in both halves: every construction fails
     v, why = m._decide(crit, 400, m.T414_MIN_N, "symbol-days")
     assert v == "not_supported"
     res["ic"]["cross_sectional_t_nw"] = -1.0
@@ -379,16 +472,68 @@ def test_t414_accuracy_decisive_failure_below_min_n():
     assert crit[0][1] is False and crit[0][2] is False
     v, why = m._decide(crit, 400, m.T414_MIN_N, "symbol-days")
     assert v == "inconclusive"
-    # rule 11: the two IC constructions disagree -> undecided; the halves' two statistics disagree -> undecided
+    # rule 11: the rule passes the accuracy bar while the quintile form fails -> undecided (and the decisive flag is off)
+    res["accuracy"], res["acc_se"] = 0.60, math.sqrt(0.6 * 0.4 / 400)
+    crit = m.t414_criteria(res)
+    assert crit[0][1] is None and crit[0][2] is False
+    res["xs_quintile"]["accuracy"] = 0.58
+    assert m.t414_criteria(res)[0][1] is True
+    # the permutation criterion needs both forms; a degenerate null is not computable
+    res["p_perm_deflated"], res["xs_quintile"]["p_perm_deflated"] = 0.001, 0.001
+    assert m.t414_criteria(res)[1][1] is True
+    res["xs_quintile"]["p_perm_deflated"] = 0.5
+    assert m.t414_criteria(res)[1][1] is None
+    res["xs_quintile"]["p_perm_deflated"], res["degenerate_null"] = 0.001, True
+    assert m.t414_criteria(res)[1][1] is None
+    res["degenerate_null"] = False
+    # a form with fewer than MIN_PRED predictions is not computable
+    res["xs_quintile"]["n_predicted"] = 3
+    assert m.t414_criteria(res)[0][1] is None and m.t414_criteria(res)[1][1] is None
+    res["xs_quintile"]["n_predicted"] = 400
+    # the two IC constructions disagree -> undecided; the halves' statistics disagree -> undecided
     res["ic"] = {"cross_sectional_t_nw": 3.4, "pooled_t_symbol_clustered": 2.1}
-    res["halves"] = {"first": {"accuracy": 0.55, "ic_pooled": -0.1}, "second": {"accuracy": 0.54, "ic_pooled": 0.05}}
+    res["halves"] = {"first": {"accuracy": 0.55, "accuracy_xs": 0.56, "ic_pooled": -0.1}, "second": {"accuracy": 0.54, "accuracy_xs": 0.53, "ic_pooled": 0.05}}
     crit = m.t414_criteria(res)
     assert crit[2][1] is None and crit[3][1] is None
+    res["halves"]["first"]["ic_pooled"] = 0.1
+    assert m.t414_criteria(res)[3][1] is True
+    res["halves"]["second"]["accuracy_xs"] = 0.49
+    assert m.t414_criteria(res)[3][1] is None
     res["ic"] = {"cross_sectional_t_nw": 3.4, "pooled_t_symbol_clustered": None}
     assert m.t414_criteria(res)[2][1] is None
 
 
 # ============================================================================================= T-415 core ==
+
+def test_intensity_spans_name_the_streams_that_resolve_a_daily_intensity():
+    """per_hour averages the message rate over the page behind the sample: the hours from its oldest message to the sample
+    time are reported per stream (median, share over 24 h) and decide whether the stream resolves a daily intensity."""
+    def row(stream, hours, ph=10.0):
+        st = "2026-03-02T15:00:00+00:00"
+        return {"kind": "intensity-sample", "value": {"stream": stream, "day": "2026-03-02", "sample_time": st, "n": 30, "per_hour": ph,
+                                                      "oldest": datetime.fromtimestamp(m._ts(st) - hours * 3600, tz=UTC).isoformat()}}
+    rows = [row("SPY", 0.05), row("SPY", 0.1), row("SPY", 0.2), row("EEM", 900.0), row("EEM", 30.0), row("EEM", 12.0), row("XLE", 36.0), row("XLE", 10.0),
+            row("GLD", 2.0, ph=None), {"kind": "intensity-sample", "value": {"stream": "TLT", "day": "2026-03-02", "sample_time": "2026-03-02T15:00:00+00:00", "n": 30, "per_hour": 5.0}}]
+    sp = m.intensity_spans(rows)
+    assert sp["SPY"] == {"n_samples": 3, "median_span_h": pytest.approx(0.1), "share_span_gt_24h": 0.0}
+    assert sp["EEM"]["median_span_h"] == pytest.approx(30.0) and sp["EEM"]["share_span_gt_24h"] == pytest.approx(2 / 3)
+    assert sp["XLE"]["median_span_h"] == pytest.approx(23.0) and sp["XLE"]["share_span_gt_24h"] == 0.5
+    assert "GLD" not in sp and "TLT" not in sp                                          # no per_hour value / no 'oldest': no span
+    arch, P, _ = _panel(0.5, seed=2)
+    info = P["info"]
+    assert info["SPY"]["page_span_median_h"] == pytest.approx(0.5) and info["SPY"]["page_span_share_gt_24h"] == 0.0 and info["SPY"]["resolves_daily"] is True
+    assert info["EEM"]["page_span_median_h"] == pytest.approx(120.0) and info["EEM"]["page_span_share_gt_24h"] == 1.0 and info["EEM"]["resolves_daily"] is False
+    assert info["XLB"]["resolves_daily"] is False and info["XLY"]["resolves_daily"] is None and info["XLY"]["page_span_median_h"] is None
+    stat, n, verdict, reason = m.HARNESSES["b6c_stocktwits_intensity_rv"](arch)
+    d = stat["page_span_diagnostic"]
+    assert d["streams_multi_day"] == ["EEM", "XLB"] and d["streams_span_unknown"] == ["XLY"] and len(d["streams_resolving_daily"]) == 18
+    assert d["daily_resolving_subset"]["n_streams"] == 18 and d["daily_resolving_subset"]["log_z"]["t"] > 3 and "walk_forward_log_z" in d["daily_resolving_subset"]
+    assert d["multi_day_subset"]["n_streams"] == 2 and "walk_forward_log_z" not in d["multi_day_subset"]
+    assert d["daily_resolving_subset"]["n"] + d["multi_day_subset"]["n"] + sum(1 for r in P["rows"] if r["sym"] == "XLY") == n
+    assert "Page spans: 18 of 21 streams resolve a daily intensity" in reason and "EEM 120 h" in reason and "1 without span data" in reason
+    assert "daily-resolving subset (diagnostic" in reason and "the claim's cell stays the pooled panel" in reason
+    assert verdict == "supported"
+
 
 def test_zscore_trailing_uses_only_the_past():
     days = [f"d{i:03d}" for i in range(40)]
@@ -470,7 +615,7 @@ def _panel(gamma, seed=0, n_days=130):
     for w in m._entry_names(arch, m.INTENSITY_PREFIX):
         rows.extend(r for r in m._rows(arch, w) if r.get("kind") == "intensity-sample")
     intensity, few = m.intensity_panel(rows)
-    P = m.build_t415_panel(arch, intensity)
+    P = m.build_t415_panel(arch, intensity, m.intensity_spans(rows))
     return arch, P, few
 
 
@@ -582,8 +727,17 @@ def test_t414_harness_bookkeeping(planted):
     assert stat["marks"]["BTC.X"].startswith("coinbase-1m") and stat["marks"]["ETH.X"].startswith("coinbase-hourly")
     assert stat["marks"]["AAPL"].startswith("Yahoo")
     assert stat["result"]["vix_split"]["high_vix"]["n"] > 0 and stat["earnings_flag"] is None
-    assert set(stat["result"]["family"]) >= {"follow_level_0.5", "contrarian_level_0.5", "follow_threshold_0.7_0.4"}
-    assert stat["result"]["family"]["contrarian_level_0.5"]["accuracy"] < 0.5
+    fam = stat["result"]["family"]
+    assert set(fam) >= {"follow_rule_0.7_0.4_with_5d_change", "contrarian_rule_0.7_0.4_with_5d_change", "follow_threshold_0.7_0.4_level_only",
+                        "follow_xs_quintile", "follow_level_0.5", "contrarian_level_0.5", "follow_symbol_trailing_median", "follow_rule_count_weighted"}
+    assert fam["contrarian_level_0.5"]["accuracy"] < 0.5 and fam["follow_level_0.5"]["degenerate_null"] is False
+    assert fam["follow_rule_0.7_0.4_with_5d_change"]["accuracy"] == stat["result"]["accuracy"]
+    # the 5-session lag is point in time: the first five sessions of every stream have none, and SPY's sixth day loses its
+    # lag to the incomplete first window
+    assert stat["symbol_days_with_lag"] == 14 * 105 - 1 == stat["result"]["n_with_lag"] and stat["symbol_days_without_lag"] == n - (14 * 105 - 1)
+    assert stat["rule"]["source"].startswith("mandel/strategies/underlying.json") and "pre-declared" in stat["result"]["follow_rule"]
+    assert "Pre-declared rule (library entry, not fitted): long when B > 0.7 and rising" in reason and "cross-sectional quintile form (named alternative" in reason
+    assert "level-0.5 cut (family member, not judged)" in reason and "degenerate" not in reason
 
 
 def test_t415_harness_bookkeeping(planted):
@@ -594,6 +748,7 @@ def test_t415_harness_bookkeeping(planted):
     assert stat["walk_forward"]["levels_z_diagnostic"]["floored_share"] is not None
     assert set(stat["in_sample"]) == {"levels_z", "levels_abn", "log_z", "log_abn"} and set(stat["walk_forward"]) == {"log_z", "log_abn", "levels_z_diagnostic"}
     assert stat["estimators"]["rv"].startswith("intraday hourly RV 09:30-16:00 ET x19") and "deribit-dvol-BTC x1" in stat["estimators"]["iv"]
+    assert all({"page_span_median_h", "page_span_share_gt_24h", "resolves_daily"} <= set(v) for v in stat["per_symbol"].values())
     assert all(v["calendar"] == ("UTC days" if s in m.CRYPTO_PID else "NYSE sessions") for s, v in stat["per_symbol"].items())
     assert "RV estimators" in reason and "levels (the trial's equation)" in reason
     assert set(stat["family"]) == {"hourly_h1", "hourly_h5", "parkinson_h1", "parkinson_h5", "sq_ret_h1", "sq_ret_h5"}
@@ -626,6 +781,8 @@ def test_t414_two_days_is_a_data_limit_inconclusive(monkeypatch):
     assert verdict == "inconclusive" and 0 < n < m.T414_MIN_N
     assert "below min_n" in reason or "not implemented" in reason
     assert f"data limit: the pre-open backfill has stored {stat['n_weeks']} week(s) so far" in reason
+    assert "the rule's change needs the stream's window 5 sessions earlier: none archived yet" in reason
+    assert stat["result"]["n_predicted"] == 0 and stat["result"]["n_with_lag"] == 0 and stat["criteria"][0][1] is None
     assert f"n >= trial min_n ({n} of {m.T414_MIN_N} symbol-days)" in reason
 
 

@@ -8,8 +8,10 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
   * T-414  B = bullish / (bullish + bearish) over the user-tagged messages of the pre-open window (16:00 ET of the
            previous NYSE session .. 09:00 ET of day d) for the 14 declared streams (``ST_PREOPEN_SYMBOLS``), entry at the
            09:30 ET open of d, exit at the next session's open; min_n 1,200 symbol-days: accuracy >= 52% in the
-           PRE-DECLARED follow direction AND permutation p < 0.01 after deflation over the 16 declared cells AND IC t > 3
-           (both named constructions) AND the same sign in both halves of the sample.
+           PRE-DECLARED follow direction (the library entry's rule: long when B > 0.7 and rising over 5 pre-open days, flat /
+           short when B < 0.4 and falling; the grid's cross-sectional quintile form is the named alternative and must agree)
+           AND permutation p < 0.01 after deflation over the 16 declared cells AND IC t > 3 (both named constructions) AND
+           the same sign in both halves of the sample.
   * T-415  z_t = the day's message intensity (``per_hour`` of the 10:00, 13:00 and 15:30 ET samples, averaged) standardised
            within symbol on the trailing 30 sampled days (strictly before t; >= 20 of them), for the 21 IV-covered streams
            (``ST_INTENSITY_SYMBOLS``); min_n 1,500 symbol-days: in the pooled HAR regression
@@ -25,8 +27,13 @@ is tested on what it has stored and the data limit is named)
     rows created inside [window_start, window_end) (the fetcher's counts are cross-checked; mismatches reported); a
     window the fetcher could not complete drops out (counted). The library rule's filter (>= 20 tagged messages) is
     applied; the unfiltered accuracy is reported alongside.
-  * ``stocktwits-intensity-<YYYY>-W<ww>``: kind ``intensity-sample`` rows {stream, day, sample_time, n, per_hour}; a day
-    needs >= 2 of its 3 samples with a per_hour value (a sample with no message before its time has none).
+  * ``stocktwits-intensity-<YYYY>-W<ww>``: kind ``intensity-sample`` rows {stream, day, sample_time, n, oldest, per_hour}; a
+    day needs >= 2 of its 3 samples with a per_hour value (a sample with no message before its time has none). per_hour
+    is n over the hours from the page's oldest message to the sample time, so on a thin stream (EEM, the sector SPDRs)
+    the 30-message page spans days to weeks and per_hour is a multi-day trailing message rate, not the day's
+    intensity: each stream's median page span and the share of samples spanning more than 24 h are reported, the
+    streams that resolve a daily intensity (median span <= 24 h) are named, and the daily-resolving subset's result is
+    reported as a diagnostic beside the pooled estimate (the claim's cell stays the pooled panel of the declared streams).
   * Prices (T-414). Equities: Yahoo ``daily-history-<SYM>`` opens on the total-return basis (open x adjclose / close), so
     an ex-dividend between two opens does not count as a fall. Crypto streams (BTC.X, ETH.X, SOL.X, DOGE.X) trade 24/7
     and have no official open: the declared mark is the first archived trade at or after 09:30 ET, the open of the 09:30
@@ -58,21 +65,33 @@ is tested on what it has stored and the data limit is named)
     reported as unavailable (a control, not a pass criterion).
 
 Statistics
-  * T-414 follow direction, declared here from the claim's wording and not fitted (``FOLLOW_CUT``): a bullish majority
-    (B > 0.5) predicts an up open-to-next-open return, B < 0.5 a down one; B = 0.5 and zero returns make no prediction
-    (counted out of the accuracy's denominator). The permutation null (the trial's): B shuffled across days within each
-    symbol, 2,000 draws, p = (#draws with accuracy >= observed + 1) / (draws + 1); deflated over 16 cells by Sidak,
-    1 - (1 - p)^16 < 0.01. IC (rule 11, both named constructions are judged and must agree, ``_agree``: both above 3
-    pass, both at or below 3 fail, one of each is undecided): (a) the daily cross-sectional Spearman of B with the
-    forward return (days with >= 5 streams), mean / Newey-West s.e.; (b) the pooled IC = Pearson correlation of the
-    within-symbol fractional ranks of B and of the return, its t from the OLS slope of the return rank on the B rank
-    with symbol-clustered s.e. (G/(G-1) (n-1)/(n-k) small-sample factor). Halves: the observations split at the median
-    date; the accuracy edge (accuracy - 50%) and the pooled IC each keep the claim's sign in both halves, the two
-    statistics judged with the same agreement rule. Net return of the rule (a statistic, not a criterion): position = the predicted sign, round-trip cost
-    charged on turnover, 1 bp SPY/QQQ, 5 bps every other stream (the claim names no crypto cost: 5 bps assumed and
-    stated). VIX split: the previous session's VIX close above / below its sample median. The 16 declared cells
-    (direction x signal form x horizon x weighting) are charged in the deflation; the computable variants are reported
-    as a family (accuracies only), the claim's cell decides.
+  * T-414 follow direction, pre-declared by the library entry (mandel/strategies/underlying.json, slug stocktwits-bullish-ratio)
+    and not fitted (``RULE_HI``, ``RULE_LO``, ``RULE_LAG``): long at the open when B > 0.7 and rising, flat / short when B < 0.4
+    and falling, where rising / falling is the sign of B minus the same stream's B on the pre-open window five NYSE
+    sessions earlier (a complete window with a tagged message; known before 09:00 ET of the day: point in time; the
+    20-message filter applies to the traded day, not to the lag); any other day makes no prediction. The grid's other
+    signal form, the cross-sectional quintiles (on each day with >= 5 streams the top k = max(1, round(0.2 n_d)) streams by
+    B long, the bottom k short, ranks of that day only), is the named alternative: the accuracy and permutation criteria
+    are judged in both forms with the rule-11 agreement rule (``_agree``). The simple level cut (B > 0.5 up, B < 0.5 down)
+    is a reported family member only: StockTwits sentiment is skewed bullish, so on the archived sample every B lies
+    above 0.5, the cut is an always-long rule whose 'accuracy' is the share of up days and whose permutation p is
+    identically 1 (every within-symbol shuffle reproduces the same prediction vector): a degenerate null, reported as
+    such, not evidence against the claim. The permutation null (the trial's): each symbol's days shuffled, 2,000 draws,
+    p = (#draws with accuracy >= observed + 1) / (draws + 1); B, its 5-day change and hence the rule's prediction travel
+    together under the shuffle, the quintile ranks are recomputed from the shuffled B; a form whose predictions are
+    identical within every symbol (degenerate) is not computable for this criterion; deflated over 16 cells by Sidak,
+    1 - (1 - p)^16 < 0.01. IC (rule 11, both named constructions are judged and must agree): (a) the daily
+    cross-sectional Spearman of B with the forward return (days with >= 5 streams), mean / Newey-West s.e.; (b) the
+    pooled IC = Pearson correlation of the within-symbol fractional ranks of B and of the return, its t from the OLS
+    slope of the return rank on the B rank with symbol-clustered s.e. (G/(G-1) (n-1)/(n-k) small-sample factor).
+    Halves: the observations split at the median date; the rule's accuracy edge (accuracy - 50%), the quintile form's
+    edge and the pooled IC each keep the claim's sign in both halves, the three judged with the agreement rule. Net
+    return of the rule (a statistic, not a criterion): position = the predicted sign, round-trip cost charged on
+    turnover, 1 bp SPY/QQQ, 5 bps every other stream (the claim names no crypto cost: 5 bps assumed and stated). VIX
+    split: the previous session's VIX close above / below its sample median. The 16 declared cells (direction x signal
+    form x horizon x weighting) are charged in the deflation; the computable variants are reported as a family
+    (accuracies only; the symbol-relative cells use the trailing, strictly-before-t median of the symbol's B, point in
+    time), the claim's cell decides.
   * T-415 regression, pooled OLS with a common intercept and Driscoll-Kraay s.e. (per-day sums of the score, Bartlett
     kernel, lag max(nw_lag(T), horizon)), in two forms that are both judged: the trial's literal levels equation
     (RV_{t+1} on RV_t, RV_week, RV_month, IV_t and the regressor) and the log form (ln RV_{t+1} on the logs of the same
@@ -147,7 +166,13 @@ T414_ACC = 0.52
 T414_P = 0.01
 T414_IC_T = 3.0
 T414_MIN_TAGGED = 20          # the library rule: skip symbol-days with fewer than 20 tagged messages
-FOLLOW_CUT = 0.5              # PRE-DECLARED follow direction: B > 0.5 (a bullish majority) predicts up, B < 0.5 down
+RULE_HI = 0.7                 # PRE-DECLARED follow rule (library entry stocktwits-bullish-ratio): long at the open when B > 0.7 and
+RULE_LO = 0.4                 # rising, flat / short when B < 0.4 and falling; rising / falling = the sign of B's 5-pre-open-day change
+RULE_LAG = 5                  # pre-open sessions behind the change (B_t - B_{t-5}; the lag is known before 09:00 ET of t)
+XS_QUANTILE = 0.2             # the grid's other signal form: the day's top / bottom quintile of the streams by B
+LEVEL_CUT = 0.5               # a reported family member only (B > 0.5 up, B < 0.5 down): one-sided under the StockTwits bullish skew
+TRAIL_MIN = 5                 # prior pre-open days a symbol's trailing median needs (the relative family cells, point in time)
+MIN_PRED = 8                  # predictions a signal form needs before its accuracy is judged
 COST_RT = {"SPY": 1e-4, "QQQ": 1e-4}
 COST_RT_DEFAULT = 5e-4        # single names (the claim); crypto streams unnamed by the claim: the same 5 bps, stated
 MARK_HHMM = (9, 30)           # the entry mark, ET
@@ -169,6 +194,7 @@ HAR_EQ = (5, 22)
 HAR_CRYPTO = (7, 30)
 HAR_MIN_COVER = 0.8           # share of a HAR window's sessions that must have RV (the mean is over those that do)
 MIN_SAMPLES = 2
+SPAN_DAILY_H = 24.0           # a stream resolves a daily intensity when the page behind its samples spans at most this many hours (median)
 MIN_BARS_EQ = 6
 MIN_BARS_CRYPTO = 20
 QLIKE_FLOOR_Q = 0.01
@@ -594,30 +620,123 @@ def _net_returns(obs: Sequence[dict], pred: np.ndarray) -> dict:
     return {"mean_gross_bps": float(np.mean(gross)) * 1e4, "mean_net_bps": float(np.mean(net)) * 1e4, "n": len(net)}
 
 
+def rule_pred(B, dB) -> np.ndarray:
+    """The library entry's pre-declared follow rule: +1 (long at the open) when B > RULE_HI and its RULE_LAG-pre-open-day
+    change is positive (rising), -1 (flat / short) when B < RULE_LO and the change is negative (falling), 0 otherwise.
+    A day whose change is unknown (NaN: the stream's window RULE_LAG sessions earlier is not archived) makes no prediction."""
+    B, d = np.asarray(B, float), np.asarray(dB, float)
+    with np.errstate(invalid="ignore"):
+        up = (B > RULE_HI) & (d > 0)
+        dn = (B < RULE_LO) & (d < 0)
+    return np.where(up, 1.0, np.where(dn, -1.0, 0.0))
+
+
+def xs_quintile_pred(M, q: float = XS_QUANTILE, min_cs: int = MIN_CS) -> np.ndarray:
+    """The grid's cross-sectional signal form on a days x streams matrix of B (NaN = no observation): on each day with at
+    least ``min_cs`` observations the k = max(1, round(q n_d)) streams with the highest B are +1 and the k lowest -1 (ties
+    in stream order), every other entry 0. Point in time: a day's predictions use only that day's row."""
+    M = np.asarray(M, float)
+    D, S = M.shape
+    valid = np.isfinite(M)
+    nd = valid.sum(axis=1)
+    k = np.maximum(1, np.rint(q * nd)).astype(int)
+    order = np.argsort(np.where(valid, M, np.inf), axis=1, kind="stable")
+    pos = np.empty_like(order)
+    np.put_along_axis(pos, order, np.broadcast_to(np.arange(S), (D, S)), axis=1)
+    ok = (nd >= min_cs)[:, None] & valid
+    pred = np.zeros((D, S))
+    pred[ok & (pos < k[:, None])] = -1.0
+    pred[ok & (pos >= (nd - k)[:, None])] = 1.0
+    return pred
+
+
+def trailing_median_pred(B, day, gid, min_prior: int = TRAIL_MIN) -> np.ndarray:
+    """The symbol-relative family cell, point in time: +1 / -1 when B is above / below the median of the same symbol's B on
+    its earlier days (strictly before t, at least ``min_prior`` of them), 0 otherwise."""
+    B, day, gid = np.asarray(B, float), np.asarray(day), np.asarray(gid)
+    pred = np.zeros(B.size)
+    for g in np.unique(gid):
+        idx = np.where(gid == g)[0]
+        idx = idx[np.argsort(day[idx], kind="stable")]
+        for j in range(min_prior, idx.size):
+            pred[idx[j]] = np.sign(B[idx[j]] - np.median(B[idx[:j]]))
+    return pred
+
+
+def _degenerate(pred: np.ndarray, groups: Sequence[np.ndarray]) -> bool:
+    """True when every symbol's predictions take a single value: shuffling days within symbols then reproduces the
+    identical prediction vector in every draw, so the permutation p is identically 1 (a degenerate null, not evidence).
+    Callers flag a form as degenerate only when it makes predictions at all."""
+    return all(np.unique(pred[idx]).size <= 1 for idx in groups)
+
+
+def five_day_changes(panel: dict, sessions: Sequence[str], lag: int = RULE_LAG) -> dict:
+    """{(stream, day): (B_lag, B - B_lag)} for every panel window with B, from the same stream's complete window on the
+    NYSE session ``lag`` sessions before ``day`` (known before 09:00 ET of ``day``: point in time); (None, None) when that
+    window is not archived, incomplete or untagged. The 20-message filter applies to the traded day, not to the lag."""
+    bser: dict = defaultdict(dict)
+    for (s, d), p in panel.items():
+        if p.get("complete") and p.get("B") is not None:
+            bser[s][d] = float(p["B"])
+    out = {}
+    for (s, d), p in panel.items():
+        if p.get("B") is None:
+            continue
+        i = bisect.bisect_left(sessions, d)
+        ld = sessions[i - lag] if i >= lag and i < len(sessions) and sessions[i] == d else None
+        bl = bser[s].get(ld) if ld else None
+        out[(s, d)] = (bl, float(p["B"]) - bl) if bl is not None else (None, None)
+    return out
+
+
 def bullish_ratio_test(obs: Sequence[dict], n_perm: int = T414_N_PERM, seed: int = SEED, cells: int = T414_CELLS,
                        vix: Optional[dict] = None) -> dict:
-    """The claim's statistics on observations {sym, day, B, ret, tagged, cost}: accuracy in the follow direction, the
-    permutation null, both IC constructions, halves, the net return, the VIX split and the family of declared cells."""
+    """The claim's statistics on observations {sym, day, B, dB5 (B minus its value RULE_LAG pre-open sessions earlier; None
+    when unknown), ret, tagged, cost}: the pre-declared rule's accuracy and permutation p (the claim's cell), the
+    cross-sectional quintile form's (the grid's named alternative, judged with the rule-11 agreement rule), the level-0.5
+    cut's (a family member, reported with its degeneracy), both IC constructions, the halves, the net return, the VIX
+    split and the family of declared cells. The permutation shuffles each symbol's days: B, its change and hence the
+    rule's prediction travel together, the quintile ranks are recomputed from the shuffled B."""
     n = len(obs)
-    out: dict = {"n": n, "follow_rule": f"B > {FOLLOW_CUT} predicts up, B < {FOLLOW_CUT} predicts down (pre-declared, not fitted)"}
-    if n < 8:
-        out.update(accuracy=None, n_predicted=0, p_perm=None, p_perm_deflated=None, ic=None, halves=None)
+    out: dict = {"n": n, "follow_rule": f"long when B > {RULE_HI} and rising over {RULE_LAG} pre-open sessions, short when B < {RULE_LO} and "
+                                        f"falling, otherwise no position (pre-declared in the library entry, not fitted); named alternative "
+                                        f"form: the day's top / bottom quintile of the streams by B"}
+    if n < MIN_PRED:
+        out.update(accuracy=None, n_predicted=0, n_long=0, n_short=0, n_with_lag=0, acc_se=None, p_perm=None, p_perm_deflated=None,
+                   degenerate_null=None, xs_quintile=None, level_cut=None, ic=None, halves=None)
         return out
     sym = np.array([o["sym"] for o in obs])
     day = np.array([o["day"] for o in obs])
     B = np.array([float(o["B"]) for o in obs])
+    dB = np.array([np.nan if o.get("dB5") is None else float(o["dB5"]) for o in obs])
     ret = np.array([float(o["ret"]) for o in obs])
     sgn = np.sign(ret)
-    gid = np.unique(sym, return_inverse=True)[1]
-    pred = np.sign(B - FOLLOW_CUT)
+    usym, gid = np.unique(sym, return_inverse=True)
+    udays, di = np.unique(day, return_inverse=True)
+    D, S = udays.size, usym.size
+    groups = [np.where(gid == g)[0] for g in range(S)]
+
+    def xs_of(Bv):
+        M = np.full((D, S), np.nan)
+        M[di, gid] = Bv
+        return xs_quintile_pred(M)[di, gid]
+
+    pred = rule_pred(B, dB)
+    pred_xs = xs_of(B)
+    pred_lvl = np.sign(B - LEVEL_CUT)
     acc, k = _accuracy(pred, sgn)
+    acc_xs, k_xs = _accuracy(pred_xs, sgn)
+    acc_lvl, k_lvl = _accuracy(pred_lvl, sgn)
+    deg = bool(k and _degenerate(pred, groups))                 # a form without predictions is not degenerate, it is empty
+    deg_lvl = bool(k_lvl and _degenerate(pred_lvl, groups))
+    deg_xs = bool(k_xs and _degenerate(pred_xs, groups))
     rB, rR = _within_ranks(B, gid), _within_ranks(ret, gid)
     ic_pooled = float(np.corrcoef(rB, rR)[0, 1]) if rB.std() > 0 and rR.std() > 0 else 0.0
     t_pooled = _cluster_t(rR, rB, gid) if rB.std() > 0 else None
     # daily cross-sectional IC
     cs = []
-    for d in np.unique(day):
-        m = day == d
+    for d in range(D):
+        m = di == d
         if m.sum() >= MIN_CS:
             v = spearman(B[m], ret[m])
             if v is not None:
@@ -625,28 +744,33 @@ def bullish_ratio_test(obs: Sequence[dict], n_perm: int = T414_N_PERM, seed: int
     cs = np.asarray(cs, float)
     ic_cs = float(cs.mean()) if cs.size else None
     t_cs = nw_t(cs) if cs.size >= 3 else None
-    # permutation null: B shuffled across days within each symbol
+    # permutation null: each symbol's days shuffled (B, its change and the rule's prediction together; quintile ranks recomputed)
     rng = np.random.default_rng(seed)
-    groups = [np.where(gid == g)[0] for g in range(gid.max() + 1)]
-    acc_ge, ic_ge = 0, 0
+    ge = np.zeros(4, int)
     for _ in range(n_perm):
-        Bp, rBp = B.copy(), rB.copy()
+        Bp, rBp, pp, pl = B.copy(), rB.copy(), pred.copy(), pred_lvl.copy()
         for idx in groups:
             pi = rng.permutation(idx.size)
-            Bp[idx] = B[idx][pi]
-            rBp[idx] = rB[idx][pi]
-        a_p, _ = _accuracy(np.sign(Bp - FOLLOW_CUT), sgn)
-        if a_p is not None and acc is not None and a_p >= acc - 1e-12:
-            acc_ge += 1
+            Bp[idx], rBp[idx], pp[idx], pl[idx] = B[idx][pi], rB[idx][pi], pred[idx][pi], pred_lvl[idx][pi]
+        for j, (pr, a) in enumerate(((pp, acc), (xs_of(Bp), acc_xs), (pl, acc_lvl))):
+            if a is not None:
+                a_p, _ = _accuracy(pr, sgn)
+                if a_p is not None and a_p >= a - 1e-12:
+                    ge[j] += 1
         ic_p = float(np.corrcoef(rBp, rR)[0, 1]) if rBp.std() > 0 and rR.std() > 0 else 0.0
         if ic_p >= ic_pooled - 1e-12:
-            ic_ge += 1
-    p_acc = (acc_ge + 1.0) / (n_perm + 1.0) if acc is not None else None
-    p_ic = (ic_ge + 1.0) / (n_perm + 1.0)
+            ge[3] += 1
+
+    def pval(j, a):
+        return (ge[j] + 1.0) / (n_perm + 1.0) if a is not None else None
+
+    def se(a, kk):
+        return math.sqrt(a * (1 - a) / kk) if a is not None and kk else None
+    p_rule, p_xs, p_lvl, p_ic = pval(0, acc), pval(1, acc_xs), pval(2, acc_lvl), (ge[3] + 1.0) / (n_perm + 1.0)
     # halves at the median date: the first day whose preceding observations make up at least half the sample
-    udays = sorted(set(day.tolist()))
-    cut, seen = udays[-1], 0
-    for d in udays:
+    udl = udays.tolist()
+    cut, seen = udl[-1], 0
+    for d in udl:
         if seen >= n / 2.0:
             cut = d
             break
@@ -655,13 +779,14 @@ def bullish_ratio_test(obs: Sequence[dict], n_perm: int = T414_N_PERM, seed: int
     for label, m in (("first", day < cut), ("second", day >= cut)):
         if m.sum() >= 3:
             a_h, k_h = _accuracy(pred[m], sgn[m])
+            a_x, k_x = _accuracy(pred_xs[m], sgn[m])
             g_h = np.unique(sym[m], return_inverse=True)[1]
             rb, rr = _within_ranks(B[m], g_h), _within_ranks(ret[m], g_h)
             ic_h = float(np.corrcoef(rb, rr)[0, 1]) if rb.std() > 0 and rr.std() > 0 else 0.0
-            halves[label] = {"n": int(m.sum()), "accuracy": a_h, "n_predicted": k_h, "ic_pooled": ic_h,
+            halves[label] = {"n": int(m.sum()), "accuracy": a_h, "n_predicted": k_h, "accuracy_xs": a_x, "n_predicted_xs": k_x, "ic_pooled": ic_h,
                              "days": [str(min(day[m])), str(max(day[m]))]}
         else:
-            halves[label] = {"n": int(m.sum()), "accuracy": None, "n_predicted": 0, "ic_pooled": None, "days": None}
+            halves[label] = {"n": int(m.sum()), "accuracy": None, "n_predicted": 0, "accuracy_xs": None, "n_predicted_xs": 0, "ic_pooled": None, "days": None}
     # VIX split (previous session's close vs the sample median)
     vsplit = None
     if vix:
@@ -672,26 +797,40 @@ def bullish_ratio_test(obs: Sequence[dict], n_perm: int = T414_N_PERM, seed: int
             for label, m in (("high_vix", vv > med), ("low_vix", vv <= med)):
                 m = m & np.isfinite(vv)
                 a_v, k_v = _accuracy(pred[m], sgn[m]) if m.sum() else (None, 0)
-                vsplit[label] = {"n": int(m.sum()), "accuracy": a_v, "n_predicted": k_v,
+                a_vx, k_vx = _accuracy(pred_xs[m], sgn[m]) if m.sum() else (None, 0)
+                vsplit[label] = {"n": int(m.sum()), "accuracy": a_v, "n_predicted": k_v, "accuracy_xs": a_vx, "n_predicted_xs": k_vx,
                                  "ic_pooled": float(np.corrcoef(rB[m], rR[m])[0, 1]) if m.sum() >= 3 and rB[m].std() > 0 and rR[m].std() > 0 else None}
     # family of declared cells (accuracies; the claim's cell decides)
     fam = {}
-    thr_pred = np.where(B > 0.7, 1.0, np.where(B < 0.4, -1.0, 0.0))
-    med_cut = np.empty(n)
-    for idx in groups:
-        med_cut[idx] = np.median(B[idx])
-    rel_pred = np.sign(B - med_cut)
-    for name, pr in (("follow_level_0.5", pred), ("contrarian_level_0.5", -pred), ("follow_threshold_0.7_0.4", thr_pred),
-                     ("contrarian_threshold_0.7_0.4", -thr_pred), ("follow_symbol_median", rel_pred), ("contrarian_symbol_median", -rel_pred)):
+    thr_lvl = np.where(B > RULE_HI, 1.0, np.where(B < RULE_LO, -1.0, 0.0))
+    trail = trailing_median_pred(B, day, gid)
+    for name, pr in (("follow_rule_0.7_0.4_with_5d_change", pred), ("contrarian_rule_0.7_0.4_with_5d_change", -pred),
+                     ("follow_threshold_0.7_0.4_level_only", thr_lvl), ("contrarian_threshold_0.7_0.4_level_only", -thr_lvl),
+                     ("follow_xs_quintile", pred_xs), ("contrarian_xs_quintile", -pred_xs),
+                     ("follow_level_0.5", pred_lvl), ("contrarian_level_0.5", -pred_lvl),
+                     ("follow_symbol_trailing_median", trail), ("contrarian_symbol_trailing_median", -trail)):
         a_f, k_f = _accuracy(pr, sgn)
         fam[name] = {"accuracy": a_f, "n_predicted": k_f}
+    fam["follow_level_0.5"]["degenerate_null"] = deg_lvl
+    fam["follow_symbol_trailing_median"]["note"] = f"median of the symbol's B on its earlier days (strictly before t, >= {TRAIL_MIN} of them): point in time"
     w = np.array([float(o.get("tagged") or 0) for o in obs])
     valid = (pred != 0) & (sgn != 0) & (w > 0)
-    fam["follow_level_0.5_count_weighted"] = {"accuracy": float(np.average((pred[valid] == sgn[valid]), weights=w[valid])) if valid.any() else None,
-                                              "n_predicted": int(valid.sum())}
-    out.update(accuracy=acc, n_predicted=k, acc_se=(math.sqrt(acc * (1 - acc) / k) if acc is not None and k else None),
-               p_perm=p_acc, p_perm_deflated=sidak(p_acc, cells), p_perm_ic=p_ic, p_perm_ic_deflated=sidak(p_ic, cells),
-               ic={"pooled": ic_pooled, "pooled_t_symbol_clustered": t_pooled, "n_symbols": int(gid.max() + 1),
+    fam["follow_rule_count_weighted"] = {"accuracy": float(np.average((pred[valid] == sgn[valid]), weights=w[valid])) if valid.any() else None,
+                                         "n_predicted": int(valid.sum())}
+    n_above, n_below = int((B > LEVEL_CUT).sum()), int((B < LEVEL_CUT).sum())
+    side = "above" if n_below == 0 else ("below" if n_above == 0 else "on one side of")
+    out.update(accuracy=acc, n_predicted=k, n_long=int((pred > 0).sum()), n_short=int((pred < 0).sum()), n_with_lag=int(np.isfinite(dB).sum()),
+               acc_se=se(acc, k), p_perm=p_rule, p_perm_deflated=sidak(p_rule, cells), degenerate_null=deg,
+               xs_quintile={"accuracy": acc_xs, "n_predicted": k_xs, "n_long": int((pred_xs > 0).sum()), "n_short": int((pred_xs < 0).sum()),
+                            "n_days": int(sum(1 for d in range(D) if (di == d).sum() >= MIN_CS)), "acc_se": se(acc_xs, k_xs),
+                            "p_perm": p_xs, "p_perm_deflated": sidak(p_xs, cells), "degenerate_null": deg_xs, "quantile": XS_QUANTILE},
+               level_cut={"cut": LEVEL_CUT, "accuracy": acc_lvl, "n_predicted": k_lvl, "acc_se": se(acc_lvl, k_lvl), "p_perm": p_lvl,
+                          "p_perm_deflated": sidak(p_lvl, cells), "degenerate_null": deg_lvl, "n_above": n_above, "n_below": n_below,
+                          "note": (f"every B lies {side} the cut: the cut is an always-one-sided rule, its accuracy is the share of days in that "
+                                   f"direction and the permutation p is identically 1 — a degenerate null, not evidence against the claim")
+                          if deg_lvl else "reported family member; the claim's cell is the pre-declared rule"},
+               p_perm_ic=p_ic, p_perm_ic_deflated=sidak(p_ic, cells),
+               ic={"pooled": ic_pooled, "pooled_t_symbol_clustered": t_pooled, "n_symbols": int(S),
                    "cross_sectional_mean": ic_cs, "cross_sectional_t_nw": t_cs, "n_days_cs": int(cs.size), "lag_nw": nw_lag(cs.size)},
                halves=halves, halves_cut=str(cut), net=_net_returns(obs, pred), vix_split=vsplit, family=fam,
                cells_deflated=cells, n_perm=n_perm)
@@ -699,36 +838,52 @@ def bullish_ratio_test(obs: Sequence[dict], n_perm: int = T414_N_PERM, seed: int
 
 
 def t414_criteria(res: dict) -> list:
-    """[(name, ok, decisive_fail)] from ``bullish_ratio_test``'s output (None = not computable)."""
+    """[(name, ok, decisive_fail)] from ``bullish_ratio_test``'s output (None = not computable). The accuracy and
+    permutation criteria are judged in the claim's rule and in the cross-sectional quintile form, which must agree
+    (rule 11); a form whose permutation null is degenerate (every prediction identical within each symbol) is not
+    computable for the permutation criterion."""
     acc, k = res.get("accuracy"), res.get("n_predicted") or 0
-    if acc is None or k < 8:
-        return [(f"accuracy >= {T414_ACC:.0%} in the follow direction", None, False),
-                (f"permutation p < {T414_P} after {T414_CELLS}-cell deflation", None, False),
-                (f"IC t > {T414_IC_T:g} (daily cross-sectional NW t and pooled symbol-clustered t)", None, False),
-                ("same sign in both halves (accuracy edge and pooled IC)", None, False)]
-    se = res.get("acc_se") or 0.0
-    ub99 = acc + Z99 * se
-    ok_acc = acc >= T414_ACC
-    pd_ = res.get("p_perm_deflated")
-    ok_p = None if pd_ is None else pd_ < T414_P
+    xs = res.get("xs_quintile") or {}
+    acc_x, k_x = xs.get("accuracy"), xs.get("n_predicted") or 0
+
+    def ok_a(a, kk):
+        return None if a is None or kk < MIN_PRED else bool(a >= T414_ACC)
+
+    def ub(a, s_):
+        return None if a is None or s_ is None else a + Z99 * s_
+
+    def ok_p(p, dg, kk):
+        return None if p is None or kk < MIN_PRED or dg else bool(p < T414_P)
+    ub_r, ub_x = ub(acc, res.get("acc_se")), ub(acc_x, xs.get("acc_se"))
+    ok_acc = _agree([ok_a(acc, k), ok_a(acc_x, k_x)])
+    dec_acc = bool(ub_r is not None and ub_x is not None and ub_r < T414_ACC and ub_x < T414_ACC)
+    pd_, pd_x = res.get("p_perm_deflated"), xs.get("p_perm_deflated")
+    ok_perm = _agree([ok_p(pd_, res.get("degenerate_null"), k), ok_p(pd_x, xs.get("degenerate_null"), k_x)])
     ic = res.get("ic") or {}
     t1, t2 = ic.get("cross_sectional_t_nw"), ic.get("pooled_t_symbol_clustered")
     ok_ic = _agree([None if t1 is None else t1 > T414_IC_T, None if t2 is None else t2 > T414_IC_T])
     h = res.get("halves") or {}
     hv = [h.get("first") or {}, h.get("second") or {}]
-    ok_h_acc = all(x["accuracy"] > 0.5 for x in hv) if all(x.get("accuracy") is not None for x in hv) else None
-    ok_h_ic = all(x["ic_pooled"] > 0 for x in hv) if all(x.get("ic_pooled") is not None for x in hv) else None
-    ok_h = _agree([ok_h_acc, ok_h_ic])
-    return [(f"accuracy >= {T414_ACC:.0%} in the follow direction (observed {_pu(acc)}, one-sided 99% upper bound {_pu(ub99)})", ok_acc, ub99 < T414_ACC),
-            (f"permutation p < {T414_P} after {T414_CELLS}-cell Sidak deflation (raw {_f(res.get('p_perm'), 4)}, deflated {_f(pd_, 4)})", ok_p, False),
+
+    def both(key, thr):
+        return all(x[key] > thr for x in hv) if all(x.get(key) is not None for x in hv) else None
+    ok_h_acc, ok_h_xs, ok_h_ic = both("accuracy", 0.5), both("accuracy_xs", 0.5), both("ic_pooled", 0.0)
+    ok_h = _agree([ok_h_acc, ok_h_xs, ok_h_ic])
+    dg_txt = " (degenerate null: every prediction identical within each symbol, p identically 1)"
+    return [(f"accuracy >= {T414_ACC:.0%} in the pre-declared follow direction, the rule (B > {RULE_HI} and rising / B < {RULE_LO} and falling) "
+             f"and the cross-sectional quintile form agreeing (rule {_pu(acc)} on {k} predicted days, one-sided 99% upper bound {_pu(ub_r)}; "
+             f"quintiles {_pu(acc_x)} on {k_x}, upper bound {_pu(ub_x)})", ok_acc, dec_acc),
+            (f"permutation p < {T414_P} after {T414_CELLS}-cell Sidak deflation in both forms (rule raw {_f(res.get('p_perm'), 4)}, deflated {_f(pd_, 4)}"
+             f"{dg_txt if res.get('degenerate_null') else ''}; quintiles raw {_f(xs.get('p_perm'), 4)}, deflated {_f(pd_x, 4)}"
+             f"{dg_txt if xs.get('degenerate_null') else ''})", ok_perm, False),
             (f"IC t > {T414_IC_T:g} in both named constructions, which must agree (cross-sectional NW t {_s(t1, 2)}, pooled symbol-clustered t {_s(t2, 2)})",
              ok_ic, bool(t1 is not None and t2 is not None and t1 < -T414_IC_T and t2 < -T414_IC_T)),
-            (f"same sign in both halves, accuracy edge and pooled IC agreeing (edge > 0 in both halves: {ok_h_acc}; IC > 0 in both halves: {ok_h_ic})",
-             ok_h, False)]
+            (f"same sign in both halves, the rule's accuracy edge, the quintile form's edge and the pooled IC agreeing (rule edge > 0 in both halves: "
+             f"{ok_h_acc}; quintile edge > 0: {ok_h_xs}; IC > 0: {ok_h_ic})", ok_h, False)]
 
 
 def b6c_stocktwits_bullish_ratio(archive):
-    """T-414: pre-open StockTwits bullish ratio -> sign of the open-to-next-open return (follow direction)."""
+    """T-414: pre-open StockTwits bullish ratio -> sign of the open-to-next-open return (the pre-declared follow rule)."""
     weeks = _entry_names(archive, PREOPEN_PREFIX)
     miss = _missing(archive, [SPY_B] + (weeks or [PREOPEN_PREFIX + "<YYYY>-W<ww> (no week archived yet)"]))
     if miss:
@@ -739,6 +894,7 @@ def b6c_stocktwits_bullish_ratio(archive):
         for r in _rows(archive, w):
             (wins if r.get("kind") == "window" else msgs).append(r)
     panel = preopen_panel(msgs, wins)
+    changes = five_day_changes(panel, sessions)
     syms = list(ST_PREOPEN_SYMBOLS)
     days = sorted({d for (_, d) in panel})
     raw_counts = {s: sum(1 for (ss, _) in panel if ss == s) for s in syms}
@@ -789,7 +945,8 @@ def b6c_stocktwits_bullish_ratio(archive):
         if not p0 or not p1:
             drops["entry or exit mark missing"] += 1
             continue
-        o = {"sym": s, "day": d, "B": p["B"], "ret": p1 / p0 - 1.0, "tagged": p["tagged"], "cost": COST_RT.get(s, COST_RT_DEFAULT)}
+        bl, db = changes.get((s, d), (None, None))
+        o = {"sym": s, "day": d, "B": p["B"], "B_lag5": bl, "dB5": db, "ret": p1 / p0 - 1.0, "tagged": p["tagged"], "cost": COST_RT.get(s, COST_RT_DEFAULT)}
         unfiltered.append(o)
         if p["tagged"] < T414_MIN_TAGGED:
             drops[f"fewer than {T414_MIN_TAGGED} tagged messages"] += 1
@@ -799,17 +956,23 @@ def b6c_stocktwits_bullish_ratio(archive):
     n = len(obs)
     res = bullish_ratio_test(obs, n_perm=T414_N_PERM, vix=_vix_prev(archive, sessions)) if n else {"n": 0}
     unf = None
-    if len(unfiltered) >= 8 and len(unfiltered) != n:
-        pr = np.sign(np.array([o["B"] for o in unfiltered]) - FOLLOW_CUT)
+    if len(unfiltered) >= MIN_PRED and len(unfiltered) != n:
+        pr = rule_pred([o["B"] for o in unfiltered], [np.nan if o["dB5"] is None else o["dB5"] for o in unfiltered])
         sg = np.sign(np.array([o["ret"] for o in unfiltered]))
         a_u, k_u = _accuracy(pr, sg)
         unf = {"n": len(unfiltered), "accuracy": a_u, "n_predicted": k_u}
     crit = t414_criteria(res)
     verdict, why = _decide(crit, n, T414_MIN_N, "symbol-days")
+    n_lag = res.get("n_with_lag", 0) or 0
     stat = {"theory": "T-414", "weeks": weeks, "n_weeks": len(weeks), "days": [days[0], days[-1]] if days else None, "n_days": len(days),
             "symbol_days_raw": int(sum(raw_counts.values())), "symbol_days_used": n, "min_n": T414_MIN_N, "per_symbol_used": dict(per_sym),
             "per_symbol_raw": raw_counts, "drops": dict(drops), "price_missing": price_missing, "marks": mark_desc,
             "window_count_mismatches": mismatches, "unfiltered": unf, "min_tagged": T414_MIN_TAGGED,
+            "rule": {"long": f"B > {RULE_HI} and B - B_lag > 0", "short": f"B < {RULE_LO} and B - B_lag < 0",
+                     "lag": f"B_lag = the stream's B on the pre-open window {RULE_LAG} NYSE sessions earlier (complete window, >= 1 tagged message)",
+                     "source": "mandel/strategies/underlying.json stocktwits-bullish-ratio (pre-declared, not fitted)",
+                     "alternative_form": f"the day's top / bottom {XS_QUANTILE:.0%} of the streams by B (>= {MIN_CS} streams on the day)"},
+            "symbol_days_with_lag": n_lag, "symbol_days_without_lag": n - n_lag,
             "costs_round_trip_bps": {"SPY": 1, "QQQ": 1, "other": COST_RT_DEFAULT * 1e4},
             "earnings_flag": None, "earnings_note": "no earnings calendar is archived; the earnings-day control is not available",
             "result": res, "criteria": [(c[0], c[1]) for c in crit]}
@@ -817,16 +980,29 @@ def b6c_stocktwits_bullish_ratio(archive):
     h = res.get("halves") or {}
     net = res.get("net") or {}
     vs = res.get("vix_split")
-    limit = (f" (data limit: the pre-open backfill has stored {len(weeks)} week(s) so far; {T414_MIN_N - n} more symbol-days are needed)"
+    xs = res.get("xs_quintile") or {}
+    lv = res.get("level_cut") or {}
+    lag_txt = f"; the rule's change needs the stream's window {RULE_LAG} sessions earlier: none archived yet" if n and not n_lag else ""
+    limit = (f" (data limit: the pre-open backfill has stored {len(weeks)} week(s) so far; {T414_MIN_N - n} more symbol-days are needed{lag_txt})"
              if n < T414_MIN_N else "")
+    dg = " (degenerate null: every prediction identical within each symbol, p identically 1)"
+    lv_txt = (f"accuracy {_pu(lv.get('accuracy'))} on {lv.get('n_predicted', 0)}, permutation p {_f(lv.get('p_perm'), 4)}"
+              + (f" identically 1: every B lies {'above' if not lv.get('n_below') else ('below' if not lv.get('n_above') else 'on one side of')} "
+                 f"the cut within each symbol, a degenerate null, not evidence against the claim" if lv.get("degenerate_null") else "")) if lv else "n/a"
     reason = (f"T-414: {len(weeks)} pre-open week bundle(s) archived ({days[0] if days else 'n/a'}..{days[-1] if days else 'n/a'}, {len(days)} days, "
               f"{sum(raw_counts.values())} raw symbol-days); {n} symbol-days used of min_n {T414_MIN_N} after drops {dict(drops)}{limit}"
               f"{'; no prices for ' + ', '.join(price_missing) if price_missing else ''}. "
-              f"Follow rule {res.get('follow_rule', 'n/a')}: accuracy {_pu(res.get('accuracy'))} on {res.get('n_predicted', 0)} predicted days "
-              f"(unfiltered {_pu(unf['accuracy']) if unf else 'same'}), permutation p {_f(res.get('p_perm'), 4)} -> Sidak-{T414_CELLS} {_f(res.get('p_perm_deflated'), 4)}; "
+              f"Pre-declared rule (library entry, not fitted): long when B > {RULE_HI} and rising over {RULE_LAG} pre-open sessions, short when B < {RULE_LO} "
+              f"and falling: {n_lag} of {n} symbol-days have the {RULE_LAG}-session lag, {res.get('n_predicted', 0)} predicted ({res.get('n_long', 0)} long / "
+              f"{res.get('n_short', 0)} short), accuracy {_pu(res.get('accuracy'))} (unfiltered {_pu(unf['accuracy']) if unf else 'same'}), "
+              f"permutation p {_f(res.get('p_perm'), 4)} -> Sidak-{T414_CELLS} {_f(res.get('p_perm_deflated'), 4)}{dg if res.get('degenerate_null') else ''}; "
+              f"cross-sectional quintile form (named alternative, must agree): accuracy {_pu(xs.get('accuracy'))} on {xs.get('n_predicted', 0)} predictions over "
+              f"{xs.get('n_days', 0)} days, permutation p {_f(xs.get('p_perm'), 4)} -> Sidak-{T414_CELLS} {_f(xs.get('p_perm_deflated'), 4)}; "
+              f"level-{LEVEL_CUT} cut (family member, not judged): {lv_txt}; "
               f"IC pooled {_s(ic.get('pooled'), 3)} (symbol-clustered t {_s(ic.get('pooled_t_symbol_clustered'), 2)}, permutation p {_f(res.get('p_perm_ic'), 4)}), "
               f"daily cross-sectional IC {_s(ic.get('cross_sectional_mean'), 3)} (NW t {_s(ic.get('cross_sectional_t_nw'), 2)} over {ic.get('n_days_cs', 0)} days); "
-              f"halves accuracy {_pu((h.get('first') or {}).get('accuracy'))} / {_pu((h.get('second') or {}).get('accuracy'))}, "
+              f"halves accuracy rule {_pu((h.get('first') or {}).get('accuracy'))} / {_pu((h.get('second') or {}).get('accuracy'))}, "
+              f"quintiles {_pu((h.get('first') or {}).get('accuracy_xs'))} / {_pu((h.get('second') or {}).get('accuracy_xs'))}, "
               f"pooled IC {_s((h.get('first') or {}).get('ic_pooled'), 3)} / {_s((h.get('second') or {}).get('ic_pooled'), 3)}; "
               f"net {_s(net.get('mean_net_bps'), 2)} bps/day (gross {_s(net.get('mean_gross_bps'), 2)}); "
               f"VIX split accuracy high {_pu((vs or {}).get('high_vix', {}).get('accuracy'))} / low {_pu((vs or {}).get('low_vix', {}).get('accuracy'))}; "
@@ -848,6 +1024,23 @@ def intensity_panel(rows: Sequence[dict], min_samples: int = MIN_SAMPLES) -> tup
         out[s] = {d: float(np.mean(x)) for d, x in by.items() if len(x) >= min_samples}
         dropped[s] = sum(1 for x in by.values() if len(x) < min_samples)
     return out, dropped
+
+
+def intensity_spans(rows: Sequence[dict]) -> dict:
+    """{stream: {n_samples, median_span_h, share_span_gt_24h}}: the hours from the oldest message of the 30-message page
+    behind each sample to the sample time, i.e. the window the sample's ``per_hour`` rate averages over. A stream whose
+    median span is within a day resolves a daily intensity; a longer span makes ``per_hour`` a multi-day trailing average
+    of the message rate (and z > 2 a burst of 30+ messages). Streams whose rows carry no ``oldest`` are absent."""
+    acc: dict = defaultdict(list)
+    for r in rows:
+        v = r.get("value") or {}
+        if v.get("stream") and v.get("per_hour") is not None and v.get("oldest") and v.get("sample_time"):
+            acc[v["stream"]].append((_ts(v["sample_time"]) - _ts(v["oldest"])) / 3600.0)
+    out = {}
+    for s, x in acc.items():
+        a = np.asarray(x, float)
+        out[s] = {"n_samples": int(a.size), "median_span_h": float(np.median(a)), "share_span_gt_24h": float((a > SPAN_DAILY_H).mean())}
+    return out
 
 
 def zscore_trailing(days: Sequence[str], x: Sequence[float], window: int = Z_WINDOW, min_obs: int = Z_MIN_OBS) -> np.ndarray:
@@ -1172,8 +1365,10 @@ def _estimator_summary(info: dict) -> dict:
     return {"rv": fmt(rv), "iv": fmt(iv)}
 
 
-def build_t415_panel(archive, intensity: dict) -> dict:
-    """Rows of the primary cell and the family cells per symbol, with the per-symbol bookkeeping."""
+def build_t415_panel(archive, intensity: dict, spans: Optional[dict] = None) -> dict:
+    """Rows of the primary cell and the family cells per symbol, with the per-symbol bookkeeping (``spans`` from
+    ``intensity_spans``: each stream's median page span and the share of samples spanning more than a day, and whether
+    the stream resolves a daily intensity, median span <= SPAN_DAILY_H)."""
     syms = list(ST_INTENSITY_SYMBOLS)
     rows_primary, fam_rows, info = [], defaultdict(list), {}
     drops = defaultdict(int)
@@ -1209,7 +1404,26 @@ def build_t415_panel(archive, intensity: dict) -> dict:
         no_rv = sum(1 for d in zmap if d in iv and d not in rv)
         info[s] = {"used": len(pr), "days_sampled": len(days_x), "days_with_z": len(zmap), "days_without_iv": no_iv, "days_without_rv": no_rv,
                    "rv": rv_src, "iv": iv_src, "har_lags": [w, m], "calendar": "UTC days" if s in CRYPTO_PID else "NYSE sessions"}
+    for s, v in info.items():
+        sp = (spans or {}).get(s)
+        v.update(page_span_median_h=sp["median_span_h"] if sp else None, page_span_share_gt_24h=sp["share_span_gt_24h"] if sp else None,
+                 resolves_daily=(bool(sp["median_span_h"] <= SPAN_DAILY_H) if sp else None))
     return {"rows": rows_primary, "family": dict(fam_rows), "info": info, "drops": dict(drops)}
+
+
+def _span_subset(rows: Sequence[dict], walk_forward: bool) -> dict:
+    """In-sample log_z / levels_z (t, dR2) and, when asked, the log_z walk-forward of a subset of the panel rows: a
+    diagnostic beside the pooled result (the claim's cell stays the pooled panel)."""
+    out = {"n": len(rows), "n_streams": len({r["sym"] for r in rows})}
+    if len(rows) < 12:
+        return out
+    for key, log in (("log_z", True), ("levels_z", False)):
+        r = har_test(rows, "z", 1, log=log)
+        out[key] = {"t": r.get("t"), "dr2": r.get("dr2"), "n": r.get("n")}
+    if walk_forward:
+        wf = walk_forward_qlike(rows, "z")
+        out["walk_forward_log_z"] = {k: wf.get(k) for k in ("dm_t", "dm_p", "dm_p_sidak", "qlike_base", "qlike_full", "n_origins", "n_forecasts")}
+    return out
 
 
 def b6c_stocktwits_intensity_rv(archive):
@@ -1223,8 +1437,9 @@ def b6c_stocktwits_intensity_rv(archive):
     for w in weeks:
         rows.extend(r for r in _rows(archive, w) if r.get("kind") == "intensity-sample")
     intensity, few = intensity_panel(rows)
+    spans = intensity_spans(rows)
     days = sorted({r["value"]["day"] for r in rows})
-    P = build_t415_panel(archive, intensity)
+    P = build_t415_panel(archive, intensity, spans)
     prow = P["rows"]
     n = len(prow)
     z_in = har_test(prow, "z", 1)
@@ -1244,6 +1459,19 @@ def b6c_stocktwits_intensity_rv(archive):
     verdict, why = _decide(crit, n, T415_MIN_N, "symbol-days")
     abn_share = float(np.mean([r["abn"] for r in prow])) if n else None
     per_sym = {s: v.get("used", 0) for s, v in P["info"].items()}
+    used = [s for s, k in per_sym.items() if k]
+    # page-span diagnostic (rule 9 reporting): which streams' samples resolve a daily intensity, and the subsets' results
+    daily = [s for s in used if P["info"][s].get("resolves_daily") is True]
+    multi = [s for s in used if P["info"][s].get("resolves_daily") is False]
+    unknown = [s for s in used if P["info"][s].get("resolves_daily") is None]
+    span_diag = {"definition": f"median hours from the oldest message of the 30-message page behind a sample to the sample time (the window per_hour "
+                               f"averages over); a stream resolves a daily intensity when its median page span is <= {SPAN_DAILY_H:g} h; a longer span makes "
+                               f"per_hour a multi-day trailing average of the message rate and z > 2 a burst of 30+ messages",
+                 "streams_resolving_daily": daily, "streams_multi_day": multi, "streams_span_unknown": unknown,
+                 "multi_day_spans_h": {s: P["info"][s].get("page_span_median_h") for s in multi},
+                 "daily_resolving_subset": _span_subset([r for r in prow if r["sym"] in set(daily)], True),
+                 "multi_day_subset": _span_subset([r for r in prow if r["sym"] in set(multi)], False),
+                 "note": "a diagnostic beside the pooled result; the claim's cell stays the pooled panel of the declared streams"}
     stat = {"theory": "T-415", "weeks": [weeks[0], weeks[-1]] if weeks else None, "n_weeks": len(weeks), "days_sampled": [days[0], days[-1]] if days else None,
             "n_days_sampled": len(days), "symbol_days_used": n, "min_n": T415_MIN_N, "per_symbol": P["info"], "symbols_dropped": P["drops"],
             "days_with_too_few_samples": few, "z_window": Z_WINDOW, "z_min_obs": Z_MIN_OBS, "abnormal_share": abn_share,
@@ -1252,17 +1480,28 @@ def b6c_stocktwits_intensity_rv(archive):
                              "(forecasts floored) is a diagnostic",
             "in_sample": {"log_z": z_in, "log_abn": a_in, "levels_z": z_lev, "levels_abn": a_lev},
             "walk_forward": {"log_z": z_wf, "log_abn": a_wf, "levels_z_diagnostic": z_wf_lev},
-            "estimators": _estimator_summary(P["info"]),
+            "estimators": _estimator_summary(P["info"]), "page_span_diagnostic": span_diag,
             "family": fam, "cells_deflated": T415_CELLS, "ex_fomc_target_days": ex_fomc, "n_fomc_days": len(fomc),
             "earnings_flag": None, "earnings_note": "no earnings calendar is archived; the earnings-day control is not available",
             "criteria": [(c[0], c[1]) for c in crit]}
-    used = [s for s, k in per_sym.items() if k]
     dropped_txt = ", ".join(f"{s} ({v.get('reason')})" for s, v in P["info"].items() if not v.get("used"))
     est = _estimator_summary(P["info"])
+    ds, ms = span_diag["daily_resolving_subset"], span_diag["multi_day_subset"]
+    dwf = ds.get("walk_forward_log_z") or {}
+    span_txt = (f"Page spans: {len(daily)} of {len(used)} streams resolve a daily intensity (median page span <= {SPAN_DAILY_H:g} h)"
+                + (f"; {len(multi)} span days to weeks (" + ", ".join(f"{s} {P['info'][s]['page_span_median_h']:.0f} h" for s in multi)
+                   + "), where per_hour is a multi-day trailing message rate" if multi else "")
+                + (f"; {len(unknown)} without span data" if unknown else "")
+                + (f"; daily-resolving subset (diagnostic, n {ds.get('n')}): log_z t {_s((ds.get('log_z') or {}).get('t'), 2)}, dR2 "
+                   f"{_pu((ds.get('log_z') or {}).get('dr2'))}, levels_z t {_s((ds.get('levels_z') or {}).get('t'), 2)}, dR2 {_pu((ds.get('levels_z') or {}).get('dr2'))}, "
+                   f"walk-forward log_z DM t {_s(dwf.get('dm_t'), 2)}, Sidak p {_f(dwf.get('dm_p_sidak'), 4)}" if ds.get("log_z") else "")
+                + (f"; multi-day subset (n {ms.get('n')}): log_z t {_s((ms.get('log_z') or {}).get('t'), 2)}, dR2 {_pu((ms.get('log_z') or {}).get('dr2'))}" if ms.get("log_z") else "")
+                + "; the claim's cell stays the pooled panel. ")
     reason = (f"T-415: {len(weeks)} intensity week bundle(s) ({days[0] if days else 'n/a'}..{days[-1] if days else 'n/a'}, {len(days)} sampled days); "
               f"{n} symbol-days in the regression of min_n {T415_MIN_N} over {len(used)} of {len(ST_INTENSITY_SYMBOLS)} streams"
               f"{' (dropped: ' + dropped_txt + ')' if dropped_txt else ''}; RV estimators {est['rv']}; IV sources {est['iv']}; "
-              f"z on the trailing {Z_WINDOW} sampled days, abnormal share {_pu(abn_share)}. In-sample pooled HAR+IV (Driscoll-Kraay lag {z_in.get('lag')}): "
+              f"z on the trailing {Z_WINDOW} sampled days, abnormal share {_pu(abn_share)}. " + span_txt
+              + f"In-sample pooled HAR+IV (Driscoll-Kraay lag {z_in.get('lag')}): "
               f"levels (the trial's equation) z: c t {_s(z_lev.get('t'), 2)}, incremental R^2 {_pu(z_lev.get('dr2'))}, 1{{z>2}}: t {_s(a_lev.get('t'), 2)}, "
               f"dR2 {_pu(a_lev.get('dr2'))}; log form z: c t {_s(z_in.get('t'), 2)}, dR2 {_pu(z_in.get('dr2'))} (R^2 {_f(z_in.get('r2_base'))} -> "
               f"{_f(z_in.get('r2_full'))}), 1{{z>2}}: t {_s(a_in.get('t'), 2)}, dR2 {_pu(a_in.get('dr2'))}. "
