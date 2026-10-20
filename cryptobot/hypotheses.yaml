@@ -857,6 +857,20 @@
   preregistered: true
   trials_run: 0
 
+- id: daytrade-timeblock
+  title: "Day trading bot: time-block scalper (momentum longs in the US-morning window, fades in the evening window) on 15m/30m crypto bars"
+  source: "operator direction 2026-10-20 (a separate day-trading sub-bot; template: TradingView 'BTC Intraday Time-Block Scalper': EMA 9/21 crossover, longs only 13:30-16:00 UTC Mon-Fri with +1.5% / -0.75%, shorts only 22:00-03:00 UTC with +2% / -1%, flat outside the windows; suggested ATR exits at 1:2 and an opening-range filter); prior desk evidence: range-profile-2026-10 (13-16 UTC is the busiest window; no hour of day predicts direction), kalshi-perps-hourly-rules (hourly rules 0-6 bp gross vs 18 bp), family-search-2026-10"
+  claim: "On BTC, ETH, SOL and DOGE, the time-block rule nets > 0 per trade after Kalshi perps taker costs (4 bp a side plus the measured half-spread: BTC 0.2, ETH 0.4, SOL 1.4, DOGE 2.9 bp), in one of three forms: V0 the template as written; V1 ATR(14) exits, stop 1.5 ATR, target 3 ATR (1:2); V2 V1 plus filters: longs only when the bar closes above the 13:30-14:00 UTC opening range high, shorts only when RSI(14) was above 65 within the last 4 bars and volume is below its 20-bar mean."
+  test: "cryptobot.daytrade_study on Coinbase 15-minute candles, two years to 2026-10 (30m resampled); signals on a closed bar, entry at the next bar's open, stops and targets checked on later bars (a bar touching both counts as the stop), forced flat at the first bar outside the windows; one position per asset; net per trade in bp, t clustered by day, halves by date, DSR at 24 trials. Trials: 3 variants x 2 timeframes x 4 assets = 24."
+  success: "Written before any backtest: CANDIDATE for a cell if net >= +5 bp a trade at t >= 2.5 with both halves positive over >= 200 trades and DSR >= 0.95 at 24 trials; a candidate on >= 2 assets in the same variant and timeframe goes to the paper bot's real-money gate review after 100 paper trades. KILLED for a variant if net per trade is negative on every asset at both timeframes. Otherwise inconclusive. The paper bot runs regardless (it costs nothing) and its record is read against this backtest."
+  data: "Coinbase public 15-minute candles (scratch dt/<COIN>_15m.json)"
+  result: "PRE-REGISTERED 2026-10-20; not run"
+  verdict: inconclusive
+  regime: "pending"
+  rerun: "python -m cryptobot.daytrade_study --scratch <dir> --fetch"
+  preregistered: true
+  trials_run: 0
+
 - id: pead-revisit
   title: "Post-earnings-announcement drift, long top-decile surprises 20 days, in small and mid caps"
   source: "Martineau 2022 (drift gone in large caps); 2025 revival papers on PEAD in small caps and with analyst-revision conditioning; operator question 2026-10-09"

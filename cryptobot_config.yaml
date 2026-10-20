@@ -291,3 +291,12 @@ collectors:
     enabled: true
     interval_s: 3600
 
+# Day trading bot (cryptobot.daytrade_bot): the time-block scalper, every
+# variant side by side, PAPER ONLY. Coinbase public 15-minute candles; no
+# order is ever sent. Registered as daytrade-timeblock; real money waits for
+# the backtest verdict and 100 paper trades.
+daytrade:
+  enabled: true
+  assets: [BTC, ETH, SOL, DOGE]
+  variants: [V0, V1, V2]
+  notional_usd: 250

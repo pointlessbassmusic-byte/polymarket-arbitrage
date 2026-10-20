@@ -99,6 +99,14 @@ def research_lines(state_dir: Optional[Path]) -> list[str]:
     if books:
         out.append("research: order books " + ", ".join(f"{t} {b['rows']} rows/{b['days']}d" for t, b in books.items()))
     try:
+        from .daytrade_bot import report as dt_report
+        dr = dt_report(Path(state_dir))
+        if dr["trades"] or dr["open"]:
+            out.append("research: day trading bot (paper) " + f"{dr['trades']} closed, {len(dr['open'])} open; "
+                       + ", ".join(f"{v} {s['n']} trades {s['net_bp']:+.1f} bp" for v, s in dr["by_variant"].items()))
+    except Exception:                                 # noqa: BLE001
+        pass
+    try:
         rs = Path(state_dir) / "review_status.txt"
         if rs.exists():
             out.append("review: real book " + rs.read_text().strip())
@@ -1017,6 +1025,12 @@ async def _main(args) -> int:
         d = cfg.get("desk", {}).get("digest_utc", "00:30")
         hh, mm = (int(x) for x in str(d).split(":"))
         tasks.append(digest_loop(bots, alerter, hh, mm, state_dir=args.state_dir))
+    dtc = cfg.get("daytrade") or {}
+    if dtc.get("enabled") and args.state_dir:
+        from .daytrade_bot import DayTradeBot
+        dbot = DayTradeBot(Path(args.state_dir), dtc)
+        tasks.append(dbot.run_forever())
+        logger.info("day trading bot on (PAPER ONLY): %s x %s", ",".join(dbot.assets), ",".join(dbot.variants))
     if args.state_dir:
         from .review import review_loop
         tasks.append(review_loop(Path(args.state_dir), alerter))
