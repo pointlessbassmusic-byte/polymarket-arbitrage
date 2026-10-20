@@ -1,0 +1,1547 @@
+{
+ "as_of": "2026-10-20",
+ "nodes": [
+  {
+   "id": "T-559",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Calendar sleeve (overnight QQQM, IBS, turn of month)",
+   "mode": "paper",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:overnight-gap",
+   "kind": "signal",
+   "label": "overnight-gap"
+  },
+  {
+   "id": "signal:ibs",
+   "kind": "signal",
+   "label": "ibs"
+  },
+  {
+   "id": "signal:turn-of-month",
+   "kind": "signal",
+   "label": "turn-of-month"
+  },
+  {
+   "id": "signal:spy-tlt-monthend",
+   "kind": "signal",
+   "label": "spy-tlt-monthend"
+  },
+  {
+   "id": "stream:alpaca-iex-bars",
+   "kind": "stream",
+   "label": "alpaca-iex-bars",
+   "state": "broker",
+   "age_days": null,
+   "latest": null
+  },
+  {
+   "id": "venue:alpaca",
+   "kind": "venue",
+   "label": "alpaca",
+   "cost": "0 commission; auction fills; IEX data"
+  },
+  {
+   "id": "account:alpaca-paper-1",
+   "kind": "account",
+   "label": "alpaca-paper-1"
+  },
+  {
+   "id": "factor:us-equity-beta",
+   "kind": "factor",
+   "label": "us-equity-beta",
+   "cap_usd": 8000
+  },
+  {
+   "id": "T-560",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "XSP put credit spread, trend-filtered",
+   "mode": "paper",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:trend-10m-sma",
+   "kind": "signal",
+   "label": "trend-10m-sma"
+  },
+  {
+   "id": "signal:put-premium",
+   "kind": "signal",
+   "label": "put-premium"
+  },
+  {
+   "id": "stream:alpaca-option-quotes",
+   "kind": "stream",
+   "label": "alpaca-option-quotes",
+   "state": "broker",
+   "age_days": null,
+   "latest": null
+  },
+  {
+   "id": "factor:short-volatility",
+   "kind": "factor",
+   "label": "short-volatility",
+   "cap_usd": 3500
+  },
+  {
+   "id": "T-542",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "SPX put-call parity band",
+   "mode": "forward",
+   "state": "stalled"
+  },
+  {
+   "id": "signal:put-call-parity",
+   "kind": "signal",
+   "label": "put-call-parity"
+  },
+  {
+   "id": "stream:options-chain-SPX",
+   "kind": "stream",
+   "label": "options-chain-SPX",
+   "state": "stale",
+   "age_days": 5,
+   "latest": "2026-10-15",
+   "captures": 2
+  },
+  {
+   "id": "venue:cboe-delayed",
+   "kind": "venue",
+   "label": "cboe-delayed",
+   "cost": "data only (15-minute delayed chains)"
+  },
+  {
+   "id": "T-541",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "VIX call spreads at captured mids",
+   "mode": "forward",
+   "state": "stalled"
+  },
+  {
+   "id": "signal:vix-call-premium",
+   "kind": "signal",
+   "label": "vix-call-premium"
+  },
+  {
+   "id": "stream:options-chain-VIX",
+   "kind": "stream",
+   "label": "options-chain-VIX",
+   "state": "stale",
+   "age_days": 5,
+   "latest": "2026-10-15",
+   "captures": 2
+  },
+  {
+   "id": "stream:cboe-VVIX-history",
+   "kind": "stream",
+   "label": "cboe-VVIX-history",
+   "state": "stale",
+   "age_days": 5,
+   "latest": "2026-10-15",
+   "captures": null
+  },
+  {
+   "id": "T-543",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "BTC event-day straddle (FOMC, CPI)",
+   "mode": "forward",
+   "state": "running"
+  },
+  {
+   "id": "signal:event-day-vol",
+   "kind": "signal",
+   "label": "event-day-vol"
+  },
+  {
+   "id": "stream:deribit-dvol-BTC-history",
+   "kind": "stream",
+   "label": "deribit-dvol-BTC-history",
+   "state": "stale",
+   "age_days": 5,
+   "latest": "2026-10-15",
+   "captures": null
+  },
+  {
+   "id": "stream:fomc-meetings",
+   "kind": "stream",
+   "label": "fomc-meetings",
+   "state": "ok",
+   "age_days": 5,
+   "latest": "2026-10-15",
+   "captures": null
+  },
+  {
+   "id": "stream:macro-release-cpi",
+   "kind": "stream",
+   "label": "macro-release-cpi",
+   "state": "ok",
+   "age_days": 5,
+   "latest": "2026-10-15",
+   "captures": null
+  },
+  {
+   "id": "venue:deribit-model",
+   "kind": "venue",
+   "label": "deribit-model",
+   "cost": "model-priced, not US-accessible"
+  },
+  {
+   "id": "T-565",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Shadow: HMM regime filter for putwriting",
+   "mode": "forward",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:hmm-vol-regime",
+   "kind": "signal",
+   "label": "hmm-vol-regime"
+  },
+  {
+   "id": "stream:cboe-PUT-history",
+   "kind": "stream",
+   "label": "cboe-PUT-history",
+   "state": "ok",
+   "age_days": 5,
+   "latest": "2026-10-15",
+   "captures": null
+  },
+  {
+   "id": "venue:record-only",
+   "kind": "venue",
+   "label": "record-only",
+   "cost": "no orders (shadow record)"
+  },
+  {
+   "id": "T-566",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Shadow: HMM volatility scaling of QQQM overnight",
+   "mode": "forward",
+   "state": "waiting"
+  },
+  {
+   "id": "T-573",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Shadow: EWMA volatility scaling of QQQM overnight",
+   "mode": "forward",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:ewma-vol",
+   "kind": "signal",
+   "label": "ewma-vol"
+  },
+  {
+   "id": "T-576",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "IEF over the month's last session (Treasury month-end)",
+   "mode": "paper",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:treasury-month-end",
+   "kind": "signal",
+   "label": "treasury-month-end"
+  },
+  {
+   "id": "account:alpaca-paper-wide",
+   "kind": "account",
+   "label": "alpaca-paper-wide"
+  },
+  {
+   "id": "factor:rates-beta",
+   "kind": "factor",
+   "label": "rates-beta",
+   "cap_usd": 2000
+  },
+  {
+   "id": "T-567",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Pre-holiday IWM (1-day hold)",
+   "mode": "paper",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:pre-holiday",
+   "kind": "signal",
+   "label": "pre-holiday"
+  },
+  {
+   "id": "T-568",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "GLD / TLT / USO put spreads (9-24 day holds)",
+   "mode": "paper",
+   "state": "waiting"
+  },
+  {
+   "id": "factor:gold-beta",
+   "kind": "factor",
+   "label": "gold-beta",
+   "cap_usd": 1000
+  },
+  {
+   "id": "factor:oil-beta",
+   "kind": "factor",
+   "label": "oil-beta",
+   "cap_usd": 1000
+  },
+  {
+   "id": "H-bounce-short",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "Memecoin bounce-short (DOGE, SHIB)",
+   "mode": "live",
+   "state": "running"
+  },
+  {
+   "id": "signal:bounce-in-decline",
+   "kind": "signal",
+   "label": "bounce-in-decline"
+  },
+  {
+   "id": "stream:child:Hurst:kalshi-perp-books",
+   "kind": "stream",
+   "label": "child:Hurst:kalshi-perp-books",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "venue:kalshi-perps",
+   "kind": "venue",
+   "label": "kalshi-perps",
+   "cost": "4 bp taker / 2 bp maker a side; funding 3x a day"
+  },
+  {
+   "id": "account:kalshi-hurst",
+   "kind": "account",
+   "label": "kalshi-hurst"
+  },
+  {
+   "id": "factor:crypto-beta",
+   "kind": "factor",
+   "label": "crypto-beta",
+   "cap_usd": 1500
+  },
+  {
+   "id": "H-orb-qqq",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "QQQ opening-range breakout",
+   "mode": "paper",
+   "state": "running"
+  },
+  {
+   "id": "signal:opening-range",
+   "kind": "signal",
+   "label": "opening-range"
+  },
+  {
+   "id": "stream:child:Hurst:alpaca-bars",
+   "kind": "stream",
+   "label": "child:Hurst:alpaca-bars",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "H-2s10s-xlf",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "2s10s curve into XLF lead",
+   "mode": "paper",
+   "state": "running"
+  },
+  {
+   "id": "signal:curve-2s10s",
+   "kind": "signal",
+   "label": "curve-2s10s"
+  },
+  {
+   "id": "H-btc-us500-lead",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "BTC perp leads US500 perp off-session",
+   "mode": "forward",
+   "state": "running"
+  },
+  {
+   "id": "signal:cross-perp-lead",
+   "kind": "signal",
+   "label": "cross-perp-lead"
+  },
+  {
+   "id": "H-book-imbalance",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "Order-book imbalance, 8 Kalshi perps",
+   "mode": "forward",
+   "state": "running"
+  },
+  {
+   "id": "signal:book-imbalance",
+   "kind": "signal",
+   "label": "book-imbalance"
+  },
+  {
+   "id": "H-btc-favourite",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "Daily BTC favourite on Kalshi binaries",
+   "mode": "forward",
+   "state": "running"
+  },
+  {
+   "id": "signal:favourite-longshot",
+   "kind": "signal",
+   "label": "favourite-longshot"
+  },
+  {
+   "id": "stream:child:Hurst:kalshi-settled-binaries",
+   "kind": "stream",
+   "label": "child:Hurst:kalshi-settled-binaries",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "venue:kalshi",
+   "kind": "venue",
+   "label": "kalshi",
+   "cost": "quadratic fee, ~1-2 c a contract at mid prices"
+  },
+  {
+   "id": "H-hype-fade",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "Attention-spike fade on Kalshi coins",
+   "mode": "forward",
+   "state": "running"
+  },
+  {
+   "id": "signal:attention-spike",
+   "kind": "signal",
+   "label": "attention-spike"
+  },
+  {
+   "id": "stream:child:Hurst:hype-signals",
+   "kind": "stream",
+   "label": "child:Hurst:hype-signals",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "H-ibit-carry",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "IBIT-hedged BTC funding carry",
+   "mode": "forward",
+   "state": "running"
+  },
+  {
+   "id": "signal:funding-carry",
+   "kind": "signal",
+   "label": "funding-carry"
+  },
+  {
+   "id": "stream:child:Hurst:perp-funding",
+   "kind": "stream",
+   "label": "child:Hurst:perp-funding",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "stream:child:Hurst:ibit-surface",
+   "kind": "stream",
+   "label": "child:Hurst:ibit-surface",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "H-ibit-ladder",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "IBIT option ladder, out of sample",
+   "mode": "forward",
+   "state": "running"
+  },
+  {
+   "id": "signal:btc-vol-premium",
+   "kind": "signal",
+   "label": "btc-vol-premium"
+  },
+  {
+   "id": "venue:ibit-options",
+   "kind": "venue",
+   "label": "ibit-options",
+   "cost": "~$0.65 a contract; ~$25k margin for the ladder"
+  },
+  {
+   "id": "K-maker-kalshi",
+   "kind": "strategy",
+   "owner": "Kelly",
+   "label": "$1 touch-maker fill-share test",
+   "mode": "live",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:touch-maker-clv",
+   "kind": "signal",
+   "label": "touch-maker-clv"
+  },
+  {
+   "id": "stream:child:Kelly:kalshi-books",
+   "kind": "stream",
+   "label": "child:Kelly:kalshi-books",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "account:kalshi-kelly",
+   "kind": "account",
+   "label": "kalshi-kelly"
+  },
+  {
+   "id": "K-tennis-longshot-no",
+   "kind": "strategy",
+   "owner": "Kelly",
+   "label": "NO on tennis longshots at T-30",
+   "mode": "forward",
+   "state": "running"
+  },
+  {
+   "id": "B-maker-pmus",
+   "kind": "strategy",
+   "owner": "Brier",
+   "label": "$1 touch-maker test, Polymarket US",
+   "mode": "live",
+   "state": "waiting"
+  },
+  {
+   "id": "stream:child:Brier:pmus-books",
+   "kind": "stream",
+   "label": "child:Brier:pmus-books",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "venue:polymarket-us",
+   "kind": "venue",
+   "label": "polymarket-us",
+   "cost": "maker rebate tiered (0 below $10M/month)"
+  },
+  {
+   "id": "account:pmus-brier",
+   "kind": "account",
+   "label": "pmus-brier"
+  },
+  {
+   "id": "B-paper-book",
+   "kind": "strategy",
+   "owner": "Brier",
+   "label": "Sportsbot paper book ($100)",
+   "mode": "paper",
+   "state": "running"
+  },
+  {
+   "id": "signal:model-vs-market",
+   "kind": "signal",
+   "label": "model-vs-market"
+  },
+  {
+   "id": "stream:child:Brier:polymarket-tape",
+   "kind": "stream",
+   "label": "child:Brier:polymarket-tape",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "venue:polymarket",
+   "kind": "venue",
+   "label": "polymarket",
+   "cost": "paper only (not US-accessible for trading)"
+  },
+  {
+   "id": "S-fed-g10",
+   "kind": "strategy",
+   "owner": "Shannon",
+   "label": "Central-bank bucket >= 0.90, G10",
+   "mode": "forward",
+   "state": "running"
+  },
+  {
+   "id": "signal:central-bank-bucket",
+   "kind": "signal",
+   "label": "central-bank-bucket"
+  },
+  {
+   "id": "stream:child:Shannon:cb-watch",
+   "kind": "stream",
+   "label": "child:Shannon:cb-watch",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "H-btc-tom",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "BTC perp turn-of-month (days -4..+3)",
+   "mode": "forward",
+   "state": "proposed"
+  },
+  {
+   "id": "H-us500-overnight",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "US500 perp overnight drift vs funding",
+   "mode": "forward",
+   "state": "proposed"
+  },
+  {
+   "id": "H-gold-perp-carry",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "Gold perp funding vs T-bills",
+   "mode": "forward",
+   "state": "proposed"
+  },
+  {
+   "id": "stream:fred-DTB3",
+   "kind": "stream",
+   "label": "fred-DTB3",
+   "state": "stale",
+   "age_days": 5,
+   "latest": "2026-10-15",
+   "captures": null
+  },
+  {
+   "id": "B-longshot-calibration",
+   "kind": "strategy",
+   "owner": "Brier",
+   "label": "YES < 0.10 at 7 days, non-sports",
+   "mode": "forward",
+   "state": "proposed"
+  },
+  {
+   "id": "K-thin-queue-maker",
+   "kind": "strategy",
+   "owner": "Kelly",
+   "label": "Maker fills by touch-queue depth",
+   "mode": "forward",
+   "state": "proposed"
+  },
+  {
+   "id": "signal:queue-depth",
+   "kind": "signal",
+   "label": "queue-depth"
+  },
+  {
+   "id": "S-kalshi-crypto-short",
+   "kind": "strategy",
+   "owner": "Shannon",
+   "label": "Recorder: settled 15-min and hourly Kalshi crypto",
+   "mode": "forward",
+   "state": "proposed"
+  },
+  {
+   "id": "stream:child:Shannon:kalshi-crypto-recorder",
+   "kind": "stream",
+   "label": "child:Shannon:kalshi-crypto-recorder",
+   "state": "child",
+   "age_days": 0,
+   "latest": "2026-10-20"
+  },
+  {
+   "id": "S-macro-buckets",
+   "kind": "strategy",
+   "owner": "Shannon",
+   "label": "Recorder: Kalshi CPI and Fed buckets at T-7, T-1",
+   "mode": "forward",
+   "state": "proposed"
+  },
+  {
+   "id": "K-queue-markov-fill",
+   "kind": "strategy",
+   "owner": "Kelly",
+   "label": "Markov queue model of maker fill probability",
+   "mode": "forward",
+   "state": "proposed"
+  },
+  {
+   "id": "T-557",
+   "kind": "claim",
+   "label": "T-557"
+  },
+  {
+   "id": "T-41",
+   "kind": "claim",
+   "label": "T-41"
+  },
+  {
+   "id": "T-554",
+   "kind": "claim",
+   "label": "T-554"
+  }
+ ],
+ "edges": [
+  {
+   "from": "T-559",
+   "to": "signal:overnight-gap",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:overnight-gap",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-559"
+  },
+  {
+   "from": "T-559",
+   "to": "signal:ibs",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:ibs",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-559"
+  },
+  {
+   "from": "T-559",
+   "to": "signal:turn-of-month",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:turn-of-month",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-559"
+  },
+  {
+   "from": "T-559",
+   "to": "signal:spy-tlt-monthend",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:spy-tlt-monthend",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-559"
+  },
+  {
+   "from": "T-559",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-559",
+   "to": "account:alpaca-paper-1",
+   "kind": "in"
+  },
+  {
+   "from": "T-559",
+   "to": "factor:us-equity-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 3000
+  },
+  {
+   "from": "T-560",
+   "to": "signal:trend-10m-sma",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:trend-10m-sma",
+   "to": "stream:alpaca-option-quotes",
+   "kind": "from",
+   "strategy": "T-560"
+  },
+  {
+   "from": "signal:trend-10m-sma",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-560"
+  },
+  {
+   "from": "T-560",
+   "to": "signal:put-premium",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:put-premium",
+   "to": "stream:alpaca-option-quotes",
+   "kind": "from",
+   "strategy": "T-560"
+  },
+  {
+   "from": "signal:put-premium",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-560"
+  },
+  {
+   "from": "T-560",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-560",
+   "to": "account:alpaca-paper-1",
+   "kind": "in"
+  },
+  {
+   "from": "T-560",
+   "to": "factor:us-equity-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 2000
+  },
+  {
+   "from": "T-560",
+   "to": "factor:short-volatility",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 2000
+  },
+  {
+   "from": "T-542",
+   "to": "signal:put-call-parity",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:put-call-parity",
+   "to": "stream:options-chain-SPX",
+   "kind": "from",
+   "strategy": "T-542"
+  },
+  {
+   "from": "T-542",
+   "to": "venue:cboe-delayed",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-541",
+   "to": "signal:vix-call-premium",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:vix-call-premium",
+   "to": "stream:options-chain-VIX",
+   "kind": "from",
+   "strategy": "T-541"
+  },
+  {
+   "from": "signal:vix-call-premium",
+   "to": "stream:cboe-VVIX-history",
+   "kind": "from",
+   "strategy": "T-541"
+  },
+  {
+   "from": "T-541",
+   "to": "venue:cboe-delayed",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-543",
+   "to": "signal:event-day-vol",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:event-day-vol",
+   "to": "stream:deribit-dvol-BTC-history",
+   "kind": "from",
+   "strategy": "T-543"
+  },
+  {
+   "from": "signal:event-day-vol",
+   "to": "stream:fomc-meetings",
+   "kind": "from",
+   "strategy": "T-543"
+  },
+  {
+   "from": "signal:event-day-vol",
+   "to": "stream:macro-release-cpi",
+   "kind": "from",
+   "strategy": "T-543"
+  },
+  {
+   "from": "T-543",
+   "to": "venue:deribit-model",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-565",
+   "to": "signal:hmm-vol-regime",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:hmm-vol-regime",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-565"
+  },
+  {
+   "from": "signal:hmm-vol-regime",
+   "to": "stream:cboe-PUT-history",
+   "kind": "from",
+   "strategy": "T-565"
+  },
+  {
+   "from": "T-565",
+   "to": "signal:put-premium",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:put-premium",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-565"
+  },
+  {
+   "from": "signal:put-premium",
+   "to": "stream:cboe-PUT-history",
+   "kind": "from",
+   "strategy": "T-565"
+  },
+  {
+   "from": "T-565",
+   "to": "venue:record-only",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-566",
+   "to": "signal:hmm-vol-regime",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:hmm-vol-regime",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-566"
+  },
+  {
+   "from": "T-566",
+   "to": "signal:overnight-gap",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:overnight-gap",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-566"
+  },
+  {
+   "from": "T-566",
+   "to": "venue:record-only",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-573",
+   "to": "signal:ewma-vol",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:ewma-vol",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-573"
+  },
+  {
+   "from": "T-573",
+   "to": "signal:overnight-gap",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:overnight-gap",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-573"
+  },
+  {
+   "from": "T-573",
+   "to": "venue:record-only",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-576",
+   "to": "signal:treasury-month-end",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:treasury-month-end",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-576"
+  },
+  {
+   "from": "T-576",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-576",
+   "to": "account:alpaca-paper-wide",
+   "kind": "in"
+  },
+  {
+   "from": "T-576",
+   "to": "factor:rates-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 1500
+  },
+  {
+   "from": "T-567",
+   "to": "signal:pre-holiday",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:pre-holiday",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-567"
+  },
+  {
+   "from": "T-567",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-567",
+   "to": "account:alpaca-paper-wide",
+   "kind": "in"
+  },
+  {
+   "from": "T-567",
+   "to": "factor:us-equity-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 2000
+  },
+  {
+   "from": "T-568",
+   "to": "signal:put-premium",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:put-premium",
+   "to": "stream:alpaca-option-quotes",
+   "kind": "from",
+   "strategy": "T-568"
+  },
+  {
+   "from": "T-568",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-568",
+   "to": "account:alpaca-paper-wide",
+   "kind": "in"
+  },
+  {
+   "from": "T-568",
+   "to": "factor:gold-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 500
+  },
+  {
+   "from": "T-568",
+   "to": "factor:rates-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 500
+  },
+  {
+   "from": "T-568",
+   "to": "factor:oil-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 500
+  },
+  {
+   "from": "T-568",
+   "to": "factor:short-volatility",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 500
+  },
+  {
+   "from": "H-bounce-short",
+   "to": "signal:bounce-in-decline",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:bounce-in-decline",
+   "to": "stream:child:Hurst:kalshi-perp-books",
+   "kind": "from",
+   "strategy": "H-bounce-short"
+  },
+  {
+   "from": "H-bounce-short",
+   "to": "venue:kalshi-perps",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-bounce-short",
+   "to": "account:kalshi-hurst",
+   "kind": "in"
+  },
+  {
+   "from": "H-bounce-short",
+   "to": "factor:crypto-beta",
+   "kind": "exposed_to",
+   "sign": -1,
+   "capital_usd": 1000
+  },
+  {
+   "from": "H-orb-qqq",
+   "to": "signal:opening-range",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:opening-range",
+   "to": "stream:child:Hurst:alpaca-bars",
+   "kind": "from",
+   "strategy": "H-orb-qqq"
+  },
+  {
+   "from": "H-orb-qqq",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-orb-qqq",
+   "to": "account:alpaca-paper-1",
+   "kind": "in"
+  },
+  {
+   "from": "H-orb-qqq",
+   "to": "factor:us-equity-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 0
+  },
+  {
+   "from": "H-2s10s-xlf",
+   "to": "signal:curve-2s10s",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:curve-2s10s",
+   "to": "stream:child:Hurst:alpaca-bars",
+   "kind": "from",
+   "strategy": "H-2s10s-xlf"
+  },
+  {
+   "from": "H-2s10s-xlf",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-2s10s-xlf",
+   "to": "account:alpaca-paper-1",
+   "kind": "in"
+  },
+  {
+   "from": "H-2s10s-xlf",
+   "to": "factor:us-equity-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 0
+  },
+  {
+   "from": "H-btc-us500-lead",
+   "to": "signal:cross-perp-lead",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:cross-perp-lead",
+   "to": "stream:child:Hurst:kalshi-perp-books",
+   "kind": "from",
+   "strategy": "H-btc-us500-lead"
+  },
+  {
+   "from": "H-btc-us500-lead",
+   "to": "venue:kalshi-perps",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-book-imbalance",
+   "to": "signal:book-imbalance",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:book-imbalance",
+   "to": "stream:child:Hurst:kalshi-perp-books",
+   "kind": "from",
+   "strategy": "H-book-imbalance"
+  },
+  {
+   "from": "H-book-imbalance",
+   "to": "venue:kalshi-perps",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-btc-favourite",
+   "to": "signal:favourite-longshot",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:favourite-longshot",
+   "to": "stream:child:Hurst:kalshi-settled-binaries",
+   "kind": "from",
+   "strategy": "H-btc-favourite"
+  },
+  {
+   "from": "H-btc-favourite",
+   "to": "venue:kalshi",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-hype-fade",
+   "to": "signal:attention-spike",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:attention-spike",
+   "to": "stream:child:Hurst:hype-signals",
+   "kind": "from",
+   "strategy": "H-hype-fade"
+  },
+  {
+   "from": "H-hype-fade",
+   "to": "venue:kalshi-perps",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-ibit-carry",
+   "to": "signal:funding-carry",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:funding-carry",
+   "to": "stream:child:Hurst:perp-funding",
+   "kind": "from",
+   "strategy": "H-ibit-carry"
+  },
+  {
+   "from": "signal:funding-carry",
+   "to": "stream:child:Hurst:ibit-surface",
+   "kind": "from",
+   "strategy": "H-ibit-carry"
+  },
+  {
+   "from": "H-ibit-carry",
+   "to": "venue:kalshi-perps",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-ibit-ladder",
+   "to": "signal:btc-vol-premium",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:btc-vol-premium",
+   "to": "stream:child:Hurst:ibit-surface",
+   "kind": "from",
+   "strategy": "H-ibit-ladder"
+  },
+  {
+   "from": "H-ibit-ladder",
+   "to": "venue:ibit-options",
+   "kind": "trades_on"
+  },
+  {
+   "from": "K-maker-kalshi",
+   "to": "signal:touch-maker-clv",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:touch-maker-clv",
+   "to": "stream:child:Kelly:kalshi-books",
+   "kind": "from",
+   "strategy": "K-maker-kalshi"
+  },
+  {
+   "from": "K-maker-kalshi",
+   "to": "venue:kalshi",
+   "kind": "trades_on"
+  },
+  {
+   "from": "K-maker-kalshi",
+   "to": "account:kalshi-kelly",
+   "kind": "in"
+  },
+  {
+   "from": "K-tennis-longshot-no",
+   "to": "signal:favourite-longshot",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:favourite-longshot",
+   "to": "stream:child:Kelly:kalshi-books",
+   "kind": "from",
+   "strategy": "K-tennis-longshot-no"
+  },
+  {
+   "from": "K-tennis-longshot-no",
+   "to": "venue:kalshi",
+   "kind": "trades_on"
+  },
+  {
+   "from": "B-maker-pmus",
+   "to": "signal:touch-maker-clv",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:touch-maker-clv",
+   "to": "stream:child:Brier:pmus-books",
+   "kind": "from",
+   "strategy": "B-maker-pmus"
+  },
+  {
+   "from": "B-maker-pmus",
+   "to": "venue:polymarket-us",
+   "kind": "trades_on"
+  },
+  {
+   "from": "B-maker-pmus",
+   "to": "account:pmus-brier",
+   "kind": "in"
+  },
+  {
+   "from": "B-paper-book",
+   "to": "signal:model-vs-market",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:model-vs-market",
+   "to": "stream:child:Brier:polymarket-tape",
+   "kind": "from",
+   "strategy": "B-paper-book"
+  },
+  {
+   "from": "B-paper-book",
+   "to": "venue:polymarket",
+   "kind": "trades_on"
+  },
+  {
+   "from": "S-fed-g10",
+   "to": "signal:central-bank-bucket",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:central-bank-bucket",
+   "to": "stream:child:Shannon:cb-watch",
+   "kind": "from",
+   "strategy": "S-fed-g10"
+  },
+  {
+   "from": "S-fed-g10",
+   "to": "venue:kalshi",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-btc-tom",
+   "to": "signal:turn-of-month",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:turn-of-month",
+   "to": "stream:child:Hurst:kalshi-perp-books",
+   "kind": "from",
+   "strategy": "H-btc-tom"
+  },
+  {
+   "from": "H-btc-tom",
+   "to": "venue:kalshi-perps",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-us500-overnight",
+   "to": "signal:overnight-gap",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:overnight-gap",
+   "to": "stream:child:Hurst:kalshi-perp-books",
+   "kind": "from",
+   "strategy": "H-us500-overnight"
+  },
+  {
+   "from": "H-us500-overnight",
+   "to": "signal:funding-carry",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:funding-carry",
+   "to": "stream:child:Hurst:kalshi-perp-books",
+   "kind": "from",
+   "strategy": "H-us500-overnight"
+  },
+  {
+   "from": "H-us500-overnight",
+   "to": "venue:kalshi-perps",
+   "kind": "trades_on"
+  },
+  {
+   "from": "H-gold-perp-carry",
+   "to": "signal:funding-carry",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:funding-carry",
+   "to": "stream:child:Hurst:perp-funding",
+   "kind": "from",
+   "strategy": "H-gold-perp-carry"
+  },
+  {
+   "from": "signal:funding-carry",
+   "to": "stream:fred-DTB3",
+   "kind": "from",
+   "strategy": "H-gold-perp-carry"
+  },
+  {
+   "from": "H-gold-perp-carry",
+   "to": "venue:kalshi-perps",
+   "kind": "trades_on"
+  },
+  {
+   "from": "B-longshot-calibration",
+   "to": "signal:favourite-longshot",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:favourite-longshot",
+   "to": "stream:child:Brier:pmus-books",
+   "kind": "from",
+   "strategy": "B-longshot-calibration"
+  },
+  {
+   "from": "B-longshot-calibration",
+   "to": "venue:polymarket-us",
+   "kind": "trades_on"
+  },
+  {
+   "from": "K-thin-queue-maker",
+   "to": "signal:touch-maker-clv",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:touch-maker-clv",
+   "to": "stream:child:Kelly:kalshi-books",
+   "kind": "from",
+   "strategy": "K-thin-queue-maker"
+  },
+  {
+   "from": "K-thin-queue-maker",
+   "to": "signal:queue-depth",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:queue-depth",
+   "to": "stream:child:Kelly:kalshi-books",
+   "kind": "from",
+   "strategy": "K-thin-queue-maker"
+  },
+  {
+   "from": "K-thin-queue-maker",
+   "to": "venue:kalshi",
+   "kind": "trades_on"
+  },
+  {
+   "from": "S-kalshi-crypto-short",
+   "to": "signal:favourite-longshot",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:favourite-longshot",
+   "to": "stream:child:Shannon:kalshi-crypto-recorder",
+   "kind": "from",
+   "strategy": "S-kalshi-crypto-short"
+  },
+  {
+   "from": "S-kalshi-crypto-short",
+   "to": "venue:kalshi",
+   "kind": "trades_on"
+  },
+  {
+   "from": "S-macro-buckets",
+   "to": "signal:central-bank-bucket",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:central-bank-bucket",
+   "to": "stream:child:Shannon:cb-watch",
+   "kind": "from",
+   "strategy": "S-macro-buckets"
+  },
+  {
+   "from": "S-macro-buckets",
+   "to": "venue:kalshi",
+   "kind": "trades_on"
+  },
+  {
+   "from": "K-queue-markov-fill",
+   "to": "signal:queue-depth",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:queue-depth",
+   "to": "stream:child:Kelly:kalshi-books",
+   "kind": "from",
+   "strategy": "K-queue-markov-fill"
+  },
+  {
+   "from": "K-queue-markov-fill",
+   "to": "signal:touch-maker-clv",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:touch-maker-clv",
+   "to": "stream:child:Kelly:kalshi-books",
+   "kind": "from",
+   "strategy": "K-queue-markov-fill"
+  },
+  {
+   "from": "K-queue-markov-fill",
+   "to": "venue:kalshi",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-557",
+   "to": "H-btc-favourite",
+   "kind": "contradicts",
+   "sign": -1,
+   "topic": "favourite-longshot"
+  },
+  {
+   "from": "T-41",
+   "to": "T-554",
+   "kind": "contradicts",
+   "sign": -1,
+   "topic": "greed-sentiment"
+  }
+ ]
+}

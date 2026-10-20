@@ -1,0 +1,857 @@
+[
+ {
+  "strategy": "T-559",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-559|venue:alpaca"
+ },
+ {
+  "strategy": "T-559",
+  "owner": "Mandel",
+  "kind": "in",
+  "target": "alpaca-paper-1",
+  "target_kind": "account",
+  "health": null,
+  "key": "T-559|account:alpaca-paper-1"
+ },
+ {
+  "strategy": "T-559",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "us-equity-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-559|factor:us-equity-beta"
+ },
+ {
+  "strategy": "T-560",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-560|venue:alpaca"
+ },
+ {
+  "strategy": "T-560",
+  "owner": "Mandel",
+  "kind": "in",
+  "target": "alpaca-paper-1",
+  "target_kind": "account",
+  "health": null,
+  "key": "T-560|account:alpaca-paper-1"
+ },
+ {
+  "strategy": "T-560",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "us-equity-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-560|factor:us-equity-beta"
+ },
+ {
+  "strategy": "T-560",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "short-volatility",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-560|factor:short-volatility"
+ },
+ {
+  "strategy": "T-542",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "cboe-delayed",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-542|venue:cboe-delayed"
+ },
+ {
+  "strategy": "T-541",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "cboe-delayed",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-541|venue:cboe-delayed"
+ },
+ {
+  "strategy": "T-543",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "deribit-model",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-543|venue:deribit-model"
+ },
+ {
+  "strategy": "T-565",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "record-only",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-565|venue:record-only"
+ },
+ {
+  "strategy": "T-566",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "record-only",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-566|venue:record-only"
+ },
+ {
+  "strategy": "T-573",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "record-only",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-573|venue:record-only"
+ },
+ {
+  "strategy": "T-576",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-576|venue:alpaca"
+ },
+ {
+  "strategy": "T-576",
+  "owner": "Mandel",
+  "kind": "in",
+  "target": "alpaca-paper-wide",
+  "target_kind": "account",
+  "health": null,
+  "key": "T-576|account:alpaca-paper-wide"
+ },
+ {
+  "strategy": "T-576",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "rates-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-576|factor:rates-beta"
+ },
+ {
+  "strategy": "T-567",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-567|venue:alpaca"
+ },
+ {
+  "strategy": "T-567",
+  "owner": "Mandel",
+  "kind": "in",
+  "target": "alpaca-paper-wide",
+  "target_kind": "account",
+  "health": null,
+  "key": "T-567|account:alpaca-paper-wide"
+ },
+ {
+  "strategy": "T-567",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "us-equity-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-567|factor:us-equity-beta"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-568|venue:alpaca"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "in",
+  "target": "alpaca-paper-wide",
+  "target_kind": "account",
+  "health": null,
+  "key": "T-568|account:alpaca-paper-wide"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "gold-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-568|factor:gold-beta"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "rates-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-568|factor:rates-beta"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "oil-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-568|factor:oil-beta"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "short-volatility",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-568|factor:short-volatility"
+ },
+ {
+  "strategy": "H-bounce-short",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "kalshi-perps",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-bounce-short|venue:kalshi-perps"
+ },
+ {
+  "strategy": "H-bounce-short",
+  "owner": "Hurst",
+  "kind": "in",
+  "target": "kalshi-hurst",
+  "target_kind": "account",
+  "health": null,
+  "key": "H-bounce-short|account:kalshi-hurst"
+ },
+ {
+  "strategy": "H-bounce-short",
+  "owner": "Hurst",
+  "kind": "exposed_to",
+  "target": "crypto-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "H-bounce-short|factor:crypto-beta"
+ },
+ {
+  "strategy": "H-orb-qqq",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-orb-qqq|venue:alpaca"
+ },
+ {
+  "strategy": "H-orb-qqq",
+  "owner": "Hurst",
+  "kind": "in",
+  "target": "alpaca-paper-1",
+  "target_kind": "account",
+  "health": null,
+  "key": "H-orb-qqq|account:alpaca-paper-1"
+ },
+ {
+  "strategy": "H-orb-qqq",
+  "owner": "Hurst",
+  "kind": "exposed_to",
+  "target": "us-equity-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "H-orb-qqq|factor:us-equity-beta"
+ },
+ {
+  "strategy": "H-2s10s-xlf",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-2s10s-xlf|venue:alpaca"
+ },
+ {
+  "strategy": "H-2s10s-xlf",
+  "owner": "Hurst",
+  "kind": "in",
+  "target": "alpaca-paper-1",
+  "target_kind": "account",
+  "health": null,
+  "key": "H-2s10s-xlf|account:alpaca-paper-1"
+ },
+ {
+  "strategy": "H-2s10s-xlf",
+  "owner": "Hurst",
+  "kind": "exposed_to",
+  "target": "us-equity-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "H-2s10s-xlf|factor:us-equity-beta"
+ },
+ {
+  "strategy": "H-btc-us500-lead",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "kalshi-perps",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-btc-us500-lead|venue:kalshi-perps"
+ },
+ {
+  "strategy": "H-book-imbalance",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "kalshi-perps",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-book-imbalance|venue:kalshi-perps"
+ },
+ {
+  "strategy": "H-btc-favourite",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "kalshi",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-btc-favourite|venue:kalshi"
+ },
+ {
+  "strategy": "H-hype-fade",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "kalshi-perps",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-hype-fade|venue:kalshi-perps"
+ },
+ {
+  "strategy": "H-ibit-carry",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "kalshi-perps",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-ibit-carry|venue:kalshi-perps"
+ },
+ {
+  "strategy": "H-ibit-ladder",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "ibit-options",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-ibit-ladder|venue:ibit-options"
+ },
+ {
+  "strategy": "K-maker-kalshi",
+  "owner": "Kelly",
+  "kind": "trades_on",
+  "target": "kalshi",
+  "target_kind": "venue",
+  "health": null,
+  "key": "K-maker-kalshi|venue:kalshi"
+ },
+ {
+  "strategy": "K-maker-kalshi",
+  "owner": "Kelly",
+  "kind": "in",
+  "target": "kalshi-kelly",
+  "target_kind": "account",
+  "health": null,
+  "key": "K-maker-kalshi|account:kalshi-kelly"
+ },
+ {
+  "strategy": "K-tennis-longshot-no",
+  "owner": "Kelly",
+  "kind": "trades_on",
+  "target": "kalshi",
+  "target_kind": "venue",
+  "health": null,
+  "key": "K-tennis-longshot-no|venue:kalshi"
+ },
+ {
+  "strategy": "B-maker-pmus",
+  "owner": "Brier",
+  "kind": "trades_on",
+  "target": "polymarket-us",
+  "target_kind": "venue",
+  "health": null,
+  "key": "B-maker-pmus|venue:polymarket-us"
+ },
+ {
+  "strategy": "B-maker-pmus",
+  "owner": "Brier",
+  "kind": "in",
+  "target": "pmus-brier",
+  "target_kind": "account",
+  "health": null,
+  "key": "B-maker-pmus|account:pmus-brier"
+ },
+ {
+  "strategy": "B-paper-book",
+  "owner": "Brier",
+  "kind": "trades_on",
+  "target": "polymarket",
+  "target_kind": "venue",
+  "health": null,
+  "key": "B-paper-book|venue:polymarket"
+ },
+ {
+  "strategy": "S-fed-g10",
+  "owner": "Shannon",
+  "kind": "trades_on",
+  "target": "kalshi",
+  "target_kind": "venue",
+  "health": null,
+  "key": "S-fed-g10|venue:kalshi"
+ },
+ {
+  "strategy": "H-btc-tom",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "kalshi-perps",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-btc-tom|venue:kalshi-perps"
+ },
+ {
+  "strategy": "H-us500-overnight",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "kalshi-perps",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-us500-overnight|venue:kalshi-perps"
+ },
+ {
+  "strategy": "H-gold-perp-carry",
+  "owner": "Hurst",
+  "kind": "trades_on",
+  "target": "kalshi-perps",
+  "target_kind": "venue",
+  "health": null,
+  "key": "H-gold-perp-carry|venue:kalshi-perps"
+ },
+ {
+  "strategy": "B-longshot-calibration",
+  "owner": "Brier",
+  "kind": "trades_on",
+  "target": "polymarket-us",
+  "target_kind": "venue",
+  "health": null,
+  "key": "B-longshot-calibration|venue:polymarket-us"
+ },
+ {
+  "strategy": "K-thin-queue-maker",
+  "owner": "Kelly",
+  "kind": "trades_on",
+  "target": "kalshi",
+  "target_kind": "venue",
+  "health": null,
+  "key": "K-thin-queue-maker|venue:kalshi"
+ },
+ {
+  "strategy": "S-kalshi-crypto-short",
+  "owner": "Shannon",
+  "kind": "trades_on",
+  "target": "kalshi",
+  "target_kind": "venue",
+  "health": null,
+  "key": "S-kalshi-crypto-short|venue:kalshi"
+ },
+ {
+  "strategy": "S-macro-buckets",
+  "owner": "Shannon",
+  "kind": "trades_on",
+  "target": "kalshi",
+  "target_kind": "venue",
+  "health": null,
+  "key": "S-macro-buckets|venue:kalshi"
+ },
+ {
+  "strategy": "K-queue-markov-fill",
+  "owner": "Kelly",
+  "kind": "trades_on",
+  "target": "kalshi",
+  "target_kind": "venue",
+  "health": null,
+  "key": "K-queue-markov-fill|venue:kalshi"
+ },
+ {
+  "strategy": "T-559",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-559|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-560",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-560|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-565",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-565|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-566",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-566|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-567",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-567|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-573",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-573|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-576",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-576|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-560",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-option-quotes",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-560|stream:alpaca-option-quotes"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-option-quotes",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-568|stream:alpaca-option-quotes"
+ },
+ {
+  "strategy": "T-542",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "options-chain-SPX",
+  "target_kind": "stream",
+  "health": "stale",
+  "key": "T-542|stream:options-chain-SPX"
+ },
+ {
+  "strategy": "T-541",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "options-chain-VIX",
+  "target_kind": "stream",
+  "health": "stale",
+  "key": "T-541|stream:options-chain-VIX"
+ },
+ {
+  "strategy": "T-541",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "cboe-VVIX-history",
+  "target_kind": "stream",
+  "health": "stale",
+  "key": "T-541|stream:cboe-VVIX-history"
+ },
+ {
+  "strategy": "T-543",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "deribit-dvol-BTC-history",
+  "target_kind": "stream",
+  "health": "stale",
+  "key": "T-543|stream:deribit-dvol-BTC-history"
+ },
+ {
+  "strategy": "T-543",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "fomc-meetings",
+  "target_kind": "stream",
+  "health": "ok",
+  "key": "T-543|stream:fomc-meetings"
+ },
+ {
+  "strategy": "T-543",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "macro-release-cpi",
+  "target_kind": "stream",
+  "health": "ok",
+  "key": "T-543|stream:macro-release-cpi"
+ },
+ {
+  "strategy": "T-565",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "cboe-PUT-history",
+  "target_kind": "stream",
+  "health": "ok",
+  "key": "T-565|stream:cboe-PUT-history"
+ },
+ {
+  "strategy": "H-book-imbalance",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:kalshi-perp-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-book-imbalance|stream:child:Hurst:kalshi-perp-books"
+ },
+ {
+  "strategy": "H-bounce-short",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:kalshi-perp-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-bounce-short|stream:child:Hurst:kalshi-perp-books"
+ },
+ {
+  "strategy": "H-btc-tom",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:kalshi-perp-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-btc-tom|stream:child:Hurst:kalshi-perp-books"
+ },
+ {
+  "strategy": "H-btc-us500-lead",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:kalshi-perp-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-btc-us500-lead|stream:child:Hurst:kalshi-perp-books"
+ },
+ {
+  "strategy": "H-us500-overnight",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:kalshi-perp-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-us500-overnight|stream:child:Hurst:kalshi-perp-books"
+ },
+ {
+  "strategy": "H-2s10s-xlf",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:alpaca-bars",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-2s10s-xlf|stream:child:Hurst:alpaca-bars"
+ },
+ {
+  "strategy": "H-orb-qqq",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:alpaca-bars",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-orb-qqq|stream:child:Hurst:alpaca-bars"
+ },
+ {
+  "strategy": "H-btc-favourite",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:kalshi-settled-binaries",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-btc-favourite|stream:child:Hurst:kalshi-settled-binaries"
+ },
+ {
+  "strategy": "H-hype-fade",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:hype-signals",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-hype-fade|stream:child:Hurst:hype-signals"
+ },
+ {
+  "strategy": "H-gold-perp-carry",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:perp-funding",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-gold-perp-carry|stream:child:Hurst:perp-funding"
+ },
+ {
+  "strategy": "H-ibit-carry",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:perp-funding",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-ibit-carry|stream:child:Hurst:perp-funding"
+ },
+ {
+  "strategy": "H-ibit-carry",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:ibit-surface",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-ibit-carry|stream:child:Hurst:ibit-surface"
+ },
+ {
+  "strategy": "H-ibit-ladder",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "child:Hurst:ibit-surface",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "H-ibit-ladder|stream:child:Hurst:ibit-surface"
+ },
+ {
+  "strategy": "K-maker-kalshi",
+  "owner": "Kelly",
+  "kind": "reads",
+  "target": "child:Kelly:kalshi-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "K-maker-kalshi|stream:child:Kelly:kalshi-books"
+ },
+ {
+  "strategy": "K-queue-markov-fill",
+  "owner": "Kelly",
+  "kind": "reads",
+  "target": "child:Kelly:kalshi-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "K-queue-markov-fill|stream:child:Kelly:kalshi-books"
+ },
+ {
+  "strategy": "K-tennis-longshot-no",
+  "owner": "Kelly",
+  "kind": "reads",
+  "target": "child:Kelly:kalshi-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "K-tennis-longshot-no|stream:child:Kelly:kalshi-books"
+ },
+ {
+  "strategy": "K-thin-queue-maker",
+  "owner": "Kelly",
+  "kind": "reads",
+  "target": "child:Kelly:kalshi-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "K-thin-queue-maker|stream:child:Kelly:kalshi-books"
+ },
+ {
+  "strategy": "B-longshot-calibration",
+  "owner": "Brier",
+  "kind": "reads",
+  "target": "child:Brier:pmus-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "B-longshot-calibration|stream:child:Brier:pmus-books"
+ },
+ {
+  "strategy": "B-maker-pmus",
+  "owner": "Brier",
+  "kind": "reads",
+  "target": "child:Brier:pmus-books",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "B-maker-pmus|stream:child:Brier:pmus-books"
+ },
+ {
+  "strategy": "B-paper-book",
+  "owner": "Brier",
+  "kind": "reads",
+  "target": "child:Brier:polymarket-tape",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "B-paper-book|stream:child:Brier:polymarket-tape"
+ },
+ {
+  "strategy": "S-fed-g10",
+  "owner": "Shannon",
+  "kind": "reads",
+  "target": "child:Shannon:cb-watch",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "S-fed-g10|stream:child:Shannon:cb-watch"
+ },
+ {
+  "strategy": "S-macro-buckets",
+  "owner": "Shannon",
+  "kind": "reads",
+  "target": "child:Shannon:cb-watch",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "S-macro-buckets|stream:child:Shannon:cb-watch"
+ },
+ {
+  "strategy": "H-gold-perp-carry",
+  "owner": "Hurst",
+  "kind": "reads",
+  "target": "fred-DTB3",
+  "target_kind": "stream",
+  "health": "stale",
+  "key": "H-gold-perp-carry|stream:fred-DTB3"
+ },
+ {
+  "strategy": "S-kalshi-crypto-short",
+  "owner": "Shannon",
+  "kind": "reads",
+  "target": "child:Shannon:kalshi-crypto-recorder",
+  "target_kind": "stream",
+  "health": "child",
+  "key": "S-kalshi-crypto-short|stream:child:Shannon:kalshi-crypto-recorder"
+ }
+]

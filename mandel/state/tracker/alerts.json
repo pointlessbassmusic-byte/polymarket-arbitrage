@@ -1,0 +1,205 @@
+[
+ {
+  "id": "stream:stream:fred-DTB3",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:fred-DTB3",
+  "message": "fred-DTB3: no data since 2026-10-15 (5 days); it also holds back 7 blocked theories (T-111, T-112, T-117, T-542, T-552, T-553...)",
+  "affected": "H-gold-perp-carry",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 7
+ },
+ {
+  "id": "stream:stream:options-chain-SPY",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:options-chain-SPY",
+  "message": "options-chain-SPY: no data since 2026-10-15 (5 days); it also holds back 6 blocked theories (T-108, T-117, T-118, T-120, T-122, T-537)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 6
+ },
+ {
+  "id": "stream:stream:options-chain-SPX",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:options-chain-SPX",
+  "message": "options-chain-SPX: no data since 2026-10-15 (5 days); it also holds back 4 blocked theories (T-111, T-112, T-117, T-542)",
+  "affected": "T-542",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 4
+ },
+ {
+  "id": "account:account:alpaca-paper-1",
+  "severity": "warning",
+  "kind": "account",
+  "node": "account:alpaca-paper-1",
+  "message": "one broker account shared by Hurst, Mandel: cash, equity and P&L mix",
+  "affected": "H-2s10s-xlf, H-orb-qqq, T-559, T-560",
+  "n_affected": 4,
+  "action": "give each owner its own paper account"
+ },
+ {
+  "id": "stream:stream:social-prices",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-prices",
+  "message": "social-prices: no data since 2026-10-15 (5 days); it also holds back 3 blocked theories (T-39, T-40, T-43)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 3
+ },
+ {
+  "id": "stream:stream:cboe-VVIX-history",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:cboe-VVIX-history",
+  "message": "cboe-VVIX-history: no data since 2026-10-15 (5 days); it also holds back 1 blocked theory (T-541)",
+  "affected": "T-541",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:deribit-dvol-BTC-history",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:deribit-dvol-BTC-history",
+  "message": "deribit-dvol-BTC-history: no data since 2026-10-15 (5 days); it also holds back 1 blocked theory (T-543)",
+  "affected": "T-543",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:options-chain-VIX",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:options-chain-VIX",
+  "message": "options-chain-VIX: no data since 2026-10-15 (5 days); it also holds back 1 blocked theory (T-541)",
+  "affected": "T-541",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:social-derived",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-derived",
+  "message": "social-derived: no data since 2026-10-15 (5 days); it also holds back 2 blocked theories (T-39, T-43)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:social-stocktwits",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-stocktwits",
+  "message": "social-stocktwits: no data since 2026-10-15 (5 days); it also holds back 2 blocked theories (T-40, T-45)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:options-surface",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:options-surface",
+  "message": "options-surface: no data since 2026-10-15 (5 days); it also holds back 1 blocked theory (T-376)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:social-crypto",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-crypto",
+  "message": "social-crypto: no data since 2026-10-15 (5 days); it also holds back 1 blocked theory (T-44)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:social-house-ptr",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-house-ptr",
+  "message": "social-house-ptr: no data since 2026-10-15 (5 days); it also holds back 1 blocked theory (T-42)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:social-reddit",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-reddit",
+  "message": "social-reddit: no data since 2026-10-15 (5 days); it also holds back 1 blocked theory (T-46)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "exposure:factor:us-equity-beta",
+  "severity": "info",
+  "kind": "exposure",
+  "node": "factor:us-equity-beta",
+  "message": "5 strategies carry us-equity-beta: $7,000 gross, $7,000 net against a $8,000 cap",
+  "affected": "H-2s10s-xlf, H-orb-qqq, T-559, T-560, T-567",
+  "n_affected": 5,
+  "action": "within the cap; they move together"
+ },
+ {
+  "id": "contradiction:favourite-longshot",
+  "severity": "info",
+  "kind": "contradiction",
+  "node": "favourite-longshot",
+  "message": "Polymarket YES < 0.10 at 7 days resolved +2.08 pp ABOVE price (longshots underpriced); Hurst finds Kalshi crypto longshots lose 27-72% per dollar (overpriced), and Kelly's forward record bets NO on tennis longshots.",
+  "affected": "T-557, H-btc-favourite",
+  "n_affected": 2,
+  "action": "split the calibration by venue x category in B-longshot-calibration before acting on either"
+ },
+ {
+  "id": "contradiction:greed-sentiment",
+  "severity": "info",
+  "kind": "contradiction",
+  "node": "greed-sentiment",
+  "message": "Mandel's T-41 expected greed (F&G >= 75) to be contrarian; the data showed BTC's 7-day return HIGHER after greed.",
+  "affected": "T-41, T-554",
+  "n_affected": 2,
+  "action": "T-554 replicates on ETH; until it reads, neither direction is traded"
+ },
+ {
+  "id": "exposure:factor:rates-beta",
+  "severity": "info",
+  "kind": "exposure",
+  "node": "factor:rates-beta",
+  "message": "2 strategies carry rates-beta: $2,000 gross, $2,000 net against a $2,000 cap",
+  "affected": "T-568, T-576",
+  "n_affected": 2,
+  "action": "within the cap; they move together"
+ },
+ {
+  "id": "exposure:factor:short-volatility",
+  "severity": "info",
+  "kind": "exposure",
+  "node": "factor:short-volatility",
+  "message": "2 strategies carry short-volatility: $2,500 gross, $2,500 net against a $3,500 cap",
+  "affected": "T-560, T-568",
+  "n_affected": 2,
+  "action": "within the cap; they move together"
+ }
+]
