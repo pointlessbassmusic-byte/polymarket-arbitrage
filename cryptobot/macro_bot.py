@@ -133,6 +133,11 @@ class MacroBot:
                 self.open = None
             else:
                 self._save(self.open)
+        if self.open is None and hasattr(ex, "positions"):
+            held = (await ex.positions()).get(self.symbol, 0.0)
+            if held:                                       # a fill the pilot never recorded: flatten it
+                out_px = (await ex.close(self.symbol, abs(held), await ex.mid(self.symbol))).price
+                logger.warning("macro: flattened an unrecorded %s position of %+.0f shares at %.2f", self.symbol, held, out_px)
         if self.open is None and self.pending and self.pending["side"]:
             mid = await ex.mid(self.symbol)
             fill = await (ex.open_long if self.pending["side"] > 0 else ex.open_short)(self.symbol, self.notional, mid)

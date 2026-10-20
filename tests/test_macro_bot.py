@@ -85,3 +85,16 @@ def test_trade_lifecycle_and_report(tmp_path):
     assert what == "execute" and when.astimezone(M.ET).time() == M.EXEC_ET
     assert M.passes({"closed": 20, "mean_bp": 80.0, "net_pct": 1.6})[0] == "alive"
     assert M.passes({"closed": 20, "mean_bp": -5.0, "net_pct": -0.1})[0] == "killed"
+
+
+def test_execute_flattens_an_unrecorded_position(tmp_path):
+    import asyncio
+
+    class Ex(FakeExec):
+        async def positions(self):
+            return {"XLF": 6.0}
+
+    ex = Ex()
+    bot = M.MacroBot(tmp_path, {}, executor=ex, now=lambda: dt.datetime(2026, 10, 20, 13, 31, tzinfo=dt.timezone.utc))
+    assert asyncio.run(bot.execute()) is None
+    assert ex.orders == ["close"]
