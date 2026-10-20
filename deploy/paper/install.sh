@@ -35,9 +35,17 @@ python3 -m venv "$DIR/.venv"
 "$DIR/.venv/bin/python" -m pytest -q "$DIR/tests/test_mandel_live.py"
 
 echo "== 3. keys (Alpaca PAPER account: dashboard -> Paper Trading -> API keys)"
+# A malformed env file (e.g. from an earlier run whose prompts read the piped script) is replaced, not trusted.
+ENV_OK='^ALPACA_API_KEY_ID=[A-Za-z0-9]+$'
+if [ -f /etc/mandel-paper.env ] && ! sudo grep -Eq "$ENV_OK" /etc/mandel-paper.env; then
+  echo "   /etc/mandel-paper.env is malformed: asking for the keys again"; sudo rm -f /etc/mandel-paper.env
+fi
 if [ ! -f /etc/mandel-paper.env ]; then
-  read -r -p "   ALPACA_API_KEY_ID (paper): " KEY
-  read -r -s -p "   ALPACA_API_SECRET_KEY (paper): " SECRET; echo
+  # Read from the terminal, not stdin: under 'curl ... | bash' stdin is the script itself.
+  read -r -p "   ALPACA_API_KEY_ID (paper): " KEY </dev/tty
+  read -r -s -p "   ALPACA_API_SECRET_KEY (paper): " SECRET </dev/tty; echo
+  [[ "$KEY" =~ ^[A-Za-z0-9]+$ && "$SECRET" =~ ^[A-Za-z0-9]+$ ]] || { echo "refusing: the key or secret is empty or has unexpected characters"; exit 1; }
+  [[ "$KEY" == PK* ]] || echo "   warning: Alpaca paper key ids usually start with PK; check you copied the PAPER key"
   sudo install -m 600 -o "$USER_NAME" /dev/null /etc/mandel-paper.env
   printf 'ALPACA_API_KEY_ID=%s\nALPACA_API_SECRET_KEY=%s\nMANDEL_PAPER_STATE=%s\nMANDEL_PAPER_LEDGER=0\n' "$KEY" "$SECRET" "$STATE" | sudo tee /etc/mandel-paper.env >/dev/null
   unset KEY SECRET
