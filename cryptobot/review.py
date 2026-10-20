@@ -141,6 +141,53 @@ def render(state: Path, bench: dict, today: Optional[dt.date] = None) -> str:
     return "\n".join(o)
 
 
+def load_bench() -> dict:
+    return json.loads(BENCH.read_text())
+
+
+def real_status(state: Path, bench: Optional[dict] = None) -> str:
+    """The real book's verdict against the benchmark, one word-ish: used to
+    alert once when it turns into a warning."""
+    c = compare(load_closed(state, "real"), bench or load_bench())
+    return c.get("status", "no closed trades yet") if c.get("n") else "no closed trades yet"
+
+
+async def review_once(state: Path, alerter, weekday: int = 0, now: Optional[dt.datetime] = None) -> str:
+    """One daily step: write the review, alert once on a new warning, and
+    send the full review on `weekday`. Returns the real book's status."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    state = Path(state)
+    status_file = state / "review_status.txt"
+    bench = load_bench()
+    text = render(state, bench, today=now.date())
+    (state / "review_latest.txt").write_text(text + "\n")
+    st = real_status(state, bench)
+    prev = status_file.read_text().strip() if status_file.exists() else ""
+    if st.startswith("WARNING") and not prev.startswith("WARNING"):
+        await alerter.send("REVIEW WARNING: the real book is doing worse than its backtest beyond bad luck.\n" + text)
+    status_file.write_text(st + "\n")
+    if now.weekday() == weekday:
+        await alerter.send(text)
+    return st
+
+
+async def review_loop(state: Path, alerter, weekday: int = 0, hour_utc: int = 13, minute_utc: int = 10) -> None:
+    """Daily at hour:minute UTC: review_once (full review sent on Mondays)."""
+    import asyncio
+    import logging
+    log = logging.getLogger(__name__)
+    while True:
+        now = dt.datetime.now(dt.timezone.utc)
+        nxt = now.replace(hour=hour_utc, minute=minute_utc, second=0, microsecond=0)
+        if nxt <= now:
+            nxt += dt.timedelta(days=1)
+        await asyncio.sleep((nxt - now).total_seconds())
+        try:
+            await review_once(Path(state), alerter, weekday)
+        except Exception as exc:                       # never let the review kill the desk
+            log.warning("weekly review failed: %s", exc)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--state", type=Path, default=Path("state"))
@@ -152,7 +199,7 @@ def main(argv=None) -> int:
         BENCH.write_text(json.dumps(b, indent=0))
         print(f"benchmark: {b['n']} trades, mean {b['mean']:+.2%}, win {b['hit']:.0%}, exits {b['exits']}, {b['first']} to {b['last']}")
         return 0
-    print(render(a.state, json.loads(BENCH.read_text())))
+    print(render(a.state, load_bench()))
     return 0
 
 

@@ -31,3 +31,29 @@ def test_render_reads_the_desk_books(tmp_path):
 def test_shipped_benchmark_is_present_and_sane():
     b = json.loads(R.BENCH.read_text())
     assert b["n"] >= 50 and abs(sum(b["exits"].values()) - 1) < 1e-9
+
+
+def test_review_once_warns_once_and_sends_weekly(tmp_path):
+    import asyncio
+    import datetime as dt
+
+    class FakeAlerter:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, text):
+            self.sent.append(text)
+            return True
+
+    bad = [{"pnl_usd": -10.0, "size_usd": 100.0, "exit_reason": "stop_loss"}] * 12
+    (tmp_path / "cryptobot_real_portfolio.json").write_text(json.dumps({"closed": bad}))
+    a = FakeAlerter()
+    tuesday = dt.datetime(2026, 10, 20, 13, 10, tzinfo=dt.timezone.utc)
+    st = asyncio.run(R.review_once(tmp_path, a, now=tuesday))
+    assert st.startswith("WARNING") and len(a.sent) == 1 and a.sent[0].startswith("REVIEW WARNING")
+    asyncio.run(R.review_once(tmp_path, a, now=tuesday + dt.timedelta(days=1)))
+    assert len(a.sent) == 1                                   # the warning is sent once, not every day
+    monday = dt.datetime(2026, 10, 26, 13, 10, tzinfo=dt.timezone.utc)
+    asyncio.run(R.review_once(tmp_path, a, now=monday))
+    assert len(a.sent) == 2 and a.sent[1].startswith("weekly review")
+    assert (tmp_path / "review_latest.txt").exists()

@@ -99,6 +99,12 @@ def research_lines(state_dir: Optional[Path]) -> list[str]:
     if books:
         out.append("research: order books " + ", ".join(f"{t} {b['rows']} rows/{b['days']}d" for t, b in books.items()))
     try:
+        rs = Path(state_dir) / "review_status.txt"
+        if rs.exists():
+            out.append("review: real book " + rs.read_text().strip())
+    except Exception:                                 # noqa: BLE001
+        pass
+    try:
         from .hype_scanner import status as hype_status
         hy = hype_status(Path(state_dir))
     except Exception:                                 # noqa: BLE001
@@ -1011,6 +1017,10 @@ async def _main(args) -> int:
         d = cfg.get("desk", {}).get("digest_utc", "00:30")
         hh, mm = (int(x) for x in str(d).split(":"))
         tasks.append(digest_loop(bots, alerter, hh, mm, state_dir=args.state_dir))
+    if args.state_dir:
+        from .review import review_loop
+        tasks.append(review_loop(Path(args.state_dir), alerter))
+        logger.info("weekly review on: Mondays 13:10 UTC through the alerter, warning check daily")
     try:
         await asyncio.gather(*tasks)
     finally:
