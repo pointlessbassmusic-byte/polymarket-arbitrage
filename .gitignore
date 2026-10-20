@@ -2048,3 +2048,6 @@ mandel/archive/data/polymarket-open-price-history-daily.jsonl.gz
 mandel/archive/data/binance-1m-BTCUSDT-btc-above.jsonl.gz
 # stocktwits intensity merge
 mandel/archive/data/stocktwits-anchors.jsonl.gz
+
+# intraday ML data store (vendor data, local only)
+mandel/ml_data/
