@@ -33,8 +33,26 @@ def _d1d2(S, K, T, r, sigma, q):
     return d1, d1 - sigma * np.sqrt(T)
 
 
+def _price_scalar(S: float, K: float, T: float, r: float, sigma: float, kind: str, q: float) -> np.float64:
+    """price() for scalar inputs, operation for operation (np.exp / np.log on floats are bit-identical to the 0-d array
+    path, math.exp is not); the array path costs ~40 us a call inside Python loops, this one ~3 us."""
+    if kind not in ("call", "put"):
+        raise ValueError("kind must be call or put")
+    if T <= 0:
+        return np.float64(max(S - K, 0.0) if kind == "call" else max(K - S, 0.0))
+    sig = max(sigma, 1e-12); Tc = max(T, 1e-12)
+    d1 = (np.log(S / K) + (r - q + 0.5 * sig ** 2) * Tc) / (sig * math.sqrt(Tc))
+    d2 = d1 - sig * math.sqrt(Tc)
+    n = lambda x: 0.5 * (1.0 + math.erf(x / _SQRT2))
+    if kind == "call":
+        return np.float64(S * np.exp(-q * T) * n(d1) - K * np.exp(-r * T) * n(d2))
+    return np.float64(K * np.exp(-r * T) * n(-d2) - S * np.exp(-q * T) * n(-d1))
+
+
 def price(S, K, T, r, sigma, kind: Kind = "call", q: float = 0.0):
     """European price. T in years; r, q continuous. At T<=0 returns intrinsic value."""
+    if all(np.ndim(a) == 0 for a in (S, K, T, r, sigma, q)):
+        return _price_scalar(float(S), float(K), float(T), float(r), float(sigma), kind, float(q))
     S, K, T = (np.asarray(a, dtype=float) for a in (S, K, T))
     d1, d2 = _d1d2(S, K, T, r, sigma, q)
     if kind == "call":

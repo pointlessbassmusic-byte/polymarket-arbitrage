@@ -92,6 +92,16 @@ def monthly_cycles(days) -> list:
     return list(zip(e[:-1], e[1:]))
 
 
+def _rate_on_or_before(rates: dict, rate_days: list, d: str) -> float:
+    """rates[d], else the latest print before d (rate_days = sorted(rates)); no print on or before d raises, as max() did."""
+    if d in rates:
+        return rates[d]
+    i = bisect.bisect_right(rate_days, d) - 1
+    if i < 0:
+        raise ValueError(f"no rate on or before {d}")
+    return rates[rate_days[i]]
+
+
 def run_structure(days, closes, vix: dict, rates: dict, legs, dte: int, hold: int, mode: tuple, smile: Optional[Smile] = None,
                   start: str = "1993-01-01", q: float = Q, step: Optional[int] = None, schedule=None) -> dict:
     """legs: list of (kind, side, qty, strike_spec) with strike_spec = moneyness float, ('delta', d), or ('zero_cost_put',).
@@ -110,9 +120,10 @@ def run_structure(days, closes, vix: dict, rates: dict, legs, dte: int, hold: in
                 break
             cycles.append((idx[i], idx[i] + hold, dte / 365.0))
     out = {k: [] for k in ("day", "exit", "debit", "payoff", "pnl", "max_loss", "spot", "vix", "strikes", "zero_cost_ok")}
+    rate_days = sorted(rates)
     for a, b, T in cycles:
         d = days[a]; S = float(closes[a]); S1 = float(closes[b]); V = vix[d] / 100
-        r = math.log(1 + rates.get(d, rates[max(k for k in rates if k <= d)]) / 100) if rates else 0.0
+        r = math.log(1 + _rate_on_or_before(rates, rate_days, d) / 100) if rates else 0.0
         def sig(K):
             if mode[0] == "flat":
                 return max(mode[1] * V, 0.01)
