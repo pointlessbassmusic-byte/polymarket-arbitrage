@@ -31,7 +31,8 @@ is tested on what it has stored and the data limit is named)
     an ex-dividend between two opens does not count as a fall. Crypto streams (BTC.X, ETH.X, SOL.X, DOGE.X) trade 24/7
     and have no official open: the declared mark is the first archived trade at or after 09:30 ET, the open of the 09:30
     ET minute bar from ``coinbase-1m-<PID>-<YYYY-MM>`` when that month is archived, else the open of the first
-    ``coinbase-hourly-<PID>`` bar starting at or after 09:30 ET (the 10:00 ET bar); the stat names each stream's mark.
+    ``coinbase-hourly-<PID>`` bar starting at or after 09:30 ET (the 10:00 ET bar), else the same from Yahoo's
+    ``hourly-<PID>`` bars; the stat names each stream's mark.
     The exit mark is the same mark on the next NYSE session (a Friday window spans the weekend for crypto too, as the
     claim's open-to-next-open does). A stream without archived prices drops out with its count.
   * Realised variance (T-415), the asset's own calendar: equities RV_t = the sum of squared log returns across the
@@ -61,38 +62,49 @@ Statistics
     (B > 0.5) predicts an up open-to-next-open return, B < 0.5 a down one; B = 0.5 and zero returns make no prediction
     (counted out of the accuracy's denominator). The permutation null (the trial's): B shuffled across days within each
     symbol, 2,000 draws, p = (#draws with accuracy >= observed + 1) / (draws + 1); deflated over 16 cells by Sidak,
-    1 - (1 - p)^16 < 0.01. IC (rule 11, both named constructions must pass t > 3): (a) the daily cross-sectional
-    Spearman of B with the forward return (days with >= 5 streams), mean / Newey-West s.e.; (b) the pooled IC = Pearson
-    correlation of the within-symbol fractional ranks of B and of the return, its t from the OLS slope of the return
-    rank on the B rank with symbol-clustered s.e. (G/(G-1) (n-1)/(n-k) small-sample factor). Halves: the observations
-    split at the median date; both the accuracy edge (accuracy - 50%) and the pooled IC must keep the claim's sign in
-    both halves. Net return of the rule (a statistic, not a criterion): position = the predicted sign, round-trip cost
+    1 - (1 - p)^16 < 0.01. IC (rule 11, both named constructions are judged and must agree, ``_agree``: both above 3
+    pass, both at or below 3 fail, one of each is undecided): (a) the daily cross-sectional Spearman of B with the
+    forward return (days with >= 5 streams), mean / Newey-West s.e.; (b) the pooled IC = Pearson correlation of the
+    within-symbol fractional ranks of B and of the return, its t from the OLS slope of the return rank on the B rank
+    with symbol-clustered s.e. (G/(G-1) (n-1)/(n-k) small-sample factor). Halves: the observations split at the median
+    date; the accuracy edge (accuracy - 50%) and the pooled IC each keep the claim's sign in both halves, the two
+    statistics judged with the same agreement rule. Net return of the rule (a statistic, not a criterion): position = the predicted sign, round-trip cost
     charged on turnover, 1 bp SPY/QQQ, 5 bps every other stream (the claim names no crypto cost: 5 bps assumed and
     stated). VIX split: the previous session's VIX close above / below its sample median. The 16 declared cells
     (direction x signal form x horizon x weighting) are charged in the deflation; the computable variants are reported
     as a family (accuracies only), the claim's cell decides.
-  * T-415 regression: the pooled HAR+IV in its log form (ln RV_{t+1} on ln RV_t, ln RV_week, ln RV_month, ln IV_t and
-    z_t; Corsi's own scale-free variant and the standard for a panel of assets), pooled OLS with a common intercept and
-    Driscoll-Kraay s.e. (per-day sums of the score, Bartlett kernel, lag max(nw_lag(T), horizon)). The variance levels
-    of the 21 streams differ by a factor of about 60 (TLT 1e-5 a day, ETH 6e-4), so the literal levels regression is a
-    scale artifact: its z coefficient is set by the crypto rows and pushes the low-volatility names' forecasts below
-    zero (checked on the archive: floored forecasts rose from 17 to 91 of 3,422 and every one of the largest QLIKE
-    losses was a sector SPDR with a negative z); it is reported as the ``levels`` diagnostic with its floor share, not
-    judged. Incremental R^2 = R^2(with z) - R^2(HAR+IV) on the same rows (log variance). Two readings of the regressor,
-    both judged and both must pass (the claim's own words name the abnormal flag, the trial's equation the score): z_t
-    continuous and A_t = 1{z_t > 2}. Walk-forward: expanding window refit at every origin from the 60th sampled day,
-    training rows whose target lies >= 5 sampled days before the origin (the embargo), forecast F = exp(fitted ln RV +
-    s^2 / 2) with s^2 the training residual variance (the lognormal mean correction), QLIKE = RV/F - ln(RV/F) - 1; the
-    Diebold-Mariano statistic is the mean over origins of the day's cross-sectional mean loss difference (HAR+IV minus
-    HAR+IV+z) over its Newey-West s.e., one-sided p for an improvement; the trial's "12 cells deflated" is applied to
-    this p by Sidak (1 - (1 - p)^12 < 0.05) and reported for the t-stat too (t > 3 already implies a Sidak-12 p below
-    0.05: 1 - (1 - 0.00135)^12 = 0.016). The declared family (realised-vol estimator: hourly RV / Parkinson / daily
-    squared return x horizon 1 / 5 days) is reported with its in-sample t and incremental R^2; the claim's cell (hourly
-    RV, 1 day) decides.
+  * T-415 regression, pooled OLS with a common intercept and Driscoll-Kraay s.e. (per-day sums of the score, Bartlett
+    kernel, lag max(nw_lag(T), horizon)), in two forms that are both judged: the trial's literal levels equation
+    (RV_{t+1} on RV_t, RV_week, RV_month, IV_t and the regressor) and the log form (ln RV_{t+1} on the logs of the same
+    HAR terms and IV; Corsi's scale-free variant and the standard for a panel of assets whose variance levels differ by
+    a factor of about 60 here: TLT 1e-5 a day, ETH 6e-4). Two readings of the regressor are judged as well: z_t
+    continuous (the trial's equation) and A_t = 1{z_t > 2} (the claim's own words). The in-sample criterion (c t > 3
+    with incremental R^2 >= 2%, R^2(with the regressor) - R^2(HAR+IV) on the same rows) therefore has four
+    constructions, {levels, log} x {z, A}, judged with the rule-11 agreement rule (``_agree``): all pass -> pass, all
+    fail -> fail, otherwise undecided (a pass that does not hold in the trial's literal form, or in the panel's natural
+    form, or for the other reading of the regressor, is not evidence; T-162). Walk-forward: expanding window refit at
+    every origin from the 60th sampled day, training rows whose target lies >= 5 sampled days before the origin (the
+    embargo), QLIKE = RV/F - ln(RV/F) - 1, forecasts in the log form F = exp(fitted ln RV + s^2 / 2) with s^2 the
+    training residual variance (the lognormal mean correction), both readings judged with the agreement rule. The
+    levels walk-forward is a reported diagnostic, not judged: the pooled levels model's common slope is set by the
+    high-variance rows and drives the low-variance names' forecasts below zero (floored at the 1% quantile of the
+    training targets; the floored share is reported), and the synthetic planted-effect test shows that construction
+    failing under a true multiplicative effect (DM t -3.3 with 19% of forecasts floored while the log form passes at
+    DM t +14), so it cannot carry the claim's out-of-sample criterion. The Diebold-Mariano statistic is the mean over
+    origins of the day's cross-sectional mean loss difference (HAR+IV minus HAR+IV+regressor) over its Newey-West s.e.,
+    one-sided p for an improvement; the trial's "12 cells deflated" is applied to this p by Sidak (1 - (1 - p)^12 <
+    0.05) and reported for the t-stat too (t > 3 already implies a Sidak-12 p below 0.05: 1 - (1 - 0.00135)^12 =
+    0.016). HAR rows live on the asset's own session calendar (NYSE sessions from SPY's daily bars; UTC days for
+    crypto): a row needs RV on day t itself and on the next session (a session without RV, e.g. an early close with too
+    few hourly bars or a feed gap, drops the rows that need it as regressor or target rather than shifting the target
+    past it), while RV_week / RV_month are the means over the sessions of their windows that have RV, each window
+    needing at least 80% of its sessions (4 of 5, 18 of 22; crypto 6 of 7, 24 of 30). The declared family
+    (realised-vol estimator: hourly RV / Parkinson / daily squared return x horizon 1 / 5 days) is reported with its
+    in-sample log-form t and incremental R^2; the claim's cell (hourly RV, 1 day) decides.
   * Below trial.min_n (rule 5): never supported; a failing criterion counts only when it fails decisively: T-414's
-    accuracy when its one-sided 99% upper bound (the pass's own confidence) is below 52%, T-414's and T-415's t when the
-    estimate is decisively of the wrong sign (t < -3, the pass's own confidence); p-value, incremental-R^2 and sign
-    criteria are never decisive.
+    accuracy when its one-sided 99% upper bound (the pass's own confidence) is below 52%, T-414's IC when both
+    constructions' t are below -3 and T-415's c when every judged construction's t is below -3 (decisively the wrong
+    sign at the pass's own confidence); p-value, incremental-R^2 and sign criteria are never decisive.
 
 Verdicts use ``underlying2._verdict`` through ``batch6b_bw._decide``: any implemented criterion failing -> not_supported;
 any criterion not implemented (None) -> at best inconclusive; supported needs every criterion implemented and passing.
@@ -155,6 +167,7 @@ EMBARGO = 5
 MIN_TRAIN = 60
 HAR_EQ = (5, 22)
 HAR_CRYPTO = (7, 30)
+HAR_MIN_COVER = 0.8           # share of a HAR window's sessions that must have RV (the mean is over those that do)
 MIN_SAMPLES = 2
 MIN_BARS_EQ = 6
 MIN_BARS_CRYPTO = 20
@@ -202,6 +215,20 @@ def _utc_day(t) -> str:
 
 def _et_dt(t) -> datetime:
     return datetime.fromtimestamp(float(t), tz=NY)
+
+
+def _agree(oks: Sequence[Optional[bool]]) -> Optional[bool]:
+    """Rule 11 for a criterion judged in several constructions: True when every construction passes, False when every
+    construction fails, None when any is not computable or when they disagree (a pass that flips under a permitted
+    alternative is not evidence)."""
+    if any(o is None for o in oks):
+        return None
+    vals = [bool(o) for o in oks]
+    if all(vals):
+        return True
+    if not any(vals):
+        return False
+    return None
 
 
 def sidak(p: Optional[float], k: int) -> Optional[float]:
@@ -483,7 +510,8 @@ def _first_bar_at_or_after(archive, name: str, targets: Sequence[float], horizon
 def crypto_open_marks(archive, pid: str, days: Sequence[str]) -> tuple:
     """({day: price at the declared crypto mark}, mark description, {day: source}). The mark is the first archived trade
     at or after 09:30 ET: the 09:30 minute bar's open (``coinbase-1m-<PID>-<YYYY-MM>``) when that month is archived, else
-    the open of the first ``coinbase-hourly-<PID>`` bar starting at or after 09:30 ET (the 10:00 ET bar)."""
+    the open of the first ``coinbase-hourly-<PID>`` bar starting at or after 09:30 ET (the 10:00 ET bar), else the same
+    from Yahoo's ``hourly-<PID>`` bars."""
     targets = {d: _et_ts(d, *MARK_HHMM) for d in days}
     out, src = {}, {}
     months = sorted({d[:7] for d in days})
@@ -497,16 +525,17 @@ def crypto_open_marks(archive, pid: str, days: Sequence[str]) -> tuple:
             if d[:7] == m and targets[d] in got:
                 out[d] = got[targets[d]]
                 src[d] = "1m"
-    rest = [d for d in days if d not in out]
-    hourly = f"coinbase-hourly-{pid}"
-    if rest and _has(archive, hourly):
-        got = _first_bar_at_or_after(archive, hourly, [targets[d] for d in rest], 90 * 60)
-        for d in rest:
-            if targets[d] in got:
-                out[d] = got[targets[d]]
-                src[d] = "1h"
+    for hourly, tag in ((f"coinbase-hourly-{pid}", "1h"), (hourly_b(pid), "yh")):
+        rest = [d for d in days if d not in out]
+        if rest and _has(archive, hourly):
+            got = _first_bar_at_or_after(archive, hourly, [targets[d] for d in rest], 90 * 60)
+            for d in rest:
+                if targets[d] in got:
+                    out[d] = got[targets[d]]
+                    src[d] = tag
     kinds = sorted(set(src.values()))
-    desc = {"1m": "coinbase-1m open of the 09:30 ET minute bar", "1h": "coinbase-hourly open of the first bar at/after 09:30 ET (10:00 ET)"}
+    desc = {"1m": "coinbase-1m open of the 09:30 ET minute bar", "1h": "coinbase-hourly open of the first bar at/after 09:30 ET (10:00 ET)",
+            "yh": "Yahoo hourly open of the first bar at/after 09:30 ET"}
     return out, " / ".join(desc[k] for k in kinds) if kinds else "no archived bars", src
 
 
@@ -684,18 +713,18 @@ def t414_criteria(res: dict) -> list:
     ok_p = None if pd_ is None else pd_ < T414_P
     ic = res.get("ic") or {}
     t1, t2 = ic.get("cross_sectional_t_nw"), ic.get("pooled_t_symbol_clustered")
-    ok_ic = None if (t1 is None or t2 is None) else (t1 > T414_IC_T and t2 > T414_IC_T)
+    ok_ic = _agree([None if t1 is None else t1 > T414_IC_T, None if t2 is None else t2 > T414_IC_T])
     h = res.get("halves") or {}
     hv = [h.get("first") or {}, h.get("second") or {}]
-    if all(x.get("accuracy") is not None and x.get("ic_pooled") is not None for x in hv):
-        ok_h = all(x["accuracy"] > 0.5 and x["ic_pooled"] > 0 for x in hv)
-    else:
-        ok_h = None
+    ok_h_acc = all(x["accuracy"] > 0.5 for x in hv) if all(x.get("accuracy") is not None for x in hv) else None
+    ok_h_ic = all(x["ic_pooled"] > 0 for x in hv) if all(x.get("ic_pooled") is not None for x in hv) else None
+    ok_h = _agree([ok_h_acc, ok_h_ic])
     return [(f"accuracy >= {T414_ACC:.0%} in the follow direction (observed {_pu(acc)}, one-sided 99% upper bound {_pu(ub99)})", ok_acc, ub99 < T414_ACC),
             (f"permutation p < {T414_P} after {T414_CELLS}-cell Sidak deflation (raw {_f(res.get('p_perm'), 4)}, deflated {_f(pd_, 4)})", ok_p, False),
-            (f"IC t > {T414_IC_T:g} in both named constructions (cross-sectional NW t {_s(t1, 2)}, pooled symbol-clustered t {_s(t2, 2)})", ok_ic,
-             bool(t2 is not None and t2 < -T414_IC_T)),
-            ("same sign in both halves (accuracy edge > 0 and pooled IC > 0 in each half)", ok_h, False)]
+            (f"IC t > {T414_IC_T:g} in both named constructions, which must agree (cross-sectional NW t {_s(t1, 2)}, pooled symbol-clustered t {_s(t2, 2)})",
+             ok_ic, bool(t1 is not None and t2 is not None and t1 < -T414_IC_T and t2 < -T414_IC_T)),
+            (f"same sign in both halves, accuracy edge and pooled IC agreeing (edge > 0 in both halves: {ok_h_acc}; IC > 0 in both halves: {ok_h_ic})",
+             ok_h, False)]
 
 
 def b6c_stocktwits_bullish_ratio(archive):
@@ -721,7 +750,8 @@ def b6c_stocktwits_bullish_ratio(archive):
         need = sorted({d for (ss, d) in panel if ss == s} | {ns for (ss, d) in panel if ss == s for ns in [next_session(sessions, d)] if ns})
         if s in CRYPTO_PID:
             pid = CRYPTO_PID[s]
-            if not (_has(archive, f"coinbase-hourly-{pid}") or any(_has(archive, f"coinbase-1m-{pid}-{m}") for m in {d[:7] for d in need})):
+            if not (_has(archive, f"coinbase-hourly-{pid}") or _has(archive, hourly_b(pid))
+                    or any(_has(archive, f"coinbase-1m-{pid}-{m}") for m in {d[:7] for d in need})):
                 price_missing.append(s)
                 continue
             mk, desc, _ = crypto_open_marks(archive, pid, need)
@@ -787,8 +817,10 @@ def b6c_stocktwits_bullish_ratio(archive):
     h = res.get("halves") or {}
     net = res.get("net") or {}
     vs = res.get("vix_split")
+    limit = (f" (data limit: the pre-open backfill has stored {len(weeks)} week(s) so far; {T414_MIN_N - n} more symbol-days are needed)"
+             if n < T414_MIN_N else "")
     reason = (f"T-414: {len(weeks)} pre-open week bundle(s) archived ({days[0] if days else 'n/a'}..{days[-1] if days else 'n/a'}, {len(days)} days, "
-              f"{sum(raw_counts.values())} raw symbol-days); {n} symbol-days used of min_n {T414_MIN_N} after drops {dict(drops)}"
+              f"{sum(raw_counts.values())} raw symbol-days); {n} symbol-days used of min_n {T414_MIN_N} after drops {dict(drops)}{limit}"
               f"{'; no prices for ' + ', '.join(price_missing) if price_missing else ''}. "
               f"Follow rule {res.get('follow_rule', 'n/a')}: accuracy {_pu(res.get('accuracy'))} on {res.get('n_predicted', 0)} predicted days "
               f"(unfiltered {_pu(unf['accuracy']) if unf else 'same'}), permutation p {_f(res.get('p_perm'), 4)} -> Sidak-{T414_CELLS} {_f(res.get('p_perm_deflated'), 4)}; "
@@ -882,22 +914,33 @@ def sq_ret(daily: dict) -> dict:
     return out
 
 
-def har_rows(sym: str, rv: dict, z: dict, iv: dict, w: int, m: int, horizon: int = 1, abn: Optional[dict] = None) -> list:
-    """Panel rows {sym, day, target_day, y, rv, rvw, rvm, iv, z, abn} on the asset's own RV calendar: y = the mean RV
-    over the next ``horizon`` RV days, rvw / rvm the means of the last w / m RV days including t (windows complete)."""
-    cal = sorted(rv)
-    vals = np.array([rv[d] for d in cal], float)
-    cs = np.concatenate([[0.0], np.cumsum(vals)])
+def _utc_days(first: str, last: str) -> list:
+    d0, d1 = datetime.fromisoformat(first).date(), datetime.fromisoformat(last).date()
+    return [(d0 + timedelta(days=k)).isoformat() for k in range((d1 - d0).days + 1)]
+
+
+def har_rows(sym: str, cal: Sequence[str], rv: dict, z: dict, iv: dict, w: int, m: int, horizon: int = 1, abn: Optional[dict] = None,
+             min_cover: float = HAR_MIN_COVER) -> list:
+    """Panel rows {sym, day, target_day, y, rv, rvw, rvm, iv, z, abn} on the asset's own session calendar ``cal`` (sorted;
+    NYSE sessions for equities, UTC days for crypto). A row for the sampled day d needs IV on d, RV on d itself and on
+    each of the ``horizon`` sessions after it (a session without RV drops the rows that need it as regressor or target;
+    the target is never shifted past a missing session), and RV on at least ``min_cover`` of the w / m sessions ending
+    at d; y = the mean RV over the next sessions, rvw / rvm the means over the sessions of the last w / m that have RV."""
+    cal = list(cal)
+    vals = np.array([rv[d] if d in rv else np.nan for d in cal], float)
     pos = {d: i for i, d in enumerate(cal)}
+    need_w, need_m = math.ceil(min_cover * w), math.ceil(min_cover * m)
     out = []
     for d, zt in z.items():
         i = pos.get(d)
-        if i is None or not np.isfinite(zt) or i + 1 < m or i + horizon >= len(cal) or d not in iv:
+        if i is None or not np.isfinite(zt) or i + 1 < m or i + horizon >= len(cal) or d not in iv or not np.isfinite(vals[i]):
             continue
-        y = float((cs[i + 1 + horizon] - cs[i + 1]) / horizon)
-        out.append({"sym": sym, "day": d, "target_day": cal[i + 1], "y": y, "rv": float(vals[i]), "rvw": float((cs[i + 1] - cs[i + 1 - w]) / w),
-                    "rvm": float((cs[i + 1] - cs[i + 1 - m]) / m), "iv": float(iv[d]), "z": float(zt),
-                    "abn": float(zt > Z_ABNORMAL) if abn is None else float(abn[d])})
+        hist, fut = vals[i + 1 - m:i + 1], vals[i + 1:i + 1 + horizon]
+        hw = hist[-w:]
+        if not np.isfinite(fut).all() or np.isfinite(hw).sum() < need_w or np.isfinite(hist).sum() < need_m:
+            continue
+        out.append({"sym": sym, "day": d, "target_day": cal[i + 1], "y": float(fut.mean()), "rv": float(vals[i]), "rvw": float(np.nanmean(hw)),
+                    "rvm": float(np.nanmean(hist)), "iv": float(iv[d]), "z": float(zt), "abn": float(zt > Z_ABNORMAL) if abn is None else float(abn[d])})
     return out
 
 
@@ -982,7 +1025,7 @@ def walk_forward_qlike(rows: Sequence[dict], zkey: str = "z", min_train: int = M
     yy = np.array([f(v) for v in y])
     Xb = np.column_stack([np.ones(len(rows)), np.array([[f(r[c]) for c in _BASE] for r in rows])])
     Xf = np.column_stack([Xb, np.array([r[zkey] for r in rows])])
-    diffs, lb, lf, n_fc, origins, floored = [], [], [], 0, [], 0
+    diffs, lb, lf, n_fc, origins, floored, floored_b = [], [], [], 0, [], 0, 0
     for k in range(min_train, len(days)):
         tr = tgt <= k - embargo
         te = rd == k
@@ -1002,6 +1045,7 @@ def walk_forward_qlike(rows: Sequence[dict], zkey: str = "z", min_train: int = M
             floor = max(float(np.quantile(y[tr], floor_q)), 1e-12)
             rb, rf = Xb[te] @ bb, Xf[te] @ bf
             floored += int((rf < floor).sum())
+            floored_b += int((rb < floor).sum())
             fb, ff = np.maximum(rb, floor), np.maximum(rf, floor)
         qb, qf = qlike(y[te], fb), qlike(y[te], ff)
         diffs.append(float((qb - qf).mean()))
@@ -1012,7 +1056,7 @@ def walk_forward_qlike(rows: Sequence[dict], zkey: str = "z", min_train: int = M
     d = np.asarray(diffs, float)
     base = {"form": "log-HAR, F = exp(fit + s^2/2)" if log else "levels, forecasts floored", "n_origins": int(d.size), "n_forecasts": n_fc,
             "origins": [origins[0], origins[-1]] if origins else None, "embargo": embargo, "min_train": min_train,
-            "floored_share": (floored / n_fc if (not log and n_fc) else None)}
+            "floored_share": (floored / n_fc if (not log and n_fc) else None), "floored_share_base": (floored_b / n_fc if (not log and n_fc) else None)}
     if d.size < 8:
         base.update(dm_t=None, dm_p=None, dm_p_sidak=None, qlike_base=None, qlike_full=None, share_days_improved=None)
         return base
@@ -1023,8 +1067,11 @@ def walk_forward_qlike(rows: Sequence[dict], zkey: str = "z", min_train: int = M
     return base
 
 
-def t415_criteria(z_in: dict, a_in: dict, z_wf: dict, a_wf: dict) -> list:
-    """[(name, ok, decisive_fail)] for the two pass criteria, each judged on both readings (z continuous, A = 1{z > 2})."""
+def t415_criteria(ins: dict, wfs: dict) -> list:
+    """[(name, ok, decisive_fail)] for the two pass criteria. ``ins``: the in-sample results of the four judged
+    constructions {'levels_z', 'levels_abn', 'log_z', 'log_abn'} ({levels, log} x {z continuous, A = 1{z > 2}});
+    ``wfs``: the log-form walk-forward results of the two readings {'log_z', 'log_abn'}. Each criterion passes when
+    every construction passes, fails when every construction fails, and is undecided otherwise (``_agree``)."""
     def ok_reg(r):
         if r.get("t") is None or r.get("dr2") is None:
             return None
@@ -1034,16 +1081,24 @@ def t415_criteria(z_in: dict, a_in: dict, z_wf: dict, a_wf: dict) -> list:
         if w.get("dm_p_sidak") is None or w.get("qlike_full") is None:
             return None
         return bool(w["dm_p_sidak"] < T415_DM_P and w["qlike_full"] < w["qlike_base"])
-    o1, o2 = ok_reg(z_in), ok_reg(a_in)
-    reg_ok = None if (o1 is None or o2 is None) else (o1 and o2)
-    w1, w2 = ok_wf(z_wf), ok_wf(a_wf)
-    wf_ok = None if (w1 is None or w2 is None) else (w1 and w2)
-    return [(f"c Driscoll-Kraay t > {T415_T:g} with incremental R^2 >= {T415_DR2:.0%}, both readings (z: t {_s(z_in.get('t'), 2)}, dR2 {_pu(z_in.get('dr2'))}, "
-             f"Sidak-{T415_CELLS} p {_f(z_in.get('p_sidak'), 4)}; 1{{z>2}}: t {_s(a_in.get('t'), 2)}, dR2 {_pu(a_in.get('dr2'))})", reg_ok,
-             bool(z_in.get("t") is not None and z_in["t"] < -T415_T)),
-            (f"out-of-sample QLIKE improvement with DM p < {T415_DM_P} after Sidak-{T415_CELLS} deflation, both readings (z: DM t {_s(z_wf.get('dm_t'), 2)}, "
-             f"p {_f(z_wf.get('dm_p'), 4)} -> {_f(z_wf.get('dm_p_sidak'), 4)}; 1{{z>2}}: DM t {_s(a_wf.get('dm_t'), 2)}, p {_f(a_wf.get('dm_p'), 4)} -> "
-             f"{_f(a_wf.get('dm_p_sidak'), 4)})", wf_ok, False)]
+
+    def reg_txt(k):
+        r = ins.get(k) or {}
+        return f"{k} t {_s(r.get('t'), 2)}, dR2 {_pu(r.get('dr2'))}"
+
+    def wf_txt(k):
+        w = wfs.get(k) or {}
+        return f"{k} DM t {_s(w.get('dm_t'), 2)}, p {_f(w.get('dm_p'), 4)} -> Sidak {_f(w.get('dm_p_sidak'), 4)}"
+    keys_in = ("levels_z", "levels_abn", "log_z", "log_abn")
+    keys_wf = ("log_z", "log_abn")
+    reg_ok = _agree([ok_reg(ins.get(k) or {}) for k in keys_in])
+    wf_ok = _agree([ok_wf(wfs.get(k) or {}) for k in keys_wf])
+    ts = [(ins.get(k) or {}).get("t") for k in keys_in]
+    decisive = all(t is not None and t < -T415_T for t in ts)
+    return [(f"c Driscoll-Kraay t > {T415_T:g} with incremental R^2 >= {T415_DR2:.0%} in every judged construction, {{levels, log}} x {{z, 1{{z>2}}}} "
+             f"({'; '.join(reg_txt(k) for k in keys_in)}; log_z Sidak-{T415_CELLS} p {_f((ins.get('log_z') or {}).get('p_sidak'), 4)})", reg_ok, decisive),
+            (f"out-of-sample QLIKE improvement with DM p < {T415_DM_P} after Sidak-{T415_CELLS} deflation, both readings in the log form "
+             f"({'; '.join(wf_txt(k) for k in keys_wf)})", wf_ok, False)]
 
 
 def _iv_series(archive, sym: str) -> tuple:
@@ -1106,6 +1161,17 @@ def _rv_series(archive, sym: str) -> tuple:
     return {}, None
 
 
+def _estimator_summary(info: dict) -> dict:
+    """{'rv': 'estimator x count, ...', 'iv': 'source x count, ...'} over the streams that contributed rows."""
+    rv, iv = defaultdict(int), defaultdict(int)
+    for v in info.values():
+        if v.get("used"):
+            rv[str(v.get("rv")).split(" (")[0]] += 1
+            iv[("Cboe " if str(v.get("iv")).startswith("cboe") else "") + str(v.get("iv")).replace("-history", "")] += 1
+    fmt = lambda d: ", ".join(f"{k} x{n}" for k, n in sorted(d.items(), key=lambda kv: -kv[1])) or "none"
+    return {"rv": fmt(rv), "iv": fmt(iv)}
+
+
 def build_t415_panel(archive, intensity: dict) -> dict:
     """Rows of the primary cell and the family cells per symbol, with the per-symbol bookkeeping."""
     syms = list(ST_INTENSITY_SYMBOLS)
@@ -1130,18 +1196,19 @@ def build_t415_panel(archive, intensity: dict) -> dict:
             drops["no IV source"] += 1
             continue
         w, m = HAR_CRYPTO if s in CRYPTO_PID else HAR_EQ
-        pr = har_rows(s, rv, zmap, iv, w, m, 1)
+        cal = _utc_days(min(rv), max(rv)) if s in CRYPTO_PID else _sessions(archive)
+        pr = har_rows(s, cal, rv, zmap, iv, w, m, 1)
         rows_primary.extend(pr)
-        fam_rows[("hourly", 5)].extend(har_rows(s, rv, zmap, iv, w, m, 5))
+        fam_rows[("hourly", 5)].extend(har_rows(s, cal, rv, zmap, iv, w, m, 5))
         if s not in CRYPTO_PID and _has(archive, dh(s)):
             dly = _daily(archive, s)
             for nm, est in (("parkinson", parkinson(dly)), ("sq_ret", sq_ret(dly))):
                 for hz in (1, 5):
-                    fam_rows[(nm, hz)].extend(har_rows(s, est, zmap, iv, w, m, hz))
+                    fam_rows[(nm, hz)].extend(har_rows(s, cal, est, zmap, iv, w, m, hz))
         no_iv = sum(1 for d in zmap if d not in iv)
         no_rv = sum(1 for d in zmap if d in iv and d not in rv)
         info[s] = {"used": len(pr), "days_sampled": len(days_x), "days_with_z": len(zmap), "days_without_iv": no_iv, "days_without_rv": no_rv,
-                   "rv": rv_src, "iv": iv_src, "har_lags": [w, m]}
+                   "rv": rv_src, "iv": iv_src, "har_lags": [w, m], "calendar": "UTC days" if s in CRYPTO_PID else "NYSE sessions"}
     return {"rows": rows_primary, "family": dict(fam_rows), "info": info, "drops": dict(drops)}
 
 
@@ -1163,6 +1230,7 @@ def b6c_stocktwits_intensity_rv(archive):
     z_in = har_test(prow, "z", 1)
     a_in = har_test(prow, "abn", 1)
     z_lev = har_test(prow, "z", 1, log=False)
+    a_lev = har_test(prow, "abn", 1, log=False)
     z_wf = walk_forward_qlike(prow, "z") if n else {"n_origins": 0}
     a_wf = walk_forward_qlike(prow, "abn") if n else {"n_origins": 0}
     z_wf_lev = walk_forward_qlike(prow, "z", log=False) if n else {"n_origins": 0}
@@ -1170,30 +1238,39 @@ def b6c_stocktwits_intensity_rv(archive):
     fam["hourly_h1"] = {k: z_in.get(k) for k in ("n", "T", "c", "t", "dr2", "p_sidak")}
     fomc = _fomc_days(archive)
     ex_fomc = har_test([r for r in prow if r["target_day"] not in fomc], "z", 1) if fomc else None
-    crit = t415_criteria(z_in, a_in, z_wf, a_wf)
+    ins = {"levels_z": z_lev, "levels_abn": a_lev, "log_z": z_in, "log_abn": a_in}
+    wfs = {"log_z": z_wf, "log_abn": a_wf}
+    crit = t415_criteria(ins, wfs)
     verdict, why = _decide(crit, n, T415_MIN_N, "symbol-days")
     abn_share = float(np.mean([r["abn"] for r in prow])) if n else None
     per_sym = {s: v.get("used", 0) for s, v in P["info"].items()}
     stat = {"theory": "T-415", "weeks": [weeks[0], weeks[-1]] if weeks else None, "n_weeks": len(weeks), "days_sampled": [days[0], days[-1]] if days else None,
             "n_days_sampled": len(days), "symbol_days_used": n, "min_n": T415_MIN_N, "per_symbol": P["info"], "symbols_dropped": P["drops"],
             "days_with_too_few_samples": few, "z_window": Z_WINDOW, "z_min_obs": Z_MIN_OBS, "abnormal_share": abn_share,
-            "specification": "pooled log-HAR+IV with Driscoll-Kraay s.e. (deciding); the literal levels regression is the 'levels' diagnostic",
-            "in_sample": {"z": z_in, "abnormal": a_in, "levels_z": z_lev}, "walk_forward": {"z": z_wf, "abnormal": a_wf, "levels_z": z_wf_lev},
+            "specification": "pooled HAR+IV with Driscoll-Kraay s.e.; in-sample judged in {levels (the trial's literal equation), log} x {z, 1{z>2}} "
+                             "with the rule-11 agreement rule; out-of-sample QLIKE judged in the log form for both readings; the levels walk-forward "
+                             "(forecasts floored) is a diagnostic",
+            "in_sample": {"log_z": z_in, "log_abn": a_in, "levels_z": z_lev, "levels_abn": a_lev},
+            "walk_forward": {"log_z": z_wf, "log_abn": a_wf, "levels_z_diagnostic": z_wf_lev},
+            "estimators": _estimator_summary(P["info"]),
             "family": fam, "cells_deflated": T415_CELLS, "ex_fomc_target_days": ex_fomc, "n_fomc_days": len(fomc),
             "earnings_flag": None, "earnings_note": "no earnings calendar is archived; the earnings-day control is not available",
             "criteria": [(c[0], c[1]) for c in crit]}
     used = [s for s, k in per_sym.items() if k]
     dropped_txt = ", ".join(f"{s} ({v.get('reason')})" for s, v in P["info"].items() if not v.get("used"))
+    est = _estimator_summary(P["info"])
     reason = (f"T-415: {len(weeks)} intensity week bundle(s) ({days[0] if days else 'n/a'}..{days[-1] if days else 'n/a'}, {len(days)} sampled days); "
               f"{n} symbol-days in the regression of min_n {T415_MIN_N} over {len(used)} of {len(ST_INTENSITY_SYMBOLS)} streams"
-              f"{' (dropped: ' + dropped_txt + ')' if dropped_txt else ''}; "
-              f"z on the trailing {Z_WINDOW} sampled days, abnormal share {_pu(abn_share)}. In-sample pooled log-HAR+IV (Driscoll-Kraay lag {z_in.get('lag')}): "
-              f"c t {_s(z_in.get('t'), 2)}, incremental R^2 {_pu(z_in.get('dr2'))} (R^2 {_f(z_in.get('r2_base'))} -> {_f(z_in.get('r2_full'))}); "
-              f"1{{z>2}}: t {_s(a_in.get('t'), 2)}, dR2 {_pu(a_in.get('dr2'))}; literal levels diagnostic t {_s(z_lev.get('t'), 2)}, dR2 {_pu(z_lev.get('dr2'))}. "
-              f"Walk-forward ({z_wf.get('n_origins', 0)} origins, {z_wf.get('n_forecasts', 0)} forecasts, embargo {EMBARGO}): QLIKE {_g(z_wf.get('qlike_base'))} -> "
+              f"{' (dropped: ' + dropped_txt + ')' if dropped_txt else ''}; RV estimators {est['rv']}; IV sources {est['iv']}; "
+              f"z on the trailing {Z_WINDOW} sampled days, abnormal share {_pu(abn_share)}. In-sample pooled HAR+IV (Driscoll-Kraay lag {z_in.get('lag')}): "
+              f"levels (the trial's equation) z: c t {_s(z_lev.get('t'), 2)}, incremental R^2 {_pu(z_lev.get('dr2'))}, 1{{z>2}}: t {_s(a_lev.get('t'), 2)}, "
+              f"dR2 {_pu(a_lev.get('dr2'))}; log form z: c t {_s(z_in.get('t'), 2)}, dR2 {_pu(z_in.get('dr2'))} (R^2 {_f(z_in.get('r2_base'))} -> "
+              f"{_f(z_in.get('r2_full'))}), 1{{z>2}}: t {_s(a_in.get('t'), 2)}, dR2 {_pu(a_in.get('dr2'))}. "
+              f"Walk-forward in the log form ({z_wf.get('n_origins', 0)} origins, {z_wf.get('n_forecasts', 0)} forecasts, embargo {EMBARGO}): QLIKE {_g(z_wf.get('qlike_base'))} -> "
               f"{_g(z_wf.get('qlike_full'))}, DM t {_s(z_wf.get('dm_t'), 2)}, p {_f(z_wf.get('dm_p'), 4)} -> Sidak-{T415_CELLS} {_f(z_wf.get('dm_p_sidak'), 4)}; "
-              f"1{{z>2}} DM t {_s(a_wf.get('dm_t'), 2)}; levels diagnostic DM t {_s(z_wf_lev.get('dm_t'), 2)} with {_pu(z_wf_lev.get('floored_share'))} of forecasts floored. "
-              f"Family (t, dR2): "
+              f"1{{z>2}} DM t {_s(a_wf.get('dm_t'), 2)}, Sidak p {_f(a_wf.get('dm_p_sidak'), 4)}; levels diagnostic (not judged) DM t {_s(z_wf_lev.get('dm_t'), 2)} "
+              f"with {_pu(z_wf_lev.get('floored_share'))} of forecasts floored. "
+              f"Family (log-form t, dR2): "
               + "; ".join(f"{k} {_s(v.get('t'), 2)}/{_pu(v.get('dr2'))}" for k, v in fam.items())
               + f". Ex-FOMC target days t {_s((ex_fomc or {}).get('t'), 2)}; earnings flags not available — {why}")
     return _out(stat, n, verdict, reason)

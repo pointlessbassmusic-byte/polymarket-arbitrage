@@ -349,21 +349,39 @@ def test_info_share_prefers_the_leading_venue():
     assert s is not None and s["coinbase_lower"] > 0.6 and s["coinbase_upper"] >= s["coinbase_lower"]
 
 
-def test_t425_planted_supported_and_null_not():
+def test_t425_planted_passes_every_tier_but_the_unrecorded_tier_caps_it():
+    """A planted gap pays every published tier pair; the implemented necessary condition passes, yet 'at the user's tier'
+    is None (the tier is recorded nowhere), so the verdict is capped at inconclusive (rule 2 / rule 9)."""
     fake = FakeArchive(world([M1, M2], seed=4, gap=arb_gap(0.01, 0.045, 2)))
     stat, n, verdict, reason = m.b6c_kraken_inventory_arb(fake)
     json.dumps(stat, allow_nan=False)
-    assert verdict == "supported", reason
+    assert verdict == "inconclusive" and "not implemented" in reason and "not recorded" in reason, reason
+    assert stat["criteria"][0][1] is None and stat["criteria"][1][1] is True
+    assert n >= 20_000 and stat["missing_months"] == []
     retail = stat["cells"][f"cb:{m.RETAIL_PAIR[0]}|kr:{m.RETAIL_PAIR[1]}|taker"]
     assert retail["triggers"] > 100 and retail["total_net"] > 0 and stat["tiers"]["user_tier"] is None
     assert all(v["total_net"] > 0 for v in stat["cells"].values())
+    assert all(v is not None for v in stat["family_sharpes_daily"].values()) and min(stat["family_triggers"].values()) >= m.FAMILY_MIN_N
+    best = stat["bootstrap"][f"cb:{m.HIGHVOL_PAIR[0]}|kr:{m.HIGHVOL_PAIR[1]}|maker"]
+    assert best["p"] < 0.05 and best["ci"][0] > 0
     assert stat["five_minute"]["retail"]["range"][0] <= stat["five_minute"]["retail"]["pooled_total_net"] <= stat["five_minute"]["retail"]["range"][1]
-    m._CACHE.clear()
+
+
+def test_t425_null_fails_the_necessary_condition():
+    """No gap: even the most favourable published pair loses (period costs, no triggers), which no tier can beat."""
     stat0, n0, verdict0, reason0 = m.b6c_kraken_inventory_arb(FakeArchive(world([M1, M2], seed=4)))
     assert verdict0 == "not_supported", reason0
+    assert stat0["criteria"][0][1] is None and stat0["criteria"][1][1] is False
     best = stat0["cells"][f"cb:{m.HIGHVOL_PAIR[0]}|kr:{m.HIGHVOL_PAIR[1]}|maker"]
     assert best["total_net"] < 0 and best["total_period_costs"] < 0
-    assert "tier not recorded" in reason0
+    assert "not recorded" in reason0 and "necessary for any tier" in reason0
+    # cells without triggers are only the financing drag: they do not enter the DSR family variance
+    assert stat0["family_sharpes_daily"]["1m|retail"] is None and stat0["family_triggers"]["1m|retail"] < m.FAMILY_MIN_N
+    # on a partial window the same failure must be decisive to count: the best pair's upper bound is below 0 here
+    m._CACHE.clear()
+    stat1, _, verdict1, reason1 = m.b6c_kraken_inventory_arb(FakeArchive(world([M1], seed=4)))
+    assert stat1["missing_months"] == [M2]
+    assert verdict1 == ("not_supported" if stat1["criteria"][1][2] else "inconclusive"), reason1
 
 
 def test_t425_unresolved_tiers_stay_inconclusive():
@@ -373,10 +391,53 @@ def test_t425_unresolved_tiers_stay_inconclusive():
     best = stat["cells"][f"cb:{m.HIGHVOL_PAIR[0]}|kr:{m.HIGHVOL_PAIR[1]}|maker"]
     worst = stat["cells"][f"cb:{m.RETAIL_PAIR[0]}|kr:{m.RETAIL_PAIR[1]}|taker"]
     assert best["triggers"] > 50 and worst["triggers"] == 0
-    assert verdict == "inconclusive" and stat["criteria"][0][1] is None
+    assert verdict == "inconclusive" and stat["criteria"][0][1] is None and stat["criteria"][1][1] is True
 
 
 # --------------------------------------------------------------------------------------------------- T-459 --
+
+def test_stationary_boot_mean_planted_vs_null():
+    rng = np.random.default_rng(0)
+    n = 2000
+    e = rng.normal(0, 1, n)
+    ar = np.empty(n); ar[0] = e[0]
+    for i in range(1, n):
+        ar[i] = 0.5 * ar[i - 1] + e[i]                        # autocorrelated noise: blocks matter
+    planted = ar + 0.25
+    r = m.stationary_boot_mean(planted, 40.0, n_boot=400, reps=2)
+    assert r["p"] < 0.01 and r["ci"][0] > 0 and r["mean_block"] == 40.0 and r["reps"] == 2 and r["est"] > 0
+    r0 = m.stationary_boot_mean(ar, 40.0, n_boot=400, reps=2)
+    assert r0["p"] > 0.05 and r0["ci"][0] < 0 < r0["ci"][1]
+    # the mean block is capped at n / 4; too few observations give no p
+    assert m.stationary_boot_mean(planted[:40], 1000.0, n_boot=100, reps=1)["mean_block"] == 10.0
+    assert m.stationary_boot_mean(planted[:5], 2.0)["p"] is None
+    # blocks of mean 1 reduce to an iid bootstrap: an iid positive mean still passes
+    assert m.stationary_boot_mean(e + 0.3, 1.0, n_boot=400, reps=1)["p"] < 0.01
+
+
+def test_agree_rule11():
+    assert m._agree(0.001, 0.005, 0.01) is True
+    assert m._agree(0.2, 0.5, 0.01) is False
+    assert m._agree(0.001, 0.5, 0.01) is None and m._agree(0.5, 0.001, 0.01) is None
+    assert m._agree(None, 0.001, 0.01) is None
+
+
+def test_imbalance_z_ratio_is_bounded_and_signed_is_not():
+    fake = FakeArchive(world([M1], seed=6, imb_level=0.0))
+    g = m.grid(fake, [M1], [M1])
+    b, s_ = m._roll_sum(g["kr_buy"], 5), m._roll_sum(g["kr_sell"], 5)
+    zr, zs = m.imbalance_z(g, 5), m.imbalance_z(g, 5, signed=True)
+    ok = np.isfinite(zr) & np.isfinite(zs)
+    assert ok.sum() > 10_000 and np.isnan(zr[:720]).all() and np.isfinite(zr[1440:]).all()   # >= 720 prior minutes are needed first
+    # both are trailing-day z-scores: mean about 0, sd about 1 over the month
+    assert abs(np.nanmean(zr)) < 0.1 and 0.8 < np.nanstd(zr) < 1.2 and abs(np.nanmean(zs)) < 0.1 and 0.8 < np.nanstd(zs) < 1.2
+    # the ratio z is a monotone function of the ratio, the signed z of buy - sell: in a minute with the same ratio but
+    # twice the volume the signed reading moves twice as far
+    i = np.flatnonzero(ok)[100]
+    assert np.sign(zr[i] - np.nanmean(zr)) == np.sign(((b - s_) / (b + s_))[i] - np.nanmean(((b - s_) / (b + s_))[ok]))
+    g2 = dict(g); g2["kr_buy"] = g["kr_buy"] * 2; g2["kr_sell"] = g["kr_sell"] * 2
+    assert np.allclose(m.imbalance_z(g2, 5)[ok], zr[ok]) and not np.allclose(m.imbalance_z(g2, 5, signed=True)[ok], zs[ok], atol=1e-3)
+
 
 def test_imbalance_trades_fill_rule_and_planted_effect():
     fake = FakeArchive(world([M1], seed=6, flow_drift=0.0012, imb_level=0.0))
@@ -389,8 +450,8 @@ def test_imbalance_trades_fill_rule_and_planted_effect():
     # a strict reading (print strictly below the bid) fills too here, since sells print 0.2% through
     trs = m.imbalance_trades(g, z, 0, g["N"], 5, 2.5, True, strict=True)
     assert trs["net"].size == tr["net"].size
-    # no print through the quote -> no fill
-    g2 = dict(g); g2["kr_slo"] = g["kr_close"] * 1.0001
+    # no print through the quote -> no fill (sells print 5% above every close: no seller ever reaches a bid at the prior close)
+    g2 = dict(g); g2["kr_slo"] = g["kr_close"] * 1.05
     tr2 = m.imbalance_trades(g2, z, 0, g["N"], 5, 2.5, True)
     assert tr2["net"].size == 0 and tr2["unfilled"] == tr2["signals_taken"]
     # the taker reading pays two taker fees and fills at the next closes
@@ -403,17 +464,42 @@ def test_imbalance_trades_fill_rule_and_planted_effect():
     assert tr0["net"].size > 30 and tr0["net"].mean() < 0
 
 
-def test_t459_planted_supported_and_null_not():
+def test_t459_planted_supported_and_null_not(monkeypatch):
+    """The declared family is patched to the claim cell's maker / taker pair: the planted 5-minute drift then passes every
+    criterion (both bootstraps agree, DSR against the family's spread); the null fails the mean-net criterion."""
+    monkeypatch.setattr(m, "T459_GRID", [(5, 5, 2.0, True), (5, 5, 2.0, False)])
     fake = FakeArchive(world([M1, M2], seed=7, flow_drift=0.0015, flow_spike=2.0, imb_level=0.0))
     stat, n, verdict, reason = m.b6c_kraken_flow_imbalance(fake)
     json.dumps(stat, allow_nan=False)
     assert verdict == "supported", reason
-    assert n >= 50 and stat["oos"]["cluster_boot"]["p"] < 0.01 and stat["dsr"]["dsr"] >= 0.95
+    assert n >= 50 and stat["oos"]["cluster_boot"]["p"] < 0.01 and stat["oos"]["stationary_boot"]["p"] < 0.01 and stat["dsr"]["dsr"] >= 0.95
+    assert stat["oos"]["stationary_boot"]["mean_block"] > 1 and stat["oos"]["stationary_boot"]["ci"][0] > 0
     assert stat["oos_months_stored"] == [M2] and stat["forward_regression_oos"]["t"] > 2
+    assert "stationary" in reason and "must agree" in stat["criteria"][0][0]
     m._CACHE.clear()
     stat0, n0, verdict0, reason0 = m.b6c_kraken_flow_imbalance(FakeArchive(world([M1, M2], seed=7, imb_level=0.0)))
     assert verdict0 == "not_supported", reason0
-    assert stat0["oos"]["mean_net"] < 0
+    assert stat0["oos"]["mean_net"] < 0 and stat0["criteria"][0][1] is False
+    assert stat0["oos"]["stationary_boot"]["p"] > 0.5 and stat0["oos"]["cluster_boot"]["p"] > 0.5
+
+
+def test_t459_full_grid_runs_and_the_family_spread_deflates_the_claim_cell():
+    """With the full 24-cell family the planted world's structurally different cells (60-minute horizons, 3-sigma cells
+    with a dozen trades) spread the trial Sharpes, so the DSR criterion, not the mean-net one, decides."""
+    fake = FakeArchive(world([M1, M2], seed=7, flow_drift=0.0015, flow_spike=2.0, imb_level=0.0))
+    stat, n, verdict, reason = m.b6c_kraken_flow_imbalance(fake)
+    json.dumps(stat, allow_nan=False)
+    assert len(stat["cells_out_of_sample"]) == 24 and stat["in_sample_best"] in stat["cells_out_of_sample"]
+    assert stat["criteria"][0][1] is True and stat["criteria"][1][1] is False and verdict == "not_supported"
+    assert stat["dsr"]["var_used"].startswith("observed")
+    # cells with fewer than FAMILY_MIN_N trades (the 3-sigma cells here) do not enter the family variance
+    small = sum(1 for v in stat["cells_out_of_sample"].values() if v["n"] < m.FAMILY_MIN_N)
+    assert small > 0 and stat["dsr"]["n_family_computed"] == 24 - small
+    assert set(stat["vol_terciles_oos"]) == {"low", "mid", "high"}
+    # the alternative reading (raw signed volume z-scored) runs through the same pipeline and is reported, not decided
+    alt = stat["alternative_reading_signed_volume"]
+    assert alt["out_of_sample"]["n"] > 30 and alt["out_of_sample"]["mean_net"] > 0 and alt["out_of_sample"]["stationary_p"] < 0.05
+    assert "alternative reading" in reason and "alternative" not in " ".join(c[0] for c in stat["criteria"])
 
 
 def test_t459_without_out_of_sample_months_is_inconclusive():

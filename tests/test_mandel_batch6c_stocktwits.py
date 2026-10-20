@@ -1,10 +1,11 @@
 """Batch-6c stocktwits harnesses (T-414 pre-open bullish ratio, T-415 intensity -> next-day realised variance) on
 synthetic data only: for every core function a planted effect passes and a null does not; the pre-open window filter
-and count cross-check, the crypto 09:30 ET marks (minute bars, then hourly), the permutation null under the StockTwits
-bullish skew, the strictly-trailing z-score, the session bar filter, the HAR row alignment, the Driscoll-Kraay
-estimator, the walk-forward embargo and Diebold-Mariano, the two-reading criteria and the rule-5 / data-limit paths are
-checked directly; every harness runs JSON-safe on a fake archive, missing bundles give inconclusive, optional bundles
-are optional. No archive, no network."""
+and count cross-check, the crypto 09:30 ET marks (minute bars, then Coinbase hourly, then Yahoo hourly), the permutation
+null under the StockTwits bullish skew, the strictly-trailing z-score, the session bar filter, the HAR row alignment on
+the session calendar, the Driscoll-Kraay estimator, the walk-forward embargo and Diebold-Mariano, the rule-11 agreement
+rule over the judged constructions (the levels walk-forward failing under a true multiplicative effect is documented,
+which is why it is a diagnostic), and the rule-5 / data-limit paths are checked directly; every harness runs JSON-safe
+on a fake archive, missing bundles give inconclusive, optional bundles are optional. No archive, no network."""
 
 import json
 import math
@@ -253,6 +254,14 @@ def t415_world(gamma, n_days=130, seed=0, start="2025-10-01", hourly_for_all=Tru
 
 # ======================================================================================== small pieces ==
 
+def test_agree_rule_11():
+    assert m._agree([True, True]) is True
+    assert m._agree([False, False, False]) is False
+    assert m._agree([True, False]) is None                                # disagreement: a pass that flips is not evidence
+    assert m._agree([True, None]) is None and m._agree([False, None]) is None
+    assert m._agree([np.bool_(True), np.bool_(True)]) is True
+
+
 def test_sidak_nw_lag_and_ranks():
     assert abs(m.sidak(0.0005, 16) - (1 - (1 - 0.0005) ** 16)) < 1e-12
     assert m.sidak(None, 16) is None
@@ -316,6 +325,9 @@ def test_crypto_open_marks_prefer_minute_bars_then_hourly():
     assert "1m" in desc and "hourly" in desc
     marks2, desc2, _ = m.crypto_open_marks(arch, "ETH-USD", days)
     assert marks2 == {} and desc2 == "no archived bars"
+    arch.add("hourly-ETH-USD", [bar_row(utc_ts(d, h), 300 + h, 300 + h, 300 + h, 300 + h) for d in days for h in range(24)])
+    marks3, desc3, src3 = m.crypto_open_marks(arch, "ETH-USD", days)
+    assert marks3 == {"2025-11-03": 315, "2025-11-04": 315} and set(src3.values()) == {"yh"} and desc3.startswith("Yahoo hourly")
 
 
 # ============================================================================================= T-414 core ==
@@ -350,19 +362,30 @@ def test_permutation_p_is_one_under_a_pure_bullish_skew():
 
 def test_t414_accuracy_decisive_failure_below_min_n():
     res = {"accuracy": 0.40, "n_predicted": 400, "acc_se": math.sqrt(0.4 * 0.6 / 400), "p_perm_deflated": 0.9,
-           "ic": {"cross_sectional_t_nw": -1.0, "pooled_t_symbol_clustered": -3.5},
+           "ic": {"cross_sectional_t_nw": -3.2, "pooled_t_symbol_clustered": -3.5},
            "halves": {"first": {"accuracy": 0.4, "ic_pooled": -0.1}, "second": {"accuracy": 0.41, "ic_pooled": -0.05}}}
     crit = m.t414_criteria(res)
     assert crit[0][1] is False and crit[0][2] is True                    # 99% upper bound of 40% on 400 days is below 52%
-    assert crit[2][2] is True                                            # pooled t < -3: decisively the wrong sign
+    assert crit[2][1] is False and crit[2][2] is True                    # both constructions' t < -3: decisively the wrong sign
+    assert crit[3][1] is False                                           # edge < 0 and IC < 0 in both halves: both constructions fail
     v, why = m._decide(crit, 400, m.T414_MIN_N, "symbol-days")
     assert v == "not_supported"
+    res["ic"]["cross_sectional_t_nw"] = -1.0
+    crit = m.t414_criteria(res)
+    assert crit[2][1] is False and crit[2][2] is False                   # only one construction decisively negative: not decisive
     res["accuracy"], res["acc_se"] = 0.515, math.sqrt(0.515 * 0.485 / 400)
     res["ic"]["pooled_t_symbol_clustered"] = 1.0
     crit = m.t414_criteria(res)
     assert crit[0][1] is False and crit[0][2] is False
     v, why = m._decide(crit, 400, m.T414_MIN_N, "symbol-days")
     assert v == "inconclusive"
+    # rule 11: the two IC constructions disagree -> undecided; the halves' two statistics disagree -> undecided
+    res["ic"] = {"cross_sectional_t_nw": 3.4, "pooled_t_symbol_clustered": 2.1}
+    res["halves"] = {"first": {"accuracy": 0.55, "ic_pooled": -0.1}, "second": {"accuracy": 0.54, "ic_pooled": 0.05}}
+    crit = m.t414_criteria(res)
+    assert crit[2][1] is None and crit[3][1] is None
+    res["ic"] = {"cross_sectional_t_nw": 3.4, "pooled_t_symbol_clustered": None}
+    assert m.t414_criteria(res)[2][1] is None
 
 
 # ============================================================================================= T-415 core ==
@@ -416,14 +439,29 @@ def test_parkinson_sq_ret_and_har_rows_alignment():
     rv = {d: float(i + 1) for i, d in enumerate(cal)}
     z = {cal[24]: 1.5, cal[27]: 2.5, cal[10]: 0.3}
     iv = {d: 2.0 for d in cal if d != cal[10]}
-    rows = m.har_rows("S", rv, z, iv, 5, 22, 1)
+    rows = m.har_rows("S", cal, rv, z, iv, 5, 22, 1)
     assert [r["day"] for r in rows] == [cal[24]]                       # cal[27] has no next day; cal[10] has no IV and no 22-day window
     r = rows[0]
     assert r["y"] == 26.0 and r["rv"] == 25.0 and r["rvw"] == 23.0 and r["rvm"] == 14.5 and r["target_day"] == cal[25]
     assert r["abn"] == 0.0
-    assert m.har_rows("S", rv, {cal[20]: 3.0}, iv, 5, 22, 1) == []      # only 21 RV days up to cal[20]: no 22-day window
-    rows5 = m.har_rows("S", rv, {cal[21]: 3.0}, iv, 5, 22, 5)
+    assert m.har_rows("S", cal, rv, {cal[20]: 3.0}, iv, 5, 22, 1) == []      # only 21 RV days up to cal[20]: no 22-day window
+    rows5 = m.har_rows("S", cal, rv, {cal[21]: 3.0}, iv, 5, 22, 5)
     assert rows5[0]["y"] == np.mean([23, 24, 25, 26, 27]) and rows5[0]["abn"] == 1.0
+    # a session without RV (an early close or a feed gap) drops the rows that need it as regressor or target instead of
+    # shifting the target past it; inside the HAR windows it is tolerated up to 20% of the window (mean over the rest)
+    rv_gap = {d: v for d, v in rv.items() if d != cal[25]}
+    assert m.har_rows("S", cal, rv_gap, {cal[24]: 1.5}, iv, 5, 22, 1) == []           # the next session has no RV
+    assert m.har_rows("S", cal, rv_gap, {cal[25]: 1.5}, iv, 5, 22, 1) == []           # the day itself has no RV
+    ok = m.har_rows("S", cal, rv_gap, {cal[23]: 1.5}, iv, 5, 22, 1)
+    assert len(ok) == 1 and ok[0]["target_day"] == cal[24] and ok[0]["y"] == 25.0
+    assert m.har_rows("S", cal, rv_gap, {cal[23]: 1.5}, iv, 5, 22, 2) == []           # a 2-day horizon reaches the hole
+    hole = m.har_rows("S", cal, rv_gap, {cal[26]: 1.5}, iv, 5, 22, 1)                 # the hole sits inside both windows
+    assert len(hole) == 1 and hole[0]["rvw"] == np.mean([23, 24, 25, 27]) and hole[0]["rvm"] == np.mean([v for v in range(6, 28) if v != 26])
+    rv_two = {d: v for d, v in rv.items() if d not in (cal[24], cal[25])}             # 2 of 5 missing: the week window fails
+    assert m.har_rows("S", cal, rv_two, {cal[26]: 1.5}, iv, 5, 22, 1) == []
+    assert len(m.har_rows("S", cal, rv_two, {cal[26]: 1.5}, iv, 5, 22, 1, min_cover=0.5)) == 1
+    # the calendar, not the RV keys, defines adjacency: a sampled day not on the calendar yields nothing
+    assert m.har_rows("S", cal[:20], rv, {cal[24]: 1.5}, iv, 5, 22, 1) == []
 
 
 def _panel(gamma, seed=0, n_days=130):
@@ -476,19 +514,42 @@ def test_walk_forward_embargo_excludes_recent_targets():
     assert wf["n_origins"] == 20 and wf["origins"][0] == "2026-03-02"
 
 
-def test_t415_criteria_need_both_readings():
+def test_t415_criteria_judge_every_construction_with_the_agreement_rule():
     ok = {"t": 3.5, "dr2": 0.03, "p_sidak": 0.001}
     bad = {"t": 2.0, "dr2": 0.03, "p_sidak": 0.1}
+    neg = {"t": -3.5, "dr2": 0.03}
     wf_ok = {"dm_t": 3.0, "dm_p": 0.001, "dm_p_sidak": 0.01, "qlike_full": 0.4, "qlike_base": 0.5}
     wf_bad = {"dm_t": 1.0, "dm_p": 0.16, "dm_p_sidak": 0.9, "qlike_full": 0.49, "qlike_base": 0.5}
-    c = m.t415_criteria(ok, ok, wf_ok, wf_ok)
+    ins = lambda lz, la, gz, ga: {"levels_z": lz, "levels_abn": la, "log_z": gz, "log_abn": ga}
+    wfs = lambda z, a: {"log_z": z, "log_abn": a}
+    c = m.t415_criteria(ins(ok, ok, ok, ok), wfs(wf_ok, wf_ok))
     assert c[0][1] is True and c[1][1] is True
-    c = m.t415_criteria(ok, bad, wf_ok, wf_bad)
+    c = m.t415_criteria(ins(bad, bad, bad, bad), wfs(wf_bad, wf_bad))
     assert c[0][1] is False and c[1][1] is False and c[0][2] is False
-    c = m.t415_criteria({"t": -3.5, "dr2": 0.03}, ok, wf_ok, wf_ok)
-    assert c[0][2] is True                                               # decisively the wrong sign
-    c = m.t415_criteria({"t": None, "dr2": None}, ok, {"dm_p_sidak": None}, wf_ok)
+    c = m.t415_criteria(ins(bad, bad, ok, ok), wfs(wf_ok, wf_bad))        # the literal levels form fails while the log form passes
+    assert c[0][1] is None and c[1][1] is None                           # disagreement: undecided, never a pass
+    c = m.t415_criteria(ins(ok, bad, ok, ok), wfs(wf_ok, wf_ok))          # the abnormal-flag reading fails
+    assert c[0][1] is None and c[1][1] is True
+    c = m.t415_criteria(ins(neg, neg, neg, neg), wfs(wf_bad, wf_bad))
+    assert c[0][1] is False and c[0][2] is True                          # every construction decisively the wrong sign
+    c = m.t415_criteria(ins(neg, bad, neg, neg), wfs(wf_bad, wf_bad))
+    assert c[0][1] is False and c[0][2] is False
+    c = m.t415_criteria(ins({"t": None, "dr2": None}, ok, ok, ok), wfs({"dm_p_sidak": None}, wf_ok))
     assert c[0][1] is None and c[1][1] is None
+    assert "levels_z" in c[0][0] and "log_abn" in c[0][0] and "log_z" in c[1][0]
+
+
+def test_levels_walk_forward_fails_under_a_true_multiplicative_effect_and_is_a_diagnostic():
+    """The pooled levels model's common slope is set by the high-variance rows and drives low-variance names' forecasts
+    below zero: under the planted (multiplicative) effect the levels walk-forward loses to HAR+IV while the log form
+    wins decisively, so the harness judges the out-of-sample criterion in the log form and reports the levels as a
+    diagnostic. The in-sample levels regression does detect the planted effect and is judged."""
+    _, P, _ = _panel(0.5, seed=2)
+    lev = m.walk_forward_qlike(P["rows"], "z", log=False)
+    assert lev["dm_t"] < 0 and lev["floored_share"] > 0.1 and lev["floored_share_base"] is not None
+    assert m.walk_forward_qlike(P["rows"], "z")["dm_t"] > 5
+    zl, al = m.har_test(P["rows"], "z", 1, log=False), m.har_test(P["rows"], "abn", 1, log=False)
+    assert zl["t"] > 3 and zl["dr2"] >= 0.02 and al["t"] > 3 and al["dr2"] >= 0.02
 
 
 # ============================================================================================ harnesses ==
@@ -529,7 +590,12 @@ def test_t415_harness_bookkeeping(planted):
     m._CACHE.clear()
     stat, n, verdict, reason = m.HARNESSES["b6c_stocktwits_intensity_rv"](planted)
     assert stat["symbols_dropped"] == {} and len(stat["per_symbol"]) == 21
-    assert stat["in_sample"]["levels_z"]["t"] is not None and stat["walk_forward"]["levels_z"]["floored_share"] is not None
+    assert stat["in_sample"]["levels_z"]["t"] is not None and stat["in_sample"]["levels_abn"]["t"] is not None
+    assert stat["walk_forward"]["levels_z_diagnostic"]["floored_share"] is not None
+    assert set(stat["in_sample"]) == {"levels_z", "levels_abn", "log_z", "log_abn"} and set(stat["walk_forward"]) == {"log_z", "log_abn", "levels_z_diagnostic"}
+    assert stat["estimators"]["rv"].startswith("intraday hourly RV 09:30-16:00 ET x19") and "deribit-dvol-BTC x1" in stat["estimators"]["iv"]
+    assert all(v["calendar"] == ("UTC days" if s in m.CRYPTO_PID else "NYSE sessions") for s, v in stat["per_symbol"].items())
+    assert "RV estimators" in reason and "levels (the trial's equation)" in reason
     assert set(stat["family"]) == {"hourly_h1", "hourly_h5", "parkinson_h1", "parkinson_h5", "sq_ret_h1", "sq_ret_h5"}
     assert stat["ex_fomc_target_days"]["n"] < n and stat["n_fomc_days"] > 0
     assert stat["days_with_too_few_samples"]["XLU"] == 1
@@ -559,6 +625,7 @@ def test_t414_two_days_is_a_data_limit_inconclusive(monkeypatch):
     stat, n, verdict, reason = m.HARNESSES["b6c_stocktwits_bullish_ratio"](arch)
     assert verdict == "inconclusive" and 0 < n < m.T414_MIN_N
     assert "below min_n" in reason or "not implemented" in reason
+    assert f"data limit: the pre-open backfill has stored {stat['n_weeks']} week(s) so far" in reason
     assert f"n >= trial min_n ({n} of {m.T414_MIN_N} symbol-days)" in reason
 
 

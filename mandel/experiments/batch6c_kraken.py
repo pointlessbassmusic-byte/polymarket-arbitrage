@@ -9,7 +9,8 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
   * T-331  Hourly UTC marks 2022-01..2026-09. On each venue the last trade at or before the mark: Kraken = the close of
            the HH:59 bar (its last trade; the ticks give the same print), Coinbase = the close of the HH:59 candle (the
            candle close is the last trade in the minute, so this is exact at the mark). A venue whose last trade is more
-           than 5 minutes old at the mark (outage) makes the mark invalid (counted). gap = ln(P_cb / P_kr); excursion =
+           than 5 minutes old at the mark (outage) makes the mark invalid (counted; the share with no outage rule, the last
+           trade up to 60 minutes back, is reported beside it). gap = ln(P_cb / P_kr); excursion =
            |gap| > 0.70%. Pass: lower bound of the 95% Wilson interval of the excursion share >= 0.5%. Null (the trial):
            'share = 0 beyond what a 1-minute price-staleness simulation produces': one venue's mark is shifted by s seconds
            (s uniform in 1..60, one draw per mark, fixed seed; s = 30 and 60 also reported). The shifted venue is Kraken,
@@ -34,25 +35,38 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (house rules
            (continuous) on the USD inventory of one notional per venue (2 x notional) every calendar day; a weekly transfer
            (0.0001 BTC) in each week with a trade. Annual net P&L = the sum per calendar year; the test statistic is the
            daily net P&L series (studentized block bootstrap, 7-day blocks, one-sided p for H0: mean <= 0). The user's fee
-           tier is NOT recorded anywhere in the repo, so 'at the user's tier' is reported for every published tier pair and
-           resolves only when every tier agrees: all pass (the worst tier under taker fees passes p < 0.05 and every pair's
-           total is positive) -> pass; the best tier under maker fees fails decisively -> fail; otherwise None (rule 2 /
-           rule 9 cap). Cells: 1-minute (the claim) and 5-minute bars (rule 10: the 5 phases pooled, per-phase range
-           reported), retail and high-volume tiers (ETH not archived): DSR over the 8 declared cells reported. Regime:
+           tier is NOT recorded anywhere in the repo, so the criterion 'at the user's tier' is None (rule 2 / rule 9 cap: the
+           verdict is at best inconclusive) and the P&L is reported for every published tier pair under maker and taker
+           fees. A second, implemented criterion is the necessary condition any tier must meet: net P&L > 0 with p < 0.05 at
+           the most favourable published pair ($400M+ / Pro 5, maker fees); it fails decisively when that pair's one-sided
+           95% upper bound of the daily mean lies below 0 (then no tier can pass). Cells: 1-minute (the claim) and 5-minute
+           bars (rule 10: the 5 phases pooled, per-phase range
+           reported), retail and high-volume tiers (ETH not archived): DSR over the 8 declared cells reported, the family
+           variance from cells with at least FAMILY_MIN_N triggers (a cell without trades is only the financing drag). Regime:
            triggers in hours with |trailing 60-minute return| > 3% vs calm. Information share: Hasbrouck bounds (Baillie
            et al. 2002 form, VECM with 5 lags, per calendar year).
   * T-459  Kraken only, 2023-01..2026-09; in-sample 2023-01..2024-12, out of sample 2025-01..2026-09. Imbalance I_t =
-           (buy - sell) / (buy + sell) over the last w closed minutes, z-scored against the trailing day (prior 1440
-           minutes, at least 720 valid). The claim's cell: w = 5, horizon 5 minutes, z > 2, maker-only. Maker entry: a bid
+           (buy - sell) / (buy + sell) over the last w closed minutes (the library rule's ratio), z-scored against the
+           trailing day (prior 1440 minutes, at least 720 valid). The claim's cell: w = 5, horizon 5 minutes, z > 2,
+           maker-only. NOTE (measured on the archive): Kraken minutes are thin (median 10 trades, 0.19 BTC), so the ratio is
+           bimodal with a trailing-day sd of about 0.64 and z > 2 would need I > 1.28, which a ratio bounded at 1 cannot
+           reach; the rule as worded fires in about 0.01% of minutes. The claim's construction stays the ratio; the other
+           reading of 'signed-volume imbalance', the raw signed volume (buy - sell, in BTC) z-scored the same way, runs
+           through the same pipeline and is REPORTED (``alternative_reading_signed_volume``), not decided. Maker entry: a bid
            at the close of minute t (the last trade) posted at t + 60 s; it fills only when a seller-initiated trade prints
            at or below it in minute t + 1 (the bar's sell_lo <= bid, the fetcher's own convention; the strict reading is
            reported); otherwise the signal lapses. Maker exit: an ask at the close of minute t + h posted at its end; it
            fills when a buyer-initiated trade prints at or above it in minute t + h + 1 (buy_hi >= ask), else the position
            is crossed at that minute's close as a taker. Costs as the claim states: Kraken maker 0.16%, taker 0.26% (the
            base tier the claim names; the 2026 Tier 1 0.40% / 0.80% is a reported sensitivity). One position at a time.
-           Pass: >= 20,000 out-of-sample trades AND mean net > 0 with p < 0.01 (studentized bootstrap with trades resampled
-           in 1-day clusters, the trial's 1-day blocks) AND DSR >= 0.95 over the 36 declared cells (24 computed: window
-           1/5/15 x horizon 5/60 x threshold 2/3 x maker/taker). The in-sample best cell is reported out of sample too.
+           Pass: >= 20,000 out-of-sample trades AND mean net > 0 with p < 0.01 under the trial's null construction, a
+           stationary block bootstrap of the trade sequence with 1-day blocks (Politis-Romano: geometric block lengths whose
+           mean is the out-of-sample trades per trading day; centred percentile p), which must agree with a studentized
+           bootstrap of the trades resampled in 1-day clusters (rule 11: both pass -> pass, both fail -> fail, otherwise
+           undecided) AND DSR >= 0.95 over the 36 declared cells (24 computed: window
+           1/5/15 x horizon 5/60 x threshold 2/3 x maker/taker; a cell's per-trade Sharpe enters the family variance only
+           with at least FAMILY_MIN_N trades, since a Sharpe from a dozen trades is noise, not a trial estimate). The
+           in-sample best cell is reported out of sample too.
            Regime: volatility terciles (trailing 60-minute realised vol, cutpoints from the in-sample signals).
   * T-465  Hourly observations 2023-01..2026-09. VPIN from Kraken signed volume: bucket = ADV / 50 (ADV = the mean daily
            Kraken volume over the previous 30 UTC days, at least 10), buckets filled from the 1-minute buy / sell volumes
@@ -94,7 +108,7 @@ from typing import Callable, Optional, Sequence
 
 import numpy as np
 
-from mandel.experiments.batch6b_bw import Bills, _clean, _closes, _f, _has, _mean_stat, _pc, _s, _stud, mc_reps
+from mandel.experiments.batch6b_bw import Bills, _chunks, _clean, _closes, _f, _has, _mean_stat, _pc, _s, _stud, mc_reps
 from mandel.experiments.batch6c_cryptovenue import ar1, dsr_row, wilson
 from mandel.experiments.batch6c_mom import family_dsr
 from mandel.experiments.batch6c_pub import cluster_stud
@@ -146,6 +160,8 @@ TRANSFER_FEE = 0.0001          # BTC per weekly rebalancing transfer, per BTC no
 VOL_SPIKE = 0.03               # |trailing 60-minute return| > 3%
 T425_CELLS = 8
 IS_LAGS = 5
+
+FAMILY_MIN_N = 30              # trades (T-459) or triggers (T-425) for a cell's Sharpe to enter the DSR family variance
 
 # T-459
 T459_MAKER, T459_TAKER = 0.0016, 0.0026
@@ -421,7 +437,47 @@ def _mean_boot(x, block: int, level: float = 0.90, reps: Optional[int] = None) -
     x = np.asarray(x, float)
     if x.size < 8:
         return {"est": float(x.mean()) if x.size else None, "ci": [None, None], "p": None, "p_lt": None, "n": int(x.size)}
-    return mc_reps(lambda seed: _stud(_mean_stat, [x], block, N_BOOT, seed, level), reps=reps, keys=("ci",))
+    return mc_reps(lambda seed: _stud(_mean_stat, [x], block, N_BOOT, seed, level), reps=REPS if reps is None else reps, keys=("ci",))
+
+
+def _stationary_once(x: np.ndarray, L: float, n_boot: int, seed: int) -> dict:
+    rng = np.random.default_rng(seed)
+    n = x.size
+    m0 = float(x.mean())
+    pos = np.arange(n)
+    mm = []
+    for k in _chunks(n_boot, n):
+        new = rng.random((k, n)) < 1.0 / L                      # a new block starts here (geometric lengths, mean L)
+        new[:, 0] = True
+        starts = rng.integers(0, n, (k, n))                     # the start of the block that begins at each position
+        last = np.maximum.accumulate(np.where(new, pos[None, :], 0), axis=1)
+        idx = (np.take_along_axis(starts, last, axis=1) + (pos[None, :] - last)) % n
+        mm.append(x[idx].mean(axis=1))
+    mm = np.concatenate(mm)
+    return {"est": m0, "ci": [float(np.quantile(mm, 0.025)), float(np.quantile(mm, 0.975))],
+            "p": float((np.sum(mm - m0 >= m0) + 1) / (mm.size + 1)), "p_lt": float((np.sum(mm - m0 <= m0) + 1) / (mm.size + 1)),
+            "mean_block": float(L), "n": int(n)}
+
+
+def stationary_boot_mean(x, mean_block: float, n_boot: Optional[int] = None, reps: Optional[int] = None) -> dict:
+    """Politis-Romano stationary (circular) block bootstrap of a mean with geometric block lengths of mean ``mean_block``
+    (capped at n / 4), over replicate seeds: est, 95% percentile ci, centred percentile p (H0: mean <= 0: the share of
+    resampled means with m* - m0 >= m0) and p_lt (H0: mean >= 0)."""
+    x = np.asarray(x, float)
+    n = x.size
+    if n < 8:
+        return {"est": float(x.mean()) if n else None, "ci": [None, None], "p": None, "p_lt": None, "mean_block": None, "n": int(n)}
+    L = max(1.0, min(float(mean_block), n / 4.0))
+    nb = N_BOOT if n_boot is None else int(n_boot)
+    return mc_reps(lambda seed: _stationary_once(x, L, nb, seed), reps=REPS if reps is None else reps, keys=("ci",))
+
+
+def _agree(pa: Optional[float], pb: Optional[float], alpha: float) -> Optional[bool]:
+    """Rule 11: two named constructions of one p-value pass only together; one passing and one failing is undecided."""
+    if pa is None or pb is None:
+        return None
+    a, b = pa < alpha, pb < alpha
+    return True if (a and b) else (False if (not a and not b) else None)
 
 
 def _sidak(p: Optional[float], k: int) -> Optional[float]:
@@ -494,7 +550,13 @@ def hourly_gaps(g: dict, i0: int, i1: int, thr: float = GAP_THR, seed: int = SEE
         cross_s = np.abs(np.log(cb / kr_s))                  # cross-venue gap with Kraken's mark shifted
         stale_cb = np.abs(np.log(cb / cb_prev))              # Coinbase approximation: candle floor (overstates staleness)
     ok_null = valid & np.isfinite(stale_kr)
+    cb_all, _ = _last_before(g["cb_close"], marks, 60)        # no outage rule: the last trade up to 60 minutes back
+    kr_all, _ = _last_before(g["kr_close"], marks, 60)
+    v_all = np.isfinite(cb_all) & np.isfinite(kr_all)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        exc_all = v_all & (np.abs(np.log(cb_all / kr_all)) > thr)
     return {"marks": marks, "valid": valid, "gap": gap, "exc": exc, "cb": cb, "kr": kr, "s": s_draw, "has_tick": has_tick,
+            "n_all": int(v_all.sum()), "exc_all": int(exc_all.sum()),
             "stale_kr": stale_kr, "stale_kr60": stale_kr60, "stale_kr30": stale_kr30, "cross_s": cross_s, "stale_cb": stale_cb,
             "ok_null": ok_null, "age_cb": age_cb, "age_kr": age_kr, "invalid": int(marks.size - valid.sum())}
 
@@ -577,11 +639,13 @@ def b6c_kraken_cross_venue_gap(archive):
               f"Wilson 95% [{_pc(w95[0], 3)}, {_pc(w95[1], 3)}], Sidak-adjusted for {T331_VARIANTS} variants lower {_pc(w_sidak[0], 3)}; staleness-only share "
               f"{_pc(null_share, 3)} (s = 30 s {_pc(null30, 3)}, s = 60 s {_pc(null60, 3)}; Coinbase candle-floor approximation {_pc(null_cb, 3)}, which "
               f"overstates staleness); cross-venue share with Kraken shifted {_pc(cross_s, 3)}; |gap| median {_pc(tail.get(0.5), 3)}, p99 {_pc(tail.get(0.99), 3)}, "
-              f"p99.9 {_pc(tail.get(0.999), 3)}; gap AR(1) {_f(phi)}; stress: " + ", ".join(f"{lab} {_pc(s_['share'], 2)} ({s_['excursions']}/{s_['n']})"
+              f"p99.9 {_pc(tail.get(0.999), 3)}; without the outage rule {r['exc_all']} of {r['n_all']} marks = {_pc(r['exc_all'] / r['n_all'] if r['n_all'] else None, 3)}; "
+              f"gap AR(1) {_f(phi)}; stress: " + ", ".join(f"{lab} {_pc(s_['share'], 2)} ({s_['excursions']}/{s_['n']})"
               for lab, s_ in stress.items()) + f"; excluding stress {_pc(kr_ / nr_ if nr_ else None, 3)}; single-venue rule (Kraken toward Coinbase) "
               f"{(sv or {}).get('kraken', {}).get('n', 0)} trades, mean net {_pc(((sv or {}).get('kraken') or {}).get('mean_net'), 3)} — " + why)
     stat = {"window": cov["window"], "covered_months": _months_txt(cov["covered"]), "missing_months": cov["missing"], "n_marks": n, "invalid_marks": r["invalid"],
             "marks_with_ticks": int(r["has_tick"].sum()), "excursions": k, "share": share, "wilson95": w95, "wilson_sidak4": w_sidak, "threshold": GAP_THR,
+            "without_outage_rule": {"n_marks": r["n_all"], "excursions": r["exc_all"], "share": r["exc_all"] / r["n_all"] if r["n_all"] else None},
             "staleness": {"share_random_s": null_share, "share_s30": null30, "share_s60": null60, "coinbase_candle_floor_share": null_cb,
                           "cross_venue_share_kraken_shifted": cross_s, "excess": {kq: ex.get(kq) for kq in ("est", "ci", "ci_mc_se", "p", "p_lt", "reps")},
                           "note": "Kraken shifted with exact HH:59 ticks; the Coinbase reading floors the shifted mark to the last closed candle (up to "
@@ -775,21 +839,24 @@ def b6c_kraken_inventory_arb(archive):
     five = {}
     for key, pair in (("retail", RETAIL_PAIR), ("highvol", HIGHVOL_PAIR)):
         fs = next(cm for cn, cm, _, _ in COINBASE_TIERS if cn == pair[0]) + next(km for kn, km, _, _ in KRAKEN_TIERS if kn == pair[1])
-        per_phase, dailies = [], []
+        per_phase, dailies, triggers = [], [], []
         for ph in range(5):
             idx = np.arange(ph, gap.size, 5)
             gp = gap[idx]
             _, sg = _roll_prior(gp, 288, 144)
             r = arb_sim(gp, sg, fs, hold=3)
+            triggers.append(int(r["pnl"].size))
             ex = idx[r["exit"]] + i0 if r["exit"].size else np.array([], np.int64)
             dp = _daily_pnl(g, ex, r["pnl"], i0, i1, bills)
             per_phase.append(float(dp["net"].sum())); dailies.append(dp["net"])
         pooled = np.mean(dailies, axis=0)
         five[key] = {"pooled_total_net": float(pooled.sum()), "per_phase_total_net": per_phase, "range": [min(per_phase), max(per_phase)],
-                     "_daily": pooled}
+                     "triggers": int(np.mean(triggers)), "_daily": pooled}
     # DSR over the 8 declared cells (4 computed: 1m / 5m x retail / high-volume, maker reading)
     fam = {"1m|retail": cells[retail_m]["_daily"], "1m|highvol": cells[hv_m]["_daily"], "5m|retail": five["retail"]["_daily"], "5m|highvol": five["highvol"]["_daily"]}
-    fam_sr = {k_: (float(sharpe_ratio(v_)) if v_.size > 2 and v_.std() > 0 else None) for k_, v_ in fam.items()}
+    fam_trig = {"1m|retail": cells[retail_m]["triggers"], "1m|highvol": cells[hv_m]["triggers"],
+                "5m|retail": five["retail"]["triggers"], "5m|highvol": five["highvol"]["triggers"]}
+    fam_sr = {k_: (float(sharpe_ratio(v_)) if v_.size > 2 and v_.std() > 0 and fam_trig[k_] >= FAMILY_MIN_N else None) for k_, v_ in fam.items()}
     dsr = {k_: family_dsr(fam[k_], list(fam_sr.values()), T425_CELLS) for k_ in ("1m|retail", "1m|highvol")}
     # information share per year
     ishare = {}
@@ -803,17 +870,21 @@ def b6c_kraken_inventory_arb(archive):
             continue
         with np.errstate(invalid="ignore"):
             ishare[y] = info_share(np.log(cb[sel]), np.log(kr[sel]))
-    # the user's tier criterion: resolves only when every tier agrees
+    # the user's tier is not recorded: that criterion is None (rule 2 / rule 9 cap); the necessary condition at the most
+    # favourable published pair is implemented and can fail decisively (then no tier passes)
     totals = {k_: c_["total_net"] for k_, c_ in cells.items()}
     worst_p = boot[retail_t].get("p")
+    best_p = boot[hv_m].get("p")
     best_ci = boot[hv_m].get("ci") or [None, None]
-    all_pass = worst_p is not None and worst_p < ALPHA and all(t_ > 0 for t_ in totals.values())
-    all_fail_dec = best_ci[1] is not None and best_ci[1] < 0
-    tier_ok = True if all_pass else (False if all_fail_dec else None)
+    best_ok = None if best_p is None else bool(best_p < ALPHA and cells[hv_m]["total_net"] > 0)
+    best_dec = best_ci[1] is not None and best_ci[1] < 0
     n_pos = sum(1 for t_ in totals.values() if t_ > 0)
-    crit = [(f"net P&L > 0 with bootstrap p < 0.05 at the user's tier (tier not recorded in the repo; {n_pos} of {len(totals)} tier pairs x readings positive; "
-             f"worst tier taker: total {_pc(cells[retail_t]['total_net'])} p {_f(worst_p, 4)}; best tier maker: total {_pc(cells[hv_m]['total_net'])}, "
-             f"daily mean one-sided 95% bounds [{_pc(best_ci[0], 4)}, {_pc(best_ci[1], 4)}], p {_f(boot[hv_m].get('p'), 4)})", tier_ok, all_fail_dec)]
+    crit = [(f"net P&L > 0 with bootstrap p < 0.05 at the user's tier (the user's Coinbase / Kraken fee tier is not recorded in the repo; "
+             f"{n_pos} of {len(totals)} tier pairs x fee readings have a positive total; least favourable pair {RETAIL_PAIR[0]} / {RETAIL_PAIR[1]} taker: "
+             f"total {_pc(cells[retail_t]['total_net'])}, p {_f(worst_p, 4)})", None, False),
+            (f"necessary for any tier: net P&L > 0 with bootstrap p < 0.05 at the most favourable published pair ({HIGHVOL_PAIR[0]} / {HIGHVOL_PAIR[1]}, maker): "
+             f"total {_pc(cells[hv_m]['total_net'])}, daily mean {_pc(boot[hv_m].get('est'), 4)} with one-sided 95% bounds [{_pc(best_ci[0], 4)}, "
+             f"{_pc(best_ci[1], 4)}], p {_f(best_p, 4)}", best_ok, best_dec)]
     verdict, why = _judge(crit, n, MIN_N[tid], "aligned minutes", cov["missing"], cov["window"])
     rm, hm = cells[retail_m], cells[hv_m]
     reason = (f"Coinbase/Kraken BTC-USD 1-minute {cov['window']}: covered {_months_txt(cov['covered'])}, {n} aligned minutes; retail pair "
@@ -833,7 +904,8 @@ def b6c_kraken_inventory_arb(archive):
                       "user_tier": None, "note": "the user's Coinbase / Kraken fee tier is not recorded in the repo"},
             "cells": {k_: {q: v_ for q, v_ in c_.items() if not q.startswith("_")} for k_, c_ in cells.items()},
             "bootstrap": boot, "regimes": regimes, "five_minute": {k_: {q: v_ for q, v_ in c_.items() if not q.startswith("_")} for k_, c_ in five.items()},
-            "family_sharpes_daily": fam_sr, "dsr": {k_: {q: v_ for q, v_ in d_.items()} for k_, d_ in dsr.items()},
+            "family_sharpes_daily": fam_sr, "family_triggers": fam_trig, "family_min_n": FAMILY_MIN_N,
+            "dsr": {k_: {q: v_ for q, v_ in d_.items()} for k_, d_ in dsr.items()},
             "information_share_coinbase": ishare, "costs": {"edge_bps": EDGE_BPS, "hold_minutes": HOLD_MIN, "exit_sigma": EXIT_SIGMA,
                                                            "transfer_fee_btc_per_week": TRANSFER_FEE, "financing": "DTB3 continuous on 2 x notional USD inventory, daily"},
             "criteria": crit, "rule10": "1-minute: every minute is a decision (no phase); 5-minute cell: the 5 phases pooled, range reported",
@@ -843,12 +915,13 @@ def b6c_kraken_inventory_arb(archive):
 
 # ======================================================================================================= T-459 ==
 
-def imbalance_z(g: dict, w: int) -> np.ndarray:
-    """z of the w-minute signed-volume imbalance against the trailing day (prior 1440 minutes, >= 720 valid)."""
+def imbalance_z(g: dict, w: int, signed: bool = False) -> np.ndarray:
+    """z of the w-minute imbalance against the trailing day (prior 1440 minutes, >= 720 valid): the library's ratio
+    (buy - sell) / (buy + sell), or with ``signed`` the raw signed volume buy - sell in BTC (the alternative reading)."""
     b, s = _roll_sum(g["kr_buy"], w), _roll_sum(g["kr_sell"], w)
     tot = b + s
     with np.errstate(invalid="ignore", divide="ignore"):
-        I = np.where(tot > 0, (b - s) / np.where(tot > 0, tot, 1.0), np.nan)
+        I = np.where(tot > 0, (b - s) if signed else (b - s) / np.where(tot > 0, tot, 1.0), np.nan)
     mu, sd = _roll_prior(I, Z_WINDOW, Z_MIN)
     with np.errstate(invalid="ignore", divide="ignore"):
         z = (I - mu) / sd
@@ -959,8 +1032,25 @@ def b6c_kraken_flow_imbalance(archive):
     n = int(x.size)
     labels = [_day_str(int(d)) for d in _day_of(g, to["entry"])] if n else []
     cs = cluster_stud(x, labels) if n >= 8 else {"est": float(x.mean()) if n else None, "ci": [None, None], "p": None, "p_lt": None, "clusters": 0}
-    fam = [v_["sharpe_per_trade"] for v_ in cells_oos.values()]
+    sb = (stationary_boot_mean(x, n / max(1, len(set(labels)))) if n >= 8
+          else {"est": float(x.mean()) if n else None, "ci": [None, None], "p": None, "p_lt": None, "mean_block": None})
+    p_ok = _agree(sb.get("p"), cs.get("p"), 0.01)
+    p_dec = all(v_ is not None and v_ < 0.01 for v_ in (sb.get("p_lt"), cs.get("p_lt")))
+    fam = [v_["sharpe_per_trade"] for v_ in cells_oos.values() if v_["n"] >= FAMILY_MIN_N]
     dsr = family_dsr(x, fam, T459_CELLS) if n > 3 else {"dsr": None, "psr0": None}
+    # the alternative reading of 'signed-volume imbalance': raw buy - sell (BTC) z-scored the same way (reported, not decided)
+    z_sv = imbalance_z(g, 5, signed=True)
+    alt_is = imbalance_trades(g, z_sv, a0, a1, 5, 2.0, True)
+    alt = imbalance_trades(g, z_sv, b0, b1, 5, 2.0, True)
+    xa = alt["net"]
+    la = [_day_str(int(d)) for d in _day_of(g, alt["entry"])] if xa.size else []
+    alt_cs = cluster_stud(xa, la) if xa.size >= 8 else {"p": None, "p_lt": None, "ci": [None, None]}
+    alt_sb = stationary_boot_mean(xa, xa.size / max(1, len(set(la)))) if xa.size >= 8 else {"p": None, "p_lt": None, "ci": [None, None]}
+    alt_out = {"construction": "z of the 5-minute raw signed volume (buy - sell, BTC) against the trailing day; z > 2; maker-only; same fills and fees",
+               "in_sample": {"signals": alt_is["signals"], "n": int(alt_is["net"].size), "mean_net": float(alt_is["net"].mean()) if alt_is["net"].size else None},
+               "out_of_sample": {"signals": alt["signals"], "taken": alt.get("signals_taken", 0), "unfilled_bids": alt["unfilled"], "n": int(xa.size),
+                                 "mean_net": float(xa.mean()) if xa.size else None, "stationary_p": alt_sb.get("p"), "stationary_p_lt": alt_sb.get("p_lt"),
+                                 "cluster_p": alt_cs.get("p"), "cluster_p_lt": alt_cs.get("p_lt"), "ci95": alt_cs.get("ci")}}
     fwd = forward_regression(g, zs[5], b0, b1, 5) if b1 > b0 else {"slope": None, "t": None, "n": 0}
     fwd_is = forward_regression(g, zs[5], a0, a1, 5)
     # strict fills, Tier-1 sensitivity, terciles
@@ -976,33 +1066,42 @@ def b6c_kraken_flow_imbalance(archive):
             sel = lab == q
             terc[name] = {"n": int(sel.sum()), "mean_net": float(x[sel].mean()) if sel.any() else None}
     crit = [
-        (f"out-of-sample mean net per trade {_pc(cs.get('est'), 3)} > 0 with p < 0.01 (1-day clusters: p {_f(cs.get('p'), 4)}, 95% CI "
-         f"[{_pc((cs.get('ci') or [None])[0], 3)}, {_pc((cs.get('ci') or [None, None])[1], 3)}], {cs.get('clusters', 0)} days)",
-         None if cs.get("p") is None else cs["p"] < 0.01, cs.get("p_lt") is not None and cs["p_lt"] < 0.01),
-        dsr_row(dsr, f"DSR >= 0.95 over {T459_CELLS} declared cells (24 computed)"),
+        (f"out-of-sample mean net per trade {_pc(cs.get('est'), 3)} > 0 with p < 0.01: stationary block bootstrap with 1-day blocks (mean block "
+         f"{_f(sb.get('mean_block'), 1)} trades) p {_f(sb.get('p'), 4)}, 95% percentile CI [{_pc((sb.get('ci') or [None])[0], 3)}, "
+         f"{_pc((sb.get('ci') or [None, None])[1], 3)}]; the day-cluster studentized bootstrap must agree: p {_f(cs.get('p'), 4)} "
+         f"({cs.get('clusters', 0)} days), 95% CI [{_pc((cs.get('ci') or [None])[0], 3)}, {_pc((cs.get('ci') or [None, None])[1], 3)}]",
+         p_ok, p_dec),
+        dsr_row(dsr, f"DSR >= 0.95 over {T459_CELLS} declared cells (24 computed; family variance from the {len(fam)} cells with >= {FAMILY_MIN_N} trades)"),
     ]
     verdict, why = _judge(crit, n, MIN_N[tid], "out-of-sample trades", cov["missing"], cov["window"])
     oos_cov = [m for m in cov["covered"] if m >= T459_OOS_FIRST]
     reason = (f"Kraken XBTUSD 1-minute bars {cov['window']} (in-sample {first}..{is_last}, out of sample {T459_OOS_FIRST}..{last}): covered "
               f"{_months_txt(cov['covered'])} (out-of-sample months stored: {_months_txt(oos_cov) if oos_cov else 'none'}); claim cell w5/h5/z2/maker out of "
-              f"sample: {to['signals']} signals, {to.get('signals_taken', 0)} taken, {to['unfilled']} unfilled bids, {n} trades, mean net {_pc(cs.get('est'), 3)}, "
+              f"sample: {to['signals']} signals, {to.get('signals_taken', 0)} taken, {to['unfilled']} unfilled bids, {n} trades, mean net {_pc(cs.get('est'), 3)} "
+              f"(stationary 1-day-block p {_f(sb.get('p'), 4)}, day-cluster p {_f(cs.get('p'), 4)}), "
               f"maker exits {_pc(float(to['maker_exit'].mean()) if n else None, 1)}, strict-fill mean net {_pc(float(strict['net'].mean()) if strict['net'].size else None, 3)} "
               f"({strict['net'].size}), Tier-1 fees {_pc(float(tier1['net'].mean()) if tier1['net'].size else None, 3)}; in-sample claim cell "
               f"{cells_is[ckey]['n']} trades mean net {_pc(cells_is[ckey]['mean_net'], 3)}; in-sample best cell {best_is} "
               f"({_pc(cells_is[best_is]['mean_net'], 3) if best_is else 'n/a'}) out of sample {_pc(cells_oos[best_is]['mean_net'], 3) if best_is else 'n/a'} "
               f"({cells_oos[best_is]['n'] if best_is else 0}); forward 5-minute return on z: slope {_f(fwd['slope'], 6)} (HAC t {_f(fwd['t'], 2)}, n {fwd['n']}) "
               f"out of sample, in-sample t {_f(fwd_is['t'], 2)}; vol terciles " + (", ".join(f"{k_} {_pc(v_['mean_net'], 3)} ({v_['n']})" for k_, v_ in terc.items()) or "n/a")
-              + f"; DSR {_f(dsr.get('dsr'))} — " + why)
+              + f"; DSR {_f(dsr.get('dsr'))} ({len(fam)} cells with >= {FAMILY_MIN_N} trades in the family variance); alternative reading (raw signed volume z > 2): "
+              f"in-sample {alt_out['in_sample']['n']} trades mean net {_pc(alt_out['in_sample']['mean_net'], 3)}, out of sample {alt_out['out_of_sample']['n']} trades "
+              f"mean net {_pc(alt_out['out_of_sample']['mean_net'], 3)} (stationary p {_f(alt_out['out_of_sample']['stationary_p'], 4)}) — " + why)
     stat = {"window": cov["window"], "in_sample": f"{first}..{is_last}", "out_of_sample": f"{T459_OOS_FIRST}..{last}", "covered_months": _months_txt(cov["covered"]),
             "missing_months": cov["missing"], "oos_months_stored": oos_cov, "n_oos_trades": n, "claim_cell": ckey,
             "oos": {"signals": to["signals"], "taken": to.get("signals_taken", 0), "unfilled_bids": to["unfilled"], "mean_net": cs.get("est"),
+                    "stationary_boot": {kq: sb.get(kq) for kq in ("est", "ci", "ci_mc_se", "p", "p_mc_se", "p_lt", "mean_block", "reps")},
                     "cluster_boot": {kq: cs.get(kq) for kq in ("est", "se", "ci", "ci90", "p", "p_lt", "clusters")},
+                    "rule11": "the stationary block bootstrap (the trial's null) and the day-cluster studentized bootstrap must agree",
                     "maker_exit_share": float(to["maker_exit"].mean()) if n else None,
                     "strict_fill": {"n": int(strict["net"].size), "mean_net": float(strict["net"].mean()) if strict["net"].size else None},
                     "tier1_fees": {"n": int(tier1["net"].size), "mean_net": float(tier1["net"].mean()) if tier1["net"].size else None}},
             "in_sample_claim_cell": cells_is[ckey], "in_sample_best": best_is, "cells_in_sample": cells_is,
             "cells_out_of_sample": {k_: {q: v_ for q, v_ in c_.items() if not q.startswith("_")} for k_, c_ in cells_oos.items()},
-            "forward_regression_oos": fwd, "forward_regression_is": fwd_is, "vol_terciles_oos": terc, "dsr": dsr,
+            "forward_regression_oos": fwd, "forward_regression_is": fwd_is, "vol_terciles_oos": terc, "dsr": dsr, "family_min_n": FAMILY_MIN_N,
+            "alternative_reading_signed_volume": alt_out,
+            "signal_note": "the library's ratio imbalance on thin Kraken minutes rarely exceeds 2 trailing-day sigmas (bounded at 1, sd about 0.64)",
             "fees": {"maker": T459_MAKER, "taker": T459_TAKER, "sensitivity_tier1": T459_TIER1}, "criteria": crit,
             "rule12": "signal from the closed minute t (known at t+60 s); fills by later prints through the resting quote",
             "rule10": "signal-driven entries: no grid phase"}
