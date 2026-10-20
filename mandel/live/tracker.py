@@ -48,8 +48,9 @@ REGISTERED = {"T-541": "2026-10-15", "T-542": "2026-10-14", "T-543": "2026-10-15
 
 
 def _registry() -> dict:
-    from mandel.experiments.run import load_registry
-    th = (load_registry() or {}).get("theories", [])
+    # Read the file directly: mandel.experiments.run imports numpy, which the paper box does not install.
+    path = MANDEL_ROOT / "theories" / "registry.json"
+    th = (json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}).get("theories", [])
     return {t.get("id"): t for t in th} if isinstance(th, list) else th
 
 
