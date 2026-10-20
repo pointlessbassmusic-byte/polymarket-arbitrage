@@ -14875,7 +14875,9 @@
     "pass": "all three ETFs: difference > 0 with Holm p < 0.05",
     "controls": "the January refit is what T-561/T-562 used; the daily refit can only use returns before the forecast day; the result decides whether the live shadows (T-565/T-566) should be refitted daily (a change made only at a pre-registered checkpoint)"
    },
-   "experiments": [],
+   "experiments": [
+    "b10_calib_hmm_daily_vs_yearly"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
