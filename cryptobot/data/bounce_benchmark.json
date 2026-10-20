@@ -1,0 +1,758 @@
+{
+"rule": "short when the 1-day move is in its top tercile and the 3-day move in its bottom tercile; -20% target, +10% stop, 14 days",
+"coins": [
+"DOGE",
+"kSHIB"
+],
+"cost": 0.0018,
+"n": 123,
+"mean": 0.033553390243902435,
+"hit": 0.5691056910569106,
+"exits": {
+"take_profit": 0.24390243902439024,
+"stop_loss": 0.37398373983739835,
+"time_exit": 0.3821138211382114
+},
+"first": "2022-03-05",
+"last": "2026-09-24",
+"trades": [
+{
+"coin": "DOGE",
+"date": "2022-03-05",
+"ret": 0.009408,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2022-04-12",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2022-05-01",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2022-05-10",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2022-05-13",
+"ret": 0.072695,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2022-06-02",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2022-06-14",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2022-06-29",
+"ret": 0.108096,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2022-08-20",
+"ret": 0.093596,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2022-09-07",
+"ret": 0.061049,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2022-11-04",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2022-11-10",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2022-11-22",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2022-12-17",
+"ret": 0.110926,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2023-02-03",
+"ret": 0.054538,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2023-04-22",
+"ret": 0.042813,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2023-06-06",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2023-08-18",
+"ret": -0.011879,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2023-11-15",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2023-11-22",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2023-12-13",
+"ret": 0.025347,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2024-01-04",
+"ret": 0.068554,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2024-03-14",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2024-03-17",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2024-04-04",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2024-04-14",
+"ret": 0.093829,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2024-05-02",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2024-05-09",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2024-05-24",
+"ret": 0.093519,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2024-06-15",
+"ret": 0.106913,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2024-07-06",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2024-08-06",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2024-09-02",
+"ret": -0.007848,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2024-09-17",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2024-11-27",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2024-12-11",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2024-12-28",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2025-01-10",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2025-01-21",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2025-02-03",
+"ret": 0.092173,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2025-02-19",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2025-03-05",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2025-03-11",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2025-05-13",
+"ret": 0.060085,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2025-06-06",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2025-07-25",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2025-08-03",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2025-08-15",
+"ret": 0.064255,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2025-09-24",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2025-10-12",
+"ret": 0.004048,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2025-10-31",
+"ret": 0.15236,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2025-11-15",
+"ret": 0.089003,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2025-12-13",
+"ret": 0.103698,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2026-01-21",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2026-02-02",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "DOGE",
+"date": "2026-02-12",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2026-04-20",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2026-05-08",
+"ret": 0.064045,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2026-08-26",
+"ret": 0.015175,
+"exit": "time_exit"
+},
+{
+"coin": "DOGE",
+"date": "2026-09-11",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "DOGE",
+"date": "2026-09-24",
+"ret": 0.121822,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2022-04-07",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2022-05-01",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2022-05-10",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2022-05-13",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2022-05-28",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2022-06-02",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2022-06-14",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2022-06-29",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2022-07-13",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2022-07-26",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2022-09-07",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2022-09-19",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2022-11-10",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2022-12-17",
+"ret": 0.02352,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2023-01-25",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2023-02-10",
+"ret": 0.022926,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2023-03-01",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2023-03-10",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2023-04-22",
+"ret": 0.094258,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2023-06-06",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2023-06-29",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2023-08-08",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2023-08-18",
+"ret": 0.078289,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2023-09-12",
+"ret": -0.015195,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2023-10-19",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2023-11-22",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2023-12-13",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2024-01-04",
+"ret": 0.076109,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2024-03-11",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2024-03-17",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2024-03-31",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2024-04-14",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2024-06-12",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2024-07-05",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2024-07-19",
+"ret": 0.175064,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2024-08-06",
+"ret": -0.016378,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2024-08-29",
+"ret": 0.038206,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2024-10-26",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2024-11-15",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2024-12-07",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2024-12-11",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2024-12-20",
+"ret": -0.090444,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2025-01-21",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2025-02-03",
+"ret": 0.061295,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2025-02-25",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2025-04-28",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2025-05-13",
+"ret": 0.114841,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2025-06-06",
+"ret": 0.088164,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2025-07-25",
+"ret": 0.057899,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2025-08-20",
+"ret": 0.005676,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2025-10-11",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2025-10-18",
+"ret": -0.029536,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2025-11-05",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2025-12-06",
+"ret": 0.115966,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2026-01-16",
+"ret": 0.152955,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2026-02-02",
+"ret": 0.1982,
+"exit": "take_profit"
+},
+{
+"coin": "kSHIB",
+"date": "2026-04-20",
+"ret": -0.033655,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2026-05-14",
+"ret": 0.154705,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2026-06-07",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2026-08-26",
+"ret": 0.018699,
+"exit": "time_exit"
+},
+{
+"coin": "kSHIB",
+"date": "2026-09-11",
+"ret": -0.1018,
+"exit": "stop_loss"
+},
+{
+"coin": "kSHIB",
+"date": "2026-09-24",
+"ret": 0.082283,
+"exit": "time_exit"
+}
+]
+}
