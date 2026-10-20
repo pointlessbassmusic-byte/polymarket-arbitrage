@@ -88,21 +88,40 @@ LEXICON: dict[str, tuple[str, str, list[str]]] = {
     "provenance":      ("Provenance & audit", "substrate", [r"\bprovenance\b", r"\baudit", r"\bledger\b", r"\bhash", r"\btamper"]),
     "agent_tools":     ("Agents, tools, MCP", "substrate", [r"\bmcp\b", r"\bagentic\b", r"\btool[- ]use\b", r"\bclaude code\b", r"\bsubagent"]),
     "cost_budget":     ("Resource cost & budgets", "substrate", [r"\btoken(s)? (cost|budget)\b", r"\bbudget", r"\bcost of (information|acquiring)\b", r"\bfrugal", r"\bresource (use|waste)\b"]),
+    # market variables (the learning program's inputs and the strategy literature around them, 2026-10-20)
+    "volume":          ("Volume & liquidity", "variables", [r"\bvolume\b", r"\bturnover\b", r"\bdollar volume\b", r"\billiquid", r"\bamihud\b", r"\bvwap\b"]),
+    "implied_vol":     ("Implied volatility & skew", "variables", [r"\bimplied vol", r"\bvolatility smirk\b", r"\bskew\b", r"\bvix\b", r"\bdvol\b", r"\bterm structure\b"]),
+    "vrp":             ("Variance risk premium", "variables", [r"\bvariance risk premium\b", r"\bvolatility risk premium\b", r"\bvrp\b", r"\bimplied[- ](minus|over)[- ]reali[sz]ed\b"]),
+    "option_flow":     ("Dealer gamma & option flow", "variables", [r"\bgamma\b", r"\bvanna\b", r"\bcharm\b", r"\bopex\b", r"\b0dte\b", r"\bput[- ]call\b", r"\bopen interest\b", r"\bpinning\b"]),
+    "short_interest":  ("Short interest & lending", "variables", [r"\bshort interest\b", r"\bdays[- ]to[- ]cover\b", r"\bshort volume\b", r"\bshort[- ]sale\b", r"\bborrow (fee|cost|rate)", r"\bsecurities lending\b", r"\bshort squeeze", r"\breg ?sho\b"]),
+    "earnings":        ("Earnings & corporate events", "variables", [r"\bearnings\b", r"\bpead\b", r"\bannouncement (premium|drift|return)", r"\bbuybacks?\b", r"\bshare issuance\b", r"\bindex (inclusion|addition|deletion)", r"\binsider (buying|trading|filings?)"]),
+    "size":            ("Size & market cap", "variables", [r"\bmarket cap", r"\bsize (effect|premium|factor)", r"\bsmall[- ]caps?\b", r"\bshares outstanding\b"]),
+    "intraday":        ("Intraday & overnight patterns", "variables", [r"\bintraday\b", r"\bovernight\b", r"\btime[- ]of[- ]day\b", r"\bopening range\b", r"\bclos(e|ing) auction\b", r"\bhalf[- ]hour\b"]),
+    "calendar":        ("Calendar & macro events", "variables", [r"\bfomc\b", r"\bturn[- ]of[- ](the[- ])?month\b", r"\bpre[- ]holiday\b", r"\bmonth[- ]end\b", r"\bcpi\b", r"\bpayrolls?\b", r"\bseasonal(ity)?\b", r"\bday[- ]of[- ](the[- ])?week\b"]),
+    "lead_lag":        ("Cross-asset lead-lag", "variables", [r"\blead[- ]lag\b", r"\bcross[- ]asset\b", r"\beconomic links?\b", r"\bspill-?overs?\b", r"\bleading indicator"]),
+    "momentum":        ("Momentum & reversal", "variables", [r"\bmomentum\b", r"\breversal\b", r"\btrend[- ]following\b", r"\bmean[- ]revers"]),
+    "carry":           ("Carry, basis & funding", "variables", [r"\bcarry\b", r"\bbasis\b", r"\bfunding rates?\b", r"\broll yield\b", r"\bcontango\b", r"\bbackwardation\b"]),
+    "positioning":     ("Positioning & flows", "variables", [r"\bcommitments of traders\b", r"\bcot\b", r"\bhedging pressure\b", r"\b(fund|etf) flows?\b", r"\brebalanc", r"\bliquidations?\b"]),
+    "vol_regime":      ("Volatility regimes & timing", "variables", [r"\bvolatility[- ]managed\b", r"\bvolatility timing\b", r"\bregime[- ]switch", r"\breali[sz]ed (vol|skew|kurt)", r"\bhar[- ]rv\b"]),
+    "anomaly_decay":   ("Anomaly decay after publication", "validation", [r"\bpost[- ]publication\b", r"\banomal(y|ies) (decay|disappear)", r"\bdecay(ed|s)?\b", r"\barbitraged away\b", r"\bno longer (works|pays)\b"]),
+    "reference_price": ("Reference-price edge", "markets", [r"\breference[- ]price\b", r"\bsharper (public )?source\b", r"\bleads? the (book|market)\b"]),
+    "adverse_selection": ("Adverse selection & markouts", "markets", [r"\badverse(ly)? select", r"\bmarkouts?\b", r"\bqueue position\b", r"\bmaker fills?\b"]),
 }
 
 CONCEPT_GROUP_LABELS = {
     "information": "Information", "prediction": "Prediction", "framing": "Framing", "validation": "Validation",
     "learning": "Learning", "mathematics": "Mathematics", "fractal": "Fractals", "markets": "Markets", "substrate": "Substrate",
+    "variables": "Market variables",
 }
 
 # Principles from MANDEL.md section 2, with the concepts that feed them and the centres they govern.
 PRINCIPLES: list[tuple[str, str, list[str], list[str]]] = [
     ("p01", "Provenance is mandatory", ["provenance", "memory", "noisy_channel"], ["store", "ledger"]),
     ("p02", "Pre-register before you measure", ["replication", "forking_paths", "rsi"], ["proposals", "ledger"]),
-    ("p03", "Only out-of-sample results count", ["overfitting", "lookahead", "backtest"], ["gate"]),
-    ("p04", "Score with proper scoring rules", ["proper_scoring", "calibration", "shannon", "edge_vs_market"], ["forecasts", "gate"]),
-    ("p05", "Deflate for the search", ["monte_carlo", "backtest", "forking_paths", "law_large_numbers"], ["gate"]),
-    ("p06", "Information has a cost; budget it", ["information", "entropy", "cost_budget", "fees_slippage"], ["cycles"]),
+    ("p03", "Only out-of-sample results count", ["overfitting", "lookahead", "backtest", "anomaly_decay"], ["gate"]),
+    ("p04", "Score with proper scoring rules", ["proper_scoring", "calibration", "shannon", "edge_vs_market", "reference_price"], ["forecasts", "gate"]),
+    ("p05", "Deflate for the search", ["monte_carlo", "backtest", "forking_paths", "law_large_numbers", "anomaly_decay"], ["gate"]),
+    ("p06", "Information has a cost; budget it", ["information", "entropy", "cost_budget", "fees_slippage", "adverse_selection"], ["cycles"]),
     ("p07", "Redundancy for reliability", ["noisy_channel", "replication", "bayes"], ["store", "children"]),
     ("p08", "Never delete; tombstone", ["provenance", "information", "memory"], ["ledger", "store"]),
     ("p09", "Point-in-time discipline", ["lookahead", "markov", "backtest"], ["gate", "forecasts"]),
@@ -210,7 +229,11 @@ def _excerpt(text: str, rxs: Iterable[re.Pattern], width: int = 230) -> str:
 
 
 def build_graph(knowledge_root: Path = KNOWLEDGE_ROOT, mandel_root: Path = MANDEL_ROOT,
-                children: Optional[list[dict]] = None) -> dict:
+                children: Optional[list[dict]] = None, theories: Optional[list[dict]] = None,
+                child_ledger: Optional[list[dict]] = None) -> dict:
+    """``theories`` (the registry's rows) and ``child_ledger`` (the children's pre-registered tests with verdicts) add the
+    evidence overlay: what Mandel's and the children's own tests say about each concept. A child's ``text`` (its reports
+    and guidance) links the child to the concepts it reports on."""
     rx = _compile()
     nodes: dict[str, Node] = {}
     edges: list[Edge] = []
@@ -337,6 +360,23 @@ def build_graph(knowledge_root: Path = KNOWLEDGE_ROOT, mandel_root: Path = MANDE
     edges.append(Edge("stream:markets", "k:edge_vs_market", "provenance", 1, 1.5, "observed"))
     edges.append(Edge("stream:resolutions", "c:forecasts", "flow", 1, 1.5, "resolve"))
 
+    # ---- evidence overlay: Mandel's verdicts, the children's reports and their research ledger ----
+    for ch in children or []:
+        text = ch.get("text") or ""
+        for cid, r in rx.items():
+            n = _count_mentions(text, r)
+            if n and f"k:{cid}" in nodes:
+                edges.append(Edge(f"child:{ch['name']}", f"k:{cid}", "evidence", 1, float(min(6, 1 + math.log1p(n))),
+                                  f"the child's reports mention it {n} time{'s' if n != 1 else ''}"))
+    _verdict_overlay(nodes, edges, rx, theories, "stream:theories", "Mandel's tested theories",
+                     "pre-registered theories and their verdicts (theories/registry.json)",
+                     lambda t: f"{t.get('slug', '')} {t.get('claim', '')}", lambda t: t.get("status", ""),
+                     ("supported",), ("not_supported",))
+    _verdict_overlay(nodes, edges, rx, child_ledger, "stream:child-ledger", "Children's research ledger",
+                     "the children's pre-registered tests (child repo docs/research_ledger.json)",
+                     lambda t: f"{t.get('test', '')} {t.get('result', '')}", lambda t: str(t.get("verdict", "")).upper(),
+                     ("PASS",), ("FAIL",))
+
     # ---- edges whose endpoints are missing are dropped ----------------
     edges = [e for e in edges if e.s in nodes and e.t in nodes]
 
@@ -350,6 +390,31 @@ def build_graph(knowledge_root: Path = KNOWLEDGE_ROOT, mandel_root: Path = MANDE
         "nodes": [asdict(n) for n in nodes.values()],
         "edges": [asdict(e) for e in edges],
     }
+
+
+def _verdict_overlay(nodes, edges, rx, rows, sid, label, detail, text_of, status_of, good, bad):
+    """One substrate node for a body of tests; an evidence edge to every concept the tests touch, positive when more of
+    them passed than failed, negative otherwise, with the tally in the label and on the concept."""
+    if not rows:
+        return
+    nodes[sid] = Node(sid, label, 0, "stream", size=2.2, group="streams", detail=detail, meta={"rows": len(rows)})
+    for cid, r in rx.items():
+        k = f"k:{cid}"
+        if k not in nodes:
+            continue
+        tally: dict[str, int] = {}
+        for t in rows:
+            if _count_mentions(text_of(t), r):
+                st = status_of(t) or "unknown"
+                tally[st] = tally.get(st, 0) + 1
+        if not tally:
+            continue
+        g, b = sum(tally.get(x, 0) for x in good), sum(tally.get(x, 0) for x in bad)
+        tested = g + b
+        nodes[k].meta.setdefault("verdicts", {})[label] = tally
+        desc = ", ".join(f"{v} {s.replace('_', ' ').lower()}" for s, v in sorted(tally.items(), key=lambda x: -x[1]))
+        edges.append(Edge(sid, k, "evidence", 1 if g >= b and tested else -1, float(min(6, 1 + math.log1p(sum(tally.values())))),
+                          f"{desc} ({g} of {tested} decided passed)" if tested else desc))
 
 
 def write_graph(out_path: Optional[Path] = None, **kw) -> Path:

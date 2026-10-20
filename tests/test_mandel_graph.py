@@ -79,3 +79,26 @@ def test_write_html_embeds_json(tmp_path):
     out = write_html(build_graph(knowledge_root=_tree(tmp_path)), template=tpl, out=tmp_path / "o.html")
     html = out.read_text()
     assert PLACEHOLDER not in html and '"nodes":[' in html and "</script>" in html
+
+
+def test_evidence_overlay_tallies_verdicts(tmp_path):
+    root = _tree(tmp_path)
+    (root / "adjacent" / "A2-vol.md").write_text(DOC.format(title="Vol", extra=" and the variance risk premium and short interest"))
+    theories = [{"slug": "vrp-a", "claim": "the variance risk premium pays", "status": "supported"},
+                {"slug": "vrp-b", "claim": "a variance risk premium timing rule", "status": "not_supported"},
+                {"slug": "vrp-c", "claim": "variance risk premium on BTC", "status": "supported"},
+                {"slug": "si", "claim": "short interest predicts returns", "status": "not_supported"}]
+    ledger = [{"test": "short interest squeeze", "verdict": "FAIL", "result": ""}]
+    kids = [{"name": "Hurst", "domain": "", "status": "active", "report_count": 1, "guidance_count": 0,
+             "text": "funding carry and the variance risk premium"}]
+    g = build_graph(knowledge_root=root, children=kids, theories=theories, child_ledger=ledger)
+    ids = {n["id"] for n in g["nodes"]}
+    assert {"stream:theories", "stream:child-ledger"} <= ids
+    ev = {(e["s"], e["t"]): e for e in g["edges"] if e["type"] == "evidence"}
+    assert ev[("stream:theories", "k:vrp")]["sign"] == 1 and "2 of 3 decided passed" in ev[("stream:theories", "k:vrp")]["label"]
+    assert ev[("stream:theories", "k:short_interest")]["sign"] == -1
+    assert ev[("stream:child-ledger", "k:short_interest")]["sign"] == -1
+    assert ("child:Hurst", "k:vrp") in ev
+    k = next(n for n in g["nodes"] if n["id"] == "k:vrp")
+    assert k["meta"]["verdicts"]["Mandel's tested theories"] == {"supported": 2, "not_supported": 1}
+    assert all(e["s"] in ids and e["t"] in ids for e in g["edges"])

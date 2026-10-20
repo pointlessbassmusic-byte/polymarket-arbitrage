@@ -157,6 +157,7 @@ aside#panel { min-width: 0; min-height: 0; overflow: auto; background: var(--sur
         <label><input type="checkbox" id="f-skeptical" checked> Held loosely</label>
         <label><input type="checkbox" id="f-tension" checked> Tension</label>
         <label><input type="checkbox" id="f-flow" checked> Loop flow</label>
+        <label><input type="checkbox" id="f-evidence" checked> Test evidence</label>
         <label class="wide">Sign
           <select id="f-sign" aria-label="Edge sign"><option value="all">all</option><option value="pos">correlated only</option><option value="neg">inverse only</option></select>
         </label>
@@ -203,18 +204,18 @@ aside#panel { min-width: 0; min-height: 0; overflow: auto; background: var(--sur
   const nodes = GRAPH.nodes.map(n => ({ ...n }));
   const byId = new Map(nodes.map(n => [n.id, n]));
   const links = GRAPH.edges.map((e, i) => ({ ...e, i, source: byId.get(e.s), target: byId.get(e.t) })).filter(l => l.source && l.target);
-  const DIRECTED = new Set(['provenance', 'skeptical', 'supports', 'flow']);
+  const DIRECTED = new Set(['provenance', 'skeptical', 'supports', 'flow', 'evidence']);
   const adj = new Map(nodes.map(n => [n.id, []]));
   links.forEach(l => { adj.get(l.s).push(l); adj.get(l.t).push(l); });
 
   const st = GRAPH.stats;
   $('stats').innerHTML = `<span><b>${st.nodes}</b> nodes</span><span><b>${st.edges}</b> edges</span><span><b>${st.documents}</b> knowledge files</span>`;
-  $('method-note').textContent = `Co-occurrence edges are computed from ${st.documents} knowledge files (positive PMI, or never-together for common concepts). With this few documents they are suggestive, not proof. Provenance and held-loosely edges come straight from each file's sections; supports and loop-flow edges are the engine's own structure.`;
+  $('method-note').textContent = `Co-occurrence edges are computed from ${st.documents} knowledge files (positive PMI, or never-together for common concepts). With this few documents they are suggestive, not proof. Provenance and held-loosely edges come straight from each file's sections; supports and loop-flow edges are the engine's own structure. Test-evidence edges tally what Mandel's pre-registered theories and the children's own tests found for each concept: solid when more passed than failed, dashed when more failed.`;
   $('stage-note').textContent = `${st.layers.substrate} substrate · ${st.layers.concepts} concepts · ${st.layers.principles} principles · ${st.layers.centres} centres`;
 
   // ---------- state ----------
   const state = { hover: null, selected: null, query: '', ambient: !reduced, pulse: null,
-                  filters: { types: new Set(['provenance', 'cooccur', 'supports', 'skeptical', 'tension', 'flow']), sign: 'all', minw: 0 } };
+                  filters: { types: new Set(['provenance', 'cooccur', 'supports', 'skeptical', 'tension', 'flow', 'evidence']), sign: 'all', minw: 0 } };
 
   function edgeVisible(l) {
     const f = state.filters;
@@ -461,7 +462,9 @@ aside#panel { min-width: 0; min-height: 0; overflow: auto; background: var(--sur
     const conns = adj.get(n.id).filter(edgeVisible).sort((a, b) => b.w - a.w);
     const kv = [];
     if (n.kind === 'source') { kv.push(['file', n.meta.file || n.detail]); if (n.meta.coverage != null) kv.push(['coverage confidence', n.meta.coverage]); if (n.meta.quality) kv.push(['evidence', n.meta.quality]); if (n.meta.words) kv.push(['words', n.meta.words]); }
-    if (n.kind === 'concept') { kv.push(['group', n.detail]); kv.push(['mentions', n.meta.mentions]); kv.push(['files', n.meta.documents]); }
+    if (n.kind === 'concept') { kv.push(['group', n.detail]); kv.push(['mentions', n.meta.mentions]); kv.push(['files', n.meta.documents]);
+      Object.entries((n.meta && n.meta.verdicts) || {}).forEach(([who, t]) => kv.push([who, Object.entries(t).sort((a, b) => b[1] - a[1]).map(([s, c]) => c + ' ' + s.replace(/_/g, ' ').toLowerCase()).join(', ')])); }
+    if (n.kind === 'stream') { kv.push(['what', n.detail]); if (n.meta && n.meta.rows) kv.push(['tests', n.meta.rows]); }
     if (n.kind === 'centre') kv.push(['module', n.meta.module]);
     if (n.kind === 'child') { kv.push(['domain', n.detail]); kv.push(['status', n.meta.status]); kv.push(['reports', n.meta.report_count]); }
     if (n.kind === 'principle') kv.push(['from', 'MANDEL.md §2']);
@@ -493,7 +496,7 @@ aside#panel { min-width: 0; min-height: 0; overflow: auto; background: var(--sur
   $('btn-clear').addEventListener('click', () => { $('search').value = ''; state.query = ''; state.pulse = null; select(null); });
   $('search').addEventListener('input', e => { state.query = e.target.value.trim().toLowerCase(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { select(null); } if (e.key === '/' && document.activeElement !== $('search')) { e.preventDefault(); $('search').focus(); } });
-  ['provenance', 'cooccur', 'supports', 'skeptical', 'tension', 'flow'].forEach(t => $('f-' + t).addEventListener('change', e => { if (e.target.checked) state.filters.types.add(t); else state.filters.types.delete(t); if (state.selected) select(state.selected); }));
+  ['provenance', 'cooccur', 'supports', 'skeptical', 'tension', 'flow', 'evidence'].forEach(t => $('f-' + t).addEventListener('change', e => { if (e.target.checked) state.filters.types.add(t); else state.filters.types.delete(t); if (state.selected) select(state.selected); }));
   $('f-sign').addEventListener('change', e => { state.filters.sign = e.target.value; if (state.selected) select(state.selected); });
   $('f-minw').addEventListener('input', e => { state.filters.minw = parseFloat(e.target.value); if (state.selected) select(state.selected); });
   const ps = $('pulse-src');

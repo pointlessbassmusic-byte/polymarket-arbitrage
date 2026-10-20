@@ -478,12 +478,31 @@ def cmd_ingest(_args) -> int:
     return 0
 
 
+def _graph_evidence() -> dict:
+    """The evidence overlay's inputs: the theory registry, the children's own report and guidance text, and the child
+    repo's research ledger when it is checked out next to this one."""
+    import json as _json
+    from mandel.paths import MANDEL_ROOT
+    out = {"theories": None, "child_ledger": None, "texts": {}}
+    reg = MANDEL_ROOT / "theories" / "registry.json"
+    if reg.exists():
+        out["theories"] = _json.loads(reg.read_text())["theories"]
+    for d in (MANDEL_ROOT / "state" / "children").glob("*"):
+        if d.is_dir() and (d / "reports.jsonl").exists():
+            out["texts"][d.name.lower()] = " ".join(f.read_text(encoding="utf-8") for f in sorted(d.glob("*.jsonl")))
+    led = MANDEL_ROOT.parent.parent / "pointless-repo" / "docs" / "research_ledger.json"
+    if led.exists():
+        out["child_ledger"] = _json.loads(led.read_text()).get("tests")
+    return out
+
+
 def cmd_graph(args) -> int:
     reg = Ctx().children
+    ev = _graph_evidence()
     kids = [{"name": ch.name, "domain": ch.domain, "status": ch.status, "report_count": ch.report_count,
-             "guidance_count": ch.guidance_count} for ch in reg.all()]
-    g = build_graph(children=kids)
-    out = write_graph(children=kids)
+             "guidance_count": ch.guidance_count, "text": ev["texts"].get(ch.name.lower(), "")} for ch in reg.all()]
+    g = build_graph(children=kids, theories=ev["theories"], child_ledger=ev["child_ledger"])
+    out = write_graph(children=kids, theories=ev["theories"], child_ledger=ev["child_ledger"])
     print(f"graph: {g['stats']} -> {out}")
     if TEMPLATE_PATH.exists() and not args.json_only:
         html = write_html(g)
