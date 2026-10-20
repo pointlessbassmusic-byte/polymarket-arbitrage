@@ -1,0 +1,346 @@
+<style>
+  .pt { font-family: var(--font-anthropic-sans); color: var(--color-fg); display: grid; gap: var(--cds-gap-lg); }
+  .pt-head h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; }
+  .pt-head p { margin: var(--cds-gap-xs) 0 0; color: var(--color-fg-muted); font-size: var(--cds-font-size-body); }
+  .pt-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); gap: var(--cds-gap-md); }
+  .pt-tile, .pt-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); }
+  .pt-tile .lab { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .pt-tile .val { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; margin-top: var(--cds-gap-xs); }
+  .pt-tile .sub { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-top: var(--cds-gap-xs); }
+  .pt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: var(--cds-gap-md); }
+  .pt-card h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; }
+  .pt-card .note { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin: var(--cds-gap-xs) 0 var(--cds-gap-md); }
+  .pt-chart { position: relative; min-height: 120px; }
+  .pt-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); max-width: 16rem; display: none; z-index: 2; }
+  .pt-tip .k { color: var(--cds-text-secondary); }
+  .pt-controls { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; margin-bottom: var(--cds-gap-md); }
+  .pt-controls button { font: inherit; font-size: var(--cds-font-size-caption); padding: var(--cds-pad-xs) var(--cds-pad-sm); border-radius: var(--cds-radius); border: 1px solid var(--color-border-line); background: var(--color-bg); color: var(--color-fg); cursor: pointer; }
+  .pt-controls button[aria-pressed="true"] { border-color: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
+  .pt-controls input { font: inherit; font-size: var(--cds-font-size-caption); padding: var(--cds-pad-xs) var(--cds-pad-sm); border-radius: var(--cds-radius); border: 1px solid var(--color-border-line); background: var(--color-bg); color: var(--color-fg); min-width: 10rem; flex: 1; max-width: 18rem; }
+  .pt-tablebox { max-height: 34rem; overflow: auto; }
+  .pt-table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+  .pt-table th { position: sticky; top: 0; background: var(--color-panel); text-align: left; font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; cursor: pointer; }
+  .pt-table td { padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+  .pt-table td.num, .pt-table th.num { text-align: right; }
+  .pt-bar { display: inline-block; width: 4.5rem; height: 6px; border-radius: 3px; background: var(--cds-chart-grid); vertical-align: middle; margin-right: var(--cds-gap-xs); overflow: hidden; }
+  .pt-bar i { display: block; height: 100%; border-radius: 3px; }
+  .pt-dot { display: inline-block; width: .5rem; height: .5rem; border-radius: 50%; margin-right: .35rem; vertical-align: middle; }
+  .pt-state-running { color: var(--color-ok); } .pt-state-waiting { color: var(--color-warn); } .pt-state-stalled { color: var(--color-bad); }
+  @media (max-width: 40rem) { .pt-hide-narrow { display: none; } }
+  [data-dash-source-state=empty] { color: transparent; }
+  [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+  .pt-fail { display: flex; align-items: center; justify-content: center; gap: .4rem; min-height: 120px; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+  .pt-empty::before { display: none; }
+  .pt-fail::before { content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); }
+</style>
+
+<div class="pt">
+  <header class="pt-head" id="top">
+    <h1>Paper strategy tracker</h1>
+    <p class="pt-takeaway dash-skeleton" data-source="summary" data-field="takeaway">—</p>
+  </header>
+
+  <section class="pt-tiles" id="headline" aria-label="Headline figures">
+    <div class="pt-tile"><div class="lab">Tests tracked</div><div class="val dash-skeleton" data-source="summary" data-field="tests">—</div><div class="sub" data-source="summary" data-field="proposed_note">—</div></div>
+    <div class="pt-tile"><div class="lab">Real money armed</div><div class="val dash-skeleton" data-source="summary" data-field="live_capital">—</div><div class="sub" data-source="summary" data-field="live_note">—</div></div>
+    <div class="pt-tile"><div class="lab">Running</div><div class="val dash-skeleton pt-state-running" data-source="summary" data-field="running">—</div><div class="sub">recording or trading</div></div>
+    <div class="pt-tile"><div class="lab">Waiting on you</div><div class="val dash-skeleton pt-state-waiting" data-source="summary" data-field="waiting">—</div><div class="sub">install or keys</div></div>
+    <div class="pt-tile"><div class="lab">Stalled</div><div class="val dash-skeleton pt-state-stalled" data-source="summary" data-field="stalled">—</div><div class="sub">data capture stopped</div></div>
+    <div class="pt-tile"><div class="lab">Next read</div><div class="val dash-skeleton" data-source="summary" data-field="next_read">—</div><div class="sub" data-source="summary" data-field="next_read_name">—</div></div>
+  </section>
+
+  <div class="pt-grid">
+    <section class="pt-card" id="progress">
+      <h2>Progress to decision</h2>
+      <p class="note">Count so far against the pre-registered sample that decides each test. Tests without a count or target are left out.</p>
+      <div class="pt-chart" id="progress-chart" data-source="strategies"></div>
+    </section>
+    <section class="pt-card" id="reads">
+      <h2>Locked read dates</h2>
+      <p class="note">Forward tests that refuse a verdict before their date, from today on.</p>
+      <div class="pt-chart" id="reads-chart" data-source="strategies"></div>
+    </section>
+  </div>
+
+  <section class="pt-card" id="history">
+    <h2>Progress over time</h2>
+    <p class="note pt-hist-note">Mean share of the decision sample reached, by owner, one point per tracker refresh.</p>
+    <div class="pt-chart" id="history-chart" data-source="history"></div>
+  </section>
+
+  <section class="pt-card" id="all-tests">
+    <h2>Every test</h2>
+    <p class="note">Children's figures are their own and unverified unless the row names a Mandel check. Click a header to sort.</p>
+    <div class="pt-controls">
+      <div class="pt-owners" role="group" aria-label="Owner"></div>
+      <input class="pt-search" type="search" placeholder="Search strategy, venue, status" aria-label="Search tests">
+    </div>
+    <div class="pt-tablebox">
+      <table class="pt-table" data-source="strategies" data-row-key="id">
+        <thead><tr>
+          <th data-field="id">Test</th>
+          <th data-field="owner">Owner</th>
+          <th data-field="strategy">Strategy</th>
+          <th data-field="venue" class="pt-hide-narrow">Venue</th>
+          <th data-field="group" class="pt-hide-narrow">Kind</th>
+          <th data-field="n_now" class="num">Count</th>
+          <th data-field="n_target" class="num">Target</th>
+          <th data-field="unit" class="pt-hide-narrow">Counting</th>
+          <th data-field="status">Status</th>
+          <th data-field="read_date" class="pt-hide-narrow">Read</th>
+          <th data-field="pnl_usd" class="num pt-hide-narrow">P&amp;L</th>
+          <th data-field="next_step" class="pt-hide-narrow">Next step</th>
+          <th data-field="verified" class="pt-hide-narrow">Figures</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+  window.PT = window.PT || {};
+  window.PT.stateColor = (s) => s === 'stalled' ? 'var(--cds-chart-status-critical)' : s === 'waiting' ? dash.colors[2] : s === 'proposed' ? 'var(--cds-chart-muted)' : dash.colors[0];
+  window.PT.money = (v) => v == null ? '—' : (v < 0 ? '−$' : '$') + d3.format(',.2f')(Math.abs(v));
+  window.PT.day = (s) => s ? d3.utcFormat('%b %-d, %Y')(new Date(s + 'T00:00:00Z')) : '—';
+
+  dash.calc('summary', {
+    title: 'Tracker headline',
+    description: 'Counts of tests by state, real money armed, and the nearest locked read date.',
+    inputs: ['strategies'],
+    fn: (strategies) => {
+      const today = strategies.length ? strategies[0].as_of : null;
+      const by = (s) => strategies.filter((r) => r.state === s).length;
+      const live = strategies.filter((r) => r.mode === 'live' && r.capital_usd > 0);
+      const cap = live.reduce((a, r) => a + r.capital_usd, 0);
+      const reads = strategies.filter((r) => r.read_date && r.read_date >= today).sort((a, b) => a.read_date < b.read_date ? -1 : 1);
+      const waiting = by('waiting'), stalled = by('stalled'), proposed = by('proposed');
+      return [{
+        tests: strategies.length, running: by('running'), waiting, stalled, proposed,
+        live_capital: cap, live_note: live.map((r) => r.owner + ', ' + r.venue).join('; ') || 'none',
+        next_read: reads.length ? reads[0].read_date : null, next_read_name: reads.length ? reads[0].owner + ': ' + reads[0].strategy : '',
+        proposed_note: proposed + ' proposed, not yet started',
+        takeaway: 'Nothing has reached a decision yet. ' + waiting + ' tests wait on an operator step (the Linode install, venue keys), ' +
+          stalled + ' have stalled because the daily option capture stopped, ' + proposed + ' new models are proposed to the children, and only ' + live.length + ' holds real money.'
+      }];
+    }
+  });
+
+  dash.onData(() => {
+    const s = dash.data('summary');
+    const set = (f, txt) => document.querySelectorAll('[data-source="summary"][data-field="' + f + '"]').forEach((el) => { el.textContent = txt; el.classList.toggle('dash-skeleton', s.status !== 'ok'); });
+    if (s.status !== 'ok' || !s.data.length) { ['tests','running','waiting','stalled','live_capital','next_read','takeaway'].forEach((f) => set(f, '—')); return; }
+    const r = s.data[0];
+    set('tests', d3.format(',')(r.tests)); set('running', d3.format(',')(r.running)); set('waiting', d3.format(',')(r.waiting));
+    set('stalled', d3.format(',')(r.stalled)); set('live_capital', '$' + d3.format(',')(r.live_capital)); set('live_note', r.live_note);
+    set('next_read', r.next_read ? d3.utcFormat('%b %-d')(new Date(r.next_read + 'T00:00:00Z')) : '—'); set('next_read_name', r.next_read_name);
+    set('takeaway', r.takeaway); set('proposed_note', r.proposed_note);
+  });
+</script>
+
+<script>
+  const tipFor = (box) => {
+    let t = box.querySelector('.pt-tip');
+    if (!t) { t = document.createElement('div'); t.className = 'pt-tip'; box.appendChild(t); }
+    return t;
+  };
+  const showTip = (box, tip, ev, lines) => {
+    tip.replaceChildren(...lines.map((l, i) => { const d = document.createElement('div'); if (i === 0) d.className = 'k'; d.textContent = l; return d; }));
+    tip.style.display = 'block';
+    const b = box.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = ev.clientX - b.left + 12, y = ev.clientY - b.top + 12;
+    if (x + w > b.width) x = Math.max(0, ev.clientX - b.left - w - 12);
+    if (y + h > b.height) y = Math.max(0, ev.clientY - b.top - h - 12);
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  };
+  const failBox = (box) => { box.replaceChildren(); const f = document.createElement('div'); f.className = 'pt-fail'; f.textContent = 'Failed to load'; box.appendChild(f); };
+  const emptyLine = (box, txt) => { box.replaceChildren(); const f = document.createElement('div'); f.className = 'pt-fail'; f.textContent = txt; f.classList.add('pt-empty'); box.appendChild(f); };
+
+  function drawProgress() {
+    const box = document.getElementById('progress-chart');
+    const d = dash.data('strategies');
+    box.classList.toggle('dash-skeleton', d.status === 'loading');
+    if (d.status === 'error') return failBox(box);
+    if (d.status !== 'ok') { box.replaceChildren(); return; }
+    const rows = d.data.filter((r) => r.progress != null).sort((a, b) => d3.descending(a.progress, b.progress) || d3.ascending(a.owner, b.owner));
+    box.replaceChildren();
+    const W = Math.max(280, box.clientWidth), rowH = 26, top = 4;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${top + rows.length * rowH + 22}`);
+    const labels = rows.map((r) => r.id + ' · ' + r.owner);
+    const meas = svg.append('g').attr('font-size', 'var(--cds-font-size-caption)');
+    let lw = 0; labels.forEach((l) => { const t = meas.append('text').text(l); lw = Math.max(lw, t.node().getComputedTextLength()); t.remove(); });
+    meas.remove();
+    const left = Math.min(W * 0.45, lw + 10), right = 70;
+    const x = d3.scaleLinear([0, 1], [left, W - right]);
+    const g = svg.append('g');
+    g.selectAll('line.grid').data([0, .5, 1]).join('line').attr('x1', (v) => x(v)).attr('x2', (v) => x(v)).attr('y1', top).attr('y2', top + rows.length * rowH)
+      .attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data([0, .5, 1]).join('text').attr('x', (v) => x(v)).attr('y', top + rows.length * rowH + 16).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d3.format('.0%'));
+    const tip = tipFor(box);
+    const row = g.selectAll('g.r').data(rows).join('g').attr('transform', (r, i) => `translate(0,${top + i * rowH})`);
+    row.append('text').attr('x', left - 8).attr('y', rowH / 2 + 4).attr('text-anchor', 'end').attr('fill', 'var(--color-fg)')
+      .attr('font-size', 'var(--cds-font-size-caption)').text((r) => r.id + ' · ' + r.owner);
+    row.append('rect').attr('x', x(0)).attr('y', 7).attr('height', 12).attr('rx', 4).attr('width', x(1) - x(0)).attr('fill', 'var(--cds-chart-grid)').attr('opacity', .6);
+    row.append('rect').attr('x', x(0)).attr('y', 7).attr('height', 12).attr('rx', 4).attr('width', (r) => Math.max(2, x(r.progress) - x(0)))
+      .attr('fill', (r) => window.PT.stateColor(r.state));
+    row.append('text').attr('x', W - right + 6).attr('y', rowH / 2 + 4).attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)')
+      .text((r) => d3.format(',')(r.n_now) + ' / ' + d3.format(',')(r.n_target));
+    row.append('rect').attr('x', 0).attr('y', 0).attr('width', W).attr('height', rowH).attr('fill', 'transparent')
+      .on('mousemove', (ev, r) => showTip(box, tip, ev, [r.id + ' · ' + r.owner, r.strategy, d3.format(',')(r.n_now) + ' of ' + d3.format(',')(r.n_target) + ' ' + r.unit + ' (' + d3.format('.0%')(r.progress) + ')', r.status]))
+      .on('mouseleave', () => { tip.style.display = 'none'; });
+    box.style.minHeight = (top + rows.length * rowH + 22) + 'px';
+  }
+
+  function drawReads() {
+    const box = document.getElementById('reads-chart');
+    const d = dash.data('strategies');
+    box.classList.toggle('dash-skeleton', d.status === 'loading');
+    if (d.status === 'error') return failBox(box);
+    if (d.status !== 'ok') { box.replaceChildren(); return; }
+    const today = d.data.length ? d.data[0].as_of : null;
+    const rows = d.data.filter((r) => r.read_date && r.read_date >= today).sort((a, b) => d3.ascending(a.read_date, b.read_date));
+    box.replaceChildren();
+    if (!rows.length) return emptyLine(box, 'No locked read dates ahead');
+    const parse = (s) => new Date(s + 'T00:00:00Z');
+    const W = Math.max(280, box.clientWidth), rowH = 26, top = 18;
+    const H = top + rows.length * rowH + 24;
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const names = rows.map((r) => r.owner + ': ' + r.strategy);
+    const meas = svg.append('g').attr('font-size', 'var(--cds-font-size-caption)');
+    let lw = 0; names.forEach((l) => { const t = meas.append('text').text(l); lw = Math.max(lw, t.node().getComputedTextLength()); t.remove(); });
+    meas.remove();
+    const left = Math.min(W * 0.5, lw + 10), right = 24;
+    const x = d3.scaleUtc([parse(today), parse(rows[rows.length - 1].read_date)], [left, W - right]);
+    const ticks = x.ticks(Math.max(2, Math.floor((W - left) / 90)));
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', (t) => x(t)).attr('x2', (t) => x(t)).attr('y1', top - 6).attr('y2', H - 22).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(ticks).join('text').attr('x', (t) => x(t)).attr('y', H - 6).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d3.utcFormat('%b %Y'));
+    svg.append('line').attr('x1', x(parse(today))).attr('x2', x(parse(today))).attr('y1', top - 10).attr('y2', H - 22).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '3 3');
+    svg.append('text').attr('x', x(parse(today)) + 4).attr('y', top - 8).attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text('today');
+    const tip = tipFor(box);
+    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (r, i) => `translate(0,${top + i * rowH})`);
+    g.append('text').attr('x', left - 8).attr('y', rowH / 2 + 4).attr('text-anchor', 'end').attr('fill', 'var(--color-fg)').attr('font-size', 'var(--cds-font-size-caption)')
+      .text((r) => r.owner + ': ' + r.strategy);
+    g.append('line').attr('x1', x(parse(today))).attr('x2', (r) => x(parse(r.read_date))).attr('y1', rowH / 2).attr('y2', rowH / 2).attr('stroke', dash.colors[0]).attr('stroke-width', 2).attr('stroke-linecap', 'round').attr('opacity', .35);
+    g.append('circle').attr('cx', (r) => x(parse(r.read_date))).attr('cy', rowH / 2).attr('r', 5).attr('fill', dash.colors[0]);
+    g.append('rect').attr('x', 0).attr('width', W).attr('height', rowH).attr('fill', 'transparent')
+      .on('mousemove', (ev, r) => showTip(box, tip, ev, [window.PT.day(r.read_date) + ' · in ' + d3.format(',')(r.days_to_read) + ' days', r.owner + ': ' + r.strategy, r.decision || '']))
+      .on('mouseleave', () => { tip.style.display = 'none'; });
+    box.style.minHeight = H + 'px';
+  }
+
+  dash.calc('history_by_owner', {
+    title: 'Progress by owner per refresh',
+    description: 'Mean share of the decision sample reached, per owner and refresh day, over tests with a target.',
+    inputs: ['history'],
+    fn: (history) => {
+      const m = d3.rollups(history.filter((h) => h.progress != null), (v) => d3.mean(v, (h) => h.progress), (h) => h.owner, (h) => h.day);
+      return m.flatMap(([owner, days]) => days.map(([day, p]) => ({ owner, day, progress: p }))).sort((a, b) => d3.ascending(a.day, b.day));
+    }
+  });
+
+  function drawHistory() {
+    const box = document.getElementById('history-chart');
+    const d = dash.data('history_by_owner');
+    box.classList.toggle('dash-skeleton', d.status === 'loading');
+    if (d.status === 'error') return failBox(box);
+    if (d.status !== 'ok') { box.replaceChildren(); return; }
+    const rows = d.data.map((r) => ({ ...r, date: new Date(r.day + 'T00:00:00Z') }));
+    box.replaceChildren();
+    if (!rows.length) return emptyLine(box, 'No refreshes yet');
+    const days = Array.from(new Set(rows.map((r) => r.day)));
+    document.querySelector('.pt-hist-note').textContent = 'Mean share of the decision sample reached, by owner, one point per tracker refresh (' + d3.format(',')(days.length) + (days.length === 1 ? ' refresh so far: the lines grow as the tracker is refreshed).' : ' refreshes).');
+    const owners = Array.from(new Set(rows.map((r) => r.owner)));
+    const W = Math.max(280, box.clientWidth), H = 200, m = { t: 10, r: 110, b: 24, l: 40 };
+    const svg = d3.select(box).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const ext = d3.extent(rows, (r) => r.date);
+    if (+ext[0] === +ext[1]) { ext[0] = d3.utcDay.offset(ext[0], -3); ext[1] = d3.utcDay.offset(ext[1], 3); }
+    const x = d3.scaleUtc(ext, [m.l, W - m.r]);
+    const y = d3.scaleLinear([0, 1], [H - m.b, m.t]);
+    svg.append('g').selectAll('line').data([0, .25, .5, .75, 1]).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', (v) => y(v)).attr('y2', (v) => y(v)).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data([0, .5, 1]).join('text').attr('x', m.l - 6).attr('y', (v) => y(v) + 4).attr('text-anchor', 'end').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d3.format('.0%'));
+    const xt = x.ticks(Math.max(2, Math.floor((W - m.l - m.r) / 90)));
+    svg.append('g').selectAll('text').data(xt).join('text').attr('x', (t) => x(t)).attr('y', H - 6).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d3.utcFormat('%b %-d'));
+    const line = d3.line().x((r) => x(r.date)).y((r) => y(r.progress));
+    const tip = tipFor(box);
+    const ends = [];
+    owners.forEach((o, i) => {
+      const pts = rows.filter((r) => r.owner === o);
+      const c = dash.colors[i % dash.colors.length];
+      svg.append('path').datum(pts).attr('d', line).attr('fill', 'none').attr('stroke', c).attr('stroke-width', 2).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+      svg.append('g').selectAll('circle').data(pts).join('circle').attr('cx', (r) => x(r.date)).attr('cy', (r) => y(r.progress)).attr('r', 3.5).attr('fill', c)
+        .on('mousemove', (ev, r) => showTip(box, tip, ev, [d3.utcFormat('%b %-d')(r.date), o + ': ' + d3.format('.1%')(r.progress)]))
+        .on('mouseleave', () => { tip.style.display = 'none'; });
+      const last = pts[pts.length - 1];
+      ends.push({ o, c, y: y(last.progress), v: last.progress });
+    });
+    ends.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 13) ends[i].y = ends[i - 1].y + 13;
+    svg.append('g').selectAll('text').data(ends).join('text').attr('x', W - m.r + 8).attr('y', (e) => e.y + 4).attr('fill', (e) => e.c).attr('font-size', 'var(--cds-font-size-caption)')
+      .text((e) => e.o + ' ' + d3.format('.0%')(e.v));
+    box.style.minHeight = H + 'px';
+  }
+
+  dash.onData(() => { drawProgress(); drawReads(); drawHistory(); });
+</script>
+
+<script>
+  const COLS = ['id', 'owner', 'strategy', 'venue', 'group', 'n_now', 'n_target', 'unit', 'status', 'read_date', 'pnl_usd', 'next_step', 'verified'];
+  const NARROW = new Set(['venue', 'group', 'unit', 'read_date', 'pnl_usd', 'next_step', 'verified']);
+  const NUM = new Set(['n_now', 'n_target', 'pnl_usd']);
+  let sortKey = 'owner', sortDir = 1;
+  const ownersBox = document.querySelector('.pt-owners');
+  const search = document.querySelector('.pt-search');
+  search.addEventListener('input', () => drawTable());
+  document.querySelectorAll('.pt-table th').forEach((th) => th.addEventListener('click', () => {
+    const k = th.dataset.field; if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = 1; }
+    drawTable();
+  }));
+
+  function drawTable() {
+    const d = dash.data('strategies');
+    const tbody = document.querySelector('.pt-table tbody');
+    if (d.status !== 'ok') { tbody.replaceChildren(); ownersBox.replaceChildren(); return; }
+    const owner = dash.params().owner || 'All';
+    const owners = ['All', ...Array.from(new Set(d.data.map((r) => r.owner)))];
+    ownersBox.replaceChildren(...owners.map((o) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = o; b.setAttribute('aria-pressed', String(o === owner));
+      b.addEventListener('click', () => dash.setParams({ owner: o === 'All' ? null : o })); return b;
+    }));
+    const q = search.value.trim().toLowerCase();
+    let rows = d.data.filter((r) => (owner === 'All' || r.owner === owner) &&
+      (!q || [r.id, r.strategy, r.venue, r.status, r.next_step, r.owner].join(' ').toLowerCase().includes(q)));
+    rows = rows.slice().sort((a, b) => {
+      const va = a[sortKey], vb = b[sortKey];
+      if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1;
+      return (NUM.has(sortKey) ? va - vb : String(va).localeCompare(String(vb))) * sortDir;
+    });
+    document.querySelectorAll('.pt-table th').forEach((th) => th.setAttribute('aria-sort', th.dataset.field === sortKey ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'));
+    tbody.replaceChildren(...rows.map((r) => {
+      const tr = document.createElement('tr');
+      COLS.forEach((c) => {
+        const td = document.createElement('td');
+        if (NARROW.has(c)) td.classList.add('pt-hide-narrow');
+        if (NUM.has(c)) td.classList.add('num');
+        if (c === 'n_now') {
+          if (r.progress != null) {
+            const bar = document.createElement('span'); bar.className = 'pt-bar';
+            const fill = document.createElement('i'); fill.style.width = (r.progress * 100) + '%'; fill.style.background = window.PT.stateColor(r.state);
+            bar.appendChild(fill); td.appendChild(bar);
+          }
+          td.appendChild(document.createTextNode(r.n_now == null ? '—' : d3.format(',')(r.n_now)));
+        } else if (c === 'n_target') td.textContent = r.n_target == null ? '—' : d3.format(',')(r.n_target);
+         else if (c === 'status') {
+          const dot = document.createElement('span'); dot.className = 'pt-dot'; dot.style.background = window.PT.stateColor(r.state);
+          td.appendChild(dot); td.appendChild(document.createTextNode(r.status || '—'));
+        } else if (c === 'read_date') td.textContent = r.read_date ? window.PT.day(r.read_date) : '—';
+        else if (c === 'pnl_usd') td.textContent = window.PT.money(r.pnl_usd);
+        else td.textContent = r[c] == null ? '—' : String(r[c]);
+        tr.appendChild(td);
+      });
+      return tr;
+    }));
+  }
+  dash.onData(drawTable);
+</script>

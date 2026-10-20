@@ -182,7 +182,7 @@ def build(today: date, journal_path: Path) -> list[dict]:
         if r.get("n_now") is None and r.get("unit") == "days" and r.get("started"):
             r["n_now"] = _days_since(r["started"], today)          # a dated forward record counts elapsed days
         st = (r.get("status") or "").lower()
-        r["state"] = ("stalled" if "stalled" in st else "waiting" if "waiting" in st else "running")
+        r["state"] = ("stalled" if "stalled" in st else "waiting" if "waiting" in st else "proposed" if "proposed" in st else "running")
         r["group"] = {"live": "Live money", "paper": "Paper", "forward": "Forward record"}[r["mode"]]
         r["progress"] = round(min(1.0, r["n_now"] / r["n_target"]), 4) if r.get("n_now") is not None and r.get("n_target") else None
         r["days_to_read"] = (date.fromisoformat(r["read_date"]) - today).days if r.get("read_date") else None

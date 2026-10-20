@@ -186,8 +186,14 @@ class ChildRegistry:
         return rep
 
     def record_guidance(self, name: str, summary: str, insights: list[str] | None = None, warnings: list[str] | None = None,
-                        requests: list[str] | None = None) -> Guidance:
+                        requests: list[str] | None = None, known_ids: Optional[set[str]] = None) -> Guidance:
+        """``insights`` holds insight ids (I-...) or plain texts. With ``known_ids``, an id that is not in it is refused,
+        so guidance never cites an insight that does not exist."""
         name = self._resolve(name)
+        if known_ids is not None:
+            bad = [i for i in (insights or []) if re.fullmatch(r"I-[0-9a-f]{6,}", i) and i not in known_ids]
+            if bad:
+                raise ValueError(f"guidance cites unknown insight ids: {bad}")
         c = self._children[name]
         g = Guidance(id="G-" + uuid.uuid4().hex[:10], to=name, ts=utcnow_iso(), summary=summary,
                      insights=list(insights or []), warnings=list(warnings or []), requests=list(requests or []))

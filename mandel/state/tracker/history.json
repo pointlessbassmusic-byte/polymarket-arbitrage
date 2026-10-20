@@ -51,8 +51,8 @@
   "day": "2026-10-20",
   "id": "H-orb-qqq",
   "owner": "Hurst",
-  "n_now": null,
-  "progress": null,
+  "n_now": 5,
+  "progress": 0.0833,
   "pnl_usd": null
  },
  {
@@ -148,6 +148,62 @@
   "id": "S-fed-g10",
   "owner": "Shannon",
   "n_now": 0,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-20",
+  "id": "H-btc-tom",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-20",
+  "id": "H-us500-overnight",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-20",
+  "id": "H-gold-perp-carry",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-20",
+  "id": "B-longshot-calibration",
+  "owner": "Brier",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-20",
+  "id": "K-thin-queue-maker",
+  "owner": "Kelly",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-20",
+  "id": "S-kalshi-crypto-short",
+  "owner": "Shannon",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-20",
+  "id": "S-macro-buckets",
+  "owner": "Shannon",
+  "n_now": null,
   "progress": null,
   "pnl_usd": null
  }

@@ -44,7 +44,7 @@
       "Session cost": "cost_usd 1,955.74; 10,783,024 input tokens, 7,234,587 output tokens, 1.65B cache-read tokens; 682,041 of 1,000,000 context tokens used; model run claude-opus-5-5 (configured claude-fable-5, user-switched); origin iOS; created 2026-09-17 [unclear; get_session session_01Sxmv33Z3rkBy1wVC1KuN9D]"
     },
     "report_count": 1,
-    "guidance_count": 0
+    "guidance_count": 1
   },
   "Brier": {
     "name": "Brier",
@@ -94,7 +94,7 @@
       "Test suite and CI": "460 test functions in tests/; child reports 459-460 passing and ruff clean on PRs #88, #90, #91 [unclear; tests/*.py count; transcript 2026-10-19T16:38Z and 22:20Z]"
     },
     "report_count": 1,
-    "guidance_count": 0
+    "guidance_count": 1
   },
   "Kelly": {
     "name": "Kelly",
@@ -140,7 +140,7 @@
       "Session cost": "cumulative cost_usd 8,246.22; output_tokens 20,446,120; input_tokens 4,802,423; context used 753,945 of 1,000,000 [unclear; get_session external_metadata.usage / context_usage]"
     },
     "report_count": 1,
-    "guidance_count": 0
+    "guidance_count": 1
   },
   "Shannon": {
     "name": "Shannon",
@@ -201,6 +201,6 @@
       "Session resource use": "cost_usd 10,790.58; input 3,842,448 / output 12,332,684 tokens; cache reads 8.54B; context 598,047 of 1,000,000 used; model claude-opus-5-5 (configured claude-fable-5); created 2026-09-06, last update 2026-10-19T16:37Z; repeatedly hit five-hour and weekly usage limits (2026-10-14, 2026-10-16) [unclear; get_session record; transcript pages p04, p08, p09]"
     },
     "report_count": 1,
-    "guidance_count": 0
+    "guidance_count": 1
   }
 }

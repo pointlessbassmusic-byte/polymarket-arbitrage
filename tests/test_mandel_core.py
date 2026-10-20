@@ -273,6 +273,9 @@ class TestChildRegistry:
         assert reg.reports("Julia")[0].learnings == ["fees matter"]
         assert reg.guidance("Julia")[0].id == g.id
         assert reg.suggest_names(1)[0][0] == "Fatou"
+        with pytest.raises(ValueError):
+            reg.record_guidance("Julia", "x", insights=["I-abcdef12"], known_ids={"I-123456"})
+        assert reg.get("Julia").guidance_count == 1
         kinds = [e.kind for e in ledger.events(kind="child")]
         assert kinds == ["child.registered", "child.report", "child.guidance"]
 
