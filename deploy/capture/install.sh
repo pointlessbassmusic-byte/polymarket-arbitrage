@@ -43,30 +43,31 @@ mkdir -p "$DATA/archive" "$DATA/state" "$DATA/capture" "$DATA/wide"
 [ -f "$DATA/archive/INDEX.json" ] || cp "$DIR/mandel/archive/INDEX.json" "$DATA/archive/INDEX.json"
 
 echo "== 3. keys for the widened sleeves (Alpaca PAPER)"
-ENV_OK='^ALPACA_API_KEY_ID=[A-Za-z0-9]+$'
-if [ -f /etc/mandel-wide.env ] && ! $SUDO grep -Eq "$ENV_OK" /etc/mandel-wide.env; then
+# /etc/mandel-wide.env holds this install's own keys, or only a REUSE line: the units then read the paper runner's
+# validated /etc/mandel-paper.env (loaded first; a key in mandel-wide.env overrides it).
+if [ -f /etc/mandel-wide.env ] && ! $SUDO grep -Eq '^(ALPACA_API_KEY_ID=[A-Za-z0-9]+|REUSE_PAPER_KEYS=1)$' /etc/mandel-wide.env; then
   echo "   /etc/mandel-wide.env is malformed: asking again"; $SUDO rm -f /etc/mandel-wide.env
 fi
 if [ ! -f /etc/mandel-wide.env ]; then
   echo "   A second Alpaca paper account keeps these sleeves' cash and P&L apart from the calendar sleeve."
   read -r -p "   ALPACA_API_KEY_ID for the widened sleeves (Enter = reuse the paper runner's keys): " KEY </dev/tty
   KEY=$(printf '%s' "$KEY" | tr -d '[:space:]')
+  $SUDO install -m 600 -o "$USER_NAME" /dev/null /etc/mandel-wide.env
   if [ -z "$KEY" ]; then
-    [ -f /etc/mandel-paper.env ] || { echo "refusing: no key given and no /etc/mandel-paper.env to reuse"; exit 1; }
-    KEY=$($SUDO grep '^ALPACA_API_KEY_ID=' /etc/mandel-paper.env | cut -d= -f2-)
-    SECRET=$($SUDO grep '^ALPACA_API_SECRET_KEY=' /etc/mandel-paper.env | cut -d= -f2-)
+    [ -f /etc/mandel-paper.env ] || { $SUDO rm -f /etc/mandel-wide.env; echo "refusing: no key given and no /etc/mandel-paper.env to reuse"; exit 1; }
+    echo "REUSE_PAPER_KEYS=1" | $SUDO tee /etc/mandel-wide.env >/dev/null
     echo "   reusing the paper runner's keys (one shared paper account)"
   else
     read -r -s -p "   ALPACA_API_SECRET_KEY: " SECRET </dev/tty; echo
     SECRET=$(printf '%s' "$SECRET" | tr -d '[:space:]')
+    echo "   read a key id of ${#KEY} characters and a secret of ${#SECRET} characters"
+    [[ "$KEY" =~ ^[A-Za-z0-9]+$ ]] || { $SUDO rm -f /etc/mandel-wide.env; echo "refusing: the key id has unexpected characters"; exit 1; }
+    [ -n "$SECRET" ] || { $SUDO rm -f /etc/mandel-wide.env; echo "refusing: the secret is empty"; exit 1; }
+    printf 'ALPACA_API_KEY_ID=%s\nALPACA_API_SECRET_KEY=%s\n' "$KEY" "$SECRET" | $SUDO tee /etc/mandel-wide.env >/dev/null
   fi
-  echo "   read a key id of ${#KEY} characters and a secret of ${#SECRET} characters"
-  [[ "$KEY" =~ ^[A-Za-z0-9]+$ ]] || { echo "refusing: the key id is empty or has unexpected characters"; exit 1; }
-  [[ "$SECRET" =~ ^[!-~]+$ ]] || { echo "refusing: the secret is empty"; exit 1; }
-  $SUDO install -m 600 -o "$USER_NAME" /dev/null /etc/mandel-wide.env
-  printf 'ALPACA_API_KEY_ID=%s\nALPACA_API_SECRET_KEY=%s\n' "$KEY" "$SECRET" | $SUDO tee /etc/mandel-wide.env >/dev/null
   unset KEY SECRET
 fi
+[ -f /etc/mandel-paper.env ] || $SUDO install -m 600 -o "$USER_NAME" /dev/null /etc/mandel-paper.env
 $SUDO grep -q MANDEL_ALPACA_LIVE /etc/mandel-wide.env && { echo "refusing: /etc/mandel-wide.env contains MANDEL_ALPACA_LIVE"; exit 1; }
 $SUDO tee /etc/mandel-capture.env >/dev/null <<ENV
 MANDEL_ARCHIVE_ROOT=$DATA/archive
@@ -87,6 +88,7 @@ Type=oneshot
 User=$USER_NAME
 WorkingDirectory=$DIR
 EnvironmentFile=/etc/mandel-capture.env
+EnvironmentFile=/etc/mandel-paper.env
 EnvironmentFile=/etc/mandel-wide.env
 ExecStart=$2
 TimeoutStartSec=3h
@@ -119,7 +121,8 @@ for t in capture-daily capture-weekly shadow wide-close wide-options wide-reconc
 done
 
 echo "== 5. dry runs"
-set -a; . /etc/mandel-capture.env; . <($SUDO cat /etc/mandel-wide.env); set +a
+set -a; . /etc/mandel-capture.env; . <($SUDO cat /etc/mandel-paper.env); . <($SUDO cat /etc/mandel-wide.env); set +a
+export MANDEL_PAPER_STATE=   # the paper runner's state path is not this install's
 cd "$DIR"
 "$PY" -m mandel.live.wide status
 "$PY" -m mandel.live.wide close --dry-run || true
