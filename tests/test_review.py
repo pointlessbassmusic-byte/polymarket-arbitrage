@@ -23,8 +23,10 @@ def test_compare_flags_a_live_record_far_below_the_backtest():
 
 def test_render_reads_the_desk_books(tmp_path):
     (tmp_path / "cryptobot_real_portfolio.json").write_text(json.dumps({"closed": [
-        {"pnl_usd": 5.0, "size_usd": 100.0, "exit_reason": "take_profit"}] * 6}))
+        {"pnl_usd": 5.0, "size_usd": 100.0, "exit_reason": "take_profit", "symbol": "DOGE",
+         "opened_at": 0.0, "closed_at": 3 * 86400.0}] * 6}))
     out = R.render(tmp_path, _bench())
+    assert "mean 3.0 days over 6 trades" in out and "DOGE 3.0d (take_profit, +5.0%)" in out
     assert "real: 6 closed" in out and "sim: no closed trades yet" in out and "forward tests:" in out
 
 

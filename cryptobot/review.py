@@ -114,6 +114,20 @@ def compare(closed: list[dict], bench: dict, rng: Optional[random.Random] = None
     return out
 
 
+def holds_line(closed: list[dict], bench: dict) -> Optional[str]:
+    """Days each real trade was held, newest last. The edge needs the full
+    hold, so live trades exiting much earlier than the backtest's are a flag."""
+    rows = [t for t in closed if t.get("opened_at") is not None and t.get("closed_at") is not None]
+    if not rows:
+        return None
+    days = [(t["closed_at"] - t["opened_at"]) / 86400 for t in rows]
+    each = ", ".join(f"{t.get('symbol', '?')} {d:.1f}d ({t.get('exit_reason', '?')}, {t['pnl_usd'] / t['size_usd']:+.1%})"
+                     for t, d in zip(rows[-10:], days[-10:]) if t.get("size_usd"))
+    full = bench.get("exits", {}).get("time_exit")
+    ref = f"; the backtest ran the full 14 days on {full:.0%} of trades" if full is not None else ""
+    return f"hold length, real: mean {statistics.fmean(days):.1f} days over {len(days)} trades{ref}. Last {min(10, len(rows))}: {each}"
+
+
 def fills_line(state: Path) -> str:
     """Real fills against the price the order was sent at and the price the
     backtest assumes (positive bp = cost). Meaningful after about 10 fills."""
@@ -155,6 +169,9 @@ def render(state: Path, bench: dict, today: Optional[dt.date] = None) -> str:
         o.append(f"  {book}: {c['n']} closed, P&L ${c['pnl_usd']:+,.2f}, mean {c['mean']:+.2%} a trade, win rate {c['hit']:.0%}, exits "
                  + ", ".join(f"{k} {v:.0%}" for k, v in c["exits"].items())
                  + f"; chance the backtest does this badly or worse {c['p_low']:.0%} -> {c['status']}")
+    h = holds_line(load_closed(state, "real"), bench)
+    if h:
+        o.append("  " + h)
     if per.get("real", {}).get("n") and per.get("sim", {}).get("n"):
         o.append(f"  real minus sim, per trade: {per['real']['mean'] - per['sim']['mean']:+.2%} (execution cost the paper book does not pay)")
     o.append("  " + fills_line(state))
