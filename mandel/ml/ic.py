@@ -54,11 +54,14 @@ def period_ics(df: pd.DataFrame, feat: str, y: str, period: pd.Series) -> pd.Ser
 
 
 def summarise(ics: pd.Series) -> dict:
+    """Mean period IC, its t over periods and the two-sided p from Student's t with n - 1 degrees of freedom (a
+    confirmation period of nine months is too short for the normal approximation)."""
+    from scipy.stats import t as student
     n = len(ics)
     if n < 3 or ics.std() == 0:
         return {"n_periods": n, "mean_ic": float(ics.mean()) if n else None, "t": None, "p": None}
     t = float(ics.mean() / ics.std() * math.sqrt(n))
-    return {"n_periods": n, "mean_ic": float(ics.mean()), "t": t, "p": float(2 * (1 - ND.cdf(abs(t))))}
+    return {"n_periods": n, "mean_ic": float(ics.mean()), "t": t, "p": float(2 * student.sf(abs(t), n - 1))}
 
 
 def bh(pvals: list) -> list:
@@ -88,8 +91,9 @@ def judge(rows: list) -> dict:
         r["sign"] = "positive" if (r["disc_mean_ic"] or 0) > 0 else "inverse"
         c = r["conf"]
         if r["discovered"] and c and c.get("t") is not None:
+            from scipy.stats import t as student
             t_signed = c["t"] if r["sign"] == "positive" else -c["t"]
-            c["p_one_sided"] = float(1 - ND.cdf(t_signed))
+            c["p_one_sided"] = float(student.sf(t_signed, c["n_periods"] - 1))
             r["confirmed"] = c["p_one_sided"] < 0.05
         else:
             r["confirmed"] = None if r["discovered"] else False

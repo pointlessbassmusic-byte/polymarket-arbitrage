@@ -15015,9 +15015,11 @@
     "b12_ml_intraday"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-84635a3e"
+   ],
    "notes": "pre-registered before any model was fitted; lockbox 2026-10-01 onward sealed."
   },
   {
@@ -15095,9 +15097,11 @@
     "b12_ml_implied"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a99dd863"
+   ],
    "notes": "pre-registered before any F3 model was fitted; lockbox 2026-10-01 onward sealed."
   }
  ]
