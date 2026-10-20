@@ -39,7 +39,19 @@ USE_LEDGER = os.environ.get("MANDEL_PAPER_LEDGER", "1") != "0"
 JOURNAL = STATE / "journal.jsonl"
 KILL = STATE / "KILL"
 SPREAD_STATE = STATE / "spread.json"
-CAPITAL_SPLIT = {"calendar": 0.60, "spread_risk": 0.40}   # of account equity; the spread slot is its max-loss budget
+CAPITAL_SPLIT = {"calendar": 0.60, "spread_risk": 0.40}   # of the sleeve capital; the spread slot is its max-loss budget
+# The sleeves trade a FIXED capital, not the account's equity: a paper account can be shared (the crypto child's QQQ and
+# XLF pilots ran in the one this was installed on) and the forward test rehearses a small live account.
+SLEEVE_CAPITAL = float(os.environ.get("MANDEL_PAPER_CAPITAL") or 5000)
+
+
+def sleeve_capital(equity: float) -> float:
+    return min(SLEEVE_CAPITAL, equity)
+
+
+def calendar_capital(equity: float, cash: float, own_value: float) -> float:
+    """The calendar slot never borrows: capped by cash plus what it already holds (SPLG/QQQM at market)."""
+    return max(0.0, min(sleeve_capital(equity) * CAPITAL_SPLIT["calendar"], cash + own_value))
 
 
 def _journal(kind: str, payload: dict, dry: bool) -> None:
@@ -82,14 +94,15 @@ def phase_close(api, dry: bool) -> None:
     if today not in sessions:
         print("not a session"); return
     acct = api.account()
-    equity = float(acct["equity"])
-    capital = equity * CAPITAL_SPLIT["calendar"]
+    equity, cash = float(acct["equity"]), float(acct.get("cash") or 0)
     snap = api.stock_snapshots(["SPLG", "QQQM"])
     db = snap["SPLG"]["dailyBar"]
     bar = {"high": db["h"], "low": db["l"], "last": snap["SPLG"]["latestTrade"]["p"]}
     bars = api.daily_bars(["SPY", "TLT"], (today - timedelta(days=70)).isoformat())
-    dec = S.close_decision(today, sessions, capital, bar, _mtd(bars.get("SPY", []), today), _mtd(bars.get("TLT", []), today))
     held = {p["symbol"]: int(float(p["qty"])) for p in api.positions() if p["symbol"] in ("SPLG", "QQQM")}
+    own_value = sum(q * snap[s]["latestTrade"]["p"] for s, q in held.items())
+    capital = calendar_capital(equity, cash, own_value)
+    dec = S.close_decision(today, sessions, capital, bar, _mtd(bars.get("SPY", []), today), _mtd(bars.get("TLT", []), today))
     orders = []
     for sym, usd in dec.targets.items():
         px = snap[sym]["latestTrade"]["p"]
@@ -97,7 +110,8 @@ def phase_close(api, dry: bool) -> None:
         delta = want - held.get(sym, 0)
         if delta:
             orders.append(api_order(sym, delta, "cls", today))
-    _journal("close.decision", {"day": today, "equity": equity, "capital": capital, "snapshot_splg": bar,
+    _journal("close.decision", {"day": today, "equity": equity, "cash": cash, "sleeve_capital": SLEEVE_CAPITAL,
+                                "capital": capital, "snapshot_splg": bar,
                                 "targets": dec.targets, "reasons": dec.reasons, "held": held, "orders": orders}, dry)
     for o in orders:
         _send(api, o, dry)
@@ -187,7 +201,7 @@ def phase_options(api, dry: bool) -> None:
     spot = api.stock_snapshots(["SPY"])["SPY"]["latestTrade"]["p"]       # XSP = SPX/10 ~ SPY (index spot not served)
     equity = float(api.account()["equity"])
     book, sym_of = _put_book(api, today)
-    plan, why = S.plan_put_spread(today, spot, book, equity * CAPITAL_SPLIT["spread_risk"], trend)
+    plan, why = S.plan_put_spread(today, spot, book, sleeve_capital(equity) * CAPITAL_SPLIT["spread_risk"], trend)
     _journal("spread.plan", {"day": today, "spot_proxy_spy": spot, "trend_ok": trend, "plan": plan.__dict__ if plan else None,
                              "reason": why}, dry)
     if plan:

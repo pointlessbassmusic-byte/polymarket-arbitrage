@@ -142,3 +142,12 @@ def test_tracker_counts_journal_sessions_fills_and_round_trip_pnl(tmp_path):
     t559 = next(r for r in rows if r["id"] == "T-559")
     assert t559["state"] == "running" and t559["progress"] == pytest.approx(2 / 60, abs=1e-4)
     assert {r["owner"] for r in rows} >= {"Mandel", "Hurst", "Kelly", "Brier", "Shannon"}
+
+
+def test_sleeve_trades_fixed_capital_and_never_borrows():
+    from mandel.live import runner as R
+    assert R.sleeve_capital(97176.97) == R.SLEEVE_CAPITAL == 5000
+    assert R.calendar_capital(97176.97, 1341.92, 0.0) == pytest.approx(1341.92)      # shared account, little cash
+    assert R.calendar_capital(97176.97, 50000, 0.0) == pytest.approx(3000)            # 60% of the fixed 5,000
+    assert R.calendar_capital(97176.97, 100, 2900) == pytest.approx(3000)             # own holdings count back in
+    assert R.calendar_capital(750, 750, 0.0) == pytest.approx(450)                    # small account: equity binds

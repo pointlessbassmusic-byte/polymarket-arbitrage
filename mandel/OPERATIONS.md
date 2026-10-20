@@ -168,3 +168,8 @@ with `--dry-run` once by hand first; `status` prints equity, positions and the o
 day to `state/tracker/history.jsonl` / `history.json`. Those two files feed the "Paper Strategy Tracker" dashboard
 (https://claude.ai/artifact/YW11NMqwusSM59jktjYmSW): Mandel re-uploads them after each refresh. The children's rows come
 from `state/children/forward_tests.json`, their own figures; update its counts and `as_of` when a child reports again.
+
+Sleeve capital: the runner trades a fixed `MANDEL_PAPER_CAPITAL` (default 5000; set it in /etc/mandel-paper.env to
+change), never the account's equity, and the calendar slot never borrows (capped by cash plus its own SPLG/QQQM). The
+first install landed on a paper account shared with the crypto child's QQQ/XLF pilots; a dedicated Alpaca paper account
+keeps the two forward records apart.
