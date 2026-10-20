@@ -71685,6 +71685,29 @@
    "parked_reason": "",
    "in_git": false,
    "schema": "kind message: value = {stream, id, created_at, sentiment (Bullish|Bearish|None), user_id, followers, symbols, likes, body_len} (bodies not stored); available_at = created_at | kind window: value = {stream, day, window_start, window_end, anchor_id, pages, messages, tagged, bullish, bearish, complete}; available_at = window end"
+  },
+  "kraken-trades-1m-XBTUSD-2025-01": {
+   "name": "kraken-trades-1m-XBTUSD-2025-01",
+   "kind": "data",
+   "path": "mandel/archive/data/kraken-trades-1m-XBTUSD-2025-01.jsonl.gz",
+   "created_at": "2026-10-20T01:52:56.658823+00:00",
+   "rows": 44268,
+   "bytes": 4320088,
+   "sha256": "3e6dca7abd7993ab929b513aeb92107bc879e987d93a6d5ddf0331fa01721280",
+   "tags": [
+    "1m",
+    "2025-01",
+    "complete",
+    "crypto",
+    "kraken",
+    "signed-volume",
+    "span:2025-01-01..2025-01-31",
+    "trades"
+   ],
+   "recipe": "GET https://api.kraken.com/0/public/Trades?pair=XBTUSD&since=<ns cursor, from 2025-01-01T00:00:00Z>&count=1000, paged on result.last until a trade at or after 2025-02-01T00:00:00Z; trades de-duplicated by trade id and aggregated with mandel.data.crypto_history.MinuteAgg via fetch_kraken_trades_1m (Kraken's OHLC endpoint keeps only 720 bars, so history comes from Trades). Licence: Kraken public market data: Kraken's terms grant no redistribution right. The repo is public, so the bundle is local disk only (in_git=False); rebuild it from this recipe.",
+   "parked_reason": "",
+   "in_git": false,
+   "schema": "value = {symbol, t (minute start, unix s), open, high, low, close (first / last trade by time and id), volume, vwap, n, buy_vol, sell_vol, n_buy, n_sell (aggressor side: buy = buyer-initiated), buy_hi, buy_lo, sell_hi, sell_lo (price range of each side's prints), mkt_vol (market-order volume; None when the venue does not say), first_ts, last_ts (unix s, fractional), last_id, ticks (minute HH:59 only: every trade [time, price, volume, side b/s, ordertype m/l, trade_id], so the last trade at or before an hour mark minus s seconds is exact)}; minutes without trades are absent; observed_at = minute start; available_at = minute end"
   }
  }
 }
