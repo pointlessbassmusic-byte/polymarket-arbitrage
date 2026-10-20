@@ -90,7 +90,7 @@ Description=Push the Mandel paper journal to branch paper/journal
 [Service]
 Type=oneshot
 User=$USER_NAME
-ExecStart=/bin/bash -lc 'set -e; J=$HOME/mandel-paper-journal; [ -d \$J/.git ] || { git clone $REPO \$J; git -C \$J checkout --orphan paper/journal; git -C \$J rm -rfq . || true; }; cp $STATE/*.json* \$J/ 2>/dev/null || true; cd \$J; git add -A; git -c user.name=MandelPaper -c user.email=mandel@localhost commit -qm "paper journal \$(date -u +%%FT%%TZ)" || exit 0; git push -q origin HEAD:paper/journal'
+ExecStart=/bin/bash $DIR/deploy/paper/push_journal.sh $STATE $REPO git@github.com:pointlessbassmusic-byte/polymarket-arbitrage.git
 UNIT
 sudo tee /etc/systemd/system/mandel-paper-journal.timer >/dev/null <<UNIT
 [Unit]

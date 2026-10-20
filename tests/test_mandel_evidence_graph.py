@@ -62,3 +62,12 @@ def test_checkpoint_size_is_fractional_kelly_shrunk_by_dsr():
     assert G.checkpoint_size(0.0001, 0.0001, dsr=1.0, cap_usd=5000) == pytest.approx(1250)   # 0.25 x 1 x 5000
     assert G.checkpoint_size(0.0001, 0.0001, dsr=0.75, cap_usd=5000) == pytest.approx(625)
     assert G.checkpoint_size(0.01, 0.0001, dsr=1.0, cap_usd=5000) == 5000               # capped
+
+
+def test_capture_status_freshens_streams():
+    b = {"options-chain-SPX-2026-10-15": {}, "fred-DTB3": {"created_at": "2026-10-15T00:00:00"}}
+    st = {"families": {"options-chain-SPX": {"latest": "2026-10-19", "count": 3}}, "undated": {"fred-DTB3": "2026-10-19T22:00:00"}}
+    m = G.apply_capture_status(b, st)
+    assert G.stream_health("options-chain-SPX", m, TODAY, None)["state"] == "ok"
+    assert G.stream_health("fred-DTB3", m, TODAY, None)["state"] == "ok"
+    assert G.stream_health("options-chain-SPX", b, TODAY, None)["state"] == "stale"

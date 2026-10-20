@@ -90,6 +90,105 @@
   "key": "T-543|venue:deribit-model"
  },
  {
+  "strategy": "T-565",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "record-only",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-565|venue:record-only"
+ },
+ {
+  "strategy": "T-566",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "record-only",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-566|venue:record-only"
+ },
+ {
+  "strategy": "T-567",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-567|venue:alpaca"
+ },
+ {
+  "strategy": "T-567",
+  "owner": "Mandel",
+  "kind": "in",
+  "target": "alpaca-paper-wide",
+  "target_kind": "account",
+  "health": null,
+  "key": "T-567|account:alpaca-paper-wide"
+ },
+ {
+  "strategy": "T-567",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "us-equity-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-567|factor:us-equity-beta"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-568|venue:alpaca"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "in",
+  "target": "alpaca-paper-wide",
+  "target_kind": "account",
+  "health": null,
+  "key": "T-568|account:alpaca-paper-wide"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "gold-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-568|factor:gold-beta"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "rates-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-568|factor:rates-beta"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "oil-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-568|factor:oil-beta"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "short-volatility",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-568|factor:short-volatility"
+ },
+ {
   "strategy": "H-bounce-short",
   "owner": "Hurst",
   "kind": "trades_on",
@@ -378,6 +477,33 @@
   "key": "T-560|stream:alpaca-iex-bars"
  },
  {
+  "strategy": "T-565",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-565|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-566",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-566|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-567",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-567|stream:alpaca-iex-bars"
+ },
+ {
   "strategy": "T-560",
   "owner": "Mandel",
   "kind": "reads",
@@ -385,6 +511,15 @@
   "target_kind": "stream",
   "health": "broker",
   "key": "T-560|stream:alpaca-option-quotes"
+ },
+ {
+  "strategy": "T-568",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-option-quotes",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-568|stream:alpaca-option-quotes"
  },
  {
   "strategy": "T-542",
@@ -439,6 +574,15 @@
   "target_kind": "stream",
   "health": "ok",
   "key": "T-543|stream:macro-release-cpi"
+ },
+ {
+  "strategy": "T-565",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "cboe-PUT-history",
+  "target_kind": "stream",
+  "health": "ok",
+  "key": "T-565|stream:cboe-PUT-history"
  },
  {
   "strategy": "H-book-imbalance",

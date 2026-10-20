@@ -183,3 +183,22 @@ theories), shared accounts and factor exposure against caps, conflicting measure
 point, and a value-of-information ranking of what to test next. It recommends only; `checkpoint_size` (quarter Kelly
 shrunk by the deflated Sharpe, capped) is applied only at a pre-registered decision point. Wiring for a new strategy
 goes in `WIRING` in mandel/live/evidence_graph.py.
+
+### Linode capture box, HMM shadows, widened sleeves
+
+`deploy/capture/install.sh` (one command on the Linode, beside the paper runner) installs a second pinned checkout
+`~/mandel-capture` with its data outside it (`~/mandel-capture-data`, via `MANDEL_ARCHIVE_ROOT` / `MANDEL_DATA_ROOT`):
+
+- `mandel.live.capture daily` (18:30 ET) runs the daily fetches (CBOE chains + surfaces, Deribit books, VIX/FRED/DVOL
+  histories, social, Polymarket books) and `score` (T-542's parity share on the box's captures); `weekly` (Sunday) the
+  slower histories and the Cboe PUT index. Raw Cboe chains stay on the box.
+- `mandel.live.shadow record` (16:35 ET) writes the frozen HMMs' readings for T-565 / T-566 (`shadow_params.json`,
+  fitted through 2026-09-30, never refitted). Nothing is traded.
+- `mandel.live.wide` runs T-567 (pre-holiday IWM, 12:46 and 15:46 ET runs that act only near that session's close) and
+  T-568 (GLD/TLT/USO put spreads, 15:27 ET) on its own keys (`/etc/mandel-wide.env`; a second Alpaca paper account is
+  recommended), capital `MANDEL_WIDE_CAPITAL` (5,000), state `~/mandel-capture-data/wide`, KILL file there.
+- 19:30 ET: `deploy/capture/push_status.sh` pushes status.json, scores.json, shadow.jsonl and the widened journal (no raw
+  data) to branch `capture/status`. Mandel copies status.json to `state/tracker/capture_status.json` before running the
+  evidence graph, which then reads stream freshness from the box.
+The paper runner's journal push now runs `deploy/paper/push_journal.sh` (the earlier inline command was mangled by
+systemd's `$` and `%` expansion); re-running deploy/paper/install.sh installs it without changing the runner's code.

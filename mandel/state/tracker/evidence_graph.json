@@ -52,7 +52,7 @@
    "id": "factor:us-equity-beta",
    "kind": "factor",
    "label": "us-equity-beta",
-   "cap_usd": 6000
+   "cap_usd": 8000
   },
   {
    "id": "T-560",
@@ -84,7 +84,7 @@
    "id": "factor:short-volatility",
    "kind": "factor",
    "label": "short-volatility",
-   "cap_usd": 2000
+   "cap_usd": 3500
   },
   {
    "id": "T-542",
@@ -190,6 +190,86 @@
    "kind": "venue",
    "label": "deribit-model",
    "cost": "model-priced, not US-accessible"
+  },
+  {
+   "id": "T-565",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Shadow: HMM regime filter for putwriting",
+   "mode": "forward",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:hmm-vol-regime",
+   "kind": "signal",
+   "label": "hmm-vol-regime"
+  },
+  {
+   "id": "stream:cboe-PUT-history",
+   "kind": "stream",
+   "label": "cboe-PUT-history",
+   "state": "ok",
+   "age_days": 5,
+   "latest": "2026-10-15",
+   "captures": null
+  },
+  {
+   "id": "venue:record-only",
+   "kind": "venue",
+   "label": "record-only",
+   "cost": "no orders (shadow record)"
+  },
+  {
+   "id": "T-566",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Shadow: HMM volatility scaling of QQQM overnight",
+   "mode": "forward",
+   "state": "waiting"
+  },
+  {
+   "id": "T-567",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Pre-holiday IWM (1-day hold)",
+   "mode": "paper",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:pre-holiday",
+   "kind": "signal",
+   "label": "pre-holiday"
+  },
+  {
+   "id": "account:alpaca-paper-wide",
+   "kind": "account",
+   "label": "alpaca-paper-wide"
+  },
+  {
+   "id": "T-568",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "GLD / TLT / USO put spreads (9-24 day holds)",
+   "mode": "paper",
+   "state": "waiting"
+  },
+  {
+   "id": "factor:gold-beta",
+   "kind": "factor",
+   "label": "gold-beta",
+   "cap_usd": 1000
+  },
+  {
+   "id": "factor:rates-beta",
+   "kind": "factor",
+   "label": "rates-beta",
+   "cap_usd": 1000
+  },
+  {
+   "id": "factor:oil-beta",
+   "kind": "factor",
+   "label": "oil-beta",
+   "cap_usd": 1000
   },
   {
    "id": "H-bounce-short",
@@ -781,6 +861,149 @@
    "from": "T-543",
    "to": "venue:deribit-model",
    "kind": "trades_on"
+  },
+  {
+   "from": "T-565",
+   "to": "signal:hmm-vol-regime",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:hmm-vol-regime",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-565"
+  },
+  {
+   "from": "signal:hmm-vol-regime",
+   "to": "stream:cboe-PUT-history",
+   "kind": "from",
+   "strategy": "T-565"
+  },
+  {
+   "from": "T-565",
+   "to": "signal:put-premium",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:put-premium",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-565"
+  },
+  {
+   "from": "signal:put-premium",
+   "to": "stream:cboe-PUT-history",
+   "kind": "from",
+   "strategy": "T-565"
+  },
+  {
+   "from": "T-565",
+   "to": "venue:record-only",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-566",
+   "to": "signal:hmm-vol-regime",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:hmm-vol-regime",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-566"
+  },
+  {
+   "from": "T-566",
+   "to": "signal:overnight-gap",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:overnight-gap",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-566"
+  },
+  {
+   "from": "T-566",
+   "to": "venue:record-only",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-567",
+   "to": "signal:pre-holiday",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:pre-holiday",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-567"
+  },
+  {
+   "from": "T-567",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-567",
+   "to": "account:alpaca-paper-wide",
+   "kind": "in"
+  },
+  {
+   "from": "T-567",
+   "to": "factor:us-equity-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 2000
+  },
+  {
+   "from": "T-568",
+   "to": "signal:put-premium",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:put-premium",
+   "to": "stream:alpaca-option-quotes",
+   "kind": "from",
+   "strategy": "T-568"
+  },
+  {
+   "from": "T-568",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-568",
+   "to": "account:alpaca-paper-wide",
+   "kind": "in"
+  },
+  {
+   "from": "T-568",
+   "to": "factor:gold-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 500
+  },
+  {
+   "from": "T-568",
+   "to": "factor:rates-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 500
+  },
+  {
+   "from": "T-568",
+   "to": "factor:oil-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 500
+  },
+  {
+   "from": "T-568",
+   "to": "factor:short-volatility",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 500
   },
   {
    "from": "H-bounce-short",

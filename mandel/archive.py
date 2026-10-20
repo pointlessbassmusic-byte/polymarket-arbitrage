@@ -36,7 +36,9 @@ from mandel._io import atomic_write_text, file_lock
 from mandel.ledger import Ledger, utcnow_iso
 from mandel.paths import MANDEL_ROOT
 
-ARCHIVE_ROOT = MANDEL_ROOT / "archive"
+# MANDEL_ARCHIVE_ROOT relocates the archive outside the checkout (the Linode capture box keeps its raw captures there,
+# so a pinned checkout stays clean); bundles indexed relative to the repo root still resolve against the checkout.
+ARCHIVE_ROOT = Path(os.environ.get("MANDEL_ARCHIVE_ROOT") or (MANDEL_ROOT / "archive"))
 INDEX_PATH = ARCHIVE_ROOT / "INDEX.json"
 INLINE_LIMIT_BYTES = 8 * 1024 * 1024      # bundles larger than this are kept out of git
 

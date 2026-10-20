@@ -4,11 +4,11 @@
   "severity": "warning",
   "kind": "stream",
   "node": "stream:fred-DTB3",
-  "message": "fred-DTB3: no data since 2026-10-15 (5 days); it also holds back 6 blocked theories (T-111, T-112, T-117, T-542, T-552, T-553)",
+  "message": "fred-DTB3: no data since 2026-10-15 (5 days); it also holds back 7 blocked theories (T-111, T-112, T-117, T-542, T-552, T-553...)",
   "affected": "H-gold-perp-carry",
   "n_affected": 1,
   "action": "restart the capture",
-  "theories_held": 6
+  "theories_held": 7
  },
  {
   "id": "stream:stream:options-chain-SPY",
@@ -157,9 +157,9 @@
   "severity": "info",
   "kind": "exposure",
   "node": "factor:us-equity-beta",
-  "message": "4 strategies carry us-equity-beta: $5,000 gross, $5,000 net against a $6,000 cap",
-  "affected": "H-2s10s-xlf, H-orb-qqq, T-559, T-560",
-  "n_affected": 4,
+  "message": "5 strategies carry us-equity-beta: $7,000 gross, $7,000 net against a $8,000 cap",
+  "affected": "H-2s10s-xlf, H-orb-qqq, T-559, T-560, T-567",
+  "n_affected": 5,
   "action": "within the cap; they move together"
  },
  {
@@ -181,5 +181,15 @@
   "affected": "T-41, T-554",
   "n_affected": 2,
   "action": "T-554 replicates on ETH; until it reads, neither direction is traded"
+ },
+ {
+  "id": "exposure:factor:short-volatility",
+  "severity": "info",
+  "kind": "exposure",
+  "node": "factor:short-volatility",
+  "message": "2 strategies carry short-volatility: $2,500 gross, $2,500 net against a $3,500 cap",
+  "affected": "T-560, T-568",
+  "n_affected": 2,
+  "action": "within the cap; they move together"
  }
 ]

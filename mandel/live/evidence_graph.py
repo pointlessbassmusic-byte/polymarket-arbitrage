@@ -59,6 +59,15 @@ WIRING: dict[str, dict] = {
     "T-560": {"signals": ["trend-10m-sma", "put-premium"], "streams": ["alpaca-option-quotes", "alpaca-iex-bars"],
               "venue": "alpaca", "account": "alpaca-paper-1", "factors": {"us-equity-beta": 1, "short-volatility": 1},
               "capital_usd": 2000},
+    "T-565": {"signals": ["hmm-vol-regime", "put-premium"], "streams": ["alpaca-iex-bars", "cboe-PUT-history"],
+              "venue": "record-only", "factors": {}},
+    "T-566": {"signals": ["hmm-vol-regime", "overnight-gap"], "streams": ["alpaca-iex-bars"], "venue": "record-only",
+              "factors": {}},
+    "T-567": {"signals": ["pre-holiday"], "streams": ["alpaca-iex-bars"], "venue": "alpaca", "account": "alpaca-paper-wide",
+              "factors": {"us-equity-beta": 1}, "capital_usd": 2000},
+    "T-568": {"signals": ["put-premium"], "streams": ["alpaca-option-quotes"], "venue": "alpaca",
+              "account": "alpaca-paper-wide", "factors": {"gold-beta": 1, "rates-beta": 1, "oil-beta": 1, "short-volatility": 1},
+              "capital_usd": 500},                       # max loss per spread (one spread per underlying)
     "T-542": {"signals": ["put-call-parity"], "streams": ["options-chain-SPX"], "venue": "cboe-delayed", "factors": {}},
     "T-541": {"signals": ["vix-call-premium"], "streams": ["options-chain-VIX", "cboe-VVIX-history"], "venue": "cboe-delayed",
               "factors": {}},
@@ -100,7 +109,7 @@ VENUES = {
     "alpaca": "0 commission; auction fills; IEX data", "cboe-delayed": "data only (15-minute delayed chains)",
     "deribit-model": "model-priced, not US-accessible", "kalshi-perps": "4 bp taker / 2 bp maker a side; funding 3x a day",
     "kalshi": "quadratic fee, ~1-2 c a contract at mid prices", "polymarket-us": "maker rebate tiered (0 below $10M/month)",
-    "polymarket": "paper only (not US-accessible for trading)", "ibit-options": "~$0.65 a contract; ~$25k margin for the ladder",
+    "polymarket": "paper only (not US-accessible for trading)", "record-only": "no orders (shadow record)", "ibit-options": "~$0.65 a contract; ~$25k margin for the ladder",
 }
 
 # Measured results that point opposite ways (the signal map's 'tension' edges, between numbers instead of texts).
@@ -114,10 +123,12 @@ CONTRADICTIONS = [
      "test": "T-554 replicates on ETH; until it reads, neither direction is traded"},
 ]
 
-FACTOR_CAP_USD = {"us-equity-beta": 6000, "short-volatility": 2000, "crypto-beta": 1500}   # combined, per factor
+FACTOR_CAP_USD = {"us-equity-beta": 8000, "short-volatility": 3500, "crypto-beta": 1500, "gold-beta": 1000,
+                  "rates-beta": 1000, "oil-beta": 1000}   # combined, per factor
 
 STREAM_STALE_DAYS = 3        # an archived daily stream older than this (in days) is stale
-STREAM_STALE_OVERRIDE = {"fomc-meetings": 120, "macro-release-cpi": 40}   # calendars: refreshed monthly at most
+STREAM_STALE_OVERRIDE = {"fomc-meetings": 120, "macro-release-cpi": 40,   # calendars: refreshed monthly at most
+                         "cboe-PUT-history": 10}                           # refreshed weekly by the capture box
 CHILD_STALE_DAYS = 10        # a child's figures older than this are stale (weekly protocol + slack)
 
 STATUS_WEIGHT = {"inconclusive": 1.0, "untested": 0.8, "blocked": 0.5}
@@ -134,6 +145,21 @@ def _load(path: Path, default):
 
 def _bundles() -> dict:
     return _load(ARCHIVE_INDEX, {}).get("bundles", {})
+
+
+def apply_capture_status(bundles: dict, status: dict) -> dict:
+    """Merge the Linode capture box's status (branch capture/status, fetched to state/tracker/capture_status.json): its
+    newest day per dated family becomes a bundle name, and newer created_at stamps of undated bundles win. Names and
+    dates only; no data."""
+    out = dict(bundles)
+    for fam, f in (status.get("families") or {}).items():
+        if f.get("latest"):
+            out.setdefault(f"{fam}-{f['latest']}", {"created_at": f["latest"], "source": "capture box"})
+    for name, ts in (status.get("undated") or {}).items():
+        cur = str((out.get(name) or {}).get("created_at", ""))
+        if ts and ts > cur:
+            out[name] = {**(out.get(name) or {}), "created_at": ts, "source": "capture box"}
+    return out
 
 
 _DATED = re.compile(r"^(?P<family>.+?)-(?P<day>\d{4}-\d{2}-\d{2})$")
@@ -383,6 +409,9 @@ def run(today: date, out: Path = TRACKER) -> dict:
     if not rows:
         raise SystemExit("no tracker rows: run python -m mandel.live.tracker first")
     bundles = _bundles()
+    cap = _load(out / "capture_status.json", None)
+    if cap:
+        bundles = apply_capture_status(bundles, cap)
     child_as_of = _load(CHILD_TESTS, {}).get("as_of")
     graph = build_graph(rows, bundles, today, child_as_of)
     alerts = monitors(graph, rows, today)
