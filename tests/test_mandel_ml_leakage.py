@@ -54,9 +54,9 @@ def test_target_is_next_open_to_open():
 
 # --- T-578 daily swing horizons: the same contract on daily bars, including the cross-asset (F1) inputs
 
-def _daily(n=900, seed=1, start="2023-01-02 14:30"):
+def _daily(n=900, seed=1, start="2023-01-02"):
     rng = np.random.default_rng(seed)
-    t = pd.bdate_range(start, periods=n, tz="UTC")
+    t = pd.bdate_range(start, periods=n, tz="UTC") + pd.Timedelta(hours=14, minutes=30)     # Yahoo stamps the open
     c = 100 * np.exp(np.cumsum(rng.normal(0, 0.01, n)))
     o = c * np.exp(rng.normal(0, 0.003, n))
     h = np.maximum(o, c) * (1 + rng.uniform(0, 0.01, n))
@@ -124,3 +124,31 @@ def test_swing_walk_forward_purges_and_holds_do_not_overlap():
     grid = SW.non_overlapping(pred, 20)
     d = np.sort(grid["date"].unique())
     assert (np.diff(d) >= np.timedelta64(20, "D")).all()        # 20 trading days apart: no two holds overlap
+
+
+def test_implied_features_enter_only_once_published(monkeypatch):
+    """T-580: an options-implied value published after the asset's close must not reach that day's features."""
+    from mandel.ml import swing as SW
+    own = _daily(seed=4)
+    monkeypatch.setattr(SW, "load_daily", lambda s: own.copy())
+    days = pd.bdate_range("2023-01-02", periods=900)
+    pub = pd.to_datetime([f"{d.date()} 21:30" for d in days], utc=True)       # Cboe's 21:30 UTC, after a 16:00 ET close
+    rng = np.random.default_rng(5)
+    level = pd.DataFrame({"known_at": pub, "day": [str(d.date()) for d in days], "close": 15 + rng.uniform(0, 5, 900)})
+
+    def implied(lv):
+        return {"market": {"iv_vix": pd.DataFrame({"known_at": lv["known_at"], "value": np.log(lv["close"])})},
+                "own": {"VIX": lv}}
+
+    cal = {"fomc": [], "cpi": []}
+    f1 = SW.build("XYZ", (1,), {}, cal, {}, implied(level))
+    cut = len(f1) // 2
+    k_cut = f1["decision_at"].iloc[cut]
+    shocked = level.copy()
+    shocked.loc[shocked["known_at"] > k_cut, "close"] *= 4.0
+    f2 = SW.build("XYZ", (1,), {}, cal, {}, implied(shocked))
+    cols = ["iv_vix", "own_iv", "own_iv_chg5", "own_iv_rv"]
+    a, b = f1.iloc[: cut + 1][cols], f2.iloc[: cut + 1][cols]
+    assert np.allclose(a.fillna(-999).values, b.fillna(-999).values), "an implied value published after the close leaked"
+    same_day = level[level["day"] == str(f1.index[cut].tz_convert("America/New_York").date())]
+    assert len(same_day) and f1["iv_vix"].iloc[cut] != pytest.approx(np.log(same_day["close"].iloc[0]))

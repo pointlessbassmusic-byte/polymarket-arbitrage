@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from mandel.ml import features as FE
+from mandel.ml import implied as IM
 from mandel.ml import train as TR
 from mandel.ml.fetch import ASSET_CLASS, COINBASE, YAHOO, _safe
 
@@ -69,10 +70,13 @@ def load_daily(sym: str) -> pd.DataFrame | None:
         return None
     written = pd.Timestamp((FE.STORE / "1d" / f"{_safe(sym)}.csv.gz").stat().st_mtime, unit="s", tz="UTC")
     df = df[(df["o"] > 0) & (df["c"] > 0)]
-    return df[known_at(df.index, ASSET_CLASS.get(sym, "other")) <= written]
+    ka = known_at(df.index, ASSET_CLASS.get(sym, "other"))
+    if (ka <= df.index).any():                            # a stamp convention this module does not know: stop, never guess
+        raise ValueError(f"{sym}: daily bar stamped at or after its assumed close, e.g. {df.index[ka <= df.index][0]}")
+    return df[ka <= written]
 
 
-def build(sym: str, horizons, leaders: dict, cal: dict, si: dict) -> pd.DataFrame | None:
+def build(sym: str, horizons, leaders: dict, cal: dict, si: dict, implied: dict | None = None) -> pd.DataFrame | None:
     cls = ASSET_CLASS.get(sym, "other")
     df = load_daily(sym)
     if df is None or len(df) < 300:
@@ -116,6 +120,14 @@ def build(sym: str, horizons, leaders: dict, cal: dict, si: dict) -> pd.DataFram
         m = pd.merge_asof(f[["known_at"]].reset_index(), lf, on="known_at", direction="backward")
         for col in ("r1", "r5", "r20"):
             f[f"x_{_safe(name)}_{col}"] = m[col].values
+    # F3 options-implied (T-580): market-wide series and the asset's own implied vol, each once known by this close
+    if implied:
+        for name, fr in implied["market"].items():
+            m = pd.merge_asof(f[["known_at"]].reset_index(), fr[["known_at", "value"]], on="known_at", direction="backward")
+            f[name] = m["value"].values
+        own = IM.own_features(implied["own"], IM.own_iv_key(sym, cls), f["known_at"], f["rv20"], cls == "crypto")
+        for col in IM.OWN:
+            f[col] = own[col].values
     # targets: next open to the open h bars later; realised at the stamp of bar i+1+h
     lo = np.log(o)
     stamps = pd.Series(df.index, index=df.index)
@@ -141,9 +153,14 @@ def leader_frames() -> dict:
     return out
 
 
+FAMILIES = {"F0": "f0", "F0F1": "f0f1", "F2": "f2", "ALL": "all", "F0F1F3": "f0f1f3", "ALLF3": "allf3"}
+T578_FAMILIES = ("F0", "F0F1", "F2", "ALL")
+
+
 def family_cols(cols, fam: str) -> list:
     f1 = [c for c in cols if c.startswith("x_")]
-    return {"f0": F0, "f0f1": F0 + f1, "f2": F2, "all": F0 + f1 + F2}[fam]
+    return {"f0": F0, "f0f1": F0 + f1, "f2": F2, "all": F0 + f1 + F2, "f0f1f3": F0 + f1 + IM.F3,
+            "allf3": F0 + f1 + F2 + IM.F3}[fam]
 
 
 def walk_forward(df: pd.DataFrame, cols: list, kind: str, hz: int, lockbox: bool) -> pd.DataFrame:
@@ -218,10 +235,10 @@ def score(tr: pd.DataFrame, hz: int, cls: str) -> dict:
             "first": str(tr["decision_at"].min()), "last": str(tr["decision_at"].max())}
 
 
-def panel(syms, horizons, lockbox: bool, leaders, cal, si) -> pd.DataFrame:
+def panel(syms, horizons, lockbox: bool, leaders, cal, si, implied: dict | None = None) -> pd.DataFrame:
     parts = []
     for s in syms:
-        f = build(s, horizons, leaders, cal, si)
+        f = build(s, horizons, leaders, cal, si, implied)
         if f is None:
             continue
         if not lockbox:
@@ -232,8 +249,17 @@ def panel(syms, horizons, lockbox: bool, leaders, cal, si) -> pd.DataFrame:
     return pd.concat(parts).replace([np.inf, -np.inf], np.nan) if parts else pd.DataFrame()
 
 
-def run(classes, horizons, lockbox: bool, models=("ridge", "gbm")) -> dict:
+def load_implied() -> dict:
+    spy = load_daily("SPY")
+    return IM.load(spy, known_at(spy.index, "equity_etf") if spy is not None else None)
+
+
+def run(classes, horizons, lockbox: bool, models=("ridge", "gbm"), families=T578_FAMILIES, baselines: bool = True,
+        extra_trials: int = 0) -> dict:
+    """``families`` beyond T-578's (the F3 ones, T-580) load the implied series; ``extra_trials`` adds the cells of an
+    earlier run of the same programme to the deflated Sharpe's trial count."""
     leaders, cal, si = leader_frames(), FE.calendars(), FE.short_interest()
+    implied = load_implied() if any("F3" in f for f in families) else None
     by_cls = {}
     for s in YAHOO + [f"{c}-USD" for c in COINBASE]:
         by_cls.setdefault(ASSET_CLASS.get(s, "other"), []).append(s)
@@ -242,13 +268,14 @@ def run(classes, horizons, lockbox: bool, models=("ridge", "gbm")) -> dict:
         cost = TR.COST.get(cls)
         if cost is None:
             continue
-        df = panel(by_cls.get(cls, []), horizons, lockbox, leaders, cal, si)
+        df = panel(by_cls.get(cls, []), horizons, lockbox, leaders, cal, si, implied)
         if df.empty:
             cells.append({"cls": cls, "status": "no data"}); continue
         nsym = int(df["sym"].nunique())
         rules = [("sign", rule_sign)] + ([("xs", rule_xs)] if nsym >= XS_MIN_SYMBOLS else [])
         for hz in horizons:
-            for fam_name, fam in TR.FAMILIES.items():
+            for fam_name in families:
+                fam = FAMILIES[fam_name]
                 cols = [c for c in family_cols(df.columns, fam) if c in df.columns]
                 for kind in models:
                     pred = walk_forward(df, cols, kind, hz, lockbox)
@@ -260,6 +287,8 @@ def run(classes, horizons, lockbox: bool, models=("ridge", "gbm")) -> dict:
                         cells.append({"cls": cls, "h": hz, "family": fam_name, "model": kind, "rule": rname, "n_symbols": nsym, **sc})
                         print(json.dumps({k: cells[-1].get(k) for k in ("cls", "h", "family", "model", "rule", "n_trades", "ic",
                                                                          "mean_net_per_trade_bps", "sr_annual")}), flush=True)
+            if not baselines:
+                continue
             # baselines: sign of the trailing h-day return (time-series momentum) and its inverse, same evaluation
             rcol = {1: "r1", 5: "r5", 20: "r20"}.get(hz, "r20")
             base = df[(df["decision_at"] >= DEV_START)].dropna(subset=[f"y{hz}", f"vn{hz}"])
@@ -268,7 +297,7 @@ def run(classes, horizons, lockbox: bool, models=("ridge", "gbm")) -> dict:
                 b["pred"] = sgn * np.sign(base[rcol].fillna(0)) * 1.0
                 sc = score(rule_sign(b, hz, cost), hz, cls)
                 cells.append({"cls": cls, "h": hz, "family": nm, "model": "rule", "rule": "sign", "n_symbols": nsym, **sc})
-    n_trials = sum(1 for c in cells if "sr_period" in c)
+    n_trials = sum(1 for c in cells if "sr_period" in c) + extra_trials
     for c in cells:
         if "sr_period" in c:
             c["dsr"] = TR.deflated_sharpe(c["sr_period"], c["n_periods"], n_trials, c["skew"], c["kurt"])
@@ -284,8 +313,12 @@ def main(argv=None) -> int:
     ap.add_argument("--models", default="ridge,gbm")
     ap.add_argument("--lockbox", action="store_true")
     ap.add_argument("--stage", default="dev")
+    ap.add_argument("--families", default=",".join(T578_FAMILIES), help="T-580: F0F1F3,ALLF3")
+    ap.add_argument("--no-baselines", action="store_true")
+    ap.add_argument("--extra-trials", type=int, default=0, help="cells of an earlier run counted in the DSR")
     a = ap.parse_args(argv)
-    res = run(a.classes.split(","), tuple(int(x) for x in a.horizons.split(",")), a.lockbox, tuple(a.models.split(",")))
+    res = run(a.classes.split(","), tuple(int(x) for x in a.horizons.split(",")), a.lockbox, tuple(a.models.split(",")),
+              tuple(a.families.split(",")), not a.no_baselines, a.extra_trials)
     TR.OUT.mkdir(parents=True, exist_ok=True)
     (TR.OUT / f"swing_{a.stage}.json").write_text(json.dumps(res, indent=1, default=str))
     passing = [c for c in res["cells"] if c.get("passes_dev")]

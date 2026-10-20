@@ -22,11 +22,6 @@ Feature families, kept apart so the program can measure what carries information
 
 from __future__ import annotations
 
-import gzip
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -40,7 +35,7 @@ F0 = ["lv_rel12", "lv_rel_tod", "dv_log", "tod_sin", "tod_cos", "dow", "min_to_c
 F2 = ["r1", "r2", "r3", "r6", "r12", "rv12", "rv48", "rng", "clv", "vwap_dist", "r_sess"]
 
 
-def load_bars(interval: str, sym: str) -> Optional[pd.DataFrame]:
+def load_bars(interval: str, sym: str) -> pd.DataFrame | None:
     p = STORE / interval / f"{_safe(sym)}.csv.gz"
     if not p.exists():
         return None
@@ -112,8 +107,8 @@ def short_interest() -> dict:
     return {s: g.sort_values("avail") for s, g in df.groupby("sym")}
 
 
-def build(sym: str, interval: str, horizons=(1,), leaders: Optional[dict] = None, cal: Optional[dict] = None,
-          si: Optional[dict] = None) -> Optional[pd.DataFrame]:
+def build(sym: str, interval: str, horizons=(1,), leaders: dict | None = None, cal: dict | None = None,
+          si: dict | None = None) -> pd.DataFrame | None:
     """One row per decision bar: features (F0, F1, F2), targets y_h (next-open to open h bars later, log), and the
     trailing volatility used to normalise them."""
     crypto = ASSET_CLASS.get(sym) == "crypto"

@@ -27,6 +27,23 @@ windows, and turn whatever survives into new pre-registered strategies for the w
   days (Yahoo's limit); 60-minute bars for two years as context.
 - Daily context: FINRA short interest (by publication time), FOMC and CPI dates.
 
+### T-578: swing holds (`python -m mandel.ml.swing`)
+
+Day-to-month: 10 years of daily bars (Yahoo; Coinbase from 2017), holds of 1, 5 and 20 trading days, monthly test
+blocks through 2026 with every model fitted only on rows whose outcome was realised before the block (purged), and
+two trading rules: the sign rule of T-577 and a cross-sectional rule (long the top fifth of predictions, short the
+bottom fifth) for classes with at least 10 symbols. Holds are scored on a non-overlapping date grid. A daily bar is
+known at its class's close (stocks 16:00 ET, CME futures 17:00 ET, indices 16:15 ET, FX and crypto stamp + 24 h) and
+other assets enter only once known by the asset's own close.
+
+### T-579: correlation and inverse-relationship scan (`python -m mandel.ml.ic`)
+
+Every feature against the forward return, per asset class and interval or hold: the rank correlation inside each
+period (a trading day intraday, a month on daily bars), its mean and t over periods, Benjamini-Hochberg over every
+triple. Discoveries are checked in their own sign on periods the scan never saw (intraday: the lockbox, read once;
+daily: 2026 after discovery on 2016-2025). Inverse relationships are scanned on the same footing as positive ones. A
+correlation is not a trade.
+
 ## Stage B (the Linode, after stage A)
 
 The same code on Alpaca's 2026 history (stocks and ETFs, 5-minute, Jan-Oct 2026, the full market feed for data older

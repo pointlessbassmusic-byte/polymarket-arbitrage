@@ -4,6 +4,7 @@ Feature correlation scan for the learning program (T-579): every feature against
 
     python -m mandel.ml.ic                 # discovery (intraday: before 2026-10-01; daily: 2016-2025) + daily confirmation
     python -m mandel.ml.ic --confirm       # also the intraday confirmation on the lockbox (once, after T-577's development)
+    python -m mandel.ml.ic --f3            # T-580's options-implied rows, their own Benjamini-Hochberg family
 
 For each (feature, asset class, interval or hold) the rank correlation (Spearman) with the forward return is computed
 inside each period (a trading day for intraday bars, a calendar month for daily bars), pooled over the class's symbols;
@@ -78,10 +79,66 @@ def family_of(feat: str) -> str:
     return "F0" if feat in FE.F0 or feat in SW.F0 else "F2"
 
 
-def scan(confirm_intraday: bool) -> dict:
+def judge(rows: list) -> dict:
+    """Benjamini-Hochberg over ``rows``, then each discovery's one-sided check in its own sign."""
+    tested = [r for r in rows if r["disc_p"] is not None]
+    for r, q in zip(tested, bh([r["disc_p"] for r in tested])):
+        r["disc_q"] = q
+        r["discovered"] = q < 0.05
+        r["sign"] = "positive" if (r["disc_mean_ic"] or 0) > 0 else "inverse"
+        c = r["conf"]
+        if r["discovered"] and c and c.get("t") is not None:
+            t_signed = c["t"] if r["sign"] == "positive" else -c["t"]
+            c["p_one_sided"] = float(1 - ND.cdf(t_signed))
+            r["confirmed"] = c["p_one_sided"] < 0.05
+        else:
+            r["confirmed"] = None if r["discovered"] else False
+    disc = [r for r in tested if r["discovered"]]
+    judged = [r for r in disc if r["confirmed"] is not None]
+    conf = [r for r in judged if r["confirmed"]]
+    return {"n_triples": len(tested), "n_discovered": len(disc), "n_judged": len(judged), "n_confirmed": len(conf),
+            "confirmed_fraction": (len(conf) / len(judged)) if judged else None}
+
+
+def daily_rows(cls: str, df: pd.DataFrame, feats: list) -> list:
+    month = df["decision_at"].dt.strftime("%Y-%m")
+    disc = (df["decision_at"] >= pd.Timestamp("2016-01-01", tz="UTC")) & (df["decision_at"] < DAILY_DISCOVERY_END)
+    conf = (df["decision_at"] >= DAILY_DISCOVERY_END) & (df["decision_at"] < TR.LOCKBOX)
+    rows = []
+    for hz in (1, 5, 20):
+        for ft in feats:
+            d = summarise(period_ics(df[disc], ft, f"y{hz}", month[disc]))
+            c = summarise(period_ics(df[conf], ft, f"y{hz}", month[conf]))
+            rows.append({"scope": "daily", "cls": cls, "horizon": f"{hz}d", "feature": ft, "family": family_of(ft),
+                         **{f"disc_{k}": v for k, v in d.items()}, "conf": c})
+    return rows
+
+
+def scan_f3() -> dict:
+    """T-580's options-implied features, scanned with the T-579 method as their own family."""
+    from mandel.ml import implied as IM
+    leaders, cal, si, implied = SW.leader_frames(), FE.calendars(), FE.short_interest(), SW.load_implied()
+    rows = []
+    for cls, syms in _by_cls().items():
+        if TR.COST.get(cls) is None:
+            continue
+        df = SW.panel(syms, (1, 5, 20), False, leaders, cal, si, implied)
+        if not df.empty:
+            rows += daily_rows(cls, df, [c for c in IM.F3 if c in df.columns])
+    for r in rows:
+        r["family"] = "F3"
+    return {"as_of": datetime.now(timezone.utc).isoformat(timespec="seconds"), **judge(rows), "rows": rows}
+
+
+def _by_cls() -> dict:
     by_cls = {}
     for s in YAHOO + [f"{c}-USD" for c in COINBASE]:
         by_cls.setdefault(ASSET_CLASS.get(s, "other"), []).append(s)
+    return by_cls
+
+
+def scan(confirm_intraday: bool) -> dict:
+    by_cls = _by_cls()
     rows = []
     # intraday: T-577 panels, h = 1 bar, period = trading day (New York date; crypto: UTC date)
     for cls, syms in by_cls.items():
@@ -106,45 +163,21 @@ def scan(confirm_intraday: bool) -> dict:
         if TR.COST.get(cls) is None:
             continue
         df = SW.panel(syms, (1, 5, 20), False, leaders, cal, si)
-        if df.empty:
-            continue
-        month = df["decision_at"].dt.strftime("%Y-%m")
-        disc = (df["decision_at"] >= pd.Timestamp("2016-01-01", tz="UTC")) & (df["decision_at"] < DAILY_DISCOVERY_END)
-        conf = (df["decision_at"] >= DAILY_DISCOVERY_END) & (df["decision_at"] < TR.LOCKBOX)
-        feats = [c for c in SW.F0 + SW.F2 + [c for c in df.columns if c.startswith("x_")] if c in df.columns]
-        for hz in (1, 5, 20):
-            for ft in feats:
-                d = summarise(period_ics(df[disc], ft, f"y{hz}", month[disc]))
-                c = summarise(period_ics(df[conf], ft, f"y{hz}", month[conf]))
-                rows.append({"scope": "daily", "cls": cls, "horizon": f"{hz}d", "feature": ft, "family": family_of(ft),
-                             **{f"disc_{k}": v for k, v in d.items()}, "conf": c})
-    tested = [r for r in rows if r["disc_p"] is not None]
-    for r, q in zip(tested, bh([r["disc_p"] for r in tested])):
-        r["disc_q"] = q
-        r["discovered"] = q < 0.05
-        r["sign"] = "positive" if (r["disc_mean_ic"] or 0) > 0 else "inverse"
-        c = r["conf"]
-        if r["discovered"] and c and c.get("t") is not None:
-            t_signed = c["t"] if r["sign"] == "positive" else -c["t"]
-            c["p_one_sided"] = float(1 - ND.cdf(t_signed))
-            r["confirmed"] = c["p_one_sided"] < 0.05
-        else:
-            r["confirmed"] = None if r["discovered"] else False
-    disc = [r for r in tested if r["discovered"]]
-    judged = [r for r in disc if r["confirmed"] is not None]
-    conf = [r for r in judged if r["confirmed"]]
+        if not df.empty:
+            rows += daily_rows(cls, df, [c for c in SW.F0 + SW.F2 + [c for c in df.columns if c.startswith("x_")]
+                                         if c in df.columns])
     return {"as_of": datetime.now(timezone.utc).isoformat(timespec="seconds"), "intraday_confirmation_read": confirm_intraday,
-            "n_triples": len(tested), "n_discovered": len(disc), "n_judged": len(judged), "n_confirmed": len(conf),
-            "confirmed_fraction": (len(conf) / len(judged)) if judged else None, "rows": rows}
+            **judge(rows), "rows": rows}
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="python -m mandel.ml.ic")
     ap.add_argument("--confirm", action="store_true", help="read the intraday lockbox (once, after T-577 development)")
+    ap.add_argument("--f3", action="store_true", help="T-580's options-implied rows only")
     a = ap.parse_args(argv)
-    res = scan(a.confirm)
+    res = scan_f3() if a.f3 else scan(a.confirm)
     TR.OUT.mkdir(parents=True, exist_ok=True)
-    (TR.OUT / "ic_scan.json").write_text(json.dumps(res, indent=1, default=str))
+    (TR.OUT / ("ic_scan_f3.json" if a.f3 else "ic_scan.json")).write_text(json.dumps(res, indent=1, default=str))
     print(json.dumps({k: v for k, v in res.items() if k != "rows"}))
     return 0
 
