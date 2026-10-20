@@ -63,6 +63,7 @@ WIRING: dict[str, dict] = {
               "venue": "record-only", "factors": {}},
     "T-566": {"signals": ["hmm-vol-regime", "overnight-gap"], "streams": ["alpaca-iex-bars"], "venue": "record-only",
               "factors": {}},
+    "T-573": {"signals": ["ewma-vol", "overnight-gap"], "streams": ["alpaca-iex-bars"], "venue": "record-only", "factors": {}},
     "T-567": {"signals": ["pre-holiday"], "streams": ["alpaca-iex-bars"], "venue": "alpaca", "account": "alpaca-paper-wide",
               "factors": {"us-equity-beta": 1}, "capital_usd": 2000},
     "T-568": {"signals": ["put-premium"], "streams": ["alpaca-option-quotes"], "venue": "alpaca",

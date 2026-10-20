@@ -14879,10 +14879,37 @@
     "b10_calib_hmm_daily_vs_yearly"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
+   "results": [
+    "X-7aebfe00"
+   ],
+   "notes": "pre-registered on 2026-10-20: the user asked for daily per-model calibration so parameters cannot drift from what the data supports. Independent refutation 2026-10-20 (verdict stands, weakened): no look-ahead; SPY and IWM gains come from crisis days (top 1% of days carry 101% / 94%; 2008 is 76% / 79%; excluding 2008 and 2020 the gain is +0.0028 / +0.0052, still p 0.0005); QQQ's warm-started daily chain sits on a worse local optimum than the cold January fit (2.7-5.9 log-lik points), so its arm differs partly by optimum; both refits lose to EWMA(0.94) on all three ETFs (daily HMM minus EWMA QLIKE +0.055 to +0.072), daily refitting closes only 25-38% of that gap. Consequences: the live calibration challenger now keeps the better of a warm and a cold fit each day; EWMA is tracked as the benchmark and gets its own forward shadow (T-573)."
+  },
+  {
+   "id": "T-573",
+   "slug": "qqqm-overnight-ewma-scaling-forward-shadow",
+   "kind": "underlying-strategy",
+   "claim": "Over T-559's first 250 paper sessions, weighting each night's QQQM overnight-slot return by w = min(1, s*/s_f), where s_f is the EWMA(0.94) volatility of QQQ daily returns through that close and s* the median EWMA volatility of QQQ through 2026-09-30, raises the annualised Sharpe ratio of the slot's net returns (paired 95% lower bound of the difference > 0).",
+   "origin": [
+    "T-566/T-569/T-572 reviews",
+    "forward tests 2026-10-20"
+   ],
+   "trial": {
+    "statistic": "Sharpe(w x r) - Sharpe(r) over nights the slot held QQQM, r from T-559's paper fills",
+    "null": "difference <= 0",
+    "procedure": "w recorded by mandel.live.shadow (T-573 field) at each close before the night; paired studentized circular block bootstrap, 10-night blocks; T-566 (HMM weights) reported beside it",
+    "data": "state/capture/shadow.jsonl (Linode), the paper journal",
+    "min_n": 200,
+    "pass": "paired 95% lower bound of the Sharpe difference > 0",
+    "controls": "EWMA was chosen after the T-569 / T-572 reviews found it the best variance forecaster on 2003-2026 data, so only a forward record is evidence; nothing is traded (T-559 unchanged)"
+   },
+   "experiments": [],
+   "testable_now": false,
+   "status": "blocked",
+   "blocked_on": "200 shadow-weighted overnight nights of T-559 fills",
    "results": [],
-   "notes": "pre-registered on 2026-10-20: the user asked for daily per-model calibration so parameters cannot drift from what the data supports."
+   "notes": "pre-registered forward shadow on 2026-10-20: the better variance forecaster's version of T-566."
   }
  ]
 }

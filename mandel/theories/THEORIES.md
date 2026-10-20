@@ -1,10 +1,10 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `f6bcc1937c6e3cd5`). 502 theories. supported 55, not_supported 250, inconclusive 49, untested 4, blocked 129, parked 15.
+Rendered from `registry.json` (hash `a4ddf5ef57cf3ed7`). 507 theories. supported 58, not_supported 251, inconclusive 49, untested 4, blocked 130, parked 15.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
-## Supported (55)
+## Supported (58)
 
 ### T-06 · price-series-are-multifractal
 
@@ -890,7 +890,52 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-a6b47633: supported — Coinbase daily DOGE-USD 2021-06-03..2026-10-14, SHIB-USD 2021-09-09..2026-10-14; 173 rule firings (pooled expanding terciles, >= 120 days of history), 109 trades with signal candles 2021..2026-09-30 after the 14-day re-entry rule; next-open short, stop-first later-bar exits: mean gross +3.01%, mean net +2.55% after 18 bp and 0.01%/8h funding paid (funding received instead: +3.10%); month-clustered 95% CI +0.20% to +4.78% (51 months; the trial's cluster, a pass that depends on the width: two-month clusters lower end -0.10% (30 clusters), quarterly -0.06% (20 clusters), reported not criteria); DOGE-USD 55 trades +3.30% (CI +0.42% to +6.33%); SHIB-USD 54 trades +1.80% (CI -1.25% to +4.79%); exits {'time': 39, 'target': 26, 'stop': 44}; halves (split 2024-04-07) +2.50% over 51 / +2.60% over 58; the child's benchmark fills on the same signals (signal-close entry, barrier fills) mean +2.82% per trade, 26 at exactly +0.1982 and 44 at exactly -0.1018; the child's literal 120-row history 109 trades +2.55%, per-coin cuts 106 trades +2.59%; DSR at the child's 4512-trial search 0.060 (context, not a criterion) — all criteria pass
 - note: pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-20: harness b7_crypto_memecoin_bounce_short written and reviewed; its preview is supported (109 trades, mean net +2.55%, month-clustered CI +0.20% to +4.78%; 2-month and quarterly clusters cross 0; SHIB alone CI -1.25% to +4.79%) but the independent refutation could not run (organisation spend limit), so it is NOT run officially: no verdict is recorded until it is refuted. | refutation 2026-10-20 05:0x UTC: independent rebuild reproduced it exactly (CI lower +0.24%, 5 seeds +0.15..+0.24%) and the pass held under every open choice (per-coin terciles, quantile method, fill conventions); recorded after refutation.
 
-## Not Supported (250)
+### T-569 · msm-vs-hmm-variance-forecast
+
+**Claim.** For SPY, QQQ and IWM daily log returns 2003-01 to 2026-09, the one-day-ahead variance forecast of a k=4 binomial Markov-switching multifractal model has a lower mean QLIKE loss than a two-state Gaussian HMM's, both refitted every January on all prior returns, for all three ETFs (Holm-adjusted p < 0.05).
+
+- kind: volatility · origin: k:markov/k:multifractal tension, signal map 2026-10-20 (concepts with source support and no market test; the map's Markov-vs-multifractal tension)
+- statistic: mean of QLIKE(HMM) - QLIKE(MSM) per day, QLIKE = r^2/h + log h
+- null: mean difference <= 0
+- procedure: mandel.experiments.batch9_signal: one-step predicted variances (no smoothing); studentized circular block bootstrap, 20-day blocks; Holm over 3 ETFs
+- data: daily-history-SPY, daily-history-QQQ, daily-history-IWM · min n: 5000
+- pass: all three ETFs: difference > 0 with Holm p < 0.05
+- controls: the map's tension between discrete Markov regimes and continuous multifractal roughness, decided on forecast loss; the winner sizes T-562 / T-566-style scaling
+- harness: b9_signal_msm_vs_hmm
+- result X-09cdaf8c: supported — SPY 2003-01-02..2026-09-30 (5974 days): QLIKE HMM -8.2731 vs MSM -8.3462, difference +0.0731 (p 0.0017 (MC +/-0.0008), Holm 0.0017 (MC +/-0.0008)); QQQ 2003-01-02..2026-09-30 (5974 days): QLIKE HMM -7.7834 vs MSM -7.8329, difference +0.0495 (p 0.0005 (MC +/-0.0004), Holm 0.0015 (MC +/-0.0008)); IWM 2004-01-02..2026-09-30 (5722 days): QLIKE HMM -7.6307 vs MSM -7.6635, difference +0.0328 (p 0.0005 (MC +/-0.0004), Holm 0.0015 (MC +/-0.0008)) — all criteria pass
+- note: pre-registered from the signal map on 2026-10-20: the signal map's tension between discrete regimes (11, 13) and multifractal roughness (A4) had no test; the better variance model is the one to size the sleeves with. Independent refutation 2026-10-20 (verdict stands as worded, weak as evidence for MSM): no look-ahead; the gain survives trimming the top 1% days but 76-101% of it comes from the top 1% of days; an EWMA(0.94) beats MSM on QLIKE for QQQ (p 0.0025) and IWM (p 0.01) and the HMM is the worst of HMM / MSM / 20-day / EWMA on all three; MSM over-forecasts variance (mean r^2/h 0.72 QQQ). EWMA(0.94) is added as the benchmark in the daily calibration record (mandel.live.calibration).
+
+### T-570 · ibs-reversal-by-hurst-regime
+
+**Claim.** On SPY, QQQ and IWM 2003-01 to 2026-09, IBS < 0.2 closes followed to the next close earn more when the DFA Hurst exponent of the trailing 250 daily log returns is below 0.5 than when it is 0.5 or above (pooled difference > 0, p < 0.05, both halves positive).
+
+- kind: underlying-strategy · origin: k:fractal_dimension/T-332, signal map 2026-10-20 (concepts with source support and no market test; the map's Markov-vs-multifractal tension)
+- statistic: pooled mean next-day return of IBS trades with H < 0.5 minus those with H >= 0.5
+- null: difference <= 0
+- procedure: mandel.experiments.batch9_signal; H from scaling.hurst_dfa on log adjclose through the signal close; studentized circular block bootstrap (20 trades) of the signed contributions; halves by trade order
+- data: daily-history-SPY, daily-history-QQQ, daily-history-IWM · min n: 1000
+- pass: difference > 0 with p < 0.05 and both halves positive
+- controls: a reversal should pay more when the series is anti-persistent; the IBS rule itself is T-332/T-558; one threshold (0.5), no grid
+- harness: b9_signal_ibs_hurst_regime
+- result X-f849177b: supported — IBS < 0.2 closes on SPY, QQQ, IWM 2003..2026-09 with a trailing 250-return DFA Hurst exponent: 3414 trades (2233 with H < 0.5, 1181 with H >= 0.5); next-day return +24.24 bps vs +13.84 bps, difference +10.39 bps; per ETF SPY 1111 trades, 68% low-H, +18.76 bps vs +14.93 bps; QQQ 1108 trades, 64% low-H, +28.25 bps vs +21.09 bps; IWM 1195 trades, 64% low-H, +25.92 bps vs +6.26 bps — all criteria pass
+- note: pre-registered from the signal map on 2026-10-20: the map's 'fractal dimension / roughness' concept (28.6 support, one parked theory) applied to the calendar sleeve's IBS slot. Independent refutation 2026-10-20 (verdict kept as registered; DO NOT BUILD ON IT): no look-ahead, but the H split is a volatility proxy (corr(H, 20-day vol) -0.41); with trailing 20-day vol in the regression the low-H coefficient is +0.13 bps (t 0.02); date-clustered p 0.062 (same day up to 3 ETFs; the registered 20-trade blocks did not cluster by date); halves +16.3 / +3.5 bps, 2020-26 +2.2 bps. The live IBS slot is not changed.
+
+### T-572 · hmm-daily-vs-yearly-refit
+
+**Claim.** For SPY, QQQ and IWM daily log returns 2003-01 to 2026-09, refitting the two-state Gaussian HMM every day on all returns before that day (EM warm-started from the previous day's fit) gives a lower mean QLIKE loss of the one-day-ahead variance forecast than refitting it every January, for all three ETFs (Holm-adjusted p < 0.05).
+
+- kind: volatility · origin: T-562/T-569, calibration request 2026-10-20
+- statistic: mean of QLIKE(yearly refit) - QLIKE(daily refit) per day
+- null: mean difference <= 0
+- procedure: mandel.experiments.batch10_calib; both forecasts one step ahead from returns through the previous close (no smoothing); studentized circular block bootstrap, 20-day blocks; Holm over 3 ETFs; reported: the T-562 scaled-overnight Sharpe under each refit, and how far the daily parameters drift within each year
+- data: daily-history-SPY, daily-history-QQQ, daily-history-IWM · min n: 5000
+- pass: all three ETFs: difference > 0 with Holm p < 0.05
+- controls: the January refit is what T-561/T-562 used; the daily refit can only use returns before the forecast day; the result decides whether the live shadows (T-565/T-566) should be refitted daily (a change made only at a pre-registered checkpoint)
+- harness: b10_calib_hmm_daily_vs_yearly
+- result X-7aebfe00: supported — SPY 2003-01-02..2026-09-30 (5974 days): QLIKE yearly -8.27313 vs daily -8.29949, difference +0.02636 (p 0.0101 (MC +/-0.0020), Holm 0.0162 (MC +/-0.0025)); daily parameters drift from the January fit by a median 0.006 pts of daily high-state vol (95th pct 0.071), 0.0005 in the high-state stay probability; QQQ 2003-01-02..2026-09-30 (5974 days): QLIKE yearly -7.78344 vs daily -7.80646, difference +0.02301 (p 0.0005 (MC +/-0.0004), Holm 0.0015 (MC +/-0.0008)); daily parameters drift from the January fit by a median 0.010 pts of daily high-state vol (95th pct 0.167), 0.0008 in the high-state stay probability; IWM 2004-01-02..2026-09-30 (5722 days): QLIKE yearly -7.63070 vs daily -7.66411, difference +0.03341 (p 0.0081 (MC +/-0.0018), Holm 0.0162 (MC +/-0.0025)); daily parameters drift from the January fit by a median 0.021 pts of daily high-state vol (95th pct 0.289), 0.0006 in the high-state stay probability — all criteria pass
+- note: pre-registered on 2026-10-20: the user asked for daily per-model calibration so parameters cannot drift from what the data supports. Independent refutation 2026-10-20 (verdict stands, weakened): no look-ahead; SPY and IWM gains come from crisis days (top 1% of days carry 101% / 94%; 2008 is 76% / 79%; excluding 2008 and 2020 the gain is +0.0028 / +0.0052, still p 0.0005); QQQ's warm-started daily chain sits on a worse local optimum than the cold January fit (2.7-5.9 log-lik points), so its arm differs partly by optimum; both refits lose to EWMA(0.94) on all three ETFs (daily HMM minus EWMA QLIKE +0.055 to +0.072), daily refitting closes only 25-38% of that gap. Consequences: the live calibration challenger now keeps the better of a warm and a cold fit each day; EWMA is tracked as the benchmark and gets its own forward shadow (T-573).
+
+## Not Supported (251)
 
 ### T-02 · longshot-bias
 
@@ -4834,6 +4879,21 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - result X-c6da9486: not_supported — T-556's 109 DOGE/SHIB trades (same entries, costs, funding): mean net fixed exit +2.55% vs with the Markov exit +0.87%; paired difference -1.68% (month-clustered 95% CI -3.72% to +0.47%, 51 months); DOGE-USD 55 trades, difference -1.95%; SHIB-USD 54 trades, difference -1.40%; Markov-rule exits {'markov': 101, 'target': 3, 'stop': 5}; mean hold 1.5 vs 9.0 days; chain usable on 107 trades — failed: month-clustered 95% CI of the mean paired difference -1.68% excludes 0 on the positive side (lower -3.72%); DOGE-USD mean difference -1.95% > 0 (55 trades); SHIB-USD mean difference -1.40% > 0 (54 trades)
 - note: pre-registered Markov-model test (parent T-556) on 2026-10-20: the user asked whether hold / exit timing rather than the signal is what limits a rule; a Markov state model predicts the next day's drift from the current state without a parameter search.
 
+### T-571 · calendar-sleeve-half-kelly-weights
+
+**Claim.** From 2006-01 to 2026-09, weighting the calendar sleeve's three slots (overnight QQQ, IBS SPY, turn-of-month SPY, 1 bp a side) by half-Kelly weights re-estimated each month on all prior daily returns (long-only, no leverage) gives a higher mean daily log growth than the fixed 0.40 / 0.30 / 0.30 weights (paired p < 0.05, both halves positive).
+
+- kind: underlying-strategy · origin: k:kelly/T-559, signal map 2026-10-20 (concepts with source support and no market test; the map's Markov-vs-multifractal tension)
+- statistic: mean daily log growth, Kelly-weighted minus fixed-weight sleeve
+- null: difference <= 0
+- procedure: mandel.experiments.batch9_signal; w = 0.5 inv(Sigma) mu clipped at 0 and scaled to sum 1 when above 1; studentized circular block bootstrap, 20-day blocks
+- data: daily-history-SPY, daily-history-QQQ · min n: 4000
+- pass: difference > 0 with p < 0.05 and both halves positive
+- controls: the map's tension 'edge in bits as the Kelly growth rate versus never full Kelly on an estimated edge' (half Kelly, estimated only from the past); T-345's month-end skip is left out of both legs
+- harness: b9_signal_kelly_calendar_weights
+- result X-586fc4b7: not_supported — calendar sleeve slots (overnight QQQ, IBS SPY, turn-of-month SPY; 1 bp a side) 2006-01-03..2026-09-30 (5218 days): half-Kelly weights re-estimated monthly on all prior days averaged 0.27 / 0.42 / 0.30 (invested 100%) vs fixed 0.40 / 0.30 / 0.30; annual log growth +6.32% vs +6.79%, Sharpe 0.78 vs 0.81 — failed: mean daily log growth, Kelly - fixed -0.187 bps/day > 0 with p < 0.05 (p 0.8750 (MC +/-0.0065)); both halves positive (-0.044 / -0.331 bps/day)
+- note: pre-registered from the signal map on 2026-10-20: the map's Kelly / bet-sizing concept had one blocked theory; the sleeve's 40/30/30 split was a judgement call.
+
 ## Inconclusive (49)
 
 ### T-01 · market-prices-beat-the-coin
@@ -5660,7 +5720,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: b6c_kraken_vpin_volatility
 - note: from the underlying-library library: VPIN flow toxicity predicts crypto volatility; harness suggestion: VPIN builder in a crypto microstructure module. HAR and QLIKE shared with social-volume-volatility. | added by the verifier pass
 
-## Blocked (129)
+## Blocked (130)
 
 ### T-05 · cross-venue-arbitrage
 
@@ -7445,6 +7505,20 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: basis: each asset's implied variance exceeds realised (T-50/T-244/T-271, T-64, T-63/T-512); the spread form is not backtested; ETF options are American (exit at 21 DTE limits assignment); no trend filter (T-551 inconclusive); the HMM shadow (T-565) is reported beside it
 - blocked on: 36 closed spreads on paper
 - note: pre-registered forward test (parent T-560) on 2026-10-20: the variance premium is supported on gold, Treasuries and crude; defined-risk spreads put it within a small account's reach and hold 9-24 days.
+
+### T-573 · qqqm-overnight-ewma-scaling-forward-shadow
+
+**Claim.** Over T-559's first 250 paper sessions, weighting each night's QQQM overnight-slot return by w = min(1, s*/s_f), where s_f is the EWMA(0.94) volatility of QQQ daily returns through that close and s* the median EWMA volatility of QQQ through 2026-09-30, raises the annualised Sharpe ratio of the slot's net returns (paired 95% lower bound of the difference > 0).
+
+- kind: underlying-strategy · origin: T-566/T-569/T-572 reviews, forward tests 2026-10-20
+- statistic: Sharpe(w x r) - Sharpe(r) over nights the slot held QQQM, r from T-559's paper fills
+- null: difference <= 0
+- procedure: w recorded by mandel.live.shadow (T-573 field) at each close before the night; paired studentized circular block bootstrap, 10-night blocks; T-566 (HMM weights) reported beside it
+- data: state/capture/shadow.jsonl (Linode), the paper journal · min n: 200
+- pass: paired 95% lower bound of the Sharpe difference > 0
+- controls: EWMA was chosen after the T-569 / T-572 reviews found it the best variance forecaster on 2003-2026 data, so only a forward record is evidence; nothing is traded (T-559 unchanged)
+- blocked on: 200 shadow-weighted overnight nights of T-559 fills
+- note: pre-registered forward shadow on 2026-10-20: the better variance forecaster's version of T-566.
 
 ## Parked (15)
 

@@ -115,7 +115,9 @@ def step(model: str, days: list, r: np.ndarray, state: dict, frozen: dict) -> tu
         p = MK.filter_probs(r, h_frozen_model)[-1]
         h_f = MK.one_step_sigma(float(p), h_frozen_model) ** 2
         init = hmm_from(chal_state) if chal_state else h_frozen_model
-        ch = MK.fit(r, max_iter=50, init=init)
+        warm = MK.fit(r, max_iter=50, init=init)
+        cold = MK.fit(r)                       # a warm chain can sit on a worse local optimum (T-572 review, QQQ)
+        ch = warm if warm.loglik >= cold.loglik else cold
         pc = MK.filter_probs(r, ch)[-1]
         h_c = MK.one_step_sigma(float(pc), ch) ** 2
         new_chal = hmm_to(ch)

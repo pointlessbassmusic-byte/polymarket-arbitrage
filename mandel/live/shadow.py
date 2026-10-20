@@ -1,5 +1,5 @@
 """
-Shadow records for the forward tests T-565 and T-566: what the frozen HMMs say each session, written before outcomes.
+Shadow records for the forward tests T-565, T-566 and T-573: what the frozen HMMs say each session, written before outcomes.
 ====================================================================================================================
 
     python -m mandel.live.shadow record [--dry-run]     # after the close, weekdays
@@ -71,7 +71,19 @@ def record_from_bars(spy: list, qqq: list, models: dict) -> dict:
     return {"day": day, "qqq_day": d2[-1],
             "T-565": {"p_high": p_spx, "in_put": p_spx < CUT, "n_returns": len(r1)},
             "T-566": {"p_high": p_q, "sigma_f": sf, "sstar": sstar, "w": min(1.0, sstar / sf) if sf > 0 else 1.0,
-                      "n_returns": len(r2)}}
+                      "n_returns": len(r2)},
+            "T-573": _ewma_weight(r2)}
+
+
+def _ewma_weight(r: list) -> dict:
+    """T-573: the EWMA(0.94) version of T-566's weight (s* = the median EWMA sigma of QQQ through 2026-09-30)."""
+    p = json.loads(PARAMS.read_text()).get("qqq_ewma") or {}
+    lam, sstar = p.get("lambda", 0.94), p.get("sstar")
+    h = sum(x * x for x in r[:250]) / max(1, min(250, len(r)))
+    for x in r:
+        h = lam * h + (1 - lam) * x * x
+    sf = math.sqrt(h)
+    return {"sigma_f": sf, "sstar": sstar, "w": (min(1.0, sstar / sf) if sstar and sf > 0 else None)}
 
 
 def record(api, dry: bool) -> dict:

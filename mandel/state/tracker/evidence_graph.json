@@ -228,6 +228,19 @@
    "state": "waiting"
   },
   {
+   "id": "T-573",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Shadow: EWMA volatility scaling of QQQM overnight",
+   "mode": "forward",
+   "state": "waiting"
+  },
+  {
+   "id": "signal:ewma-vol",
+   "kind": "signal",
+   "label": "ewma-vol"
+  },
+  {
    "id": "T-567",
    "kind": "strategy",
    "owner": "Mandel",
@@ -925,6 +938,33 @@
   },
   {
    "from": "T-566",
+   "to": "venue:record-only",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-573",
+   "to": "signal:ewma-vol",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:ewma-vol",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-573"
+  },
+  {
+   "from": "T-573",
+   "to": "signal:overnight-gap",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:overnight-gap",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-573"
+  },
+  {
+   "from": "T-573",
    "to": "venue:record-only",
    "kind": "trades_on"
   },

@@ -108,6 +108,15 @@
   "key": "T-566|venue:record-only"
  },
  {
+  "strategy": "T-573",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "record-only",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-573|venue:record-only"
+ },
+ {
   "strategy": "T-567",
   "owner": "Mandel",
   "kind": "trades_on",
@@ -502,6 +511,15 @@
   "target_kind": "stream",
   "health": "broker",
   "key": "T-567|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-573",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-573|stream:alpaca-iex-bars"
  },
  {
   "strategy": "T-560",
