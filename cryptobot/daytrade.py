@@ -14,6 +14,15 @@ Variants (registered as `daytrade-timeblock`):
       shorts only when RSI(14) was > 65 in the last 4 bars and volume is
       below its 20-bar mean (overextended on fading volume)
 
+Instruments (amendment of 2026-10-20): every trade is also scored as
+  spot     the coin itself, longs only (US retail cannot short spot), at
+           Alpaca crypto taker 25 bp a side plus the half-spread
+  bin15    a Kalshi 15-minute UP/DOWN binary in the signal direction for
+           the 15 minutes from the entry bar's open, bought at 0.51 plus
+           the 0.07 p(1-p) fee; ties settle UP; stops/targets ignored
+  bin60    the same over the 60 minutes from the entry bar's open
+Binary results are per dollar staked, in bp.
+
 Fills: the signal is read on a closed bar; entry at the next bar's open;
 stops and targets on later bars (a bar touching both is the stop; a gap
 through a level fills at the open); at the first bar outside the windows
@@ -36,6 +45,48 @@ HALF_SPREAD_BP = {"BTC": 0.2, "ETH": 0.4, "SOL": 1.4, "DOGE": 2.9, "XRP": 1.6, "
 def cost_bp(asset: str) -> float:
     """Round trip on Kalshi perps at the taker fee plus the measured half-spread, both sides."""
     return 2 * (TAKER_BP + HALF_SPREAD_BP.get(asset, 3.0))
+
+
+SPOT_TAKER_BP = 25.0
+BIN_PRICE = 0.51
+INSTRUMENTS = ("perp", "spot", "bin15", "bin60")
+
+
+def spot_cost_bp(asset: str) -> float:
+    return 2 * (SPOT_TAKER_BP + HALF_SPREAD_BP.get(asset, 3.0))
+
+
+def binary_fee(p: float) -> float:
+    """Kalshi's fee per contract, 0.07 p (1-p) rounded up to the cent."""
+    return math.ceil(round(0.07 * p * (1 - p) * 100, 9)) / 100
+
+
+def binary_bp(win: bool, price: float = BIN_PRICE) -> float:
+    """Return per dollar staked on one binary bought at `price` plus the fee."""
+    c = price + binary_fee(price)
+    return ((1.0 if win else 0.0) / c - 1) * 1e4
+
+
+def binary_win(side: int, bars15: dict, entry_ts: float, minutes: int) -> Optional[bool]:
+    """Did an UP (side +1) or DOWN (side -1) binary over `minutes` from the
+    entry bar's open win? bars15 maps 15-minute bar start -> bar. None when
+    the bars are not there (yet)."""
+    first, last = bars15.get(int(entry_ts)), bars15.get(int(entry_ts + minutes * 60 - 900))
+    if first is None or last is None:
+        return None
+    up = last[4] >= first[1]
+    return up if side > 0 else not up
+
+
+def score(trade: dict, bars15: dict) -> dict:
+    """The trade's result in bp on every instrument (None = not tradeable
+    that way, or not known yet)."""
+    out = {"perp": trade["net_bp"],
+           "spot": trade["gross_bp"] - spot_cost_bp(trade["asset"]) if trade["side"] > 0 else None}
+    for k, m in (("bin15", 15), ("bin60", 60)):
+        w = binary_win(trade["side"], bars15, trade["entry_ts"], m)
+        out[k] = None if w is None else binary_bp(w)
+    return out
 
 
 def window(ts: float) -> Optional[str]:

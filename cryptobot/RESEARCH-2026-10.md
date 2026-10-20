@@ -1691,3 +1691,68 @@ Blend of Models, HRRR). The model is also overconfident: buckets it
 rated 50–80% likely resolved 22–37% of the time. A second try would
 need NBM station forecasts (archived by the Iowa Environmental Mesonet),
 which the market already prices, so it is not scheduled.
+
+## Addendum, 2026-10-20 (31): the day trading bot, and which instrument to trade it with
+
+The operator's template is a time-block scalper. It goes long on an EMA 9/21
+up-cross in 13:30-16:00 UTC and short on a down-cross in 22:00-03:00
+UTC, and is flat otherwise. It was registered as `daytrade-timeblock`
+with three variants:
+
+- V0, the template as written.
+- V1, with ATR exits at 1:2.
+- V2, which is V1 plus an opening-range filter on longs and an
+  overextension and fading-volume filter on shorts.
+
+Before any result was read, the registration was amended to score every
+trade on four instruments. Those are the Kalshi perp; the coin itself
+(spot, longs only, at Alpaca's 25 bp taker); a Kalshi 15-minute UP/DOWN
+binary; and an hourly at-the-money binary, both bought at 0.51 plus
+the fee. That gives 3 variants x 2 timeframes x 4 coins x 4
+instruments = 96 trials, on two years of Coinbase 15-minute candles.
+
+| instrument | round trip | net per trade, range over the cells | best cell |
+|---|---|---|---|
+| perp | 8-14 bp | -27 to +25 bp | V2 30m SOL +24.9 bp, n 45, t 1.6 |
+| spot (longs) | 50-56 bp | -68 to -17 bp | all 24 cells negative |
+| 15-minute binary | 3 cents a contract | hit rate 41-60% | V2 30m SOL 60%, n 45 |
+| hourly binary | 3 cents a contract | hit rate 44-58% | V2 15m ETH 58%, n 77 |
+
+No cell passes. V0 is killed: it is negative on every perp cell. V1 and
+V2 are inconclusive, and every positive cell has fewer than 110 trades
+and t of 1.6 or less. The rule's gross edge is about 0 to +15 bp a
+trade. That is under a perp round trip for most cells and far under
+spot's. Between 50% and 80% of trades end at the forced flat when the
+window closes, so the stops and targets rarely decide anything.
+
+What the instruments do to the same signal:
+
+- **Spot** is the worst way to day trade here. A 50 bp round trip is
+  three to six times the perp's, and spot cannot short at all.
+- **Binaries** reduce the signal to a direction call with a 53%
+  break-even. A rule worth a few bp a trade moves the hit rate by a
+  fraction of a point, so the 3-cent cost dominates.
+- **Mixing**: the best instrument per cell, chosen in sample, gives
+  nothing on the short side and only small, insignificant long-side
+  binary cells.
+
+One result is worth keeping, though it was found after the output was
+read. The DOWN binary after the evening down-cross won only 41-46% on all
+four coins (BTC 45.6%, ETH 43.8%, SOL 44.4%, DOGE 40.8%). Ties were 0-2 of
+225-260, so the tie rule does not explain it. The evening down-cross is
+followed by a bounce more often than not, pooled UP 56.4% over 962
+entries. This came out of a 96-trial run, so it counts for nothing yet.
+It is registered as `daytrade-bear-cross-bounce`, a forward test on the
+paper bot's own entries:
+
+- read at 300 entries, about May 2027;
+- advance at 56% or better, and kill below 54%.
+
+Advancing only moves it to recording Kalshi's real 15-minute asks,
+because a market that already prices the bounce leaves nothing.
+
+The paper bot keeps running V1 and V2. Each closed paper trade now
+carries its spot result, and each entry is scored as a 15-minute and an
+hourly binary (`state/daytrade/binaries.jsonl`), so the instrument
+comparison continues forward at no cost.
+

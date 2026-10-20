@@ -81,3 +81,22 @@ def test_paper_bot_logs_trades_once_and_survives_restart(tmp_path):
     r = B.report(tmp_path)
     assert r["trades"] == 1 and r["by_variant"]["V0"]["net_bp"] > 0
     assert "paper" in B.render(r)
+    assert r["instruments"]["V0"]["spot"][0] == 1
+    bins = [l for l in (tmp_path / "daytrade" / "binaries.jsonl").read_text().splitlines() if l]
+    assert len(bins) == 1                               # the entry, scored as 15-minute and hourly binaries, once
+
+
+def test_binary_pricing_and_scoring():
+    assert D.binary_fee(0.51) == 0.02                  # 0.07 x 0.51 x 0.49 = 1.75 cents, rounded up
+    assert abs(D.binary_bp(True) - (1 / 0.53 - 1) * 1e4) < 1e-6
+    assert D.binary_bp(False) == -1e4
+    t0 = 1_800_000_000 // 900 * 900
+    bars = {t0 + 900 * i: (t0 + 900 * i, 100 + i, 101 + i, 99 + i, 100.5 + i, 1.0) for i in range(4)}
+    assert D.binary_win(1, bars, t0, 15) is True       # 100 -> 100.5
+    assert D.binary_win(-1, bars, t0, 60) is False     # 100 -> 103.5: the DOWN binary loses
+    assert D.binary_win(1, bars, t0 + 900, 60) is None  # the hour is not complete
+    tr = {"asset": "BTC", "side": -1, "entry_ts": t0, "net_bp": 10.0, "gross_bp": 18.4}
+    sc = D.score(tr, bars)
+    assert sc["spot"] is None and sc["perp"] == 10.0 and sc["bin15"] == -1e4
+    tr["side"] = 1
+    assert abs(D.score(tr, bars)["spot"] - (18.4 - D.spot_cost_bp("BTC"))) < 1e-9

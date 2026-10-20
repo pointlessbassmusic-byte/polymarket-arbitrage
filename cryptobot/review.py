@@ -40,7 +40,8 @@ FORWARD = (
     ("kalshi-btc-carry-etf-hedge", "short BTC perp vs long IBIT while funding > 4%/yr", dt.date(2027, 2, 12), "120 days"),
     ("btc-vrp-ladder-oos", "IBIT option ladder, out of sample", dt.date(2027, 10, 1), "12 months of IBIT rows"),
     ("orb-qqq-pilot", "QQQ opening-range paper pilot", None, "60 traded sessions"),
-    ("daytrade-timeblock", "day trading bot, time-block scalper (paper)", None, "100 paper trades per variant"),
+    ("daytrade-timeblock", "day trading bot, time-block scalper V1/V2 (paper; backtest: no edge on any instrument)", None, "100 paper trades per variant"),
+    ("daytrade-bear-cross-bounce", "UP 15-minute binary after the evening down-cross", None, "300 forward entries (about 2027-05)"),
     ("macro pilot (2s10s -> XLF)", "macro paper pilot", None, "20 closed trades"),
 )
 
