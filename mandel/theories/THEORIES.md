@@ -1,6 +1,6 @@
 # Theories and their trial math
 
-Rendered from `registry.json` (hash `5026e1afcd3c538e`). 492 theories. supported 54, not_supported 246, inconclusive 49, untested 5, blocked 123, parked 15.
+Rendered from `registry.json` (hash `694a1fb60eb8b113`). 494 theories. supported 54, not_supported 246, inconclusive 49, untested 5, blocked 125, parked 15.
 
 A theory is one falsifiable statement. Its status moves only through a recorded experiment result or a ledgered park/unpark event. Parked theories are kept in full so they can be picked up without re-deriving them.
 
@@ -5599,7 +5599,7 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - harness: b7_crypto_memecoin_bounce_short
 - note: pre-registered salvage successor of child:cryptobot (unregistered sibling session; its armed live rule) on 2026-10-20: real money is armed on this rule; Mandel's job under section 5 is to measure it independently and report, not to change it. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-20: harness b7_crypto_memecoin_bounce_short written and reviewed; its preview is supported (109 trades, mean net +2.55%, month-clustered CI +0.20% to +4.78%; 2-month and quarterly clusters cross 0; SHIB alone CI -1.25% to +4.79%) but the independent refutation could not run (organisation spend limit), so it is NOT run officially: no verdict is recorded until it is refuted.
 
-## Blocked (123)
+## Blocked (125)
 
 ### T-05 · cross-venue-arbitrage
 
@@ -7300,6 +7300,34 @@ A theory is one falsifiable statement. Its status moves only through a recorded 
 - controls: ETH was not used by T-363; on BTC the hysteresis control gave central Sharpe 1.13 against -0.64 for the switching rule (seen, so BTC is not the test); Deribit is not accessible to US retail: the US analogue is a Coinbase Derivatives or Kalshi perp, whose funding history is not archived (venue access recorded)
 - blocked on: deribit-funding-ETH-PERPETUAL history (fetchable from the Deribit history API)
 - note: pre-registered salvage successor of T-363 on 2026-10-20: T-363 lost on 118 switches, not on funding: the hysteresis exit cut turnover and is the part worth keeping. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands.
+
+### T-559 · calendar-sleeve-paper-forward
+
+**Claim.** Run by mandel.live.runner on the Alpaca paper account from 2026-10-21, the four-rule calendar sleeve (40% overnight QQQM close-to-open; 30% SPLG close-to-close after IBS < 0.2 read at 15:45 ET; 30% SPLG over turn-of-month return days -4..+3 with T-345's month-end skip) fills its closing- and opening-auction orders within 1.5 bp per side of the official auction print, and earns a positive mean daily net return.
+
+- kind: underlying-strategy · origin: T-549, T-332, T-59, T-345, user request 2026-10-20 (paper first, then live)
+- statistic: (a) mean |fill - official auction print| per side in bp over every filled order; (b) mean daily net return of the sleeve on paper fills
+- null: (a) mean fill gap > 1.5 bp per side; (b) mean daily net return <= 0
+- procedure: journal mandel/state/paper/journal.jsonl (decisions written before the auction, fills reconciled after); official prints from daily-history-SPLG / QQQM opens and closes; stationary bootstrap of the daily series; the archive backtest's per-rule returns (SPY/QQQ, 1 bp a side, IBS at the close) are the reference band
+- data: mandel/state/paper/journal.jsonl, daily-history-SPLG, daily-history-QQQM · min n: 60
+- pass: (a) decided at 60 sessions: fill gap <= 1.5 bp per side with the 95% upper bound <= 2.5 bp (execution validated, live may be considered by the user); (b) decided at 250 sessions: mean daily net > 0 with one-sided p < 0.1
+- controls: not backtested as a combination before registration; exploratory archive run on 2026-10-20 (SPY/QQQ, 1 bp a side, IBS at the close): 2003-2026 CAGR +7.8%, Sharpe 0.98, max DD -12.9%; 2015-2026 +6.5% / 0.81 / -12.9% vs SPY +13.8% / 0.82 / -33.7%: a drawdown-efficiency sleeve, not a return booster; the live IBS reads a 15:45 snapshot (weaker than the close-based backtest); SPLG / QQQM replace SPY / QQQ for whole-share auction orders on a ~$1k account
+- blocked on: 60 paper sessions from 2026-10-21 (runner phases close 15:45 ET, open 08:30 ET, reconcile 16:15 ET)
+- note: pre-registered paper forward test on 2026-10-20 before any order; real money only by the user's switch (MANDEL_ALPACA_LIVE)
+
+### T-560 · xsp-put-spread-paper-forward
+
+**Claim.** Run by mandel.live.runner on the Alpaca paper account from 2026-10-21, one 3-point XSP put credit spread a month (the standard monthly expiry 30-45 days out, short strike the highest listed strike at or below 95% of spot, opened only when SPY closed above its 10-month SMA at the last month-end, closed at 50% of the credit or at 21 days to expiry) earns a positive mean P&L per spread after real fills.
+
+- kind: options-strategy · origin: T-48, T-540, T-128, T-551, user request 2026-10-20
+- statistic: mean P&L per spread (dollars) after fills and Alpaca's index-option fees; fill vs quoted mid at entry and exit
+- null: mean P&L per spread <= 0
+- procedure: every plan, order, rejection and fill journalled before outcomes; per-cycle P&L from fills; bootstrap over cycles once 12 exist
+- data: mandel/state/paper/journal.jsonl, mandel/state/paper/spread*.json · min n: 12
+- pass: after 12 monthly cycles: mean P&L per spread > 0 and no single cycle loses more than the declared max loss; execution: mean fill within the quoted half-spread
+- controls: this spread form is NOT backtested in the archive (closest: ATM putwrite index T-128/T-202 supported in model/ index form; the quote-priced exit test T-550 inconclusive); the trend filter is T-551's drawdown component (inconclusive, 236 of 300 months); XSP spot is proxied by SPY because Alpaca serves no index spot at launch; Alpaca's mleg credit sign convention is verified on the first paper order
+- blocked on: 12 monthly paper cycles from 2026-10-21
+- note: pre-registered paper forward test on 2026-10-20 before any order; real money only by the user's switch (MANDEL_ALPACA_LIVE)
 
 ## Parked (15)
 

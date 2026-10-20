@@ -141,3 +141,22 @@ lists them. The commands that matter day to day:
 3. Decide where the signal map is served (Linode behind auth, or the
    claude.ai artifact link, or both).
 4. Ask Mandel to create the daily Routine, or install the systemd timer.
+
+## Paper sleeves (T-559, T-560), added 2026-10-20
+
+`mandel.live.runner` trades the Alpaca PAPER account. Live money needs both `--live` and
+`MANDEL_ALPACA_LIVE=I-UNDERSTAND` in the environment; Mandel never sets either. Keys:
+`ALPACA_API_KEY_ID` and `ALPACA_API_SECRET_KEY` in the environment of the machine that runs it (the
+Linode), never in the repository. A file `mandel/state/paper/KILL` stops every order-placing phase.
+
+Cron on the Linode, in New York time (`CRON_TZ=America/New_York`), weekdays:
+
+```
+30 8  * * 1-5  cd /opt/mandel && python3 -m mandel.live.runner open
+25 15 * * 1-5  cd /opt/mandel && python3 -m mandel.live.runner options
+44 15 * * 1-5  cd /opt/mandel && python3 -m mandel.live.runner close
+20 16 * * 1-5  cd /opt/mandel && python3 -m mandel.live.runner reconcile
+```
+
+Closing-auction orders must reach Alpaca by 15:50 ET and opening-auction orders by 09:28 ET. Run each phase
+with `--dry-run` once by hand first; `status` prints equity, positions and the open spread.
