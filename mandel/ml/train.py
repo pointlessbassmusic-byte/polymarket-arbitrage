@@ -63,8 +63,8 @@ def panel(syms, interval: str, lockbox: bool) -> pd.DataFrame:
         f = FE.build(s, interval, (H,), leaders, cal, si)
         if f is None:
             continue
-        if not lockbox:
-            f = f[f["decision_at"] < LOCKBOX]
+        if not lockbox:                                   # neither the decision nor its outcome may reach the lockbox
+            f = f[(f["decision_at"] < LOCKBOX) & (f["y_end"] < LOCKBOX)]
         parts.append(f)
     if not parts:
         return pd.DataFrame()
@@ -89,12 +89,13 @@ def walk_forward(df: pd.DataFrame, cols: list, kind: str) -> pd.DataFrame:
         if tr.sum() < 2000 or te.sum() == 0:
             continue
         m = make_model(kind)
-        Xtr = X[tr].fillna(X[tr].median())
+        med = X[tr].median().fillna(0.0)                   # a column with no training values (e.g. short interest on FX)
+        Xtr = X[tr].fillna(med)
         ytr = df.loc[tr, "yn"].clip(-10, 10)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             m.fit(Xtr.values, ytr.values)
-            p = m.predict(X[te].fillna(X[tr].median()).values)
+            p = m.predict(X[te].fillna(med).values)
         o = df.loc[te, ["sym", "cls", "decision_at", f"y{H}", "vol_norm"]].copy()
         o["pred_n"] = p
         out.append(o)

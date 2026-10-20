@@ -4,7 +4,8 @@ Bar store for the learning program: multi-asset intraday bars, kept local (mande
 
     python -m mandel.ml.fetch yahoo      # 5m/15m/30m (last 60 days) and 60m (2 years) for the Yahoo universe
     python -m mandel.ml.fetch coinbase   # 5-minute candles from 2026-01-01 for the Coinbase universe
-    python -m mandel.ml.fetch context    # daily context: Yahoo daily bars for the universe (volume, ranges), 2y
+    python -m mandel.ml.fetch context    # daily bars for the Yahoo universe, 10 years (swing horizons, T-578)
+    python -m mandel.ml.fetch coinbase-daily   # daily candles from 2017 for the Coinbase universe
 
 Every bar is stamped with its OPEN time (Yahoo and Coinbase both stamp bars by open); the feature builder treats a
 bar as known only at open + bar length, so nothing from inside a bar leaks into a decision taken at its start.
@@ -43,7 +44,7 @@ COINBASE = ["BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT", "L
 ASSET_CLASS = {**{s: "equity_etf" for s in EQUITY_ETF}, **{s: "bond_etf" for s in BOND_ETF},
                **{s: "commodity_etf" for s in COMMOD_ETF}, **{s: "stock" for s in STOCKS}, **{s: "future" for s in FUTURES},
                **{s: "fx" for s in FX}, **{s: "index" for s in INDEX}, **{f"{c}-USD": "crypto" for c in COINBASE}}
-YAHOO_PLAN = {"5m": "60d", "15m": "60d", "30m": "60d", "60m": "730d", "1d": "2y"}
+YAHOO_PLAN = {"5m": "60d", "15m": "60d", "30m": "60d", "60m": "730d", "1d": "10y"}
 
 
 def _safe(sym: str) -> str:
@@ -123,11 +124,11 @@ def coinbase(client: httpx.Client, product: str, start: int, end: int, gran: int
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="python -m mandel.ml.fetch")
-    ap.add_argument("what", choices=["yahoo", "coinbase", "context"])
+    ap.add_argument("what", choices=["yahoo", "coinbase", "context", "coinbase-daily"])
     a = ap.parse_args(argv)
     client = httpx.Client()
     if a.what in ("yahoo", "context"):
-        plan = {"1d": "2y"} if a.what == "context" else {k: v for k, v in YAHOO_PLAN.items() if k != "1d"}
+        plan = {"1d": YAHOO_PLAN["1d"]} if a.what == "context" else {k: v for k, v in YAHOO_PLAN.items() if k != "1d"}
         for interval, rng in plan.items():
             for sym in YAHOO:
                 try:
@@ -138,15 +139,17 @@ def main(argv=None) -> int:
                     print(f"{interval} {sym} FAILED {type(e).__name__}: {str(e)[:120]}", file=sys.stderr, flush=True)
                 time.sleep(1.0)
     else:
-        start = int(datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp())
-        end = int(time.time()) // 300 * 300
+        daily = a.what == "coinbase-daily"
+        gran, interval = (86400, "1d") if daily else (300, "5m")
+        start = int(datetime(2017 if daily else 2026, 1, 1, tzinfo=timezone.utc).timestamp())
+        end = int(time.time()) // gran * gran                 # the bar still forming is never requested
         for c in COINBASE:
             try:
-                rows = coinbase(client, f"{c}-USD", start, end)
-                write("5m", f"{c}-USD", rows)
-                print(f"5m {c}-USD {len(rows)}", flush=True)
+                rows = coinbase(client, f"{c}-USD", start, end, gran)
+                write(interval, f"{c}-USD", rows)
+                print(f"{interval} {c}-USD {len(rows)}", flush=True)
             except Exception as e:
-                print(f"5m {c}-USD FAILED {type(e).__name__}: {str(e)[:120]}", file=sys.stderr, flush=True)
+                print(f"{interval} {c}-USD FAILED {type(e).__name__}: {str(e)[:120]}", file=sys.stderr, flush=True)
     return 0
 
 

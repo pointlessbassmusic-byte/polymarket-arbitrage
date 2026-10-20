@@ -48,6 +48,8 @@ def load_bars(interval: str, sym: str) -> Optional[pd.DataFrame]:
     if df.empty:
         return None
     df = df.dropna(subset=["o", "h", "l", "c"]).sort_values("t").drop_duplicates("t")
+    # Yahoo appends the bar still forming at fetch time, stamped with the fetch second (e.g. 20:59:59): not a bar
+    df = df[df["t"] % (300 if interval == "5m" else 60) == 0]
     df["t"] = pd.to_datetime(df["t"], unit="s", utc=True)
     return df.set_index("t")
 
@@ -180,6 +182,8 @@ def build(sym: str, interval: str, horizons=(1,), leaders: Optional[dict] = None
         if not crypto:                                    # intraday horizons never cross the session close
             same = sess.shift(-(1 + hz)) == sess.shift(-1)
             f.loc[~same.fillna(False), f"y{hz}"] = np.nan
+    # when the longest target is realised (the open h+1 bars on): the caller drops rows whose target ends in the lockbox
+    f["y_end"] = pd.Series(df.index, index=df.index).shift(-(1 + max(horizons)))
     f["vol_norm"] = f["rv48"].replace(0, np.nan)
     f["sym"] = sym
     f["cls"] = ASSET_CLASS.get(sym, "other")
