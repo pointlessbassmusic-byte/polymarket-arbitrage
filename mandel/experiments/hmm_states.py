@@ -50,14 +50,18 @@ def init_params(x: Sequence[float]) -> tuple:
     return (float(a.mean()), float(a.mean())), (v0, v1), ((0.98, 0.02), (0.02, 0.98)), (0.5, 0.5)
 
 
-def fit(x: Sequence[float], max_iter: int = 200, tol: float = 1e-8) -> HMM2:
+def fit(x: Sequence[float], max_iter: int = 200, tol: float = 1e-8, init: Optional[HMM2] = None) -> HMM2:
     """Baum-Welch with scaling. Stops when the mean log-likelihood per observation improves by less than ``tol``. The
-    returned states are ordered so that state 1 has the larger variance."""
+    returned states are ordered so that state 1 has the larger variance. ``init`` warm-starts EM from an earlier fit
+    (a daily refit then converges in a few iterations)."""
     xs = [float(v) for v in x]
     n = len(xs)
     if n < 50:
         raise ValueError("too few returns to fit an HMM")
-    (m0, m1), (v0, v1), ((a00, a01), (a10, a11)), (p0, p1) = init_params(xs)
+    if init is not None:
+        (m0, m1), (v0, v1), ((a00, a01), (a10, a11)), (p0, p1) = init.mu, init.var, init.P, init.pi
+    else:
+        (m0, m1), (v0, v1), ((a00, a01), (a10, a11)), (p0, p1) = init_params(xs)
     prev, ll, it = -math.inf, -math.inf, 0
     f0 = [0.0] * n; f1 = [0.0] * n; sc = [0.0] * n
     for it in range(1, max_iter + 1):

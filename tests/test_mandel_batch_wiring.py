@@ -13,7 +13,7 @@ def _index_names() -> set[str]:
 
 
 def test_every_batch_harness_is_wired_with_declared_bundles():
-    assert len(run.BATCH_HARNESSES) == 240
+    assert len(run.BATCH_HARNESSES) == 243
     for m in run.BATCH_MODULES:
         for h, fn in m.HARNESSES.items():
             assert run.HARNESSES[h] is fn, h

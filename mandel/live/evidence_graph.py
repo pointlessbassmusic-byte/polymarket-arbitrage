@@ -418,6 +418,12 @@ def run(today: date, out: Path = TRACKER) -> dict:
     reg = _load(REGISTRY, {}).get("theories", [])
     reg = reg if isinstance(reg, list) else list(reg.values())
     nxt = next_tests(reg, bundles)
+    cal = _load(out / "calibration.json", None)               # the Linode's daily per-model calibration
+    for model, rec in ((cal or {}).get("models") or {}).items():
+        for flag in rec.get("flags") or []:
+            alerts.append(_alert("action", "calibration", f"model:{model}", f"{model}: {flag} ({rec.get('scored_days')} scored days)",
+                                 ["T-565"] if model.startswith("spx") else ["T-566"],
+                                 "pre-register the parameter switch; it takes effect only at the test's checkpoint"))
     alerted = {a["node"] for a in alerts}
     fams: dict[str, str] = {}
     for k in bundles:                                           # daily capture families no tracked strategy reads

@@ -14769,6 +14769,118 @@
    "blocked_on": "36 closed spreads on paper",
    "results": [],
    "notes": "pre-registered forward test (parent T-560) on 2026-10-20: the variance premium is supported on gold, Treasuries and crude; defined-risk spreads put it within a small account's reach and hold 9-24 days."
+  },
+  {
+   "id": "T-569",
+   "slug": "msm-vs-hmm-variance-forecast",
+   "kind": "volatility",
+   "claim": "For SPY, QQQ and IWM daily log returns 2003-01 to 2026-09, the one-day-ahead variance forecast of a k=4 binomial Markov-switching multifractal model has a lower mean QLIKE loss than a two-state Gaussian HMM's, both refitted every January on all prior returns, for all three ETFs (Holm-adjusted p < 0.05).",
+   "origin": [
+    "k:markov/k:multifractal tension",
+    "signal map 2026-10-20 (concepts with source support and no market test; the map's Markov-vs-multifractal tension)"
+   ],
+   "trial": {
+    "statistic": "mean of QLIKE(HMM) - QLIKE(MSM) per day, QLIKE = r^2/h + log h",
+    "null": "mean difference <= 0",
+    "procedure": "mandel.experiments.batch9_signal: one-step predicted variances (no smoothing); studentized circular block bootstrap, 20-day blocks; Holm over 3 ETFs",
+    "data": "daily-history-SPY, daily-history-QQQ, daily-history-IWM",
+    "min_n": 5000,
+    "pass": "all three ETFs: difference > 0 with Holm p < 0.05",
+    "controls": "the map's tension between discrete Markov regimes and continuous multifractal roughness, decided on forecast loss; the winner sizes T-562 / T-566-style scaling"
+   },
+   "experiments": [
+    "b9_signal_msm_vs_hmm"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-09cdaf8c"
+   ],
+   "notes": "pre-registered from the signal map on 2026-10-20: the signal map's tension between discrete regimes (11, 13) and multifractal roughness (A4) had no test; the better variance model is the one to size the sleeves with. Independent refutation 2026-10-20 (verdict stands as worded, weak as evidence for MSM): no look-ahead; the gain survives trimming the top 1% days but 76-101% of it comes from the top 1% of days; an EWMA(0.94) beats MSM on QLIKE for QQQ (p 0.0025) and IWM (p 0.01) and the HMM is the worst of HMM / MSM / 20-day / EWMA on all three; MSM over-forecasts variance (mean r^2/h 0.72 QQQ). EWMA(0.94) is added as the benchmark in the daily calibration record (mandel.live.calibration)."
+  },
+  {
+   "id": "T-570",
+   "slug": "ibs-reversal-by-hurst-regime",
+   "kind": "underlying-strategy",
+   "claim": "On SPY, QQQ and IWM 2003-01 to 2026-09, IBS < 0.2 closes followed to the next close earn more when the DFA Hurst exponent of the trailing 250 daily log returns is below 0.5 than when it is 0.5 or above (pooled difference > 0, p < 0.05, both halves positive).",
+   "origin": [
+    "k:fractal_dimension/T-332",
+    "signal map 2026-10-20 (concepts with source support and no market test; the map's Markov-vs-multifractal tension)"
+   ],
+   "trial": {
+    "statistic": "pooled mean next-day return of IBS trades with H < 0.5 minus those with H >= 0.5",
+    "null": "difference <= 0",
+    "procedure": "mandel.experiments.batch9_signal; H from scaling.hurst_dfa on log adjclose through the signal close; studentized circular block bootstrap (20 trades) of the signed contributions; halves by trade order",
+    "data": "daily-history-SPY, daily-history-QQQ, daily-history-IWM",
+    "min_n": 1000,
+    "pass": "difference > 0 with p < 0.05 and both halves positive",
+    "controls": "a reversal should pay more when the series is anti-persistent; the IBS rule itself is T-332/T-558; one threshold (0.5), no grid"
+   },
+   "experiments": [
+    "b9_signal_ibs_hurst_regime"
+   ],
+   "testable_now": true,
+   "status": "supported",
+   "blocked_on": "",
+   "results": [
+    "X-f849177b"
+   ],
+   "notes": "pre-registered from the signal map on 2026-10-20: the map's 'fractal dimension / roughness' concept (28.6 support, one parked theory) applied to the calendar sleeve's IBS slot. Independent refutation 2026-10-20 (verdict kept as registered; DO NOT BUILD ON IT): no look-ahead, but the H split is a volatility proxy (corr(H, 20-day vol) -0.41); with trailing 20-day vol in the regression the low-H coefficient is +0.13 bps (t 0.02); date-clustered p 0.062 (same day up to 3 ETFs; the registered 20-trade blocks did not cluster by date); halves +16.3 / +3.5 bps, 2020-26 +2.2 bps. The live IBS slot is not changed."
+  },
+  {
+   "id": "T-571",
+   "slug": "calendar-sleeve-half-kelly-weights",
+   "kind": "underlying-strategy",
+   "claim": "From 2006-01 to 2026-09, weighting the calendar sleeve's three slots (overnight QQQ, IBS SPY, turn-of-month SPY, 1 bp a side) by half-Kelly weights re-estimated each month on all prior daily returns (long-only, no leverage) gives a higher mean daily log growth than the fixed 0.40 / 0.30 / 0.30 weights (paired p < 0.05, both halves positive).",
+   "origin": [
+    "k:kelly/T-559",
+    "signal map 2026-10-20 (concepts with source support and no market test; the map's Markov-vs-multifractal tension)"
+   ],
+   "trial": {
+    "statistic": "mean daily log growth, Kelly-weighted minus fixed-weight sleeve",
+    "null": "difference <= 0",
+    "procedure": "mandel.experiments.batch9_signal; w = 0.5 inv(Sigma) mu clipped at 0 and scaled to sum 1 when above 1; studentized circular block bootstrap, 20-day blocks",
+    "data": "daily-history-SPY, daily-history-QQQ",
+    "min_n": 4000,
+    "pass": "difference > 0 with p < 0.05 and both halves positive",
+    "controls": "the map's tension 'edge in bits as the Kelly growth rate versus never full Kelly on an estimated edge' (half Kelly, estimated only from the past); T-345's month-end skip is left out of both legs"
+   },
+   "experiments": [
+    "b9_signal_kelly_calendar_weights"
+   ],
+   "testable_now": true,
+   "status": "not_supported",
+   "blocked_on": "",
+   "results": [
+    "X-586fc4b7"
+   ],
+   "notes": "pre-registered from the signal map on 2026-10-20: the map's Kelly / bet-sizing concept had one blocked theory; the sleeve's 40/30/30 split was a judgement call."
+  },
+  {
+   "id": "T-572",
+   "slug": "hmm-daily-vs-yearly-refit",
+   "kind": "volatility",
+   "claim": "For SPY, QQQ and IWM daily log returns 2003-01 to 2026-09, refitting the two-state Gaussian HMM every day on all returns before that day (EM warm-started from the previous day's fit) gives a lower mean QLIKE loss of the one-day-ahead variance forecast than refitting it every January, for all three ETFs (Holm-adjusted p < 0.05).",
+   "origin": [
+    "T-562/T-569",
+    "calibration request 2026-10-20"
+   ],
+   "trial": {
+    "statistic": "mean of QLIKE(yearly refit) - QLIKE(daily refit) per day",
+    "null": "mean difference <= 0",
+    "procedure": "mandel.experiments.batch10_calib; both forecasts one step ahead from returns through the previous close (no smoothing); studentized circular block bootstrap, 20-day blocks; Holm over 3 ETFs; reported: the T-562 scaled-overnight Sharpe under each refit, and how far the daily parameters drift within each year",
+    "data": "daily-history-SPY, daily-history-QQQ, daily-history-IWM",
+    "min_n": 5000,
+    "pass": "all three ETFs: difference > 0 with Holm p < 0.05",
+    "controls": "the January refit is what T-561/T-562 used; the daily refit can only use returns before the forecast day; the result decides whether the live shadows (T-565/T-566) should be refitted daily (a change made only at a pre-registered checkpoint)"
+   },
+   "experiments": [],
+   "testable_now": true,
+   "status": "untested",
+   "blocked_on": "",
+   "results": [],
+   "notes": "pre-registered on 2026-10-20: the user asked for daily per-model calibration so parameters cannot drift from what the data supports."
   }
  ]
 }

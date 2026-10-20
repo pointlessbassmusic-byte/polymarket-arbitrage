@@ -11,7 +11,7 @@
 #   3. /etc/mandel-wide.env (mode 600): Alpaca PAPER keys for the widened sleeves and the shadow's market data.
 #      A second Alpaca paper account is recommended; press Enter at the prompt to reuse the paper runner's keys.
 #   4. systemd timers, New York time:
-#        capture daily 18:30 Mon-Fri, weekly Sun 07:30, shadow 16:35 Mon-Fri,
+#        capture daily 18:30 Mon-Fri, weekly Sun 07:30, shadow + daily model calibration 16:35 Mon-Fri,
 #        wide close 12:46 and 15:46 (acts only 4-16 minutes before that session's close), options 15:27, reconcile 16:22,
 #        status push 19:30 Mon-Fri to branch capture/status (summaries, scores, shadow and wide journals; no raw data)
 #   5. dry runs of every phase
@@ -103,7 +103,7 @@ timer() {  # name, OnCalendar (one or more, ';'-separated)
 PY="$DIR/.venv/bin/python"
 unit mandel-capture-daily "/bin/bash -lc '$PY -m mandel.live.capture daily; $PY -m mandel.live.capture score'" "Mandel daily captures"
 unit mandel-capture-weekly "$PY -m mandel.live.capture weekly" "Mandel weekly history refresh"
-unit mandel-shadow "$PY -m mandel.live.shadow record" "Mandel HMM shadow record (T-565, T-566)"
+unit mandel-shadow "/bin/bash -lc '$PY -m mandel.live.shadow record; $PY -m mandel.live.calibration run'" "Mandel HMM shadow record (T-565, T-566) and daily per-model calibration"
 unit mandel-wide-close "$PY -m mandel.live.wide close" "Mandel widened sleeves: closing auction (T-567)"
 unit mandel-wide-options "$PY -m mandel.live.wide options" "Mandel widened sleeves: put spreads (T-568)"
 unit mandel-wide-reconcile "$PY -m mandel.live.wide reconcile" "Mandel widened sleeves: reconcile fills"
@@ -128,6 +128,7 @@ cd "$DIR"
 "$PY" -m mandel.live.wide close --dry-run || true
 "$PY" -m mandel.live.wide options --dry-run || true
 "$PY" -m mandel.live.shadow record --dry-run || true
+"$PY" -m mandel.live.calibration run --dry-run | tail -25 || true
 "$PY" -m mandel.live.capture status | head -20 || true
 systemctl list-timers 'mandel-*' --no-pager
 echo "Installed at commit $COMMIT. The first capture runs at 18:30 ET; to run it now: sudo systemctl start mandel-capture-daily.service"

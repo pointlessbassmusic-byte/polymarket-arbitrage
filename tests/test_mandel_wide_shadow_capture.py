@@ -106,3 +106,23 @@ def test_capture_status_summarises_families(monkeypatch, tmp_path):
     st = C.status()
     assert st["families"]["options-chain-SPX"] == {"latest": "2026-10-22", "count": 2, "bytes": st["families"]["options-chain-SPX"]["bytes"]}
     assert json.loads((tmp_path / "out" / "status.json").read_text())["families"]
+
+
+def test_calibration_scores_yesterdays_forecast_and_flags_only_with_evidence():
+    import numpy as np
+    from mandel.live import calibration as CB
+    rng = np.random.default_rng(5)
+    r = rng.normal(0, 0.01, 3000)
+    days = [f"d{i:05d}" for i in range(3000)]
+    frozen = {"spx_hmm": CB.MK.fit(r[:2500]), "qqq_hmm": CB.MK.fit(r[:2500]),
+              "qqq_msm": {"m0": 1.4, "gamma1": 0.02, "b": 2.0, "sigma": 0.01, "k": 4}}
+    state = {"pending": {}, "challenger": {}}
+    s1, p1, c1 = CB.step("qqq_hmm", days[:2999], r[:2999], state, frozen)
+    assert s1 is None and p1["for_after"] == days[2998] and p1["h_challenger"] > 0
+    state["pending"]["qqq_hmm"] = p1
+    s2, p2, _ = CB.step("qqq_hmm", days, r, state, frozen)
+    assert s2["day"] == days[-1] and s2["r"] == pytest.approx(r[-1])
+    lines = [dict(s2, loss_frozen=1.0, loss_challenger=0.0) for _ in range(59)]
+    assert CB.summarise(lines, state, {})["qqq_hmm"]["flags"] == []           # 59 days: below the 60-day minimum
+    lines += [dict(s2, loss_frozen=1.1, loss_challenger=0.0)]
+    assert any("recalibration" in f for f in CB.summarise(lines, state, {})["qqq_hmm"]["flags"])

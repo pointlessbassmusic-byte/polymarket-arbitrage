@@ -45,6 +45,7 @@ from mandel.experiments import batch6c_pmcal, batch6c_pmmicro, batch6c_pmxv
 from mandel.experiments import batch6c_kraken, batch6c_stocktwits
 from mandel.experiments import batch7_cal, batch7_crypto, batch7_pm, batch7_vol
 from mandel.experiments import batch8_markov
+from mandel.experiments import batch9_signal
 from mandel.experiments import underlying2 as u2
 from mandel.forecasts import ForecastBook
 from mandel.ledger import Ledger
@@ -988,7 +989,8 @@ BATCH_MODULES = (batch4_fomc, batch4_fact, batch4_carry, batch4_ohlc, batch4_vx,
                  batch6b_hedge, batch6b_chain, batch6b_misc, batch6b_dolt, batch6b_volh, batch6b_drb, batch6c_cal,
                  batch6c_mom, batch6c_misc, batch6c_xs, batch6c_pairs, batch6c_rates, batch6c_macro, batch6c_pub,
                  batch6c_events, batch6c_stockxs, batch6c_cryptoxs, batch6c_cryptovenue, batch6c_pmcal, batch6c_pmxv, batch6c_pmmicro,
-                 batch6c_kraken, batch6c_stocktwits, batch7_pm, batch7_vol, batch7_cal, batch7_crypto, batch8_markov)
+                 batch6c_kraken, batch6c_stocktwits, batch7_pm, batch7_vol, batch7_cal, batch7_crypto, batch8_markov,
+                 batch9_signal)
 BATCH_HARNESSES = {h: fn for m in BATCH_MODULES for h, fn in m.HARNESSES.items()}
 BATCH_THEORY = {h: tid for m in BATCH_MODULES for tid, h in m.THEORY_MAP.items()}
 BATCH_BUNDLES = {
@@ -1232,6 +1234,9 @@ BATCH_BUNDLES = {
     "b8_markov_overnight_state_conditioned": ["daily-history-IWM", "daily-history-QQQ"],
     "b8_markov_overnight_vol_scaled": ["daily-history-IWM", "daily-history-QQQ"],
     "b8_markov_putwrite_hmm_filter": ["cboe-PUT-history", "daily-history--GSPC", "daily-history-SPY", "fred-DTB3"],
+    "b9_signal_ibs_hurst_regime": ["daily-history-IWM", "daily-history-QQQ", "daily-history-SPY"],
+    "b9_signal_kelly_calendar_weights": ["daily-history-QQQ", "daily-history-SPY"],
+    "b9_signal_msm_vs_hmm": ["daily-history-IWM", "daily-history-QQQ", "daily-history-SPY"],
 }
 
 
