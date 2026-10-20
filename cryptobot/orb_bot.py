@@ -186,7 +186,7 @@ class OrbBot:
             except Exception as exc:                      # noqa: BLE001 - a bad day must not stop the pilot
                 logger.warning("orb session %s failed: %s", day, exc)
                 self._record({"day": day.isoformat(), "symbol": self.symbol, "mode": self.mode,
-                              "reason": f"error: {type(exc).__name__}", "side": 0, "net": 0.0, "net_pct": 0.0, "r": 0.0})
+                              "reason": f"error: {type(exc).__name__}", "error": str(exc)[:300], "side": 0, "net": 0.0, "net_pct": 0.0, "r": 0.0})
                 await self._sleep(60)
 
     async def close(self) -> None:
