@@ -27,10 +27,15 @@ from zoneinfo import ZoneInfo
 from mandel._io import append_line
 from mandel.ledger import Ledger, utcnow_iso
 from mandel.live import sleeves as S
+import os
+
 from mandel.paths import MANDEL_ROOT
 
 ET = ZoneInfo("America/New_York")
-STATE = MANDEL_ROOT / "state" / "paper"
+# On the Linode the journal lives outside the repository (MANDEL_PAPER_STATE) and the ledger is not touched
+# (MANDEL_PAPER_LEDGER=0): one hash chain, one writer. The journal is imported into Mandel's ledger later.
+STATE = Path(os.environ.get("MANDEL_PAPER_STATE") or (MANDEL_ROOT / "state" / "paper"))
+USE_LEDGER = os.environ.get("MANDEL_PAPER_LEDGER", "1") != "0"
 JOURNAL = STATE / "journal.jsonl"
 KILL = STATE / "KILL"
 SPREAD_STATE = STATE / "spread.json"
@@ -44,7 +49,9 @@ def _journal(kind: str, payload: dict, dry: bool) -> None:
         return
     STATE.mkdir(parents=True, exist_ok=True)
     append_line(JOURNAL, json.dumps(rec, default=str))
-    Ledger().append("paper.decision", {"kind": kind, "summary": {k: payload[k] for k in list(payload)[:6]}}, actor="mandel")
+    if USE_LEDGER:
+        Ledger().append("paper.decision", {"kind": kind, "summary": {k: payload[k] for k in list(payload)[:6]}},
+                        actor="mandel")
 
 
 def _guard(phase: str) -> None:
@@ -96,9 +103,18 @@ def phase_close(api, dry: bool) -> None:
         _send(api, o, dry)
 
 
+def _is_session(api, today: date) -> bool:
+    if today not in _sessions(api, today):
+        print(f"{today} is not a trading session: nothing to do")
+        return False
+    return True
+
+
 def phase_open(api, dry: bool) -> None:
     _guard("open")
     today = datetime.now(ET).date()
+    if not _is_session(api, today):
+        return
     held = {p["symbol"]: int(float(p["qty"])) for p in api.positions()}
     q = held.get("QQQM", 0)
     orders = [api_order("QQQM", -q, "opg", today)] if q > 0 else []
@@ -142,6 +158,8 @@ def phase_options(api, dry: bool) -> None:
     _guard("options")
     from mandel.live.alpaca import spread_order
     today = datetime.now(ET).date()
+    if not _is_session(api, today):
+        return
     st = json.loads(SPREAD_STATE.read_text()) if SPREAD_STATE.exists() else None
     if st:                                   # manage the open spread
         exp = date.fromisoformat(st["expiry"])
