@@ -98,6 +98,28 @@ def test_demean_is_cross_sectional():
     np.testing.assert_allclose(M.demean(X, axis=1), [[-1.0, 0.0, np.nan, 1.0]], equal_nan=True)
 
 
+def test_t666_bar_coverage_counts_sessions_with_any_bar():
+    tables = [{"2024-01-02": {"09:30": (1, 1, 1, 1, 1)}, "2024-01-03": {"10:30": (1, 1, 1, 1, 1)}}, {}, {"2024-01-03": {}}]
+    assert M.t666_bar_coverage(tables, ["2024-01-02", "2024-01-03"]) == [2, 0, 0]
+
+
+def test_t666_missing_name_is_inconclusive_not_a_smaller_universe(monkeypatch):
+    syms = list(M.T666_STOCKS) + list(M.T666_SECTORS)
+    cover = [500] * len(syms)
+    cover[syms.index("XLRE")] = 0
+    pan = {"syms": syms, "days": [f"d{i}" for i in range(500)], "early": [], "bar_sessions": cover,
+           "unreadable": {}}
+    monkeypatch.setattr(M.B7C, "_missing", lambda archive, names: None)
+    monkeypatch.setattr(M, "t666_panel", lambda archive: pan)
+    _stat, n, verdict, reason = M.b13_intraday_c_same_hour_xs(object())
+    assert verdict == "inconclusive" and n == 0
+    assert "XLRE" in reason and "rule 9" in reason and f"1 of the {len(syms)}" in reason
+    pan["unreadable"] = {"XLRE": "OSError: bad gzip"}
+    assert "unreadable: OSError" in M.t666_missing_names(pan)[3]
+    pan["bar_sessions"] = [500] * len(syms)
+    assert M.t666_missing_names(pan) is None
+
+
 # ------------------------------------------------------------------------------------------------------ T-657 --
 
 def test_volume_condition_uses_earlier_sessions_only():
@@ -194,7 +216,25 @@ def test_drift_and_port():
     np.testing.assert_allclose(M._drift(w, r), [1.0, 0.0, 0.0])
 
 
+def test_t661_coverage_row_says_computed_and_unmet():
+    unmet = M.t661_cover_text({"priced": 47348, "member_months": 52927, "share": 47348 / 52927})
+    assert "NOT met" in unmet and "89.5% < 90%" in unmet and "support is impossible" in unmet
+    assert "not implemented" not in unmet and "capped at inconclusive" not in unmet
+    assert M.t661_cover_text({"priced": 95, "member_months": 100, "share": 0.95}).endswith("- met")
+    why = M.t661_why("failed: alpha; halves (not implemented: " + unmet + ")")
+    assert "not implemented" not in why and "without overriding the failure" in why
+    assert "not implemented" not in M.t661_why("implemented criteria pass; not implemented: " + unmet)
+
+
 # ------------------------------------------------------------------------------------------------------ T-668 --
+
+def test_t668_coinbase_maker_tier_matches_the_repo_fee_table():
+    from mandel.experiments.batch6c_kraken import COINBASE_TIERS
+    tier = next(t for t in COINBASE_TIERS if t[0] == M.T668_CB_MAKER_TIER)
+    assert tier[1] == M.T668_CB_MAKER and tier[3] is True             # verified in the repo
+    costs = dict(M.T668_COSTS)
+    assert any("Coinbase spot maker tier" in k and math.isclose(v, 2 * tier[1]) for k, v in costs.items())
+
 
 def _minute_rows(days: int, drop: tuple = (), shock_from: int | None = None):
     t0 = int(datetime(2024, 3, 1, tzinfo=timezone.utc).timestamp())

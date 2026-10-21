@@ -254,6 +254,32 @@ def test_gate_at_t_trades_from_the_next_settle():
     assert tf["gated"][k + 1] == pytest.approx(-70.0)
 
 
+def test_cm_vx_rebalance_and_roll_trades_are_charged_in_both_arms():
+    e1, e2, e3 = "2020-01-15", "2020-02-19", "2020-03-18"
+    curve = {"2020-01-13": {e1: 15.0, e2: 17.0, e3: 18.0}, "2020-01-14": {e1: 15.5, e2: 17.2, e3: 18.1},
+             "2020-01-15": {e1: 15.2, e2: 17.1, e3: 18.0}, "2020-01-16": {e2: 17.4, e3: 18.3}}
+    cm = M.cm_vx_daily(curve)
+    w = cm["w1"]
+    assert w[0] == pytest.approx(7 / 35) and w[1] == pytest.approx(6 / 35) and w[2] == 1.0    # e1 expires on 01-15
+    assert cm["e1"][2] == e2 and cm["e2"][2] == e3
+    idx = [0, 1, 2]
+    c = M.vx_trade_costs(cm, idx, np.ones(3, bool))
+    reweight = 2 * (w[0] - w[1])                                             # F1 down, F2 up by the same amount
+    roll = w[1] + abs(1.0 - (1.0 - w[1])) + 0.0                              # e1 settles (w1), e2 tops up to 1, e3 0
+    assert c["traded"].tolist() == pytest.approx([1.0, reweight, roll, 1.0])
+    assert c["settled"].tolist() == pytest.approx([0.0, 0.0, w[1], 0.0])
+    assert c["cost"].tolist() == pytest.approx([70.0, 70 * reweight, 70 * (roll + 1.0)])  # final exit booked on the last
+    tf = M.gated_short_vx(cm, ["2020-01-10", "2020-01-13", "2020-01-14", "2020-01-15"], np.array([True, True, True, True]),
+                          "2020-01-13", "2020-01-15")
+    assert tf["always"].tolist() == pytest.approx((-cm["dollar"][:3] - c["cost"]).tolist())
+    assert tf["gated"].tolist() == pytest.approx(tf["always"].tolist())        # gate always on = always-short
+    g = M.vx_trade_costs(cm, idx, np.array([False, True, False]))
+    assert g["cost"].tolist() == pytest.approx([0.0, 70.0, 70.0])               # on only over [01-14, 01-15]: no re-weighting
+    assert g["settled"][2] == pytest.approx(w[1])                               # its e1 leg closes at the final settle
+    k = M.vx_trade_costs(cm, idx, np.array([True, True, False]))
+    assert k["cost"][1] == pytest.approx(70 * reweight) and k["cost"][2] == pytest.approx(70.0)
+
+
 # ============================================================================ end-to-end cores (synthetic) ==
 
 _VERDICTS = {"supported", "not_supported", "inconclusive"}
@@ -274,7 +300,11 @@ def test_vrp_core_runs_end_to_end_and_counts_the_registered_forecasts():
     rep = M.vrp_premium_test(days, px, vix, spy, _bills(days), n_boot=60, reps=1)
     assert rep["verdict"] in _VERDICTS and rep["n"] == 222                  # 2008-01..2026-06 month-ends
     assert rep["stat"]["first_last_forecast"] == ["2008-01-31", "2026-06-30"]
-    assert len(rep["stat"]["criteria"]) == 5
+    assert len(rep["stat"]["criteria"]) == 5                                 # the CT-truncated reading is not judged
+    ct = rep["stat"]["ct_truncated_not_registered"]
+    assert set(ct) == {"h21", "h63", "h126"} and ct["h63"]["n"] == 222
+    assert rep["stat"]["timing_rule_identical_under_truncation"] is True
+    assert "No Campbell-Thompson slope or sign restriction is applied" in rep["reason"]
 
 
 def test_cor1m_core_runs_end_to_end_and_counts_the_registered_forecasts():

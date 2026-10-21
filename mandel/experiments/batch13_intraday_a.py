@@ -59,8 +59,12 @@ Claim-specific readings (declared before any return was computed)
     gaps only, before any trade return), so a single date would leave mixed-contract bars in. The complement is "closing
     hour not down" (a flat bar counts there). The NQ replication is read two ways that must agree: NQ's own 15:00 bar,
     and ES's. Costs per micro contract: MES 0.25 tick and $5/pt, MNQ 0.25 and $2/pt, M2K 0.10 and $5/pt (1 tick + $1).
-    The lower bound must clear 0 under the studentized circular block bootstrap (blocks of 5 consecutive trades) and the
-    HAC t (one-sided 1.645). Halves split at 2025-08-09, the calendar midpoint of the bars. Maker variant (report only):
+    The lower bound must clear 0 under the studentized circular block bootstrap and the HAC t (one-sided 1.645). The
+    registered block is 5 SESSIONS, so the bootstrap runs on the session-indexed series of every eligible night in date
+    order (``cond_series``: m + flag (x - m) / p, whose mean is the conditional mean), blocks of 5 eligible sessions; the
+    HAC t is the trades' (Newey-West, automatic lag). Reported only: the CBB on blocks of 5 consecutive trades (an
+    earlier reading, about 10 sessions a block) and the HAC t of the session-indexed series. NQ's same-sign criterion
+    uses the same session-indexed bootstrap for its decisive-failure test. Halves split at 2025-08-09, the calendar midpoint of the bars. Maker variant (report only):
     a bid one tick under the 02:00 open fills only if the low trades through it, exit at the close paying half a tick +
     $1. The VIX diagnostic uses the session before D. The Dukascopy extension is not archived (reported).
   * T-669. RV starts at the 09:30 60m bar's open; the last of the 7 returns runs from the 14:30 bar's close (15:30) to
@@ -69,8 +73,9 @@ Claim-specific readings (declared before any return was computed)
     date, a non-event day matched to at most one event (events in date order); the matched mean is pooled over matched
     days. The stationary bootstrap is studentized, on the flagged series of the event and matched days in date order;
     the permutation moves the event label within each set under the shifted null (event values - 0.2). "Lower 95%
-    bound" = the lower end of the two-sided 95% interval (one-sided p vs 0 at 0.025; the bootstrap-t interval is
-    reported). The placebo is CPI and Employment Situation days (FOMC days removed) matched by the same rules, read as
+    bound" = the house reading (``batch6_surf``, Statistics): a ONE-SIDED 95% bound, i.e. the studentized stationary
+    bootstrap test of H0 D <= 0 at 5% (the one-sided bootstrap-t bound and the two-sided 95% interval are printed as
+    reports). The placebo is CPI and Employment Situation days (FOMC days removed) matched by the same rules, read as
     two-sided p >= 0.05 under both nulls.
   * T-660. Ticker reuse: a fja spell is kept only when the Yahoo series' firstTradeDate is at most 10 days after the
     spell's start and, for an earlier spell of a ticker with several, a Wikipedia removal within 10 days of its end names
@@ -85,7 +90,9 @@ Claim-specific readings (declared before any return was computed)
   * T-664. 52 symbols: FXI, ARKK and SMH have no daily-history (no official open/close or dividends) and GLD is not an
     equity symbol. Official prices from ``daily-history`` (through 2026-10-14; the local 1d bars carry no dividends or
     adjclose after the capture, so they are not used). Dividends from ``daily-events`` (the adjclose factor for ETFs
-    without one). "Equal" = within 1e-6 relative. Halves split at the median session. The control's 20 bp winsorisation
+    without one). "Equal" = within 1e-6 relative. A symbol whose local 60m file exists but does not read makes the
+    harness inconclusive with the exception text (a read error is never treated as an absent symbol). Halves split at
+    the median session. The control's 20 bp winsorisation
     is ambiguous between the primary and a robustness reading, so every criterion is read raw and winsorised and must
     agree. Wild bootstrap: null slope -0.5 imposed, cluster-robust t with G / (G - 1), escalated in batches of 9,999.
 """
@@ -179,18 +186,33 @@ T664_EQ_TOL = 1e-6                 # relative: the 15:30 bar close 'equals' the 
 # ================================================================================================ shared helpers ==
 
 _LOCAL: dict = {}
+_LOCAL_ERR: dict = {}
 
 
 def _local(interval: str, sym: str):
-    """Local Yahoo bars (``mandel.ml.features.load_bars``), cached per process; None when absent."""
+    """Local Yahoo bars (``mandel.ml.features.load_bars``), cached per process. None when the file is absent
+    (``load_bars`` itself returns None for a missing or empty file) or unreadable; an unreadable file's exception text is
+    kept in ``_LOCAL_ERR`` (``_local_err``) so the harnesses report a read error as a read error, never as data that is
+    not on disk. The import is not guarded: a broken loader surfaces."""
     key = (interval, sym)
     if key not in _LOCAL:
+        from mandel.ml.features import load_bars
         try:
-            from mandel.ml.features import load_bars
             _LOCAL[key] = load_bars(interval, sym)
-        except Exception:  # pragma: no cover - optional local data
+        except Exception as exc:  # noqa: BLE001 - a corrupt CSV / gzip / parse error: recorded and reported, not mislabelled as absent
             _LOCAL[key] = None
+            _LOCAL_ERR[key] = f"{type(exc).__name__}: {exc}"
     return _LOCAL[key]
+
+
+def _local_err(interval: str, sym: str) -> Optional[str]:
+    """The exception text of a local bar file that exists but could not be read (None when it read, or is absent)."""
+    return _LOCAL_ERR.get((interval, sym))
+
+
+def _unreadable(interval: str, syms: Sequence[str]) -> dict:
+    """{sym: exception text} of the local files among ``syms`` that failed to read (after ``_local`` was called)."""
+    return {s: e for s in syms if (e := _local_err(interval, s)) is not None}
 
 
 def _missing(archive, names: Sequence[str]):
@@ -223,16 +245,34 @@ def _sig(point, p, draws, side: str = "greater", alpha: float = ALPHA, bar: floa
     return CAL.decide_p(p, draws, alpha)
 
 
-def boot_mean(x, block: int) -> dict:
-    """Mean with the studentized circular block-bootstrap one-sided p's (escalated) and the HAC (Newey-West) t."""
-    x = np.asarray(x, float)
-    out = {"n": int(x.size), "mean": float(x.mean()) if x.size else None, "pg": None, "pl": None, "draws": 0,
-           "t": None, "se": None}
-    if x.size < 8:
+def cond_series(x_all, flag) -> np.ndarray:
+    """Session-indexed series whose mean is the conditional mean mean(x[flag]): m + flag (x - m) / p over every
+    eligible session in date order (p = the conditional share; the influence-function form of
+    ``batch6c_cal.flag_diff_series``). A block of it is a run of consecutive SESSIONS, so a block-resampled mean
+    carries the conditional mean's sampling spread under session-time dependence."""
+    x, f = np.asarray(x_all, float), np.asarray(flag, bool)
+    p, m = float(f.mean()), float(x[f].mean())
+    return m + np.where(f, (x - m) / p, 0.0)
+
+
+def cond_boot(x_all, flag, block: int = T659_BLOCK) -> dict:
+    """T-659's statistic: the mean net per conditional trade, with the studentized circular block bootstrap on the
+    session-indexed ``cond_series`` (block ``block`` sessions, as registered; escalated) and the HAC t of the trades.
+    Reported only: the HAC t of the session-indexed series and the earlier trade-indexed CBB (blocks of 5 trades)."""
+    x, f = np.asarray(x_all, float), np.asarray(flag, bool)
+    tr = x[f]
+    out = {"n": int(f.sum()), "n_sessions": int(f.size), "mean": float(tr.mean()) if tr.size else None, "pg": None,
+           "pl": None, "draws": 0, "t": None, "se": None, "lag": None, "t_sessions": None, "pg_trades": None,
+           "pl_trades": None}
+    if tr.size < 8:
         return out
-    pg, pl, nd = CAL.studentized_p_escalated(x, block, N_BOOT, SEED, N_SEEDS)
-    h = SX.nw_mean(x, SX.nw_lag(x.size))
-    out.update(pg=pg, pl=pl, draws=nd, t=h["t"], se=h["se"], lag=h["lag"])
+    d = cond_series(x, f)
+    pg, pl, nd = CAL.studentized_p_escalated(d, block, N_BOOT, SEED, N_SEEDS)
+    h = SX.nw_mean(tr, SX.nw_lag(tr.size))
+    hs = SX.nw_mean(d, SX.nw_lag(d.size))
+    pgt, plt_ = CAL.studentized_p(tr, block, N_BOOT, SEED, N_SEEDS)
+    out.update(pg=pg, pl=pl, draws=nd, t=h["t"], se=h["se"], lag=h["lag"], t_sessions=hs["t"], lag_sessions=hs["lag"],
+               pg_trades=pgt, pl_trades=plt_)
     return out
 
 
@@ -422,10 +462,16 @@ def b13_intraday_a_es_0200_drift(archive):
     if miss:
         return miss
     raw = {s: _local("60m", s) for s in T659_SPEC}
+    bad = _unreadable("60m", ("ES_F", "NQ_F"))
+    if bad:
+        return _out({"unreadable_local": bad}, 0, "inconclusive",
+                    f"local 60m bars {sorted(bad)} exist but could not be read ({bad}): the claim cannot be tested until "
+                    f"the files are repaired (rule 9)")
     if raw["ES_F"] is None or raw["NQ_F"] is None:
         absent = [s for s in ("ES_F", "NQ_F") if raw[s] is None]
         return _out({"missing_local": absent}, 0, "inconclusive",
                     f"local 60m bars {absent} are not on disk (mandel/ml_data/bars/60m): the claim cannot be tested (rule 9)")
+    rty_err = _local_err("60m", "RTY_F")
     bars = {s: et_bars(df) for s, df in raw.items() if df is not None}
     last = max(d for d, _ in bars["ES_F"])
     end = min(T659_END, last)
@@ -435,15 +481,16 @@ def b13_intraday_a_es_0200_drift(archive):
     elig = [r for r in es if r["eligible"] and not r["async"]]
     cond = [r for r in elig if r["down"]]
     comp = [r for r in elig if not r["down"]]
-    x = np.array([r["net"] for r in cond])
-    B = boot_mean(x, T659_BLOCK)
+    # the registered CBB block is 5 SESSIONS: bootstrap the session-indexed series of the eligible nights in date order
+    B = cond_boot(np.array([r["net"] for r in elig]), np.array([r["down"] for r in elig], bool), T659_BLOCK)
     lb_ok, lb_dec = _lb_ok(B)
     # NQ: two registered readings of the replication (its own closing hour; ES's closing hour), which must agree
     nq_reads = {}
     for tag, cbars in (("own", None), ("es", bars["ES_F"])):
         rows = [r for r in t659_nights(bars["NQ_F"], "NQ_F", end=end, cond_bars=cbars, ec=ec, rolls=rolls)
-                if r["eligible"] and not r["async"] and r["down"]]
-        nq_reads[tag] = boot_mean(np.array([r["net"] for r in rows]), T659_BLOCK)
+                if r["eligible"] and not r["async"]]
+        nq_reads[tag] = cond_boot(np.array([r["net"] for r in rows]), np.array([r["down"] for r in rows], bool),
+                                  T659_BLOCK)
     nq_ok = CAL._agree([None if v["mean"] is None else bool(v["mean"] > 0) for v in nq_reads.values()])
     nq_dec = all(v["mean"] is not None and v["mean"] < 0 and CAL.decide_p(v["pl"], v["draws"]) is True
                  for v in nq_reads.values())
@@ -455,8 +502,9 @@ def b13_intraday_a_es_0200_drift(archive):
     G = CAL.group_test(xa, flag, T659_BLOCK, N_BOOT, SEED, N_SEEDS, max_seeds=CAL.MAX_SEEDS) if flag.any() and (~flag).any() else None
     comp_ok = None if G is None or G["diff"] is None else bool(G["diff"] > 0)
     comp_dec = bool(G is not None and G["diff"] is not None and G["diff"] < 0 and CAL.decide_p(G["p_less"], G["draws"]) is True)
-    rows = [(f"ES conditional mean net {_bp(B['mean'])} with one-sided 95% lower bound > 0 (studentized CBB block "
-             f"{T659_BLOCK}: p {_mc(B['pg'], B['draws'])}; HAC t {_f(B['t'], 2)} at lag {B.get('lag')})", lb_ok, lb_dec),
+    rows = [(f"ES conditional mean net {_bp(B['mean'])} with one-sided 95% lower bound > 0 (studentized CBB, block "
+             f"{T659_BLOCK} sessions on the session-indexed series of the {B['n_sessions']} eligible nights: p "
+             f"{_mc(B['pg'], B['draws'])}; HAC t of the trades {_f(B['t'], 2)} at lag {B.get('lag')})", lb_ok, lb_dec),
             ("NQ conditional mean net > 0 (same sign; readings own closing hour / ES closing hour: "
              + " / ".join(f"{_bp(v['mean'])} (n {v['n']})" for v in nq_reads.values()) + ")", nq_ok, nq_dec),
             (f"ES mean net > 0 in both halves (split {T659_SPLIT}: {' / '.join(_bp(h) for h in halves)})", half_ok, False),
@@ -499,13 +547,18 @@ def b13_intraday_a_es_0200_drift(archive):
               f"(n {asyn_rep[2]['n']}), 03:00 {_bp(asyn_rep[3]['mean'])}, 04:00 {_bp(asyn_rep[4]['mean'])}; maker variant "
               f"fill rate {len(filled)}/{len(cond)}, mean per fill {_bp(float(np.mean(filled)) if filled else None)}; SPY "
               f"overnight-only baseline (T-549) {_bp(spy_c['mean'])} on the conditional nights, {_bp(spy_all['mean'])} on all; "
-              f"RTY replication {_bp(rty['mean'] if rty else None)} (n {rty['n'] if rty else 0}); VIX diagnostic (prior-"
+              f"RTY replication {_bp(rty['mean'] if rty else None)} (n {rty['n'] if rty else 0}"
+              f"{'; RTY_F file unreadable: ' + rty_err if rty_err else ''}); block choices (reported): CBB on blocks of "
+              f"{T659_BLOCK} consecutive trades p_greater {_pf(B['pg_trades'])}, HAC t of the session-indexed series "
+              f"{_f(B['t_sessions'], 2)}; VIX diagnostic (prior-"
               f"session VIX vs trailing median) high {_bp(vixd['high']['mean'])} / low {_bp(vixd['low']['mean'])}; the "
               f"Dukascopy 2012-2026 extension the controls require before any forward test is not archived (pilot sample, "
               f"as the verifier's power check says)")
     stat = {"n_candidates": len(es), "n_eligible": len(elig), "n_conditional": len(cond), "n_complement": len(comp),
-            "excluded": excl, "es": {k: B[k] for k in ("mean", "pg", "pl", "draws", "t", "se")},
-            "nq": {k: {kk: vv[kk] for kk in ("n", "mean", "pg", "pl", "draws", "t")} for k, vv in nq_reads.items()},
+            "excluded": excl, "es": {k: B[k] for k in ("mean", "n_sessions", "pg", "pl", "draws", "t", "se", "lag",
+                                                       "t_sessions", "pg_trades", "pl_trades")},
+            "nq": {k: {kk: vv[kk] for kk in ("n", "n_sessions", "mean", "pg", "pl", "draws", "t")} for k, vv in nq_reads.items()},
+            "rty_unreadable": rty_err,
             "halves": halves, "complement_mean": float(np.mean([r["net"] for r in comp])) if comp else None,
             "group": None if G is None else {k: G[k] for k in ("diff", "ci", "p_greater", "p_less", "draws")},
             "unconditional_mean": unc, "hour_means": {str(h): m for h, m in rank_tab.items()}, "hour_rank_0200": rank,
@@ -566,11 +619,12 @@ def implied_session_var(vix1d_open: float) -> float:
     return (vix1d_open / 100.0) ** 2 * T669_IV_SCALE
 
 
-def t669_days(archive, start: str = T669_START, end: str = T669_END) -> dict:
-    """Per session in [start, end] with the 7 regular bars, a VIX1D open and an official close: log R, the
-    close-to-close robustness ratio and the last-interval variance share."""
-    sd, sc = CAL._daily(archive, SPY_B, "close")
-    vx, hb = _vix1d(archive), _spy_hourly(archive)
+def t669_rows(sd: Sequence[str], sc: Sequence[float], vx: dict, hb: dict, start: str = T669_START,
+              end: str = T669_END) -> dict:
+    """Per session d in [start, end] with the 7 regular bars, a VIX1D open and an official close: log R = log(RV_d /
+    iv_d) with iv_d = ``implied_session_var`` of d's VIX1D OPEN only (``vx[d][0]``; d's own VIX1D close never enters
+    d's row), the close-to-close robustness ratio (the PRIOR session's VIX1D close) and the last-interval variance
+    share. ``vx`` = {day: (open, close)}, ``hb`` = {day: {"HH:MM": (open, close)}}."""
     out = {}
     for i, d in enumerate(sd):
         if not (start <= d <= end) or d not in hb or d not in vx:
@@ -578,13 +632,39 @@ def t669_days(archive, start: str = T669_START, end: str = T669_END) -> dict:
         sv = session_variance(hb[d], sc[i])
         if sv is None or not sv["rv"] > 0:
             continue
-        row = {"logR": math.log(sv["rv"] / implied_session_var(vx[d][0])), "share_last": float(sv["r"][-1] ** 2 / sv["rv"]),
+        iv = implied_session_var(vx[d][0])
+        row = {"logR": math.log(sv["rv"] / iv), "iv": iv, "share_last": float(sv["r"][-1] ** 2 / sv["rv"]),
                "shares": (sv["r"] ** 2 / sv["rv"]).tolist(), "logR_cc": None}
         if i > 0 and sd[i - 1] in vx:
             rv_cc = math.log(sv["open"] / sc[i - 1]) ** 2 + sv["rv"]
             row["logR_cc"] = math.log(rv_cc / ((vx[sd[i - 1]][1] / 100.0) ** 2 / 365.0))
         out[d] = row
-    return {"days": sd, "rows": out}
+    return out
+
+
+def t669_days(archive, start: str = T669_START, end: str = T669_END) -> dict:
+    """``t669_rows`` on the archived daily-history-SPY closes, Cboe VIX1D history and hourly-SPY bars."""
+    sd, sc = CAL._daily(archive, SPY_B, "close")
+    return {"days": sd, "rows": t669_rows(sd, sc, _vix1d(archive), _spy_hourly(archive), start, end)}
+
+
+def t669_calendar(rows: dict, sessions: Sequence[str], fomc: Sequence[str], cpi: Sequence[str],
+                  nfp: Sequence[str]) -> dict:
+    """The calendar-only inputs of T-669's contrasts: event days inside the rows' span, the exclusion set (FOMC, CPI,
+    NFP, OPEX, early closes: all scheduled in advance), the valid days (sessions with a row: data presence, never a
+    value) and the matched sets of the FOMC events and of the CPI/NFP placebo (FOMC days removed). No R value enters."""
+    first, last = min(rows), max(rows)
+    y0, y1 = int(first[:4]), int(last[:4])
+    fomc = [d for d in fomc if first <= d <= last]
+    cpi = [d for d in cpi if first <= d <= last]
+    nfp = [d for d in nfp if first <= d <= last]
+    opex, ec = opex_days(y0, y1), early_closes(y0, y1)
+    excluded = set(fomc) | set(cpi) | set(nfp) | opex | ec
+    valid = set(rows)
+    plc = sorted((set(cpi) | set(nfp)) - set(fomc))
+    return {"first": first, "last": last, "y0": y0, "y1": y1, "fomc": fomc, "cpi": cpi, "nfp": nfp, "opex": opex,
+            "ec": ec, "excluded": excluded, "valid": valid,
+            "S_f": match_sets(fomc, sessions, valid, excluded), "S_p": match_sets(plc, sessions, valid, excluded)}
 
 
 def match_sets(events: Sequence[str], sessions: Sequence[str], valid: set, excluded: set, k: int = T669_MATCH,
@@ -703,18 +783,12 @@ def b13_intraday_a_vix1d_fomc_ratio(archive):
     rows, sessions = T["rows"], [d for d in T["days"] if T669_START <= d <= T669_END]
     if not rows:
         return _out({"n_days": 0}, 0, "inconclusive", "no session has the 7 regular SPY bars, a VIX1D open and a close (rule 9)")
-    first, last = min(rows), max(rows)
-    y0, y1 = int(first[:4]), int(last[:4])
-    fomc = [d for d in _fomc_days(archive) if first <= d <= last]
-    cpi = [d for d in _release_days(archive, CPI_B, "cpi") if first <= d <= last]
-    nfp = [d for d in _release_days(archive, NFP_B, "employment") if first <= d <= last]
-    opex, ec = opex_days(y0, y1), early_closes(y0, y1)
-    excluded = set(fomc) | set(cpi) | set(nfp) | opex | ec
-    valid = set(rows)
+    K = t669_calendar(rows, sessions, _fomc_days(archive), _release_days(archive, CPI_B, "cpi"),
+                      _release_days(archive, NFP_B, "employment"))
+    first, last, y0, y1 = K["first"], K["last"], K["y0"], K["y1"]
+    fomc, cpi, nfp, opex = K["fomc"], K["cpi"], K["nfp"], K["opex"]
+    excluded, valid, S_f, S_p = K["excluded"], K["valid"], K["S_f"], K["S_p"]
     vals = {d: r["logR"] for d, r in rows.items()}
-    S_f = match_sets(fomc, sessions, valid, excluded)
-    plc = sorted((set(cpi) | set(nfp)) - set(fomc))
-    S_p = match_sets(plc, sessions, valid, excluded)
     C_f, C_p = event_contrast(S_f, vals), event_contrast(S_p, vals)
     n = C_f["n_event"]
     D = C_f["D"]
@@ -724,12 +798,15 @@ def b13_intraday_a_vix1d_fomc_ratio(archive):
     obs_p, pg_p, pl_p, nd_p = set_perm_p(C_f["per"], T669_BAR)
     sig_b, sig_p = _sig(D, pg_b, nd_b, bar=T669_BAR), _sig(D, pg_p, nd_p, bar=T669_BAR)
     dec1 = bool(D < T669_BAR and CAL.decide_p(pl_b, nd_b) is True and CAL.decide_p(pl_p, nd_p) is True)
-    pg0, pl0, nd0 = stationary_p(C_f["d"], 0.0, alpha=0.025)
+    # 'lower 95% bound above 0' = the house reading (batch6_surf, Statistics): a ONE-SIDED 95% bound, i.e. the test of
+    # H0 D <= 0 at 5%; the two-sided bootstrap-t interval is printed as a report only
+    pg0, pl0, nd0 = stationary_p(C_f["d"], 0.0)
     m_, se0, tdraw = stationary_t(C_f["d"], T669_BLOCK, N_BOOT * N_SEEDS, SEED)
+    lb1 = m_ - float(np.quantile(tdraw, 0.95)) * se0
     lb = m_ - float(np.quantile(tdraw, 0.975)) * se0
     ub = m_ - float(np.quantile(tdraw, 0.025)) * se0
-    lb_ok = _sig(D, pg0, nd0, alpha=0.025)
-    lb_dec = bool(D < 0 and CAL.decide_p(pl0, nd0, 0.025) is True)
+    lb_ok = _sig(D, pg0, nd0)
+    lb_dec = bool(D < 0 and CAL.decide_p(pl0, nd0) is True)
     # placebo: not significantly different from 0, two-sided, under both nulls
     pl_rep = {"D": C_p["D"], "n": C_p["n_event"]}
     if C_p["D"] is not None:
@@ -746,8 +823,9 @@ def b13_intraday_a_vix1d_fomc_ratio(archive):
     crit_rows = [(f"FOMC minus matched mean log R {_f(D)} > {T669_BAR} with one-sided p < 0.05 under the day-level stationary "
                   f"bootstrap (mean block {T669_BLOCK:g}: p {_mc(pg_b, nd_b)}) and the matched-set permutation (p "
                   f"{_mc(pg_p, nd_p)})", CAL._agree([sig_b, sig_p]), dec1),
-                 (f"lower 95% bound of the FOMC difference above 0 (bootstrap-t interval [{_f(lb)}, {_f(ub)}]; one-sided p "
-                  f"vs 0 {_mc(pg0, nd0)} at 0.025)", lb_ok, lb_dec),
+                 (f"one-sided 95% lower bound of the FOMC difference above 0 (bootstrap-t bound {_f(lb1)}; one-sided p vs "
+                  f"0 {_mc(pg0, nd0)} at 0.05; two-sided 95% bootstrap-t interval [{_f(lb)}, {_f(ub)}], reported)",
+                  lb_ok, lb_dec),
                  (f"CPI/NFP placebo difference {_f(C_p['D'])} (n {C_p['n_event']}) not significantly different from 0 "
                   f"(two-sided p bootstrap {_pf(pl_rep.get('p_two_boot'))}, permutation {_pf(pl_rep.get('p_two_perm'))})",
                   plc_ok, plc_dec)]
@@ -798,7 +876,8 @@ def b13_intraday_a_vix1d_fomc_ratio(archive):
               f"Partly in-sample (T-529 reported event VIX1D pricing over 2022-05..2026-10): any pass must be confirmed on the "
               f"next 8 FOMC days before it informs T-217/T-218; no trade is claimed")
     stat = {"n_sessions": len(rows), "n_fomc": n, "n_matched": C_f["n_matched"], "D": D, "boot": [pg_b, pl_b, nd_b],
-            "perm": [obs_p, pg_p, pl_p, nd_p], "lower_bound_p": [pg0, pl0, nd0], "ci_boot_t": [lb, ub], "placebo": pl_rep,
+            "perm": [obs_p, pg_p, pl_p, nd_p], "lower_bound_p": [pg0, pl0, nd0], "lower_bound_one_sided": lb1,
+            "ci_boot_t": [lb, ub], "placebo": pl_rep,
             "D_cc": D_cc, "D_opex": D_opex, "random_share_ge": share_rnd, "random_n": int(rnd.size),
             "share_last": {"fomc": sh_f, "matched": sh_m}, "profile_corr": corr,
             "fomc_sets": [[e, ms] for e, ms in S_f], "criteria": crit}
@@ -1178,7 +1257,8 @@ def b13_intraday_a_overnight_persistence(archive):
               f"ticker-reuse refusals: {len(sw['late_series'])} spells with a later series, {len(sw['unverified_earlier_spell'])} "
               f"unverified earlier spells; dividends from adjclose for {inp['div_fallback']} symbols without events; open "
               f"spot-check on {spot['n_syms']} stocks: median |Yahoo daily open - first 60m open| {spot['median_bp']} bp (mean "
-              f"{spot['mean_bp']} bp, {(spot['share_over_5bp'] or 0) * 100:.1f}% of days above 5 bp); weight on names "
+              f"{spot['mean_bp']} bp, {(spot['share_over_5bp'] or 0) * 100:.1f}% of days above 5 bp"
+              f"{'; unreadable local files left out: ' + str(spot['unreadable']) if spot['unreadable'] else ''}); weight on names "
               f"without a return on a holding night (series ending inside the month, renormalised away) "
               f"{max(0.0, float(np.mean(prim['missing']))) * 100:.2f}% per night. The coverage gate is a None criterion (a cap): it "
               f"never turns a failing criterion into inconclusive (house convention)")
@@ -1201,7 +1281,7 @@ def open_spot_check(archive) -> dict:
     P = daily_panel(archive)
     pos = {d: i for i, d in enumerate(P.days.astype(str).tolist())}
     have = set(P.symbols.tolist())
-    diffs, n_syms, mean_abs = [], 0, []
+    diffs, n_syms = [], 0
     for s in T660_LOCAL_STOCKS:
         df = _local("60m", s)
         if df is None or s not in have:
@@ -1216,7 +1296,8 @@ def open_spot_check(archive) -> dict:
                 diffs.append(abs(O[i] - o) / O[i] * 1e4)
     d = np.array(diffs)
     return {"n_syms": n_syms, "n": int(d.size), "median_bp": round(float(np.median(d)), 2) if d.size else None,
-            "mean_bp": round(float(d.mean()), 2) if d.size else None, "share_over_5bp": float(np.mean(d > 5)) if d.size else None}
+            "mean_bp": round(float(d.mean()), 2) if d.size else None, "share_over_5bp": float(np.mean(d > 5)) if d.size else None,
+            "unreadable": _unreadable("60m", T660_LOCAL_STOCKS)}
 
 
 # ====================================================================================== T-664 auction deviation ==
@@ -1241,7 +1322,7 @@ def auction_dev(close_1530: float, official_close: float) -> float:
 
 def new_counts(no_daily=()) -> dict:
     return {"symbol_days": 0, "equal_dropped": 0, "no_bar": 0, "early": 0, "no_next": 0, "no_dividend_data": [],
-            "no_60m": [], "no_daily_history": list(no_daily), "abs_dev_gt_2pct": 0}
+            "no_60m": [], "unreadable_60m": {}, "no_daily_history": list(no_daily), "abs_dev_gt_2pct": 0}
 
 
 def new_rows() -> dict:
@@ -1300,7 +1381,11 @@ def t664_rows(archive, start: str = T664_START) -> dict:
     for s in syms:
         df = _local("60m", s)
         if df is None:
-            cnt["no_60m"].append(s)
+            err = _local_err("60m", s)
+            if err is not None:
+                cnt["unreadable_60m"][s] = err
+            else:
+                cnt["no_60m"].append(s)
             continue
         b15 = bar_1530(df)
         o, c, a = P.col(s, "open"), P.col(s, "close"), P.col(s, "adjclose")
@@ -1384,10 +1469,17 @@ def b13_intraday_a_auction_reversal(archive):
     miss = _missing(archive, [SPY_B, "daily-history-AAPL", "daily-events-AAPL"])
     if miss:
         return miss
-    if _local("60m", "SPY") is None:
+    spy60 = _local("60m", "SPY")
+    if spy60 is None and _local_err("60m", "SPY") is None:
         return _out({"missing_local": ["60m"]}, 0, "inconclusive", "local 60m bars are not on disk: the claim cannot be tested (rule 9)")
     T = t664_rows(archive)
     Rw, cnt = T["rows"], T["counts"]
+    if cnt["unreadable_60m"]:
+        # a symbol with a local 60m file is in the registered universe; a file that will not read is a data defect,
+        # not an absent symbol, so the registered universe cannot be tested (never silently dropped)
+        return _out({"unreadable_local": cnt["unreadable_60m"], "counts": cnt}, 0, "inconclusive",
+                    f"local 60m bars of {sorted(cnt['unreadable_60m'])} exist but could not be read "
+                    f"({cnt['unreadable_60m']}): the registered universe cannot be tested until the files are repaired (rule 9)")
     n = int(Rw["y"].size)
     if n < 100:
         return _out({"n": n, "counts": cnt}, n, "inconclusive", f"only {n} symbol-days (rule 9)")
@@ -1449,7 +1541,9 @@ def b13_intraday_a_auction_reversal(archive):
               f"{_f(flags['month_end']['slope_flagged'])} vs {_f(flags['month_end']['slope_other'])}, quad witching "
               f"{_f(flags['quad']['slope_flagged'])}, Russell reconstitution {_f(flags['russell']['slope_flagged'])} (n "
               f"{flags['russell']['n']}); 5m cross-check: the 15:30 60m close equals the 15:55 5m close on "
-              f"{xc['equal']}/{xc['n']} symbol-days; |dev| > 2% on {cnt['abs_dev_gt_2pct']} symbol-days (kept). No costs: a "
+              f"{xc['equal']}/{xc['n']} symbol-days"
+              f"{' (unreadable 5m files left out of the check: ' + str(xc['unreadable_5m']) + ')' if xc['unreadable_5m'] else ''}"
+              f"; |dev| > 2% on {cnt['abs_dev_gt_2pct']} symbol-days (kept). No costs: a "
               f"cost diagnostic for MOC-based rules")
     stat = {"n": n, "counts": cnt, "share_equal_dropped": share_eq, "reads": reads, "no_fe_slope": nofe,
             "per_symbol": per, "ex_seen_slope": rob, "placebo_prev_dev_slope": plc, "flags": flags, "check_5m": xc,
@@ -1471,7 +1565,7 @@ def check_5m(syms: Sequence[str]) -> dict:
             if d in b60:
                 n += 1
                 eq += int(abs(b60[d] - c) <= T664_EQ_TOL * c)
-    return {"n": n, "equal": eq}
+    return {"n": n, "equal": eq, "unreadable_5m": _unreadable("5m", syms)}
 
 
 HARNESSES = {"b13_intraday_a_es_0200_drift": b13_intraday_a_es_0200_drift,

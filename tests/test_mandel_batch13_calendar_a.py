@@ -179,6 +179,44 @@ def test_concession_test_detects_an_injected_concession_and_cluster_values_are_w
     assert r["excess"] < -0.01 and r["boot_p_less"] < 0.01 and r["place_p_less"] < 0.01
 
 
+def test_period_demeaned_values_use_each_clusters_own_half():
+    rng = np.random.default_rng(20)
+    W = rng.normal(0, 1, (2, 400))
+    seg = (np.arange(400) >= 250).astype(int)
+    starts = np.array([10, 100, 260, 390])
+    A = np.array([[0.5, 0.5], [1.0, 0.0], [0.0, 1.0], [0.5, 0.5]])
+    v = M.cluster_values(W, A, starts, seg)
+    for c, a in enumerate(starts):
+        m = W[:, seg == seg[a]].mean(axis=1)
+        assert v[c] == pytest.approx(float(A[c] @ (W[:, a] - m)))
+    assert _same(M.cluster_values(W, A, starts), M.cluster_values(W, A, starts, np.zeros(400, int)))
+
+
+def test_window_segments_classify_by_the_close_of_t_minus_1():
+    days = _bdays(30, "2019-12-02")
+    seg = M.window_segments(days, len(days) - M.T589_SPAN, "2020-01-01")
+    for a, s in enumerate(seg):
+        assert s == (days[a + M.T589_SPAN] >= "2020-01-01")
+
+
+def test_year_stratified_placement_never_draws_another_year():
+    days = _bdays(800, "2014-01-02")
+    S = len(days) - M.T589_SPAN
+    pool = M.placement_pool(days, set())
+    py = M.pool_years(days, pool)
+    assert set(py) >= {2014, 2015, 2016}
+    W = np.zeros((1, S))
+    W[0, pool[py == 2015].ravel()] = 1.0                                    # only the 2015 pool weeks' windows carry 1
+    A = np.ones((6, 1))
+    wd = np.array([0, 1, 2, 3, 4, 2])
+    cy = np.array([2015] * 6)
+    seg = np.zeros(S, int)
+    const = 1.0 - W[0].mean()                                               # every same-year draw: 1 - the unconditional mean
+    lo = M._placement_strat_batch(W, A, wd, pool, py, cy, seg, const - 1e-9, 500, 0)
+    hi = M._placement_strat_batch(W, A, wd, pool, py, cy, seg, const + 1e-9, 500, 0)
+    assert lo == (1.0, pytest.approx(1 / 501)) and hi == (pytest.approx(1 / 501), 1.0)
+
+
 def test_placement_pool_excludes_coupon_weeks():
     days = _bdays(200, "2015-01-05")
     weeks = {M.iso_week(d) for d in days[:50]}
@@ -228,6 +266,33 @@ def test_put_interval_labels_rolls_dte_and_holidays():
     w = M.put_intervals(idx, gspc, bills, "2012-01-03", weekly=True)
     k = list(np.array(w["d1"])).index("2012-03-09")                          # weekly: every Friday is a roll
     assert w["roll_end"][k] and not w["short_dte"].any()
+
+
+def test_roll_day_interval_is_excluded_on_monthly_indices_only():
+    days, idx, gspc, bills = _put_setup()
+    iv = M.put_intervals(idx, gspc, bills, "2012-01-03", weekly=False)
+    k = list(iv["d0"]).index("2012-03-16")                                   # Fri -> Mon starting on the 16 March roll
+    assert iv["weekend"][k] and iv["roll_start"][k] and not iv["short_dte"][k] and not iv["roll_end"][k]
+    assert iv["excluded"][k] and not iv["excluded_end_only"][k]              # the roll-day clause alone removes it
+    assert (iv["excluded"] == (iv["excluded_end_only"] | iv["roll_start"])).all()
+    t = M.weekend_test(iv, "2012-01-03", "2013-12-31", None, pvals=False)
+    te = M.weekend_test(iv, "2012-01-03", "2013-12-31", None, pvals=False, excl="excluded_end_only")
+    assert te["n_weekend"] - t["n_weekend"] == t["n_excluded"]["roll_start_only"] > 0
+    w = M.put_intervals(idx, gspc, bills, "2012-01-03", weekly=True)
+    k = list(w["d0"]).index("2012-03-09")                                    # WPUT: the first weekend of each weekly put is kept
+    assert w["roll_start"][k] and w["weekend"][k] and not w["excluded"][k]
+    assert (w["excluded"] == w["excluded_end_only"]).all()
+
+
+def test_roll_exclusions_do_not_depend_on_marks_after_the_interval():
+    days, idx, gspc, bills = _put_setup()
+    iv = M.put_intervals(idx, gspc, bills, "2012-01-03", weekly=False)
+    k = 150
+    cut = iv["d1"][k]
+    idx2 = {"close": {d: (v * 0.5 if d > cut else v) for d, v in idx["close"].items()}, "backtest": idx["backtest"]}
+    iv2 = M.put_intervals(idx2, gspc, bills, "2012-01-03", weekly=False)
+    for key in ("roll_start", "roll_end", "short_dte", "hol_adj", "excluded", "excluded_end_only"):
+        assert (iv[key][:k + 1] == iv2[key][:k + 1]).all(), key
 
 
 def test_put_residual_ignores_marks_after_the_interval():
@@ -312,6 +377,21 @@ def test_matched_diff_linearised_series_mean_is_the_difference():
     c = {k: y[~ev & (dec == k)].mean() for k in range(10)}
     assert md["diff"] == pytest.approx(np.mean([y[i] - c[dec[i]] for i in np.where(ev)[0]]))
     assert md["z"].mean() == pytest.approx(md["diff"])
+
+
+def test_stationary_index_runs_and_cluster_bootstrap():
+    rng = np.random.default_rng(21)
+    idx = M.stationary_idx(rng, 100, 3.0, 400)
+    step = (idx[:, 1:] - idx[:, :-1]) % 100
+    cont = step == 1
+    assert idx.min() >= 0 and idx.max() < 100
+    assert 0.55 < cont.mean() < 0.78                                         # P(continue) = 1 - 1/3, plus chance hits
+    months = np.repeat([f"{2018 + k // 12}-{k % 12 + 1:02d}" for k in range(60)], 20)
+    x = rng.normal(0.0, 1.0, months.size)
+    pg, pl = M.stationary_cluster_boot(x + 0.5, months, 1000, 0, 3.0)
+    assert pg < 0.01 and pl > 0.99
+    pg0, pl0 = M.stationary_cluster_boot(x[:100], months[:100], 1000, 0, 3.0)   # 5 clusters: below the 8-cluster minimum
+    assert pg0 is None and pl0 is None
 
 
 def test_declustering_uses_past_events_only():
@@ -402,6 +482,21 @@ def test_rank_uses_month_m_minus_1_rates_known_at_the_rank_day():
              for c, l in book.items()}
     rd3, b3, st3 = [s for s in M.rank_schedule(days, book3) if s[0][:7] == "2015-05"][0]
     assert "EUR" in st3                                                     # a print not yet out: the earlier one, flagged stale
+
+
+def test_rate_publication_gate_ignores_the_own_month_stamp():
+    assert M.rate_available("2015-04", "2015-04-28T00:00:00+00:00") == "2015-05-15"   # the stamp precedes the month's end
+    assert M.rate_available("2015-12", "2015-12-28T00:00:00+00:00") == "2016-01-15"
+    assert M.rate_available("2026-01", "2026-03-02T00:00:00+00:00") == "2026-03-02"   # a later stamp wins
+    days = _bdays(300, "2015-01-02")
+    months = sorted({d[:7] for d in days} | {"2014-12"})
+    book = _book(months, M.G10)                                             # stamped on the 28th of their own month
+    late = {c: [(m, x, av) if not (c == "EUR" and m == "2015-04") else (m, x, "2015-04-28T00:00:00+00:00") for m, x, av in l]
+            for c, l in book.items()}
+    rd, basket, stale = [s for s in M.rank_schedule(days, late) if s[0][:7] == "2015-05"][0]
+    assert "EUR" not in stale                                               # published 2015-05-15, before the May rank day
+    early = [d for d in days if d[:7] == "2015-05" and d < "2015-05-15"]
+    assert M.rate_available("2015-04", "2015-04-28") > early[-1]            # a mid-May rank could not have used it
 
 
 def test_carry_window_fixed_at_noon_t_minus_1():

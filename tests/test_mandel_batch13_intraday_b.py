@@ -347,3 +347,123 @@ def test_mean_test_direction():
     assert t["mean"] < -10e-4 and t["p_nw"] < 0.05 and t["p_bt"] < 0.05
     t2 = M.mean_test(x, 0.0, "greater", 5, 10)
     assert t2["p_nw"] > 0.95 and t2["p_nw_opp"] < 0.05
+
+
+# ------------------------------------------------------------------------------------- review fixes (T-663) ----
+
+def _cap_pan(D=10):
+    days = np.array([str(np.datetime64("2024-01-01") + np.timedelta64(k, "D")) for k in range(D)])
+    open_ts = np.array([datetime.fromisoformat(d).replace(tzinfo=timezone.utc).timestamp() + 14.5 * 3600 for d in days])
+    syms = ["AAA", "GOOGL", "GOOG", "BRK-B", "ZZZ"]
+    C = np.tile(np.array([50.0, 100.0, 101.0, 400.0, 20.0]), (D, 1))
+    F = np.ones((D, len(syms)))
+    F[:4, 0] = 2.0                                   # AAA split 2:1 with ex-date days[4]
+    return {"days": days, "open_ts": open_ts, "syms": syms, "col": {y: j for j, y in enumerate(syms)}, "C": C, "F": F}
+
+
+def _cap_inputs(pan, s=6):
+    forms = [{"settle": "r0", "s": s, "dtc": np.array([1.0, 2.0, 3.0, 4.0, 5.0])}]
+    rel = [{"settle": "r0", "rows": {M.finra_sym(y): (nm, 1.0, 1.0) for y, nm in
+                                     (("AAA", "Aaa Corp"), ("GOOGL", "Alphabet Inc. Class A"), ("GOOG", "Alphabet Inc. Class C"),
+                                      ("BRK-B", "Berkshire Hathaway Class B"), ("ZZZ", "Zeta Holdings"))},
+            "stock": frozenset({"AAA", "GOOGL", "GOOG", "GOOGM", "BRKA", "BRKB", "ZZZ"})}]
+    av0 = pan["open_ts"][1]                          # accepted well before the entry open
+    sec = {"cik_of": {"AAA": 1, "GOOGL": 2, "GOOG": 2, "BRK-B": 3, "ZZZ": 4},
+           "by_cik": {1: ["AAA"], 2: ["GOOGL", "GOOG", "GOOGM"], 3: ["BRK-B", "BRK-A"], 4: ["ZZZ"]},
+           "names": {1: ["Aaa Corp"], 2: ["Alphabet Inc."], 3: ["Berkshire Hathaway Inc"], 4: ["Omega Widgets Inc"]},
+           "shares": {1: [(av0, str(pan["days"][0]), 1000.0)], 2: [(av0, str(pan["days"][0]), 600.0)],
+                      3: [(av0, str(pan["days"][0]), 10.0)], 4: [(av0, str(pan["days"][0]), 5.0)]}}
+    return forms, rel, sec
+
+
+def test_formation_caps_definition_and_classes():
+    pan = _cap_pan()
+    forms, rel, sec = _cap_inputs(pan)
+    cap = M.formation_caps(pan, forms, rel, sec)[0]
+    # split after the cover date restates the count: close 50 (post-split basis) x 1000 x 2
+    assert cap[0] == pytest.approx(50.0 * 1000.0 * 2.0)
+    # GOOGL / GOOG share the summed count; the depositary row GOOGM is not a class
+    assert cap[1] == pytest.approx(100.0 * 600.0 / 2) and cap[2] == pytest.approx(101.0 * 600.0 / 2)
+    # BRK-A is a listed class with no price in the panel: no cap
+    assert np.isnan(cap[3])
+    # the FINRA issue name disagrees with the CIK's SEC names (a reused ticker): no cap
+    assert np.isnan(cap[4])
+
+
+def test_formation_caps_ignore_data_after_the_entry_open():
+    pan = _cap_pan()
+    forms, rel, sec = _cap_inputs(pan)
+    s = forms[0]["s"]
+    c0 = M.formation_caps(pan, forms, rel, sec)[0]
+    pan2 = dict(pan)
+    pan2["C"] = pan["C"].copy()
+    pan2["C"][s:] *= 7.0                             # prices from the entry session on
+    sec2 = {k: (dict(v) if isinstance(v, dict) else v) for k, v in sec.items()}
+    sec2["shares"] = {c: sorted(v + [(pan["open_ts"][s] + 60.0, str(pan["days"][s]), 1e9)]) for c, v in sec["shares"].items()}
+    c1 = M.formation_caps(pan2, forms, rel, sec2)[0]
+    assert np.allclose(c0, c1, equal_nan=True)
+    # a price at s-1 does move it (the cap is the close before the entry)
+    pan3 = dict(pan)
+    pan3["C"] = pan["C"].copy()
+    pan3["C"][s - 1, 0] *= 3.0
+    assert M.formation_caps(pan3, forms, rel, sec)[0][0] == pytest.approx(3.0 * c0[0])
+
+
+def test_hold_series_value_weights():
+    D, S = 8, 20
+    rng = np.random.default_rng(1)
+    ID = rng.normal(0, 0.01, (D, S))
+    ON = rng.normal(0, 0.01, (D, S))
+    sc = np.arange(S, dtype=float)
+    caps = [np.linspace(1.0, 20.0, S)]
+    caps[0][19] = np.nan                             # a name without a cap carries no weight
+    forms = [{"s": 2, "dtc": sc, "elig": np.ones(S, bool)}]
+    h = M.hold_series(D, forms, "dtc", ID, ON, caps=caps)
+    w_lo = caps[0][[0, 1]]
+    assert h["id"][4] == pytest.approx(ID[4, 18] - (ID[4, [0, 1]] * w_lo).sum() / w_lo.sum())
+    ID2 = ID.copy()
+    ID2[5:] += 1.0
+    h2 = M.hold_series(D, forms, "dtc", ID2, ON, caps=caps)
+    assert np.allclose(h["d"][:5], h2["d"][:5], equal_nan=True)
+
+
+def test_two_sided_vs_zero_is_against_zero_not_the_bar():
+    x = np.random.default_rng(3).normal(-1e-4, 1e-3, 800)
+    r = M.two_sided_vs_zero(x, 10, 20)
+    t = M.nw(x, 10)["t"]
+    assert r["nw_t"] == pytest.approx(t)
+    assert r["p_nw"] == pytest.approx(2 * (1 - M._phi(abs(t))))
+    bar = M.mean_test(x, 2e-4, "greater", 10, 20)
+    assert r["p_nw"] > min(1.0, 2 * min(bar["p_nw"], bar["p_nw_opp"]))
+
+
+# ------------------------------------------------------------------------------------- review fixes (T-665) ----
+
+def _j(v):
+    return (v, f"{v} why", [(f"c {v}", v == "supported")])
+
+
+def test_combine_fixes_conjunction_at_each_fix_own_n():
+    labels = {"T": "Tokyo fix", "E": "Europe fix"}
+    ns = {"T": 575, "E": 721}
+    v, why, crit, n = M.combine_fixes({"T": _j("inconclusive"), "E": _j("not_supported")}, ns, labels)
+    assert v == "not_supported" and n == 721 and "own n 721" in why
+    v, _w, _c, n = M.combine_fixes({"T": _j("inconclusive"), "E": _j("supported")}, ns, labels)
+    assert v == "inconclusive" and n == 575
+    v, _w, _c, n = M.combine_fixes({"T": _j("supported"), "E": _j("supported")}, ns, labels)
+    assert v == "supported"
+    assert [c[0].split(":")[0] for c in crit] == ["Tokyo fix", "Europe fix"]
+
+
+def test_combine_fixes_rule5_shields_only_the_thin_fix():
+    # the same failing rows: below min_n (Tokyo) a non-decisive failure is undecided, at min_n (Europe) it fails
+    rows = [("significance", False, False), ("halves", True, False)]
+    jT = M._judge(rows, 575, M.T665_MIN_N, "Tokyo fix basket days")
+    jE = M._judge(rows, 721, M.T665_MIN_N, "Europe fix basket days")
+    assert jT[0] == "inconclusive" and jE[0] == "not_supported"
+    v, _w, _c, n = M.combine_fixes({"T": jT, "E": jE}, {"T": 575, "E": 721}, {"T": "Tokyo fix", "E": "Europe fix"})
+    assert v == "not_supported" and n == 721
+
+
+def test_jp_holidays_include_coming_of_age_days():
+    assert {"2024-01-08", "2025-01-13", "2026-01-12"} <= M.JP_HOLIDAYS

@@ -116,6 +116,18 @@ def test_t632_exclusions_and_stale_open():
     assert R["drop"]["stale_open"] == 1
 
 
+def test_t632_cpi_release_days_keep_one_release_per_month():
+    raw = ["2014-01-16", "2014-02-18", "2014-02-20", "2014-03-18", "2015-02-20", "2015-02-26", "2015-03-24"]
+    keep, dropped = M.cpi_release_days(raw)
+    assert dropped == ["2014-02-18", "2015-02-20"]               # seasonal-factor vintages before the January CPI
+    assert keep == ["2014-01-16", "2014-02-20", "2014-03-18", "2015-02-26", "2015-03-24"]
+    keep2, dropped2 = M.cpi_release_days(["2016-01-20", "2016-02-19", "2016-03-16"])
+    assert dropped2 == [] and len(keep2) == 3                    # ordinary monthly gaps are untouched
+    # calendar-only: adding a later release never changes which earlier days are kept
+    keep3, _ = M.cpi_release_days(raw + ["2015-04-14"])
+    assert keep3[:len(keep)] == keep
+
+
 def test_t632_fe_slope_recovers_beta_and_psi_mean():
     days = _sessions("2015-01-01", "2017-12-31")
     x = np.array([1.0 if M.is_expiry(date.fromisoformat(d)) else 0.0 for d in days])
@@ -178,6 +190,26 @@ def test_t633_ratio_and_month_psi_mean():
     years = np.array([int(m[:4]) for m in months])
     pg, pl, _ = M.perm_R(hf, hb, opex, years, R, n_perm=500)
     assert 0 < pg <= 1 and 0 < pl <= 1
+
+
+def test_t633_permutation_tests_the_registered_boundary():
+    """H0 is R <= 1.05: the permutation must be inverted at R = 1.05, not run against exchangeable labels (R = 1)."""
+    rng = np.random.default_rng(11)
+    n = 520
+    opex = np.zeros(n, bool); opex[::4] = True
+    years = np.repeat(np.arange(2005, 2005 + n // 52 + 1), 52)[:n]
+    hf = rng.integers(300, 600, n).astype(float); hb = rng.integers(300, 600, n).astype(float)
+    R0 = M.ratio_R(hf, hb, opex)
+    p0 = M.perm_R(hf, hb, opex, years, R0, n_perm=2000, bar=1.0)[0]
+    hf2 = hf.copy(); hf2[opex] *= M.T633_BAR                        # the same data with exactly the boundary effect added
+    R2 = M.ratio_R(hf2, hb, opex)
+    assert R2 == pytest.approx(M.T633_BAR * R0)
+    pa = M.perm_R(hf2, hb, opex, years, R2, n_perm=2000)[0]          # default: the registered boundary, hits / 1.05
+    ps = M.perm_R(hf2, hb, opex, years, R2, n_perm=2000, adjust=False)[0]
+    assert pa == pytest.approx(p0, abs=1e-9)                        # adjusted data = the original data
+    assert ps == pytest.approx(p0, abs=0.03)                        # draws x 1.05: the same test up to the draw noise
+    p_vs_1 = M.perm_R(hf2, hb, opex, years, R2, n_perm=2000, bar=1.0)[0]
+    assert p_vs_1 < pa                                              # against R = 1 the boundary effect looks significant
 
 
 # ===================================================================================================== T-639 ==

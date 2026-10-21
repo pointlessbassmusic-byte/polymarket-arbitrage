@@ -41,6 +41,10 @@ in the reason so a reviewer sees it):
     The expanding fit at t uses only months whose target window ended at or before the close of t.
   * T-649 targets are ^GSPC price returns (no dividends) minus the bill return over the window; the timing rule trades
     SPY adjclose. Newey-West lag of the Clark-West t = h / 21 months (1, 3, 6), the larger reading of "the overlap".
+    No Campbell-Thompson slope or sign restriction is applied to the T-649 forecasts: T-649 registers none (unlike
+    T-650, which declares its slope restriction), so the judged forecast is the unrestricted OLS one. The
+    CT-truncated forecast (floored at zero) is reported beside it, never judged; the timing rule's weights are
+    clipped at 0 already, so the rule, its Sharpe difference and its DSR are identical under either reading.
     The HAR(1,5,22) model regresses the next 21 sessions' summed squared ^GSPC log returns on r_t^2 and the 5- and
     22-session mean squared returns, by OLS on every day from 1953-01 (the five-day week) whose 21-session target
     ended by t, refitted at each month-end; VRP_HAR = VIX^2/12 - its forecast. Costs: 2 bp of NAV each month the
@@ -63,8 +67,12 @@ in the reason so a reviewer sees it):
     the expanding window holds 252 days, and a day gets a quintile once 252 such values precede it. The slope criterion
     uses Bonferroni over the two targets like the spread and must hold on a target whose spread criterion passes; the
     slope is fitted on the confirmation window. Trading form: short 1 CM VX contract-equivalent ($1,000 x the weighted
-    settle change) over [settle t+1, settle t+2] when PC2 at t is in quintile 4 or 5, $70 a side ($140 a round trip),
-    versus always short; judged on the confirmation window. Its DSR family is the 8 named VX theories plus this one (9
+    settle change) over [settle t+1, settle t+2] when PC2 at t is in quintile 4 or 5, versus always short; judged on
+    the confirmation window. Costs: $70 per contract side ($140 a round trip) on every contract either arm trades,
+    i.e. the summed |change in contracts| per expiry at each settle: entry, exit, the daily F1/F2 re-weighting and the
+    monthly roll into the next expiry (the gated arm pays the last two only while it holds the position). A leg held
+    to its final settlement is charged its closing side as well (the literal, conservative reading of "$140 per round
+    trip"; it is near zero because w1 has usually reached 0 by the expiry). Its DSR family is the 8 named VX theories plus this one (9
     trials); none of the other 8 Sharpes is computed here (T-651 and T-652 are untested, the rest are other series),
     so ``dsr_vs_uncomputed_family`` can fail it (when even the most favourable variance, the 1/(T-1) floor, misses
     0.95) but never pass it (undecided otherwise). Rule 11 again on two series: the gated P&L and gated minus always.
@@ -444,14 +452,24 @@ def vrp_premium_test(gdays, gclose, vix: dict, spy_adj: dict, bills: CAL.Bills, 
     train = np.array([d >= T649_TRAIN for d in mdays])
     oos = np.array([T649_OOS[0] <= d <= T649_OOS[1] for d in mdays])
     preds = {"vrp": fr["vrp"], "vrp_har": fr["vrp_har"], "vix": fr["vix"], "rv": fr["rv"]}
-    cells, ev, tg = {}, {}, {}
+    cells, ev, tg, slopes = {}, {}, {}, {}
     for h in T649_H:
         y, end = window_targets(pos, h, n, lambda a, e: P[e] / P[a] - 1.0 - (B[e] / B[a] - 1.0))
         tg[h] = y
         for name, x in preds.items():
             fm, fb, sl = expanding_ols(x, y, pos, end, train, oos & np.isfinite(x))
             cells[(name, h)] = (fm, fb)
+            slopes[(name, h)] = sl
             ev[(name, h)] = oos_stats(y, fm, fb, oos, max(1, h // 21))
+    # Campbell-Thompson truncation (forecast floored at zero): NOT registered for T-649, reported only
+    ct = {}
+    for h in T649_H:
+        fm, fb = cells[("vrp", h)]
+        sl = slopes[("vrp", h)]
+        okf = oos & np.isfinite(fm)
+        ct[h] = {**oos_stats(tg[h], np.maximum(fm, 0.0), fb, oos, max(1, h // 21)),
+                 "share_slope_pos": float(np.mean(sl[okf] > 0)) if okf.any() else None,
+                 "share_forecast_neg": float(np.mean(fm[okf] < 0)) if okf.any() else None}
     prim = ev[("vrp", T649_PRIMARY)]
     n_fc = prim["n"]
     # sub-periods (reported)
@@ -466,6 +484,8 @@ def vrp_premium_test(gdays, gclose, vix: dict, spy_adj: dict, bills: CAL.Bills, 
     rs, rb, cd = hold_returns(gdays, pos, j_idx, spy_adj, B)
     fam_cells = {(nm, h): (cells[(nm, h)][0][j_idx], cells[(nm, h)][1][j_idx]) for nm in ("vrp", "vrp_har") for h in T649_H}
     fam = rule_family(fam_cells, rs, rb, cd, ("vrp", T649_PRIMARY))
+    ct_same_rule = all(np.array_equal(timing_weights(fm_, fb_), timing_weights(np.maximum(fm_, 0.0), fb_))
+                       for fm_, fb_ in fam_cells.values())
     P0 = fam[("vrp", T649_PRIMARY)]
     sd = _sharpe_diff(P0["ex"], P0["bh"], n_boot, reps)
     sd_row = BW._ci_crit(sd, "gt", 0.0, "Sharpe(timing rule) - Sharpe(SPY buy-and-hold) lower 95% bound > 0 (studentized "
@@ -487,8 +507,13 @@ def vrp_premium_test(gdays, gclose, vix: dict, spy_adj: dict, bills: CAL.Bills, 
             "weight_primary": {"mean": float(wv.mean()), "min": float(wv.min()), "max": float(wv.max()),
                                "share_zero": float((wv == 0).mean()), "share_levered": float((wv > 1).mean())},
             "dsr": dsr, "criteria": crit, "n_hold_months": int(j_idx.size),
-            "first_last_forecast": [mdays[j_idx[0]], mdays[j_idx[-1]]] if j_idx.size else None}
+            "first_last_forecast": [mdays[j_idx[0]], mdays[j_idx[-1]]] if j_idx.size else None,
+            "restriction": "none (T-649 registers no Campbell-Thompson slope or sign restriction; the judged forecast is "
+                           "the unrestricted OLS one)",
+            "ct_truncated_not_registered": {f"h{h}": v_ for h, v_ in ct.items()},
+            "timing_rule_identical_under_truncation": bool(ct_same_rule)}
     cl = lambda k: ev[k]
+    c63 = ct[T649_PRIMARY]
     reason = (f"^GSPC price excess return over DTB3 from the close of t+1, expanding OLS from 1990-01 on VRP = VIX^2/12 - "
               f"trailing 21-session RV, {n_fc} month-end forecasts {mdays[j_idx[0]][:7]}..{T649_OOS[1][:7]} at 63 sessions: "
               f"OOS R^2 {_s(r2v, 4)}, Clark-West t {_s(prim['cw_t'], 2)} (p {_f(prim['cw_p'], 4)}, NW lag 3); "
@@ -501,7 +526,15 @@ def vrp_premium_test(gdays, gclose, vix: dict, spy_adj: dict, bills: CAL.Bills, 
               f"same-average-exposure buy-and-hold {_s(P0['sr_same'], 2)}; DSR (6 trials) excess {_f(dsr['excess']['dsr'])}, "
               f"active {_f(dsr['active']['dsr'])} (observed trial-Sharpe variance instead of the 1/(T-1) floor: "
               f"{_dsr_obs(dsr['excess'])} / {_dsr_obs(dsr['active'])}); reported 2015-2026 OOS R^2 {_s(sub['2015-2026']['oos_r2'], 4)}, ex-2020 "
-              f"{_s(sub['ex-2020']['oos_r2'], 4)} (not the verdict). VIX 1990-2003 is Cboe's reconstruction; the claim's "
+              f"{_s(sub['ex-2020']['oos_r2'], 4)} (not the verdict). No Campbell-Thompson slope or sign restriction is "
+              f"applied (T-649 registers none, unlike T-650): the judged forecast is the unrestricted OLS one. "
+              f"CT-truncated forecast (floored at zero; not registered, reported, not judged): 63-session OOS R^2 "
+              f"{_s(c63['oos_r2'], 4)}, CW p {_f(c63['cw_p'], 4)}; 21/126 sessions {_s(ct[21]['oos_r2'], 4)} / "
+              f"{_s(ct[126]['oos_r2'], 4)} (CW p {_f(ct[21]['cw_p'], 3)} / {_f(ct[126]['cw_p'], 3)}); the fitted 63-session "
+              f"slope is positive in {_share(c63['share_slope_pos'])} of fits and the forecast negative in "
+              f"{_share(c63['share_forecast_neg'])} of OOS months; the timing rule is "
+              f"{'identical' if ct_same_rule else 'NOT identical'} under truncation (its weights are clipped at 0), so "
+              f"the Sharpe-difference and DSR criteria do not depend on this choice. VIX 1990-2003 is Cboe's reconstruction; the claim's "
               f"month-end calendar has no grid phase (rule 10); VIX enters at t (21:30 UTC), positions and targets at the "
               f"close of t+1 — {why}")
     return {"stat": stat, "n": n_fc, "verdict": v, "reason": reason}
@@ -686,10 +719,12 @@ def expanding_quintiles(days: Sequence[str], x, valid, start: str, end: str, min
 def cm_vx_daily(curve: dict, target: int = T653_CM_DAYS) -> dict:
     """Daily-rebalanced constant-maturity VX: for each settle day d_k (all but the last), the weights on F1 / F2 (first
     two expiries strictly after d_k; w1 = clip((tau2 - target) / (tau2 - tau1), 0, 1), calendar days), the
-    interpolated level at d_k, and the return / $ change (x 1,000) of that fixed-weight pair to the next settle d_{k+1}."""
+    interpolated level at d_k, and the return / $ change (x 1,000) of that fixed-weight pair to the next settle d_{k+1}.
+    ``e1`` / ``e2`` name the pair's expiries (None where undefined)."""
     days = sorted(curve)
     m = len(days)
     ret, dol, lvl, w1s = np.full(m, np.nan), np.full(m, np.nan), np.full(m, np.nan), np.full(m, np.nan)
+    e1s, e2s = [None] * m, [None] * m
     for k in range(m):
         d0 = days[k]
         ex = sorted(e for e in curve[d0] if e > d0)[:2]
@@ -701,12 +736,13 @@ def cm_vx_daily(curve: dict, target: int = T653_CM_DAYS) -> dict:
         w1 = float(np.clip((t2 - target) / (t2 - t1), 0.0, 1.0))
         p0 = w1 * curve[d0][e1] + (1 - w1) * curve[d0][e2]
         lvl[k], w1s[k] = p0, w1
+        e1s[k], e2s[k] = e1, e2
         if k + 1 < m:
             d1 = days[k + 1]
             if e1 in curve[d1] and e2 in curve[d1]:
                 p1 = w1 * curve[d1][e1] + (1 - w1) * curve[d1][e2]
                 ret[k], dol[k] = p1 / p0 - 1.0, T653_VX_MULT * (p1 - p0)
-    return {"days": days, "ret": ret, "dollar": dol, "level": lvl, "w1": w1s}
+    return {"days": days, "ret": ret, "dollar": dol, "level": lvl, "w1": w1s, "e1": e1s, "e2": e2s}
 
 
 def forward_returns(sig_days: Sequence[str], tdays: Sequence[str], step_ret: np.ndarray, hold: int = T653_HOLD) -> np.ndarray:
@@ -755,26 +791,72 @@ def slope_test(y, pc2, ts, lv, mask, lag: int = T653_LAG) -> dict:
             "t_logvix": float(r["t"][3]), "b_alone": float(u["beta"][1]), "t_alone": float(u["t"][1])}
 
 
+def vx_trade_costs(cm: dict, idx: Sequence[int], on) -> dict:
+    """$ cost of every contract a short CM VX contract-equivalent trades, booked on the interval whose opening settle
+    the trade happens at. At each boundary settle the holdings move from the previous interval's {F1: w1, F2: 1 - w1}
+    (empty when flat) to this interval's, and ``T653_VX_SIDE`` is charged per contract of |change| summed over
+    expiries: the entry, the daily F1/F2 re-weighting, the monthly roll into the next expiry and the exit (the closing
+    trades after the last interval are booked on it). A leg held to its final settlement is charged its closing side
+    too, the literal '$140 per round trip' (the conservative reading); that part is tallied apart as ``settled``."""
+    days, w1, e1, e2 = cm["days"], cm["w1"], cm["e1"], cm["e2"]
+    on = np.asarray(on, bool)
+    n = len(idx)
+    cost, traded, settled = np.zeros(n), np.zeros(n + 1), np.zeros(n + 1)
+
+    def hold(j: int) -> dict:
+        if j < 0 or j >= n or not on[j]:
+            return {}
+        k = idx[j]
+        return {e1[k]: float(w1[k]), e2[k]: 1.0 - float(w1[k])}
+
+    for j in range(n + 1 if n else 0):
+        old, new = hold(j - 1), hold(j)
+        bday = days[idx[j]] if j < n else days[idx[-1] + 1]
+        for e in set(old) | set(new):
+            qty = abs(new.get(e, 0.0) - old.get(e, 0.0))
+            traded[j] += qty
+            if e <= bday:                                          # reached its final settlement at this boundary
+                settled[j] += qty
+        cost[min(j, n - 1)] += T653_VX_SIDE * traded[j]
+    held = np.zeros(n + 1, bool)                                   # boundaries where the arm holds on both sides
+    if n:
+        held[1:n] = on[1:] & on[:-1]
+    return {"cost": cost, "traded": traded, "settled": settled, "held": held}
+
+
 def gated_short_vx(cm: dict, sig_days: Sequence[str], gate, lo: str, hi: str) -> dict:
     """Daily $ P&L of short 1 CM VX contract-equivalent over [settle k, settle k+1] when the gate at the last signal day
-    strictly before settle k is on (gated) and always (always), $70 a side; intervals with settle k in lo..hi."""
+    strictly before settle k is on (gated) and always (always); intervals with settle k in lo..hi. Each arm pays $70 per
+    contract side on every contract it trades (``vx_trade_costs``: entry, exit, daily re-weighting and roll; the gated
+    arm only while it holds the position)."""
     days, dol = cm["days"], cm["dollar"]
     gate = np.asarray(gate, bool)
     idx = [k for k in range(len(days)) if lo <= days[k] <= hi and np.isfinite(dol[k])]
-    pos_g = np.zeros(len(idx))
+    n = len(idx)
+    pos_g = np.zeros(n)
     for j, k in enumerate(idx):
         i = bisect_left(sig_days, days[k]) - 1
         pos_g[j] = 1.0 if i >= 0 and gate[i] else 0.0
     pnl = -np.array([dol[k] for k in idx])
     sw = np.abs(np.diff(np.concatenate([[0.0], pos_g, [0.0]])))
-    g = pos_g * pnl - T653_VX_SIDE * sw[:-1]
-    g[-1:] -= T653_VX_SIDE * sw[-1]
-    a = pnl.copy()
-    if a.size:
-        a[0] -= T653_VX_SIDE
-        a[-1] -= T653_VX_SIDE
+    cg = vx_trade_costs(cm, idx, pos_g > 0)
+    ca = vx_trade_costs(cm, idx, np.ones(n, bool))
+    g = pos_g * pnl - cg["cost"]
+    a = pnl - ca["cost"]
+
+    def per_day(c: dict) -> dict:
+        if not n:
+            return {}
+        reb = c["traded"][c["held"]]
+        return {"contracts_per_day": float(c["traded"].sum() / n), "usd_per_day": float(c["cost"].sum() / n),
+                "rebalance_roll_contracts_per_day": float(reb.sum() / n),
+                "rebalance_roll_usd_per_day": float(T653_VX_SIDE * reb.sum() / n),
+                "settlement_side_usd_per_day": float(T653_VX_SIDE * c["settled"].sum() / n)}
+
     return {"gated": g, "always": a, "share_on": float(pos_g.mean()) if pos_g.size else None,
-            "switches": int(sw.sum()), "days": [days[k] for k in idx]}
+            "switches": int(sw.sum()), "days": [days[k] for k in idx],
+            "costs": {"gated": per_day(cg), "always": per_day(ca)},
+            "gross_always_usd_per_day": float(pnl.mean()) if n else None}
 
 
 def gated_long_etp(edays: Sequence[str], eadj, sig_days: Sequence[str], gate, lo: str, hi: str) -> dict:
@@ -867,7 +949,9 @@ def vix_curve_test(idx: dict, curve: dict, vxx: tuple, svxy: tuple) -> dict:
     stat = {"n_conf_i": n, "spread": sp, "spread_p_bonf": padj, "slope": sl, "slope_p_bonf": sadj, "controls": ctrl,
             "reported": rep, "trading": {"share_on": tf["share_on"], "switches": tf["switches"], "sr_gated": _sr_d(tf["gated"]),
                                           "sr_always": _sr_d(tf["always"]), "mean_gated_usd": float(tf["gated"].mean()),
-                                          "mean_always_usd": float(tf["always"].mean()), "dsr_gated": ig, "dsr_active": ia,
+                                          "mean_always_usd": float(tf["always"].mean()), "costs": tf["costs"],
+                                          "gross_always_usd_per_day": tf["gross_always_usd_per_day"],
+                                          "dsr_gated": ig, "dsr_active": ia,
                                           "full_sr_gated": _sr_d(tf_full["gated"]), "full_sr_always": _sr_d(tf_full["always"]),
                                           "svxy_sr_gated": _sr_d(sv["gated"]), "svxy_sr_always": _sr_d(sv["always"])},
             "pc2_loadings_last": {t: float(x) for t, x in zip(TENORS, lc)}, "first_signal_day": common[int(np.argmax(q > 0))],
@@ -883,7 +967,13 @@ def vix_curve_test(idx: dict, curve: dict, vxx: tuple, svxy: tuple) -> dict:
               f"log(VIX3M/VIX) {_pc(ctrl['log_VIX3M_over_VIX']['spread'])}, log VIX "
               f"{_pc(ctrl['log_VIX']['spread'])}, PC1 {_pc(ctrl['PC1']['spread'])}, random "
               f"{_pc(ctrl['random_placebo']['spread'])}; trading form (short CM VX in Q4-Q5, on "
-              f"{_share(tf['share_on'])} of days, $140 per round trip) daily Sharpe x sqrt(252) "
+              f"{_share(tf['share_on'])} of days; $70 per contract side on every contract either arm trades, the daily "
+              f"F1/F2 re-weighting and the monthly roll included: always-short trades "
+              f"{_f(tf['costs']['always'].get('contracts_per_day'))} contracts a day, "
+              f"${_f(tf['costs']['always'].get('usd_per_day'), 2)} a day against a gross "
+              f"${_f(tf['gross_always_usd_per_day'], 2)} (a leg held to its final settlement is charged its closing "
+              f"side, ${_f(tf['costs']['always'].get('settlement_side_usd_per_day'), 2)} of that), the gated arm "
+              f"${_f(tf['costs']['gated'].get('usd_per_day'), 2)}) daily Sharpe x sqrt(252) "
               f"{_s(_sr_d(tf['gated']), 2)} vs always-short {_s(_sr_d(tf['always']), 2)}; SVXY mirror {_s(_sr_d(sv['gated']), 2)} "
               f"vs {_s(_sr_d(sv['always']), 2)} (reported). Every day is a signal day (overlapping 5-day windows pooled, NW lag 5; "
               f"the gate is daily), so there is no grid phase (rule 10). Four-tenor curve, not Johnson's SPX curve; index closes at 16:15 ET "

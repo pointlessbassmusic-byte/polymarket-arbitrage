@@ -17,11 +17,16 @@ Batch 13, group ``calendar_a``: five calendar / event claims from the 2026-10-20
   * T-592  Put-write weekend decay. Cboe PUT live marks 2007-06-20..2026-10, intervals between consecutive Cboe closes:
            residual = index return - DTB3 bill accrual over the interval's calendar days - beta x the ^GSPC excess return,
            beta the OLS slope over the index's prior 60 live intervals. D = mean Fri->Mon residual - 1.5 x mean single-
-           weekday residual (Mon-Tue .. Thu-Fri). Excluded: the interval into a roll (ending on the roll session),
-           intervals whose held put has < 10 calendar days to expiry at the interval's end, intervals next to (or
-           spanning) an exchange closure. Pass: D > 0 with one-sided p < 0.05 (studentized circular block bootstrap of
-           ISO-week clusters, 4-week blocks, 5 seeds) after Holm over PUT and WPUT, both halves (2007-06..2016-12 /
-           2017-01..2026-10) positive, and D > 0 on WPUT's live marks (2015-08-03 on). min_n 500 weekend intervals.
+           weekday residual (Mon-Tue .. Thu-Fri). Excluded: both intervals next to each monthly roll session (the one
+           ending on it, the Thu-Fri into the roll, and the one starting on it, the roll day; read so at review, after
+           the builder's run, because under the reading 'ending on it only' the registered roll clause removes nothing
+           for PUT: every such interval is also < 10 days to expiry; WPUT keeps its Fri->Mon, the registered 'first
+           weekend of each weekly put', under an explicit WPUT-only waiver as for the DTE rule; the end-only reading is
+           reported as a sensitivity and the verdict depends on it), intervals whose held put has < 10 calendar days to
+           expiry at the interval's end, intervals next to (or spanning) an exchange closure. Pass: D > 0 with one-sided
+           p < 0.05 (studentized circular block bootstrap of ISO-week clusters, 4-week blocks, 5 seeds) after Holm over
+           PUT and WPUT, both halves (2007-06..2016-12 / 2017-01..2026-10) positive, and D > 0 on WPUT's live marks
+           (2015-08-03 on). min_n 500 weekend intervals.
   * T-582  HVIX next-session premium (Hu et al., NBER w25817). Spike day t: VIX close(t) - EWMA(t-1) >= 3.0 points,
            EWMA(t-1) = 0.7 sum_k 0.3^k VIX(t-1-k) from 1990. Trade: SPY t+1 official open -> t+1 close, 2 bps a round
            trip. Control: non-spike days in the same decile of the day-t SPY close-to-close return (cutoffs expanding
@@ -62,7 +67,9 @@ Conventions (and every reading taken before any run; the harness reasons repeat 
     payroll dates are scheduled in advance; T-589's offering amounts enter only from their announcement row's
     available_at (end of the announcement day), so the size window starts at the next session's close (the registered
     announcement-day-close window is reported); T-583's ranks use month m-1 rates whose available_at precedes the
-    month-m rank date, stale EUR/GBP rates (OECD series ending 2026-01) are forward-filled and flagged; T-592's betas use
+    month-m rank date, taking a print as published at the later of its stamp and the 15th of the following month (the
+    archive stamps every print on the 28th of its own month); a currency whose m-1 print fails that gate carries its
+    earlier print and is flagged (EUR/GBP after the OECD series end in 2026-01); T-592's betas use
     prior live intervals only and back-tested index rows never enter.
   * Rule 10: no claim holds on a free grid phase: every window is anchored on a dated event (auctions, FOMC, payrolls,
     VIX spikes) or on the weekday calendar the claim names (T-592).
@@ -140,6 +147,7 @@ T582_COST = 2e-4
 T582_DEC_FROM = "1993-01-01"
 T582_DEC_MIN = 250                            # prior returns before an expanding decile is assigned
 T582_DECLUSTER = 5
+T582_MEAN_BLOCK = 3.0                         # stationary bootstrap of month clusters: mean block 3 months (review)
 T582_IBS = 0.2
 T582_MIN_N = 40
 # T-581
@@ -168,6 +176,7 @@ T583_COST_MAJOR = 1.5e-4
 T583_BLOCK = 21
 T583_N_PERM = 10000
 T583_MIN_N = 120
+T583_PUB_DAY = 15                             # an OECD month-m rate counts as published from the 15th of month m+1 (review)
 T583_EASE = -0.20                             # DFF 30-day mean down more than 20 bps over the prior 6 months
 T583_FX60 = {"EUR": ("EURUSD=X", False), "GBP": ("GBPUSD=X", False), "AUD": ("AUDUSD=X", False),
              "NZD": ("NZDUSD=X", False), "JPY": ("USDJPY=X", True), "CAD": ("USDCAD=X", True), "CHF": ("USDCHF=X", True)}
@@ -497,24 +506,39 @@ def _weights(clusters: Sequence[dict], tenors: Sequence[int]) -> np.ndarray:
     return A
 
 
-def cluster_values(W: np.ndarray, A: np.ndarray, starts: np.ndarray) -> np.ndarray:
-    """Per-cluster excess: sum_n A[c, n] (W[n, a_c] - mean_a W[n, a]) (W: (T, S) windows)."""
-    Wb = W.mean(axis=-1)
-    return np.einsum("ct,tc->c", A, W[:, starts] - Wb[:, None])
+def cluster_values(W: np.ndarray, A: np.ndarray, starts: np.ndarray, seg: Optional[np.ndarray] = None) -> np.ndarray:
+    """Per-cluster excess: sum_n A[c, n] (W[n, a_c] - mean_a W[n, a]) (W: (T, S) windows). ``seg`` (an integer segment
+    id per window start, e.g. the half): each cluster is demeaned by its own segment's unconditional mean instead."""
+    if seg is None:
+        Wb = W.mean(axis=-1)
+        return np.einsum("ct,tc->c", A, W[:, starts] - Wb[:, None])
+    return np.einsum("ct,tc->c", A, W[:, starts] - _seg_means(W, seg)[..., seg[starts]])
+
+
+def _seg_means(W: np.ndarray, seg: np.ndarray) -> np.ndarray:
+    """(..., T, n_seg) means of the windows ``W`` (..., T, S) over the starts of each segment."""
+    return np.stack([W[..., seg == s].mean(axis=-1) for s in range(int(seg.max()) + 1)], axis=-1)
+
+
+def window_segments(days: Sequence[str], S: int, split: str = T589_SPLIT, span: int = T589_SPAN) -> np.ndarray:
+    """Half of each window start a (0 before ``split``, 1 from it), by the window's last day (the close of t-1 for a
+    cluster)."""
+    return np.array([1 if days[a + span] >= split else 0 for a in range(S)], int)
 
 
 def _flags_fixed_batch(V, me, A, starts, shift: float, block: int, n_boot: int, seed: int, span: int = T589_SPAN,
-                       chunk: int = 200) -> tuple:
+                       chunk: int = 200, seg: Optional[np.ndarray] = None) -> tuple:
     """One seed of the flags-fixed studentized circular block bootstrap: the non-month-end daily returns (all tenors on
     the same resampled days) are resampled in circular ``block``-day blocks into the non-month-end positions (month-end
     positions stay zero, the event flags and windows stay fixed), every cluster value recomputed; t* = mean / se
-    (se = sd of the cluster values / sqrt K) against t = (observed mean + shift) / se. (p_greater, p_less)."""
+    (se = sd of the cluster values / sqrt K) against t = (observed mean + shift) / se. (p_greater, p_less). ``seg``:
+    cluster values demeaned by their own segment's mean (observed and resampled alike)."""
     keep = np.where(~me)[0]
     pool = V[:, keep]
     Mk = keep.size
     K = len(starts)
     U0 = V * (~me)[None, :]
-    obs = cluster_values(windows(U0, span), A, starts)
+    obs = cluster_values(windows(U0, span), A, starts, seg)
     se0 = obs.std(ddof=1) / math.sqrt(K)
     if not se0 > 0:
         return None, None
@@ -528,7 +552,10 @@ def _flags_fixed_batch(V, me, A, starts, shift: float, block: int, n_boot: int, 
         Ub = np.zeros((k, T, M))
         Ub[:, :, keep] = np.transpose(pool[:, idx], (1, 0, 2))
         Wb = windows(Ub, span)
-        G = Wb[:, :, starts] - Wb.mean(axis=-1)[:, :, None]
+        if seg is None:
+            G = Wb[:, :, starts] - Wb.mean(axis=-1)[:, :, None]
+        else:
+            G = Wb[:, :, starts] - _seg_means(Wb, seg)[:, :, seg[starts]]
         vals = np.einsum("ktc,ct->kc", G, A)
         se = vals.std(axis=1, ddof=1) / math.sqrt(K)
         ok = se > 0
@@ -577,6 +604,64 @@ def _placement_batch(W, A, wd, pool, obs_shifted: float, n_place: int, seed: int
         done += k
     st = np.concatenate(stats)
     return float((np.sum(st >= obs_shifted) + 1) / (st.size + 1)), float((np.sum(st <= obs_shifted) + 1) / (st.size + 1))
+
+
+def pool_years(days: Sequence[str], pool: np.ndarray, span: int = T589_SPAN) -> np.ndarray:
+    """Calendar year of each placement-pool week (its mid-week series day)."""
+    return np.array([int(days[r[2] + span + 1][:4]) for r in pool], int)
+
+
+def _placement_strat_batch(W, A, wd, pool, pyear, cyear, seg, obs_shifted: float, n_place: int, seed: int) -> tuple:
+    """One seed of the year-stratified placement null for the period-demeaned statistic: each cluster moved to a random
+    no-coupon-auction week of its own calendar year (same weekday, drawn with replacement; a year without pool weeks
+    draws from the whole pool), every window demeaned by its own half's mean; (p_greater, p_less)."""
+    K = A.shape[0]
+    if pool.shape[0] < 2:
+        return None, None
+    rng = np.random.default_rng(seed + 15485863)
+    WW = W - _seg_means(W, seg)[:, seg]
+    cand = {y: np.where(pyear == y)[0] for y in set(cyear.tolist())}
+    allr = np.arange(pool.shape[0])
+    stats, done = [], 0
+    while done < n_place:
+        k = min(1000, n_place - done)
+        ch = np.empty((k, K), int)
+        for y, cs in cand.items():
+            cols = np.where(cyear == y)[0]
+            src = cs if cs.size else allr
+            ch[:, cols] = src[rng.integers(0, src.size, (k, cols.size))]
+        Sp = pool[ch, wd[None, :]]
+        stats.append(np.einsum("tkc,ct->kc", WW[:, Sp], A).mean(axis=1))
+        done += k
+    st = np.concatenate(stats)
+    return float((np.sum(st >= obs_shifted) + 1) / (st.size + 1)), float((np.sum(st <= obs_shifted) + 1) / (st.size + 1))
+
+
+def period_demeaned_test(panel: dict, clusters: Sequence[dict], pool: np.ndarray, shift: float, alpha: float = ALPHA,
+                         n_boot: int = N_BOOT, seed: int = SEED, split: str = T589_SPLIT, span: int = T589_SPAN) -> dict:
+    """Report only (the reviewer's period check): the cluster excess with each cluster demeaned by its own half's
+    unconditional window mean (``window_segments``), under the flags-fixed CBB (half-demeaned in every resample) and the
+    year-stratified placement null, at the shifted statistic (H0 excess + shift >= 0 tested by p_less)."""
+    W = windows(panel["U"], span)
+    S = W.shape[1]
+    cl = [c for c in clusters if 0 <= c["a"] < S]
+    if len(cl) < 4:
+        return {"n": len(cl)}
+    seg = window_segments(panel["days"], S, split, span)
+    A = _weights(cl, panel["tenors"])
+    starts = np.array([c["a"] for c in cl], int)
+    vals = cluster_values(W, A, starts, seg)
+    wd = np.array([_d(c["t"]).weekday() for c in cl], int)
+    cyear = np.array([int(c["t"][:4]) for c in cl], int)
+    pyear = pool_years(panel["days"], pool, span)
+    obs = float(vals.mean())
+    pg, pl, dr = _escalate(lambda k: _flags_fixed_batch(panel["V"], panel["me"], A, starts, shift, T589_BLOCK, n_boot, seed + k,
+                                                        span, seg=seg), n_boot, alpha=alpha)
+    pg2, pl2, dr2 = _escalate(lambda k: _placement_strat_batch(W, A, wd, pool, pyear, cyear, seg, obs + shift, n_boot, seed + k),
+                              n_boot, alpha=alpha)
+    return {"n": len(cl), "excess": obs, "n_by_half": [int((seg[starts] == 0).sum()), int((seg[starts] == 1).sum())],
+            "boot_p_less": pl, "boot_draws": dr, "place_p_less": pl2, "place_draws": dr2,
+            "pool_weeks_by_year": {int(y): int((pyear == y).sum()) for y in sorted(set(pyear.tolist()))}}
 
 
 def concession_test(panel: dict, clusters: Sequence[dict], pool: np.ndarray, shift: float, alpha: float = ALPHA,
@@ -752,9 +837,15 @@ def b13_calendar_a_pre_auction_concession(archive):
     size_reg = {"n": len(srows_reg)}
     if len(srows_reg) >= 10:
         z2 = np.array([r[0] for r in srows_reg]); w2 = np.array([r[1] for r in srows_reg])
-        size_reg = {"n": len(srows_reg), **coef_test(w2, z2, 0, CAL.nw_lags(len(srows_reg)), 1, boot=False)}
+        size_reg = {"n": len(srows_reg), **coef_test(w2, z2, 0, CAL.nw_lags(len(srows_reg)), 1)}
     hb_size, hb_seen = holm2(size.get("boot_p_less"), rs.get("boot_p_less"))
     hh_size, _ = holm2(size.get("hac_p_less"), rs.get("boot_p_less"))
+    hb_size_r, _ = holm2(size_reg.get("boot_p_less"), rs.get("boot_p_less"))
+    hh_size_r, _ = holm2(size_reg.get("hac_p_less"), rs.get("boot_p_less"))
+    # reported next to the pre-declared net readings: the literal gross bar (excess < -2 bps, no cost) and the
+    # period-demeaned excess (each cluster against its own half's unconditional mean; year-stratified placement)
+    prim_g = concession_test(panel, unseen, pool, T589_BAR, split=None)
+    pdm = period_demeaned_test(panel, unseen, pool, shift)
     # criteria
     c1_ok = _both_nulls(prim, net + T589_BAR)
     c1_dec = (prim.get("boot_p_greater") is not None and _decide(prim["boot_p_greater"], prim["boot_draws"]) is True)
@@ -765,20 +856,29 @@ def b13_calendar_a_pre_auction_concession(archive):
     c3_ok = None if rx_net is None else _both_nulls(rx, rx_net, T589_ALT_ALPHA)
     rs_net = None if rs.get("excess") is None else rs["excess"] + T589_COST
     c4_ok = None if rs_net is None else rs_net < 0
-    sc = size.get("coef")
-    c5_ok = None if sc is None else CAL._agree([_hac_ok(sc, hh_size), _sig(sc, hb_size, size.get("boot_draws", 0))])
+    sc, sc_r = size.get("coef"), size_reg.get("coef")
+    c5_ok = (None if sc is None or sc_r is None else
+             CAL._agree([_hac_ok(sc, hh_size), _sig(sc, hb_size, size.get("boot_draws", 0)),
+                         _hac_ok(sc_r, hh_size_r), _sig(sc_r, hb_size_r, size_reg.get("boot_draws", 0))]))
+    g_ok = _both_nulls(prim_g, ex + T589_BAR) if prim_g.get("excess") is not None else None
     rows = [
         (f"unseen-week net excess (excess {_bp(ex)} + 2 bps cost = {_bp(net)} bps) < -2 bps with one-sided p < 0.05 under "
          f"both nulls: flags-fixed studentized CBB (block 10) p {_mc(prim.get('boot_p_less'), prim.get('boot_draws', 0))}, "
-         f"placement in {prim.get('pool_weeks')} no-coupon-auction weeks p {_mc(prim.get('place_p_less'), prim.get('place_draws', 0))}",
+         f"placement in {prim.get('pool_weeks')} no-coupon-auction weeks p {_mc(prim.get('place_p_less'), prim.get('place_draws', 0))} "
+         f"[literal gross reading, reported: excess {_bp(ex)} < -2 bps: CBB p {_mc(prim_g.get('boot_p_less'), prim_g.get('boot_draws', 0))}, "
+         f"placement p {_mc(prim_g.get('place_p_less'), prim_g.get('place_draws', 0))}: "
+         f"{'passes' if g_ok else 'fails' if g_ok is False else 'undecided'}]",
          c1_ok, c1_dec),
-        (f"both halves negative net (2014-2019 {_bp(hn[0])}, 2020-2026 {_bp(hn[1])} bps; n {prim.get('halves_n')})", c2_ok, False),
+        (f"both halves negative net (2014-2019 {_bp(hn[0])}, 2020-2026 {_bp(hn[1])} bps; n {prim.get('halves_n')}) [gross, "
+         f"reported: {_bp(h[0])} / {_bp(h[1])}]", c2_ok, False),
         (f"ex-CPI net excess {_bp(rx_net)} bps negative with p < 0.1 under both nulls ({rx.get('n')} clusters; CBB p "
          f"{_mc(rx.get('boot_p_less'), rx.get('boot_draws', 0))}, placement p {_mc(rx.get('place_p_less'), rx.get('place_draws', 0))})",
          c3_ok, False),
         (f"10/30-year-week secondary (seen in T-442) the same sign: net excess {_bp(rs_net)} bps over {rs.get('n')} clusters", c4_ok, False),
-        (f"size slope (concession from the session after the announcement to t-1 on the offering z-score) negative with "
-         f"Holm-adjusted p < 0.05 over the 2 secondaries: slope {_bp(sc)} bps per z over {size.get('n')} clusters, HAC t "
+        (f"size slope (concession to t-1 on the offering z-score) negative with Holm-adjusted p < 0.05 over the 2 secondaries, "
+         f"on both windows (they must agree): registered window from the announcement-day close {_bp(sc_r)} bps per z over "
+         f"{size_reg.get('n')} clusters, HAC t {_f(size_reg.get('t'), 2)}, Holm p HAC {_p(hh_size_r)} / bootstrap {_p(hb_size_r)}; "
+         f"archive-stamp window from the next session's close {_bp(sc)} bps per z over {size.get('n')} clusters, HAC t "
          f"{_f(size.get('t'), 2)}, Holm p HAC {_p(hh_size)} / bootstrap {_p(hb_size)}", c5_ok, False),
     ]
     v, why, crit = CAL._judge(CAL._undecided(rows), n, T589_MIN_N, "unseen auction-week clusters")
@@ -812,8 +912,15 @@ def b13_calendar_a_pre_auction_concession(archive):
               f"{_bp(prim.get('uncond_mean'))}, excess {_bp(ex)} bps gross / {_bp(net)} net of the 2 bps round trip; halves "
               f"net {_bp(hn[0])} / {_bp(hn[1])}; ex-CPI ({rx.get('n')} clusters) net {_bp(rx_net)}; 10/30-year weeks "
               f"({rs.get('n')} clusters, tenors 10 and 30 via DGS20; the week's 3-year auction ({n3y} weeks) has no registered "
-              f"series and only sets t) net {_bp(rs_net)}; size slope {_bp(sc)} bps per z (registered announcement-close window "
-              f"{_bp(size_reg.get('coef'))}, n {size_reg.get('n')}). Tradeable checks (gross excess, every session): "
+              f"series and only sets t) net {_bp(rs_net)}; size slope on the registered announcement-close window "
+              f"{_bp(sc_r)} bps per z (n {size_reg.get('n')}) and on the archive-stamp next-session window {_bp(sc)} (n "
+              f"{size.get('n')}), decided on both. Literal gross reading (no cost on top of the -2 bps bar; reported): excess "
+              f"{_bp(ex)} bps, CBB p {_p(prim_g.get('boot_p_less'))}, placement p {_p(prim_g.get('place_p_less'))}, halves gross "
+              f"{_bp(h[0])} / {_bp(h[1])}. Period-demeaned primary (reported; each cluster against its own half's unconditional "
+              f"window mean, because {pdm.get('n_by_half', [None, None])[1]} of {pdm.get('n')} clusters fall in 2020-2026): excess "
+              f"{_bp(pdm.get('excess'))} gross / {_bp(None if pdm.get('excess') is None else pdm['excess'] + T589_COST)} net, CBB "
+              f"(half-demeaned resamples) p {_p(pdm.get('boot_p_less'))}, year-stratified placement p "
+              f"{_p(pdm.get('place_p_less'))} (both at the net -2 bps bar). Tradeable checks (gross excess, every session): "
               + ", ".join(f"{k} {_bp(e_.get('excess'))} bps (n {e_.get('n')})" for k, e_ in etf.items())
               + f". Flagged (net bps): clusters with an FOMC decision in the window or week {fomc_flag}; 2020-03 {flags['2020-03']}; "
               f"2022 {flags['2022']}; reopening clusters {reopen}. Unconditional means use every 4-session window 2014-01..2026-10")
@@ -827,7 +934,13 @@ def b13_calendar_a_pre_auction_concession(archive):
             "seen_10_30": {"n": rs.get("n"), "net_bps": None if rs_net is None else rs_net * 1e4, "boot_p_less": rs.get("boot_p_less"),
                            "place_p_less": rs.get("place_p_less")},
             "size": {k: size.get(k) for k in ("n", "coef", "t", "hac_p_less", "boot_p_less", "boot_draws")} | {"holm_hac": hh_size, "holm_boot": hb_size},
-            "size_registered_window": {k: size_reg.get(k) for k in ("n", "coef", "t", "hac_p_less")},
+            "size_registered_window": {k: size_reg.get(k) for k in ("n", "coef", "t", "hac_p_less", "boot_p_less", "boot_draws")}
+            | {"holm_hac": hh_size_r, "holm_boot": hb_size_r},
+            "gross_reading": {"excess_bps": ex * 1e4, "boot_p_less": prim_g.get("boot_p_less"), "place_p_less": prim_g.get("place_p_less"),
+                              "draws": [prim_g.get("boot_draws"), prim_g.get("place_draws")], "halves_gross_bps": [None if x is None else x * 1e4 for x in h],
+                              "primary_ok": g_ok},
+            "period_demeaned": {k: (pdm.get(k) * 1e4 if k == "excess" and pdm.get(k) is not None else pdm.get(k))
+                                for k in ("n", "excess", "n_by_half", "boot_p_less", "boot_draws", "place_p_less", "place_draws", "pool_weeks_by_year")},
             "compositions": comp, "etf_checks": etf, "fomc_flag": fomc_flag, "flags": flags, "reopening": reopen,
             "criteria": crit}
     return _out(stat, n, v, reason + " — " + why)
@@ -881,9 +994,12 @@ def put_intervals(idx: dict, gspc: dict, bills, live_from: str, weekly: bool, be
     """Intervals between consecutive LIVE closes of a put-write index (back-tested rows never enter, not even in the
     betas): residual = index return - bill accrual over the interval's calendar days (``batch6b_bw.Bills``) - beta x
     (^GSPC return - the same accrual), beta from the prior ``beta_win`` intervals. Labels: weekend (Fri -> Mon, 3 calendar
-    days), weekday (Mon-Tue .. Thu-Fri, 1 calendar day), holiday-spanning (a closed weekday inside); exclusions: ends on a
-    roll session, held put under ``min_dte`` calendar days to expiry at the interval's end (monthly indices only: a
-    weekly put always is), next to a closure."""
+    days), weekday (Mon-Tue .. Thu-Fri, 1 calendar day), holiday-spanning (a closed weekday inside); exclusions
+    (``excluded``, the primary reading): ends on a roll session (the Thu-Fri into the roll), starts on a roll session
+    (the roll day; monthly indices only: WPUT's registered 'first weekend of each weekly put' is the Fri -> Mon starting
+    on its roll, so it is waived there), held put under ``min_dte`` calendar days to expiry at the interval's end
+    (monthly indices only: a weekly put always is), next to a closure. ``excluded_end_only`` is the pre-review reading
+    (only the interval ending on the roll session), reported as a sensitivity."""
     close, bt = idx["close"], idx["backtest"]
     days = sorted(d for d in close if d >= live_from and not bt.get(d, True))
     rows = []
@@ -906,6 +1022,8 @@ def put_intervals(idx: dict, gspc: dict, bills, live_from: str, weekly: bool, be
     weekday = (cal == 1) & (wd0 <= 3)
     spans = np.array([any(_closed_weekday(_d(a) + timedelta(days=k)) for k in range(1, c)) for a, c in zip(d0, cal)])
     roll_end = np.array([b in rset for b in d1])
+    roll_start = np.array([a in rset for a in d0])
+    roll_start_x = np.zeros(len(rows), bool) if weekly else roll_start      # WPUT waiver: its Fri -> Mon starts on every roll
     if weekly:
         dte = np.full(len(rows), 99)
     else:
@@ -914,25 +1032,32 @@ def put_intervals(idx: dict, gspc: dict, bills, live_from: str, weekly: bool, be
     short = dte < min_dte
     hol = np.array([holiday_adjacent(a) or holiday_adjacent(b) for a, b in zip(d0, d1)])
     out.update(d0=d0, d1=d1, ex=ex, gx=gx, beta=beta, resid=ex - beta * gx, weekend=weekend, weekday=weekday, spans=spans,
-               roll_end=roll_end, short_dte=short, hol_adj=hol, excluded=roll_end | short | hol, dte=dte)
+               roll_end=roll_end, roll_start=roll_start, roll_start_excluded=roll_start_x, short_dte=short, hol_adj=hol,
+               excluded=roll_end | roll_start_x | short | hol, excluded_end_only=roll_end | short | hol, dte=dte)
     return out
 
 
 def weekend_test(iv: dict, start: str, end: str, split: Optional[str] = T592_SPLIT, mult: float = T592_MULT,
-                 block: int = T592_BLOCK, pvals: bool = True, n_boot: int = N_BOOT, seed: int = SEED) -> dict:
+                 block: int = T592_BLOCK, pvals: bool = True, n_boot: int = N_BOOT, seed: int = SEED,
+                 excl: str = "excluded") -> dict:
     """D = mean weekend residual - mult x mean weekday residual over the kept intervals in [start, end] (by the interval's
-    start day), its studentized circular block bootstrap of ISO-week clusters (``block`` weeks; the linearised series
-    whose mean is D) and the halves."""
+    start day; ``excl`` names the exclusion mask: the primary reading or ``excluded_end_only``), its studentized
+    circular block bootstrap of ISO-week clusters (``block`` weeks; the linearised series whose mean is D) and the
+    halves. Exclusion counts overlap (an interval can meet several rules)."""
     if not iv.get("n"):
         return {"n_weekend": 0}
     d0 = np.array(iv["d0"])
     inr = (d0 >= start) & (d0 <= end) & np.isfinite(iv["beta"])
-    keep = inr & ~iv["excluded"]
+    keep = inr & ~iv[excl]
     wk, wdy = keep & iv["weekend"], keep & iv["weekday"]
+    typed = inr & (iv["weekend"] | iv["weekday"])
+    rs = iv["roll_start_excluded"] if excl == "excluded" else np.zeros(d0.size, bool)
     out = {"n_weekend": int(wk.sum()), "n_weekday": int(wdy.sum()),
-           "n_excluded": {"roll": int((inr & iv["roll_end"] & (iv["weekend"] | iv["weekday"])).sum()),
-                          "short_dte": int((inr & iv["short_dte"] & (iv["weekend"] | iv["weekday"])).sum()),
-                          "holiday_adjacent": int((inr & iv["hol_adj"] & (iv["weekend"] | iv["weekday"])).sum())}}
+           "n_excluded": {"roll_end": int((typed & iv["roll_end"]).sum()), "roll_start": int((typed & rs).sum()),
+                          "roll_start_only": int((typed & rs & ~iv["excluded_end_only"]).sum()),
+                          "short_dte": int((typed & iv["short_dte"]).sum()),
+                          "holiday_adjacent": int((typed & iv["hol_adj"]).sum()),
+                          "roll_end_not_short_dte": int((typed & iv["roll_end"] & ~iv["short_dte"]).sum())}}
     if wk.sum() < 2 or wdy.sum() < 2:
         return out
     r = iv["resid"]
@@ -977,43 +1102,72 @@ def b13_calendar_a_putwrite_weekend(archive):
     if P.get("D") is None or W.get("D") is None:
         v, why, crit = CAL._judge([("PUT and WPUT weekend and weekday intervals", None, False)], n, T592_MIN_N, "PUT weekend intervals")
         return _out({"n_weekend": n}, n, v, f"too few kept intervals — {why}")
-    hp, hw = holm2(P.get("p_greater"), W.get("p_greater"))
-    h = P.get("halves") or [None, None]
-    rows = [
-        (f"PUT D = weekend {_bp(P['mean_weekend'])} - 1.5 x weekday {_bp(P['mean_weekday'])} = {_bp(P['D'])} bps > 0 with "
-         f"one-sided p < 0.05 after Holm over PUT and WPUT (raw p {_mc(P.get('p_greater'), P.get('draws', 0))}, Holm {_p(hp)}; "
-         f"studentized CBB of ISO weeks, 4-week blocks)", _sig(P["D"], hp, P.get("draws", 0), "greater"),
-         P.get("p_less") is not None and _decide(P["p_less"], P["draws"]) is True),
-        (f"PUT both halves positive (2007-06..2016-12 {_bp(h[0])}, 2017-01..2026-10 {_bp(h[1])} bps)",
-         None if any(x is None for x in h) else all(x > 0 for x in h), False),
-        (f"WPUT live (2015-08-03 on) D the same sign: {_bp(W['D'])} bps (weekend {_bp(W['mean_weekend'])}, weekday "
-         f"{_bp(W['mean_weekday'])}; {W['n_weekend']} weekends; raw p {_p(W.get('p_greater'))}, Holm {_p(hw)})", W["D"] > 0, False),
-    ]
+
+    def t592_rows(Pr):
+        hp_, hw_ = holm2(Pr.get("p_greater"), W.get("p_greater"))
+        h_ = Pr.get("halves") or [None, None]
+        rows_ = [
+            (f"PUT D = weekend {_bp(Pr['mean_weekend'])} - 1.5 x weekday {_bp(Pr['mean_weekday'])} = {_bp(Pr['D'])} bps > 0 with "
+             f"one-sided p < 0.05 after Holm over PUT and WPUT (raw p {_mc(Pr.get('p_greater'), Pr.get('draws', 0))}, Holm "
+             f"{_p(hp_)}; studentized CBB of ISO weeks, 4-week blocks)", _sig(Pr["D"], hp_, Pr.get("draws", 0), "greater"),
+             Pr.get("p_less") is not None and _decide(Pr["p_less"], Pr["draws"]) is True),
+            (f"PUT both halves positive (2007-06..2016-12 {_bp(h_[0])}, 2017-01..2026-10 {_bp(h_[1])} bps)",
+             None if any(x is None for x in h_) else all(x > 0 for x in h_), False),
+            (f"WPUT live (2015-08-03 on) D the same sign: {_bp(W['D'])} bps (weekend {_bp(W['mean_weekend'])}, weekday "
+             f"{_bp(W['mean_weekday'])}; {W['n_weekend']} weekends; raw p {_p(W.get('p_greater'))}, Holm {_p(hw_)})", W["D"] > 0, False),
+        ]
+        return rows_, hp_, hw_, h_
+
+    rows, hp, hw, h = t592_rows(P)
     v, why, crit = CAL._judge(CAL._undecided(rows), n, T592_MIN_N, "PUT weekend intervals")
+    # sensitivity: the pre-review reading (only the interval ending on the roll session excluded; for PUT every such
+    # interval is also under 10 days to expiry, so the roll clause removes nothing under it)
+    PE = weekend_test(iv, T592_LIVE["PUT"], T592_END, T592_SPLIT, excl="excluded_end_only")
+    sens = {"n_weekend": PE.get("n_weekend", 0)}
+    if PE.get("D") is not None:
+        rows_e, hp_e, _, h_e = t592_rows(PE)
+        v_e, why_e, _ = CAL._judge(CAL._undecided(rows_e), PE["n_weekend"], T592_MIN_N, "PUT weekend intervals")
+        sens.update(D=PE["D"], p_greater=PE.get("p_greater"), draws=PE.get("draws"), holm=hp_e, halves=h_e, verdict=v_e,
+                    n_weekday=PE.get("n_weekday"), n_excluded=PE.get("n_excluded"))
     # reported
     Y = res.get("PUTY", (None, {}))[1]
+    YE = (weekend_test(res["PUTY"][0], T592_LIVE["PUTY"], T592_END, None, pvals=False, excl="excluded_end_only")
+          if "PUTY" in res else {})
     d0 = np.array(iv["d0"]); r = iv["resid"]
     inr = (d0 >= T592_START) & np.isfinite(iv["beta"])
-    holi = inr & iv["spans"] & ~iv["roll_end"] & ~iv["short_dte"]
+    holi = inr & iv["spans"] & ~iv["roll_end"] & ~iv["roll_start_excluded"] & ~iv["short_dte"]
     hol_mean = float(r[holi].mean()) if holi.any() else None
     nfp = set(_release_days(archive, NFP_B, "employment")) if _has(archive, NFP_B) else set()
     keep = inr & ~iv["excluded"] & iv["weekend"]
     mon = np.array([b in nfp for b in iv["d1"]]) & keep
+    ne = P["n_excluded"]
     reason = (f"PUT live marks {iv['d0'][0]}..{iv['d1'][-1]} ({iv['n']} intervals between consecutive Cboe closes; the first "
               f"{T592_BETA_WIN} live intervals only seed the beta): kept {P['n_weekend']} Fri->Mon and {P['n_weekday']} single-weekday "
-              f"intervals (excluded {P['n_excluded']}); residual = return - DTB3 calendar-day accrual - trailing-60 beta x ^GSPC excess. "
-              f"Mean weekend residual {_bp(P['mean_weekend'])} bps, weekday {_bp(P['mean_weekday'])} bps (ratio {_f(P.get('ratio'), 2)}; "
-              f"raw excess {_bp(P['mean_weekend_raw_ex'])} / {_bp(P['mean_weekday_raw_ex'])}), D {_bp(P['D'])} bps, p "
-              f"{_p(P.get('p_greater'))}; halves {_bp(h[0])} / {_bp(h[1])}. WPUT (live, weekly roll every Friday; the < 10-day "
-              f"rule cannot apply to a one-week put, theta-acceleration caveat) D {_bp(W['D'])} bps over {W['n_weekend']} weekends / "
-              f"{W['n_weekday']} weekdays. Reported: PUTY live (2019-02-15 on) D {_bp(Y.get('D'))} bps ({Y.get('n_weekend')} weekends, "
-              f"weekend {_bp(Y.get('mean_weekend'))} / weekday {_bp(Y.get('mean_weekday'))}); PUT pre-holiday-to-post-holiday "
-              f"intervals {int(holi.sum())}, mean residual {_bp(hol_mean)} bps; kept weekends ending on an Employment Situation "
-              f"Monday {int(mon.sum())} (mean {_bp(float(r[mon].mean()) if mon.any() else None)}). Index marks carry no costs: a "
-              f"pass would be a premium estimate, not a net trade")
+              f"intervals. Roll exclusion read (at review, after the builder's run) as BOTH intervals next to each third-Friday "
+              f"roll session for PUT/PUTY: the one ending on it (the Thu-Fri into the roll) and the one starting on it (the roll "
+              f"day); WPUT keeps its Fri->Mon (its registered 'first weekend of each weekly put') under an explicit WPUT-only "
+              f"waiver, as for the DTE rule. Excluded (overlapping) {ne}: every interval ending on a PUT roll is also under 10 "
+              f"days to expiry ({ne['roll_end_not_short_dte']} are not), so only the roll-day clause removes anything "
+              f"({ne['roll_start_only']} weekends). Residual = return - DTB3 calendar-day accrual - trailing-60 beta x ^GSPC "
+              f"excess. Mean weekend residual {_bp(P['mean_weekend'])} bps, weekday {_bp(P['mean_weekday'])} bps (ratio "
+              f"{_f(P.get('ratio'), 2)}; raw excess {_bp(P['mean_weekend_raw_ex'])} / {_bp(P['mean_weekday_raw_ex'])}), D "
+              f"{_bp(P['D'])} bps, p {_p(P.get('p_greater'))} (p_less {_p(P.get('p_less'))}); halves {_bp(h[0])} / {_bp(h[1])}. "
+              f"THE VERDICT DEPENDS ON THE ROLL READING: under the pre-review reading (only the interval ending on the roll "
+              f"session excluded, which is vacuous for PUT) {sens.get('n_weekend')} weekends, D {_bp(sens.get('D'))} bps, p "
+              f"{_p(sens.get('p_greater'))} (Holm {_p(sens.get('holm'))}), halves {_bp((sens.get('halves') or [None])[0])} / "
+              f"{_bp((sens.get('halves') or [None, None])[1])}: {sens.get('verdict')} (sensitivity, not the verdict). WPUT (live, "
+              f"weekly roll every Friday; the < 10-day rule cannot apply to a one-week put, theta-acceleration caveat) D "
+              f"{_bp(W['D'])} bps over {W['n_weekend']} weekends / {W['n_weekday']} weekdays. Reported: PUTY live (2019-02-15 on) D "
+              f"{_bp(Y.get('D'))} bps ({Y.get('n_weekend')} weekends, weekend {_bp(Y.get('mean_weekend'))} / weekday "
+              f"{_bp(Y.get('mean_weekday'))}; pre-review reading {_bp(YE.get('D'))} over {YE.get('n_weekend')}); PUT "
+              f"pre-holiday-to-post-holiday intervals {int(holi.sum())}, mean residual {_bp(hol_mean)} bps; kept weekends ending "
+              f"on an Employment Situation Monday {int(mon.sum())} (mean {_bp(float(r[mon].mean()) if mon.any() else None)}). "
+              f"Index marks carry no costs: a pass would be a premium estimate, not a net trade")
     slim = lambda d: {k: d.get(k) for k in ("n_weekend", "n_weekday", "n_excluded", "mean_weekend", "mean_weekday", "D", "ratio",
                                             "p_greater", "p_less", "draws", "halves")}
     stat = {"PUT": slim(P), "WPUT": slim(W), "PUTY": slim(Y), "holm_put": hp, "holm_wput": hw,
+            "roll_reading": "both intervals next to each monthly roll session excluded (PUT/PUTY); WPUT Fri->Mon waived",
+            "sensitivity_end_only_reading": sens, "PUTY_end_only": slim(YE),
             "holiday_intervals": {"n": int(holi.sum()), "mean": hol_mean}, "nfp_monday_weekends": int(mon.sum()), "criteria": crit}
     return _out(stat, n, v, reason + " — " + why)
 
@@ -1111,17 +1265,63 @@ def matched_diff(y, ev, dec) -> dict:
             "control_mean": float(cd[e].mean()), "uncond_mean": float(y[use].mean()), "dropped": int((ok & ev).sum() - K)}
 
 
+def stationary_idx(rng, n: int, mean_block: float, k: int) -> np.ndarray:
+    """(k, n) Politis-Romano stationary-bootstrap indices: circular runs of consecutive units with geometric lengths of
+    mean ``mean_block`` (``batch4_carry._stationary_idx``, vectorised over draws)."""
+    idx = np.empty((k, n), dtype=np.int64)
+    idx[:, 0] = rng.integers(0, n, k)
+    new = rng.random((k, n)) < 1.0 / max(float(mean_block), 1.0)
+    jump = rng.integers(0, n, (k, n))
+    for t in range(1, n):
+        idx[:, t] = np.where(new[:, t], jump[:, t], idx[:, t - 1] + 1)
+    return idx % n
+
+
+def stationary_cluster_boot(x, groups, n_boot: int, seed: int, mean_block: float) -> tuple:
+    """``batch7_cal.cluster_boot`` with the clusters (sorted, i.e. chronological for 'YYYY-MM' labels) drawn as a
+    stationary bootstrap of consecutive clusters (geometric run lengths, mean ``mean_block``) instead of i.i.d.:
+    studentized (p_greater, p_less) of the ratio mean of x; (None, None) below 8 clusters."""
+    x = np.asarray(x, float)
+    _, inv = np.unique(np.asarray(groups), return_inverse=True)
+    S = np.bincount(inv, weights=x)
+    N = np.bincount(inv).astype(float)
+    G = S.size
+    if G < 8:
+        return None, None
+    m = S.sum() / N.sum()
+
+    def se(Sm, Nm, mm):
+        e = Sm - mm[:, None] * Nm
+        return np.sqrt(G / (G - 1) * (e ** 2).sum(axis=1)) / Nm.sum(axis=1)
+
+    s0 = float(se(S[None], N[None], np.array([m]))[0])
+    if not s0 > 0:
+        return None, None
+    idx = stationary_idx(np.random.default_rng(seed), G, mean_block, n_boot)
+    Sb, Nb = S[idx], N[idx]
+    mb = Sb.sum(axis=1) / Nb.sum(axis=1)
+    sb = se(Sb, Nb, mb)
+    ok = sb > 0
+    tb = (mb[ok] - m) / sb[ok]
+    t0 = m / s0
+    return float((np.sum(tb >= t0) + 1) / (tb.size + 1)), float((np.sum(tb <= t0) + 1) / (tb.size + 1))
+
+
 def hvix_test(fr: dict, span: tuple, shift: float, pvals: bool = True, n_boot: int = N_BOOT, seed: int = SEED) -> dict:
-    """``matched_diff`` on the rows with t in ``span``; p of H0 mean(z) - shift <= 0 by the studentized bootstrap of
-    calendar-month clusters (``batch7_cal.cluster_p``, clusters drawn i.i.d.)."""
+    """``matched_diff`` on the rows with t in ``span``; p of H0 mean(z) - shift <= 0 by two studentized bootstraps of
+    calendar-month clusters: drawn i.i.d. (``batch7_cal.cluster_p``; p_greater / p_less) and as the registered
+    stationary bootstrap of consecutive months (mean block ``T582_MEAN_BLOCK`` months; st_p_greater / st_p_less)."""
     m = (fr["day"] >= span[0]) & (fr["day"] <= span[1])
     md = matched_diff(fr["y"][m], fr["spike"][m], fr["dec"][m])
     if md.get("K", 0) == 0:
         return md
     if pvals:
         months = np.array([d[:7] for d in fr["day"][m][md["use"]]])
-        pg, pl, dr = B7C.cluster_p(md["z"] - shift, months, n_boot, seed, N_SEEDS, 1)
+        zs = md["z"] - shift
+        pg, pl, dr = B7C.cluster_p(zs, months, n_boot, seed, N_SEEDS, 1)
         md.update(p_greater=pg, p_less=pl, draws=dr)
+        sg, sl, sdr = _escalate(lambda k: stationary_cluster_boot(zs, months, n_boot, seed + k, T582_MEAN_BLOCK), n_boot)
+        md.update(st_p_greater=sg, st_p_less=sl, st_draws=sdr)
     return md
 
 
@@ -1158,18 +1358,30 @@ def b13_calendar_a_hvix_next_session(archive):
     raw = P["event_mean"] - T582_COST - P["uncond_mean"]
     sec = {s: hvix_test(frames[s], T582_HOLD, T582_COST) for s in ("QQQ", "IWM")}
     hq, hi_ = holm2(sec["QQQ"].get("p_greater"), sec["IWM"].get("p_greater"))
-    oks = [_sig(sec[s].get("diff", np.nan) - T582_COST, hp, sec[s].get("draws", 0), "greater") for s, hp in (("QQQ", hq), ("IWM", hi_))]
+    hq_s, hi_s = holm2(sec["QQQ"].get("st_p_greater"), sec["IWM"].get("st_p_greater"))
+    sec_net = {s: sec[s].get("diff", np.nan) - T582_COST for s in ("QQQ", "IWM")}
+    oks = [CAL._agree([_sig(sec_net[s], hp, sec[s].get("draws", 0), "greater"),
+                       _sig(sec_net[s], hs, sec[s].get("st_draws", 0), "greater")])
+           for s, hp, hs in (("QQQ", hq, hq_s), ("IWM", hi_, hi_s))]
+    sign_only = all(np.isfinite(sec_net[s]) and sec_net[s] > 0 for s in ("QQQ", "IWM"))
+    prim_ok = CAL._agree([_sig(net - T582_BAR, P.get("p_greater"), P.get("draws", 0), "greater"),
+                          _sig(net - T582_BAR, P.get("st_p_greater"), P.get("st_draws", 0), "greater")])
+    prim_dec = (P.get("p_less") is not None and P.get("st_p_less") is not None and _decide(P["p_less"], P["draws"]) is True
+                and _decide(P["st_p_less"], P["st_draws"]) is True)
     rows = [
         (f"holdout net matched difference ({_bp(P['diff'])} - 2 bps cost = {_bp(net)} bps) > 2 bps with one-sided p < 0.05 "
-         f"(month-cluster studentized bootstrap p {_mc(P.get('p_greater'), P.get('draws', 0))})",
-         _sig(net - T582_BAR, P.get("p_greater"), P.get("draws", 0), "greater"),
-         P.get("p_less") is not None and _decide(P["p_less"], P["draws"]) is True),
+         f"under both month-cluster studentized bootstraps (they must agree): stationary blocks of months (mean "
+         f"{T582_MEAN_BLOCK:g}) p {_mc(P.get('st_p_greater'), P.get('st_draws', 0))}, i.i.d. months p "
+         f"{_mc(P.get('p_greater'), P.get('draws', 0))}", prim_ok, prim_dec),
         (f"both holdout halves positive net (2018-06..2022-08 {_bp(hn[0])} bps over {halves[0].get('K')} events, "
          f"2022-09..2026-10 {_bp(hn[1])} over {halves[1].get('K')})", None if any(x is None for x in hn) else all(x > 0 for x in hn), False),
         (f"raw net HVIX mean above the unconditional open-to-close mean ({_bp(P['event_mean'])} - 2 bps vs {_bp(P['uncond_mean'])}: "
          f"{_bp(raw)} bps)", raw > 0, False),
-        (f"QQQ and IWM the same sign after Holm over 2 (net {_bp(sec['QQQ'].get('diff', np.nan) - T582_COST)} / "
-         f"{_bp(sec['IWM'].get('diff', np.nan) - T582_COST)} bps, Holm p {_p(hq)} / {_p(hi_)})", B7C._count_crit(oks, 2), False),
+        (f"QQQ and IWM the same sign after Holm over 2, read as both positive with Holm-adjusted p < 0.05 under both "
+         f"bootstraps (net {_bp(sec_net['QQQ'])} / {_bp(sec_net['IWM'])} bps; Holm p i.i.d. months {_p(hq)} / {_p(hi_)}, "
+         f"stationary {_p(hq_s)} / {_p(hi_s)}) [sign-only reading, reported: both net positive "
+         f"{'yes' if sign_only else 'no'}; 'after Holm' has content only under the significance reading]",
+         B7C._count_crit(oks, 2), False),
     ]
     rows = CAL._undecided(rows)
     if n < T582_MIN_N:
@@ -1209,9 +1421,14 @@ def b13_calendar_a_hvix_next_session(archive):
               f"{flags}; DSR of the SPY event trade over 3 tickers {_f(dsr, 3)}")
     stat = {"n_events": n, "diff_bps": P["diff"] * 1e4, "net_bps": net * 1e4, "event_mean_bps": P["event_mean"] * 1e4,
             "control_mean_bps": P["control_mean"] * 1e4, "uncond_mean_bps": P["uncond_mean"] * 1e4, "p_greater": P.get("p_greater"),
-            "draws": P.get("draws"), "halves_net_bps": [None if x is None else x * 1e4 for x in hn], "raw_net_minus_uncond_bps": raw * 1e4,
-            "QQQ": {"K": sec["QQQ"].get("K"), "net_bps": (sec["QQQ"].get("diff", np.nan) - T582_COST) * 1e4, "p": sec["QQQ"].get("p_greater"), "holm": hq},
-            "IWM": {"K": sec["IWM"].get("K"), "net_bps": (sec["IWM"].get("diff", np.nan) - T582_COST) * 1e4, "p": sec["IWM"].get("p_greater"), "holm": hi_},
+            "draws": P.get("draws"), "stationary_p_greater": P.get("st_p_greater"), "stationary_draws": P.get("st_draws"),
+            "stationary_mean_block_months": T582_MEAN_BLOCK,
+            "halves_net_bps": [None if x is None else x * 1e4 for x in hn], "raw_net_minus_uncond_bps": raw * 1e4,
+            "QQQ": {"K": sec["QQQ"].get("K"), "net_bps": sec_net["QQQ"] * 1e4, "p": sec["QQQ"].get("p_greater"), "holm": hq,
+                    "stationary_p": sec["QQQ"].get("st_p_greater"), "stationary_holm": hq_s},
+            "IWM": {"K": sec["IWM"].get("K"), "net_bps": sec_net["IWM"] * 1e4, "p": sec["IWM"].get("p_greater"), "holm": hi_,
+                    "stationary_p": sec["IWM"].get("st_p_greater"), "stationary_holm": hi_s},
+            "qqq_iwm_sign_only_reading": sign_only,
             "declustered": {"K": D.get("K"), "net_bps": (D.get("diff", np.nan) - T582_COST) * 1e4},
             "ibs_secondary_bps": None if ibs_sec is None else ibs_sec * 1e4, "overnight_matched_bps": None if on.get("diff") is None else on["diff"] * 1e4,
             "in_paper": {"K": paper.get("K"), "diff_bps": None if paper.get("diff") is None else paper["diff"] * 1e4},
@@ -1407,10 +1624,23 @@ def _prev_month(m: str) -> str:
     return f"{y - 1}-12" if mo == 1 else f"{y}-{mo - 1:02d}"
 
 
+def _next_month(m: str) -> str:
+    y, mo = int(m[:4]), int(m[5:7])
+    return f"{y + 1}-01" if mo == 12 else f"{y}-{mo + 1:02d}"
+
+
+def rate_available(month: str, av: str, pub_day: int = T583_PUB_DAY) -> str:
+    """The day a month's OECD rate is taken as published: the later of the row's available_at date and day ``pub_day``
+    of the following month (the archive stamps each print on the 28th of its own month, before that month's average is
+    complete, so the stamp alone is not a publication time)."""
+    return max(str(av or "")[:10], f"{_next_month(month)}-{pub_day:02d}")
+
+
 def rank_schedule(days: Sequence[str], book: dict, ccys: Sequence[str] = G10, top: int = T583_TOP) -> list:
     """[(rank_day, basket, stale ccys)]: at the last H.10 day of each month m (complete months only), the ``top``
-    currencies by the month m-1 OECD 3-month rate (the latest month <= m-1 whose available_at is on or before the rank
-    day; a currency whose m-1 print is not yet out carries its latest earlier print and is listed as stale)."""
+    currencies by the month m-1 OECD 3-month rate (the latest month <= m-1 published, per ``rate_available``, on or
+    before the rank day; a currency whose m-1 print is not yet out carries its latest earlier print and is listed as
+    stale)."""
     last = {}
     for i, d in enumerate(days[:-1]):
         if d[:7] != days[i + 1][:7]:
@@ -1421,7 +1651,7 @@ def rank_schedule(days: Sequence[str], book: dict, ccys: Sequence[str] = G10, to
         target = _prev_month(m)
         lv, stale = {}, []
         for c in ccys:
-            ok = [(mm, x) for mm, x, av in book.get(c, []) if mm <= target and av[:10] <= rd]
+            ok = [(mm, x) for mm, x, av in book.get(c, []) if mm <= target and rate_available(mm, av) <= rd]
             if not ok:
                 continue
             mm, x = ok[-1]
@@ -1663,6 +1893,7 @@ def b13_calendar_a_fomc_carry(archive):
     clean = ~me_flag & ~cpi_flag
     zlb = np.array([_in(w["t"], T583_ZLB) for w in W])
     stale = sum(1 for w in W if w["stale"])
+    stale_ccys = sorted({c for w in W for c in w["stale"]})
     inter = {}
     if _has(archive, DFF_B) and _has(archive, VXTLT_B):
         dff = CAL._series(archive, DFF_B)
@@ -1696,7 +1927,9 @@ def b13_calendar_a_fomc_carry(archive):
         comp["/".join(w["basket"])] += 1
     reason = (f"{n} scheduled FOMC windows {W[0]['t']}..{W[-1]['t']} (noon t-1 -> noon t+1, H.10; every basket currency printing); "
               f"top-3 basket by month m-1 OECD 3-month rate ranked at each month end (" + ", ".join(f"{k} {v_}" for k, v_ in
-              sorted(comp.items(), key=lambda kv: -kv[1])[:6]) + f"; {stale} windows rank on a stale EUR/GBP rate): window "
+              sorted(comp.items(), key=lambda kv: -kv[1])[:6]) + f"; ranks gate each OECD print on its publication, the later of its stamp and the {T583_PUB_DAY}th of the next "
+              f"month: {stale} windows rank with an m-1 print not yet published, carried from an earlier month "
+              f"({'/'.join(stale_ccys) or 'none'})): window "
               f"gross {_bp(S['mean_gross'])} / net {_bp(S['mean_net'])} bps vs 2 x the non-FOMC daily {_bp(S['base_daily'])}: "
               f"difference {_bp(S['diff_gross'])} gross / {_bp(D_)} net; halves net {_bp(hn[0])} / {_bp(hn[1])}; DOL net {_bp(Dd)} "
               f"(gross {_bp(SD['diff_gross'])}). Permutation pool {sum(v_.size for v_ in pool.values())} non-FOMC windows. Reported: "
@@ -1709,7 +1942,7 @@ def b13_calendar_a_fomc_carry(archive):
             "base_daily_bps": S["base_daily"] * 1e4, "boot": {"p_greater": bg, "draws": bdr, "holm": hb},
             "perm": {"p_greater": pg, "draws": pdr, "holm": hp}, "halves_net_bps": [None if x is None else x * 1e4 for x in hn],
             "dol": {"diff_net_bps": Dd * 1e4, "boot_p": dbg, "perm_p": dpg, "holm_boot": hbd, "holm_perm": hpd},
-            "month_end_windows": int(me_flag.sum()), "cpi_windows": int(cpi_flag.sum()), "stale_rank_windows": stale,
+            "month_end_windows": int(me_flag.sum()), "cpi_windows": int(cpi_flag.sum()), "stale_rank_windows": stale, "stale_ccys": stale_ccys, "rate_publication_day": T583_PUB_DAY,
             "interactions": inter, "timing_60m": timing, "baskets": dict(comp), "criteria": crit}
     return _out(stat, n, v, reason + " — " + why)
 

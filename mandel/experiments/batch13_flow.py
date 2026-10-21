@@ -17,10 +17,10 @@ flow (T-632, T-633, T-639, T-638), 2026-10-20 web sweep, cluster "flow".
   * T-633  Point-in-time S&P 500 members, raw (split-unadjusted) closes, 2005-01..2026-10. h = share of name-days with
            |P - nearest strike| / spacing <= 0.05 on the declared grid ($2.50 below $25, $5 to $200, $10 above).
            R = [h(opex day) / h(its Thursday)] / [h(other Fri) / h(other Thu)]. Pass (>= 200 opex dates): R > 1.05 with
-           permutation p < 0.05 (opex label permuted across Fridays within each calendar year, 10,000 draws; the
-           registered studentized block bootstrap over months is the second reading); R > 1 in 2005-2015 and in
-           2016-2026; R in the top dollar-volume tercile > R in the bottom tercile. Reported: the finer grid, by-year R
-           and coverage by year.
+           permutation p < 0.05 (opex label permuted across Fridays within each calendar year, 10,000 draws, tested at
+           the null boundary R = 1.05; the registered studentized block bootstrap over months is the second reading);
+           R > 1 in 2005-2015 and in 2016-2026; R in the top dollar-volume tercile > R in the bottom tercile. Reported:
+           the finer grid, by-year R and coverage by year.
   * T-639  Rebuilt DIX_t = sum_i short_i x P_i / sum_i total_i x P_i (FINRA CNMS, point-in-time S&P 500 members, P the
            daily-history close). Signal: DIX_t at or above the 80th percentile of the 252 file days ending at t (t
            included); the rule enters SPY at the t+1 close on the first day of a run at or above it and holds 60
@@ -56,7 +56,9 @@ Conventions and declared readings (fixed before any run)
     procedure Cboe's Monday Weeklys follow), and an unscheduled closure (2018-12-05) drops both neighbours (the move is
     not documented here: the conservative reading). Monthly opex = the third Friday, or the session before it when the
     Friday is a holiday. Month-end = the last NYSE session of the calendar month (rule calendar). FOMC = every decision
-    day (scheduled and unscheduled); CPI and NFP = the first session on or after the 08:30 ET release day; early
+    day (scheduled and unscheduled); CPI and NFP = the first session on or after the 08:30 ET release day (one CPI
+    release per reference month: ALFRED's CPIAUCSL vintages carry the BLS seasonal-factor revision a few days before
+    the January CPI, so of two vintages less than 7 days apart only the later, the release, is kept); early
     closes are the NYSE 13:00 ET rules (July 3 and December 24 Monday-Thursday, the day after Thanksgiving). A stale open
     is open equal to the previous close (1e-9 relative). VIX_{t-1} is the previous session's Cboe close (16:15 ET,
     archived at 21:30 UTC), known before session t opens; a row whose previous bar is not the previous NYSE session is
@@ -78,7 +80,11 @@ Conventions and declared readings (fixed before any run)
     paired with the session before it; an opex Friday whose Thursday is a holiday (2025-06-20) has no pair and is
     skipped (counted). Dollar-volume terciles: within each date, the 20-session mean of close x volume through the
     base-day close (NaN-aware, >= 10 sessions). The month bootstrap tests H0: R <= 1.05 on the delta-method influence
-    series of ln R (12-month blocks, declared here: the registration states no block length).
+    series of ln R (12-month blocks, declared here: the registration states no block length). The permutation tests
+    the registered null R <= 1.05 at its boundary (exchangeable labels centre the draws on R = 1): the opex dates'
+    Friday hits divided by 1.05 before permuting, and the raw permutation with each draw x 1.05 compared with R, both
+    rule-11 constructions with the bootstrap (all must pass; any disagreement leaves the criterion undecided). The
+    permutation against R = 1 is reported only.
   * T-639. The DIX construction is ``batch13_short_a``'s (T-674): ``dw_ratio`` over point-in-time members with an
     archived close whose Yahoo series is an EQUITY and passes the FINRA-volume identity check; two price readings (rule
     12): (a) Yahoo's split-adjusted close, literally "the daily-history close" (it embeds splits after t), and (b) the
@@ -107,9 +113,10 @@ Conventions and declared readings (fixed before any run)
     overlapping thirds (position = mean of the last three signs: every entry phase pooled, rule 10). The deflated p is
     1 - DSR(6 trials) with the trial-Sharpe variance max(observed variance of the 6 trial Sharpes, 1/(T-1)) (the
     zero-skill floor: the conservative reading); the registered block bootstrap p is required as well (rule 11). "IC >
-    0" and "residual IC > 0" are read with their HAC t one-sided p < 0.05 (the null names IC <= 0); "both halves
-    positive" is read on IC, residual IC and rule net together. The residual is from the full-sample OLS of S on day
-    d's own return.
+    0" and "residual IC > 0" are read with their HAC t one-sided p < 0.05 (the null names IC <= 0; stricter than the
+    point criterion, so the criteria text also states the point ICs' sign and what the literal point reading gives);
+    "both halves positive" is read on IC, residual IC and rule net together. The residual is from the full-sample OLS
+    of S on day d's own return.
 """
 
 from __future__ import annotations
@@ -171,6 +178,7 @@ T632_EPISODES = (("2014-01-01", "2018-02-28"), ("2020-04-01", "2024-05-31"))
 T632_SENS_DROP = ("2022-05-01", "2022-12-31")
 T632_TAU = 1.0 / 252
 T632_VIX1D_FROM = ("2023-01-01", "2023-04-24")
+T632_CPI_VINTAGE_GAP = 7         # days: two CPIAUCSL vintages closer than this are one release (keep the later)
 PARK = 2.0 * math.sqrt(math.log(2.0))
 
 # ---- T-633
@@ -335,17 +343,37 @@ def _session_on_or_after(d: str) -> Optional[str]:
     return (dd if CAL.is_nyse_session(dd) else CAL.next_session(dd)).isoformat()
 
 
+def cpi_release_days(days: Sequence[str], gap: int = T632_CPI_VINTAGE_GAP) -> tuple:
+    """One CPI release per reference month: ALFRED's CPIAUCSL vintages include the BLS seasonal-factor revision a few
+    days before the January CPI, so a day followed by another vintage within ``gap`` days is dropped and the later day
+    (the release) is kept. Returns (kept days, dropped days), both sorted."""
+    ds = sorted(set(days))
+    keep, dropped = [], []
+    for k, d in enumerate(ds):
+        nxt = ds[k + 1] if k + 1 < len(ds) else None
+        if nxt is not None and (date.fromisoformat(nxt) - date.fromisoformat(d)).days < gap:
+            dropped.append(d)
+        else:
+            keep.append(d)
+    return keep, dropped
+
+
 def event_sessions(archive) -> dict:
-    """FOMC decision sessions and the first session on or after each CPI / NFP release day (sets of ISO days)."""
-    def days(name, field):
-        out = set()
+    """FOMC decision sessions and the first session on or after each CPI / NFP release day (sets of ISO days); CPI
+    release days are de-duplicated by ``cpi_release_days`` (the dropped seasonal-factor vintages are returned too)."""
+    def raw(name, field):
+        out = []
         for r in CAL._rows(archive, name):
             v = (r.get("value") or {}).get(field)
-            s = _session_on_or_after(v) if v else None
-            if s:
-                out.add(s)
+            if v:
+                out.append(str(v)[:10])
         return out
-    return {"fomc": days(FOMC_B, "decision_day"), "cpi": days(CPI_B, "day"), "nfp": days(NFP_B, "day")}
+
+    def sessions(ds):
+        return {s for s in (_session_on_or_after(d) for d in ds) if s}
+    cpi_keep, cpi_drop = cpi_release_days(raw(CPI_B, "day"))
+    return {"fomc": sessions(raw(FOMC_B, "decision_day")), "cpi": sessions(cpi_keep), "nfp": sessions(raw(NFP_B, "day")),
+            "cpi_vintages_dropped": cpi_drop}
 
 
 def gspc_ohlc(archive) -> dict:
@@ -444,7 +472,10 @@ def b13_flow_spxw_expiry_dampening(archive):
         return miss
     g = gspc_ohlc(archive)
     vix = CAL._series(archive, VIX_B)
-    R = t632_rows(g["days"], g["open"], g["high"], g["low"], g["close"], vix, event_sessions(archive))
+    ev = event_sessions(archive)
+    R = t632_rows(g["days"], g["open"], g["high"], g["low"], g["close"], vix, ev)
+    cpi_drop_w = [d for d in ev["cpi_vintages_dropped"] if T632_START <= d <= T632_END]
+    cpi_rel_w = sorted(d for d in ev["cpi"] if T632_START <= d <= T632_END)
     days, y, pnl, E, P = R["days"], R["y"], R["pnl"], R["E"], R["P"]
     n = len(days)
     if n < 30:
@@ -509,7 +540,9 @@ def b13_flow_spxw_expiry_dampening(archive):
     ex = R["drop"]
     reason = (f"^GSPC {days[0]}..{days[-1]}, {n} sessions after exclusions ({ex.get('any', 0)} dropped: monthly opex "
               f"{ex.get('monthly_opex', 0)}, month-end {ex.get('month_end', 0)}, holiday-shifted expiry {ex.get('holiday_shifted_expiry', 0)}, "
-              f"FOMC {ex.get('fomc', 0)}, CPI {ex.get('cpi', 0)}, NFP {ex.get('nfp', 0)}, early close {ex.get('early_close', 0)}, "
+              f"FOMC {ex.get('fomc', 0)}, CPI {ex.get('cpi', 0)} (one release per month: {len(cpi_rel_w)} CPI sessions in the "
+              f"window after dropping {len(cpi_drop_w)} seasonal-factor vintages), NFP {ex.get('nfp', 0)}, early close "
+              f"{ex.get('early_close', 0)}, "
               f"stale open {ex.get('stale_open', 0)}, H<=L {ex.get('high_le_low', 0)}, no prior VIX {ex.get('no_prior_vix', 0)}; "
               f"reasons overlap). y = ln(Parkinson / (VIX_(t-1)/100/sqrt 252)) on Expiry (Fri always; Wed from 2016-03-02, Mon "
               f"from 2016-08-22, Tue from 2022-04-26, Thu from 2022-05-19) with weekday and year-month FE: beta {_fmt(b)} "
@@ -521,6 +554,7 @@ def b13_flow_spxw_expiry_dampening(archive):
               + ", ".join(f"{k} {_pf(v)}" for k, v in desc["from_launch_2023_04_24"].items()))
     stat = {"n": n, "beta": b, "p_less": pl, "p_greater": pg, "draws": nd, "episodes": eps, "straddle_beta": sec["beta"],
             "placebo_beta": plc["beta"], "placebo_p_two_sided": p2, "placebo_draws": pnd, "exclusions": ex,
+            "cpi_sessions_in_window": len(cpi_rel_w), "cpi_vintages_dropped": cpi_drop_w,
             "criteria": crit, "reported": rep}
     return _out(stat, n, verdict, reason + " — " + why)
 
@@ -615,10 +649,20 @@ def ratio_R(hf, hb, opex, mask=None) -> Optional[float]:
     return float((a / b) / (c / d))
 
 
-def perm_R(hf, hb, opex, years, obs: float, n_perm: Optional[int] = None, seed: int = SEED) -> tuple:
-    """(p_greater, p_less, draws) of R with the opex label permuted across dates within each calendar year."""
-    hf, hb = np.asarray(hf, float), np.asarray(hb, float)
-    lab = np.asarray(opex, bool).astype(np.int8)
+def perm_R(hf, hb, opex, years, obs: float, n_perm: Optional[int] = None, seed: int = SEED, bar: float = T633_BAR,
+           adjust: bool = True) -> tuple:
+    """(p_greater, p_less, draws) of R at the null boundary R = ``bar`` (H0: R <= bar), the opex label permuted across
+    dates within each calendar year. Label-exchangeable draws centre on R = 1, so the test is inverted at the boundary
+    (two constructions, rule 11): ``adjust`` True divides the observed opex dates' Friday hits by ``bar`` before
+    permuting (under R = bar that restores exchangeability; the adjusted data's R is obs / bar), ``adjust`` False
+    permutes the raw data and compares bar x draw with obs. Both compare obs / bar with the draws; ``bar`` = 1 is the
+    plain exchangeability test (reported only). ``obs`` is R on the unadjusted data."""
+    hf, hb = np.asarray(hf, float).copy(), np.asarray(hb, float)
+    o = np.asarray(opex, bool)
+    lab = o.astype(np.int8)
+    if adjust:
+        hf[o] = hf[o] / bar
+    target = obs / bar
     HF, HB = hf.sum(), hb.sum()
 
     def batch(j):
@@ -629,7 +673,7 @@ def perm_R(hf, hb, opex, years, obs: float, n_perm: Optional[int] = None, seed: 
             with np.errstate(invalid="ignore", divide="ignore"):
                 dr.append((a / b) / ((HF - a) / (HB - b)))
         d = np.concatenate(dr)
-        return CAL._perm_p(obs, d[np.isfinite(d)])
+        return CAL._perm_p(target, d[np.isfinite(d)])
 
     return CAL.escalate_p(batch, CAL._np(n_perm), 1, CAL.MAX_PERM_BATCHES)
 
@@ -750,7 +794,8 @@ def b13_flow_opex_strike_pinning(archive):
         rows = [("R computable (band hits on both groups)", None, False)]
         v, why, crit = CAL._judge(rows, n, T633_MIN_N, "opex dates")
         return _out({"n": n, "criteria": crit}, n, v, f"R not computable — {why}")
-    pg, pl, nd = perm_R(hf, hb, o, years, R)
+    pg, pl, nd = perm_R(hf, hb, o, years, R, bar=T633_BAR, adjust=True)        # registered permutation at R = 1.05
+    sg_, sl_, snd = perm_R(hf, hb, o, years, R, bar=T633_BAR, adjust=False)
     psi = month_psi(hf, hb, o, months)
     bg, bl, bd = boot_p(psi, T633_BLOCK, stop_side("greater"))
     early = np.array([d < T633_SPLIT for d in day])
@@ -758,16 +803,25 @@ def b13_flow_opex_strike_pinning(archive):
     Rt = ratio_R(T["hf_top"], T["hb_top"], o)
     Rb = ratio_R(T["hf_bot"], T["hb_bot"], o)
     perm_ok = SA.sig(R - T633_BAR, pg, nd, ALPHA, "pos")
+    perm_ok_s = SA.sig(R - T633_BAR, sg_, snd, ALPHA, "pos")
     boot_ok = SA.sig(R - T633_BAR, bg, bd, ALPHA, "pos")
-    rows = [((f"R > 1.05 with permutation p < 0.05 (R {_fmt(R)}, within-year permutation p {CAL._mc(pg, nd)}; "
-              f"registered month block bootstrap of H0 R <= 1.05, 12-month blocks, p {CAL._mc(bg, bd)}: both readings)"),
-             CAL._agree([perm_ok, boot_ok]),
-             bool(CAL.decide_p(pl, nd) is True and CAL.decide_p(bl, bd) is True)),
+    rows = [((f"R > 1.05 with permutation p < 0.05 (R {_fmt(R)}; within-year permutation tested at the null boundary "
+              f"R = 1.05: opex Friday hits / 1.05 then permuted p {CAL._mc(pg, nd)}, draws x 1.05 vs R p "
+              f"{CAL._mc(sg_, snd)}; registered month block bootstrap of H0 R <= 1.05, 12-month blocks, p "
+              f"{CAL._mc(bg, bd)}: every reading must pass (rule 11), disagreement is undecided)"),
+             CAL._agree([perm_ok, perm_ok_s, boot_ok]),
+             bool(CAL.decide_p(pl, nd) is True and CAL.decide_p(sl_, snd) is True and CAL.decide_p(bl, bd) is True)),
             (f"R > 1 in 2005-2015 and in 2016-2026 ({_fmt(R1)} / {_fmt(R2)})",
              None if R1 is None or R2 is None else bool(R1 > 1 and R2 > 1), False),
             (f"R in the top dollar-volume tercile above R in the bottom tercile ({_fmt(Rt)} vs {_fmt(Rb)})",
              None if Rt is None or Rb is None else bool(Rt > Rb), False)]
     verdict, why, crit = CAL._judge(CAL._undecided(rows), n, T633_MIN_N, "opex dates")
+    lit_note = ""
+    if perm_ok is False and perm_ok_s is False and boot_ok is True:
+        lit_note = ("READING: the registered permutation fails at the null boundary under both constructions while the "
+                    "month bootstrap (the registration's 'check') passes, so under the declared rule-11 reading criterion 1 "
+                    "is undecided; read literally (the permutation is the pass test and the bootstrap only its check, which "
+                    "cannot rescue it), criterion 1 fails and the verdict would be not_supported. Not supported either way. ")
 
     # ---- reported
     by_year = {}
@@ -794,6 +848,9 @@ def b13_flow_opex_strike_pinning(archive):
                "monthly_only_opex": ratio_R(hf[~qtr | ~o], hb[~qtr | ~o], o[~qtr | ~o])}
     blocks = {f"{k}m": boot_p(psi, k, never_stop, max_seeds=N_SEEDS)[0] for k in (1, 3, 6, 24)}
     p_vs_1 = boot_p(month_psi(hf, hb, o, months, bar=1.0), T633_BLOCK, never_stop, max_seeds=N_SEEDS)[0]
+    perm_vs_1 = perm_R(hf, hb, o, years, R, bar=1.0, adjust=False)[0]
+    blk_all = dict(blocks); blk_all[f"{T633_BLOCK}m"] = bg
+    blk_pass = [k for k in ("1m", "3m", "6m", f"{T633_BLOCK}m", "24m") if blk_all.get(k) is not None and blk_all[k] < ALPHA]
     st = T["status"]
     stc = {k: sum(1 for v in st.values() if v == k) for k in sorted(set(st.values()))}
     yrs_pos = sum(1 for v in by_year.values() if v["R"] is not None and v["R"] > 1)
@@ -802,21 +859,26 @@ def b13_flow_opex_strike_pinning(archive):
               f"priced >= $10 on the Thursday, raw closes rebuilt from splits; grid $2.50/<$25, $5/<$200, $10 above; band "
               f"0.05 of the spacing). Band-hit shares: opex day {h_rates['opex_day']:.4f} vs its Thursday "
               f"{h_rates['opex_base']:.4f}; other Fridays {h_rates['other_fri']:.4f} vs Thursdays {h_rates['other_thu']:.4f}; "
-              f"R {_fmt(R)} (within-year permutation p {_pf(pg)}, month bootstrap vs 1.05 p {_pf(bg)}); 2005-2015 "
+              f"R {_fmt(R)} (within-year permutation at the null boundary R = 1.05 p {_pf(pg)} / {_pf(sg_)} (hits / 1.05 "
+              f"permuted / draws x 1.05), month bootstrap vs 1.05 p {_pf(bg)}); 2005-2015 "
               f"{_fmt(R1)}, 2016-2026 {_fmt(R2)}; top / bottom dollar-volume tercile {_fmt(Rt)} / {_fmt(Rb)}; finer grid "
               f"($1/<$50, $2.50/<$100, $5 above, sensitivity) {_fmt(R_fine)}; R > 1 in {yrs_pos} of {len(by_year)} years. "
               f"Reported (not criteria): placebo labels on the Fridays " + ", ".join(f"{k} R {_fmt(v['R'])}" for k, v in placebo.items())
               + f" of each opex; quarterly opex R {_fmt(split_q['quarterly_opex'])}, monthly-only {_fmt(split_q['monthly_only_opex'])}; "
               f"month bootstrap vs 1.05 at other block lengths " + ", ".join(f"{k} p {_pf(v)}" for k, v in blocks.items())
-              + f" (12 months declared); vs R = 1 p {_pf(p_vs_1)}. "
+              + f" (12 months declared; p < 0.05 only at {', '.join(blk_pass) if blk_pass else 'none'} of 1/3/6/12/24 months: "
+              f"rule-11 borderline); against R = 1 rather than the registered 1.05, permutation p {_pf(perm_vs_1)} and "
+              f"bootstrap p {_pf(p_vs_1)}. "
+              + lit_note +
               f"SURVIVORSHIP: prices come from the archive's 901-symbol daily-history set (today's universe): "
               f"{stc.get('ok', 0)} of {len(st)} tickers that were members since 2005 are usable, priced members per date "
               f"{min(cov) * 100:.0f}%..{max(cov) * 100:.0f}% of members by year (lowest early); leavers are under-represented")
-    stat = {"n": n, "n_other": int((~o).sum()), "R": R, "perm_p_greater": pg, "perm_draws": nd, "boot_p_greater": bg,
+    stat = {"n": n, "n_other": int((~o).sum()), "R": R, "perm_p_greater": pg, "perm_draws": nd,
+            "perm_scaled_p_greater": sg_, "perm_scaled_draws": snd, "boot_p_greater": bg,
             "boot_draws": bd, "R_halves": [R1, R2], "R_top": Rt, "R_bottom": Rb, "R_fine_grid": R_fine, "h_rates": h_rates,
             "by_year": by_year, "ticker_status": stc, "skipped_pairs": T["skipped"], "criteria": crit,
             "reported": {"placebo_weeks": placebo, "quarterly_split": split_q, "boot_p_other_blocks": blocks,
-                         "boot_p_vs_1": p_vs_1}}
+                         "boot_p_vs_1": p_vs_1, "perm_p_vs_1": perm_vs_1, "boot_blocks_passing": blk_pass}}
     return _out(stat, n, verdict, reason + " — " + why)
 
 
@@ -1381,11 +1443,24 @@ def b13_flow_deribit_signed_delta_flow(archive):
 
     def ic_dec(d):
         return d["t"] is not None and d["t"] <= -1.6448536269514722
+
+    def point_note(key):
+        pts = [reads[k][key]["ic"] for k in ic_keys]
+        if any(v is None for v in pts):
+            return ""
+        side = ("positive" if all(v > 0 for v in pts) else "not positive" if not any(v > 0 for v in pts)
+                else "mixed in sign")
+        lit = "would pass" if side == "positive" else "would fail" if side == "not positive" else "would be undecided"
+        return (f"; a failure here comes from the declared significance reading of 'IC > 0' (the null names IC <= 0), "
+                f"stricter than the registered point criterion: the point ICs are {side} under both price readings, so "
+                f"the literal point reading {lit}")
     rows = [("IC > 0 with HAC (5 lags) one-sided p < 0.05 ("
-             + "; ".join(f"price {k[0]}: IC {_fmt(reads[k]['ic']['ic'])}, t {_fmt(reads[k]['ic']['t'], 2)}" for k in ic_keys) + ")",
+             + "; ".join(f"price {k[0]}: IC {_fmt(reads[k]['ic']['ic'], 6)}, t {_fmt(reads[k]['ic']['t'], 2)}" for k in ic_keys)
+             + point_note("ic") + ")",
              CAL._agree([ic_ok(reads[k]["ic"]) for k in ic_keys]), all(ic_dec(reads[k]["ic"]) for k in ic_keys)),
             ("residual IC (flow residualised on day d's return) > 0 with HAC one-sided p < 0.05 ("
-             + "; ".join(f"price {k[0]}: {_fmt(reads[k]['res_ic']['ic'])}, t {_fmt(reads[k]['res_ic']['t'], 2)}" for k in ic_keys) + ")",
+             + "; ".join(f"price {k[0]}: {_fmt(reads[k]['res_ic']['ic'])}, t {_fmt(reads[k]['res_ic']['t'], 2)}" for k in ic_keys)
+             + point_note("res_ic") + ")",
              CAL._agree([ic_ok(reads[k]["res_ic"]) for k in ic_keys]), all(ic_dec(reads[k]["res_ic"]) for k in ic_keys))]
     rule_oks, rule_dec = [], []
     for r in reads.values():
@@ -1415,6 +1490,12 @@ def b13_flow_deribit_signed_delta_flow(archive):
                  CAL._agree([None if r["mean_net_20bp"] is None else bool(r["mean_net_20bp"] > 0) for r in reads.values()]),
                  False))
     verdict, why, crit = CAL._judge(CAL._undecided(rows), n, T638_MIN_N, "days")
+    rest_fail = [nm.split(" (")[0] for nm, ok, _ in rows[2:] if ok is False]
+    ic_note = ""
+    if any(ok is False for _, ok, _ in rows[:2]) and rest_fail:
+        ic_note = (f" The IC criteria fail only under the declared HAC-significance reading; the verdict does not depend "
+                   f"on them, since {len(rest_fail)} of the {len(rows) - 2} rule criteria fail on their own ("
+                   + "; ".join(rest_fail) + ").")
 
     # ---- reported
     A = reads["a/s"]
@@ -1446,7 +1527,8 @@ def b13_flow_deribit_signed_delta_flow(archive):
               f"{' / '.join(_bp(v, 2) for v in A['rule_halves'])}. Baselines (a/s): "
               + ", ".join(f"{k} {_bp(v, 2)}" for k, v in rep["baselines_a_s"].items())
               + "; trials (a/s): " + ", ".join(f"{k} {_bp(t['mean'], 2)}" for k, t in A["trials"].items())
-              + ". Executed as CDE nano BTC futures (spot return as the proxy, Deribit perpetual funding as the carry)")
+              + ". Executed as CDE nano BTC futures (spot return as the proxy, Deribit perpetual funding as the carry)."
+              + ic_note)
     clean = {k: {kk: vv for kk, vv in r.items() if kk not in ("net", "sign")} for k, r in reads.items()}
     stat = {"n": n, "readings": clean, "criteria": crit, "reported": rep}
     return _out(stat, n, verdict, reason + " — " + why)

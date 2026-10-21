@@ -130,8 +130,8 @@ import bisect
 import gc
 import math
 import warnings
-from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta, timezone
+from collections import defaultdict
+from datetime import date, datetime, timezone
 from typing import Optional, Sequence
 
 import numpy as np
@@ -837,6 +837,9 @@ def b13_volume_b_confirmed_high(archive):
                                 "T-309's and T-304's trial Sharpes are not on this series")
     crit = [c_mean, c_diff, c_plc, c_h, c_dsr]
     v, why, crit_j = CAL._judge(crit, n, T697_MIN_N, "confirmed-high events")
+    # reported only: the same bound on the date-ordered per-event series (overlapping events count as independent, so
+    # it is the less conservative series; the criterion stays on the calendar-time portfolio fixed before the run)
+    _, dsr_ev = dsr_bound(x[np.argsort(dd, kind="stable")], T697_TRIALS, "per-event", "")
     # ---- reported only
     rep = {}
     for h in T697_HOLDS_REP:
@@ -859,7 +862,7 @@ def b13_volume_b_confirmed_high(archive):
     stat = {"n": n, "mean_net": float(x.mean()), "boot": {k: bc.get(k) for k in ("ci", "ci_mc_se", "clusters", "reps")},
             "n_unconfirmed": int(xu.size), "mean_unconfirmed": _mean(xu), "diff": diff,
             "diff_boot": {k: bd.get(k) for k in ("ci", "ci_mc_se", "clusters", "reps")}, "placebo": plc, "halves": halves,
-            "halves_n": [int(h1.sum()), int((~h1).sum())], "dsr": dsr_info, "n_events_all": int(E["i"].size),
+            "halves_n": [int(h1.sum()), int((~h1).sum())], "dsr": dsr_info, "dsr_event_series_reported": dsr_ev, "n_events_all": int(E["i"].size),
             "n_burn_in": int((E["cls"] == -1).sum()), "mean_all_events": _mean(allh), "horizons": rep,
             "top_decile_av": {"n": int(xt.size), "mean": _mean(xt)},
             "news_proxy": {"confirmed_news": {"n": int(news_c.size), "mean": _mean(news_c)},
@@ -868,7 +871,7 @@ def b13_volume_b_confirmed_high(archive):
             "coverage_priced_member_days": cov_all, "coverage_by_year": cov_year,
             "t578_side_cell": "not computed (an ML side cell outside the verdict)",
             "base": {k: (len(x_) if isinstance(x_, list) else x_) for k, x_ in I["info"].items()},
-            "first": str(dd.min()), "last": str(dd.max()), "criteria": crit_j, "verdict": v}
+            "first": str(min(dd.tolist())), "last": str(max(dd.tolist())), "criteria": crit_j, "verdict": v}
     reason = (f"First 252-session closing highs (split-adjusted close, no crossing in the previous 60 sessions) on "
               f"point-in-time S&P 500 members with prices, {stat['first']}..{stat['last']}: {E['i'].size} events "
               f"({stat['n_burn_in']} in the 100-event burn-in), {n} confirmed (AV above the expanding 2/3 quantile of earlier "
@@ -876,7 +879,8 @@ def b13_volume_b_confirmed_high(archive):
               f"10 bp: confirmed {_bp(float(x.mean()))} (date-clustered 95% CI {_ci_txt(bc)}, {bc.get('clusters')} dates), "
               f"unconfirmed {_bp(_mean(xu))}, difference {_bp(diff)} (CI {_ci_txt(bd)}); matched placebo p "
               f"{_f(plc.get('p'), 4)} (null mean {_bp(plc.get('null_mean'))}); halves {_bp(halves[0])} / {_bp(halves[1])}; "
-              f"DSR bound {_f(dsr_info.get('dsr_bound'))} at {T697_TRIALS} trials. Reported: 5 / 60 sessions confirmed "
+              f"DSR bound {_f(dsr_info.get('dsr_bound'))} at {T697_TRIALS} trials (per-event series, reported only: "
+              f"{_f(dsr_ev.get('dsr_bound'))}). Reported: 5 / 60 sessions confirmed "
               f"{_bp(rep['h5']['confirmed'])} / {_bp(rep['h60']['confirmed'])} (unconfirmed {_bp(rep['h5']['unconfirmed'])} / "
               f"{_bp(rep['h60']['unconfirmed'])}); top-decile AV {_bp(_mean(xt))} ({xt.size}); confirmed with a > 3 sigma "
               f"event-day move {_bp(_mean(news_c))} ({news_c.size}) vs without {_bp(_mean(quiet_c))}; lows (not judged, "
@@ -1063,7 +1067,7 @@ def b13_volume_b_rvol_momentum(archive):
     for s in ("QQQ", "IWM"):
         o = oth[s]
         so.append(None if o is None or o["high"]["mean"] is None or o["hml"] is None else bool(o["high"]["mean"] > 0 and o["hml"] > 0))
-    c_same = (f"same sign on QQQ and IWM (high mean > 0 and high minus low > 0: QQQ "
+    c_same = ("same sign on QQQ and IWM (high mean > 0 and high minus low > 0: QQQ "
               + (f"{_bp(oth['QQQ']['high']['mean'], 2)} / {_bp(oth['QQQ']['hml'], 2)}" if oth["QQQ"] else "n/a")
               + "; IWM " + (f"{_bp(oth['IWM']['high']['mean'], 2)} / {_bp(oth['IWM']['hml'], 2)}" if oth["IWM"] else "n/a") + ")",
               None if None in so else all(so), False)
@@ -1072,7 +1076,7 @@ def b13_volume_b_rvol_momentum(archive):
     crit = [c_hi, c_hml, c_plc, c_same, c_dsr]
     v, why, crit_j = CAL._judge(crit, n, T699_MIN_N, "high-RVOL SPY sessions")
     # ---- reported only
-    S, mn, use = R["S"], R["mn"], R["use"]
+    S, use = R["S"], R["use"]
     reg = {}
     for nm, path in ((FOMC_B, "fomc"), (CPI_B, "cpi")):
         if not B7C._has(archive, nm):
@@ -1117,6 +1121,13 @@ def b13_volume_b_rvol_momentum(archive):
 
 
 # ====================================================================================================== T-700 ==
+
+def epoch_seconds(index) -> np.ndarray:
+    """UTC epoch seconds of a tz-aware DatetimeIndex whatever its resolution (``load_bars`` yields datetime64[s], where
+    ``view('int64')`` is already seconds; a nanosecond index would need // 1e9)."""
+    import pandas as pd
+    return np.asarray((index - pd.Timestamp("1970-01-01", tz="UTC")) // pd.Timedelta(seconds=1), dtype=np.int64)
+
 
 def t700_universe() -> list:
     from mandel.ml.fetch import EQUITY_ETF, STOCKS
@@ -1225,9 +1236,8 @@ def t700_panel() -> dict:
         df = load_bars("60m", sym)
         if df is None or df.empty:
             continue
-        t = (df.index.view("int64") // 10 ** 9).to_numpy() if hasattr(df.index.view("int64"), "to_numpy") else \
-            np.asarray(df.index.view("int64")) // 10 ** 9
-        per[sym] = slot_day_returns(np.asarray(t), df["o"].to_numpy(float), df["c"].to_numpy(float))
+        t = epoch_seconds(df.index)
+        per[sym] = slot_day_returns(t, df["o"].to_numpy(float), df["c"].to_numpy(float))
         kinds[sym] = kind
     if "SPY" not in per:
         return {"days": [], "syms": [], "R": np.zeros((0, len(T700_SLOTS), 0))}
@@ -1248,7 +1258,7 @@ def _local_check(archive, days_local: Sequence[str]) -> dict:
     from mandel.ml.features import load_bars
     df = load_bars("60m", "SPY")
     arch = {int(v["t"]): float(v["close"]) for v in H5._values(archive, B7C.hourly("SPY")) if v.get("close") is not None}
-    t = np.asarray(df.index.view("int64")) // 10 ** 9
+    t = epoch_seconds(df.index)
     c = df["c"].to_numpy(float)
     common = [(arch[int(tt)], cc) for tt, cc in zip(t, c) if int(tt) in arch]
     if not common:

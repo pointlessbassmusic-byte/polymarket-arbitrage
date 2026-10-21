@@ -116,9 +116,21 @@ T-663 declared readings
     2018-01..2026-09 days. SURVIVORSHIP as T-671.
   * Reported, not judged: the overnight and intraday spread legs, the high-DTC intraday leg (the registration's
     pre-build bar for an intraday-only short: about 4 bp/day plus the locate), the middle-decile placebo (decile 6
-    minus decile 5 by rank), the two-sided p, and the 28-stock 60m descriptive (names above the 28-name median DTC
-    minus those below, 15:30 bar open -> official close). The value-weighted version is not computed (no point-in-
-    time share counts are wired here; reported-only).
+    minus decile 5 by rank), the two-sided p of the mean against 0 (the registration's "so the opposite sign is also
+    visible": Newey-West 10 lags on the series itself and the studentized CBB two-sided, 20-session blocks; the
+    two-sided p against the 2 bp bar is reported apart and labelled so), and the 28-stock 60m descriptive (names above
+    the 28-name median DTC minus those below, 15:30 bar open -> official close).
+  * Value-weighted version (reported; added at review, it was skipped in the first run): the same deciles, each name
+    weighted by its cap at formation, held fixed over the hold (``formation_caps``): split-adjusted close(s-1) x the
+    SEC cover count (``batch6c_stockxs.shares_series`` / ``shares_at``: the latest accession accepted before the
+    entry open, at most 15 months old) x the split factor after the cover date, divided across the issuer's listed
+    classes (its current-SEC-map tickers that are FINRA company stock rows in the formation's release and either an
+    accepted panel series or a ROOT-X class spelling; depositary / note rows such as GOOGM are not classes); no cap
+    (no weight) when the classes cannot be priced together or trade more than 2x apart (BRK-B: BRK-A is not in the
+    panel), when the current SEC map has no CIK for the ticker or the CIK's SEC names disagree with the member's FINRA
+    issue name at the formation (a reused ticker), or when no count is known (issuers reporting cover counts by share
+    class, META, V, MA, CMCSA, have no undimensioned fact in companyfacts after about 2010-2015). The ticker -> CIK
+    map is today's (an identity lookup, not a value); the share of decile slots with a cap is reported.
 
 T-665 declared readings
   * Window edges are built per day in local time with zoneinfo and mapped to UTC hour stamps (every edge falls on a
@@ -132,7 +144,12 @@ T-665 declared readings
   * Basket day: every one of the 7 currencies complete in both windows of the fix (a fixed equal-weight basket);
     per-currency means use each currency's own complete days. "At least 5 of 7 currencies with the same sign" = at
     least 5 per-currency mean (pre - post) > 0. Halves: the fix's usable days split at their median day.
-  * n for min_n is the smaller of the two fixes' basket days (the pass needs both fixes).
+  * min_n is applied per fix (changed at review, before the rerun; the first run used the smaller fix's count for
+    both): each fix's criteria are judged at that fix's own basket-day count, so house rule 5 shields only a fix below
+    600 (the Tokyo arm, capped near 575 by the Monday drop-out) and a fix at or above 600 is judged at face value.
+    The pass is a conjunction over the fixes: not_supported when either fix is not_supported, supported only when both
+    are, else inconclusive (``combine_fixes``). The reported n is the count of the fix that decides a not_supported
+    verdict, else the smaller count. Holm is still over the 2 fixes jointly, as registered.
   * Reported, not judged: the trading rule's net (long USD pre, short USD post: 4 sides a day at 1 bp EURUSD/USDJPY,
     2 bp the others); placebo windows of the same lengths shifted +6 h and -6 h; the E-L window [14:00 Berlin -> 16:00
     London] (expected flat); DXY (DX-Y.NYB, from 2024-05-29); Japanese holidays (no Tokyo fix) and month-end days
@@ -144,6 +161,7 @@ from __future__ import annotations
 
 import bisect
 import math
+import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional, Sequence
 from zoneinfo import ZoneInfo
@@ -238,9 +256,9 @@ JP_HOLIDAYS = frozenset((
     "2025-01-01", "2025-01-02", "2025-01-03", "2025-01-13", "2025-02-11", "2025-02-24", "2025-03-20", "2025-04-29",
     "2025-05-05", "2025-05-06", "2025-07-21", "2025-08-11", "2025-09-15", "2025-09-23", "2025-10-13", "2025-11-03",
     "2025-11-24", "2025-12-31",
-    "2026-01-01", "2026-01-02", "2026-02-11", "2026-02-23", "2026-03-20", "2026-04-29", "2026-05-04", "2026-05-05",
-    "2026-05-06", "2026-07-20", "2026-08-11", "2026-09-21", "2026-09-22", "2026-09-23", "2026-10-12", "2026-11-03",
-    "2026-11-23", "2026-12-31"))
+    "2026-01-01", "2026-01-02", "2026-01-12", "2026-02-11", "2026-02-23", "2026-03-20", "2026-04-29", "2026-05-04",
+    "2026-05-05", "2026-05-06", "2026-07-20", "2026-08-11", "2026-09-21", "2026-09-22", "2026-09-23", "2026-10-12",
+    "2026-11-03", "2026-11-23", "2026-12-31"))
 
 
 # ================================================================================================= small helpers ==
@@ -325,6 +343,17 @@ def mean_test(x, bar: float, side: str, lag: int, block: int, m: int = 1) -> dic
     bg, bl, dr = boot_p(x - bar, block, alphas)
     out.update(p_bt=bg if side == "greater" else bl, p_bt_opp=bl if side == "greater" else bg, draws=dr)
     return out
+
+
+def two_sided_vs_zero(x, lag: int, block: int) -> dict:
+    """Two-sided p's of mean(x) against 0 (not against a bar): Newey-West (``lag``) normal p and the studentized CBB
+    (``block``) 2 x min(p_greater, p_less)."""
+    x = np.asarray(x, float)
+    x = x[np.isfinite(x)]
+    r = nw(x, lag)
+    pg, pl, dr = boot_p(x, block)
+    return {"mean": r["mean"], "nw_t": r["t"], "p_nw": None if r["t"] is None else min(1.0, 2.0 * (1.0 - _phi(abs(r["t"])))),
+            "p_bt": CAL._two_sided(pg, pl), "draws": dr, "n": int(x.size)}
 
 
 def holm_decide(ps: Sequence[Optional[float]], draws: Sequence[Optional[int]], alpha: float = ALPHA) -> list:
@@ -953,13 +982,15 @@ def _load_60m(sym: str):
         return None
 
 
-def finra_rows(archive, fsyms: frozenset) -> list:
+def finra_rows(archive, fsyms: frozenset, classes: frozenset = frozenset()) -> list:
     """Every archived FINRA short-interest release in settlement order: {settle, av (epoch of its available_at, the
-    latest over its rows), rows {FINRA symbol: (issueName, short interest, ADV)}} for the requested symbols."""
+    latest over its rows), rows {FINRA symbol: (issueName, short interest, ADV)} for the requested symbols, stock
+    (the symbols of ``classes`` listed in that release as a company stock row, ``batch6c_stockxs.is_stock_row``: the
+    listed share classes behind T-663's value weights)}."""
     def load():
         out = []
         for nm in SX._entry_names(archive, SX.FINRA_PREFIX):
-            av, rows = None, {}
+            av, rows, stock = None, {}, set()
             for r in SX._stream(archive, nm):
                 try:
                     a = SX._ts(r["available_at"])
@@ -971,10 +1002,12 @@ def finra_rows(archive, fsyms: frozenset) -> list:
                 if sym in fsyms:
                     rows[sym] = (v.get("issueName") or "", SX._num(v.get("currentShortPositionQuantity")),
                                  SX._num(v.get("averageDailyVolumeQuantity")))
+                if sym in classes and SX.is_stock_row(v.get("marketClassCode") or "", v.get("issueName") or ""):
+                    stock.add(sym)
             if av is not None:
-                out.append({"settle": nm[len(SX.FINRA_PREFIX):], "av": av, "rows": rows})
+                out.append({"settle": nm[len(SX.FINRA_PREFIX):], "av": av, "rows": rows, "stock": frozenset(stock)})
         return out
-    return CAL._cached(archive, ("b13ib_finra", fsyms), load)
+    return CAL._cached(archive, ("b13ib_finra", fsyms, classes), load)
 
 
 def finra_sym(t: str) -> str:
@@ -1221,19 +1254,26 @@ def rank_bucket(score: np.ndarray, elig: np.ndarray, lo_q: float, hi_q: float) -
     return w
 
 
-def hold_series(D: int, forms: list, key: str, ID: np.ndarray, ON: np.ndarray, mode: str = "spread") -> dict:
+def hold_series(D: int, forms: list, key: str, ID: np.ndarray, ON: np.ndarray, mode: str = "spread",
+                caps: Optional[list] = None) -> dict:
     """Daily overnight and intraday components of a formation-held portfolio: the intraday of row t from the sets
     entered at or before the t open, the overnight into row t from the sets held over that night (entered at or before
-    row t-1). ``mode`` 'spread' = high decile minus low decile; 'placebo' = decile 6 minus decile 5 by rank."""
+    row t-1). ``mode`` 'spread' = high decile minus low decile; 'placebo' = decile 6 minus decile 5 by rank. ``caps``
+    (spread only; one array per formation, ``formation_caps``): the deciles are the same, each name weighted by its
+    formation cap (a name without a cap gets no weight); legs are equal-weighted otherwise."""
     W_hi, W_lo = [], []
-    for f in forms:
+    for i, f in enumerate(forms):
         sc = f[key]
         el = f["elig"] & np.isfinite(sc)
         if mode == "spread":
             k = int(el.sum()) // 10
             if k >= 1:
-                W_hi.append(SX.tail_fractions(sc, el, k, True))
-                W_lo.append(SX.tail_fractions(sc, el, k, False))
+                wh, wl = SX.tail_fractions(sc, el, k, True), SX.tail_fractions(sc, el, k, False)
+                if caps is not None:
+                    cp = np.where(np.isfinite(caps[i]) & (caps[i] > 0), caps[i], 0.0)
+                    wh, wl = wh * cp, wl * cp
+                W_hi.append(wh)
+                W_lo.append(wl)
             else:
                 W_hi.append(np.zeros(sc.size))
                 W_lo.append(np.zeros(sc.size))
@@ -1257,6 +1297,109 @@ def hold_series(D: int, forms: list, key: str, ID: np.ndarray, ON: np.ndarray, m
     return {"on": on, "id": idd, "d": on - idd, "hi_id": hi_id}
 
 
+def t663_sec(archive, syms: Sequence[str]) -> dict:
+    """SEC share counts for the panel names: {cik_of {Yahoo ticker: CIK} (the current SEC ticker map), by_cik {CIK:
+    every Yahoo-spelled ticker the map lists for it}, shares {CIK: ``batch6c_stockxs.shares_series``} (cover counts at
+    their acceptance, dei EntityCommonStockSharesOutstanding summed across classes per accession, else us-gaap
+    CommonStockSharesOutstanding)}. Streams only the sec-companyfacts buckets holding a wanted CIK and keeps only the
+    share facts."""
+    def load():
+        st = SX._sec_tickers(archive) if B7C._has(archive, TICK_B) else {}
+        cik_of = {y: st[y][0] for y in syms if y in st}
+        ciks = set(cik_of.values())
+        by_cik: dict = {}
+        for y, (c, _nm) in st.items():
+            if c in ciks:
+                by_cik.setdefault(c, []).append(y)
+        names = set(SX._entry_names(archive, SX.FACTS_PREFIX))
+        facts: dict = {c: [] for c in ciks}
+        for b in sorted({SX.sec_bucket(c) for c in ciks}):
+            nm = SX.FACTS_PREFIX + b
+            if nm not in names:
+                continue
+            for r in SX._stream(archive, nm):
+                if r.get("kind") != "fact":
+                    continue
+                v = r.get("value") or {}
+                if (v.get("taxonomy"), v.get("tag")) not in SX.SHARE_TAGS:
+                    continue
+                try:
+                    c = int(v.get("cik"))
+                    if c not in ciks:
+                        continue
+                    val = float(v.get("val"))
+                    av = SX._ts(r["available_at"])
+                except (TypeError, ValueError, KeyError):
+                    continue
+                facts[c].append((v.get("taxonomy"), v.get("tag"), v.get("unit"), v.get("start"), v.get("end"), val,
+                                 v.get("accn"), v.get("form") or "", av))
+        comp = SX._company_rows(archive, ciks) if ciks else {}
+        names: dict = {}
+        for y, (c, nm) in st.items():
+            if c in ciks:
+                v = comp.get(c) or {}
+                names[c] = [x for x in [nm, v.get("name") or ""] + [(f or {}).get("name") or "" for f in
+                                                                     (v.get("formerNames") or [])] if x]
+        return {"cik_of": cik_of, "by_cik": by_cik, "names": names,
+                "shares": {c: SX.shares_series(f) for c, f in facts.items()}}
+    return CAL._cached(archive, ("b13ib_sec", tuple(syms)), load)
+
+
+_CLASS_TICKER = re.compile(r"[A-Z]+-[A-Z]")      # a share-class spelling (BRK-A, BF-A, LEN-B), never a preferred's -PA
+
+
+def formation_caps(pan: dict, forms: list, releases: list, sec: dict, ratio: float = SX.CLASS_PRICE_RATIO) -> list:
+    """Per formation (entry row s), the market cap known at the s open of each name with a DTC: split-adjusted
+    close(s-1) x the SEC cover count of the latest accession accepted before the s open (at most 15 months old,
+    ``batch6c_stockxs.shares_at``) x the split factor after the cover date / k, k = the issuer's listed share classes:
+    the member plus its CIK's other current-SEC-map tickers that are FINRA company stock rows in the formation's own
+    release and either an accepted panel series (GOOG / GOOGL) or a class spelling ROOT-X (BRK-A); FINRA's 30-
+    character names cannot tell a depositary or note row (GOOGM, ACGLN) from a class, so those spellings are not
+    classes. NaN when the name has no CIK, the member's FINRA issue name at the formation disagrees with the CIK's
+    SEC names (``batch13_short_b.ident_ok``; today's ticker map reuses tickers), no usable count is known, its cover
+    date precedes the panel, or k > 1 and a class has no close at s-1 in the panel or the classes' raw closes are
+    more than ``ratio`` apart (the summed count cannot be split; ``batch6c_stockxs`` convention). Uses nothing after
+    the s open."""
+    from mandel.experiments.batch13_short_b import ident_ok
+    rel = {r["settle"]: r for r in releases}
+    days, C, F, col, syms = pan["days"], pan["C"], pan["F"], pan["col"], pan["syms"]
+    out = []
+    for f in forms:
+        s = int(f["s"])
+        cap = np.full(len(syms), np.nan)
+        out.append(cap)
+        if s < 1:
+            continue
+        ts = float(pan["open_ts"][s]) - 1.0
+        r_ = rel.get(f["settle"]) or {}
+        stock, rows = r_.get("stock", frozenset()), r_.get("rows", {})
+        for j in np.flatnonzero(np.isfinite(f["dtc"])):
+            y = syms[j]
+            c = sec["cik_of"].get(y)
+            if c is None:
+                continue
+            fy = finra_sym(y)
+            issue = (rows.get(fy) or ("",))[0]
+            if issue and not ident_ok(issue, sec.get("names", {}).get(c, []), fy):
+                continue
+            sa = SX.shares_at(sec["shares"].get(c, ()), ts, str(days[s]))
+            if not sa:
+                continue
+            sh, end = sa
+            q = int(np.searchsorted(days, end, side="right")) - 1
+            px = C[s - 1, j]
+            if q < 0 or not (np.isfinite(px) and px > 0):
+                continue
+            cls = {t for t in sec["by_cik"].get(c, ()) if t != y and finra_sym(t) in stock
+                   and (t in col or _CLASS_TICKER.fullmatch(t))} | {y}
+            if len(cls) > 1:
+                raw = np.array([C[s - 1, col[t]] * F[s - 1, col[t]] if t in col else np.nan for t in sorted(cls)])
+                if not (np.isfinite(raw).all() and (raw > 0).all() and raw.max() <= ratio * raw.min()):
+                    continue
+            cap[j] = float(px) * sh * float(F[q, j]) / len(cls)
+    return out
+
+
 def b13_intraday_b_dtc_overnight(archive):
     """T-663."""
     miss = _missing(archive, [SPY_B, FJA_B, CHG_B, SI_FIRST_B])
@@ -1266,7 +1409,9 @@ def b13_intraday_b_dtc_overnight(archive):
     days = pan["days"]
     D = len(days)
     fs = frozenset(finra_sym(y.replace("-", ".")) for y in pan["syms"])
-    rel = finra_rows(archive, fs)
+    sec = t663_sec(archive, pan["syms"])
+    cls_syms = frozenset(finra_sym(t) for ts_ in sec["by_cik"].values() for t in ts_)
+    rel = finra_rows(archive, fs, cls_syms)
     forms = t663_formations(pan, rel)
     ID, ON = day_returns(pan)
     win = (days >= T663_START) & (days <= T663_END)
@@ -1300,7 +1445,7 @@ def b13_intraday_b_dtc_overnight(archive):
     ok = fam["dtc"]["ok"]
     rep = {"overnight_spread_bp": float(np.nanmean(h["on"][ok]) * 1e4), "intraday_spread_bp": float(np.nanmean(h["id"][ok]) * 1e4),
            "high_dtc_intraday_bp": float(np.nanmean(h["hi_id"][ok]) * 1e4),
-           "two_sided_p_nw": None if T["p_nw"] is None else min(1.0, 2 * min(T["p_nw"], T["p_nw_opp"])),
+           "two_sided_p_nw_vs_bar": None if T["p_nw"] is None else min(1.0, 2 * min(T["p_nw"], T["p_nw_opp"])),
            "ivol": {"mean_bp": None if Ti["mean"] is None else Ti["mean"] * 1e4, "nw_t_vs_bar": Ti["nw_t"], "p_nw": Ti["p_nw"],
                     "p_bt": Ti["p_bt"], "holm_nw": an[1], "n": Ti["n"]},
            "formations": len(forms), "identity_rejected": int(sum(f["identity_rejected"] for f in forms)),
@@ -1308,7 +1453,26 @@ def b13_intraday_b_dtc_overnight(archive):
     pl = hold_series(D, forms, "dtc", ID, ON, mode="placebo")
     pr = nw(pl["d"][win & np.isfinite(pl["d"])], T663_LAG)
     rep["placebo_middle"] = {"mean_bp": None if pr["mean"] is None else pr["mean"] * 1e4, "nw_t": pr["t"], "n": pr["n"]}
-    rep["value_weighted"] = "not computed (no point-in-time share counts wired here; reported-only)"
+    rep["two_sided_vs_0"] = two_sided_vs_zero(x, T663_LAG, T663_BLOCK)
+    caps = formation_caps(pan, forms, rel, sec)
+    cov_w = []
+    for f, cp in zip(forms, caps):
+        el = f["elig"] & np.isfinite(f["dtc"])
+        k = int(el.sum()) // 10
+        if k >= 1:
+            fr = SX.tail_fractions(f["dtc"], el, k, True) + SX.tail_fractions(f["dtc"], el, k, False)
+            cov_w.append(float(fr[np.isfinite(cp)].sum() / fr.sum()))
+    hv = hold_series(D, forms, "dtc", ID, ON, caps=caps)
+    okv = win & np.isfinite(hv["d"])
+    xv, dv = hv["d"][okv], days[okv]
+    rv, rv0 = nw(xv - T663_BAR, T663_LAG), nw(xv, T663_LAG)
+    rep["value_weighted"] = {
+        "mean_bp": float(xv.mean() * 1e4) if xv.size else None, "nw_t_vs_bar": rv["t"], "nw_t_vs_0": rv0["t"],
+        "n": int(xv.size), "halves_bp": [float(xv[dv < T663_SPLIT].mean() * 1e4) if (dv < T663_SPLIT).any() else None,
+                                         float(xv[dv >= T663_SPLIT].mean() * 1e4) if (dv >= T663_SPLIT).any() else None],
+        "overnight_bp": float(np.nanmean(hv["on"][okv]) * 1e4) if okv.any() else None,
+        "intraday_bp": float(np.nanmean(hv["id"][okv]) * 1e4) if okv.any() else None,
+        "decile_slots_with_cap": float(np.mean(cov_w)) if cov_w else None}
     try:
         t6 = t662_data(archive)
         pn = t6["pn"]
@@ -1329,6 +1493,7 @@ def b13_intraday_b_dtc_overnight(archive):
     except Exception as e:  # pragma: no cover - descriptive only
         rep["desc_28_last_half_hour_hi_minus_lo_dtc_bp"] = f"not computed: {e}"
     desc = rep["desc_28_last_half_hour_hi_minus_lo_dtc_bp"]
+    vw = rep["value_weighted"]
     reason = (f"point-in-time S&P 500 members with archived prices, {dd[0] if n else 'n/a'}..{dd[-1] if n else 'n/a'} ({n} days, "
               f"{len(forms)} FINRA formations, median {rep['median_dtc_names']} names with a DTC, deciles floor(n/10)): "
               f"high-minus-low DTC overnight {_bp(rep['overnight_spread_bp'] / 1e4)}, intraday {_bp(rep['intraday_spread_bp'] / 1e4)}, "
@@ -1338,8 +1503,14 @@ def b13_intraday_b_dtc_overnight(archive):
               f"{_f(cov['share'], 3)}. IVOL member {_bp(Ti['mean'])} (t vs 2 bp {_s(Ti['nw_t'])}). Reported: high-DTC intraday "
               f"leg {_bp(rep['high_dtc_intraday_bp'] / 1e4)}/day (an intraday short must clear about 4 bp/day plus the locate), "
               f"middle-decile placebo {_bp(rep['placebo_middle']['mean_bp'] / 1e4 if rep['placebo_middle']['mean_bp'] is not None else None)}, "
-              f"two-sided p {_f(rep['two_sided_p_nw'], 4)}, 28-stock 15:30->close high-minus-low DTC "
-              f"{_s(desc['mean_bp']) if isinstance(desc, dict) else 'n/a'} bp; value-weighted not computed. SURVIVORSHIP: prices are "
+              f"two-sided p of the mean against 0: NW t {_s(rep['two_sided_vs_0']['nw_t'])}, p {_f(rep['two_sided_vs_0']['p_nw'], 4)}; "
+              f"CBB p {_f(rep['two_sided_vs_0']['p_bt'], 4)} (against the 2 bp bar: NW p {_f(rep['two_sided_p_nw_vs_bar'], 4)}), "
+              f"28-stock 15:30->close high-minus-low DTC {_s(desc['mean_bp']) if isinstance(desc, dict) else 'n/a'} bp; "
+              f"value-weighted (formation caps from SEC cover shares accepted before the entry open) "
+              f"{_bp(None if vw['mean_bp'] is None else vw['mean_bp'] / 1e4)}/day (NW t vs 2 bp {_s(vw['nw_t_vs_bar'])}, vs 0 "
+              f"{_s(vw['nw_t_vs_0'])}, n {vw['n']}; {_f(vw['decile_slots_with_cap'], 3)} of decile slots with a cap: issuers that "
+              f"report cover counts by share class (META, V, MA, CMCSA: companyfacts omits those facts) or have an unpriced listed "
+              f"class (BRK-B) carry no weight). SURVIVORSHIP: prices are "
               f"the archive's 901-symbol daily-history set (today's universe); unpriced member tickers {cov['unpriced_tickers']}")
     stat = {"n": n, "test": T, "test_ivol": Ti, "holm_nw": an, "holm_boot": ab,
             "halves_bp": [float(h1.mean() * 1e4) if h1.size else None, float(h2.mean() * 1e4) if h2.size else None],
@@ -1483,6 +1654,24 @@ def fred_check(archive, series: dict) -> dict:
     return out
 
 
+def combine_fixes(judged: dict, ns: dict, labels: dict) -> tuple:
+    """The T-665 pass is a conjunction over the fixes, each fix judged at its own basket-day count (house rule 5 per
+    fix, ``_judge``): not_supported when any fix is not_supported, supported only when every fix is, else
+    inconclusive. Returns (verdict, why, criteria, n) with n = the smallest count among the not_supported fixes when
+    the verdict is not_supported (the count that decides it), else the smallest count of all fixes."""
+    vs = {k: j[0] for k, j in judged.items()}
+    if any(x == "not_supported" for x in vs.values()):
+        v = "not_supported"
+        n = min(ns[k] for k in vs if vs[k] == "not_supported")
+    elif all(x == "supported" for x in vs.values()):
+        v, n = "supported", min(ns.values())
+    else:
+        v, n = "inconclusive", min(ns.values())
+    why = "; ".join(f"{labels[k]} judged at its own n {ns[k]}: {vs[k]} ({judged[k][1]})" for k in judged)
+    crit = [(f"{labels[k]}: {name}", ok) for k in judged for name, ok in judged[k][2]]
+    return v, why, crit, n
+
+
 def b13_intraday_b_usd_fix(archive):
     """T-665."""
     miss = _missing(archive, [FX_B])
@@ -1510,10 +1699,11 @@ def b13_intraday_b_usd_fix(archive):
     db = holm_decide([TT["p_bt"], TE["p_bt"]], [TT["draws"], TE["draws"]])
     an = holm_adjusted([TT["p_nw"], TE["p_nw"]])
     ab = holm_adjusted([TT["p_bt"], TE["p_bt"]])
-    rows_c = []
+    rows_by: dict = {"T": [], "E": []}
     for j, (k, lab) in enumerate((("T", "Tokyo pre-T minus post-T"), ("E", "Europe pre-E minus post-L"))):
         f = fx[k]
         T_ = f["test"]
+        rows_c = rows_by[k]
         rows_c.append(sig_row(f"{lab} {_bp(T_['mean'])} > 0 with Holm (2 fixes) one-sided p < 0.05", T_, dn[j], db[j], an[j], ab[j]))
         dd = f["days"]
         med = dd[len(dd) // 2] if len(dd) else "9999"
@@ -1526,10 +1716,11 @@ def b13_intraday_b_usd_fix(archive):
         rows_c.append((f"{lab}: at least {T665_NEED} of 7 currencies positive ({pos}; "
                        + ", ".join(f"{c} {_s(v['mean_bp'])}" for c, v in f["per"].items()) + ")",
                        bool(pos >= T665_NEED), bool(len(T665_CCY) - neg_sig < T665_NEED)))
-    rows_c = CAL._undecided(rows_c)
     nT, nE = int(fx["T"]["x"].size), int(fx["E"]["x"].size)
-    n = min(nT, nE)
-    v, why, crit = _judge(rows_c, n, T665_MIN_N, "days (the smaller fix)")
+    nfix = {"T": nT, "E": nE}
+    labels = {"T": "Tokyo fix", "E": "Europe fix"}
+    judged = {k: _judge(CAL._undecided(rows_by[k]), nfix[k], T665_MIN_N, f"{labels[k]} basket days") for k in ("T", "E")}
+    v, why, crit, n = combine_fixes(judged, nfix, labels)
     # reported
     rep = {}
     mondays = sum(1 for d in days if d.weekday() == 0)
@@ -1570,7 +1761,8 @@ def b13_intraday_b_usd_fix(archive):
     cc = rep["fred_check"]
     corr_txt = ", ".join(f"{c} {_f(x['corr'], 2)}" for c, x in cc.items() if x)
     f_T, f_E = fx["T"], fx["E"]
-    reason = (f"7-currency USD basket on local 60m bars, {sdays[0]}..{sdays[-1]}: Tokyo {nT} basket days (Mondays drop out: "
+    reason = (f"7-currency USD basket on local 60m bars, {sdays[0]}..{sdays[-1]}, each fix judged at its own basket-day count "
+              f"against min_n {T665_MIN_N} (the pass needs both fixes): Tokyo {nT} basket days (Mondays drop out: "
               f"the pre-T window starts before Yahoo's first Sunday bar), pre-T {_bp(f_T['pre'].mean() if nT else None)} vs post-T "
               f"{_bp(f_T['post'].mean() if nT else None)}, difference {_bp(TT['mean'])} (NW t {_s(TT['nw_t'])}, p {_f(TT['p_nw'], 4)}, "
               f"Holm {_f(an[0], 4)}; CBB p {CAL._mc(TT['p_bt'], TT['draws'])}), {f_T['n_pos']}/7 currencies positive; Europe {nE} days, "
@@ -1581,7 +1773,8 @@ def b13_intraday_b_usd_fix(archive):
               f"{_s(rep['E_L_window']['mean_bp'])} bp, DXY T {_s((rep.get('dxy_T') or {}).get('mean_bp'))} / E "
               f"{_s((rep.get('dxy_E') or {}).get('mean_bp'))} bp, Japanese holidays T {_s(rep['subsets_T']['jp_holiday_bp'])} bp "
               f"(n {rep['subsets_T']['n_jp']}); FRED noon cross-check corr {corr_txt}")
-    stat = {"n": n, "n_tokyo": nT, "n_europe": nE, "tokyo": {"test": TT, "per": f_T["per"], "split": f_T.get("split")},
+    stat = {"n": n, "n_tokyo": nT, "n_europe": nE, "per_fix_verdict": {k: judged[k][0] for k in judged},
+            "tokyo": {"test": TT, "per": f_T["per"], "split": f_T.get("split")},
             "europe": {"test": TE, "per": f_E["per"], "split": f_E.get("split")}, "holm_nw": an, "holm_boot": ab,
             "reported": rep, "criteria": crit}
     return _out(stat, n, v, reason + " — " + why)

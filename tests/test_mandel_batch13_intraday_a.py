@@ -99,6 +99,21 @@ def test_t659_calendar_flags():
     assert M.t659_nights(bars, "ES_F", "2025-06-06", "2025-06-08") == []
 
 
+def test_t659_session_indexed_series():
+    rng = np.random.default_rng(9)
+    x = rng.normal(0, 1e-3, 40)
+    flag = rng.random(40) < 0.5
+    d = M.cond_series(x, flag)
+    assert d.size == 40                                                # one entry per eligible SESSION, not per trade
+    assert d.mean() == pytest.approx(x[flag].mean())
+    x2 = x.copy()
+    x2[~flag] += 0.05                                                  # complement nights never enter the series
+    np.testing.assert_allclose(M.cond_series(x2, flag), d)
+    B = M.cond_boot(x, flag, 5)
+    assert B["n"] == int(flag.sum()) and B["n_sessions"] == 40 and B["mean"] == pytest.approx(x[flag].mean())
+    assert B["pg"] is not None and B["t"] is not None and B["pg_trades"] is not None
+
+
 def test_t659_maker_needs_trade_through():
     r = {"o": 100.0, "h": 100.5, "l": 99.75, "c": 100.25, "tick": 0.25, "comm_pts": 0.2}
     assert M.maker_net(r) is None                                      # low touches the bid but does not trade through
@@ -135,7 +150,7 @@ def test_t669_ratio_uses_open_implied_and_session_bars_only():
     assert M.session_variance(hb3, 501.0) is None                     # early closes (no 15:30 bar) drop out
 
 
-def test_t669_matching_is_calendar_only():
+def test_t669_matching_rules():
     sessions = []
     d = datetime(2025, 1, 2)
     while len(sessions) < 80:
@@ -146,16 +161,74 @@ def test_t669_matching_is_calendar_only():
     valid = set(sessions)
     excluded = set(events) | {sessions[25]}
     sets = M.match_sets(events, sessions, valid, excluded)
+    assert [e for e, _ in sets] == events and all(len(ms) == 3 for _, ms in sets)
     for e, ms in sets:
-        assert len(ms) <= 3 and all(datetime.fromisoformat(m).weekday() == datetime.fromisoformat(e).weekday() for m in ms)
+        assert all(datetime.fromisoformat(m).weekday() == datetime.fromisoformat(e).weekday() for m in ms)
         assert all(abs(sessions.index(m) - sessions.index(e)) <= 10 for m in ms)
         assert sessions[25] not in ms
+    # a day already matched to an earlier event is never reused
+    near = M.match_sets([sessions[20], sessions[25]], sessions, valid, {sessions[20], sessions[25]})
+    assert not set(near[0][1]) & set(near[1][1])
+
+
+def _t669_synth(rng, n=130):
+    """Synthetic NYSE sessions with SPY closes, VIX1D (open, close) and the 7 regular hourly SPY bars."""
+    from mandel.experiments import batch6c_cal as CAL
+    sd, d = [], datetime(2025, 1, 2).date()
+    while len(sd) < n:
+        if CAL.is_nyse_session(d):
+            sd.append(d.isoformat())
+        d += timedelta(days=1)
+    sc, vx, hb, px = [], {}, {}, 500.0
+    for s in sd:
+        bars = {}
+        for k in M.T669_BAR_TIMES:
+            o = px
+            c = o * (1 + rng.normal(0, 2e-3))
+            bars[k] = (o, c)
+            px = c
+        hb[s] = bars
+        sc.append(px * (1 + rng.normal(0, 5e-4)))
+        vx[s] = (float(rng.uniform(10, 20)), float(rng.uniform(10, 20)))
+    return sd, np.array(sc), vx, hb
+
+
+def test_t669_implied_leg_and_matching_ignore_post_open_values():
     rng = np.random.default_rng(5)
-    v1 = {s: float(rng.normal()) for s in sessions}
-    v2 = {s: float(rng.normal()) * 10 for s in sessions}
-    assert M.match_sets(events, sessions, valid, excluded) == sets       # values never enter the matching
-    c1, c2 = M.event_contrast(sets, v1), M.event_contrast(sets, v2)
-    assert c1["n_matched"] == c2["n_matched"]
+    sd, sc, vx, hb = _t669_synth(rng)
+    fomc, cpi, nfp = [sd[30], sd[75]], [sd[45]], [sd[60]]
+    rows1 = M.t669_rows(sd, sc, vx, hb, sd[0], sd[-1])
+    K1 = M.t669_calendar(rows1, sd, fomc, cpi, nfp)
+    assert [e for e, _ in K1["S_f"]] == fomc and all(len(ms) >= 1 for _, ms in K1["S_f"])
+    for d, r in rows1.items():                                       # logR's denominator is the VIX1D OPEN only
+        assert r["iv"] == pytest.approx(M.implied_session_var(vx[d][0]))
+    # shock everything known only after the event days' VIX1D open: their VIX1D close, every bar close (the R values)
+    # and the official closes from the first event on
+    vx2 = {d: ((v[0], v[1] * 3.0) if d in fomc + cpi + nfp else v) for d, v in vx.items()}
+    hb2 = {d: {k: (o, c * (1 + rng.normal(0, 4e-3))) for k, (o, c) in b.items()} for d, b in hb.items()}
+    sc2 = sc.copy()
+    sc2[sd.index(fomc[0]):] *= 1.02
+    rows2 = M.t669_rows(sd, sc2, vx2, hb2, sd[0], sd[-1])
+    K2 = M.t669_calendar(rows2, sd, fomc, cpi, nfp)
+    assert set(rows2) == set(rows1)
+    for d in rows1:
+        assert rows2[d]["iv"] == rows1[d]["iv"]                      # the implied leg never moves
+    for e in fomc + cpi + nfp:                                       # the event day's VIX1D close (x3) is not in iv
+        assert rows2[e]["iv"] == pytest.approx(M.implied_session_var(vx[e][0]))
+    assert K2["S_f"] == K1["S_f"] and K2["S_p"] == K1["S_p"]         # matching is calendar-only
+    assert K2["excluded"] == K1["excluded"]
+    assert any(rows2[d]["logR"] != rows1[d]["logR"] for d in rows1)  # the outcome (realised variance) does move
+    # the event day's own VIX1D close enters only the NEXT session's close-to-close robustness row
+    e = fomc[0]
+    nxt = sd[sd.index(e) + 1]
+    vx3 = dict(vx)
+    vx3[e] = (vx[e][0], vx[e][1] * 3.0)
+    rows3 = M.t669_rows(sd, sc, vx3, hb, sd[0], sd[-1])
+    assert rows3[e]["logR"] == rows1[e]["logR"] and rows3[e]["logR_cc"] == rows1[e]["logR_cc"]
+    assert rows3[nxt]["logR_cc"] != rows1[nxt]["logR_cc"]
+    vx4 = dict(vx)
+    vx4[e] = (vx[e][0] * 1.5, vx[e][1])                              # sanity: the open IS the input
+    assert M.t669_rows(sd, sc, vx4, hb, sd[0], sd[-1])[e]["iv"] != rows1[e]["iv"]
 
 
 def test_t669_permutation_shift_null():
@@ -195,6 +268,37 @@ def test_t660_dividend_added_back():
     Dv = np.array([[0.0], [0.3]])
     R = M.overnight_returns(O, C, Dv)
     assert R[1, 0] == pytest.approx((10.2 + 0.3) / 10.0 - 1)
+
+
+def test_t660_caps_point_in_time():
+    from mandel.experiments import batch6c_stockxs as SX
+    days = ["2025-01-27", "2025-01-28", "2025-01-29", "2025-01-30", "2025-01-31", "2025-02-03"]
+    f = 4                                                              # formation session 2025-01-31
+    syms = ["AAA", "AAB", "BBB", "CCC"]                                # AAA/AAB: two member classes of issuer 101
+    C = np.tile(np.array([50.0, 40.0, 30.0, 20.0]), (len(days), 1))
+    shares = {101: [(SX._et_ts("2025-01-10", 16, 0), "2024-12-31", 1000.0),
+                    (SX._et_ts(days[f], 9, 31), "2025-01-15", 5000.0)],          # accepted after 09:30 of f
+              202: [(SX._et_ts("2024-11-01", 16, 0), "2023-09-30", 300.0)]}      # 489 days old at f: stale
+    inp = {"base": {"ciks": [101, 101, 202, None]}, "days": days, "syms": syms, "C": C, "shares": shares,
+           "splits": {"AAA": [("2025-01-20", 2.0)], "AAB": [], "BBB": [], "CCC": []}}
+    cols = np.arange(4)
+    caps = M.caps_at(inp, f, cols)
+    # earlier filing only, previous close, split after the shares' date, count split across the issuer's two classes
+    assert caps[0] == pytest.approx(50.0 * 1000.0 * 2.0 / 2)
+    assert caps[1] == pytest.approx(40.0 * 1000.0 / 2)
+    assert np.isnan(caps[2]) and np.isnan(caps[3])                     # older than 456 days; no CIK
+    C2 = C.copy()
+    C2[f:] *= 3.0                                                      # the formation close and later never enter
+    np.testing.assert_allclose(M.caps_at(dict(inp, C=C2), f, cols), caps)
+    C3 = C.copy()
+    C3[f - 1, 0] *= 1.1                                                # sanity: the previous close is the input
+    assert M.caps_at(dict(inp, C=C3), f, cols)[0] == pytest.approx(caps[0] * 1.1)
+    early = dict(shares)
+    early[101] = [shares[101][0], (SX._et_ts(days[f], 9, 29), "2025-01-15", 5000.0)]
+    assert M.caps_at(dict(inp, shares=early), f, cols)[1] == pytest.approx(40.0 * 5000.0 / 2)   # before 09:30: used
+    fresh = dict(shares)
+    fresh[202] = [(SX._et_ts("2024-11-01", 16, 0), "2024-09-30", 300.0)]
+    assert M.caps_at(dict(inp, shares=fresh), f, cols)[2] == pytest.approx(30.0 * 300.0)
 
 
 def test_t660_weights_vw_with_missing_caps():
@@ -257,3 +361,57 @@ def test_t664_fe_wild_bootstrap():
     y0 = 0.0 * x + day + rng.normal(0, 5e-4, G * k)
     pl0, _, _ = M.wild_cluster_p(M.fe_slope(x, y0, g), -0.5, n_boot=999, max_batches=2)
     assert pl0 > 0.5
+
+
+# ------------------------------------------------------------------------------------- local read errors (T-659/T-664) --
+
+def _fresh_local(monkeypatch, fake):
+    monkeypatch.setattr(M, "_LOCAL", {})
+    monkeypatch.setattr(M, "_LOCAL_ERR", {})
+    monkeypatch.setattr("mandel.ml.features.load_bars", fake)
+    monkeypatch.setattr(M, "_missing", lambda archive, names: None)
+
+
+def test_local_read_error_is_not_reported_as_missing(monkeypatch):
+    def fake(interval, sym):
+        if sym == "ES_F":
+            raise ValueError("bad gzip header")
+    _fresh_local(monkeypatch, fake)
+    assert M._local("60m", "ES_F") is None and "bad gzip header" in M._local_err("60m", "ES_F")
+    assert M._local("60m", "NQ_F") is None and M._local_err("60m", "NQ_F") is None       # absent, not an error
+    stat, n, verdict, reason = M.b13_intraday_a_es_0200_drift(_NoArchive())
+    assert verdict == "inconclusive" and n == 0
+    assert "could not be read" in reason and "bad gzip header" in reason and "not on disk" not in reason
+    assert stat["unreadable_local"] == {"ES_F": "ValueError: bad gzip header"}
+
+
+def test_local_absent_file_still_reads_as_missing(monkeypatch):
+    _fresh_local(monkeypatch, lambda interval, sym: None)
+    stat, _, verdict, reason = M.b13_intraday_a_es_0200_drift(_NoArchive())
+    assert verdict == "inconclusive" and "not on disk" in reason and stat["missing_local"] == ["ES_F", "NQ_F"]
+
+
+def test_t664_unreadable_symbol_is_inconclusive_not_dropped(monkeypatch):
+    import pandas as pd
+
+    class _P:
+        days = np.array(["2025-06-02", "2025-06-03", "2025-06-04"])
+        symbols = np.array(["SPY", "AAPL"])
+
+        def col(self, s, field):
+            return np.array({"open": [100.0, 101.0, 102.0]}.get(field, [100.5, 101.5, 102.5]))
+
+    idx = pd.to_datetime(["2025-06-02 19:30", "2025-06-03 19:30"], utc=True)
+    spy = pd.DataFrame({"o": [100.0, 101.0], "h": [101.0, 102.0], "l": [99.0, 100.0], "c": [100.4, 101.6], "v": [0, 0]},
+                       index=idx)
+
+    def fake(interval, sym):
+        if sym == "AAPL":
+            raise OSError("corrupt csv")
+        return spy if sym == "SPY" else None
+    _fresh_local(monkeypatch, fake)
+    monkeypatch.setattr("mandel.experiments.panel_cache.daily_panel", lambda archive: _P())
+    stat, n, verdict, reason = M.b13_intraday_a_auction_reversal(_NoArchive())
+    assert verdict == "inconclusive" and n == 0
+    assert "AAPL" in reason and "corrupt csv" in reason and "could not be read" in reason
+    assert stat["unreadable_local"] == {"AAPL": "OSError: corrupt csv"}

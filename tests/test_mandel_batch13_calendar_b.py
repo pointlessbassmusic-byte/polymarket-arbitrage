@@ -123,15 +123,20 @@ def test_trailing_beta_and_quantile_use_only_the_past():
     assert M.trailing_quantile(x2, 0.8, 252)[t] == q[t]
 
 
-def test_trigger_pays_two_bps_per_leg_at_least_and_trades_against_the_signal():
+def test_trigger_pays_two_bps_per_leg_on_each_legs_notional_and_trades_against_the_signal():
     sig = np.array([0.02, -0.02, 0.001])
     y = np.array([0.01, 0.01, 0.01])
     q80 = np.array([0.01, 0.01, 0.01])
     k = np.array([0.5, 2.0, 0.5])
     p = M.trigger_pnl(sig, y, q80, k)
-    assert p[0] == pytest.approx(-0.01 - 2e-4 * 2)          # overweight equities -> short the spread; 2 legs x 2 bps
+    assert p[0] == pytest.approx(-0.01 - 2e-4 * 1.5)        # overweight equities -> short the spread; SPY $1 + IEF $0.5
     assert p[1] == pytest.approx(0.01 - 2e-4 * 3)           # IEF leg 2x notional pays 2 x 2 bps
     assert np.isnan(p[2])                                   # below the trailing 80th percentile: no trade
+    pf = M.trigger_pnl(sig, y, q80, k, ief_floor=True)      # report-only floor: the IEF leg pays at least 2 bps
+    assert pf[0] == pytest.approx(-0.01 - 2e-4 * 2)
+    assert pf[1] == pytest.approx(p[1])
+    k2 = k.copy(); k2[0] = -0.5                             # a negative hedge ratio pays on |k|
+    assert M.trigger_pnl(sig, y, q80, k2)[0] == pytest.approx(p[0])
 
 
 def test_t345_dummy_marks_last_two_sessions_after_spy_beats_tlt_by_two_points():
@@ -357,6 +362,9 @@ def test_payday_stats_charge_the_cost_and_test_the_bar():
     assert s["net"] == pytest.approx(s["gross"] - 2e-4)
     assert s["gross"] == pytest.approx(x[f].mean() - x[~f].mean())
     assert s["n16"] == int(f.sum())
+    g = M.payday_stats(days, x, f, cost=0.0, n_boot=300, n_seeds=1)   # the report-only gross reading: cost charged once
+    assert g["net"] == pytest.approx(g["gross"]) and g["gross"] == pytest.approx(s["gross"])
+    assert g["sub"]["second_half"][0] == pytest.approx(s["sub"]["second_half"][0] + 2e-4)
 
 
 # ===================================================================================== missing data ==

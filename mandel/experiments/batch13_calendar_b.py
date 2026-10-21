@@ -38,9 +38,11 @@ Conventions (and every reading taken before any run; the harness reasons repeat 
     in the data's final, incomplete month a bar's distance to the month end counts the scheduled sessions still to come,
     so no bar is mistaken for a month-end session.
   * Costs as registered: T-590 charges 2 bps per round trip on each 16th session and the bar is tested on the NET
-    difference (gross - 2 bps > 2 bps: the cost and the claim's 2 bp bar are both charged, the conservative reading);
-    T-586's trigger pays 2 bps per leg per triggered day on each leg's notional, at least 2 bps a leg (2 bps x (1 +
-    max(1, |k|))); T-584 pays 2 bps per round trip on the position's notional; T-585 is a statistic, no cost.
+    difference (gross - 2 bps > 2 bps: the cost and the claim's 2 bp bar are both charged, the conservative reading;
+    the gross reading of criteria 1-3 and the sign-only reading of criterion 4 are reported beside them, never decide);
+    T-586's trigger pays 2 bps per leg per triggered day on each leg's notional (2 bps x (1 + |k|) per $1 of SPY; the
+    earlier 2 bp floor on the IEF leg went beyond the registration and is now only reported); T-584 pays 2 bps per
+    round trip on the position's notional; T-585 is a statistic, no cost.
   * Inference. Every resampled p is pooled over seeds and escalated while its Monte-Carlo band straddles 0.05
     (``batch6c_cal.escalate_p``; ``decide_p``), so a seed never decides a criterion. Where a criterion names two nulls or
     two readings it passes only when both pass and fails only when both fail (``_agree``), else it is undecided.
@@ -123,6 +125,10 @@ def _bp(x, nd: int = 2) -> str:
 
 def _f(x, nd: int = 3) -> str:
     return "n/a" if x is None or not np.isfinite(x) else f"{x:+.{nd}f}"
+
+
+def _p(x) -> str:
+    return "n/a" if x is None or not np.isfinite(x) else f"{x:.4f}"
 
 
 def _mc(p, draws) -> str:
@@ -428,12 +434,14 @@ def _z(x):
     return (x - x.mean()) / sd if sd > 0 else x * 0.0
 
 
-def trigger_pnl(sig, y, q80, k) -> np.ndarray:
+def trigger_pnl(sig, y, q80, k, ief_floor: bool = False) -> np.ndarray:
     """Secondary trigger per day where |signal| > its trailing 80th percentile: -sign(signal) x spread, net of 2 bps per
-    leg on each leg's notional, at least 2 bps a leg: 2 bps x (1 + max(1, |k|)). NaN on days without a trigger."""
+    leg on each leg's notional (SPY $1, IEF $|k|): 2 bps x (1 + |k|). ``ief_floor`` (report only) charges the IEF leg
+    at least 2 bps whatever its notional, 2 bps x (1 + max(1, |k|)). NaN on days without a trigger."""
     sig, y, q80, k = (np.asarray(v, float) for v in (sig, y, q80, k))
     on = np.isfinite(q80) & (np.abs(sig) > q80)
-    cost = T586_COST_LEG * (1.0 + np.maximum(1.0, np.abs(k)))
+    leg_ief = np.maximum(1.0, np.abs(k)) if ief_floor else np.abs(k)
+    cost = T586_COST_LEG * (1.0 + leg_ief)
     return np.where(on, -np.sign(sig) * y - cost, np.nan)
 
 
@@ -463,8 +471,14 @@ def rebal_test(P: dict, start: str = T586_HOLD, end: str = "9999-12-31", n_boot:
             r["n_t345_days"] = int(P["d345"][m].sum())
         tp = trigger_pnl(P[f"sig_{lab}"][m], y, P[f"q80_{lab}"][m], P[f"k_{lab}"][m])
         tv = tp[np.isfinite(tp)]
+        tf = trigger_pnl(P[f"sig_{lab}"][m], y, P[f"q80_{lab}"][m], P[f"k_{lab}"][m], ief_floor=True)
+        tf = tf[np.isfinite(tf)]
+        on = np.isfinite(tp)
         r["trigger"] = {"n": int(tv.size), "mean_net": float(tv.mean()) if tv.size else None,
-                        "ci": CAL.mean_ci(tv, T586_BLOCK, n_boot, seed) if tv.size >= 2 else [None, None]}
+                        "ci": CAL.mean_ci(tv, T586_BLOCK, n_boot, seed) if tv.size >= 2 else [None, None],
+                        "mean_gross": float(np.mean(-np.sign(P[f"sig_{lab}"][m][on]) * y[on])) if tv.size else None,
+                        "mean_abs_k": float(np.mean(np.abs(P[f"k_{lab}"][m][on]))) if tv.size else None,
+                        "mean_net_report_only_2bp_floor_on_ief_leg": float(tf.mean()) if tf.size else None}
         yv = P[f"yv_{lab}"][m]
         r["vol_ratio_spread"] = {k_: v for k_, v in ols_hac(yv, z, L).items() if k_ in ("coef", "t")}
         r["mean_k"] = float(np.mean(P[f"k_{lab}"][m]))
@@ -494,7 +508,8 @@ def rebal_test(P: dict, start: str = T586_HOLD, end: str = "9999-12-31", n_boot:
             (("partial coefficient over the T-345 dummy and the seven T-59 turn-of-month day dummies < 0 with one-sided "
               "p < 0.05 under (b) (both p's) and the same sign under (a)"), c_part, dec_part),
             ("placebo bands 4-6% weaker (HAC t and standardized slope above the primary's) under (b) and (a)", c_plc, False),
-            ("secondary trigger mean net of 2 bps per leg > 0 under (b) and (a)", c_trig, dec_trig)]
+            ("secondary trigger mean net of 2 bps per leg on each leg's notional (2 bps x (1 + |k|)) > 0 under (b) and (a)",
+             c_trig, dec_trig)]
     v, why, crit = CAL._judge(CAL._undecided(rows), n, min_n, "holdout days")
     return {"readings": R, "n": n, "criteria": [[c, ok] for c, ok in crit], "verdict": v, "why": why}
 
@@ -543,10 +558,12 @@ def b13_calendar_b_threshold_rebalancing(archive):
         s, pl, pa, tg = r["slope"], r["placebo"], r.get("partial", {}), r["trigger"]
         tag = "b, primary: signal at close t-1" if lab == "b" else "a, MOC-optimistic: signal at the entry close t"
         return (f"({tag}) {r['n']} days {r['first']}..{r['last']}: slope {_bp(s['coef'])} bps per sd (HAC t {_f(s['t'], 2)}, "
-                f"lag {r['lag']}; HAC p {_f(s['hac_p_less'], 4)}, stationary-bootstrap p {_mc(s['boot_p_less'], s['boot_draws'])}); "
+                f"lag {r['lag']}; HAC p {_p(s['hac_p_less'])}, stationary-bootstrap p {_mc(s['boot_p_less'], s['boot_draws'])}); "
                 f"partial over T-345 + T-59 dummies {_bp(pa.get('coef'))} (t {_f(pa.get('t'), 2)}, boot p "
                 f"{_mc(pa.get('boot_p_less'), pa.get('boot_draws', 0))}); placebo 4-6% {_bp(pl['coef'])} (t {_f(pl['t'], 2)}); "
-                f"trigger {tg['n']} days, mean net {_bp(tg['mean_net'])} bps (95% CI {CAL._ci_bps(tg['ci'])})")
+                f"trigger {tg['n']} days, mean gross {_bp(tg.get('mean_gross'))}, net {_bp(tg['mean_net'])} bps at 2 bps x "
+                f"(1 + |k|) (mean |k| {_f(tg.get('mean_abs_k'), 2)}; 95% CI {CAL._ci_bps(tg['ci'])}; report only, with a 2 bp "
+                f"floor on the IEF leg {_bp(tg.get('mean_net_report_only_2bp_floor_on_ief_leg'))})")
     reason = ("SPY - k IEF next-day spread (k = trailing 252-day OLS hedge ratio, mean "
               f"{R['b']['mean_k']:+.2f} in the holdout) on the 26-band 60/40 threshold signal: " + one("b") + "; " + one("a")
               + f"; reported: in-paper 2003..2023-03-17 slope (b) {_bp(paper['b']['coef'])} (t {_f(paper['b']['t'], 2)}), "
@@ -1115,23 +1132,48 @@ def b13_calendar_b_payday_16th(archive):
         sec.append(None if "net" not in r else (False if not r["net"] > 0 else
                                                 (None if holm[k] is None else CAL.decide_p(holm[k], r["draws0"]))))
     c4 = _both(sec)
+    # Report only: the sign-only reading of criterion 4 (each secondary's net difference has SPY's sign).
+    sign4 = {k: (None if "net" not in res[k] else bool(np.sign(res[k]["net"]) == np.sign(S["net"]) != 0)) for k in ("IWM", "QQQ")}
+    res["secondary_sign_only_report_only"] = sign4
+    # Report only: the gross reading of criteria 1-3 (the 2 bp cost charged once, as the bar; gross > 2 bps).
+    G = payday_stats(ds, x, f, cost=0.0)
+    gh1, gh2, gpp = G["sub"]["first_half"][0], G["sub"]["second_half"][0], G["sub"]["post_publication"][0]
+    g1 = False if not G["gross"] > T590_BAR else CAL.decide_p(G["p_bar"], G["draws_bar"])
+    g2 = None if gh1 is None or gh2 is None else (gh1 > 0 and gh2 > 0)
+    g3 = None if gpp is None else gpp > 0
+    res["SPY_gross_reading_report_only"] = {"gross": G["gross"], "p_bar": G["p_bar"], "p_bar_less": G["p_bar_less"],
+                                            "draws_bar": G["draws_bar"], "ci_gross": G["ci_net"], "sub_gross": G["sub"],
+                                            "criteria_1_3": [g1, g2, g3]}
+
+    def pf(ok):
+        return "undecided" if ok is None else ("passes" if ok else "fails")
+    sg = " and ".join(f"{k} {_bp(res[k].get('net'))}" for k in ("IWM", "QQQ"))
     rows = [((f"SPY 16th-minus-other difference net of the 2 bp round trip > {T590_BAR * 1e4:.0f} bps with one-sided "
-              f"p < 0.05 (studentized circular block bootstrap, {T590_BLOCK} sessions, 5 seeds escalated)"), c1, d1),
-            ("both halves positive, net (2011-2018 / 2019-2026)", c2, False),
-            ("2018-10..2026-10 mean difference > 0, net", c3, False),
-            ("IWM and QQQ the same sign after Holm (net difference > 0 with Holm-adjusted one-sided p < 0.05, H0 net <= 0)", c4, False)]
+              f"p < 0.05 (studentized circular block bootstrap, {T590_BLOCK} sessions, 5 seeds escalated; net reading fixed "
+              f"before the run, the gross reading {pf(g1)})"), c1, d1),
+            (f"both halves positive, net (2011-2018 / 2019-2026; the gross reading {pf(g2)})", c2, False),
+            (f"2018-10..2026-10 mean difference > 0, net (the gross reading {pf(g3)})", c3, False),
+            (("IWM and QQQ the same sign after Holm (reading fixed before the run: net difference > 0 with Holm-adjusted "
+              f"one-sided p < 0.05, H0 net <= 0; report only, sign alone: net {sg} bps, "
+              + ("both SPY's sign, so they fail on Holm significance only)" if all(v is True for v in sign4.values())
+                 else "not both SPY's sign)")), c4, False)]
     v, why, crit = CAL._judge(CAL._undecided(rows), n, T590_MIN_N, "16th sessions")
     res.update(criteria=[[c, ok] for c, ok in crit], verdict=v)
 
     def one(k):
         r = res[k]
         return (f"{k} 16th {_bp(r.get('mean16'))} vs other {_bp(r.get('mean_other'))} bps, gross {_bp(r.get('gross'))}, net "
-                f"{_bp(r.get('net'))} (p net > 0 {_mc(r.get('p0'), r.get('draws0', 0))}, Holm {_f(holm.get(k), 4)})")
+                f"{_bp(r.get('net'))} (p net > 0 {_mc(r.get('p0'), r.get('draws0', 0))}, Holm {_p(holm.get(k))})")
     reason = (f"SPY {S['first']}..{S['last']}, {S['n16']} 16th sessions vs {S['n_other']} other sessions outside T-59's -4..+3 window "
               f"({S['excluded_16ths_in_tom']} 16ths in the window excluded): 16th {_bp(S['mean16'])} vs other {_bp(S['mean_other'])} bps, "
               f"gross difference {_bp(S['gross'])}, net of 2 bps {_bp(S['net'])} bps (95% CI {CAL._ci_bps(S['ci_net'])}); p (H0 net <= 2 bps) "
               f"{_mc(S['p_bar'], S['draws_bar'])}; halves net {_bp(h1)} / {_bp(h2)} bps; 2018-10..2026-10 net {_bp(pp)} bps "
               f"({S['sub']['post_publication'][1]} sessions); " + one("IWM") + "; " + one("QQQ")
+              + ("; IWM and QQQ share SPY's sign and fail criterion 4 on Holm significance only" if all(v is True for v in sign4.values())
+                 else "")
+              + f"; gross reading (cost charged once, report only): SPY gross {_bp(G['gross'])} bps, p (H0 gross <= 2 bps) "
+              f"{_mc(G['p_bar'], G['draws_bar'])}, halves {_bp(gh1)} / {_bp(gh2)}, 2018-10..2026-10 {_bp(gpp)}; under it criterion 1 "
+              f"{pf(g1)}, 2 {pf(g2)}, 3 {pf(g3)}"
               + f"; reported: 16ths on OPEX Fridays {dm['overlaps']['opex']}, CPI days {dm['overlaps']['cpi']}, FOMC days "
               f"{dm['overlaps']['fomc']}; dummy-regression 16th coefficient {_bp(dm['coef_16th'])} bps (HAC t {_f(dm['t_16th'], 2)}); "
               f"without overlapping 16ths {_bp(dm['diff_without_overlapping_16ths'])} bps gross ({dm['n16_clean']} sessions); no other "

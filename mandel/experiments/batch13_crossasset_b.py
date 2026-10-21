@@ -87,7 +87,13 @@ in the reason):
     the criterion when it misses 0.95 (decisive when PSR vs 0 <= 0.05) and leaves it undecided otherwise, so it can
     refute but not support (``crossasset_a.dsr_bound``). Counts: T-597 at least 7 + 4 named predictors + 12 + 12 = 35
     (full 39); T-602 at least 3 + T-430 + T-481 + 4 cluster predictors = 9 (full 31); T-601 14 + 1 = 15; T-604 2 + 18
-    T-462 cells = 20.
+    T-462 cells = 20. T-597 and T-602 deflate the same two series as the sibling ``crossasset_a`` does for T-598 /
+    T-600 in the same family (``dsr_two``): the switching rule's monthly excess return and its active return over the
+    historical-mean rule, both required (rule 11; T-597 under both thresholds, four rows).
+  * T-602 "the pre-registered sign" is a conjunction: the window-pairs slope AND the all-pairs slope must both carry
+    it (one wrong sign fails the criterion). The switching criterion is the studentized paired lower bound; the
+    percentile interval and the months in which the two positions differ are reported, and the studentized interval
+    is flagged as degenerate when they differ in fewer than 5 months.
   * Survivorship: T-604 draws prices from the archive's 901-symbol daily-history set, TODAY's universe: removed,
     acquired and renamed members are under-represented (the share of member-days without a usable price is
     reported).
@@ -280,6 +286,18 @@ def dsr_bound(x, n_min: int, n_full: int, label: str) -> tuple:
     return (txt + " [the other family Sharpes are not computed here: cannot pass]", None, False), info
 
 
+def dsr_two(R: dict, n_min: int, n_full: int, tag: str) -> tuple:
+    """The joint-family DSR judged on the same two series as the sibling ``batch13_crossasset_a.dsr_two`` (which deflates
+    T-598 / T-600 in the same family; rule 11): the switching rule's monthly excess return and the switching rule minus
+    the historical-mean rule (the active return the predictor adds). Returns ([row, row], {"excess", "active"})."""
+    if R.get("switch") is None:
+        return [(f"{tag} DSR (too few forecasts)".strip(), None, False)], {}
+    a, b = np.asarray(R["switch"], float), np.asarray(R["bench"], float)
+    r1, i1 = dsr_bound(a, n_min, n_full, f"{tag} switching-rule excess return".strip())
+    r2, i2 = dsr_bound(a - b, n_min, n_full, f"{tag} switching rule minus the historical-mean rule".strip())
+    return [r1, r2], {"excess": i1, "active": i2}
+
+
 def sharpe_diff(a, b, block: int = BLOCK_M, ppy: int = 12) -> dict:
     """Annualised Sharpe(a) - Sharpe(b), paired studentized circular block bootstrap, Monte-Carlo escalated."""
     a, b = np.asarray(a, float), np.asarray(b, float)
@@ -287,9 +305,22 @@ def sharpe_diff(a, b, block: int = BLOCK_M, ppy: int = 12) -> dict:
                           lambda t: BW._ci_crit(t, "gt", 0.0, "")[1], None, SEED)
 
 
-def switch_row(sd: dict, label: str) -> tuple:
+SWITCH_DEGENERATE_MONTHS = 5    # below this many months with different positions the studentized interval is flagged
+
+
+def switch_row(sd: dict, label: str, n_diff: Optional[int] = None) -> tuple:
+    """The paired switching-rule criterion (the studentized lower 95% bound > 0, unchanged); the percentile interval
+    and, when given, the number of months in which the rule's and the benchmark's positions differ are reported, and
+    the studentized interval is flagged as degenerate when they differ in fewer than ``SWITCH_DEGENERATE_MONTHS``."""
+    lo, hi = (sd.get("ci_pct") or [None, None])[:2]
+    extra = f"; percentile interval [{_s(lo)}, {_s(hi)}]"
+    if n_diff is not None:
+        extra += f"; positions differ in {n_diff} month{'' if n_diff == 1 else 's'}"
+        if n_diff < SWITCH_DEGENERATE_MONTHS:
+            extra += " (the studentized interval is degenerate: the two series are nearly identical)"
     return BW._ci_crit(sd, "gt", 0.0, f"{label}: switching-rule Sharpe {_f(sd.get('sharpe_a'))} minus the historical-mean "
-                                      f"rule's {_f(sd.get('sharpe_b'))} = {_s(sd.get('diff'))}, paired lower 95% bound > 0")
+                                      f"rule's {_f(sd.get('sharpe_b'))} = {_s(sd.get('diff'))}, paired lower 95% bound > 0"
+                                      + extra)
 
 
 # ================================================================================= expanding predictor engine ==
@@ -507,7 +538,8 @@ def t597_score(ms: Sequence[str], rec: dict, sign: float, tgt: dict, dtb3: tuple
     for nm, key in T597_THRESHOLDS:
         th = thr[ok] if key == "dtb3" else 0.0
         sw[key] = {"rule": switching(ym[ok], fm[ok], th), "bench": switching(ym[ok], fb[ok], th),
-                   "in_spy": float(np.mean(fm[ok] > th)), "bench_in_spy": float(np.mean(fb[ok] > th))}
+                   "in_spy": float(np.mean(fm[ok] > th)), "bench_in_spy": float(np.mean(fb[ok] > th)),
+                   "n_diff": int(np.sum((fm[ok] > th) != (fb[ok] > th)))}
     out.update(months=tm, y=y, fb=fb, fm=fm, r2=r2_os(y, fb, fm), halves=[r2_os(y[h1], fb[h1], fm[h1]),
                r2_os(y[~h1], fb[~h1], fm[~h1])], cw_t=nw["t"], cw_p=nw["p"], r2_sign_restricted=r2_os(y, fb, fsr),
                slope_last=float(rec["slope"][-1]), wrong_sign_share=float(np.mean(np.sign(rec["slope"]) != sign)),
@@ -582,11 +614,12 @@ def b13_crossasset_b_industries_lead(archive):
         for nm, key in T597_THRESHOLDS:
             s = r["switch"][key]
             sdf = sharpe_diff(s["rule"], s["bench"])
-            srows.append(switch_row(sdf, nm))
-            drow, dinf = dsr_bound(s["rule"], T597_FAMILY_MIN, T597_FAMILY_FULL, f"{nm} switching rule")
-            drows.append(drow)
+            srows.append(switch_row(sdf, nm, s["n_diff"]))
+            drs, dinf = dsr_two({"switch": s["rule"], "bench": s["bench"]}, T597_FAMILY_MIN, T597_FAMILY_FULL, f"[{nm}]")
+            drows += drs
             sinfo[key] = {"sharpe_rule": sdf.get("sharpe_a"), "sharpe_bench": sdf.get("sharpe_b"), "diff": sdf.get("diff"),
-                          "ci": sdf.get("ci"), "in_spy": s["in_spy"], "bench_in_spy": s["bench_in_spy"], "dsr": dinf}
+                          "ci": sdf.get("ci"), "ci_pct": sdf.get("ci_pct"), "in_spy": s["in_spy"],
+                          "bench_in_spy": s["bench_in_spy"], "n_diff": s["n_diff"], "dsr": dinf}
         rows.append(BW.all_constructions(srows, "switching rule beats the historical-mean rule"))
         rows.append(BW.all_constructions(drows, f"joint-family DSR > {DSR_PASS}"))
         trows.append(and_rows(rows, g))
@@ -603,15 +636,19 @@ def b13_crossasset_b_industries_lead(archive):
     for g in trials:
         r, si = R[g], tinfo.get(g) or {}
         sw = si.get("dtb3") or {}
+        dsr = sw.get("dsr") or {}
         parts.append(f"{g}: R2_OS {_s(r.get('r2'), 4)} (halves {_s((r.get('halves') or [None])[0], 4)} / "
                      f"{_s((r.get('halves') or [None, None])[1], 4)}; sign-restricted {_s(r.get('r2_sign_restricted'), 4)}), "
                      f"CW t {_s(r.get('cw_t'), 2)} Holm p {_f(holm[g], 3)}, switch SR {_f(sw.get('sharpe_rule'), 2)} vs "
-                     f"{_f(sw.get('sharpe_bench'), 2)}, DSR <= {_f((sw.get('dsr') or {}).get('dsr_bound'), 3)}")
+                     f"{_f(sw.get('sharpe_bench'), 2)}, DSR <= {_f((dsr.get('excess') or {}).get('dsr_bound'), 3)} "
+                     f"(excess) / {_f((dsr.get('active') or {}).get('dsr_bound'), 3)} (active)")
     reason = (f"FF49 groups -> Mkt-RF(t+1), expanding OLS from {T597_TRAIN_FROM}, target months "
               f"{R['financial'].get('target_first')}..{R['financial'].get('target_last')} ({n} forecasts): " + "; ".join(parts)
               + f". Placebo 95th percentiles of R2_OS: {_s(q40, 4)} (40 untouched industries), {_s(q45, 4)} (45). "
               f"The FF49 and Mkt-RF series are 2026 vintages revised over time (Tse's CRSP-revision caveat); the switching "
-              f"rule trades SPY from the first close of t+1; the joint-family DSR can fail but not pass here")
+              f"rule trades SPY from the first close of t+1; the joint-family DSR is judged on the switching rule's excess "
+              f"return and on its active return over the historical-mean rule, under both thresholds (rule 11, as "
+              f"crossasset_a deflates T-598/T-600), and can fail but not pass here")
     return _out(stat, n, v, reason + " — " + why)
 
 
@@ -700,8 +737,22 @@ def t602_reading(x: dict, tgt: dict, train_from: str, first_target: str, last_ta
                halves=[r2_os(y[:h], fb[:h], fm[:h]), r2_os(y[h:], fb[h:], fm[h:])], half_split=tm[h],
                cw_mean=float(cw.mean()), cw_t=nw["t"], cw_p=nw["p"], cw_boot_p=pg, cw_boot_p_lt=pl, cw_draws=dr,
                slope_window=ra, slope_all=rb, switch=switching(y, fm, 0.0), bench=switching(y, fb, 0.0),
-               in_spy=float(np.mean(fm > 0)), bench_in_spy=float(np.mean(fb > 0)))
+               in_spy=float(np.mean(fm > 0)), bench_in_spy=float(np.mean(fb > 0)),
+               n_diff=int(np.sum((fm > 0) != (fb > 0))))
     return out
+
+
+def t602_sign_row(slope_window: dict, slope_all: dict, sign: float) -> tuple:
+    """Deviation (5): 'the pre-registered sign' is a conjunction -- the OLS slope on the evaluation window's pairs AND
+    on every pair from the training start must both carry ``sign``; one wrong sign fails the criterion."""
+    ca = (slope_window.get("coef") or [None, None])[1]
+    cb = (slope_all.get("coef") or [None, None])[1]
+    ta = (slope_window.get("t") or [None, None])[1]
+    tb = (slope_all.get("t") or [None, None])[1]
+    sg = "negative" if sign < 0 else "positive"
+    return and_rows([(f"window pairs slope {_s(ca, 4)} (NW t {_s(ta, 2)})", None if ca is None else bool(sign * ca > 0), False),
+                     (f"all pairs slope {_s(cb, 4)} (NW t {_s(tb, 2)})", None if cb is None else bool(sign * cb > 0), False)],
+                    f"pre-registered {sg} slope (window AND all pairs)")
 
 
 def b13_crossasset_b_credit_premium(archive):
@@ -741,25 +792,19 @@ def b13_crossasset_b_credit_premium(archive):
              (f"block bootstrap ({BLOCK_M}) p {CAL._mc(r['cw_boot_p'], draws)}, Holm {_f(holm_bs[nm], 4)}",
               B7C._sig_crit(r["cw_mean"], holm_bs[nm], draws), CAL.decide_p(r["cw_boot_p_lt"], draws) is True)],
             "Clark-West one-sided p < 0.05 after Holm over 3 trials")
-        ca = (r["slope_window"].get("coef") or [None, None])[1]
-        cb = (r["slope_all"].get("coef") or [None, None])[1]
-        ta = (r["slope_window"].get("t") or [None, None])[1]
-        tb = (r["slope_all"].get("t") or [None, None])[1]
-        sg = "negative" if sign < 0 else "positive"
-        sign_row = BW.all_constructions(
-            [(f"window pairs slope {_s(ca, 4)} (NW t {_s(ta, 2)})", None if ca is None else bool(sign * ca > 0), False),
-             (f"all pairs slope {_s(cb, 4)} (NW t {_s(tb, 2)})", None if cb is None else bool(sign * cb > 0), False)],
-            f"pre-registered {sg} slope")
+        sign_row = t602_sign_row(r["slope_window"], r["slope_all"], sign)
         sdf = sharpe_diff(r["switch"], r["bench"])
-        drow, dinf = dsr_bound(r["switch"], T602_FAMILY_MIN, T602_FAMILY_FULL, f"joint-family DSR > {DSR_PASS} (switching rule)")
+        drs, dinf = dsr_two(r, T602_FAMILY_MIN, T602_FAMILY_FULL, "")
+        drow = BW.all_constructions(drs, f"joint-family DSR > {DSR_PASS}")
         rows = [(f"R2_OS {_s(r['r2'], 4)} > 0", _b(r["r2"] is not None and r["r2"] > 0), False), cw_row, sign_row,
                 (f"R2_OS > 0 in both halves of {r['target_first']}..{r['target_last']} (split {r['half_split']}: "
                  f"{_s(r['halves'][0], 4)} / {_s(r['halves'][1], 4)})",
                  None if any(h is None for h in r["halves"]) else bool(all(h > 0 for h in r["halves"])), False),
-                switch_row(sdf, "long SPY when the forecast is positive"), drow]
+                switch_row(sdf, "long SPY when the forecast is positive", r["n_diff"]), drow]
         trows.append(and_rows(rows, nm))
         tinfo[nm] = {"sharpe_rule": sdf.get("sharpe_a"), "sharpe_bench": sdf.get("sharpe_b"), "diff": sdf.get("diff"),
-                     "ci": sdf.get("ci"), "in_spy": r["in_spy"], "bench_in_spy": r["bench_in_spy"], "dsr": dinf}
+                     "ci": sdf.get("ci"), "ci_pct": sdf.get("ci_pct"), "in_spy": r["in_spy"],
+                     "bench_in_spy": r["bench_in_spy"], "n_diff": r["n_diff"], "dsr": dinf}
     crit = [any_rows(trows, "at least one of the 3 trials passes every criterion")]
     n = int(min(R[nm].get("n", 0) for nm in names))
     v, why, crit_j = CAL._judge(crit, n, T602_MIN_N, "monthly forecasts (the shortest trial)")
@@ -795,16 +840,23 @@ def b13_crossasset_b_credit_premium(archive):
         parts.append(f"{nm} {r['target_first']}..{r['target_last']} ({r['n']}): R2_OS {_s(r['r2'], 4)} (halves "
                      f"{_s(r['halves'][0], 4)} / {_s(r['halves'][1], 4)}), CW t {_s(r['cw_t'], 2)} (Holm NW "
                      f"{_f(holm_nw[nm], 3)}, boot {_f(holm_bs[nm], 3)}), slope {_s((r['slope_window'].get('coef') or [0, None])[1], 4)} "
-                     f"(t {_s((r['slope_window'].get('t') or [0, None])[1], 2)}), switch SR {_f(si.get('sharpe_rule'), 2)} vs "
-                     f"{_f(si.get('sharpe_bench'), 2)} (in SPY {si.get('in_spy', 0) * 100:.0f}% vs "
-                     f"{si.get('bench_in_spy', 0) * 100:.0f}%), DSR <= {_f((si.get('dsr') or {}).get('dsr_bound'), 3)}; "
+                     f"(t {_s((r['slope_window'].get('t') or [0, None])[1], 2)}; all pairs "
+                     f"{_s((r['slope_all'].get('coef') or [0, None])[1], 4)}), switch SR {_f(si.get('sharpe_rule'), 2)} vs "
+                     f"{_f(si.get('sharpe_bench'), 2)} (in SPY {si.get('in_spy', 0) * 100:.1f}% vs "
+                     f"{si.get('bench_in_spy', 0) * 100:.1f}%, positions differ in {si.get('n_diff')} month{'' if si.get('n_diff') == 1 else 's'}; "
+                     f"percentile interval [{_s((si.get('ci_pct') or [None, None])[0])}, "
+                     f"{_s((si.get('ci_pct') or [None, None])[1])}]"
+                     + (", studentized interval degenerate" if (si.get('n_diff') or 0) < SWITCH_DEGENERATE_MONTHS else "")
+                     + f"), DSR <= {_f(((si.get('dsr') or {}).get('excess') or {}).get('dsr_bound'), 3)} (excess) / "
+                     f"{_f(((si.get('dsr') or {}).get('active') or {}).get('dsr_bound'), 3)} (active); "
                      f"with SPY's month-t return the predictor t is {_s((ctrl.get(nm) or {}).get('t_pred'), 2)}")
     rtxt = ", ".join(f"raw {s} R2_OS {_s(raw[s]['r2'], 4)} (CW t {_s(raw[s]['cw_t'], 2)})" for s in raw)
     reason = ("SPY fill-to-fill excess return (first close of t+1 to the first close of t+2, minus DTB3) on three "
               "pre-signed credit predictors, expanding OLS (gap 2): " + "; ".join(parts) + f". Reported: {rtxt}. The "
               "duration-hedged ETF returns are Mandel proxies, not the paper's TRACE moments (a null is weak evidence "
-              "against the paper); the EBP-change and bond-skewness trials are blocked; the joint-family DSR can fail "
-              "but not pass here")
+              "against the paper); the EBP-change and bond-skewness trials are blocked; the joint-family DSR is judged on "
+              "the switching rule's excess return and its active return over the historical-mean rule (rule 11, as "
+              "crossasset_a) and can fail but not pass here")
     return _out(stat, n, v, reason + " — " + why)
 
 

@@ -101,8 +101,11 @@ Claim-specific readings (declared before any return was computed)
     reading of "the write-up counts Hurst's 478 coin-hour scan in the multiplicity"; the 12-block Holm is reported).
     Halves at the median day; IBIT split at 2024-01-11; Kraken positive (point) over the registered 2022-01..2025-12
     (later Kraken bundles exist and are not used). Costs reported: 2 bp (CME micro / Coinbase nano, to verify), 16 and
-    18 bp (Kalshi perps) round trip, and the break-even cost. The registration's "ask Hurst first" step cannot be done
-    by a harness: Hurst's per-cell values are not in the repo (only the aggregate 3 of 478), so it is flagged.
+    18 bp (Kalshi perps) round trip, the Coinbase spot maker tier (Intro tier 0.40% per side, 80 bp round trip; the
+    rate from ``batch6c_kraken.COINBASE_TIERS``) and the break-even cost. The registration's "ask Hurst first" step
+    cannot be done by a harness: Hurst's per-cell values are not in the repo (only the aggregate 3 of 478). The main
+    session must ask Hurst for its BTC 22:00 and 23:00 UTC cells before recording: if they cover Coinbase 2022-2026
+    they are the record under this registration and this harness a replication; the stat carries the flag.
 """
 
 from __future__ import annotations
@@ -180,8 +183,15 @@ T668_TARGET = 11                       # block index of 22:00-00:00 UTC
 T668_HURST = 478
 T668_MIN_N = 1500
 T668_IBIT = "2024-01-11"
+# Coinbase Advanced spot maker fee at the entry ("Intro ($0+)") volume tier, the tier a strategy of this size trades at:
+# 0.40% per side (batch6c_kraken.COINBASE_TIERS, verified in the repo 2026-10-14), charged on entry and exit.
+T668_CB_MAKER_TIER = "Intro ($0+)"
+T668_CB_MAKER = 0.0040
 T668_COSTS = (("CME micro / Coinbase nano, about 2 bp (to verify)", 2e-4), ("Kalshi perps 16 bp", 16e-4),
-              ("Kalshi perps 18 bp", 18e-4))
+              ("Kalshi perps 18 bp", 18e-4),
+              ((f"Coinbase spot maker tier ({T668_CB_MAKER_TIER}, {T668_CB_MAKER * 100:.2f}% per side x 2 = "
+                f"{2 * T668_CB_MAKER * 1e4:.0f} bp; maker tiers fall to 0% only at $250M+ 30-day volume, to verify)"),
+               2 * T668_CB_MAKER))
 
 
 # ================================================================================================ shared helpers ==
@@ -326,6 +336,10 @@ def t666_panel(archive) -> dict:
         tables = [bar_table(IA._local("60m", s)) for s in syms]
         days, early = bar_calendar(tables, T666_START, T666_END)
         D, N = len(days), len(syms)
+        cover = t666_bar_coverage(tables, days)
+        unread = IA._unreadable("60m", syms)
+        if not days:
+            return {"syms": syms, "days": [], "early": early, "bar_sessions": cover, "unreadable": unread}
         O = np.full((D, 7, N), np.nan)
         C = np.full((D, 7, N), np.nan)
         for j, t in enumerate(tables):
@@ -361,8 +375,30 @@ def t666_panel(archive) -> dict:
         prev_adj = np.array([i > 0 and days[i - 1] == CAL.prev_session(date.fromisoformat(days[i])).isoformat()
                              for i in range(D)], bool)
         return {"syms": syms, "days": days, "early": early, "R": R, "ON": ON, "prev_adj": prev_adj,
-                "div_fallback": fb, "daily_last": dp["days"][-1] if dp["days"] else None}
+                "div_fallback": fb, "daily_last": dp["days"][-1] if dp["days"] else None, "bar_sessions": cover,
+                "unreadable": unread}
     return CAL._cached(archive, ("b13ic_t666",), load)
+
+
+def t666_bar_coverage(tables: Sequence[dict], days: Sequence[str]) -> list:
+    """Per name, the number of calendar sessions on which its local 60m table has any bar (0 = no bars in the window:
+    a missing or unreadable file, which rule 9 must surface rather than let the universe shrink silently)."""
+    return [int(sum(1 for d in days if t.get(d))) for t in tables]
+
+
+def t666_missing_names(pan: dict) -> tuple | None:
+    """(stat, n, 'inconclusive', reason) when any registered name has no 60m bar in the window (rule 9), else None."""
+    syms, cover = pan["syms"], pan.get("bar_sessions") or [0] * len(pan["syms"])
+    gone = [s for s, c in zip(syms, cover) if c == 0]
+    if not gone:
+        return None
+    unread = pan.get("unreadable") or {}
+    detail = "; ".join(f"{s} ({'unreadable: ' + unread[s] if s in unread else 'no file or no bars in the window'})"
+                       for s in gone)
+    return _out({"missing_names": gone, "unreadable": unread, "bar_sessions": dict(zip(syms, cover))}, 0, "inconclusive",
+                f"{len(gone)} of the {len(syms)} registered names have no local 60m bar in {T666_START}..{T666_END}: "
+                f"{detail}. A verdict on the remaining {len(syms) - len(gone)} names would not be the registered universe "
+                f"(rule 9)")
 
 
 def t666_run(pan: dict, cols: Sequence[int], bars: Sequence[str], lags: Sequence[int]) -> dict:
@@ -402,6 +438,9 @@ def b13_intraday_c_same_hour_xs(archive):
     if miss:
         return miss
     pan = t666_panel(archive)
+    gone = t666_missing_names(pan)
+    if gone:
+        return gone
     days = pan["days"]
     if len(days) < 40:
         return _out({"n_sessions": len(days)}, 0, "inconclusive", f"only {len(days)} bar sessions in the local 60m bars (rule 9)")
@@ -437,8 +476,13 @@ def b13_intraday_c_same_hour_xs(archive):
                     f"{cell('stocks', bar, 20)}, ETFs {cell('etfs', bar, 20)}" for bar in bars)
     sizes = {u: int(np.median(res[u][(T666_PRIMARY[1], 20)]["k"][np.isfinite(res[u][(T666_PRIMARY[1], 20)]["b"])]))
              if np.isfinite(res[u][(T666_PRIMARY[1], 20)]["b"]).any() else 0 for u in unis}
-    reason = (f"{nt} names (28 local single stocks + 11 sector SPDRs, chosen with hindsight: today's large names, a "
-              f"survivor-biased breadth of 39), local Yahoo 60m bars {days[0]}..{days[-1]} ({len(days)} bar sessions; "
+    cover = pan["bar_sessions"]
+    n_bars = sum(1 for c in cover if c > 0)
+    thin = min(zip(cover, syms))
+    reason = (f"{n_bars} of the {nt} registered names with local 60m bars ({ns} local single stocks + {nt - ns} sector "
+              f"SPDRs, chosen with hindsight: today's large names, a survivor-biased breadth of {nt}; the thinnest, "
+              f"{thin[1]}, has bars on {thin[0]} of {len(days)} sessions), local Yahoo 60m bars {days[0]}..{days[-1]} "
+              f"({len(days)} bar sessions; "
               f"{len(pan['early'])} early closes dropped; official prices through {pan['daily_last']}, so the 15:30 bar and "
               f"the overnight control end there); Fama-MacBeth slope of the demeaned bar return on the mean of the name's "
               f"own demeaned same-bar returns over the previous 20 sessions, controls = the two preceding intervals, "
@@ -849,6 +893,27 @@ def t661_tercile_diag(inp: dict, sc: dict, forms: list, Z: np.ndarray | None, la
     return out
 
 
+def t661_cover_text(cov: dict) -> str:
+    """The coverage-gate criterion text: computed either way, met or not (unmet = a None cap, never 'not implemented')."""
+    share = cov.get("share")
+    pct = "n/a" if share is None else f"{share * 100:.1f}%"
+    head = (f"coverage gate (>= {T661_COVER * 100:.0f}% of fja member-months at the formation month-ends priced by a "
+            f"spell-checked series): {cov.get('priced')} of {cov.get('member_months')}, {pct}")
+    if share is not None and share >= T661_COVER:
+        return head + " - met"
+    return (head + f" - NOT met ({pct} < {T661_COVER * 100:.0f}%; computed, not missing): support is impossible; a cap that "
+            f"does not override a failing criterion")
+
+
+def t661_why(why: str) -> str:
+    """``_verdict`` labels every None criterion 'not implemented'; here a None row is a computed-but-unmet cap (the
+    coverage gate) or two readings that disagree, so the label is replaced by what it means."""
+    return (why.replace(" (not implemented: ", " (None criteria, capping the verdict below supported without overriding "
+                                                "the failure: ")
+               .replace("implemented criteria pass; not implemented: ", "implemented criteria pass; None criteria (capped "
+                                                                         "at inconclusive): "))
+
+
 def b13_intraday_c_reversal_intensity(archive):
     """T-661."""
     miss = B7C._missing(archive, ["daily-history-SPY", IA.FJA_B, IA.SPELLS_B, FF5_B, MOM_B])
@@ -904,9 +969,9 @@ def b13_intraday_c_reversal_intensity(archive):
              f"readings must agree)", CAL._agree([ok_dsr, ok_bonf]), dec1),
             (f"alpha positive in 2018-2021 and in 2022-2026 ({_bp(halves[0])} / {_bp(halves[1])})",
              None if any(h is None for h in halves) else all(h > 0 for h in halves), False),
-            (f"coverage gate: >= 90% of member-months priced ({cov['priced']} of {cov['member_months']}, "
-             f"{(cov['share'] or 0) * 100:.1f}%; below it the verdict is capped at inconclusive)", cov_ok, False)]
+            (t661_cover_text(cov), cov_ok, False)]
     v, why, crit = CAL._judge(rows, n, T661_MIN_N, "holding months")
+    why = t661_why(why)
     # ---- reported
     sort_u = t661_series(inp, sc, forms, "NR", universe="sortable")
     sort_lo = fit(sort_u, "lo") if len(sort_u.get("month", [])) > 8 else {"alpha": None, "t": None}
@@ -947,8 +1012,9 @@ def b13_intraday_c_reversal_intensity(archive):
               f"used; ticker-reuse refusals {len(sw['late_series'])} later-series spells, {len(sw['unverified_earlier_spell'])} "
               f"unverified earlier spells; dividends from adjclose for {inp['div_fallback']} symbols; top-quintile names "
               f"without an exit price (exited at their last close) {int(np.sum(nr['no_exit_price']))} name-months; "
-              f"sessions without a factor print inside the factor span {lo['missing_factor_sessions']}. The coverage gate is "
-              f"a None criterion (a cap): it never turns a failing criterion into inconclusive")
+              f"sessions without a factor print inside the factor span {lo['missing_factor_sessions']}. The coverage gate was "
+              f"computed ({'met' if cov_ok else 'NOT met'}); unmet, it is a None criterion: support is impossible, but as a "
+              f"cap it does not override a failing criterion, so a failure elsewhere still gives not_supported")
     stat = {"n_months": n, "n_formed": len(nr["month"]), "alpha": {k: lo[k] for k in ("alpha", "se", "t", "p", "p_lt", "betas", "n")},
             "p_bonferroni": p_bonf, "dsr": dsr, "p_dsr": p_dsr, "var_trials_sr_observed": var_obs, "var_trials_sr_used": var_used,
             "halves_alpha": halves, "halves_excess": hv_ex, "coverage": cov,
@@ -1151,15 +1217,18 @@ def b13_intraday_c_btc_2200_block(archive):
               f"ET-anchored diagnostics " + ", ".join(f"{k} {_bp(e['diff'])} (t {_f(e['t'])})" for k, e in et.items())
               + f"; block return on the same day's SPY close-to-close return: slope {_f(reg['slope'], 4)} (HAC t {_f(reg['t'])}, "
               f"{reg['n']} days); long-the-block mean gross {_bp(gross)} a day = the break-even round trip; net "
-              + ", ".join(f"{k} {_bp(x)}" for k, x in nets.items())
-              + f" (pre-registered as expected <= 0); Coinbase-Kraken correlation of the block return {_f(corr, 3)}. The whole "
+              + ", ".join(f"{k} {_bp(x)}" + (" (pre-registered as expected <= 0)" if i == 0 else "")
+                          for i, (k, x) in enumerate(nets.items()))
+              + f"; Coinbase-Kraken correlation of the block return {_f(corr, 3)}. The whole "
                 f"sample is post-publication (SSRN 4081000, 2022). Hurst's BTC 22:00 / 23:00 UTC cells are not in the repo (only "
                 f"the aggregate 3 of 478 coin-hours at |t| >= 2.5), so the registration's 'ask Hurst first' step was not done "
-                f"by this harness")
+                f"by this harness: before recording, ask Hurst for those cells; if they cover Coinbase 2022-2026 they are the "
+                f"record under T-668 and this result a replication, otherwise this result is the record")
     stat = {"n_days": n, "tests": tests, "holm_12": adj12, "holm_490": [adj490[k] for k in range(12)],
             "decisions_490": dec490, "decisions_12": dec12, "halves": halves, "split": split, "ibit": ibit,
             "kraken": {"n": int(kd.size), "diff": kmean}, "weekday_weekend": split_wk, "et_anchored": et, "spy_reg": reg,
-            "gross_block": gross, "net": nets, "corr_cb_kr": corr, "empty_hours": cb["empty_hours"], "criteria": crit}
+            "gross_block": gross, "net": nets, "corr_cb_kr": corr, "empty_hours": cb["empty_hours"], "criteria": crit,
+            "hurst_cells_pending": True}
     return _out(stat, n, v, reason + " — " + why)
 
 

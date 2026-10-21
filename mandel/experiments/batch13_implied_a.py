@@ -35,7 +35,8 @@ reason line names it):
   * T-651 grid (house rule 10). Decision days on offset o are the sessions o, o + 5, ... from 2013-05-20; a trade entered
     at the t+1 settle exits at the t+6 settle, the next grid entry, so trades on one offset never overlap and "no new
     entry while a trade is open" never binds. The pooled estimate is every signal day (all 5 offsets); the NW lag and
-    the bootstrap block are 12 pooled trades (>= 2x the up-to-4-trade overlap). n = the fewest signal trades on any
+    the bootstrap block are 12 pooled trades (>= 2x the up-to-4-trade overlap), and the mean row needs both tests
+    (``and_rows``: it fails when either fails). n = the fewest signal trades on any
     offset (a single offset's non-overlapping count; the pooled count is reported). The hedge regression uses the 252
     sessions ending at t (the changes into t-251..t, each in the contract that was F1 on its previous session, with its
     trading days to settlement on that session), so the ratio is known before the t+1 entry; all 252 changes must be
@@ -56,15 +57,20 @@ reason line names it):
     VVIX / RV21 is undefined, so (b) is judged under both readings (rule 11: it passes only when both do): the
     within-half z (a linear rescale, the slope's sign is that of the raw level) and the trailing 252-session z
     (T-654's definition). (a) is judged under Newey-West (lag 1) and the studentized pairs bootstrap of cycles (HC1
-    studentizer, 5 seeds of 2,000), passing only when both pass. The secondary Sharpe difference enters at the t+1
-    settle (P_t uses the 16:15 ET VIX close, after the t settle) and gates on P_t above the median of >= 12 earlier
-    cycles' P.
+    studentizer, 5 seeds of 2,000), both registered: it passes only when both pass and fails when either fails
+    (``and_rows``, a conjunction, not rule 11). The secondary Sharpe difference enters at the t+1 settle (P_t uses the
+    16:15 ET VIX close, after the t settle) and gates on P_t above the median of >= 12 earlier cycles' P. E_t is
+    iterated h = trading days to the expiry-day close; the final settlement is the expiry-morning SOQ, so the h - 1
+    iteration is a reported sensitivity.
   * T-654 is unobservable as registered on this chain: DoltHub quotes a 2/4/8-week expiry ladder and a fixed K/S strike
     ladder (0.875, 0.90, 0.92, 0.94, ...) re-centred on each day's close, so the entry contract is seldom quoted a week
     later. The harness implements the registered trade (exit at the next week's last quote day, or the first quote day
     within 3 sessions after it that quotes the position's contracts, otherwise the week is skipped and counted) and
     reports what the observable weeks give, but every criterion is None (rule 9 data limit, as batch7_vol T-550) and the
     verdict is inconclusive: the observable weeks are selected by the vendor's listing pattern, not the claim's sample.
+    fred-DTB3 is required (the registered hedged return is net of the bill rate, never silently gross). The registered
+    controls (every-week short spread, VIX-only and SKEW-only terciles, a random-tercile placebo, unhedged returns) and
+    the VVIX-on-VIX residual trial of the DSR set are computed on the same weeks and reported only.
   * T-655. Terciles: the share of the trailing 365 DVOL closes (bars D-364..D, all known at D+1 00:00) strictly below
     DVOL_D; bottom < 1/3, top >= 2/3. The bound is the lower end of the two-sided studentized 95% CI (the stricter
     reading of "lower 95% bound"), Monte Carlo resolved over 5 (25 when unresolved) seeds. n = the distinct 30-day holds
@@ -226,8 +232,20 @@ def dsr_vs_uncomputed_family(x, n_total: int, label: str) -> tuple:
     return (txt + f" [the other {n_total - 1} family Sharpes are not computed here: cannot pass]", None, False), info
 
 
+def and_rows(rows: Sequence[tuple], label: str) -> tuple:
+    """A registered conjunction of tests ('p < 0.05 by Newey-West AND the bootstrap'): passes only when every test
+    passes, fails when any test fails (decisively when a failing test is decisive), and is undecided only when none fails
+    and one is unresolved. Not rule 11: the tests are joint requirements, not alternative readings of an undefined term
+    (``BW.all_constructions`` stays for those, e.g. T-652 (b)'s two standardisations)."""
+    oks = [r[1] for r in rows]
+    ok = False if any(o is False for o in oks) else (True if all(o is True for o in oks) else None)
+    dec = bool(ok is False and any(r[1] is False and bool(r[2]) for r in rows))
+    return f"{label}: " + "; ".join(r[0] for r in rows), ok, dec
+
+
 def mean_rows(x, block: int, lag: int, label: str, n_boot: Optional[int] = None) -> tuple:
-    """'mean > 0 with one-sided p < 0.05' under Newey-West and the studentized CBB, joined by rule 11; (row, info)."""
+    """'mean > 0 with one-sided p < 0.05 by Newey-West and the bootstrap': both registered tests are required, so the
+    row fails when either fails (``and_rows``); (row, info)."""
     x = np.asarray(x, float)
     nw = nw_mean(x, lag)
     t = nw["t"]
@@ -238,7 +256,7 @@ def mean_rows(x, block: int, lag: int, label: str, n_boot: Optional[int] = None)
     pg, pl, dr = CAL.studentized_p_escalated(x, block, n_boot, SEED, B7C.N_SEEDS)
     bt_row = (f"studentized CBB ({block}-period blocks): p {CAL._mc(pg, dr)}", B7C._sig_crit(nw["mean"], pg, dr),
               CAL.decide_p(pl, dr) is True)
-    row = BW.all_constructions([nw_row, bt_row], label)
+    row = and_rows([nw_row, bt_row], label)
     return row, {"mean": nw["mean"], "nw_t": t, "nw_p": p_nw, "boot_p": pg, "boot_p_less": pl, "draws": dr, "n": int(x.size)}
 
 
@@ -483,7 +501,7 @@ def t651_test(recs: Sequence[dict], cnt: Counter, bills=None, n_boot: Optional[i
     n = min(n_off) if sig else 0
     row1, info = mean_rows(x, T651_BLOCK, T651_NW_LAG,
                            f"pooled mean net P&L {_usd(info_mean(x))} per trade > 0 with one-sided p < 0.05 by Newey-West "
-                           f"and the bootstrap (rule 11)", n_boot)
+                           f"and the bootstrap (both required)", n_boot)
     h1 = np.array([d <= T651_SPLIT for d in days], bool)
     halves = [float(x[h1].mean()) if h1.any() else None, float(x[~h1].mean()) if (~h1).any() else None]
     row2 = (f"both half means > 0 (2013-2019 {_usd(halves[0])}, 2020-2026 {_usd(halves[1])})",
@@ -735,8 +753,8 @@ def boot_slope(y, x, n_boot: int = 2000, seed: int = SEED) -> dict:
 
 
 def slope_a_row(y, x, label: str, n_boot: Optional[int] = None) -> tuple:
-    """(a) 'slope > 0 with one-sided p < 0.05 and 1 inside the 95% CI' under Newey-West lag 1 and the cycle bootstrap
-    (rule 11). Returns (row, info)."""
+    """(a) 'slope > 0 with one-sided p < 0.05 and 1 inside the 95% CI' under Newey-West lag 1 and the cycle bootstrap,
+    both registered, so the row fails when either fails (``and_rows``). Returns (row, info)."""
     y, x = np.asarray(y, float), np.asarray(x, float)
     nw = CAL.ols_nw(y, x, T652_NW_LAG)
     b, se = nw["slope"], nw["se"]
@@ -769,7 +787,7 @@ def slope_a_row(y, x, label: str, n_boot: Optional[int] = None) -> tuple:
     ok_b, dec_b, draws = judge(bt)
     lo_b, hi_b = bt.get("ci") or (None, None)
     bt_row = (f"cycle bootstrap: p {CAL._mc(bt['p'], draws)}, 95% CI [{_s(lo_b)}, {_s(hi_b)}]", ok_b, dec_b)
-    row = BW.all_constructions([nw_row, bt_row], label)
+    row = and_rows([nw_row, bt_row], label)
     return row, {"slope": b, "se_nw": se, "p_nw": p_nw, "ci_nw": [lo, hi], "p_boot": bt["p"], "ci_boot": bt["ci"],
                  "n": int(y.size)}
 
@@ -809,9 +827,11 @@ def premium_test(cyc: Sequence[dict], n_boot: Optional[int] = None) -> dict:
     return {"rows": rows, "info": info, "verdict": v, "why": why, "crit": crit}
 
 
-def build_premium_cycles(cal, ecal, curve, vix, vix3m, vvix, spy_days, spy_adj, model: str = "var") -> tuple:
+def build_premium_cycles(cal, ecal, curve, vix, vix3m, vvix, spy_days, spy_adj, model: str = "var",
+                         h_shift: int = 0) -> tuple:
     """Per-cycle observations: day, y = F1_t - FinalSettle, P = F1_t - E_t[VIX_T] (``model``: var / ar1 / har / raw =
-    the raw basis F1 - VIX), the t+1 settle return, VVIX and RV21 levels and their trailing 252-session z."""
+    the raw basis F1 - VIX), the t+1 settle return, VVIX and RV21 levels and their trailing 252-session z. The model is
+    iterated h + ``h_shift`` steps (0 = the registered h; -1 = the expiry-morning SOQ sensitivity, reported only)."""
     cyc, cnt = premium_cycles(cal, ecal, curve)
     zd, Z = logvix_frame(vix, vix3m)
     zpos = {d: i for i, d in enumerate(zd)}
@@ -837,8 +857,12 @@ def build_premium_cycles(cal, ecal, curve, vix, vix3m, vvix, spy_days, spy_adj, 
             if j is None:
                 cnt["no VIX3M at t"] += 1
                 continue
-            fc = (var1_forecast(Z, j, h) if model == "var" else ar1_forecast(Z[:, 0], j, h) if model == "ar1"
-                  else har_forecast(Z[:, 0], j, h))
+            hf = h + int(h_shift)
+            if hf < 1:
+                cnt["forecast horizon below one step"] += 1
+                continue
+            fc = (var1_forecast(Z, j, hf) if model == "var" else ar1_forecast(Z[:, 0], j, hf) if model == "ar1"
+                  else har_forecast(Z[:, 0], j, hf))
             if fc is None:
                 cnt["too little model history"] += 1
                 continue
@@ -896,6 +920,8 @@ def b13_implied_a_vix_premium_risk(archive):
         for m in ("raw", "har", "ar1"):
             cc, _ = build_premium_cycles(*args, model=m)
             ctrl[m] = premium_test(cc, n_boot=500)
+        cc, _ = build_premium_cycles(*args, model="var", h_shift=-1)
+        ctrl["var_h_minus_1"] = premium_test(cc, n_boot=500)
         ex20 = [c for c in cyc if c["day"][:7] not in T652_EX2020]
         ctrl["ex_2020_02_04"] = premium_test(ex20, n_boot=500)
         nxt = [dict(c, y=c["y_next"]) for c in cyc if c["y_next"] is not None]
@@ -946,7 +972,8 @@ def _premium_out(R: dict):
               f"{_s(bw('h1_vvix_trailing'), 3)} / {_s(bw('h2_vvix_trailing'), 3)}; on RV21 within-half z "
               f"{_s(bw('h1_rv_within'), 3)} / {_s(bw('h2_rv_within'), 3)}, trailing z {_s(bw('h1_rv_trailing'), 3)} / "
               f"{_s(bw('h2_rv_trailing'), 3)}; controls: raw basis {_ctrl_txt(ctrl['raw'])}; HAR {_ctrl_txt(ctrl['har'])}; "
-              f"AR(1) on log VIX alone {_ctrl_txt(ctrl['ar1'])}; ex 2020-02..04 {_ctrl_txt(ctrl['ex_2020_02_04'])}; t+1 "
+              f"AR(1) on log VIX alone {_ctrl_txt(ctrl['ar1'])}; VAR iterated h - 1 steps (expiry-morning SOQ) "
+              f"{_ctrl_txt(ctrl['var_h_minus_1'])}; ex 2020-02..04 {_ctrl_txt(ctrl['ex_2020_02_04'])}; t+1 "
               f"settle {_ctrl_txt(ctrl['t1_settle_entry'])}; secondary (short at the t+1 settle when P_t > the expanding "
               f"median, $140) annualised Sharpe {_s(sec.get('sharpe_gated'), 2)} vs always {_s(sec.get('sharpe_always'), 2)} "
               f"(diff {_s(sec.get('diff'), 2)}, reported); T-534/T-535: final below F1 in {_pc(cons['contango_share_final_below_f1'], 0)} "
@@ -1025,7 +1052,10 @@ def _quoted(day: dict, expiry: str, strike: float) -> Optional[dict]:
 def put_weeks(chain: dict, spy_raw: dict, spy_adj: dict, bills, start: str = T654_START, end: str = T654_END) -> tuple:
     """Per ISO week: the registered entry (the week's last quote day), expiry nearest 30 DTE in 14..60, the 0.90-0.95 K/S
     put bin and the 5%/10% OTM spread legs, and their exits (the next week's last quote day, else the first quote day
-    within 3 sessions after it that quotes the contracts). Returns (weeks, counts)."""
+    within 3 sessions after it that quotes the contracts). ``bills`` (CAL.Bills on fred-DTB3) is required: the hedged
+    return is net of the bill rate as registered, never silently gross. Returns (weeks, counts)."""
+    if bills is None:
+        raise ValueError("T-654's hedged return is net of the bill rate: fred-DTB3 is required")
     qdays = sorted(chain)
     wk = iso_weeks(qdays)
     keys = sorted(wk)
@@ -1075,7 +1105,7 @@ def put_weeks(chain: dict, spy_raw: dict, spy_adj: dict, bills, start: str = T65
                 if ax is None or sx is None:
                     cnt["no SPY close at exit"] += 1
                 else:
-                    g = bills.growth(ent, ex) if bills is not None else 0.0
+                    g = bills.growth(ent, ex)                  # required: the registered return is net of bills
                     hr, ur = [], []
                     for l in legs:
                         if inside:
@@ -1122,7 +1152,7 @@ def put_weeks(chain: dict, spy_raw: dict, spy_adj: dict, bills, start: str = T65
 def b13_implied_a_vvix_put_hedge(archive):
     """T-654: VVIX-timed delta-hedged SPY OTM put returns and VVIX-gated short 5/10% put spreads on dolt-chain-SPY
     (registered weekly exits unobservable on the DoltHub ladders: computed on the observable weeks, inconclusive)."""
-    miss = B7C._missing(archive, [CHAIN_B, VVIX_B, VIX_B, SPY_B])
+    miss = B7C._missing(archive, [CHAIN_B, VVIX_B, VIX_B, SPY_B, DTB3_B])     # DTB3: the registered bill-rate deduction
     if miss:
         return miss
 
@@ -1131,7 +1161,7 @@ def b13_implied_a_vvix_put_hedge(archive):
         _, sa = CAL._daily(archive, SPY_B, "adjclose")
         raw, adj = dict(zip(sd, sc)), dict(zip(sd, sa))
         chain, info = DOLT.chain_days(CAL._rows(archive, CHAIN_B), raw)
-        bills = CAL.Bills(CAL._series(archive, DTB3_B)) if B7C._has(archive, DTB3_B) else None
+        bills = CAL.Bills(CAL._series(archive, DTB3_B))
         idx = {"VVIX": index_frame(CAL._series(archive, VVIX_B)), "VIX": index_frame(CAL._series(archive, VIX_B))}
         if B7C._has(archive, SKEW_B):
             idx["SKEW"] = index_frame(CAL._series(archive, SKEW_B))
@@ -1145,30 +1175,66 @@ def b13_implied_a_vvix_put_hedge(archive):
     return _out(rep["stat"], rep["n"], rep["verdict"], rep["reason"])
 
 
+def _t654_reg(ws: Sequence[dict], key: str) -> dict:
+    """OLS of the hedged bin return on [1, ``key``, z(VIX), RV21] with NW (lag 2): the ``key`` slope, t, one-sided p < 0."""
+    if len(ws) < 8:
+        return {"n": len(ws)}
+    X = np.column_stack([np.ones(len(ws)), [w[key] for w in ws], [w["VIX"] for w in ws], [w["rv21"] for w in ws]])
+    yv = np.array([w["bin"] for w in ws], float)
+    try:
+        r = ols_nw_multi(yv, X, T654_NW_LAG)
+    except np.linalg.LinAlgError:
+        return {"n": len(ws), "singular": True}
+    return {"n": len(ws), "b_vvix": float(r["beta"][1]), "t_vvix": float(r["t"][1]), "p_neg": float(_N.cdf(r["t"][1]))}
+
+
+def tercile_split(b_obs: Sequence[dict], disc: Sequence[dict], key: str) -> dict:
+    """Short-spread P&L per max loss in ``key``'s top tercile vs the other weeks, the cut from its 2019-2022 weekly values
+    (``disc``; at least 10), among the observable confirmation weeks ``b_obs`` (reported)."""
+    dz = np.array([w[key] for w in disc if w.get(key) is not None], float)
+    cut = float(np.quantile(dz, 2 / 3)) if dz.size >= 10 else None
+    top = [w["spread"] for w in b_obs if cut is not None and w.get(key) is not None and w[key] >= cut]
+    oth = [w["spread"] for w in b_obs if cut is not None and w.get(key) is not None and w[key] < cut]
+    tm, om = (float(np.mean(top)) if top else None), (float(np.mean(oth)) if oth else None)
+    return {"cut": cut, "n_top": len(top), "n_other": len(oth), "top_mean": tm, "other_mean": om,
+            "diff": None if tm is None or om is None else tm - om, "top": top, "other": oth}
+
+
+def tercile_placebo(top: Sequence[float], oth: Sequence[float], draws: int = 1000, seed: int = SEED) -> dict:
+    """Random-tercile placebo: the top-minus-other difference with the top label permuted i.i.d. over the same weeks
+    (group sizes kept); one-sided p = share of placebo differences >= the observed one (reported)."""
+    x = np.asarray(list(top) + list(oth), float)
+    k = len(top)
+    if k < 1 or x.size - k < 1:
+        return {"p": None, "draws": 0}
+    obs = float(np.mean(top) - np.mean(oth))
+    rng = np.random.default_rng(seed)
+    perm = np.argsort(rng.random((int(draws), x.size)), axis=1)
+    px = x[perm]
+    d = px[:, :k].mean(axis=1) - px[:, k:].mean(axis=1)
+    return {"p": float((np.sum(d >= obs - 1e-12) + 1) / (d.size + 1)), "draws": int(d.size), "observed": obs}
+
+
 def t654_report(weeks: Sequence[dict], cnt: Counter, info: dict) -> dict:
-    """T-654 on the observable weeks; every criterion None (rule 9 data limit), verdict inconclusive."""
+    """T-654 on the observable weeks; every criterion None (rule 9 data limit), verdict inconclusive. The registered
+    controls (every-week short spread, VIX-only and SKEW-only terciles, a random-tercile placebo, unhedged put returns)
+    and the VVIX-on-VIX residual trial of the DSR set are computed and reported only."""
     inw = lambda w, lo, hi: lo <= w["entry"] <= hi
     tot = len(weeks)
-    disc_z = np.array([w["VVIX"] for w in weeks if inw(w, *T654_DISC) and w.get("VVIX") is not None], float)
-    cut = float(np.quantile(disc_z, 2 / 3)) if disc_z.size >= 10 else None
+    disc = [w for w in weeks if inw(w, *T654_DISC)]
     conf = [w for w in weeks if inw(w, *T654_CONF)]
-    a_obs = [w for w in conf if w["bin"] is not None and None not in (w.get("VVIX"), w.get("VIX"), w.get("rv21"))]
-    a_disc = [w for w in weeks if inw(w, *T654_DISC) and w["bin"] is not None and None not in (w.get("VVIX"), w.get("VIX"), w.get("rv21"))]
-    reg = {}
-    for nm, ws in (("confirmation", a_obs), ("discovery", a_disc)):
-        if len(ws) >= 8:
-            X = np.column_stack([np.ones(len(ws)), [w["VVIX"] for w in ws], [w["VIX"] for w in ws], [w["rv21"] for w in ws]])
-            yv = np.array([w["bin"] for w in ws], float)
-            try:
-                r = ols_nw_multi(yv, X, T654_NW_LAG)
-                reg[nm] = {"n": len(ws), "b_vvix": float(r["beta"][1]), "t_vvix": float(r["t"][1]), "p_neg": float(_N.cdf(r["t"][1]))}
-            except np.linalg.LinAlgError:
-                reg[nm] = {"n": len(ws), "singular": True}
-        else:
-            reg[nm] = {"n": len(ws)}
-    b_obs = [w for w in conf if w["spread"] is not None and w.get("VVIX") is not None]
-    top = [w["spread"] for w in b_obs if cut is not None and w["VVIX"] >= cut]
-    oth = [w["spread"] for w in b_obs if cut is not None and w["VVIX"] < cut]
+    full = lambda w, key: w["bin"] is not None and None not in (w.get(key), w.get("VIX"), w.get("rv21"))
+    a_obs = [w for w in conf if full(w, "VVIX")]
+    a_disc = [w for w in disc if full(w, "VVIX")]
+    reg = {"confirmation": _t654_reg(a_obs, "VVIX"), "discovery": _t654_reg(a_disc, "VVIX"),
+           "confirmation_vvix_resid": _t654_reg([w for w in conf if full(w, "vvix_resid")], "vvix_resid")}
+    b_obs = [w for w in conf if w["spread"] is not None]
+    terc = {k: tercile_split(b_obs, disc, k) for k in ("VVIX", "VIX", "SKEW", "vvix_resid")}
+    tv = terc["VVIX"]
+    cut, top, oth = tv["cut"], tv["top"], tv["other"]
+    every = [w["spread"] for w in b_obs]
+    every_comm = [w["spread_comm"] for w in b_obs]
+    placebo = tercile_placebo(top, oth)
     obs_bin = sum(1 for w in weeks if w["bin"] is not None)
     obs_sp = sum(1 for w in weeks if w["spread"] is not None)
     rows = [(f"(a) confirmation z(VVIX) slope < 0 with one-sided p < 0.05 given z(VIX) and RV21 (observable weeks "
@@ -1180,27 +1246,38 @@ def t654_report(weeks: Sequence[dict], cnt: Counter, info: dict) -> dict:
             (f"the registered weekly exit quotes are observable (bin {obs_bin} of {tot} weeks, spread {obs_sp} of {tot})", None, False)]
     n = len(a_obs)
     v, why, crit = CAL._judge(rows, n, T654_MIN_N, "confirmation weeks with an observable hedged-put return")
+    controls = {"every_week_short_spread": {"n": len(every), "mean": float(np.mean(every)) if every else None,
+                                            "mean_after_commission": float(np.mean(every_comm)) if every_comm else None},
+                "terciles": {k: {kk: vv for kk, vv in t.items() if kk not in ("top", "other")} for k, t in terc.items()},
+                "random_tercile_placebo": placebo,
+                "vvix_resid_regression": reg["confirmation_vvix_resid"]}
     stat = {"weeks": tot, "observable_bin_weeks": obs_bin, "observable_spread_weeks": obs_sp,
             "observable_confirmation_bin_weeks": n, "skipped": dict(cnt), "chain": info, "regression": reg,
-            "tercile_cut_2019_2022": cut, "top_mean": float(np.mean(top)) if top else None,
-            "other_mean": float(np.mean(oth)) if oth else None, "n_top": len(top), "n_other": len(oth),
+            "tercile_cut_2019_2022": cut, "top_mean": tv["top_mean"], "other_mean": tv["other_mean"],
+            "n_top": len(top), "n_other": len(oth), "controls": controls,
             "bin_fallback_exits": sum(1 for w in weeks if w.get("bin_fallback")),
             "mean_hedged_put_return": float(np.mean([w["bin"] for w in weeks if w["bin"] is not None])) if obs_bin else None,
             "mean_unhedged_put_return": float(np.mean([w["bin_unhedged"] for w in weeks if w["bin"] is not None])) if obs_bin else None,
             "criteria": crit}
+    tt = lambda k: (f"{k} top {_pc(terc[k]['top_mean'])} (n {terc[k]['n_top']}) vs other {_pc(terc[k]['other_mean'])} "
+                    f"(n {terc[k]['n_other']})")
     reason = (f"DATA LIMIT (rule 9): on dolt-chain-SPY ({info.get('quote_days')} quote days, {tot} ISO weeks "
               f"{weeks[0]['entry'] if weeks else 'n/a'}..{weeks[-1]['entry'] if weeks else 'n/a'}) the registered exit — the same "
               f"contract at the next week's last quote day, or within 3 sessions after it — is observable for the 0.90-0.95 "
               f"put bin in {obs_bin} of {tot} weeks and for both 5%/10% spread legs in {obs_sp}: DoltHub lists a 2/4/8-week "
               f"expiry ladder and a K/S strike ladder re-centred on each day's close, so a ~30-DTE contract is rarely quoted "
               f"a week later (skips: {', '.join(f'{k} {v_}' for k, v_ in sorted(cnt.items()))}). On the observable weeks: "
-              f"mean hedged put return {_pc(stat['mean_hedged_put_return'])} (unhedged {_pc(stat['mean_unhedged_put_return'])}); "
-              f"confirmation regression n {reg['confirmation']['n']} (z(VVIX) slope {_s(reg['confirmation'].get('b_vvix'), 4)}), "
-              f"discovery n {reg['discovery']['n']}; top-tercile spreads (cut z {_s(cut, 2)} from 2019-2022) mean "
-              f"{_pc(stat['top_mean'])} over {len(top)} weeks vs {_pc(stat['other_mean'])} over {len(oth)}. These weeks are "
-              f"selected by the vendor's listing pattern, not the claim's weekly sample, so no criterion is judged and the "
-              f"verdict is inconclusive until a chain source quotes every contract weekly (signals: VVIX/VIX/SKEW z and RV21 "
-              f"from the session before entry; the claim's weekly calendar, rule 10(a)) — {why}")
+              f"mean hedged put return net of DTB3 {_pc(stat['mean_hedged_put_return'])} (unhedged "
+              f"{_pc(stat['mean_unhedged_put_return'])}); confirmation regression n {reg['confirmation']['n']} (z(VVIX) slope "
+              f"{_s(reg['confirmation'].get('b_vvix'), 4)}), discovery n {reg['discovery']['n']}, VVIX-residual n "
+              f"{reg['confirmation_vvix_resid']['n']}; top-tercile spreads (cut z {_s(cut, 2)} from 2019-2022) mean "
+              f"{_pc(stat['top_mean'])} over {len(top)} weeks vs {_pc(stat['other_mean'])} over {len(oth)}; controls "
+              f"(reported): every-week short spread {_pc(controls['every_week_short_spread']['mean'])} over {len(every)} "
+              f"weeks; {tt('VIX')}; {tt('SKEW')}; {tt('vvix_resid')}; random-tercile placebo p "
+              f"{_f(placebo['p'], 3)} ({placebo['draws']} draws). These weeks are selected by the vendor's listing pattern, "
+              f"not the claim's weekly sample, so no criterion is judged and the verdict is inconclusive until a chain "
+              f"source quotes every contract weekly (signals: VVIX/VIX/SKEW z and RV21 from the session before entry; the "
+              f"claim's weekly calendar, rule 10(a)) — {why}")
     return {"stat": stat, "n": n, "verdict": "inconclusive" if v == "supported" else v, "reason": reason}
 
 

@@ -61,6 +61,51 @@ def test_theory_map_matches_harnesses():
     assert set(M.THEORY_MAP.values()) == set(M.HARNESSES)
 
 
+class _OnlyMissing:
+    """A stub archive that has every bundle except ``absent`` (get() raises KeyError for those)."""
+
+    def __init__(self, absent):
+        self.absent = set(absent)
+
+    def get(self, name):
+        if name in self.absent:
+            raise KeyError(name)
+        return object()
+
+
+def test_t654_requires_dtb3():
+    stat, n, verdict, reason = M.b13_implied_a_vvix_put_hedge(_OnlyMissing({M.DTB3_B}))
+    assert verdict == "inconclusive" and n == 0 and stat["missing_bundles"] == [M.DTB3_B]
+    with pytest.raises(ValueError):
+        M.put_weeks({}, {}, {}, None)
+
+
+def test_and_rows_is_a_conjunction():
+    P, F, U = ("nw", True, False), ("boot", False, False), ("boot", None, False)
+    assert M.and_rows([P, ("boot", True, False)], "x")[1] is True
+    assert M.and_rows([P, F], "x")[1] is False                       # one registered test fails -> the row fails
+    assert M.and_rows([("nw", False, False), U], "x")[1] is False
+    assert M.and_rows([P, U], "x")[1] is None                         # none fails, one unresolved -> undecided
+    assert M.and_rows([P, ("boot", False, True)], "x")[2] is True     # decisive when a failing test is decisive
+    assert M.and_rows([("nw", False, False), F], "x")[2] is False
+
+
+def test_mean_rows_fails_when_only_the_bootstrap_fails(monkeypatch):
+    x = np.full(200, 1.0) + np.random.default_rng(0).normal(0, 0.5, 200)   # NW t far above 1.645
+    monkeypatch.setattr(M.CAL, "studentized_p_escalated", lambda *a, **k: (0.40, 0.60, 10000))
+    row, info = M.mean_rows(x, 12, 12, "pooled mean")
+    assert info["nw_p"] < 0.05 and row[1] is False
+
+
+def test_slope_a_row_fails_when_only_newey_west_fails(monkeypatch):
+    rng = np.random.default_rng(2)
+    xv = rng.normal(0, 1, 160)
+    y = 1.0 * xv + rng.normal(0, 0.3, 160)
+    monkeypatch.setattr(M.CAL, "ols_nw", lambda y_, x_, lag: {"slope": 1.0, "se": 1.0, "t": 1.0})   # NW p 0.16
+    row, info = M.slope_a_row(y, xv, "(a)", n_boot=500)
+    assert info["p_nw"] > 0.05 and info["p_boot"] < 0.05 and row[1] is False
+
+
 # ------------------------------------------------------------------------------------------------- T-651 --
 
 def test_sessions_to_and_front_contract():
@@ -150,6 +195,51 @@ def test_t652_trailing_z_and_cycles():
     assert [(cal[t], e) for t, e, _, _ in cyc] == [(cal[35 - 21], e2), (cal[36], e3)]   # one per cycle, after E_prev
 
 
+def _premium_world(seed: int = 11, n: int = 720):
+    """Synthetic VX curve (expiries every 21 sessions from session 320, final settlement rows included), VIX, VIX3M,
+    VVIX and SPY on NYSE sessions 2012-.., so cycles fall after T652_START."""
+    rng = np.random.default_rng(seed)
+    cal = _sessions("2012-01-03", n)
+    pos = {d: i for i, d in enumerate(cal)}
+    lv = np.empty(n)
+    lv[0] = np.log(16.0)
+    for i in range(1, n):
+        lv[i] = 0.05 * np.log(16.0) + 0.95 * lv[i - 1] + rng.normal(0, 0.06)
+    vix = {d: float(np.exp(lv[i])) for i, d in enumerate(cal)}
+    vix3m = {d: float(vix[d] * np.exp(0.08 + rng.normal(0, 0.03))) for d in cal}
+    vvix = {d: float(90 + 10 * np.sin(i / 23.0) + rng.normal(0, 3)) for i, d in enumerate(cal)}
+    adj = 300.0 * np.cumprod(1.0 + rng.normal(0.0003, 0.01, n))
+    expiries = [cal[k] for k in range(320, n, 21)]
+    curve = {d: {e: float(vix[d] + 0.05 * (pos[e] - i) + rng.normal(0, 0.2)) for e in expiries if e >= d}
+             for i, d in enumerate(cal)}
+    return cal, curve, vix, vix3m, vvix, adj, expiries
+
+
+@pytest.mark.parametrize("model,h_shift", [("var", 0), ("var", -1), ("ar1", 0), ("har", 0), ("raw", 0)])
+def test_t652_cycles_end_to_end_ignore_data_after_t(model, h_shift):
+    cal, curve, vix, vix3m, vvix, adj, expiries = _premium_world()
+    ecal = M.extended_calendar(cal, max(expiries))
+    args = (cal, ecal, curve, vix, vix3m, vvix, cal, adj)
+    cyc, _ = M.build_premium_cycles(*args, model=model, h_shift=h_shift)
+    assert len(cyc) >= 8
+    base = cyc[len(cyc) // 2]
+    t = cal.index(base["day"])
+    c2 = copy.deepcopy(curve)
+    v2, v3, vv2, adj2 = dict(vix), dict(vix3m), dict(vvix), adj.copy()
+    for d in cal[t + 1:]:
+        c2[d] = {e: 2.5 * x + 9.0 for e, x in c2[d].items()}     # the whole VX curve after t, final settlements included
+        v2[d] *= 3.0
+        v3[d] *= 0.5
+        vv2[d] += 60.0
+    adj2[t + 1:] *= np.exp(np.cumsum(np.full(len(cal) - t - 1, 0.03)))
+    cyc2, _ = M.build_premium_cycles(cal, ecal, c2, v2, v3, vv2, cal, adj2, model=model, h_shift=h_shift)
+    shocked = next(c for c in cyc2 if c["day"] == base["day"])
+    for k in ("expiry", "h", "f1", "vix", "ev", "P", "vvix", "vvix_z", "rv", "rv_z"):
+        assert shocked[k] == pytest.approx(base[k], abs=1e-12), k
+    assert shocked["fs"] != pytest.approx(base["fs"])               # the outcome does move
+    assert shocked["y"] != pytest.approx(base["y"])
+
+
 # ------------------------------------------------------------------------------------------------- T-654 --
 
 def test_t654_signals_from_the_session_before_entry():
@@ -171,6 +261,23 @@ def test_t654_signals_from_the_session_before_entry():
     for k in ("VVIX", "VIX", "SKEW", "rv21", "vvix_resid"):
         assert shocked[k] == pytest.approx(base[k], abs=1e-12)
     assert base["signal_session"] == days[349]
+
+
+def test_t654_tercile_cut_uses_2019_2022_only_and_placebo():
+    rng = np.random.default_rng(9)
+    disc = [{"entry": f"2020-{1 + i % 12:02d}-10", "VVIX": float(z), "VIX": float(-z)} for i, z in enumerate(rng.normal(0, 1, 60))]
+    conf = [{"entry": f"2024-{1 + i % 12:02d}-10", "VVIX": float(z), "VIX": float(z), "spread": float(r)}
+            for i, (z, r) in enumerate(zip(rng.normal(0, 1, 40), rng.normal(0, 0.1, 40)))]
+    base = M.tercile_split(conf, disc, "VVIX")
+    conf2 = [dict(w, VVIX=w["VVIX"] * 10.0 + 5.0) for w in conf]  # confirmation z values never set the cut
+    assert M.tercile_split(conf2, disc, "VVIX")["cut"] == pytest.approx(base["cut"])
+    assert base["cut"] == pytest.approx(float(np.quantile([w["VVIX"] for w in disc], 2 / 3)))
+    assert base["n_top"] + base["n_other"] == 40
+    assert M.tercile_split(conf, disc, "SKEW")["cut"] is None          # SKEW not archived: control n/a
+    pl = M.tercile_placebo(base["top"], base["other"], draws=500)
+    assert 0.0 < pl["p"] <= 1.0 and pl["draws"] == 500
+    pl_hi = M.tercile_placebo([10.0, 11.0], [0.0, 0.1, -0.1, 0.2, 0.05, 0.0], draws=2000)
+    assert pl_hi["p"] < 0.1
 
 
 # ------------------------------------------------------------------------------------------------- T-655 --

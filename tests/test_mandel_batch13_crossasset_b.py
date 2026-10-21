@@ -150,6 +150,37 @@ def test_spy_target_runs_from_the_first_close_of_t_plus_1():
     assert M.spy_targets(days, adj2, bills, ["2020-01"])["2020-01"][0] == pytest.approx(y)
 
 
+def test_t602_sign_criterion_is_a_conjunction():
+    good, bad = {"coef": [0.0, -0.5], "t": [0.0, -1.0]}, {"coef": [0.0, 0.2], "t": [0.0, 0.4]}
+    assert M.t602_sign_row(good, good, -1.0)[1] is True
+    assert M.t602_sign_row(bad, good, -1.0)[1] is False          # one wrong sign fails (not undecided)
+    assert M.t602_sign_row(good, bad, -1.0)[1] is False
+    assert M.t602_sign_row(bad, bad, 1.0)[1] is True
+    assert M.t602_sign_row({"coef": None}, good, -1.0)[1] is None
+
+
+def test_dsr_two_matches_the_sibling_family_deflation():
+    from mandel.experiments import batch13_crossasset_a as XA
+    rng = np.random.default_rng(7)
+    rule = rng.normal(0.006, 0.04, 200)
+    bench = rule - rng.normal(0.0, 0.01, 200)
+    rows, info = M.dsr_two({"switch": rule, "bench": bench}, 9, 31, "")
+    rows_a, info_a = XA.dsr_two({"switch": rule, "bench": bench}, 9, 31, "")
+    assert [r[1] for r in rows] == [r[1] for r in rows_a] and len(rows) == 2
+    for k in ("excess", "active"):
+        assert info[k]["dsr_bound"] == pytest.approx(info_a[k]["dsr_bound"])
+    assert all(r[1] is not True for r in rows)                   # the bound can fail but never pass
+    assert M.dsr_two({"switch": None}, 9, 31, "")[0][0][1] is None
+
+
+def test_switch_row_reports_percentile_interval_and_flags_degenerate():
+    sd = {"sharpe_a": 0.7, "sharpe_b": 0.8, "diff": -0.1, "ci": [-7.0, 0.01], "ci_pct": [-0.3, 0.05]}
+    name, ok, _dec = M.switch_row(sd, "x", 1)
+    assert ok is False and "percentile interval" in name and "degenerate" in name
+    name2, ok2, _ = M.switch_row(sd, "x", 40)
+    assert ok2 is ok and "degenerate" not in name2
+
+
 # ------------------------------------------------------------------------------------------------------ T-601 --
 
 def _bar_world(n_days: int = 40, seed: int = 3):
