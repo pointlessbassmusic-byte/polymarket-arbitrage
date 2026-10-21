@@ -10,8 +10,8 @@ from datetime import date, datetime, timedelta, timezone
 import numpy as np
 import pytest
 
-from mandel.experiments import batch13_cryptoderiv_a as M
 from mandel.experiments import batch6c_cryptovenue as CV
+from mandel.experiments import batch13_cryptoderiv_a as M
 
 UTC = timezone.utc
 
@@ -105,7 +105,7 @@ def test_t614_slope_difference_detects_planted_reversal():
 # ============================================================================================================ T-613 ==
 
 def test_t613_weekend_return_ignores_bars_after_the_monday_mark():
-    ts, op, cl = _hourly("2024-06-01", 20, seed=4)
+    ts, _, cl = _hourly("2024-06-01", 20, seed=4)
     ev = [("2024-06-07", "2024-06-10")]
     base = M.btc_window_returns(ev, ts, cl)
     t_mark = int(CV.et_epoch("2024-06-10", "09:00"))        # the bar ending 09:00 ET is the last one used
@@ -304,3 +304,101 @@ def test_t608_placebo_is_centred_on_minus_cost():
     weeks = [{"r": rng.normal(0, 0.05, 30)} for _ in range(300)]
     null = M.placebo_null(weeks, cost_diff=0.001, n=400)
     assert abs(null.mean() + 0.001) < 0.0005
+
+
+def test_t608_hourly_beta_uses_bars_ending_by_monday_only():
+    ts, _, cl = _hourly("2024-01-01", 90, seed=11)
+    rng = np.random.default_rng(12)
+    alt = cl * np.exp(np.cumsum(rng.normal(0, 0.003, cl.size)))          # BTC beta 1 plus noise
+    g0, grid = M.hourly_grid({"BTC": (ts, cl), "SOL": (ts, alt)})
+    t_dec = _ts("2024-03-11")                                          # a Monday 00:00 UTC
+    b = M.hourly_beta(grid, g0, "SOL", t_dec)
+    assert b is not None and 0.5 < b < 1.5
+    after = ts >= t_dec                                                 # bars starting at or after the decision
+    cl2, alt2 = cl.copy(), alt.copy()
+    cl2[after] *= np.exp(rng.normal(0, 0.05, after.sum()))
+    alt2[after] *= 7.0
+    g0b, grid2 = M.hourly_grid({"BTC": (ts, cl2), "SOL": (ts, alt2)})
+    assert g0b == g0 and M.hourly_beta(grid2, g0, "SOL", t_dec) == b
+    alt3 = alt.copy()
+    alt3[ts == t_dec - 3600] *= 1.2                                     # the bar ending at 00:00 is inside the window
+    _, grid3 = M.hourly_grid({"BTC": (ts, cl), "SOL": (ts, alt3)})
+    assert M.hourly_beta(grid3, g0, "SOL", t_dec) != b
+    # too few hours with both closes -> None
+    thin = np.where(rng.random(alt.size) < 0.7, np.nan, alt)
+    keep = np.isfinite(thin)
+    _, grid4 = M.hourly_grid({"BTC": (ts, cl), "SOL": (ts[keep], thin[keep])})
+    assert M.hourly_beta(grid4, g0, "SOL", t_dec) is None
+
+
+def _reference_own_cost_placebo(weeks, n, seed):
+    """Slow dict-based reference: the same random picks, turnover exactly as weekly_books charges the primary."""
+    rng = np.random.default_rng(seed)
+    picks = []
+    for q in weeks:
+        m = q["r"].size
+        picks.append(np.argsort(rng.random((n, m)), axis=1)[:, :m // 3])
+    out = np.zeros(n)
+    for dd in range(n):
+        prev, tot = None, 0.0
+        for i, q in enumerate(weeks):
+            rows, r = q["rows"].tolist(), q["r"]
+            m = r.size
+            keep = np.ones(m, bool)
+            keep[picks[i][dd]] = False
+            w = keep / keep.sum()
+            gross = float(np.dot(w, r))
+            tw = dict(zip(rows, w.tolist()))
+            consecutive = i > 0 and q["k"] - weeks[i - 1]["k"] == 7
+            if consecutive and prev is not None:
+                to = sum(abs(tw.get(x, 0.0) - prev.get(x, 0.0)) for x in set(tw) | set(prev))
+            else:
+                to = 1.0
+            nxt_ok = i + 1 < len(weeks) and weeks[i + 1]["k"] - q["k"] == 7
+            last = i + 1 == len(weeks)
+            tot += gross - M.T608_COST * (to + (0.0 if (nxt_ok or last) else 1.0)) - q["net_all"]
+            prev = {x: wi * (1 + ri) / (1 + gross) for x, wi, ri in zip(rows, w.tolist(), r.tolist()) if wi > 0}
+        out[dd] = tot / len(weeks)
+    return out
+
+
+def test_t608_own_cost_placebo_matches_reference_and_sits_below_primary_cost_reading():
+    daily = _daily_panel(P=36, T=200, seed=13)
+    pan = M.build_panel(daily, "2019-01-01", date.fromordinal(date(2019, 1, 1).toordinal() + 199).isoformat())
+    o0 = pan["o0"]
+    cols = [c for c in range(35, 185) if date.fromordinal(o0 + c).weekday() == 0]
+    res = M.weekly_books(pan, cols)
+    W = res["weeks"]
+    assert len(W) >= 15
+    fast = M.placebo_null_own_cost(W, len(pan["pids"]), n=7, seed=3)
+    ref = _reference_own_cost_placebo(W, 7, 3)
+    assert np.allclose(fast, ref, atol=1e-12)
+    # flat prices: gross books equal, so the own-cost placebo is minus the random book's extra turnover cost (<= 0)
+    flat = [dict(q, r=np.zeros_like(q["r"]), net_all=-M.T608_COST * q["to_all"]) for q in W]
+    v = M.placebo_null_own_cost(flat, len(pan["pids"]), n=50, seed=4)
+    assert (v <= 1e-12).all() and v.mean() < 0
+
+
+def test_t608_drop_rows_remove_a_product_from_the_universe():
+    daily = _daily_panel()
+    pan = M.build_panel(daily, "2019-01-01", "2019-06-09")
+    k = date(2019, 4, 1).toordinal() - pan["o0"]
+    mem = M.universe_at(pan, k)
+    top = int(mem[0])
+    mem2 = M.universe_at(pan, k, drop=frozenset({top}))
+    assert top not in mem2.tolist() and mem2.tolist()[:len(mem) - 1] == [x for x in mem.tolist() if x != top][:len(mem) - 1]
+
+
+def test_t613_local_es_bars_read_posix_seconds(monkeypatch):
+    import pandas as pd
+
+    import mandel.ml.features as F
+    t_sun = int(CV.et_epoch("2025-03-16", "18:00"))
+    t_mon = int(CV.et_epoch("2025-03-17", "15:00"))
+    idx = pd.to_datetime([t_sun, t_sun + 3600, t_mon], unit="s", utc=True).as_unit("s")
+    df = pd.DataFrame({"o": [5600.0, 5610.0, 5650.0], "h": [1.0] * 3, "l": [1.0] * 3, "c": [5605.0, 5620.0, 5656.0],
+                       "v": [1.0] * 3}, index=idx)
+    monkeypatch.setattr(F, "load_bars", lambda interval, sym: df)
+    out = M._local_es([("2025-03-14", "2025-03-17"), ("2025-03-18", "2025-03-19")])
+    assert out["ret"][0] == pytest.approx(5656.0 / 5600.0 - 1.0)
+    assert np.isnan(out["ret"][1]) and out["first"] == "2025-03-16"

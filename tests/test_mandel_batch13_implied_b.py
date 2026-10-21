@@ -254,6 +254,56 @@ def test_gate_at_t_trades_from_the_next_settle():
     assert tf["gated"][k + 1] == pytest.approx(-70.0)
 
 
+# ============================================================================ end-to-end cores (synthetic) ==
+
+_VERDICTS = {"supported", "not_supported", "inconclusive"}
+
+
+def _bills(days):
+    return M.CAL.Bills({d: 2.0 for d in days[::5]})
+
+
+def test_vrp_core_runs_end_to_end_and_counts_the_registered_forecasts():
+    days = _bdays(9900, "1989-01-02")
+    days = [d for d in days if d <= "2026-10-15"]
+    n = len(days)
+    px = _walk(n, 21)
+    rng = np.random.default_rng(22)
+    vix = {d: float(v) for d, v in zip(days, 14 + 10 * rng.random(n)) if d >= "1990-01-02"}
+    spy = {d: float(v) for d, v in zip(days, _walk(n, 23)) if d >= "1993-01-29"}
+    rep = M.vrp_premium_test(days, px, vix, spy, _bills(days), n_boot=60, reps=1)
+    assert rep["verdict"] in _VERDICTS and rep["n"] == 222                  # 2008-01..2026-06 month-ends
+    assert rep["stat"]["first_last_forecast"] == ["2008-01-31", "2026-06-30"]
+    assert len(rep["stat"]["criteria"]) == 5
+
+
+def test_cor1m_core_runs_end_to_end_and_counts_the_registered_forecasts():
+    days = [d for d in _bdays(6000, "2005-01-03") if d <= "2026-10-15"]
+    n = len(days)
+    adj = _walk(n, 24)
+    rng = np.random.default_rng(25)
+    cor = {d: float(v) for d, v in zip(days, 20 + 40 * rng.random(n)) if d >= "2006-01-03"}
+    dspx = {d: float(v) for d, v in zip(days, 15 + 20 * rng.random(n)) if d >= "2014-06-19"}
+    vix = {d: float(v) for d, v in zip(days, 14 + 10 * rng.random(n))}
+    rep = M.cor1m_premium_test(days, adj, adj, cor, dspx, vix, _bills(days), n_boot=60, reps=1)
+    assert rep["verdict"] in _VERDICTS and rep["n"] == 159                  # 2013-01..2026-03 month-ends
+    assert rep["stat"]["cells"]["dspx_h126"]["n"] > 0
+    assert len(rep["stat"]["criteria"]) == 4
+
+
+def test_vix_curve_core_runs_end_to_end_and_never_passes_the_uncomputed_family_dsr():
+    days = [d for d in _bdays(4200, "2011-01-03") if d <= "2026-10-15"]
+    n = len(days)
+    L = _curve_logs(n, 26)
+    idx = {t: {d: float(math.exp(L[i, j])) for i, d in enumerate(days)} for j, t in enumerate(M.TENORS)}
+    curve = {d: v for d, v in _toy_curve(days, 27).items() if d >= "2013-05-20"}
+    vxx = ([d for d in days if d >= "2018-01-25"], _walk(sum(d >= "2018-01-25" for d in days), 28, 0.04))
+    svxy = ([d for d in days if d >= "2011-10-04"], _walk(sum(d >= "2011-10-04" for d in days), 29, 0.03))
+    rep = M.vix_curve_test(idx, curve, vxx, svxy)
+    assert rep["verdict"] in {"not_supported", "inconclusive"} and rep["n"] > 1500
+    assert rep["stat"]["criteria"][2][1] in (False, None)                  # the family DSR can fail but never pass
+
+
 # ======================================================================================= missing bundles ==
 
 class _NoArchive:

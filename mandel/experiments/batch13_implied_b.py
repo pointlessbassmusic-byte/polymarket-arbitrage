@@ -48,7 +48,7 @@ in the reason so a reviewer sees it):
     bp; a prevailing mean <= 0 gives weight 0. The timing rule trades the forecasts of 2008-01..2026-06 (each held
     from the close of t+1 to the close after the next month-end).
   * T-650: Newey-West lag max(6, h / 21) months (6, 6, 12). The slope restriction is applied to every trial (COR1M and
-    DSPX). The timing rule (reported, and the DSR's series) uses clip(forecast / prevailing mean, 0, 1.5) and, as in
+    DSPX) and to the VIX / VRP control forecasts (both have a positive expected sign). The timing rule (reported, and the DSR's series) uses clip(forecast / prevailing mean, 0, 1.5) and, as in
     its sibling T-649, finances leverage at DTB3 + 50 bp; 2 bp per change. The VRP control uses SPY closes (T-650's
     data list has no ^GSPC). The encompassing test is Harvey-Leybourne-Newbold's (d = (e_vrp - e_cor) e_vrp, NW t).
   * DSR (T-649, T-650): rule 11, judged on two series and passing only when both pass: the primary trial's monthly

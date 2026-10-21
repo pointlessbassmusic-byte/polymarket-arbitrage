@@ -18,7 +18,15 @@ Each claim is tested on its own wording, trial.pass and trial.min_n (MANDEL.md s
            EW(ex-losers) - EW(all), entries 2019-01..2026-09. Pass: one-sided 95% lower bound > 0 (studentized 8-week
            circular block bootstrap, 5,000 draws per seed, escalated), both halves (split 2022-11-17) positive, above the
            95th percentile of 1,000 within-week random-tercile placebos, DSR > 0.95 at 28 trials (T-314's 24, T-546 and
-           the 3 arms here). min_n 300 weeks.
+           the 3 arms here). min_n 300 weeks. The placebo criterion charges each random draw the primary's own mean cost
+           difference (T-314's convention; random exclusions turn over more than the loser tercile, so this is the
+           stricter reading, fixed before the run); the null with each random book's own turnover is reported. Reported
+           arms: gross EW(rest) - EW(losers); the 21-day lookback; on the Kalshi-listed subset (the coins the archive's
+           records name as Kalshi perps: ETH, SOL, BNB, DOGE, SHIB, PEPE; hindsight universe) long BTC x the mean
+           trailing-60-day beta of hourly Coinbase log returns (bars ending by Monday 00:00; daily for a coin without an
+           hourly bundle) minus the EW Kalshi-listed losers, 18 bp round trip per leg, funding 0 / +-10%/yr; CMC flags
+           (cmc-historical-listings matched by symbol, T-314's declared classification) and a peg screen as
+           cross-checks; per year; the BTC 200-day trend regime; the six other weekday phases (rule 10).
   * T-613  Coinbase BTC log return from the close of the hourly bar ending at the NYSE close of the last session
            before a weekend (13:00 ET on early closes) to the close of the bar ending 30 minutes before the next
            session's 09:30 ET open (holiday Mondays roll), flagged when in the bottom tercile of all prior weekends
@@ -361,13 +369,13 @@ def _deribit_vs_coinbase(archive, days, mk) -> dict:
     """Reported: Deribit's 08:00 delivery TWAP and the funding bundle's 08:00 index print vs Coinbase's 08:00 mark on
     expiry Fridays (mean |log difference| and mean signed, bp)."""
     deliv = {}
-    for r in CV._stream(archive, T614_DELIV):
+    for r in (CV._stream(archive, T614_DELIV) if B7C._has(archive, T614_DELIV) else ()):
         v = r.get("value") or {}
         p = CV._num(v.get("delivery_price"))
         if p and v.get("date"):
             deliv[v["date"]] = p
     idx08 = {}
-    for r in CV._stream(archive, T614_FUND):
+    for r in (CV._stream(archive, T614_FUND) if B7C._has(archive, T614_FUND) else ()):
         v = r.get("value") or {}
         t = v.get("timestamp")
         p = CV._num(v.get("index_price"))
@@ -383,7 +391,7 @@ def _deribit_vs_coinbase(archive, days, mk) -> dict:
 
 def b13_cryptoderiv_a_expiry_reversal(archive):
     """T-614: 08-16 UTC on 00-08 UTC slope on Deribit monthly-expiry Fridays vs Mon-Thu, and the fade trade."""
-    miss = _missing(archive, [T614_B, T614_DELIV, T614_FUND])
+    miss = _missing(archive, [T614_B])            # the Deribit bundles feed a reported row only
     if miss:
         return miss
     ts, op, cl = _hourly_oc(archive, T614_B)
@@ -578,7 +586,7 @@ def _local_es(events: Sequence[tuple]) -> Optional[dict]:
         return None
     if df is None or df.empty:
         return None
-    ts = (df.index.astype("int64") // 10 ** 9).to_numpy()
+    ts = np.array([int(t.timestamp()) for t in df.index], np.int64)   # POSIX seconds whatever the index unit
     o, c = df["o"].to_numpy(float), df["c"].to_numpy(float)
     pos = {int(t): i for i, t in enumerate(ts)}
     out = {"ret": np.full(len(events), np.nan), "t_sun": np.zeros(len(events), np.int64)}
@@ -805,7 +813,7 @@ def basis_on(rd: str, fut: dict, hourly: tuple, daily: dict) -> Optional[float]:
 def cot_table(recs: Sequence[dict], hourly: tuple, daily: dict, fut: dict, bills) -> list:
     """One row per non-superseded report with a complete 7-day forward window and every control."""
     basis = {q["report_date"]: basis_on(q["report_date"], fut, hourly, daily) for q in recs}
-    out, prev_b = [], None
+    out = []
     for i, q in enumerate(recs):
         b = basis[q["report_date"]]
         bprev = basis[recs[i - 1]["report_date"]] if i else None
@@ -991,8 +999,16 @@ T608_NPLACEBO = 1000
 T608_TRIALS = 24 + 1 + 3             # T-314's 24, T-546, the 3 arms here
 T608_MIN_N = 300
 T608_MAX_STALE = 7                   # days: a 14-day base close may be the latest within a week before M-15
-T608_KALSHI = ("ETH", "SOL", "XRP", "DOGE", "SHIB")   # Kalshi crypto perps named in Hurst's reports (hindsight set)
+# Kalshi crypto perps the archive's own records name (hindsight set, 2026 knowledge): ETH, SOL, BNB in
+# knowledge/venues/US-LEVERAGE-VENUES-2026-10-20.md ("BTC plus ~17 alts"), DOGE, SHIB, PEPE in Hurst's reports. The
+# other alts are not named anywhere in the archive, so they are left out rather than guessed.
+T608_KALSHI = ("ETH", "SOL", "BNB", "DOGE", "SHIB", "PEPE")
 T608_KALSHI_RT = 0.0018
+# Cross-check only (reported, not the primary): a base that is a wrapped token by its Coinbase asset name ("Wrapped LUNA
+# Token") but is absent from T-424's declared lists and unmatched on CMC. The primary keeps T-424's construction as
+# registered; this variant drops it from the universe.
+T608_XCHECK_WRAPPED = frozenset({"WLUNA"})
+T608_BETA_MIN_SHARE = 0.5            # an hourly beta needs >= half of the 1,440 trailing hours with both closes
 T608_FUNDING = (-0.10, 0.0, 0.10)
 T608_BETA_WIN = 60
 T608_EXCLUDE = (CV.T424_STABLE | CV.T424_WRAPPED) - {"BTC"}
@@ -1033,13 +1049,15 @@ def build_panel(daily: dict, first: str, last: str) -> dict:
             "O": O, "C": C, "Cf": Cf, "age": age, "traded": traded, "later": later, "cs": cs, "T": T}
 
 
-def universe_at(pan: dict, k: int, top: int = T608_TOP, window: int = T608_WIN) -> np.ndarray:
+def universe_at(pan: dict, k: int, top: int = T608_TOP, window: int = T608_WIN, drop: frozenset = frozenset()) -> np.ndarray:
     """Row indexes of the top ``top`` products by dollar volume summed over columns k-window..k-1, among products
-    traded on k-1 (T-424's cb_members rule; ties by product id)."""
+    traded on k-1 (T-424's cb_members rule; ties by product id); rows in ``drop`` are not eligible (reported variant)."""
     if k - window < 0:
         return np.array([], int)
     s = pan["cs"][:, k] - pan["cs"][:, k - window]
     elig = pan["traded"][:, k - 1] & (s > 0)
+    if drop:
+        elig[list(drop)] = False
     idx = np.flatnonzero(elig)
     if not idx.size:
         return idx
@@ -1082,7 +1100,8 @@ def week_returns(pan: dict, k: int, rows: np.ndarray, hold: int = 7) -> tuple:
     return ex / e - 1.0, gone & ~np.isfinite(ox)
 
 
-def weekly_books(pan: dict, cols: Sequence[int], look: int = T608_LOOK, kalshi: bool = False, btc_row: Optional[int] = None) -> dict:
+def weekly_books(pan: dict, cols: Sequence[int], look: int = T608_LOOK, kalshi: bool = False, btc_row: Optional[int] = None,
+                 drop: frozenset = frozenset()) -> dict:
     """The two books (all eligible, ex-losers) on every rebalance column in ``cols``: gross, turnover, net, the gross
     rest-minus-losers spread, and (``kalshi``) the BTC-minus-Kalshi-listed-losers arm."""
     rec = []
@@ -1092,7 +1111,7 @@ def weekly_books(pan: dict, cols: Sequence[int], look: int = T608_LOOK, kalshi: 
     for k in cols:
         if k + 7 >= pan["T"]:
             break
-        mem = universe_at(pan, k)
+        mem = universe_at(pan, k, drop=drop)
         sig = week_signal(pan, k, mem, look)
         ok = np.isfinite(sig) & np.isfinite(pan["O"][mem, k])
         rows, sig = mem[ok], sig[ok]
@@ -1134,9 +1153,60 @@ def weekly_books(pan: dict, cols: Sequence[int], look: int = T608_LOOK, kalshi: 
     return {"weeks": rec, "dropped": dropped}
 
 
+def hourly_grid(series: dict) -> tuple:
+    """{base: (bar starts, closes)} -> (g0, {base: closes on the common UTC hourly grid from g0, NaN where no bar})."""
+    if not series:
+        return 0, {}
+    g0 = min(int(ts[0]) for ts, _ in series.values() if ts.size)
+    g1 = max(int(ts[-1]) for ts, _ in series.values() if ts.size)
+    n = (g1 - g0) // H + 1
+    out = {}
+    for b, (ts, cl) in series.items():
+        a = np.full(n, np.nan)
+        a[(np.asarray(ts, np.int64) - g0) // H] = cl
+        out[b] = a
+    return g0, out
+
+
+def hourly_beta(grid: dict, g0: int, base: str, t_dec: int, days: int = T608_BETA_WIN,
+                min_share: float = T608_BETA_MIN_SHARE) -> Optional[float]:
+    """Trailing ``days``-day beta of ``base``'s hourly log returns on BTC's, over the bars ending by ``t_dec`` (bar starts
+    t_dec - days x 24 h .. t_dec - 1 h; each return against the previous bar's close), hours with both closes only;
+    None below ``min_share`` of the window's hours."""
+    c, b = grid.get(base), grid.get("BTC")
+    if c is None or b is None:
+        return None
+    hi = (int(t_dec) - H - g0) // H                       # the bar starting t_dec - 1 h (it ends at t_dec)
+    lo = hi - days * 24 + 1
+    if lo < 1 or hi >= c.size:
+        return None
+    with np.errstate(divide="ignore", invalid="ignore"):
+        x = np.log(c[lo:hi + 1] / c[lo - 1:hi])
+        y = np.log(b[lo:hi + 1] / b[lo - 1:hi])
+    m = np.isfinite(x) & np.isfinite(y)
+    if m.sum() < min_share * days * 24 or np.var(y[m]) <= 0:
+        return None
+    return float(np.cov(x[m], y[m])[0, 1] / np.var(y[m], ddof=1))
+
+
+def _daily_beta(pan: dict, k: int, row: int, btc_row: int) -> Optional[float]:
+    """Fallback for a coin with no hourly bundle (or too few hours): trailing-60-day beta of daily close-to-close log
+    returns through the bar ending at column k's 00:00, >= 40 days with both closes."""
+    lo = k - T608_BETA_WIN - 1
+    if lo < 0:
+        return None
+    with np.errstate(divide="ignore", invalid="ignore"):
+        a, b = np.diff(np.log(pan["C"][row, lo:k])), np.diff(np.log(pan["C"][btc_row, lo:k]))
+    m = np.isfinite(a) & np.isfinite(b)
+    if m.sum() < 40 or np.var(b[m]) <= 0:
+        return None
+    return float(np.cov(a[m], b[m])[0, 1] / np.var(b[m], ddof=1))
+
+
 def _kalshi_leg(pan: dict, k: int, rows: np.ndarray, r: np.ndarray, lm: np.ndarray, btc_row: int) -> dict:
-    """Reported Kalshi arm: long BTC x mean trailing-60-day beta, short the EW Kalshi-listed losers, 18 bp round trip on
-    each leg's notional; funding on the short at -10 / 0 / +10 %/yr."""
+    """Reported Kalshi arm: long BTC x mean trailing-60-day beta (hourly Coinbase returns, ``pan['hgrid']``; daily for a
+    coin without an hourly bundle), short the EW Kalshi-listed losers, 18 bp round trip on each leg's notional; funding
+    on the short at -10 / 0 / +10 %/yr."""
     sel = [j for j in np.flatnonzero(lm) if pan["base"][rows[j]] in T608_KALSHI]
     if not sel:
         return {"kalshi": None}
@@ -1147,23 +1217,26 @@ def _kalshi_leg(pan: dict, k: int, rows: np.ndarray, r: np.ndarray, lm: np.ndarr
         if not (np.isfinite(e) and np.isfinite(x)):
             return {"kalshi": None}
         rb = float(x / e - 1)
-    lo = k - T608_BETA_WIN - 1
-    if lo < 0:
-        return {"kalshi": None}
-    cb = pan["C"][btc_row, lo:k]
-    betas = []
+    g0, grid = pan.get("hgrid", (0, {}))
+    t_dec = _utc0(pan["days"][k])
+    betas, src = [], []
     for j in sel:
-        ci = pan["C"][rows[j], lo:k]
-        with np.errstate(divide="ignore", invalid="ignore"):
-            a, b = np.diff(np.log(ci)), np.diff(np.log(cb))
-        m = np.isfinite(a) & np.isfinite(b)
-        if m.sum() >= 40 and np.var(b[m]) > 0:
-            betas.append(float(np.cov(a[m], b[m])[0, 1] / np.var(b[m], ddof=1)))
+        bs = pan["base"][rows[j]]
+        bh = hourly_beta(grid, g0, bs, t_dec) if bs in grid else None
+        if bh is not None:
+            betas.append(bh)
+            src.append("hourly")
+            continue
+        bd = _daily_beta(pan, k, rows[j], btc_row)
+        if bd is not None:
+            betas.append(bd)
+            src.append("daily")
     if not betas:
         return {"kalshi": None}
     beta = float(np.mean(betas))
     base = beta * rb - float(np.mean(r[sel])) - T608_KALSHI_RT * (1 + abs(beta))
-    return {"kalshi": {f: base + f / 52.0 for f in T608_FUNDING}, "kalshi_names": [pan["base"][rows[j]] for j in sel], "kalshi_beta": beta}
+    return {"kalshi": {f: base + f / 52.0 for f in T608_FUNDING}, "kalshi_names": [pan["base"][rows[j]] for j in sel],
+            "kalshi_beta": beta, "kalshi_beta_src": src}
 
 
 def placebo_null(weeks: Sequence[dict], cost_diff: float, n: int = T608_NPLACEBO, seed: int = SEED) -> np.ndarray:
@@ -1179,6 +1252,40 @@ def placebo_null(weeks: Sequence[dict], cost_diff: float, n: int = T608_NPLACEBO
         s_l = r[pick].sum(axis=1)
         tot += (r.sum() - s_l) / (m - k) - r.mean()
     return tot / max(1, len(weeks)) - cost_diff
+
+
+def placebo_null_own_cost(weeks: Sequence[dict], n_rows: int, n: int = T608_NPLACEBO, seed: int = SEED) -> np.ndarray:
+    """Reported reading of the placebo: the same random within-week terciles, but each random ex-book charged its OWN
+    drift-adjusted turnover at T608_COST per side exactly as ``weekly_books`` charges the primary (full entry after a
+    gap, a full liquidation before one), minus the EW(all) book's own net. Random exclusions turn over more than the
+    loser tercile, so this null sits below ``placebo_null`` (which is the stricter criterion)."""
+    rng = np.random.default_rng(seed)
+    tot = np.zeros(n)
+    prev = None
+    ar = np.arange(n)[:, None]
+    for i, q in enumerate(weeks):
+        rows, r = q["rows"], q["r"]
+        m = r.size
+        k = m // 3
+        pick = np.argsort(rng.random((n, m)), axis=1)[:, :k]
+        keep = np.ones((n, m), bool)
+        keep[ar, pick] = False
+        w = keep / float(m - k)
+        gross = (w * r[None, :]).sum(axis=1)
+        consecutive = i > 0 and q["k"] - weeks[i - 1]["k"] == 7
+        if consecutive and prev is not None:
+            Wt = np.zeros((n, n_rows))
+            Wt[:, rows] = w
+            to = np.abs(Wt - prev).sum(axis=1)
+        else:
+            to = np.ones(n)
+        nxt_ok = i + 1 < len(weeks) and weeks[i + 1]["k"] - q["k"] == 7
+        last = i + 1 == len(weeks)
+        net_ex = gross - T608_COST * (to + (0.0 if (nxt_ok or last) else 1.0))
+        tot += net_ex - q["net_all"]
+        prev = np.zeros((n, n_rows))
+        prev[:, rows] = w * (1.0 + r[None, :]) / (1.0 + gross[:, None])
+    return tot / max(1, len(weeks))
 
 
 def _load_daily_ohlv(archive, pid: str) -> dict:
@@ -1217,13 +1324,42 @@ def _t608_panel(archive) -> tuple:
     return CAL._cached(archive, ("b13cda_t608_panel",), load)
 
 
-def _peg_flags(pan: dict, k: int, rows: np.ndarray) -> int:
-    """Cross-check: members whose every close over the last 14 days lies within 2% of 1 USD (a peg the declared lists
-    missed)."""
+def _peg_flags(pan: dict, k: int, rows: np.ndarray, refs: Sequence[int] = ()) -> int:
+    """Cross-check: members whose every close over the 14 days before column k lies within 2% of 1 USD, or of a
+    reference coin's close on the same days (BTC / ETH / SOL rows ``refs``: a wrapped or staked copy the declared lists
+    missed); at least 10 closes. Uses closes of bars ending by column k's 00:00 only."""
     c = pan["C"][rows, max(0, k - 14):k]
-    with np.errstate(invalid="ignore"):
-        peg = np.all(np.abs(c - 1.0) <= 0.02, axis=1) & (np.isfinite(c).sum(axis=1) >= 10)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        fin = np.isfinite(c)
+        peg = np.all(np.abs(c - 1.0) <= 0.02, axis=1, where=fin) & (fin.sum(axis=1) >= 10)
+        for ref in refs:
+            rc = pan["C"][ref, max(0, k - 14):k][None, :]
+            ok = fin & np.isfinite(rc)
+            near = np.all(np.abs(c / rc - 1.0) <= 0.02, axis=1, where=ok) & (ok.sum(axis=1) >= 10) & (rows != ref)
+            peg |= near
     return int(peg.sum())
+
+
+def _cmc_cross_check(archive, bases: set) -> dict:
+    """CMC flags as a cross-check (reported, nothing is excluded by it): every base that was ever a member, matched by
+    symbol to the CMC id with the largest market cap among cmc-historical-listings rows (rows available at capture),
+    flagged when T-314's declared CMC classification (``batch6c_cryptoxs.declared_excluded``: stablecoin, gold token,
+    wrapped / bridged / staked copy, by id or slug) marks that id."""
+    from mandel.experiments.batch6c_cryptoxs import declared_excluded
+    if not B7C._has(archive, T608_CMC):
+        return {"archived": False}
+    best = {}
+    for r in CV._stream(archive, T608_CMC):
+        v = r.get("value") or {}
+        s = str(v.get("symbol") or "").upper()
+        if s not in bases or v.get("id") is None:
+            continue
+        mc = CV._num(v.get("marketCap")) or 0.0
+        if s not in best or mc > best[s][2]:
+            best[s] = (int(v["id"]), v.get("slug"), mc)
+    flagged = sorted(s for s, (cid, slug, _) in best.items() if declared_excluded(cid, slug))
+    return {"archived": True, "n_bases": len(bases), "matched": len(best), "unmatched": sorted(bases - set(best)),
+            "flagged": flagged, "flagged_slugs": {s: best[s][1] for s in flagged}}
 
 
 def two_week_losers(pan: dict, info: dict, weekday: int = 0, full: bool = True) -> dict:
@@ -1247,11 +1383,23 @@ def two_week_losers(pan: dict, info: dict, weekday: int = 0, full: bool = True) 
     cost_diff = float(np.mean([q["cost_ex"] - q["cost_all"] for q in W])) if W else 0.0
     pl_null = placebo_null(W, cost_diff) if W else np.array([])
     q95 = float(np.quantile(pl_null, 0.95)) if pl_null.size else None
+    own = placebo_null_own_cost(W, len(pan["pids"])) if W else np.array([])
+    q95_own = float(np.quantile(own, 0.95)) if own.size else None
     rl = np.array([q["rl_gross"] for q in W])
     kal = [q for q in W if q.get("kalshi")]
     kser = np.array([q["kalshi"][0.0] for q in kal]) if kal else np.array([])
     rob = weekly_books(pan, cols, look=T608_LOOK_ROB)
     d21 = np.array([q["d"] for q in rob["weeks"]])
+    xw_rows = frozenset(i for i, b in enumerate(pan["base"]) if b in T608_XCHECK_WRAPPED)
+    xw = weekly_books(pan, cols, drop=xw_rows) if xw_rows else None
+    if xw is not None:
+        dx = np.array([q["d"] for q in xw["weeks"]])
+        fx = np.array([q["day"] < T608_SPLIT for q in xw["weeks"]])
+        pgx, _, drx = CAL.studentized_p_escalated(dx, T608_BLOCK, T608_NBOOT, SEED, 1)
+        xw_out = {"bases": sorted(T608_XCHECK_WRAPPED), "n": int(dx.size), "dropped": xw["dropped"], "mean": _mean(dx),
+                  "p": pgx, "draws": drx, "halves": [_mean(dx[fx]), _mean(dx[~fx])]}
+    else:
+        xw_out = {"bases": sorted(T608_XCHECK_WRAPPED), "n": 0, "note": "not in the panel"}
     fam = [_sr(d), _sr(rl[np.isfinite(rl)]), _sr(kser) if kser.size > 2 else None]
     dsr = family_dsr(d, fam, T608_TRIALS) if d.size > 3 else {"dsr": None}
     m = _mean(d)
@@ -1264,7 +1412,6 @@ def two_week_losers(pan: dict, info: dict, weekday: int = 0, full: bool = True) 
              dsr_row(dsr, f"DSR > 0.95 at {T608_TRIALS} trials (T-314's 24, T-546, the 3 arms here)")
              if dsr.get("dsr") is not None else ("DSR > 0.95 (n/a)", None, False)]
     v, why, crit = CAL._judge(rows_, len(W), T608_MIN_N, "weeks")
-    btc_sma = None
     by_reg = {}
     if btc_row is not None:
         Cf = pan["Cf"][btc_row]
@@ -1281,17 +1428,25 @@ def two_week_losers(pan: dict, info: dict, weekday: int = 0, full: bool = True) 
         by_year[q["day"][:4]].append(q["d"])
     excl_syms = _cmc_excluded_symbols()
     cmc_hits = sorted({pan["base"][i] for q in W for i in q["rows"] if pan["base"][i].upper() in excl_syms})
-    peg_hits = sum(_peg_flags(pan, q["k"], q["rows"]) for q in W)
+    refs = [pan["pids"].index(p) for p in ("BTC-USD", "ETH-USD", "SOL-USD") if p in pan["pids"]]
+    peg_hits = sum(_peg_flags(pan, q["k"], q["rows"], refs) for q in W)
+    src = [s for q in kal for s in q.get("kalshi_beta_src", [])]
     out.update(verdict=v, why=why, criteria=crit, p=pg, draws=dr, ci=ci, halves=halves, placebo_q95=q95,
                placebo_mean=float(pl_null.mean()) if pl_null.size else None, cost_diff=cost_diff, dsr=dsr,
+               placebo_own_cost_q95=q95_own, placebo_own_cost_mean=float(own.mean()) if own.size else None,
+               ever_member_bases=sorted({pan["base"][i] for q in W for i in q["rows"]}),
                gross_rest_minus_losers=_mean(rl), mean_gross_ex=_mean([q["gross_ex"] for q in W]),
                mean_gross_all=_mean([q["gross_all"] for q in W]), mean_to_ex=_mean([q["to_ex"] for q in W]),
                mean_to_all=_mean([q["to_all"] for q in W]), mean_n=_mean([q["n"] for q in W]),
                n_delisted=int(sum(q["n_delisted"] for q in W)), first_week=days[0] if days else None,
                last_week=days[-1] if days else None,
                robust_21d={"n": len(rob["weeks"]), "mean": _mean(d21), "dropped": rob["dropped"]},
+               cross_check_wrapped_excluded=xw_out,
                kalshi_arm={"n_active_weeks": len(kal), "mean_by_funding": {str(f): _mean([q["kalshi"][f] for q in kal]) for f in T608_FUNDING},
-                           "mean_beta": _mean([q["kalshi_beta"] for q in kal]), "set": list(T608_KALSHI)},
+                           "mean_beta": _mean([q["kalshi_beta"] for q in kal]), "set": list(T608_KALSHI),
+                           "beta_source_counts": {s: src.count(s) for s in ("hourly", "daily")},
+                           "per_year_funding0": {yv: _mean([q["kalshi"][0.0] for q in kal if q["day"][:4] == yv])
+                                                 for yv in sorted({q["day"][:4] for q in kal})}},
                by_year={y: float(np.mean(v_)) for y, v_ in sorted(by_year.items())}, btc_trend=by_reg,
                cmc_cross_check={"excluded_symbol_members": cmc_hits, "peg_screen_member_weeks": peg_hits})
     return out
@@ -1306,12 +1461,18 @@ def b13_cryptoderiv_a_two_week_losers(archive):
     if miss:
         return miss
     pan, info = _t608_panel(archive)
+    hb = {b: _hourly_oc(archive, CV.cbh(f"{b}-USD")) for b in ("BTC",) + T608_KALSHI if B7C._has(archive, CV.cbh(f"{b}-USD"))}
+    pan["hgrid"] = hourly_grid({b: (ts, cl) for b, (ts, _, cl) in hb.items()}) if "BTC" in hb else (0, {})
     j = two_week_losers(pan, info, 0, True)
+    cmc = _cmc_cross_check(archive, set(j["ever_member_bases"]))
     phases = {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][wd]: two_week_losers(pan, info, wd, False)["mean"] for wd in range(1, 7)}
     phases["Mon"] = j["mean"]
     pv = [v_ for v_ in phases.values() if v_ is not None]
     ka = j["kalshi_arm"]
-    cmc_note = ("cmc-historical-listings archived" if B7C._has(archive, T608_CMC) else "cmc-historical-listings not archived")
+    cmc_note = (f"cmc-historical-listings: {cmc['matched']} of {cmc['n_bases']} ever-member bases matched by symbol, "
+                f"flagged by T-314's declared CMC classification {cmc['flagged']}" if cmc.get("archived")
+                else "cmc-historical-listings not archived")
+    j["cmc_cross_check"]["cmc_bundle"] = cmc
     reason = (f"{info['n_bundles']} coinbase-daily USD bundles ({len(info['excluded'])} excluded: T-424's stablecoin and wrapped/staked "
               f"bases (BTC kept) and {len(info['fx_stablecoin_ids'])} fx_stablecoin ids of {info['snapshot']}); point-in-time top {T608_TOP} "
               f"by trailing {T608_WIN}-day dollar volume each Monday 00:00 UTC, {j['first_week']}..{j['last_week']}: {j['n']} weeks kept, "
@@ -1319,21 +1480,31 @@ def b13_cryptoderiv_a_two_week_losers(archive):
               f"last price -50%. Mean weekly net EW(ex-losers) - EW(all) {_bp(j['mean'])} (p {CAL._mc(j['p'], j['draws'])}, 95% CI "
               f"{_bp(j['ci'][0])} to {_bp(j['ci'][1])}); gross ex {_pc(j['mean_gross_ex'], 3)} vs all {_pc(j['mean_gross_all'], 3)}; "
               f"turnover ex {_f(j['mean_to_ex'], 3)} vs all {_f(j['mean_to_all'], 3)} a week (cost difference {_bp(j['cost_diff'])}); halves "
-              f"{_bp(j['halves'][0])} / {_bp(j['halves'][1])}; placebo 95th pct {_bp(j['placebo_q95'])} (mean {_bp(j['placebo_mean'])}); "
-              f"DSR {_f(j['dsr'].get('dsr'), 3)}. Reported: gross EW(rest) - EW(losers) {_bp(j['gross_rest_minus_losers'])}; 21-day lookback "
+              f"{_bp(j['halves'][0])} / {_bp(j['halves'][1])}; placebo 95th pct {_bp(j['placebo_q95'])} (mean {_bp(j['placebo_mean'])}; "
+              f"the primary's cost difference charged, the stricter reading; with each random book's own turnover the 95th pct is "
+              f"{_bp(j['placebo_own_cost_q95'])}); DSR {_f(j['dsr'].get('dsr'), 3)}. Reported: gross EW(rest) - EW(losers) "
+              f"{_bp(j['gross_rest_minus_losers'])}; 21-day lookback "
               f"{_bp(j['robust_21d']['mean'])} ({j['robust_21d']['n']} weeks); Kalshi-listed subset {list(T608_KALSHI)} (hindsight universe) "
-              f"BTC x beta minus losers {ka['n_active_weeks']} active weeks, mean {_bp(ka['mean_by_funding']['0.0'])} at funding 0 "
+              f"BTC x beta minus losers {ka['n_active_weeks']} active weeks (betas: {ka['beta_source_counts']['hourly']} hourly, "
+              f"{ka['beta_source_counts']['daily']} daily), mean {_bp(ka['mean_by_funding']['0.0'])} at funding 0 "
               f"({_bp(ka['mean_by_funding']['-0.1'])} / {_bp(ka['mean_by_funding']['0.1'])} at -/+10%/yr); BTC trend "
               + ", ".join(f"{k} {_bp(v_['mean'])} ({v_['n']})" for k, v_ in j["btc_trend"].items())
               + "; by year " + ", ".join(f"{y} {_bp(v_)}" for y, v_ in j["by_year"].items())
               + f"; rule 10 per-start range over the 7 weekday phases {_bp(min(pv)) if pv else 'n/a'} to {_bp(max(pv)) if pv else 'n/a'}"
               f"; CMC cross-check: members matching CMC-declared stable/wrapped symbols {j['cmc_cross_check']['excluded_symbol_members']}, "
-              f"peg-screen member-weeks {j['cmc_cross_check']['peg_screen_member_weeks']} ({cmc_note}). Survivorship: the panel is "
+              f"peg-screen member-weeks (2% of 1 USD, BTC, ETH or SOL over 14 days) {j['cmc_cross_check']['peg_screen_member_weeks']}; "
+              f"{cmc_note}; with {j['cross_check_wrapped_excluded']['bases']} (wrapped by name, missing from T-424's lists) "
+              f"dropped from the universe the primary reads {_bp(j['cross_check_wrapped_excluded'].get('mean'))} (p "
+              f"{_f(j['cross_check_wrapped_excluded'].get('p'), 4)}, halves {_bp((j['cross_check_wrapped_excluded'].get('halves') or [None, None])[0])} / "
+              f"{_bp((j['cross_check_wrapped_excluded'].get('halves') or [None, None])[1])}; reported, the primary keeps T-424's construction). "
+              f"Survivorship: the panel is "
               f"today's Coinbase product list (online and delisted USD products), so products dropped from the API entirely are "
               f"absent; the -50% delisting mark is the registered haircut — " + j["why"])
     stat = {k: j[k] for k in ("n", "dropped", "mean", "p", "draws", "ci", "halves", "placebo_q95", "placebo_mean", "cost_diff",
+                              "placebo_own_cost_q95", "placebo_own_cost_mean",
                               "gross_rest_minus_losers", "mean_gross_ex", "mean_gross_all", "mean_to_ex", "mean_to_all", "mean_n",
                               "n_delisted", "first_week", "last_week", "robust_21d", "kalshi_arm", "by_year", "btc_trend",
+                              "cross_check_wrapped_excluded",
                               "cmc_cross_check", "criteria")}
     stat.update(dsr={k: j["dsr"].get(k) for k in ("dsr", "psr0", "var_used", "n_trials")}, phases=phases,
                 excluded_products=info["excluded"], snapshot=info["snapshot"],
