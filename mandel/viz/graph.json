@@ -934,9 +934,8 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 5,
-"inconclusive": 1,
-"untested": 4,
+"not_supported": 8,
+"inconclusive": 2,
 "blocked": 1
 },
 "Children's research ledger": {
@@ -1046,7 +1045,7 @@
 "Mandel's tested theories": {
 "inconclusive": 1,
 "blocked": 4,
-"untested": 1
+"not_supported": 1
 }
 }
 }
@@ -1172,12 +1171,11 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 46,
+"not_supported": 57,
 "supported": 4,
 "inconclusive": 7,
 "blocked": 15,
-"parked": 1,
-"untested": 11
+"parked": 1
 }
 }
 }
@@ -1231,9 +1229,8 @@
 "Mandel's tested theories": {
 "blocked": 20,
 "inconclusive": 3,
-"not_supported": 5,
-"supported": 1,
-"untested": 15
+"not_supported": 20,
+"supported": 1
 }
 }
 }
@@ -1286,10 +1283,9 @@
 "verdicts": {
 "Mandel's tested theories": {
 "supported": 5,
-"not_supported": 21,
-"inconclusive": 2,
-"blocked": 20,
-"untested": 21
+"not_supported": 39,
+"inconclusive": 5,
+"blocked": 20
 }
 }
 }
@@ -1398,10 +1394,9 @@
 "verdicts": {
 "Mandel's tested theories": {
 "supported": 4,
-"not_supported": 26,
+"not_supported": 34,
 "blocked": 13,
-"inconclusive": 5,
-"untested": 9
+"inconclusive": 6
 }
 }
 }
@@ -1777,10 +1772,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 16,
+"not_supported": 17,
 "blocked": 11,
 "inconclusive": 4,
-"untested": 2
+"untested": 1
 },
 "Children's research ledger": {
 "FAIL": 2
@@ -2002,10 +1997,9 @@
 "verdicts": {
 "Mandel's tested theories": {
 "supported": 26,
-"not_supported": 76,
-"inconclusive": 9,
-"blocked": 16,
-"untested": 13
+"not_supported": 88,
+"inconclusive": 10,
+"blocked": 16
 }
 }
 }
@@ -2094,9 +2088,8 @@
 "verdicts": {
 "Mandel's tested theories": {
 "blocked": 15,
-"not_supported": 7,
-"supported": 1,
-"untested": 10
+"not_supported": 17,
+"supported": 1
 }
 }
 }
@@ -2133,8 +2126,7 @@
 "verdicts": {
 "Mandel's tested theories": {
 "blocked": 1,
-"not_supported": 3,
-"untested": 2
+"not_supported": 5
 }
 }
 }
@@ -2205,8 +2197,7 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 2,
-"untested": 1
+"not_supported": 3
 },
 "Children's research ledger": {
 "FAIL": 1
@@ -2262,10 +2253,9 @@
 "verdicts": {
 "Mandel's tested theories": {
 "blocked": 9,
-"not_supported": 5,
+"not_supported": 6,
 "inconclusive": 1,
-"supported": 1,
-"untested": 1
+"supported": 1
 }
 }
 }
@@ -2317,9 +2307,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 6,
+"not_supported": 28,
 "blocked": 23,
-"untested": 25
+"inconclusive": 3
 }
 }
 }
@@ -2530,11 +2520,10 @@
 "verdicts": {
 "Mandel's tested theories": {
 "supported": 5,
-"not_supported": 28,
+"not_supported": 39,
 "blocked": 23,
-"inconclusive": 5,
-"parked": 2,
-"untested": 12
+"inconclusive": 6,
+"parked": 2
 }
 }
 }
@@ -2586,11 +2575,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 36,
+"not_supported": 45,
 "supported": 4,
 "blocked": 5,
-"inconclusive": 1,
-"untested": 9
+"inconclusive": 1
 },
 "Children's research ledger": {
 "FAIL": 1
@@ -2724,9 +2712,8 @@
 "Mandel's tested theories": {
 "supported": 2,
 "blocked": 16,
-"not_supported": 7,
-"inconclusive": 1,
-"untested": 3
+"not_supported": 9,
+"inconclusive": 2
 }
 }
 }
@@ -2782,8 +2769,7 @@
 "supported": 2,
 "blocked": 7,
 "inconclusive": 1,
-"not_supported": 4,
-"untested": 9
+"not_supported": 13
 }
 }
 }
@@ -2839,8 +2825,7 @@
 "supported": 1,
 "blocked": 11,
 "parked": 1,
-"not_supported": 2,
-"untested": 2
+"not_supported": 4
 }
 }
 }
@@ -3134,10 +3119,9 @@
 "verdicts": {
 "Mandel's tested theories": {
 "blocked": 10,
-"not_supported": 4,
+"not_supported": 8,
 "supported": 1,
-"inconclusive": 1,
-"untested": 5
+"inconclusive": 2
 }
 }
 }
@@ -3236,10 +3220,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"inconclusive": 3,
-"not_supported": 12,
-"blocked": 2,
-"untested": 2
+"inconclusive": 4,
+"not_supported": 13,
+"blocked": 2
 }
 }
 }
@@ -3377,10 +3360,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 3,
-"inconclusive": 2,
-"blocked": 3,
-"untested": 4
+"not_supported": 6,
+"inconclusive": 3,
+"blocked": 3
 }
 }
 }
@@ -3433,8 +3415,8 @@
 "verdicts": {
 "Mandel's tested theories": {
 "blocked": 7,
-"not_supported": 2,
-"untested": 3
+"not_supported": 3,
+"inconclusive": 2
 }
 }
 }
@@ -3486,11 +3468,11 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"inconclusive": 2,
+"inconclusive": 3,
 "supported": 1,
-"not_supported": 9,
+"not_supported": 13,
 "blocked": 6,
-"untested": 6
+"untested": 1
 }
 }
 }
@@ -3542,10 +3524,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 7,
+"not_supported": 33,
 "blocked": 17,
-"inconclusive": 1,
-"untested": 32
+"inconclusive": 5,
+"untested": 2
 },
 "Children's research ledger": {
 "FAIL": 1
@@ -3601,10 +3583,9 @@
 "verdicts": {
 "Mandel's tested theories": {
 "supported": 7,
-"inconclusive": 2,
-"not_supported": 2,
-"blocked": 4,
-"untested": 5
+"inconclusive": 3,
+"not_supported": 6,
+"blocked": 4
 }
 }
 }
@@ -15605,7 +15586,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 4.091042453358316,
-"label": "10 blocked, 5 untested, 4 not supported, 1 supported, 1 inconclusive (1 of 5 decided passed)"
+"label": "10 blocked, 8 not supported, 2 inconclusive, 1 supported (1 of 9 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15613,7 +15594,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 4.295836866004329,
-"label": "9 untested, 7 blocked, 4 not supported, 3 parked, 2 supported, 1 inconclusive (2 of 6 decided passed)"
+"label": "13 not supported, 7 blocked, 3 parked, 2 supported, 1 inconclusive (2 of 15 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15621,7 +15602,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 2.9459101490553135,
-"label": "4 blocked, 1 inconclusive, 1 untested"
+"label": "4 blocked, 1 inconclusive, 1 not supported (0 of 1 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15629,7 +15610,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 3.8903717578961645,
-"label": "9 blocked, 5 not supported, 1 inconclusive, 1 supported, 1 untested (1 of 6 decided passed)"
+"label": "9 blocked, 6 not supported, 1 inconclusive, 1 supported (1 of 7 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15669,7 +15650,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.02535169073515,
-"label": "36 not supported, 9 untested, 5 blocked, 4 supported, 1 inconclusive (4 of 40 decided passed)"
+"label": "45 not supported, 5 blocked, 4 supported, 1 inconclusive (4 of 49 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15677,7 +15658,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 4.80666248977032,
-"label": "20 blocked, 15 untested, 5 not supported, 3 inconclusive, 1 supported (1 of 6 decided passed)"
+"label": "20 blocked, 20 not supported, 3 inconclusive, 1 supported (1 of 21 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15701,7 +15682,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 2.9459101490553135,
-"label": "3 not supported, 2 untested, 1 blocked (0 of 3 decided passed)"
+"label": "5 not supported, 1 blocked (0 of 5 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15717,7 +15698,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.442651256490317,
-"label": "46 not supported, 15 blocked, 11 untested, 7 inconclusive, 4 supported, 1 parked (4 of 50 decided passed)"
+"label": "57 not supported, 15 blocked, 7 inconclusive, 4 supported, 1 parked (4 of 61 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15725,7 +15706,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.007333185232471,
-"label": "25 untested, 23 blocked, 6 not supported (0 of 6 decided passed)"
+"label": "28 not supported, 23 blocked, 3 inconclusive (0 of 28 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15733,7 +15714,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 4.526360524616162,
-"label": "16 not supported, 11 blocked, 4 inconclusive, 2 untested (0 of 16 decided passed)"
+"label": "17 not supported, 11 blocked, 4 inconclusive, 1 untested (0 of 17 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15749,7 +15730,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 3.995732273553991,
-"label": "12 not supported, 3 inconclusive, 2 blocked, 2 untested (0 of 12 decided passed)"
+"label": "13 not supported, 4 inconclusive, 2 blocked (0 of 13 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15781,7 +15762,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.060443010546419,
-"label": "32 untested, 17 blocked, 7 not supported, 1 inconclusive (0 of 7 decided passed)"
+"label": "33 not supported, 17 blocked, 5 inconclusive, 2 untested (0 of 33 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15789,7 +15770,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.948759890378168,
-"label": "76 not supported, 26 supported, 16 blocked, 13 untested, 9 inconclusive (26 of 102 decided passed)"
+"label": "88 not supported, 26 supported, 16 blocked, 10 inconclusive (26 of 114 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15797,7 +15778,7 @@
 "type": "evidence",
 "sign": 1,
 "w": 4.044522437723423,
-"label": "7 supported, 5 untested, 4 blocked, 2 inconclusive, 2 not supported (7 of 9 decided passed)"
+"label": "7 supported, 6 not supported, 4 blocked, 3 inconclusive (7 of 13 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15805,7 +15786,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 4.401197381662156,
-"label": "16 blocked, 7 not supported, 3 untested, 2 supported, 1 inconclusive (2 of 9 decided passed)"
+"label": "16 blocked, 9 not supported, 2 supported, 2 inconclusive (2 of 11 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15813,7 +15794,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 3.5649493574615367,
-"label": "4 untested, 3 not supported, 3 blocked, 2 inconclusive (0 of 3 decided passed)"
+"label": "6 not supported, 3 inconclusive, 3 blocked (0 of 6 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15829,7 +15810,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 3.5649493574615367,
-"label": "7 blocked, 3 untested, 2 not supported (0 of 2 decided passed)"
+"label": "7 blocked, 3 not supported, 2 inconclusive (0 of 3 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15837,7 +15818,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 4.526360524616162,
-"label": "15 blocked, 10 untested, 7 not supported, 1 supported (1 of 8 decided passed)"
+"label": "17 not supported, 15 blocked, 1 supported (1 of 18 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15845,7 +15826,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.248495242049359,
-"label": "21 not supported, 21 untested, 20 blocked, 5 supported, 2 inconclusive (5 of 26 decided passed)"
+"label": "39 not supported, 20 blocked, 5 supported, 5 inconclusive (5 of 44 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15853,7 +15834,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 2.386294361119891,
-"label": "2 not supported, 1 untested (0 of 2 decided passed)"
+"label": "3 not supported (0 of 3 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15861,7 +15842,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.330733340286331,
-"label": "28 not supported, 23 blocked, 12 untested, 5 supported, 5 inconclusive, 2 parked (5 of 33 decided passed)"
+"label": "39 not supported, 23 blocked, 6 inconclusive, 5 supported, 2 parked (5 of 44 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15869,7 +15850,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.060443010546419,
-"label": "26 not supported, 13 blocked, 9 untested, 5 inconclusive, 4 supported (4 of 30 decided passed)"
+"label": "34 not supported, 13 blocked, 6 inconclusive, 4 supported (4 of 38 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15877,7 +15858,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 3.9444389791664403,
-"label": "11 blocked, 2 not supported, 2 untested, 1 inconclusive, 1 supported, 1 parked (1 of 3 decided passed)"
+"label": "11 blocked, 4 not supported, 1 inconclusive, 1 supported, 1 parked (1 of 5 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15885,7 +15866,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 4.218875824868201,
-"label": "9 not supported, 6 blocked, 6 untested, 2 inconclusive, 1 supported (1 of 10 decided passed)"
+"label": "13 not supported, 6 blocked, 3 inconclusive, 1 supported, 1 untested (1 of 14 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15893,7 +15874,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 3.4849066497880004,
-"label": "5 not supported, 4 untested, 1 inconclusive, 1 blocked (0 of 5 decided passed)"
+"label": "8 not supported, 2 inconclusive, 1 blocked (0 of 8 decided passed)"
 },
 {
 "s": "stream:theories",

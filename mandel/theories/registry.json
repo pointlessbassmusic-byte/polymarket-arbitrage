@@ -15130,9 +15130,11 @@
     "b13_calendar_a_vix_buildup_fomc"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b9fccbf4"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "calendar",
@@ -15245,9 +15247,11 @@
     "b13_calendar_a_hvix_next_session"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b7d5d021"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "calendar",
@@ -15361,9 +15365,11 @@
     "b13_calendar_a_fomc_carry"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-740d9c66"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "calendar",
@@ -15460,9 +15466,11 @@
     "b13_calendar_b_post_fomc_drift"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-4876b55b"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "calendar",
@@ -15553,9 +15561,11 @@
     "b13_calendar_b_dash_for_cash"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-9d973a10"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "calendar",
@@ -15664,9 +15674,11 @@
     "b13_calendar_b_threshold_rebalancing"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-47383856"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "calendar",
@@ -15929,9 +15941,11 @@
     "b13_calendar_a_pre_auction_concession"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-54b93ca1"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "calendar",
@@ -16021,9 +16035,11 @@
     "b13_calendar_b_payday_16th"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-87db3d5a"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "calendar",
@@ -16195,9 +16211,11 @@
     "b13_calendar_a_putwrite_weekend"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-66b4aa0d"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "calendar",
@@ -16601,9 +16619,11 @@
     "b13_crossasset_a_industry_leadlag"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7833541d"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "crossasset",
@@ -16702,9 +16722,11 @@
     "b13_crossasset_b_industries_lead"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e6b93a43"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "crossasset",
@@ -16791,9 +16813,11 @@
     "b13_crossasset_a_oil_spy"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-4c6bf4bd"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "crossasset",
@@ -16974,9 +16998,11 @@
     "b13_crossasset_a_gold_platinum"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-86edb4ee"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "crossasset",
@@ -17076,9 +17102,11 @@
     "b13_crossasset_b_spy_leads_hyg"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1030737c"
+   ],
    "parent": "T-578",
    "web_sweep": {
     "cluster": "crossasset",
@@ -17165,9 +17193,11 @@
     "b13_crossasset_b_credit_premium"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e0801555"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "crossasset",
@@ -17253,9 +17283,11 @@
     "b13_crossasset_a_stmom"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a581b718"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "crossasset",
@@ -17347,9 +17379,11 @@
     "b13_crossasset_b_vix_reversal"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-8e3104bc"
+   ],
    "parent": "T-462",
    "web_sweep": {
     "cluster": "crossasset",
@@ -17441,9 +17475,11 @@
     "b13_crossasset_a_dollar_carry"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a7e4feed"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "crossasset",
@@ -17625,9 +17661,11 @@
     "b13_cryptoderiv_b_small_cap_quintile"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1669dc5f"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "cryptoderiv",
@@ -17724,9 +17762,11 @@
     "b13_cryptoderiv_a_two_week_losers"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-97290bc5"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "cryptoderiv",
@@ -17930,9 +17970,11 @@
     "b13_cryptoderiv_b_us_session_momentum"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5ff9272e"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "cryptoderiv",
@@ -18117,9 +18159,11 @@
     "b13_cryptoderiv_a_cme_lev_funds"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-73981a07"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "cryptoderiv",
@@ -18210,9 +18254,11 @@
     "b13_cryptoderiv_a_btc_weekend_monday"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-4fc35fdc"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "cryptoderiv",
@@ -18315,9 +18361,11 @@
     "b13_cryptoderiv_a_expiry_reversal"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-071f5693"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "cryptoderiv",
@@ -18425,9 +18473,11 @@
     "b13_cryptoderiv_b_stablecoin_mint"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-526c2636"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "cryptoderiv",
@@ -18532,9 +18582,11 @@
     "b13_cryptoderiv_b_rr25_weekly"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-2f572b4b"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "cryptoderiv",
@@ -19604,9 +19656,11 @@
     "b13_earnings_svr_quarterly_level"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-30321d66"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "earnings",
@@ -19698,9 +19752,11 @@
     "b13_earnings_smb_ex_junk_oos"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5a2a2a38"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "earnings",
@@ -19792,9 +19848,11 @@
     "b13_earnings_dividend_initiation"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-8ac369a0"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "earnings",
@@ -20143,9 +20201,11 @@
     "b13_flow_spxw_expiry_dampening"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-447f60ce"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "flow",
@@ -20271,9 +20331,11 @@
     "b13_flow_opex_strike_pinning"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-c9947b82"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "flow",
@@ -20767,9 +20829,11 @@
     "b13_flow_deribit_signed_delta_flow"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-171c8b1d"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "flow",
@@ -20877,9 +20941,11 @@
     "b13_flow_dix_rebuild_p80_60d"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-26032619"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "flow",
@@ -21925,9 +21991,11 @@
     "b13_implied_b_vrp_equity_premium"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-ea1c2fdb"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "implied",
@@ -22042,9 +22110,11 @@
     "b13_implied_b_cor1m_equity_premium"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1785c6ce"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "implied",
@@ -22142,9 +22212,11 @@
     "b13_implied_a_vx_roll_carry"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a81ae20f"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "implied",
@@ -22259,9 +22331,11 @@
     "b13_implied_a_vix_premium_risk"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-72757337"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "implied",
@@ -22369,9 +22443,11 @@
     "b13_implied_b_vix_curve_pc2"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f9c8138e"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "implied",
@@ -22480,9 +22556,11 @@
     "b13_implied_a_vvix_put_hedge"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-2ef133e7"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "implied",
@@ -22608,9 +22686,11 @@
     "b13_implied_a_btc_vrp_ratio_tercile"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-2a7c5c0c"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "implied",
@@ -22835,9 +22915,11 @@
     "b13_intraday_c_volume_momentum"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-2a41bf98"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -23047,9 +23129,11 @@
     "b13_intraday_a_es_0200_drift"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-62c4a080"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -23162,9 +23246,11 @@
     "b13_intraday_a_overnight_persistence"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a7fab884"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -23273,9 +23359,11 @@
     "b13_intraday_c_reversal_intensity"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5964a6ca"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -23366,9 +23454,11 @@
     "b13_intraday_b_eod_reversal"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-b9de7a74"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -23465,9 +23555,11 @@
     "b13_intraday_b_dtc_overnight"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a75aa8cd"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -23559,9 +23651,11 @@
     "b13_intraday_a_auction_reversal"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-e4d14bbf"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -23658,9 +23752,11 @@
     "b13_intraday_b_usd_fix"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-77b9e445"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -23752,9 +23848,11 @@
     "b13_intraday_c_same_hour_xs"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-49e529b5"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -23947,9 +24045,11 @@
     "b13_intraday_c_btc_2200_block"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1eef4887"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -24052,9 +24152,11 @@
     "b13_intraday_a_vix1d_fomc_ratio"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-93bc2a70"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -24259,9 +24361,11 @@
     "b13_intraday_b_attention_open"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-c101ae7f"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "intraday",
@@ -24372,9 +24476,11 @@
     "b13_short_a_aggregate_si"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-7905d3c6"
+   ],
    "parent": "T-454",
    "web_sweep": {
     "cluster": "short",
@@ -24476,9 +24582,11 @@
     "b13_short_a_svr_spy_10d"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-dad325f6"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "short",
@@ -24565,9 +24673,11 @@
     "b13_short_a_dix_spy_60d"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3c191895"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "short",
@@ -24652,9 +24762,11 @@
     "b13_short_b_low_si_long"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-43766259"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "short",
@@ -24747,9 +24859,11 @@
     "b13_short_b_svr_xs_monthly"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-437ff75f"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "short",
@@ -24822,9 +24936,11 @@
     "b13_short_b_susi_monthly"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-aee98528"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "short",
@@ -25004,9 +25120,11 @@
     "b13_volregime_a_vol_target_spy"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-1268d4c6"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volregime",
@@ -25121,9 +25239,11 @@
     "b13_volregime_b_semivar_factors"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-dd23152a"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volregime",
@@ -25233,9 +25353,11 @@
     "b13_volregime_a_vol_scaled_umd"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-08176118"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volregime",
@@ -25338,9 +25460,11 @@
     "b13_volregime_b_leverage_did"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0bbbb90e"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volregime",
@@ -25433,9 +25557,11 @@
     "b13_volregime_b_shar_risk_target"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3d405712"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volregime",
@@ -25540,9 +25666,11 @@
     "b13_volregime_a_jump_model_spy"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-34cbd603"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volregime",
@@ -25647,9 +25775,11 @@
     "b13_volregime_a_vrp_predicts_spy"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-21488012"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volregime",
@@ -26142,9 +26272,11 @@
     "b13_volregime_b_ml_price_free_etf"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-3b892f02"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volregime",
@@ -26266,9 +26398,11 @@
     "b13_volume_a_stmom"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-bbadbf4c"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -26384,9 +26518,11 @@
     "b13_volume_a_visibility"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0d3dabc6"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -26496,9 +26632,11 @@
     "b13_volume_a_amihud_iwm"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f534ca9f"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -26590,9 +26728,11 @@
     "b13_volume_a_turnover_ew12"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a5e62716"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -26680,9 +26820,11 @@
     "b13_volume_b_volume_cv"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-f5d313ee"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -26860,9 +27002,11 @@
     "b13_volume_b_confirmed_high"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-69abd87e"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -26949,9 +27093,11 @@
     "b13_volume_a_return_volume"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-369a80a8"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -27055,9 +27201,11 @@
     "b13_volume_b_rvol_momentum"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0405ca38"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -27160,9 +27308,11 @@
     "b13_volume_b_same_slot"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-6483493b"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -27329,9 +27479,11 @@
     "b13_volume_b_crypto_lal"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0e5bf92e"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "volume",
@@ -28904,9 +29056,11 @@
     "b13_gaps_fx_global_rv_dol"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-6ac5e96e"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "fximplied",
@@ -28997,9 +29151,11 @@
     "b13_gaps_fx_equity_vrp_dol"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5bd64309"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "fximplied",
@@ -29483,9 +29639,11 @@
     "b13_gaps_fx_vol_innovation_carry"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-dd8cab42"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "fximplied",
@@ -29754,9 +29912,11 @@
     "b13_gaps_fx_vix_beta_sort"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-5a48a91a"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "fximplied",
@@ -30467,9 +30627,11 @@
     "b13_gaps_russell_ijr_iwm_post_recon"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-35fdd148"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "russellrecon",
@@ -30887,9 +31049,11 @@
     "b13_gaps_russell_rvx_vrp_recon"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-69cc44c3"
+   ],
    "parent": "",
    "web_sweep": {
     "cluster": "russellrecon",
