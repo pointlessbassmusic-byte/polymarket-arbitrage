@@ -192,7 +192,7 @@ def phase_close(api, dry: bool, now: Optional[datetime] = None) -> None:
         budgets[sym], prices[sym] = budget, px
         if delta:
             orders.append(auction_order(sym, abs(delta), "buy" if delta > 0 else "sell", "cls",
-                                        f"w-cls-{sym}-{today}-{uuid.uuid4().hex[:6]}"))
+                                        f"w-cls-{sym}-{today}-{uuid.uuid4().hex[:6]}", not api.live))
     _journal("close.decision", {"day": today, "close_time": sess[today], "pre_holiday_next": plan["IWM"][0],
                                 "month_end_next": plan["IEF"][0], "prices": prices, "budgets": budgets, "held": held,
                                 "orders": orders}, dry)

@@ -632,13 +632,16 @@ def harness_crypto_weekend(archive: Archive):
     return rep, rep["n"], rep["verdict"], rep["reason"]
 
 
-def _chain_captures(archive: Archive, sym: str) -> list[tuple[str, float, list]]:
+def _chain_captures(archive: Archive, sym: str, exclude_days: tuple = ()) -> list[tuple[str, float, list]]:
     """(day, spot, rows) for every raw chain capture of sym listed in the INDEX; spot from that day's surface bundle. The raw chains are
     kept off git (in_git=False), so a checkout can list captures it does not hold: any listed capture (or its surface) that is not on
-    this machine raises MissingData instead of being skipped, so 'day one' never shifts silently."""
+    this machine raises MissingData instead of being skipped, so 'day one' never shifts silently. ``exclude_days`` names days the
+    caller accounts for elsewhere (explicitly, never inferred from what is missing)."""
     out, unreadable = [], []
     for name in _bundles_matching(archive, f"options-chain-{sym}-*"):
         day = name.rsplit("-", 3)[-3:]; day = "-".join(day)
+        if day in exclude_days:
+            continue
         try:
             rows = list(archive.load(name))
         except FileNotFoundError:

@@ -81,6 +81,12 @@ def status() -> dict:
     return st
 
 
+# T-542's two capture days before the box existed: their raw chains live only where they were fetched, and their
+# parity shares are fixed in T-542's registration, so the box scores its own days and carries these two as recorded.
+PRE_BOX_PARITY = {"2026-10-14": 0.022, "2026-10-15": 0.005}
+PRE_BOX_DAYS = tuple(PRE_BOX_PARITY)
+
+
 def score() -> dict:
     """T-542's per-day parity share on every capture day this box holds (T-505's parity_v2), written to scores.json.
     The two capture days before the box existed (2026-10-14: 2.2%, 2026-10-15: 0.5%) are in T-542's registration."""
@@ -90,9 +96,11 @@ def score() -> dict:
     a = Archive()
     out = {"as_of": _now()}
     try:
-        rep = om.parity_v2(_chain_captures(a, "SPX"), a.load("fred-DTB3"))
+        rep = om.parity_v2(_chain_captures(a, "SPX", exclude_days=PRE_BOX_DAYS), a.load("fred-DTB3"))
         out["T-542"] = {k: rep.get(k) for k in ("n_days", "verdict", "reason", "per_day", "days")} | {
-            "note": "parity_v2 (T-505's construction) on this box's captures; T-542 counts days below 2% among the first 20"}
+            "pre_box_days": PRE_BOX_PARITY,
+            "note": ("parity_v2 (T-505's construction) on this box's captures; T-542 counts days below 2% among the first 20, "
+                     "the two pre-box days included at their registered values")}
     except Exception as e:                                       # recorded, not raised: the other scores still run
         out["T-542"] = {"error": f"{type(e).__name__}: {e}"[:400]}
     OUT.mkdir(parents=True, exist_ok=True)

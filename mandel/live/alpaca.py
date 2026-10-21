@@ -108,10 +108,15 @@ class Alpaca:
         return out
 
 
-def auction_order(symbol: str, qty: int, side: str, when: str, client_id: str) -> dict:
-    """Market-on-close ('cls') or market-on-open ('opg') order for whole shares."""
+def auction_order(symbol: str, qty: int, side: str, when: str, client_id: str, paper: bool = False) -> dict:
+    """Market-on-close ('cls') or market-on-open ('opg') order for whole shares.
+
+    Alpaca's paper simulator does not run the auctions: a 'cls' order there is a market order at the close that can
+    partially fill or expire (the first paper close, 2026-10-20, expired unfilled). On paper the order is therefore a
+    plain 'day' market order sent at the decision time (15:44 ET for the close, pre-open for the open, so it executes
+    at the open); the reconcile phase measures what that costs against the official close and open."""
     assert when in ("cls", "opg") and qty > 0 and side in ("buy", "sell")
-    return {"symbol": symbol, "qty": str(qty), "side": side, "type": "market", "time_in_force": when,
+    return {"symbol": symbol, "qty": str(qty), "side": side, "type": "market", "time_in_force": "day" if paper else when,
             "client_order_id": client_id}
 
 

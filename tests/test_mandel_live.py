@@ -31,16 +31,16 @@ def test_close_decision_holds_tom_and_skips_the_last_two_days_on_the_monthend_si
     flat_bar = {"high": 100, "low": 90, "last": 99}            # IBS 0.9: no IBS trade
     day_before_m4 = oct_days[-5]                              # holding over return day -4
     d = S.close_decision(day_before_m4, ss, 1000, flat_bar, 0.05, 0.0)
-    assert d.targets["SPLG"] == pytest.approx(300) and d.targets["QQQM"] == pytest.approx(400)
+    assert d.targets["SPYM"] == pytest.approx(300) and d.targets["QQQM"] == pytest.approx(400)
     before_m2 = oct_days[-3]                                  # next session is day -2
-    assert S.close_decision(before_m2, ss, 1000, flat_bar, 0.05, 0.0).targets["SPLG"] == 0        # SPY beat TLT: skip
-    assert S.close_decision(before_m2, ss, 1000, flat_bar, 0.01, 0.0).targets["SPLG"] == pytest.approx(300)
+    assert S.close_decision(before_m2, ss, 1000, flat_bar, 0.05, 0.0).targets["SPYM"] == 0        # SPY beat TLT: skip
+    assert S.close_decision(before_m2, ss, 1000, flat_bar, 0.01, 0.0).targets["SPYM"] == pytest.approx(300)
     last = oct_days[-1]                                        # next session is Nov +1: back in
-    assert S.close_decision(last, ss, 1000, flat_bar, 0.05, 0.0).targets["SPLG"] == pytest.approx(300)
+    assert S.close_decision(last, ss, 1000, flat_bar, 0.05, 0.0).targets["SPYM"] == pytest.approx(300)
     mid = oct_days[10]
-    assert S.close_decision(mid, ss, 1000, flat_bar, None, None).targets["SPLG"] == 0
+    assert S.close_decision(mid, ss, 1000, flat_bar, None, None).targets["SPYM"] == 0
     low_bar = {"high": 100, "low": 90, "last": 91}            # IBS 0.1
-    assert S.close_decision(mid, ss, 1000, low_bar, None, None).targets["SPLG"] == pytest.approx(300)
+    assert S.close_decision(mid, ss, 1000, low_bar, None, None).targets["SPYM"] == pytest.approx(300)
 
 
 def test_ibs_and_whole_shares():
@@ -74,8 +74,9 @@ def test_live_is_refused_without_the_users_switch(monkeypatch):
 
 
 def test_order_shapes():
-    o = A.auction_order("SPLG", 3, "buy", "cls", "m-1")
+    o = A.auction_order("SPYM", 3, "buy", "cls", "m-1")
     assert o["time_in_force"] == "cls" and o["qty"] == "3"
+    assert A.auction_order("SPYM", 3, "buy", "cls", "m-1", paper=True)["time_in_force"] == "day"   # paper runs no auction
     sp = A.spread_order("XSP261120P00730000", "XSP261120P00727000", 1, 0.2, True, "m-2")
     assert sp["order_class"] == "mleg" and sp["legs"][0]["position_intent"] == "sell_to_open"
 
@@ -93,7 +94,7 @@ class FakeApi:
         return {"equity": "750", "cash": "750"}
 
     def stock_snapshots(self, syms):
-        return {s: {"dailyBar": {"h": 93.0, "l": 92.0}, "latestTrade": {"p": 92.05 if s == "SPLG" else 250.0}} for s in syms}
+        return {s: {"dailyBar": {"h": 93.0, "l": 92.0}, "latestTrade": {"p": 92.05 if s == "SPYM" else 250.0}} for s in syms}
 
     def daily_bars(self, syms, start):
         return {s: [] for s in syms}
@@ -120,7 +121,7 @@ def test_runner_close_dry_run_places_nothing(monkeypatch, tmp_path, capsys):
     R.phase_close(api, dry=True)
     assert api.sent == [] and not (tmp_path / "j.jsonl").exists()
     out = capsys.readouterr().out
-    assert "DRY RUN" in out and "QQQM" in out                 # 450 x 0.4 = 180 < 250: no QQQM share; SPLG IBS 0.05
+    assert "DRY RUN" in out and "QQQM" in out                 # 450 x 0.4 = 180 < 250: no QQQM share; SPYM IBS 0.05
     (tmp_path / "KILL").write_text("stop")
     with pytest.raises(SystemExit):
         R.phase_close(api, dry=True)
@@ -137,7 +138,7 @@ def test_tracker_counts_journal_sessions_fills_and_round_trip_pnl(tmp_path):
              "filled_avg_price": "251.5", "filled_at": "2026-10-22T13:30:00Z"}]
     j.write_text("".join(json.dumps(r) + "\n" for r in recs))
     c = T.calendar_progress(T._journal(j))
-    assert c == {"n_now": 2, "fills": 2, "rejected": 0, "pnl_usd": 3.0}
+    assert c == {"n_now": 2, "fills": 2, "rejected": 0, "expired": 0, "old_code": False, "pnl_usd": 3.0}
     rows = T.build(date(2026, 10, 23), j)
     t559 = next(r for r in rows if r["id"] == "T-559")
     assert t559["state"] == "running" and t559["progress"] == pytest.approx(2 / 60, abs=1e-4)

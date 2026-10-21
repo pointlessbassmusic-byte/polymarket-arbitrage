@@ -50,7 +50,7 @@ def sleeve_capital(equity: float) -> float:
 
 
 def calendar_capital(equity: float, cash: float, own_value: float) -> float:
-    """The calendar slot never borrows: capped by cash plus what it already holds (SPLG/QQQM at market)."""
+    """The calendar slot never borrows: capped by cash plus what it already holds (SPYM/QQQM at market)."""
     return max(0.0, min(sleeve_capital(equity) * CAPITAL_SPLIT["calendar"], cash + own_value))
 
 
@@ -95,11 +95,11 @@ def phase_close(api, dry: bool) -> None:
         print("not a session"); return
     acct = api.account()
     equity, cash = float(acct["equity"]), float(acct.get("cash") or 0)
-    snap = api.stock_snapshots(["SPLG", "QQQM"])
-    db = snap["SPLG"]["dailyBar"]
-    bar = {"high": db["h"], "low": db["l"], "last": snap["SPLG"]["latestTrade"]["p"]}
+    snap = api.stock_snapshots([S.SPX_ETF, "QQQM"])
+    db = snap[S.SPX_ETF]["dailyBar"]
+    bar = {"high": db["h"], "low": db["l"], "last": snap[S.SPX_ETF]["latestTrade"]["p"]}
     bars = api.daily_bars(["SPY", "TLT"], (today - timedelta(days=70)).isoformat())
-    held = {p["symbol"]: int(float(p["qty"])) for p in api.positions() if p["symbol"] in ("SPLG", "QQQM")}
+    held = {p["symbol"]: int(float(p["qty"])) for p in api.positions() if p["symbol"] in (S.SPX_ETF, "QQQM")}
     own_value = sum(q * snap[s]["latestTrade"]["p"] for s, q in held.items())
     capital = calendar_capital(equity, cash, own_value)
     dec = S.close_decision(today, sessions, capital, bar, _mtd(bars.get("SPY", []), today), _mtd(bars.get("TLT", []), today))
@@ -109,7 +109,7 @@ def phase_close(api, dry: bool) -> None:
         want = S.shares_for(usd, px)
         delta = want - held.get(sym, 0)
         if delta:
-            orders.append(api_order(sym, delta, "cls", today))
+            orders.append(api_order(sym, delta, "cls", today, not api.live))
     _journal("close.decision", {"day": today, "equity": equity, "cash": cash, "sleeve_capital": SLEEVE_CAPITAL,
                                 "capital": capital, "snapshot_splg": bar,
                                 "targets": dec.targets, "reasons": dec.reasons, "held": held, "orders": orders}, dry)
@@ -131,15 +131,16 @@ def phase_open(api, dry: bool) -> None:
         return
     held = {p["symbol"]: int(float(p["qty"])) for p in api.positions()}
     q = held.get("QQQM", 0)
-    orders = [api_order("QQQM", -q, "opg", today)] if q > 0 else []
+    orders = [api_order("QQQM", -q, "opg", today, not api.live)] if q > 0 else []
     _journal("open.decision", {"day": today, "held": held, "orders": orders}, dry)
     for o in orders:
         _send(api, o, dry)
 
 
-def api_order(sym: str, delta: int, when: str, day: date) -> dict:
+def api_order(sym: str, delta: int, when: str, day: date, paper: bool = False) -> dict:
     from mandel.live.alpaca import auction_order
-    return auction_order(sym, abs(delta), "buy" if delta > 0 else "sell", when, f"m-{when}-{sym}-{day}-{uuid.uuid4().hex[:6]}")
+    return auction_order(sym, abs(delta), "buy" if delta > 0 else "sell", when, f"m-{when}-{sym}-{day}-{uuid.uuid4().hex[:6]}",
+                         paper)
 
 
 def _send(api, order: dict, dry: bool) -> None:

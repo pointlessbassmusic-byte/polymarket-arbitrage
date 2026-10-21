@@ -6,16 +6,16 @@ T-559, the calendar sleeve, combines four rules that Mandel's archive supports, 
 
   overnight  QQQM held from the close to the next open, every session (T-549: +3.4-3.6 bps a night net of 1 bp a
              side on QQQ/IWM, 1999-2026).
-  ibs        SPLG bought at the close when the day's internal bar strength is below 0.2 and sold at the next close
+  ibs        SPYM bought at the close when the day's internal bar strength is below 0.2 and sold at the next close
              (T-332 on SPY, T-558 replication). Live, IBS is read from a 15:45 ET snapshot because closing-auction
              orders must be in by 15:50; the backtest read the official close, so the journal records both.
-  tom        SPLG held over the return days -4..+3 of each month, i.e. from the close of the session before day -4
+  tom        SPYM held over the return days -4..+3 of each month, i.e. from the close of the session before day -4
              to the close of day +3 (T-59: +6.3 bps a day).
   monthend   inside the tom slot, skip the last two return days (-2, -1) when SPY beat TLT month to date by more
              than 2 pp at the close of the session before day -3 (T-345's previous-close reading, -47.8 bps, both
              halves); re-enter at the close of day -1 for +1..+3.
 
-SPLG and QQQM stand in for SPY and QQQ (the same indexes; whole-share closing-auction orders on a ~$1k account).
+SPYM (State Street's SPDR Portfolio S&P 500, ticker SPLG until 2025-10-31) and QQQM stand in for SPY and QQQ (the same indexes; whole-share closing-auction orders on a ~$1k account).
 
 T-560, the put-spread sleeve, sells one defined-risk XSP put spread a month: the standard monthly expiry 30-45
 days out, short strike the highest listed strike at or below 95% of spot, long strike WIDTH points lower, only
@@ -31,6 +31,7 @@ from datetime import date, timedelta
 from typing import Iterable, Optional
 
 IBS_CUT = 0.2
+SPX_ETF = "SPYM"                # the S&P 500 leg (State Street renamed SPLG to SPYM on 2025-10-31; Alpaca rejects SPLG)
 MONTHEND_GAP = 0.02            # SPY minus TLT month-to-date return, previous-close reading
 TOM_DAYS_END = 4               # return days -4..-1
 TOM_DAYS_START = 3             # return days +1..+3
@@ -89,16 +90,16 @@ class CloseDecision:
 
 def close_decision(day: date, sessions: list[date], capital: float, splg_bar: dict, spy_mtd: Optional[float],
                    tlt_mtd: Optional[float]) -> CloseDecision:
-    """Targets for the holding from ``day``'s close. ``splg_bar`` is the 15:45 snapshot {high, low, last} of SPLG;
+    """Targets for the holding from ``day``'s close. ``splg_bar`` is the 15:45 snapshot {high, low, last} of SPYM;
     ``spy_mtd`` / ``tlt_mtd`` are month-to-date returns at the PREVIOUS close (only used near month-end)."""
     nxt = next_session(day, sessions)
     reasons: dict[str, str] = {}
-    targets = {"QQQM": capital * SLOTS["overnight"], "SPLG": 0.0}
+    targets = {"QQQM": capital * SLOTS["overnight"], SPX_ETF: 0.0}
     reasons["overnight"] = "hold QQQM close -> next open (every session)"
     x = ibs(splg_bar.get("high"), splg_bar.get("low"), splg_bar.get("last"))
     if x is not None and x < IBS_CUT:
-        targets["SPLG"] += capital * SLOTS["ibs"]
-        reasons["ibs"] = f"IBS {x:.3f} < {IBS_CUT} at the 15:45 snapshot: hold SPLG to the next close"
+        targets[SPX_ETF] += capital * SLOTS["ibs"]
+        reasons["ibs"] = f"IBS {x:.3f} < {IBS_CUT} at the 15:45 snapshot: hold SPYM to the next close"
     else:
         reasons["ibs"] = f"IBS {x if x is None else round(x, 3)}: flat"
     if in_tom_window(nxt, sessions):
@@ -106,8 +107,8 @@ def close_decision(day: date, sessions: list[date], capital: float, splg_bar: di
             reasons["tom"] = (f"next session {nxt} is a turn-of-month day but SPY-TLT month to date "
                               f"{spy_mtd - tlt_mtd:+.4f} > {MONTHEND_GAP}: skip (T-345)")
         else:
-            targets["SPLG"] += capital * SLOTS["tom"]
-            reasons["tom"] = f"next session {nxt} is a turn-of-month return day: hold SPLG"
+            targets[SPX_ETF] += capital * SLOTS["tom"]
+            reasons["tom"] = f"next session {nxt} is a turn-of-month return day: hold SPYM"
     else:
         reasons["tom"] = f"next session {nxt} outside the turn-of-month window: flat"
     return CloseDecision(day, targets, reasons)

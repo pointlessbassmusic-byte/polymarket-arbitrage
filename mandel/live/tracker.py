@@ -30,6 +30,7 @@ from mandel.paths import MANDEL_ROOT
 OUT = MANDEL_ROOT / "state" / "tracker"
 CHILD_TESTS = MANDEL_ROOT / "state" / "children" / "forward_tests.json"
 ARCHIVE_INDEX = MANDEL_ROOT / "archive" / "INDEX.json"
+LINODE_CAPTURE = MANDEL_ROOT / "state" / "linode" / "capture_status"      # the capture box's pushed records (import_linode)
 
 # Mandel's own forward tests: what each counts toward its decision point.
 MANDEL_TESTS = {
@@ -117,7 +118,12 @@ def calendar_progress(journal: list[dict]) -> dict:
                 lots[0][0] -= take; q -= take
                 if lots[0][0] <= 0:
                     lots.pop(0)
-    return {"n_now": len(days), "fills": len(fills), "rejected": rejected, "pnl_usd": round(pnl, 2) if fills else None}
+    expired = sum(1 for r in journal if r.get("kind") == "order.fill" and str(r.get("client_order_id", "")).startswith("m-")
+                  and not str(r.get("client_order_id", "")).startswith("m-xsp") and r.get("status") == "expired")
+    last = [r for r in journal if r.get("kind") == "close.decision"][-1:]
+    old_code = bool(last and "SPLG" in (last[0].get("targets") or {}))        # the pre-2026-10-21 runner (SPLG, auction orders)
+    return {"n_now": len(days), "fills": len(fills), "rejected": rejected, "expired": expired, "old_code": old_code,
+            "pnl_usd": round(pnl, 2) if fills else None}
 
 
 def spread_progress(journal: list[dict]) -> dict:
@@ -125,7 +131,43 @@ def spread_progress(journal: list[dict]) -> dict:
     closed = [r for r in journal if r.get("kind") == "order.sent" and str((r.get("order") or {}).get("client_order_id", "")).startswith("m-xsp-close")]
     plans = [r for r in journal if r.get("kind") == "spread.plan"]
     last = plans[-1]["reason"] if plans else None
-    return {"n_now": len(closed), "opened": len(opened), "last_plan": last}
+    expired = sum(1 for r in journal if r.get("kind") == "order.fill" and str(r.get("client_order_id", "")).startswith("m-xsp-open")
+                  and r.get("status") == "expired")
+    filled = sum(1 for r in journal if r.get("kind") == "order.fill" and str(r.get("client_order_id", "")).startswith("m-xsp-open")
+                 and r.get("status") == "filled")
+    return {"n_now": len(closed), "opened": len(opened), "filled": filled, "expired": expired, "last_plan": last}
+
+
+def linode_progress(base: Path = LINODE_CAPTURE) -> dict:
+    """The capture box's own records: shadow lines per test, the wide sleeve's decisions and fills, chain capture days."""
+    shadow = _jsonl(base / "shadow.jsonl")
+    wide = _jsonl(base / "wide-journal.jsonl")
+    out = {}
+    for tid in ("T-565", "T-566", "T-573"):
+        days = sorted({r.get("day") for r in shadow if r.get(tid)})
+        out[tid] = {"n_now": len(days), "first": days[0] if days else None, "last": days[-1] if days else None}
+    dec = [r for r in wide if r.get("kind") == "close.decision"]
+    for tid, flag in (("T-567", "pre_holiday_next"), ("T-576", "month_end_next")):
+        out[tid] = {"days": len({r.get("day") for r in dec}), "n_now": sum(1 for r in dec if r.get(flag)),
+                    "last": dec[-1].get("day") if dec else None}
+    fills = [r for r in wide if r.get("kind") == "order.fill" and "-open-" in str(r.get("client_order_id", ""))]
+    out["T-568"] = {"filled": sum(1 for r in fills if r.get("status") == "filled"),
+                    "expired": sum(1 for r in fills if r.get("status") == "expired"),
+                    "n_now": sum(1 for r in wide if r.get("kind") == "order.fill" and "-close-" in str(r.get("client_order_id", ""))
+                                 and r.get("status") == "filled")}
+    try:
+        fam = json.loads((base / "status.json").read_text()).get("families", {})
+    except (OSError, ValueError):
+        fam = {}
+    out["chains"] = {s: fam.get(f"options-chain-{s}") for s in ("SPX", "VIX")}
+    return out
+
+
+def _jsonl(p: Path) -> list[dict]:
+    try:
+        return [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
+    except OSError:
+        return []
 
 
 def archive_progress(bundles: dict, today: date) -> dict:
@@ -158,6 +200,7 @@ def build(today: date, journal_path: Path, out: Path = OUT) -> list[dict]:
     bundles = _bundles()
     arch = archive_progress(bundles, today)
     cal, spr = calendar_progress(journal), spread_progress(journal)
+    box = linode_progress()
     rows = []
     for tid, m in MANDEL_TESTS.items():
         t = reg.get(tid, {})
@@ -166,28 +209,55 @@ def build(today: date, journal_path: Path, out: Path = OUT) -> list[dict]:
                "started": REGISTERED.get(tid), "read_date": None, "pnl_usd": None, "fills": None, "verified": "Mandel records",
                "source": "theory registry"}
         if tid == "T-559":
-            row.update(n_now=cal["n_now"], fills=cal["fills"], pnl_usd=cal["pnl_usd"], capital_usd=None,
-                       status="running" if cal["n_now"] else ("installed: first close orders at the next 3:44 pm ET close" if journal
-                                                               else "waiting on the Linode install"),
-                       next_step="run deploy/paper/install.sh on the Linode" if not (cal["n_now"] or journal) else "reconcile fills daily",
+            blocked = cal["n_now"] and not cal["fills"] and (cal["rejected"] or cal["expired"])
+            row.update(n_now=cal["n_now"] if cal["fills"] else 0, fills=cal["fills"], pnl_usd=cal["pnl_usd"], capital_usd=None,
+                       status=(f"waiting: {cal['n_now']} session(s) decided, {cal['rejected']} order(s) rejected and {cal['expired']} "
+                               "expired, 0 filled (SPLG renamed SPYM; paper runs no auction)" if blocked else
+                               "running" if cal["n_now"] else ("installed: first close orders at the next 3:44 pm ET close" if journal
+                                                                else "waiting on the Linode install")),
+                       next_step=("re-pin the Linode paper checkout to the fixed commit (deploy/paper/install.sh with PIN)"
+                                  if blocked and cal["old_code"] else "run deploy/paper/install.sh on the Linode"
+                                  if not (cal["n_now"] or journal) else "reconcile fills daily"),
                        started=None if not cal["n_now"] else REGISTERED[tid], source="paper journal")
         elif tid == "T-560":
-            row.update(n_now=spr["n_now"], status="running" if spr["opened"] else ("installed: waiting for a qualifying spread"
-                                                                                   if journal else "waiting on the Linode install"),
+            row.update(n_now=spr["n_now"], status=(f"running: {spr['opened']} opening order(s), {spr['filled']} filled, "
+                                                   f"{spr['expired']} expired at the mid" if spr["opened"] else
+                                                   ("installed: waiting for a qualifying spread" if journal else "waiting on the Linode install")),
                        next_step=spr["last_plan"] or "first plan at 15:20 ET once installed",
                        started=None if not spr["opened"] else REGISTERED[tid], source="paper journal")
-        elif tid == "T-542":
-            stale = _days_since(arch["T-542"]["last"], today)
-            row.update(n_now=arch["T-542"]["n_now"], status=f"stalled: last capture {arch['T-542']['last']}" if stale and stale > 3 else "recording",
-                       next_step="restart the daily options capture on the Linode (options-fetch job)", source="archive captures")
-        elif tid == "T-541":
-            row.update(n_now=0, status=f"stalled: {arch['T-541']['captures']} capture days, last {arch['T-541']['last']}",
-                       next_step="restart the daily options capture; first settlements follow the Nov VIX expiry", source="archive captures")
-        elif tid in ("T-565", "T-566", "T-567", "T-568", "T-573", "T-576"):
+        elif tid in ("T-541", "T-542"):
+            sym = "SPX" if tid == "T-542" else "VIX"
+            boxed = box["chains"].get(sym) or {}
+            last = max(filter(None, (arch[tid].get("last"), boxed.get("latest"))), default=None)
+            stale = _days_since(last, today)
+            n = arch[tid]["n_now"] if tid == "T-542" else 0
+            row.update(n_now=n, status=(f"stalled: last capture {last}" if stale is None or stale > 3 else
+                                        f"recording: chains captured through {last} ({boxed.get('count', 0)} on the box)"),
+                       next_step=("restart the daily options capture on the Linode (options-fetch job)" if stale is None or stale > 3 else
+                                  "none: the capture box records daily" if tid == "T-542" else
+                                  "first settlements follow the November VIX expiry"),
+                       source="capture box + archive captures")
+        elif tid in ("T-565", "T-566", "T-573"):
+            p = box[tid]
             installed = (out / "capture_status.json").exists()
-            row.update(n_now=0, status="installed: first record after tonight's run" if installed else "waiting on the Linode capture install",
+            row.update(n_now=p["n_now"], status=(f"recording: {p['n_now']} shadow day(s), first {p['first']}" if p["n_now"] else
+                                                 "installed: first record after tonight's run" if installed else
+                                                 "waiting on the Linode capture install"),
                        next_step="none: runs on its timers" if installed else "run deploy/capture/install.sh on the Linode",
-                       started=None, source="capture box" if installed else "capture box (not yet installed)")
+                       started=p["first"], source="capture box shadow.jsonl")
+        elif tid in ("T-567", "T-576"):
+            p = box[tid]
+            row.update(n_now=p["n_now"], status=(f"running: {p['days']} session(s) decided, {p['n_now']} signal day(s) so far"
+                                                 if p["days"] else "installed: first record after tonight's run"),
+                       next_step="none: runs on its timers", started=REGISTERED.get(tid) if p["days"] else None,
+                       source="capture box wide-journal.jsonl")
+        elif tid == "T-568":
+            p = box[tid]
+            row.update(n_now=p["n_now"], fills=p["filled"], status=(f"running: {p['filled']} spread(s) open, {p['expired']} opening "
+                                                                    "order(s) expired at the mid" if (p["filled"] or p["expired"])
+                                                                    else "installed: first record after tonight's run"),
+                       next_step="none: runs on its timers", started=REGISTERED.get(tid) if p["filled"] else None,
+                       source="capture box wide-journal.jsonl")
         elif tid == "T-543":
             row.update(n_now=arch["T-543"]["n_now"], status="recording",
                        next_step=f"next FOMC {arch['T-543']['next_fomc']}", source="archive calendars")

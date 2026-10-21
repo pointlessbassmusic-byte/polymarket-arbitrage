@@ -7,7 +7,7 @@
    "owner": "Mandel",
    "label": "Calendar sleeve (overnight QQQM, IBS, turn of month)",
    "mode": "paper",
-   "state": "stalled"
+   "state": "waiting"
   },
   {
    "id": "signal:overnight-gap",
@@ -60,7 +60,7 @@
    "owner": "Mandel",
    "label": "XSP put credit spread, trend-filtered",
    "mode": "paper",
-   "state": "stalled"
+   "state": "running"
   },
   {
    "id": "signal:trend-10m-sma",
@@ -92,7 +92,7 @@
    "owner": "Mandel",
    "label": "SPX put-call parity band",
    "mode": "forward",
-   "state": "stalled"
+   "state": "running"
   },
   {
    "id": "signal:put-call-parity",
@@ -103,10 +103,10 @@
    "id": "stream:options-chain-SPX",
    "kind": "stream",
    "label": "options-chain-SPX",
-   "state": "stale",
-   "age_days": 5,
-   "latest": "2026-10-15",
-   "captures": 2
+   "state": "ok",
+   "age_days": 0,
+   "latest": "2026-10-20",
+   "captures": 3
   },
   {
    "id": "venue:cboe-delayed",
@@ -120,7 +120,7 @@
    "owner": "Mandel",
    "label": "VIX call spreads at captured mids",
    "mode": "forward",
-   "state": "stalled"
+   "state": "running"
   },
   {
    "id": "signal:vix-call-premium",
@@ -131,18 +131,18 @@
    "id": "stream:options-chain-VIX",
    "kind": "stream",
    "label": "options-chain-VIX",
-   "state": "stale",
-   "age_days": 5,
-   "latest": "2026-10-15",
-   "captures": 2
+   "state": "ok",
+   "age_days": 0,
+   "latest": "2026-10-20",
+   "captures": 3
   },
   {
    "id": "stream:cboe-VVIX-history",
    "kind": "stream",
    "label": "cboe-VVIX-history",
-   "state": "stale",
-   "age_days": 5,
-   "latest": "2026-10-15",
+   "state": "ok",
+   "age_days": 0,
+   "latest": "2026-10-20",
    "captures": null
   },
   {
@@ -162,9 +162,9 @@
    "id": "stream:deribit-dvol-BTC-history",
    "kind": "stream",
    "label": "deribit-dvol-BTC-history",
-   "state": "stale",
-   "age_days": 5,
-   "latest": "2026-10-15",
+   "state": "ok",
+   "age_days": 0,
+   "latest": "2026-10-20",
    "captures": null
   },
   {
@@ -197,7 +197,7 @@
    "owner": "Mandel",
    "label": "Shadow: HMM regime filter for putwriting",
    "mode": "forward",
-   "state": "stalled"
+   "state": "running"
   },
   {
    "id": "signal:hmm-vol-regime",
@@ -225,7 +225,7 @@
    "owner": "Mandel",
    "label": "Shadow: HMM volatility scaling of QQQM overnight",
    "mode": "forward",
-   "state": "stalled"
+   "state": "running"
   },
   {
    "id": "T-573",
@@ -233,7 +233,7 @@
    "owner": "Mandel",
    "label": "Shadow: EWMA volatility scaling of QQQM overnight",
    "mode": "forward",
-   "state": "stalled"
+   "state": "running"
   },
   {
    "id": "signal:ewma-vol",
@@ -246,7 +246,7 @@
    "owner": "Mandel",
    "label": "IEF over the month's last session (Treasury month-end)",
    "mode": "paper",
-   "state": "stalled"
+   "state": "running"
   },
   {
    "id": "signal:treasury-month-end",
@@ -270,7 +270,7 @@
    "owner": "Mandel",
    "label": "Pre-holiday IWM (1-day hold)",
    "mode": "paper",
-   "state": "stalled"
+   "state": "running"
   },
   {
    "id": "signal:pre-holiday",
@@ -283,7 +283,7 @@
    "owner": "Mandel",
    "label": "GLD / TLT / USO put spreads (9-24 day holds)",
    "mode": "paper",
-   "state": "stalled"
+   "state": "running"
   },
   {
    "id": "factor:gold-beta",
@@ -628,9 +628,9 @@
    "id": "stream:fred-DTB3",
    "kind": "stream",
    "label": "fred-DTB3",
-   "state": "stale",
-   "age_days": 5,
-   "latest": "2026-10-15",
+   "state": "ok",
+   "age_days": 0,
+   "latest": "2026-10-20",
    "captures": null
   },
   {
