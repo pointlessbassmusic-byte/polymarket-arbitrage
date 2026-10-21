@@ -10,7 +10,8 @@ FX realised volatility timing the dollar basket (T-719), the US equity variance 
            to the first common fix of t+4 plus 3/12 of the month t-1 OECD AFD (flagged approximation). Expanding OLS
            from 2002-06 (each fit uses only targets whose end fix H.10 had published by the decision), 162 forecasts.
            Pass: Clark-West one-sided p < 0.05 (Newey-West lag 2), OOS R^2 > 0 (claim and null), the forecast-sign DOL
-           rule's net Sharpe > 0 in 2013-2019 and in 2020-2026, DSR >= 0.95 over the 6-trial DOL family. min_n 150.
+           rule's net Sharpe > 0 over the whole window (the claim) and in 2013-2019 and in 2020-2026, DSR >= 0.95 over
+           the 6-trial DOL family. min_n 150.
   * T-720  Month-end decisions at the month's last NYSE session t, 2012-01..2026-08. VP_t = VIX_t^2/12 - 10,000 x the
            sum of squared ^GSPC daily log returns over the 21 sessions ending at t (monthly %^2). Target: the next-month
            DOL excess return, mean log spot change from the first common fix after t to the first common fix after the
@@ -47,12 +48,18 @@ the conservative reading and is repeated in the reasons):
   * Point-in-time 3-month rates. The registrations require ALFRED vintages of the OECD IR3TIB01 rates; they are NOT
     archived (only the IRLTLT01 10-year vintages are). When ``alfred-IR3TIB01*`` bundles for all 10 G10 rates exist the
     harnesses use them (the vintage in force at the decision, ``batch6c_rates.Vintages``). Otherwise a PROXY: the rate
-    of country-month m counts as known from the first ALFRED release of the same country-month's IRLTLT01 (same OECD
-    MEI release; for months before ALFRED's 2013-06-03 start, the fetcher's period-end + 45 days rule), with the
-    latest-vintage IR3TIB01 value (revisions unmeasured; EUR is clocked by Germany's release). A criterion that rests on
-    those ranks (T-725's base book; T-728's carry alpha) can then FAIL but never PASS: a pass on the proxy reads
-    undecided and an explicit "registered vintages" row stays undecided, so the verdict is at best inconclusive.
-    T-719 and T-720 need the vintages only for their reported AFD controls.
+    of country-month m counts as known from the first ALFRED release of the same country-month's IRLTLT01 (for months
+    before ALFRED's 2013-06-03 start, the fetcher's period-end + 45 days rule), with the latest-vintage IR3TIB01 value
+    (revisions unmeasured; EUR is clocked by Germany's release). IRLTLT01 is a different OECD MEI series and its first
+    releases need not coincide with IR3TIB01's: the proxy can run AHEAD of the real IR3TIB01 publication as well as
+    behind it (at capture, fx-rates-3m JPY ends at 2026-07 while IRLTLT01JP 2026-08 had already been first-released;
+    US/DE IRLTLT01 months in 2015-2016 often first-print within 3 days of month-end, and no IR3TIB01 vintage exists to
+    confirm the same). So the proxy is not a point-in-time clock in either direction. A criterion that rests on those
+    ranks (T-725's base book; T-728's carry alpha) can then FAIL but never PASS: a pass on the proxy reads undecided and
+    an explicit "registered vintages" row stays undecided, so the verdict is at best inconclusive. Beside the proxy, a
+    fixed rank lag is reported (``LagRates``: the month t-2 rate at a month-t decision, latest vintage; report only)
+    for T-725's books and T-728's carry control. T-719 and T-720 need the vintages only for their reported AFD
+    controls (the same proxy clock).
   * Rate accruals are outcomes, not signals: T-719 and T-720 add the month t-1 OECD averages (T-719's registration and
     T-605's precedent); T-725 and T-728 use T-368's leg convention (the average of the month that ends just before the
     position opens). EUR and GBP stop printing after 2026-01 (JPY after 2026-07): accruals forward-fill at most 12
@@ -67,8 +74,10 @@ the conservative reading and is repeated in the reasons):
     window's first month. T-728: "Costs as in T-368/T-431" (2 bp per unit traded on G10 legs, 5 bp on MXN/ZAR; 1%/yr
     per leg, 2% for ZAR); the claim's flat 2 bp / 1%/yr reading is reported.
   * T-719: the sign rule re-reads the 3-month forecast's sign every month and holds one month (first fix of t+1 to the
-    first fix of t+2) - the claim's "per switch" costs imply a monthly re-decision. "Halves" = decision months
-    2013-2019 / 2020-2026. The Hodrick (1992) t uses the 1-month log excess returns summed over 3 months; EVZ is not
+    first fix of t+2) - the claim's "per switch" costs imply a monthly re-decision. The claim's full-sample net Sharpe
+    and the registered halves are all criteria. The overlapping 3-month-tranche reading (each month's sign held 3
+    months in thirds, ``tranche_positions``) is reported beside it. "Halves" = decision months 2013-2019 / 2020-2026.
+    The Hodrick (1992) t uses the 1-month log excess returns summed over 3 months; EVZ is not
     archived, so the EVZ variant is not computed. The encompassing regression is the in-sample OLS over the forecast
     decisions of the 3-month target on GV, the point-in-time AFD and the VIX level (NW lag 2).
   * T-720: the target window starts at the first common fix strictly after t and ends at the first common fix strictly
@@ -78,7 +87,12 @@ the conservative reading and is repeated in the reasons):
     arm (long DOL when VP_t exceeds the median of VP over the 60 previous decisions, else short), so its net return is
     the DSR series; the 3-month horizon trial's Sharpe is the same signal held in three overlapping one-third tranches.
     "Last-month DOL return (published fixes)" = the basket log change between the last fixes H.10 had published at the
-    previous decision and at this one.
+    previous decision and at this one. The accrual's US leg is the month t-1 OECD IR3TIB01 US rate from fx-rates-3m
+    (fixed before the first run: the same interbank series and month as the foreign legs and T-719's registered
+    "month t-1 OECD averages"). The registration's data line also names fred-DTB3, so the DTB3 reading (the month t-1
+    average of the daily DTB3 prints, all public by the decision) is reported beside every judged figure; it is not
+    judged. The per-currency panel with currency fixed effects is reported as a pooled within-currency slope with SEs
+    clustered by month (``fe_panel_slope``), beside the nine per-currency Newey-West slopes.
   * DOL-target DSR family (T-719, T-720; 6 trials): T-605's two dollar-carry books (``batch13_crossasset_a``), T-575 in
     its trading form (long the 9-currency basket on the last two trading days of each month, monthly sums), T-720's 1-
     and 3-month arms and T-719's rule; per-period Sharpes; trial-Sharpe variance floored at 1/(T-1)
@@ -93,14 +107,18 @@ the conservative reading and is repeated in the reasons):
     per seed, escalated by seeds while its Monte Carlo band straddles 0.05. The DSR family's T-682 Sharpe is not a
     monthly return series and is not computed: the DSR is judged at the most favourable trial-Sharpe variance that the
     missing member allows (it can fail, never pass). The random-switch placebo keeps the number of flat months and
-    redraws their positions (1,000 draws, costs recomputed). Bakshi-Panayotov (reported): expanding OLS of the next
+    redraws their positions (1,000 draws, costs recomputed). A Sharpe gain (each half, each placebo draw, the
+    through-2026-01 figure) exists only when both Sharpes do; otherwise it is undecided (None), never 0. Beside the
+    proxy book, the same rule on fixed month t-2 ranks (``LagRates``) is reported. Bakshi-Panayotov (reported): expanding OLS of the next
     month's base-book net return on the change in GV and DBC's month-t return (DBC used only when its close precedes the
     fill day), Clark-West vs the prevailing mean.
   * T-728: monthly excess returns run month-end common fix to month-end common fix; dVIX = change in the VIX close of the
     month's last session. Betas need all 60 months. "Alpha HAC t > 2 vs carry and DOL" is judged under every reading
     (rule 11): the two-factor regression and each single-factor one, at the automatic Newey-West lag and at lag 12; the
     carry factor is T-368's book on point-in-time ranks held on the T-728 calendar, gross of costs (its costs would only
-    add to alpha); DOL is the equal-weight 11-currency basket (the 9-currency G10 DOL is reported). "DSR counting ..."
+    add to alpha; the alpha against a carry factor ranked on fixed month t-2 rates is reported); DOL is the
+    equal-weight 11-currency basket (the 9-currency G10 DOL is reported). The holding month H's betas are row H-1 of
+    ``rolling_betas`` (``t728_decision_beta``): the 60 months H-61..H-2, a one-month skip. "DSR counting ..."
     uses the house bar > 0.95. Controls (reported): the static full-sample beta ranking, the shuffled-VIX placebo (dVIX
     permuted across months, 1,000 draws), the claim-literal costs, rank correlation of betas with month t-1 rate ranks.
     A fail on the VIX-change proxy does not refute the paper's put-based factor.
@@ -109,6 +127,10 @@ the conservative reading and is repeated in the reasons):
     missing members allow (the 1/(T-1) floor, or the computed variance shrunk as if every missing Sharpe sat at the
     computed mean) bounds it from above, so the criterion can fail but never pass (T-725, T-728). T-719 / T-720's
     6-trial DOL family is fully computed.
+  * Added after the 2026-10-21 review (each only adds a criterion the claim names or a reported figure; none changes a
+    judged construction or threshold): T-719's full-sample rule Sharpe row and tranche reading; T-720's DTB3 reading and
+    pooled fixed-effects slope; the fixed month t-2 rank-lag sensitivity (T-725, T-728); None instead of 0 for a gain
+    whose Sharpe is undefined (T-725), and for a placebo draw with zero variance (T-725, T-728).
   * House rule 10: every claim names a calendar (month-ends), so there is no free grid phase. No cross-sectional stock
     universe is used (no survivorship issue). Below trial.min_n the verdict is never supported and a failing criterion
     counts only when decisive (``batch6c_cal._judge``, house rule 5).
@@ -150,6 +172,8 @@ VIX_B = "cboe-VIX-history"
 GSPC_B = "daily-history--GSPC"
 DBC_B = "daily-history-DBC"
 EVZ_B = "cboe-EVZ-history"
+DTB3_B = "fred-DTB3"
+RANK_LAG = 2                              # the fixed rank-lag sensitivity: month t-2 rates at a month-t decision
 
 G9 = ("EUR", "JPY", "GBP", "CHF", "CAD", "AUD", "NZD", "SEK", "NOK")
 EM2 = ("MXN", "ZAR")
@@ -347,9 +371,13 @@ def rate_vec(R: dict, ccys: Sequence[str], m: str) -> np.ndarray:
     return out
 
 
-def afd_acc(R: dict, ccys: Sequence[str], m: str) -> tuple:
-    """(mean foreign minus US 3-month rate of month m in percent, forward-filled currencies) - an outcome accrual."""
-    us, fu = rate_at(R, "USD", m)
+def afd_acc(R: dict, ccys: Sequence[str], m: str, us_rate: Optional[dict] = None) -> tuple:
+    """(mean foreign minus US 3-month rate of month m in percent, forward-filled currencies) - an outcome accrual. The US
+    leg is R's USD rate, or ``us_rate[m]`` ({month: percent}, e.g. the DTB3 monthly average) when given."""
+    if us_rate is None:
+        us, fu = rate_at(R, "USD", m)
+    else:
+        us, fu = us_rate.get(m), False
     vals, filled = [], ([] if not fu else ["USD"])
     for c in ccys:
         v, fl = rate_at(R, c, m)
@@ -361,6 +389,21 @@ def afd_acc(R: dict, ccys: Sequence[str], m: str) -> tuple:
     if us is None:
         return None, filled
     return float(np.mean(vals)) - float(us), filled
+
+
+def month_avg(series: dict) -> dict:
+    """{month: mean of the daily prints dated in that month} of a {day: value} series (e.g. FRED DTB3)."""
+    acc: dict = defaultdict(list)
+    for d, v in series.items():
+        acc[d[:7]].append(float(v))
+    return {m: float(np.mean(v)) for m, v in acc.items() if v}
+
+
+def _dtb3_month(archive) -> Optional[dict]:
+    """Month averages of fred-DTB3 (None when the bundle is missing)."""
+    if not B7C._has(archive, DTB3_B):
+        return None
+    return CAL._cached(archive, ("b13_gaps_fx", "dtb3_month"), lambda: month_avg(CAL._series(archive, DTB3_B)))
 
 
 # ---------------------------------------------------------------------------------------- point-in-time rates --
@@ -404,7 +447,8 @@ def vintage_obs(values: Sequence[dict]) -> dict:
 class PitRates:
     """3-month rates known at a day. mode 'vintage': the registered ALFRED IR3TIB01 vintages; 'proxy': the month known
     is the latest whose same-country IRLTLT01 first release is on or before the day (``rel`` {ccy: {month: day}}), with
-    the latest-vintage ``fx-rates-3m`` value (forward-filled at most 12 months; flagged)."""
+    the latest-vintage ``fx-rates-3m`` value (forward-filled at most 12 months; flagged). IRLTLT01's release can lead
+    IR3TIB01's as well as lag it, so the proxy is not point-in-time in either direction (it can refute, not support)."""
 
     def __init__(self, mode: str, R: dict, rel: Optional[dict] = None, vint: Optional[dict] = None):
         self.mode, self.R, self.vint = mode, R, vint or {}
@@ -441,6 +485,23 @@ class PitRates:
         if us is None or any(v is None for v in vals):
             return None
         return float(np.mean(vals)) - float(us)
+
+
+class LagRates:
+    """Sensitivity clock (report only): at a decision day D in month t the rate known is month t - ``lag``'s
+    latest-vintage ``fx-rates-3m`` value (forward-filled at most 12 months; flagged). Same interface as ``PitRates``."""
+
+    def __init__(self, R: dict, lag: int = RANK_LAG):
+        self.R, self.lag = R, int(lag)
+        self.mode = f"fixed month t-{self.lag}"
+
+    def known(self, c: str, D: str) -> tuple:
+        m = madd(D[:7], -self.lag)
+        x, filled = rate_at(self.R, c, m)
+        return (m if x is not None else None), x, bool(filled)
+
+    def afd(self, ccys: Sequence[str], D: str) -> Optional[float]:
+        return PitRates.afd(self, ccys, D)
 
 
 def _pit(archive) -> Optional[PitRates]:
@@ -492,6 +553,51 @@ def shift(x, k: int) -> np.ndarray:
     out = np.full(x.size, np.nan)
     if k < x.size:
         out[k:] = x[:x.size - k]
+    return out
+
+
+def _gain(a, b) -> Optional[float]:
+    """Sharpe(a) - Sharpe(b), annualised; None unless both Sharpes are defined (never a silent 0)."""
+    sa, sb = _sr(a), _sr(b)
+    return None if sa is None or sb is None else sa - sb
+
+
+def tranche_positions(s, J) -> np.ndarray:
+    """Overlapping 3-month tranches of a monthly sign ``s`` (one entry per decision row) at rows ``J``: the mean of the
+    signs decided at rows j-2, j-1 and j (each held three months in thirds), NaN unless all three exist."""
+    s = np.asarray(s, float)
+    out = np.full(len(J), np.nan)
+    for k, j in enumerate(J):
+        if j >= 2 and np.isfinite(s[j - 2:j + 1]).all():
+            out[k] = float(np.mean(s[j - 2:j + 1]))
+    return out
+
+
+def fe_panel_slope(Y, x) -> dict:
+    """Pooled OLS slope of Y[j, c] on x[j] with currency fixed effects (each currency's y and x demeaned over its own
+    finite rows), standard error clustered by row j (month; CR1 small-sample factor), one-sided p (H0: slope <= 0)."""
+    Y, x = np.asarray(Y, float), np.asarray(x, float)
+    ok = np.isfinite(Y) & np.isfinite(x)[:, None]
+    keep = ok.sum(axis=0) >= 3
+    ok = ok & keep[None, :]
+    N, G, C = int(ok.sum()), int(ok.any(axis=1).sum()), int(keep.sum())
+    out = {"n_obs": N, "n_months": G, "n_ccy": C, "b": None, "t": None, "p": None}
+    if G < 12 or N < C + 4:
+        return out
+    Xb = np.where(ok, x[:, None], 0.0)
+    Yb = np.where(ok, Y, 0.0)
+    cnt = np.maximum(ok.sum(axis=0), 1)
+    xd = np.where(ok, Xb - Xb.sum(axis=0) / cnt, 0.0)
+    yd = np.where(ok, Yb - Yb.sum(axis=0) / cnt, 0.0)
+    sxx = float((xd * xd).sum())
+    if not sxx > 0:
+        return out
+    b = float((xd * yd).sum() / sxx)
+    e = np.where(ok, yd - b * xd, 0.0)
+    score = (xd * e).sum(axis=1)
+    V = float(score @ score) / sxx ** 2 * G / (G - 1) * (N - 1) / max(1, N - C - 1)
+    t = b / math.sqrt(V) if V > 0 else None
+    out.update(b=b, t=t, p=None if t is None else float(1.0 - _N.cdf(t)))
     return out
 
 
@@ -749,6 +855,15 @@ def t719_core(archive) -> dict:
         jm = [ms[j] for j in J]
         h1 = np.array([m < T719_SPLIT for m in jm])
         halves = [_sr(net[h1]), _sr(net[~h1])]
+        # reported: the overlapping 3-month-tranche reading (each month's sign held three months in thirds)
+        s_full = np.full(len(ms), np.nan)
+        s_full[J] = sign
+        tr = tranche_positions(s_full, J)
+        okt = np.isfinite(tr)
+        net3, gross3 = position_net(tr[okt], F["ret1"][J][okt], roll_units=np.ones(int(okt.sum())))
+        h13 = h1[okt]
+        tranche = {"n": int(okt.sum()), "sharpe": _sr(net3), "gross_sharpe": _sr(gross3),
+                   "halves_sharpe": [_sr(net3[h13]), _sr(net3[~h13])]}
         base = {nm: _sr(position_net(np.full(J.size, s), F["ret1"][J])[0]) for nm, s in (("always_long_dol", 1.0),
                                                                                         ("always_short_dol", -1.0))}
         enc_X = np.column_stack([F["gv"], F["afd_pit"], F["vix"]])
@@ -765,7 +880,7 @@ def t719_core(archive) -> dict:
         return {"ok": True, "n": int(ev["gv"]["n"]), "ev": ev, "halves_r2": hv, "rule": {"net": net, "gross": gross,
                 "sign": sign, "months": jm, "halves_sharpe": halves, "sharpe": _sr(net), "gross_sharpe": _sr(gross),
                 "share_long": float(np.mean(sign > 0)), "n_switch": int(np.sum(sign[1:] != sign[:-1]))},
-                "baselines": base, "encompassing": enc, "hodrick": hod, "stale_accrual_months": stale,
+                "tranche3": tranche, "baselines": base, "encompassing": enc, "hodrick": hod, "stale_accrual_months": stale,
                 "gv_mean": float(np.nanmean(F["gv"][oos])), "slope_last": float(sl3[J[-1]]) if J.size else None,
                 "first_last": [jm[0], jm[-1]] if jm else None, "pit_mode": pit.mode if pit else None}
     return CAL._cached(archive, ("b13_gaps_fx", "T-719"), run)
@@ -786,9 +901,12 @@ def b13_gaps_fx_global_rv_dol(archive):
     dsr_row, d = family_dsr_row(c["rule"]["net"], list(fam.values()), DOL_N_TRIALS, 0,
                                 f"DSR >= {DSR_PASS} over the {DOL_N_TRIALS} DOL-target trials (T-605 x2, T-575, T-720 x2, this)")
     h = c["rule"]["halves_sharpe"]
+    srr = c["rule"]["sharpe"]
     rows = [IB._p_crit(p["cw_p"], p["cw_t"], "Clark-West one-sided p < 0.05 at 3 months (Newey-West lag 2)"),
             (f"3-month OOS R^2 > 0 (the claim and the null: {_s(p['oos_r2'], 4)})", None if p["oos_r2"] is None
              else p["oos_r2"] > 0, False),
+            (f"forecast-sign DOL rule full-sample net Sharpe > 0 (the claim: {_s(srr, 3)})", None if srr is None
+             else srr > 0, False),
             (f"forecast-sign DOL rule net Sharpe > 0 in 2013-2019 ({_s(h[0], 3)})", None if h[0] is None else h[0] > 0, False),
             (f"forecast-sign DOL rule net Sharpe > 0 in 2020-2026 ({_s(h[1], 3)})", None if h[1] is None else h[1] > 0, False),
             dsr_row]
@@ -799,7 +917,7 @@ def b13_gaps_fx_global_rv_dol(archive):
     stat = {k: c[k] for k in ("n", "ev", "halves_r2", "baselines", "hodrick", "stale_accrual_months", "first_last",
                               "pit_mode", "slope_last")}
     stat.update(rule={k: c["rule"][k] for k in ("halves_sharpe", "sharpe", "gross_sharpe", "share_long", "n_switch")},
-                rule_sb_ci=sb, encompassing=enc, dsr=d, family_sharpes_pp=fam, criteria=crit, verdict=v,
+                rule_tranche3=c["tranche3"], rule_sb_ci=sb, encompassing=enc, dsr=d, family_sharpes_pp=fam, criteria=crit, verdict=v,
                 evz_variant="EVZ archived but not computed" if evz else "EVZ not archived: not computed")
     r = c["rule"]
     reason = (f"GV = mean 21-session annualised RV of the 9 G10 noon fixes PUBLISHED by H.10 at each month-end (weekly "
@@ -809,7 +927,9 @@ def b13_gaps_fx_global_rv_dol(archive):
               f"{_s(c['halves_r2']['2013-2019']['oos_r2'], 4)} / {_s(c['halves_r2']['2020-2026']['oos_r2'], 4)}; forecast-sign "
               f"rule (long the basket {r['share_long']:.0%} of months, {r['n_switch']} switches) net Sharpe {_s(r['sharpe'], 3)} "
               f"(gross {_s(r['gross_sharpe'], 3)}; stationary-bootstrap 95% CI [{_s(sb['ci'][0], 2)}, {_s(sb['ci'][1], 2)}]), "
-              f"halves {_s(h[0], 3)} / {_s(h[1], 3)}; DSR {_f(d.get('dsr'))} at {DOL_N_TRIALS} trials. Reported: 6-month OOS "
+              f"halves {_s(h[0], 3)} / {_s(h[1], 3)}; DSR {_f(d.get('dsr'))} at {DOL_N_TRIALS} trials. Reported: the same "
+              f"sign held 3 months in overlapping thirds, net Sharpe {_s(c['tranche3']['sharpe'], 3)} (halves "
+              f"{_s(c['tranche3']['halves_sharpe'][0], 3)} / {_s(c['tranche3']['halves_sharpe'][1], 3)}); 6-month OOS "
               f"R^2 {_s(ev['gv6']['oos_r2'], 4)} (CW p {_f(ev['gv6']['cw_p'], 3)}); Hodrick t {_s(c['hodrick'].get('t'), 2)}; "
               f"controls AFD-only ({c['pit_mode'] or 'no'} point-in-time rates) R^2 {_s(ev['afd']['oos_r2'], 4)}, VIX-only "
               f"{_s(ev['vix']['oos_r2'], 4)}; encompassing GV coefficient t {_s(enc_t[1] if enc_t else None, 2)} (with AFD, VIX); "
@@ -841,10 +961,12 @@ def vp_frame(days: Sequence[str], close, vix: dict, months_from: str, months_to:
             "vp": v2 - rv}
 
 
-def t720_targets(P: dict, R: dict, pit: Optional[PitRates], dec_days: Sequence[str]) -> dict:
+def t720_targets(P: dict, R: dict, pit: Optional[PitRates], dec_days: Sequence[str],
+                  us_rate: Optional[dict] = None) -> dict:
     """Per decision j: 1- and 3-month log DOL excess returns from the first common fix after day j to the first common
-    fix after decision j+1 (j+3), with the month t-1 AFD accrual; the simple 1-month return; per-currency 1-month log
-    excess returns; release days of the end fixes; the point-in-time AFD and the last-month published DOL return."""
+    fix after decision j+1 (j+3), with the month t-1 AFD accrual (US leg: R's OECD USD rate, or ``us_rate`` {month:
+    percent}, e.g. the DTB3 month average); the simple 1-month return; per-currency 1-month log excess returns; release
+    days of the end fixes; the point-in-time AFD and the last-month published DOL return."""
     M = len(dec_days)
     L, X, ccys = P["L"], P["X"], P["ccys"]
     out = {k: np.full(M, np.nan) for k in ("y1", "y3", "ret1", "afd_pit", "last_dol")}
@@ -860,7 +982,7 @@ def t720_targets(P: dict, R: dict, pit: Optional[PitRates], dec_days: Sequence[s
             p_prev = pub_idx(P, dec_days[j - 1])
             if p_now >= 0 and p_prev >= 0:
                 out["last_dol"][j] = float(np.mean(L[p_now] - L[p_prev]))
-        acc, fl = afd_acc(R, ccys, madd(m, -1))
+        acc, fl = afd_acc(R, ccys, madd(m, -1), us_rate)
         filled.append(fl)
         s = after_idx(P, t)
         if acc is None or s is None:
@@ -875,7 +997,7 @@ def t720_targets(P: dict, R: dict, pit: Optional[PitRates], dec_days: Sequence[s
             kd[h][j] = P["rel"][e]
             if h == 1:
                 out["ret1"][j] = float(np.mean(X[e] / X[s] - 1.0)) + acc / 1200.0
-                us = rate_at(R, "USD", madd(m, -1))[0]
+                us = rate_at(R, "USD", madd(m, -1))[0] if us_rate is None else us_rate.get(madd(m, -1))
                 out["y1c"][j] = (L[e] - L[s]) + (rate_vec(R, ccys, madd(m, -1)) - us) / 1200.0
     out.update(kd=kd, filled=filled)
     return out
@@ -943,22 +1065,41 @@ def t720_core(archive) -> dict:
             yc = T["y1c"][:, k]
             mc = use & np.isfinite(yc)
             per_c[c] = nw_slope(yc[mc], vz[mc], 2)
+        fe = fe_panel_slope(T["y1c"][use], vz[use])
         # trading arms (the registration's 60-month-median rule; 1- and 3-month holds)
         s = median_arm(V["vp"], oos)
         arm = oos & np.isfinite(s) & np.isfinite(T["ret1"])
         J = np.where(arm)[0]
         net1, gross1 = position_net(s[J], T["ret1"][J])
-        tr = np.array([np.mean([s[i] for i in range(j - 2, j + 1) if np.isfinite(s[i])]) if np.isfinite(s[j - 2:j + 1]).all()
-                       else np.nan for j in J])
+        tr = tranche_positions(s, J)
         okt = np.isfinite(tr)
         net3, _ = position_net(tr[okt], T["ret1"][J][okt], roll_units=np.ones(int(okt.sum())))
         stale = [m for m, fl in zip(ms, T["filled"]) if fl and T720_OOS[0] <= m <= T720_OOS[1]]
         thr = use & np.array([madd(m, -1) <= STALE_THROUGH for m in ms])
         sl_thr = nw_slope(T["y1"][thr], vz[thr], 2)
+        # reported, not judged: the registration's data line names fred-DTB3, so the accrual's US leg as the month t-1
+        # DTB3 average (public by the decision) beside the judged OECD IR3TIB01 US leg
+        dtb = _dtb3_month(archive)
+        alt = None
+        if dtb is not None:
+            T2 = t720_targets(P, R, pit, V["day"], us_rate=dtb)
+            u2 = oos & np.isfinite(V["vp"]) & np.isfinite(T2["y1"])
+            sp = np.array([m < T720_SPLIT for m in ms])
+            fm2, fb2, _ = expanding_fc(V["vp"], T2["y1"], T2["kd"][1], dd, train, oos)
+            a2 = oos & np.isfinite(s) & np.isfinite(T2["ret1"])
+            J2 = np.where(a2)[0]
+            gap = [rate_at(R, "USD", madd(m, -1))[0] - dtb[madd(m, -1)] for m in ms
+                   if T720_OOS[0] <= m <= T720_OOS[1] and madd(m, -1) in dtb and rate_at(R, "USD", madd(m, -1))[0] is not None]
+            alt = {"n_slope": int(u2.sum()), "slope": nw_slope(T2["y1"][u2], vz[u2], 2),
+                   "halves": [nw_slope(T2["y1"][u2 & sp], vz[u2 & sp], 2), nw_slope(T2["y1"][u2 & ~sp], vz[u2 & ~sp], 2)],
+                   "ev": IB.oos_stats(T2["y1"], fm2, fb2, oos & np.isfinite(fm2), 2),
+                   "fe_panel": fe_panel_slope(T2["y1c"][u2], vz[u2]),
+                   "arm1_sharpe": _sr(position_net(s[J2], T2["ret1"][J2])[0]),
+                   "mean_oecd_minus_dtb3_pct": float(np.mean(gap)) if gap else None}
         return {"ok": True, "n": int(ev["vp"]["n"]), "ev": ev, "slope": sl, "halves": halves, "slope_excl": sl_ex,
                 "slope_3m": sl3, "hodrick_3m": hod3, "multi": multi,
                 "shuffle": {"b_obs": b_obs, "pct_rank": float(np.mean(perm < b_obs)), "p95": float(np.percentile(perm, 95))},
-                "per_ccy": per_c, "arm1": {"net": net1, "gross": gross1, "months": [ms[j] for j in J],
+                "per_ccy": per_c, "fe_panel": fe, "dtb3_us_leg": alt, "arm1": {"net": net1, "gross": gross1, "months": [ms[j] for j in J],
                                            "share_long": float(np.mean(s[J] > 0)) if J.size else None},
                 "arm3": {"net": net3}, "stale_accrual_months": stale, "slope_through_2026_01": sl_thr,
                 "first_last": [ms[np.where(use)[0][0]], ms[np.where(use)[0][-1]]] if use.any() else None,
@@ -969,7 +1110,7 @@ def t720_core(archive) -> dict:
 def b13_gaps_fx_equity_vrp_dol(archive):
     """T-720: the US equity variance risk premium (VIX^2/12 - 21-session ^GSPC RV) predicts the next-month DOL excess
     return (Newey-West slope and Clark-West)."""
-    miss = B7C._missing(archive, [SPOT_B, RATE_B, VIX_B, GSPC_B])
+    miss = B7C._missing(archive, [SPOT_B, RATE_B, VIX_B, GSPC_B, DTB3_B])
     if miss:
         return miss
     c = t720_core(archive)
@@ -995,13 +1136,31 @@ def b13_gaps_fx_equity_vrp_dol(archive):
     beats = None if None in (p["oos_r2"], ev["vix2"]["oos_r2"], ev["rv"]["oos_r2"]) else bool(
         p["oos_r2"] > ev["vix2"]["oos_r2"] and p["oos_r2"] > ev["rv"]["oos_r2"])
     eur = c["per_ccy"].get("EUR", {})
+    fe, alt = c["fe_panel"], c["dtb3_us_leg"]
+
+    def outcomes(slope, halves_, ev_):
+        return [None if slope["p"] is None else slope["p"] < ALPHA, None if ev_["cw_p"] is None else ev_["cw_p"] < ALPHA,
+                None if ev_["oos_r2"] is None else ev_["oos_r2"] > 0] + [None if x["b"] is None else x["b"] > 0
+                                                                         for x in halves_]
+    dtb_agree = None if alt is None else outcomes(sl, hv, p) == outcomes(alt["slope"], alt["halves"], alt["ev"])
     stat = {k: c[k] for k in ("n", "ev", "slope", "halves", "slope_excl", "slope_3m", "hodrick_3m", "multi", "shuffle",
-                              "per_ccy", "stale_accrual_months", "slope_through_2026_01", "first_last", "n_slope",
-                              "vp_mean", "vp_sd", "pit_mode")}
+                              "per_ccy", "fe_panel", "dtb3_us_leg", "stale_accrual_months", "slope_through_2026_01",
+                              "first_last", "n_slope", "vp_mean", "vp_sd", "pit_mode")}
+    stat["dtb3_reading_same_criterion_outcomes"] = dtb_agree
     stat.update(arm1={"sharpe": _sr(net), "gross_sharpe": _sr(c["arm1"]["gross"]), "share_long": c["arm1"]["share_long"],
                       "sb_ci": sb}, arm3_sharpe=_sr(c["arm3"]["net"]), vp_beats_vix2_and_rv=beats, dsr=d,
                 family_sharpes_pp=fam, criteria=crit, verdict=v)
     pcs = ", ".join(f"{k} {_s(x.get('t'), 1)}" for k, x in c["per_ccy"].items())
+    if alt is None:
+        dtb_txt = "fred-DTB3 US leg: not computed"
+    else:
+        ae = alt["ev"]
+        dtb_txt = (f"with the US leg as the month t-1 fred-DTB3 average (registered data; OECD US minus DTB3 "
+                   f"{_s(alt['mean_oecd_minus_dtb3_pct'], 2)} pt on average): slope NW t {_s(alt['slope']['t'], 2)} (p "
+                   f"{_f(alt['slope']['p'], 4)}), halves t {_s(alt['halves'][0]['t'], 2)} / {_s(alt['halves'][1]['t'], 2)}, OOS "
+                   f"R^2 {_s(ae['oos_r2'], 4)}, CW t {_s(ae['cw_t'], 2)} (p {_f(ae['cw_p'], 4)}), FE panel t "
+                   f"{_s(alt['fe_panel']['t'], 2)}, arm Sharpe {_s(alt['arm1_sharpe'], 3)}; every judged criterion reads the "
+                   f"same: {dtb_agree}")
     reason = (f"VP = VIX^2/12 - 21-session ^GSPC RV (monthly %^2) at each month's last NYSE session, next-month DOL log "
               f"excess return from the first common fix after t (month t-1 AFD accrual), decisions {c['first_last'][0]}.."
               f"{c['first_last'][1]}: slope {_s(sl['b'] * 1e4 if sl['b'] is not None else None, 1)} bp per sd of VP, NW t "
@@ -1016,7 +1175,9 @@ def b13_gaps_fx_equity_vrp_dol(archive):
               f"{_s(c['slope_3m']['t'], 2)}, Hodrick t {_s(c['hodrick_3m'].get('t'), 2)}, R^2 {_s(ev['vp3']['oos_r2'], 4)}; "
               f"excluding 2008-09..2009-03 and 2020-03..06: slope t {_s(c['slope_excl']['t'], 2)}, R^2 "
               f"{_s(ev['vp_excl']['oos_r2'], 4)}; per-currency slope t {pcs} (EUR, insignificant in the source: "
-              f"{_s(eur.get('t'), 2)}); EUR/GBP accruals forward-filled in {len(c['stale_accrual_months'])} months (slope t "
+              f"{_s(eur.get('t'), 2)}); pooled currency-fixed-effects panel slope {_s(fe['b'] * 1e4 if fe['b'] is not None else None, 1)} "
+              f"bp per sd, t {_s(fe['t'], 2)} clustered by month ({fe['n_obs']} currency-months, {fe['n_months']} months); "
+              f"{dtb_txt}; EUR/GBP accruals forward-filled in {len(c['stale_accrual_months'])} months (slope t "
               f"through 2026-01 accruals {_s(c['slope_through_2026_01']['t'], 2)}). VIX enters at 21:30 UTC on t, the fill "
               f"is the next common noon fix — {why}")
     return _out(stat, c["n"], v, reason)
@@ -1149,15 +1310,35 @@ def book_net(rows: list, universe: Sequence[str], g=None, cost: Optional[dict] =
     return net, gross
 
 
-def placebo_gains(rows: list, universe: Sequence[str], n_flat: int, sr_untimed: float, n_draws: int, rng) -> np.ndarray:
-    """Sharpe gains of random-switch books with ``n_flat`` flat months at random positions (costs recomputed)."""
+def placebo_gains(rows: list, universe: Sequence[str], n_flat: int, sr_untimed: Optional[float], n_draws: int,
+                  rng) -> np.ndarray:
+    """Sharpe gains of random-switch books with ``n_flat`` flat months at random positions (costs recomputed); a draw
+    whose Sharpe is undefined is NaN, and every draw is NaN when the untimed Sharpe is (never a silent 0)."""
     n = len(rows)
-    out = np.empty(n_draws)
+    out = np.full(n_draws, np.nan)
+    if sr_untimed is None:
+        return out
     for i in range(n_draws):
         g = np.ones(n)
         g[rng.choice(n, size=n_flat, replace=False)] = 0.0
-        out[i] = (_sr(book_net(rows, universe, g, switch=T725_SWITCH)[0]) or 0.0) - sr_untimed
+        x = _sr(book_net(rows, universe, g, switch=T725_SWITCH)[0])
+        if x is not None:
+            out[i] = x - sr_untimed
     return out
+
+
+def placebo_summary(plac, observed: Optional[float]) -> dict:
+    """95th percentile, mean and the observed value's rank among the finite placebo draws (None when undefined)."""
+    x = np.asarray(plac if plac is not None else [], float)
+    x = x[np.isfinite(x)]
+    if x.size == 0:
+        return {"n": 0, "p95": None, "mean": None, "pct_rank": None}
+    return {"n": int(x.size), "p95": float(np.percentile(x, 95)), "mean": float(x.mean()),
+            "pct_rank": None if observed is None else float(np.mean(x < observed))}
+
+
+def _pct0(x: Optional[float]) -> str:
+    return "n/a" if x is None or not np.isfinite(x) else f"{x:.0%}"
 
 
 def t725_core(archive) -> dict:
@@ -1183,10 +1364,23 @@ def t725_core(archive) -> dict:
         vn, _ = book_net(rows, G10U, gv30, switch=T725_SWITCH)
         sd = sb_sharpe_diff(tn, un)
         h1 = np.array([H < T725_SPLIT for H in Hs])
-        halves = [(_sr(tn[h1]) or 0.0) - (_sr(un[h1]) or 0.0), (_sr(tn[~h1]) or 0.0) - (_sr(un[~h1]) or 0.0)]
+        halves = [_gain(tn[h1], un[h1]), _gain(tn[~h1], un[~h1])]
         rng = np.random.default_rng(SEED)
         n_flat = int((g == 0).sum())
-        plac = placebo_gains(rows, G10U, n_flat, _sr(un) or 0.0, T725_N_PLACEBO, rng) if 0 < n_flat < len(rows) else np.zeros(1)
+        plac = (placebo_gains(rows, G10U, n_flat, _sr(un), T725_N_PLACEBO, rng) if 0 < n_flat < len(rows)
+                else np.zeros(0))
+        # reported: the same rule on fixed month t-2 ranks (the proxy clock may lead the IR3TIB01 release)
+        lag = LagRates(R)
+        rl = carry_book(P, R, lag, hold)["rows"]
+        Hl = [r["H"] for r in rl]
+        gl = np.array([0.0 if fl["flag"][gidx[madd(H, -1)]] else 1.0 for H in Hl])
+        gl30 = np.array([0.0 if _last_on_or_before(vd, vv, month_end_day(madd(H, -1))) > T725_VIX_CUT else 1.0 for H in Hl])
+        unl, _ = book_net(rl, G10U)
+        tnl, _ = book_net(rl, G10U, gl, switch=T725_SWITCH)
+        vnl, _ = book_net(rl, G10U, gl30, switch=T725_SWITCH)
+        hl = np.array([H < T725_SPLIT for H in Hl])
+        lagged = {"mode": lag.mode, "n": len(rl), "timed": tnl, "untimed": unl, "sharpe_vix30": _sr(vnl),
+                  "sd": sb_sharpe_diff(tnl, unl), "halves": [_gain(tnl[hl], unl[hl]), _gain(tnl[~hl], unl[~hl])]}
         # T-368's frozen non-vintage book (its own month-end calendar and one-month-lagged ranks)
         panel = FX._panel(archive, XA.T605_FILL_TO)
         cb, ad = FX.g10_costs()
@@ -1221,7 +1415,7 @@ def t725_core(archive) -> dict:
         return {"ok": True, "n": len(rows), "months": Hs, "timed": tn, "untimed": un, "untimed_gross": ug, "vix30": vn,
                 "g": g, "g_vix30": gv30, "sd": sd, "halves": halves, "placebo": plac, "frozen_net": frozen["net"],
                 "frozen_months": frozen["months"], "bp": bp, "stale_months": stale, "pit_mode": pit.mode,
-                "gain_through_2026_01": (_sr(tn[thr]) or 0.0) - (_sr(un[thr]) or 0.0) if thr.sum() > 2 else None,
+                "gain_through_2026_01": _gain(tn[thr], un[thr]), "lagged_ranks": lagged,
                 "u_last": float(fl["u"][gidx[madd(Hs[-1], -1)]]) if Hs else None}
     return CAL._cached(archive, ("b13_gaps_fx", "T-725"), run)
 
@@ -1247,8 +1441,10 @@ def b13_gaps_fx_vol_innovation_carry(archive):
     rows = [proxy_cap((f"Sharpe(timed) - Sharpe(untimed) {_s(sd['diff'], 3)} > 0 with paired stationary-bootstrap one-sided "
                        f"p < 0.05 (p {CAL._mc(sd['p'], sd['draws'])})", p_ok,
                        CAL.decide_p(sd["p_lt"], sd["draws"]) is True), pit, "the base book"),
-            proxy_cap((f"gain > 0 in 2013-2019 ({_s(c['halves'][0], 3)})", c["halves"][0] > 0, False), pit, "the base book"),
-            proxy_cap((f"gain > 0 in 2020-2026 ({_s(c['halves'][1], 3)})", c["halves"][1] > 0, False), pit, "the base book"),
+            proxy_cap((f"gain > 0 in 2013-2019 ({_s(c['halves'][0], 3)})", None if c["halves"][0] is None
+                       else c["halves"][0] > 0, False), pit, "the base book"),
+            proxy_cap((f"gain > 0 in 2020-2026 ({_s(c['halves'][1], 3)})", None if c["halves"][1] is None
+                       else c["halves"][1] > 0, False), pit, "the base book"),
             proxy_cap((f"timed Sharpe {_s(srt, 3)} above the VIX > 30 filter's {_s(srv, 3)} on the same base",
                        None if srt is None or srv is None else srt > srv, False), pit, "the base book"),
             dsr_row,
@@ -1258,13 +1454,19 @@ def b13_gaps_fx_vol_innovation_carry(archive):
     n_flat = int((c["g"] == 0).sum())
     fz = np.asarray(c["frozen_net"], float)
     bp = c["bp"]
+    lg = c["lagged_ranks"]
+    lsd = lg["sd"]
+    _, ldsr = family_dsr_row(lg["timed"], list(fam.values()) + [_sr_pp(lg["timed"])], T725_N_TRIALS,
+                             len(T725_UNCOMPUTED), "DSR (fixed month t-2 ranks)")
+    lagged = {"mode": lg["mode"], "n": lg["n"], "sharpe_timed": _sr(lg["timed"]), "sharpe_untimed": _sr(lg["untimed"]),
+              "sharpe_vix30": lg["sharpe_vix30"], "sharpe_diff": lsd, "halves_gain": lg["halves"],
+              "dsr_upper_bound": ldsr.get("dsr_upper_bound")}
     stat = {"n": c["n"], "first_last": [c["months"][0], c["months"][-1]], "sharpe_timed": srt, "sharpe_untimed": sru,
             "sharpe_untimed_gross": _sr(c["untimed_gross"]), "sharpe_vix30": srv, "sharpe_diff": sd, "halves_gain": c["halves"],
             "n_flat": n_flat, "n_flat_vix30": int((c["g_vix30"] == 0).sum()),
             "mdd": {"timed": FX._mdd(tn) if hasattr(FX, "_mdd") else None, "untimed": FX._mdd(un) if hasattr(FX, "_mdd") else None},
             "skew": {"timed": FX.skewness(tn), "untimed": FX.skewness(un)},
-            "placebo": {"p95": float(np.percentile(plac, 95)), "pct_rank": float(np.mean(plac < (sd["diff"] or 0.0))),
-                        "mean": float(plac.mean())},
+            "placebo": placebo_summary(plac, sd["diff"]), "lagged_ranks_t_minus_2": lagged,
             "frozen_t368": {"n": int(fz.size), "sharpe": _sr(fz)}, "bakshi_panayotov": bp, "dsr": dsr,
             "family_sharpes_pp": fam, "stale_months": c["stale_months"], "gain_through_2026_01": c["gain_through_2026_01"],
             "pit_mode": c["pit_mode"], "criteria": crit, "verdict": v}
@@ -1276,8 +1478,12 @@ def b13_gaps_fx_vol_innovation_carry(archive):
               f"expanding 80th percentile: timed {_s(srt, 3)}, gain {_s(sd['diff'], 3)} (paired stationary bootstrap p "
               f"{_f(sd['p'], 4)}, 95% CI [{_s(sd['ci'][0], 2)}, {_s(sd['ci'][1], 2)}]); halves {_s(c['halves'][0], 3)} / "
               f"{_s(c['halves'][1], 3)}; VIX > 30 filter ({stat['n_flat_vix30']} flat months) {_s(srv, 3)}; random-switch "
-              f"placebo 95th pct gain {_s(stat['placebo']['p95'], 3)} (observed at the {stat['placebo']['pct_rank']:.0%} rank); "
-              f"DSR bound {_f(dsr.get('dsr_upper_bound'))} at {T725_N_TRIALS} trials. Reported: MDD timed "
+              f"placebo 95th pct gain {_s(stat['placebo']['p95'], 3)} (observed at the {_pct0(stat['placebo']['pct_rank'])} rank); "
+              f"DSR bound {_f(dsr.get('dsr_upper_bound'))} at {T725_N_TRIALS} trials. Reported: on fixed month t-2 ranks "
+              f"instead of the proxy clock (which can lead the IR3TIB01 release as well as lag it), {lagged['n']} months: "
+              f"untimed {_s(lagged['sharpe_untimed'], 3)}, timed {_s(lagged['sharpe_timed'], 3)}, gain "
+              f"{_s(lsd['diff'], 3)} (p {_f(lsd['p'], 4)}), halves {_s(lg['halves'][0], 3)} / {_s(lg['halves'][1], 3)}, VIX > 30 "
+              f"{_s(lagged['sharpe_vix30'], 3)}, DSR bound {_f(lagged['dsr_upper_bound'])}; MDD timed "
               f"{_pc(stat['mdd']['timed'], 1)} vs untimed {_pc(stat['mdd']['untimed'], 1)}, skew {_s(stat['skew']['timed'], 2)} "
               f"vs {_s(stat['skew']['untimed'], 2)}; T-368's frozen non-vintage month-end book Sharpe {_s(stat['frozen_t368']['sharpe'], 3)}; "
               f"Bakshi-Panayotov (dGV, DBC) OOS R^2 {_s(bp.get('oos_r2'), 4)}, CW p {_f(bp.get('cw_p'), 3)}; stale rates "
@@ -1350,6 +1556,29 @@ def rolling_betas_draws(Rm, DV, n: int = T728_BETA_N) -> np.ndarray:
     return out
 
 
+def t728_betas(P: dict, R: dict, vd: Sequence[str], vv, months: Sequence[str]) -> tuple:
+    """(Rm, dv, B) over ``months``: month-end-to-month-end excess returns, the month-end VIX change and the rolling
+    60-month betas (B[j] from rows j-60..j-1)."""
+    Rm = monthly_excess(P, R, months)
+    vme = vix_month_end(vd, vv, months)
+    dv = np.r_[np.nan, np.diff(vme)]
+    return Rm, dv, rolling_betas(Rm, dv)
+
+
+def t728_decision_beta(P: dict, B: np.ndarray, midx: dict, H: str) -> Optional[np.ndarray]:
+    """Betas behind holding month H (decided at the end of t = H-1): row t of B, i.e. the 60 months H-61..H-2 (the
+    one-month skip). None when not all finite, or when H.10 had not published the window's last month-end fix (month
+    H-2's) by the decision day."""
+    t = madd(H, -1)
+    j = midx.get(t)
+    if j is None or not np.isfinite(B[j]).all():
+        return None
+    lw = P["last"].get(madd(t, -1))
+    if lw is None or P["rel"][lw] > month_end_day(t):
+        return None
+    return B[j]
+
+
 def sort_weights(beta: np.ndarray, k: int = T728_K) -> np.ndarray:
     """+1/k on the k lowest betas, -1/k on the k highest (ties keep the universe order)."""
     order = np.argsort(beta, kind="stable")
@@ -1379,11 +1608,9 @@ def t728_core(archive) -> dict:
         vd, vv, _ = _vix_arr(archive)
         last_full = madd(P["days"][-1][:7], -1)
         months = mrange("2002-06", last_full)
-        Rm = monthly_excess(P, R, months)
-        vme = vix_month_end(vd, vv, months)
-        dv = np.r_[np.nan, np.diff(vme)]
-        B = rolling_betas(Rm, dv)
+        Rm, dv, B = t728_betas(P, R, vd, vv, months)
         midx = {m: i for i, m in enumerate(months)}
+        lag = LagRates(R)
         hold = mrange(*T728_HOLD)
         cb, ad = FX.em_costs()
         cost = np.array([cb[c] / 1e4 for c in U11])
@@ -1391,13 +1618,11 @@ def t728_core(archive) -> dict:
         rows = []
         for H in hold:
             t = madd(H, -1)
-            j = midx.get(t)
             f, e = P["first"].get(H), P["first"].get(madd(H, 1))
-            if j is None or f is None or e is None or not np.isfinite(B[j]).all():
-                continue
-            lw = P["last"].get(madd(t, -1))
-            if lw is None or P["rel"][lw] > month_end_day(t):
-                continue                                   # the beta window's last month-end fix not yet published
+            bj = t728_decision_beta(P, B, midx, H)
+            if bj is None or f is None or e is None:
+                continue                                   # incl. the beta window's last month-end fix not yet published
+            j = midx[t]
             us = rate_at(R, "USD", t)[0]
             if us is None:
                 continue
@@ -1409,9 +1634,11 @@ def t728_core(archive) -> dict:
             if wc is None or lr is None:
                 continue
             carry = float(sum(wc[c] * lr[c] for c in G10U))
+            wl = carry_weights(lag, month_end_day(t))
+            carry_l = float(sum(wl[c] * lr[c] for c in G10U)) if wl is not None else float("nan")
             rk = rate_vec(R, U11, madd(t, -1))
-            rows.append({"H": H, "j": j, "beta": B[j].copy(), "rh": rh, "carry": carry, "dol": float(rh.mean()),
-                         "dol9": float(rh[:9].mean()), "rate_rank": rk})
+            rows.append({"H": H, "j": j, "beta": bj.copy(), "rh": rh, "carry": carry, "carry_lag2": carry_l,
+                         "dol": float(rh.mean()), "dol9": float(rh[:9].mean()), "rate_rank": rk})
         if not rows:
             return {"ok": False}
         W = np.array([sort_weights(r["beta"]) for r in rows])
@@ -1431,6 +1658,14 @@ def t728_core(archive) -> dict:
                 alphas[f"{nm} lag {lg}"] = {"alpha_ann": 12 * r_["coef"][0] if r_.get("coef") else None,
                                             "t": r_["t"][0] if r_.get("t") else None}
         a9 = XA.ols_nw_all(net, np.column_stack([carry, dol9]), lags[0])
+        # reported: carry ranked on fixed month t-2 rates (the proxy clock may lead the IR3TIB01 release)
+        carry_l = np.array([r["carry_lag2"] for r in rows])
+        okl = np.isfinite(carry_l)
+        alphas_lag2 = {}
+        for nm, Xf in (("carry+DOL", np.column_stack([carry_l, dol])), ("carry", carry_l[:, None])):
+            for lg in lags:
+                r_ = XA.ols_nw_all(net[okl], Xf[okl], lg)
+                alphas_lag2[f"{nm} lag {lg}"] = {"t": r_["t"][0] if r_.get("t") else None, "n": int(okl.sum())}
         rcor = []
         for r in rows:
             if np.isfinite(r["rate_rank"]).all():
@@ -1466,12 +1701,13 @@ def t728_core(archive) -> dict:
             prev = np.concatenate([np.zeros((Wd.shape[0], 1, Wd.shape[2])), Wd[:, :-1]], axis=1)
             pn = (Wd * Rh[None]).sum(axis=2) - (np.abs(Wd - prev) * cost).sum(axis=2) - (np.abs(Wd) * admin).sum(axis=2) / 12.0
             sd_ = pn.std(axis=1, ddof=1)
-            plac = np.where(sd_ > 0, pn.mean(axis=1) / np.where(sd_ > 0, sd_, 1.0), 0.0) * math.sqrt(12)
+            plac = np.where(sd_ > 0, pn.mean(axis=1) / np.where(sd_ > 0, sd_, 1.0), np.nan) * math.sqrt(12)
         # 12-currency carry (reported)
         stale = [H for H in Hs if madd(H, -1) > STALE_THROUGH]
         thr = np.array([madd(H, -1) <= STALE_THROUGH for H in Hs])
         return {"ok": True, "n": n, "months": Hs, "net": net, "gross": gross, "lit_net": lit_net, "carry": carry,
                 "dol": dol, "alphas": alphas, "alpha_dol9": {"t": a9["t"][0] if a9.get("t") else None},
+                "alphas_carry_lag2": alphas_lag2, "carry_lag2_sharpe_gross": _sr(carry_l[okl]),
                 "rank_corr_mean": float(np.mean(rcor)) if rcor else None, "static_net": static_net, "placebo": plac,
                 "turnover": float(np.abs(np.diff(W, axis=0)).sum(axis=1).mean()) if n > 1 else None,
                 "long_counts": {c: int((W[:, k] > 0).sum()) for k, c in enumerate(U11)},
@@ -1520,13 +1756,14 @@ def b13_gaps_fx_vix_beta_sort(archive):
             dsr_row]
     v, why, crit = CAL._judge(rows, n, T728_MIN_N, "holding months")
     plac = c["placebo"]
-    pl = None if plac is None else {"p95": float(np.percentile(plac, 95)), "pct_rank": float(np.mean(plac < (sr or 0.0)))}
+    pl = None if plac is None else placebo_summary(plac, sr)
     stat = {"n": n, "first_last": [c["months"][0], c["months"][-1]], "sharpe": sr, "gross_sharpe": _sr(c["gross"]),
             "sb_ci": sb, "halves_mean": halves, "alphas": c["alphas"], "alpha_vs_carry_dol9_t": c["alpha_dol9"]["t"],
             "rank_corr_beta_rate_mean": c["rank_corr_mean"], "static_beta_sharpe": _sr(c["static_net"]),
             "shuffled_vix_placebo": pl, "claim_literal_cost_sharpe": _sr(c["lit_net"]), "turnover": c["turnover"],
             "long_counts": c["long_counts"], "short_counts": c["short_counts"], "corr_carry": c["corr_carry"],
             "corr_dol": c["corr_dol"], "carry_factor_sharpe_gross": _sr(c["carry"]), "dol_sharpe": _sr(c["dol"]),
+            "alphas_vs_carry_lag2": c["alphas_carry_lag2"], "carry_lag2_sharpe_gross": c["carry_lag2_sharpe_gross"],
             "stale_accrual_months": c["stale_months"], "sharpe_through_2026_01": c["sharpe_through_2026_01"], "dsr": d,
             "family_sharpes_pp": fam, "pit_mode": c["pit_mode"], "criteria": crit, "verdict": v}
     at = c["alphas"]
@@ -1543,7 +1780,9 @@ def b13_gaps_fx_vix_beta_sort(archive):
               f"with month t-1 rates {_s(c['rank_corr_mean'], 2)}; most often long {top(c['long_counts'])}, short "
               f"{top(c['short_counts'])}; static full-sample-beta placebo Sharpe {_s(stat['static_beta_sharpe'], 3)}; "
               f"shuffled-VIX placebo 95th pct {_s(pl['p95'] if pl else None, 3)} (observed at the "
-              f"{(pl['pct_rank'] if pl else float('nan')):.0%} rank); claim-literal costs Sharpe "
+              f"{_pct0(pl['pct_rank'] if pl else None)} rank); alpha t vs carry ranked on fixed month t-2 rates + DOL "
+              f"{_s(c['alphas_carry_lag2'][f'carry+DOL lag {CAL.nw_lags(n)}']['t'], 2)} (vs that carry alone "
+              f"{_s(c['alphas_carry_lag2'][f'carry lag {CAL.nw_lags(n)}']['t'], 2)}); claim-literal costs Sharpe "
               f"{_s(stat['claim_literal_cost_sharpe'], 3)}; EUR/GBP accruals forward-filled in {len(c['stale_months'])} "
               f"months (Sharpe through 2026-01 {_s(c['sharpe_through_2026_01'], 3)}). A VIX-change beta is a proxy for "
               f"the paper's put-based tail factor: a fail here does not refute it — {why}")

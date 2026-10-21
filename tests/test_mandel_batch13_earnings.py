@@ -131,8 +131,17 @@ def test_t627_survivorship_semantics():
     small = M.t627_survivorship(x, np.full(120, 0.01), True)
     assert small["ok"] is True
     big = M.t627_survivorship(x, np.full(120, 0.6), True)              # 5% x 0.6 = 3% per month: flips the bound
-    assert big["ok"] is None and big["tipping_delta"] is not None and big["tipping_delta"] > 0
+    assert big["ok"] is None and big["tipping_delta"] is not None and big["tipping_delta"] < 0
+    assert big["tipping_kind"] == "adverse"
     assert M.t627_survivorship(x, np.full(120, 0.01), None)["ok"] is None
+    xf = -0.005 + rng.normal(0, 0.01, 120)                             # failing bound that a favourable shift flips
+    f = M.t627_survivorship(xf, np.full(120, 0.6), False)
+    assert f["ok"] is False and f["tipping_kind"] == "favourable" and f["tipping_delta"] > 0
+
+
+def test_t629_both_judges_on_R_only():
+    assert M._both(False, True) is False and M._both(None, True) is None
+    assert M._both(True, False) is None and M._both(True, True) is True and M._both(False, False) is False
 
 
 # ================================================================================================= T-628 ==

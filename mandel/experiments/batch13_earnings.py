@@ -539,10 +539,14 @@ def t627_survivorship(x: np.ndarray, w: np.ndarray, base_ok: Optional[bool], del
     out["ok"] = (o is True) if base_ok else (o is False)
     if o is None:
         out["ok"] = None
-    if out["ok"] is False:
-        out["ok"] = None                     # a data limit: the absent names could flip it (undecided, rule 9)
+    if out["ok"] is False and base_ok:
+        out["ok"] = None                     # a data limit: the absent names could flip a pass (undecided, rule 9)
+    # failing bound that the shift flips: 'survivorship unable to flip the bound' is not met -> False (non-decisive)
     tv = SB.tipping_value(lambda rr: x + rr * w, T627_BLOCK, -2.0, 2.0)
-    out["tipping_delta"] = None if tv is None else -tv
+    # signed return of the absent names relative to their legs that moves the HAC bound onto zero:
+    # negative = adverse (bound passes), positive = favourable (bound fails)
+    out["tipping_delta"] = tv
+    out["tipping_kind"] = "adverse" if base_ok else "favourable"
     return out
 
 
@@ -587,8 +591,11 @@ def b13_earnings_svr_quarterly_level(archive):
              None if any(h is None for h in hv) else all(h > 0 for h in hv), False),
             (f"survivorship unable to flip the bound (absent names, {surv['w_mean'] * 100:.1f}% of the two legs' weight on "
              f"average, put {T627_TIP:.0%} per month against the claim on each side: bound "
-             f"{'still passes' if surv.get('ok') and ew_ok else 'still fails' if surv.get('ok') else 'flips or is undecided'}; "
-             f"tipping adverse return {_pc(surv.get('tipping_delta'))} per month; {unpriced_mm:.0f} of {member_months:.0f} "
+             f"{'still passes' if surv.get('ok') and ew_ok else 'still fails' if surv.get('ok') else 'can be flipped' if surv.get('ok') is False else 'flips or is undecided'}; "
+             f"the {surv.get('tipping_kind', 'adverse')} return absent names would need to flip the "
+             f"{'passing' if ew_ok else 'failing'} bound: {_pc(surv.get('tipping_delta'))} per month"
+             f"{', inside the adopted ' + format(T627_TIP, '.0%') + ' tolerance' if surv.get('tipping_delta') is not None and abs(surv['tipping_delta']) <= T627_TIP else ''}; "
+             f"{unpriced_mm:.0f} of {member_months:.0f} "
              f"member-months with a signal unpriced)", surv.get("ok"), False),
             dsr_r]
     rows = CAL._undecided(rows)
@@ -890,7 +897,8 @@ def t629_base(archive) -> dict:
             cand[t] = (y, mt)
         need = {tick[y][0] for t, (y, _m) in cand.items() if t not in tb["current"] and y in tick}
         comp = SX._company_rows(archive, need) if need else {}
-        vol_id = SB.cnms_base(archive)["ident"] if SX._has(archive, CNMS_FIRST_B) else {}
+        ident_run = SX._has(archive, CNMS_FIRST_B)
+        vol_id = SB.cnms_base(archive)["ident"] if ident_run else {}
         for t, (y, mt) in cand.items():
             if "disagrees" in str(vol_id.get(t, "")):
                 why[t] = "Yahoo volume disagrees with FINRA's CNMS volume while a member (T-394 identity check)"
@@ -950,6 +958,7 @@ def t629_base(archive) -> dict:
                 "A": A, "Af": Af, "traded": traded, "last": last, "spy": spy_a, "days": [str(d) for d in days],
                 "eds": np.array([EV._ed(str(d)) for d in days], np.int64), "divs": divs, "cik": cik,
                 "absent_days": dict(absent_days), "priced_days": priced_days, "why": why, "own": own,
+                "ident_run": ident_run,
                 "span_days": lens, "n_tickers": len(tickers), "edges": len(tb["edges"]), "reclassified": reclass}
     return CAL._cached(archive, ("b13e_t629",), load)
 
@@ -1186,7 +1195,11 @@ def t629_reading(B: dict, months: Sequence[str], fm: dict, excl=()) -> dict:
 
 
 def _both(a: Optional[bool], b: Optional[bool]) -> Optional[bool]:
-    return CAL._agree([a, b])
+    """Judge on R (the registered objective rules, a); the unregistered sensitivity M (b) may only tighten a pass
+    to undecided, never turn an R failure or undecided into anything else."""
+    if a is not True:
+        return a
+    return True if b is True else None
 
 
 def b13_earnings_dividend_initiation(archive):
@@ -1216,14 +1229,14 @@ def b13_earnings_dividend_initiation(archive):
     share_abs = yrs_abs / max(yrs_abs + yrs_pr, 1e-9)
     rows = [(f"one-sided lower 95% bound of the mean > 0 (R: mean net {_pc(tA['mean'])}, entry-month clusters i.i.d. p "
              f"{CAL._mc(tA['p_greater'], tA['draws'])}, 12-month cluster blocks p {CAL._mc(tB['p_greater'], tB['draws'])}; "
-             f"M: mean {_pc(Mr['tA']['mean'])}, p {CAL._mc(Mr['tA']['p_greater'], Mr['tA']['draws'])} / "
-             f"{CAL._mc(Mr['tB']['p_greater'], Mr['tB']['draws'])}; all four must agree)",
-             _both(R["lb"], Mr["lb"]), R["lb_dec"] and Mr["lb_dec"]),
+             f"M (sensitivity, may only tighten a pass): mean {_pc(Mr['tA']['mean'])}, p "
+             f"{CAL._mc(Mr['tA']['p_greater'], Mr['tA']['draws'])} / {CAL._mc(Mr['tB']['p_greater'], Mr['tB']['draws'])})",
+             _both(R["lb"], Mr["lb"]), R["lb_dec"]),
             (f"positive in both halves (R: 2005-2015 {_pc(hv[0])}, 2016-2026 {_pc(hv[1])}; M: {_pc(Mr['hv'][0])} / "
              f"{_pc(Mr['hv'][1])})", _both(hv_ok(R), hv_ok(Mr)), False),
             (f"calendar-time FF5+UMD alpha NW(12) t >= 2 (R: alpha {_pc(ct['alpha'], 3)} per month, t {_f(ct['t'], 2)}, "
              f"{ct['months']} months {ct['first']}..{ct['last']}; M: t {_f(Mr['ct']['t'], 2)})",
-             _both(ct_ok(R), ct_ok(Mr)), ct_dec(R) and ct_dec(Mr)),
+             _both(ct_ok(R), ct_ok(Mr)), ct_dec(R)),
             (f"survivorship unable to flip the bound ({yrs_abs:.0f} of {yrs_abs + yrs_pr:.0f} point-in-time member-years "
              f"({share_abs * 100:.1f}%) have no usable archived history: about {R['n_abs']} events unseen, put at the "
              f"{'worst' if R['lb'] else 'best'} included net return "
@@ -1261,7 +1274,8 @@ def b13_earnings_dividend_initiation(archive):
     rep["reclassified_rows"] = [f"{s} {d} {a:g}" for s, d, a in B["reclassified"]]
     rep["coverage"] = {"index_tickers": B["n_tickers"], "series": len(B["series"]), "member_years_priced": yrs_pr,
                        "member_years_absent": yrs_abs, "tickers_without_series": len(B["why"]), "rename_edges": B["edges"],
-                       "identity_refused": sorted(t for t, w in B["why"].items() if "disagree" in w)}
+                       "identity_refused": sorted(t for t, w in B["why"].items() if "disagree" in w),
+                       "identity_check": "run" if B.get("ident_run") else "not run (CNMS absent)"}
     rep["events"] = [{"sym": "/".join(v["classes"]), "day": v["day"], "amount": v["amount"],
                       "prev": EV._iso(v["prev"]) if v["prev"] else None, "net": float(r)} for v, r in zip(events, x)]
     reason = (f"{n} dividend initiations (ex-date after >= 730 days without one, >= 730 days of price history) on point-in-"
@@ -1278,7 +1292,10 @@ def b13_earnings_dividend_initiation(archive):
               f"{_pc(rep['second_dividend_in_window']['mean_other'])}; omissions (descriptive) "
               f"{rep['omission_leg_descriptive']['n']} at {_pc(rep['omission_leg_descriptive']['mean'])}. SURVIVORSHIP: the "
               f"901-symbol daily-history set is today's universe; detection itself needs an archived history, so "
-              f"{share_abs * 100:.1f}% of member-years are unseen")
+              f"{share_abs * 100:.1f}% of member-years are unseen"
+              + ("" if B.get("ident_run") else "; Yahoo-vs-FINRA identity check not run (CNMS absent)")
+              + "; reading M (3 corporate-action rows removed, chosen after inspecting the event list) is a "
+                "sensitivity that can only tighten a pass")
     stat = {"n": n, "block1": tA, "block12": tB, "halves": hv, "criteria": crit, "reported": rep}
     return _out(stat, n, verdict, reason + " — " + why)
 

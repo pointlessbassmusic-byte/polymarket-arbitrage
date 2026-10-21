@@ -359,3 +359,13 @@ def test_t610_full_sessions_drop_early_closes_and_holidays():
     assert "2024-11-29" not in s                        # early close
     assert "2024-12-24" not in s and "2024-12-25" not in s
     assert "2024-12-26" in s
+
+
+def test_b13cdb_review_fixes():
+    import math
+    import numpy as np
+    from mandel.experiments import batch13_cryptoderiv_b as M
+    assert M._json_t(-math.inf) is None and M._json_t(1.5) == 1.5
+    # 1 event week among 40: many resamples miss it; the draws must still number n_boot, all finite
+    d = M.cluster_diff_draws([0.01], [1], np.zeros(39), list(range(2, 41)), 500, 0)
+    assert d.size == 500 and np.isfinite(d).all()

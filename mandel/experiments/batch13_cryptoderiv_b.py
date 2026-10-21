@@ -6,7 +6,7 @@ before any run (T-616, T-607, T-615, T-610).
 Each claim is tested on its own wording, trial.pass and trial.min_n (MANDEL.md section 2, house rules 1-12):
 
   * T-616  BTC 30-DTE 25-delta risk reversal from T-257's daily smile fits (``batch6b_drb.daily_smiles``: the 07:00-09:00
-           UTC Deribit trade sample, quadratic in ln(K/S)/sqrt(T) per expiry, ``rr30`` interpolation to 30 DTE), known
+           UTC Deribit trade sample, quadratic in ln(K/S)/sqrt(T) per expiry (deviation: the registration says ln(K/F); T-257's fits use S = the sample median index and spot r = 0 deltas), ``rr30`` interpolation to 30 DTE), known
            at 09:00 UTC. z = (RR - mean) / sd over the fitted RR of the 90 calendar days before (t-90..t-1, >= 60 fits);
            a day without a fit takes the previous day's z (1-day fill), else it is skipped. Target y7 = ln(P(t+7) /
            P(t)), P = Coinbase close of the hourly bar starting 08:00 UTC (ending 09:00). Controls: trailing 7- and
@@ -129,6 +129,11 @@ def _f(x, nd: int = 3) -> str:
 
 def _u(x, nd: int = 1) -> str:
     return "n/a" if x is None or not np.isfinite(x) else f"{x:.{nd}f}"
+
+
+def _json_t(t: Optional[float]) -> Optional[float]:
+    """A deflated t for the stat dict: None in place of -inf (the ledger must not get a non-standard -Infinity)."""
+    return None if t is None or not np.isfinite(t) else float(t)
 
 
 def _tdefl(t: Optional[float]) -> str:
@@ -556,6 +561,10 @@ def b13_cryptoderiv_b_rr25_weekly(archive):
               f"{_f(max(h30t) if h30t else None, 2)}); full-window rule Sharpe difference {_f(rep['rule_full_window']['diff'], 4)}. "
               f"Priors: the SPX skew failures T-52 / T-138 / T-227 — " + j["why"])
     stat = {k: j[k] for k in ("n", "full", "fit", "t_deflated", "oos_r2", "rule", "phases", "criteria", "n_days", "first", "last")}
+    stat["bonferroni_p_capped"] = stat["t_deflated"] == -math.inf
+    stat["t_deflated"] = _json_t(stat["t_deflated"])
+    stat["phases"] = {k: dict(p, t_deflated=_json_t(p["t_deflated"]), bonferroni_p_capped=p["t_deflated"] == -math.inf)
+                      for k, p in stat["phases"].items()}
     stat.update(reported=rep, trials=T616_TRIALS, nw_lag_pooled=T616_NW_POOLED, smile_days=len(sm), rr_days=len(fitdays),
                 stale_marks=tab["stale"], rule10="pooled all-start daily regression and seven-tranche rule book; the seven weekday "
                                                   "grids reported")
@@ -741,8 +750,9 @@ def _arr(weeks: Sequence[dict], key: str) -> np.ndarray:
     return np.array([q[key] for q in weeks], float)
 
 
-def size_test(pan: dict, P: XS.CmcPanel, sundays: Sequence[str], btc_row: int, n_boot: int = T607_NBOOT) -> dict:
-    res = size_weeks(pan, P, sundays, btc_row)
+def size_test(pan: dict, P: XS.CmcPanel, sundays: Sequence[str], btc_row: int, n_boot: int = T607_NBOOT,
+              dv_floor_sum: float = T607_DV_FLOOR * T607_DV_WIN) -> dict:
+    res = size_weeks(pan, P, sundays, btc_row, dv_floor_sum=dv_floor_sum)
     W = res["weeks"]
     btc = _arr(W, "btc")
     d = _arr(W, "vw_q1_net") - btc
@@ -826,8 +836,11 @@ def b13_cryptoderiv_b_small_cap_quintile(archive):
         rr = size_weeks(pan, P, sundays, btc_row, phase=ph)["weeks"]
         phases[lab] = _mean(_arr(rr, "vw_q1_net") - _arr(rr, "btc")) if rr else None
     rep["entry_phases"] = phases
-    lit = size_weeks(pan, P, sundays, btc_row, dv_floor_sum=T607_DV_FLOOR)["weeks"]
-    rep["literal_1m_30day_total_floor"] = {"n": len(lit), "mean": _mean(_arr(lit, "vw_q1_net") - _arr(lit, "btc")) if lit else None}
+    jl = size_test(pan, P, sundays, btc_row, dv_floor_sum=T607_DV_FLOOR)
+    lit = jl["res"]["weeks"]
+    rep["literal_1m_30day_total_floor"] = {"n": len(lit), "mean": _mean(_arr(lit, "vw_q1_net") - _arr(lit, "btc")) if lit else None,
+                                           "p_greater": jl["p"], "halves": jl["halves"], "dsr": jl["dsr"].get("dsr"),
+                                           "verdict": jl["verdict"]}
     al = size_weeks(pan, P, sundays, btc_row, aliases=T607_ALIASES)["weeks"]
     rep["ticker_alias_variant"] = {"aliases": T607_ALIASES, "n": len(al),
                                    "mean": _mean(_arr(al, "vw_q1_net") - _arr(al, "btc")) if al else None}
@@ -857,7 +870,11 @@ def b13_cryptoderiv_b_small_cap_quintile(archive):
               f"{_pc(rep['btc_trend']['below_200d']['mean'], 3)} ({rep['btc_trend']['below_200d']['n']}); by year "
               + ", ".join(f"{y} {_pc(v_, 2)}" for y, v_ in rep["by_year"].items())
               + f"; rule 10 entry days (same snapshot) {_pc(min(pv), 3) if pv else 'n/a'} to {_pc(max(pv), 3) if pv else 'n/a'}; the literal "
-              f"$1m 30-day-total floor {_pc(rep['literal_1m_30day_total_floor']['mean'], 3)} ({rep['literal_1m_30day_total_floor']['n']} weeks); "
+              f"$1m 30-day-total floor {_pc(rep['literal_1m_30day_total_floor']['mean'], 3)} ({rep['literal_1m_30day_total_floor']['n']} weeks, "
+              f"p {_f(rep['literal_1m_30day_total_floor']['p_greater'], 4)}, halves "
+              + " / ".join(_pc(h, 3) for h in (rep['literal_1m_30day_total_floor']['halves'] or []))
+              + f", DSR {_f(rep['literal_1m_30day_total_floor']['dsr'], 3)}, {rep['literal_1m_30day_total_floor']['verdict']}: the stricter "
+              f"reading is not what fails it); "
               f"ticker aliases {list(T607_ALIASES)} matched {_pc(rep['ticker_alias_variant']['mean'], 3)}; CMC-declared stable/wrapped "
               f"symbols among members {rep['cmc_declared_excluded_members']}. Survivorship: the Coinbase universe is today's product "
               f"list (online and delisted USD products; {len(rep['listed_usd_products_without_bundle'])} listed USD products lack a bundle), "
@@ -911,9 +928,10 @@ def supply_grid(series: Sequence[dict], o0: int, o1: int) -> np.ndarray:
     return out
 
 
-def spike_flags(supply: np.ndarray, win: int = T615_SIG_WIN, k: float = T615_SIG_K) -> tuple:
+def spike_flags(supply: np.ndarray, win: int = T615_SIG_WIN, k: float = T615_SIG_K, raw: bool = False) -> tuple:
     """(spike, z) per day: the daily increase dS_t = S_t - S_{t-1} > 0 with z = (dS_t - mean) / sd (ddof 1) > k over the
-    ``win`` prior days' increases (all finite). Uses days up to t only."""
+    ``win`` prior days' increases (all finite). Uses days up to t only. ``raw`` (reported only): the plain reading
+    dS_t > k x sd, no mean subtracted (z is then dS_t / sd)."""
     dS = np.concatenate([[np.nan], np.diff(supply)])
     n = dS.size
     z = np.full(n, np.nan)
@@ -930,7 +948,7 @@ def spike_flags(supply: np.ndarray, win: int = T615_SIG_WIN, k: float = T615_SIG
         mu = s1 / m
         var = (s2 - m * mu * mu) / (m - 1)
         if var > 0:
-            z[t] = (dS[t] - mu) / math.sqrt(var)
+            z[t] = (dS[t] - (0.0 if raw else mu)) / math.sqrt(var)
     spike = np.isfinite(z) & (z > k) & (dS > 0)
     return spike, z
 
@@ -1013,15 +1031,19 @@ def cluster_diff_draws(xe, ge, xc, gc, n_boot: int, seed: int) -> np.ndarray:
     rng = np.random.default_rng(seed)
     out = []
     done = 0
-    while done < n_boot:
+    tries = 0
+    while done < n_boot and tries < 1000:     # redraw resamples with an empty arm until n_boot finite draws
         k = min(1000, n_boot - done)
         idx = rng.integers(0, G, size=(k, G))
         ne, nc = NE[idx].sum(axis=1), NC[idx].sum(axis=1)
         with np.errstate(invalid="ignore", divide="ignore"):
-            out.append(SE[idx].sum(axis=1) / ne - SC[idx].sum(axis=1) / nc)
-        done += k
-    d = np.concatenate(out)
-    return d[np.isfinite(d)]
+            x = SE[idx].sum(axis=1) / ne - SC[idx].sum(axis=1) / nc
+        x = x[np.isfinite(x)]
+        out.append(x)
+        done += x.size
+        tries += 1
+    d = np.concatenate(out) if out else np.array([])
+    return d[:n_boot]
 
 
 def cluster_diff_test(xe, ge, xc, gc, bar: float = 0.0, n_boot: int = T615_NBOOT) -> dict:
@@ -1037,7 +1059,7 @@ def cluster_diff_test(xe, ge, xc, gc, bar: float = 0.0, n_boot: int = T615_NBOOT
         d = cluster_diff_draws(xe, ge, xc, gc, n_boot, SEED + k)
         if k == 0:
             first["lb"] = float(np.quantile(d, 0.05)) if d.size else None
-        if not d.size:
+        if d.size < n_boot:
             return None, None
         return float((np.sum(d <= bar) + 1) / (d.size + 1)), float((np.sum(d >= bar) + 1) / (d.size + 1))
 
@@ -1046,9 +1068,9 @@ def cluster_diff_test(xe, ge, xc, gc, bar: float = 0.0, n_boot: int = T615_NBOOT
 
 
 def t615_series(supply: np.ndarray, op: np.ndarray, cl: np.ndarray, o0: int, start: str = T615_START, end: str = T615_END,
-                h: int = T615_H, strict: bool = False, ctrl_lag: int = T615_CTRL_LAG) -> dict:
+                h: int = T615_H, strict: bool = False, ctrl_lag: int = T615_CTRL_LAG, raw: bool = False) -> dict:
     """Events and controls on the common day grid from ordinal o0 (arrays indexed by day)."""
-    spike, z = spike_flags(supply)
+    spike, z = spike_flags(supply, raw=raw)
     dd, r3 = drawdown_flags(cl)
     lo, hi = _ord(start) - o0, _ord(end) - o0
     ev_all = [e for e in stable_events(spike, dd, strict=strict) if lo <= e <= hi]
@@ -1062,8 +1084,8 @@ def t615_series(supply: np.ndarray, op: np.ndarray, cl: np.ndarray, o0: int, sta
             "ge": [_week_id(o0 + e) for e in ev], "gc": [_week_id(o0 + e) for e in ct], "n_ev_raw": len(ev_all)}
 
 
-def mint_test(supply: np.ndarray, op: np.ndarray, cl: np.ndarray, o0: int, n_boot: int = T615_NBOOT) -> dict:
-    s = t615_series(supply, op, cl, o0)
+def mint_test(supply: np.ndarray, op: np.ndarray, cl: np.ndarray, o0: int, n_boot: int = T615_NBOOT, raw: bool = False) -> dict:
+    s = t615_series(supply, op, cl, o0, raw=raw)
     ev, ct = s["ev"], s["ct"]
     main = cluster_diff_test(s["ye"], s["ge"], s["yc"], s["gc"], T615_BAR, n_boot)
     split = _ord(T615_SPLIT) - o0
@@ -1153,7 +1175,20 @@ def b13_cryptoderiv_b_stablecoin_mint(archive):
     rep["n_events_before_refractory"] = s["n_ev_raw"]
     rep["n_spike_days"] = int(s["spike"][lo:hi + 1].sum())
     rep["n_drawdown_days"] = int(s["dd"][lo:hi + 1].sum())
-    rep["chain_coverage_check"] = "no DefiLlama stablecoin-circulation bundle archived: Coin Metrics chain coverage not checked"
+    jr = mint_test(supply, op, cl, o0, raw=True)
+    rep["raw_dS_gt_2sd_reading"] = {"n_raw": jr["s"]["n_ev_raw"], "n": jr["n"], "diff": jr["main"]["diff"], "lb": jr["main"]["lb"],
+                                    "p_greater": jr["main"]["p_greater"], "halves": [h["diff"] for h in jr["halves"]],
+                                    "verdict": jr["verdict"]}
+    lv = {}
+    for a in T615_PAIR:
+        g = supply_grid([sup[a]], o0, o1)
+        lv[a] = {d_: (None if not (0 <= _ord(d_) - o0 < g.size) or not np.isfinite(g[_ord(d_) - o0]) else float(g[_ord(d_) - o0]))
+                 for d_ in ("2021-06-01", "2022-06-01", "2024-06-01", "2026-10-01")}
+    rep["supply_level_check"] = lv
+    rep["chain_coverage_check"] = ("no DefiLlama stablecoin-circulation bundle archived (only defillama-yields*); Coin Metrics "
+                                   "SplyCur levels sanity-checked against published all-chain totals instead: " +
+                                   "; ".join(f"{a} " + ", ".join(f"{d_} {_u(v / 1e9 if v else None, 1)}B" for d_, v in lv[a].items())
+                                             for a in T615_PAIR))
     rep["netflow_arm"] = "not run: no exchange netflow data archived (the registration runs it only once the data exist)"
     m, hv = j["main"], j["halves"]
     reason = (f"Coin Metrics SplyCur USDT + USDC (current vintage; day s usable from s+2 00:00 UTC), spike = daily increase with z > 2 "
@@ -1172,6 +1207,10 @@ def b13_cryptoderiv_b_stablecoin_mint(archive):
               f"({rep['strict_spike_after_drawdown_day']['n']} events); with DAI/BUSD/TUSD "
               + (f"{_pc(rep['aggregate_5_stablecoins']['diff'])} ({rep['aggregate_5_stablecoins']['n']} events)"
                  if isinstance(rep["aggregate_5_stablecoins"], dict) else rep["aggregate_5_stablecoins"])
+              + f"; plain reading dS > 2 sd (no mean subtracted; reported, not judged): {rep['raw_dS_gt_2sd_reading']['n']} events "
+              f"(of {rep['raw_dS_gt_2sd_reading']['n_raw']}), difference {_pc(rep['raw_dS_gt_2sd_reading']['diff'])}, lower bound "
+              f"{_pc(rep['raw_dS_gt_2sd_reading']['lb'])}, p {_f(rep['raw_dS_gt_2sd_reading']['p_greater'], 4)} ({rep['raw_dS_gt_2sd_reading']['verdict']}): "
+              f"the inconclusive verdict depends on the z reading and the evidence on the other reading leans negative"
               + f"; event mean net of the 50 bp round trip {_pc(rep['event_net_of_50bp'])}; {rep['chain_coverage_check']}; "
               f"{rep['netflow_arm']}; T-402 and T-464 counted as prior trials (context) — " + j["why"])
     stat = {k: j[k] for k in ("n", "main", "halves", "criteria", "n_controls", "mean_event", "mean_control")}

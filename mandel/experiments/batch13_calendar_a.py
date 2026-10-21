@@ -13,7 +13,11 @@ Batch 13, group ``calendar_a``: five calendar / event claims from the 2026-10-20
            no coupon auction, same weekday); both halves (2014-2019 / 2020-2026) negative; the ex-CPI version (clusters
            whose window holds a CPI release dropped) negative with p < 0.1 under both nulls; the 10/30-year-week
            secondary (seen in T-442) the same sign; the size slope (concession from the announcement to t-1 on the
-           offering-amount z-score) negative with Holm-adjusted p < 0.05 over the 2 secondaries. min_n 150 clusters.
+           offering-amount z-score) negative with Holm-adjusted p < 0.05 over the 2 secondaries, decided on both the
+           registered announcement-day-close window and the archive-stamp next-session window (they must agree).
+           Reported beside the pre-declared net readings: the literal gross reading (excess < -2 bps, no cost) with
+           gross halves, and a period-demeaned primary (each cluster against its own half's unconditional mean,
+           half-demeaned CBB, year-stratified placement). min_n 150 clusters.
   * T-592  Put-write weekend decay. Cboe PUT live marks 2007-06-20..2026-10, intervals between consecutive Cboe closes:
            residual = index return - DTB3 bill accrual over the interval's calendar days - beta x the ^GSPC excess return,
            beta the OLS slope over the index's prior 60 live intervals. D = mean Fri->Mon residual - 1.5 x mean single-
@@ -31,9 +35,11 @@ Batch 13, group ``calendar_a``: five calendar / event claims from the 2026-10-20
            EWMA(t-1) = 0.7 sum_k 0.3^k VIX(t-1-k) from 1990. Trade: SPY t+1 official open -> t+1 close, 2 bps a round
            trip. Control: non-spike days in the same decile of the day-t SPY close-to-close return (cutoffs expanding
            from 1993, past returns only). Holdout 2018-06..2026-10. Pass: net matched difference > 2 bps with one-sided
-           p < 0.05 (studentized bootstrap of calendar-month clusters, 5 seeds), both holdout halves (2018-06..2022-08 /
-           2022-09..2026-10) positive, the raw net HVIX mean above the unconditional open-to-close mean, QQQ and IWM
-           positive with Holm-adjusted p < 0.05 over the 2. Fewer than 40 holdout events: inconclusive.
+           p < 0.05 under both a studentized stationary bootstrap of consecutive calendar months (mean block 3 months,
+           the registered form) and a studentized bootstrap of i.i.d. calendar months (they must agree), both holdout
+           halves (2018-06..2022-08 / 2022-09..2026-10) positive, the raw net HVIX mean above the unconditional
+           open-to-close mean, QQQ and IWM positive with Holm-adjusted p < 0.05 over the 2 under both bootstraps (the
+           sign-only reading is reported beside it). Fewer than 40 holdout events: inconclusive.
   * T-581  VIX build-up before FOMC statement days (Hu et al.). z = (VIX close t-2 - VIX close t-5) / sd of 3-session VIX
            changes over the 250 sessions ending at t-2. OLS over every session 2010-01..2026-10 of SPY's close t-1 ->
            close t return on z, D (scheduled FOMC statement day), z x D, r(close t-5 -> close t-2) and 1{IBS(t-1) < 0.2},
@@ -64,9 +70,10 @@ Conventions (and every reading taken before any run; the harness reasons repeat 
     nulls or two readings it passes only when both pass and fails only when both fail (``batch6c_cal._agree``).
   * Point in time. Daily bars are known at their close; the VIX close (16:15 ET) is never used for a same-day 16:00
     SPY entry (T-581's z ends at t-2 for a t-1 close entry; T-582 enters at the t+1 open); auction, FOMC, CPI and
-    payroll dates are scheduled in advance; T-589's offering amounts enter only from their announcement row's
-    available_at (end of the announcement day), so the size window starts at the next session's close (the registered
-    announcement-day-close window is reported); T-583's ranks use month m-1 rates whose available_at precedes the
+    payroll dates are scheduled in advance; T-589's offering amounts carry the archive stamp of the end of the
+    announcement day, but Treasury announces at 11:00 ET, before the close, so the size criterion is decided on both the
+    registered announcement-day-close window and the next-session window that the archive stamp alone allows (they must
+    agree); T-583's ranks use month m-1 rates whose available_at precedes the
     month-m rank date, taking a print as published at the later of its stamp and the 15th of the following month (the
     archive stamps every print on the 28th of its own month); a currency whose m-1 print fails that gate carries its
     earlier print and is flagged (EUR/GBP after the OECD series end in 2026-01); T-592's betas use
@@ -939,8 +946,9 @@ def b13_calendar_a_pre_auction_concession(archive):
             "gross_reading": {"excess_bps": ex * 1e4, "boot_p_less": prim_g.get("boot_p_less"), "place_p_less": prim_g.get("place_p_less"),
                               "draws": [prim_g.get("boot_draws"), prim_g.get("place_draws")], "halves_gross_bps": [None if x is None else x * 1e4 for x in h],
                               "primary_ok": g_ok},
-            "period_demeaned": {k: (pdm.get(k) * 1e4 if k == "excess" and pdm.get(k) is not None else pdm.get(k))
-                                for k in ("n", "excess", "n_by_half", "boot_p_less", "boot_draws", "place_p_less", "place_draws", "pool_weeks_by_year")},
+            "period_demeaned": {"excess_bps": None if pdm.get("excess") is None else pdm["excess"] * 1e4,
+                                **{k: pdm.get(k) for k in ("n", "n_by_half", "boot_p_less", "boot_draws", "place_p_less",
+                                                           "place_draws", "pool_weeks_by_year")}},
             "compositions": comp, "etf_checks": etf, "fomc_flag": fomc_flag, "flags": flags, "reopening": reopen,
             "criteria": crit}
     return _out(stat, n, v, reason + " — " + why)
