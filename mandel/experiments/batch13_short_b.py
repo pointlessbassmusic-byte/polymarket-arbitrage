@@ -46,11 +46,19 @@ Data and point in time (declared before any run)
     the CIK's submissions name and formerNames), rejected only when both house matchers reject it
     (``batch6c_stockxs.names_ok``, None = not comparable = accepted, and ``batch6c_events.name_match``; the second was
     added after the first run because the first rejects FINRA's 'A.O. Smith' / 'J.M. Smucker' spellings). A
-    disagreeing series is treated as absent (BBT, now Beacon Financial; APC, now ARKO; LB, now LandBridge). CNMS symbols use the FINRA-volume identity check of T-673/T-674
+    disagreeing series is treated as absent (BBT, now Beacon Financial; LB, now LandBridge). REVIEW FIXES (adopted
+    after the runs, verdicts unchanged): the second matcher no longer accepts a match on generic words alone
+    (GENERIC_TOKENS: the BNY-fund 'New York', ARKO 'Petroleum', 'Fox' cases), and every FINRA row, member classes
+    included, must be a stock row (``SX.is_stock_row``: no funds/ETFs such as the 2021 META ETF). APC and old FOX
+    previously dropped out only for lack of bars, not by identity. CNMS symbols use the FINRA-volume identity check of T-673/T-674
     (``batch6c_events.finra_identity`` on as-traded Yahoo volume).
   * SEC cover shares (``sec-companyfacts``): the latest dei EntityCommonStockSharesOutstanding accession accepted before
     the decision (its latest cover date, summed across share classes); only when no dei value has been accepted, the
-    latest us-gaap CommonStockSharesOutstanding (no staleness cap: the registration names none). Shares are restated to
+    latest us-gaap CommonStockSharesOutstanding. REVIEW FIX (after the runs): the count used is the accepted dei or
+    us-gaap value with the latest as-of date, capped at the house SX.SHARES_MAX_AGE (456 days before settlement;
+    stale = no shares); a us-gaap count is on its ACCEPTANCE-date basis (GOOGL's Q2-2022 10-Q is already split-
+    restated), and only clean k/d splits (d <= 4) restate shares (``true_split``: spin-off price factors such as
+    EXC 1.402 are not share splits). Shares are restated to
     the settlement date's basis by every split with an ex-date after the cover date and on or before settlement (and
     divided back when the cover date is after settlement), so a split between filing and settlement cannot fake an
     N-fold SIR (the verifier's NVDA trap). DECLARED READING for multi-class issuers (the cover count sums classes, the
@@ -204,7 +212,37 @@ def ident_ok(issue: str, names: Sequence[str], ticker: str = "") -> bool:
     Corporation' fails the first and passes the second; a reused ticker such as BBT, now Beacon Financial, fails both)."""
     if SX.names_ok(issue, names) is not False:
         return True
-    return any(EV.name_match(issue, nm, ticker) for nm in names if nm)
+    for nm in names:
+        if not nm or not EV.name_match(issue, nm, ticker):
+            continue
+        shared = EV._tokens(issue) & EV._tokens(nm)
+        if shared and not (shared - GENERIC_TOKENS):
+            continue                      # matched only on generic words ('New York', 'Petroleum', 'Fox'): rejected
+        return True
+    return False
+
+
+# Review fix (adopted after a run, verdict-neutral): words too common in issuer names to identify a company alone.
+GENERIC_TOKENS = frozenset({"new", "york", "petroleum", "fox", "american", "america", "national", "first", "united",
+                            "general", "international", "energy", "financial", "group", "holdings", "holding", "bank",
+                            "trust", "century", "twenty", "global", "capital", "resources", "income", "fund",
+                            "municipal", "technologies", "systems", "services", "industries", "us", "usa"})
+
+
+def true_split(r: float) -> bool:
+    """A clean k/d share split or reverse split (d <= 4), not a spin-off price adjustment that Yahoo stores as a
+    fractional 'split' (EXC 1.402, DELL 1.973): FINRA short interest does not change at a spin-off."""
+    if not (r > 0):
+        return False
+    for x in (r, 1.0 / r):
+        for d in (1, 2, 3, 4):
+            if abs(x * d - round(x * d)) < 1e-3 and round(x * d) >= 1:
+                return True
+    return False
+
+
+def share_splits(splits: Sequence[tuple]) -> list:
+    return [(ex, r) for ex, r in splits if true_split(r)]
 
 
 def split_adj(splits: Sequence[tuple], d_from: str, d_to: str) -> float:
@@ -253,21 +291,38 @@ def share_series(facts: Sequence[tuple]) -> tuple:
     return out[0], out[1]
 
 
-def shares_known(series: tuple, ts: float) -> Optional[tuple]:
-    """(shares, as-of date, 'dei' | 'gaap') accepted at or before ``ts``: the latest dei accession, else (only when no
-    dei value has been accepted yet) the latest us-gaap one; None when neither."""
+def shares_known(series: tuple, ts: float, day: Optional[str] = None) -> Optional[tuple]:
+    """(shares, basis date, 'dei' | 'gaap') accepted at or before ``ts``: among the accepted dei and us-gaap accessions,
+    the one with the latest as-of date (dei on ties). The basis date is the dei cover date, or for us-gaap the
+    acceptance date (a balance-sheet count filed after a split is already restated, so only later splits apply).
+    None when neither, or when the as-of date is more than SX.SHARES_MAX_AGE days before ``day`` (stale)."""
+    best = None
     for k, ser in zip(("dei", "gaap"), series):
-        j = bisect.bisect_right([s[0] for s in ser], ts) - 1
-        if j >= 0:
-            return ser[j][2], ser[j][1], k
-    return None
+        acc = [s for s in ser if s[0] <= ts]
+        if not acc:
+            continue
+        a, end, v = max(acc, key=lambda s: (s[1], s[0]))
+        key = (end, 1 if k == "dei" else 0)
+        if best is None or key > best[0]:
+            basis = end if k == "dei" else _iso(a)
+            best = (key, (v, basis, k), end)
+    if best is None:
+        return None
+    if day is not None and (date.fromisoformat(day[:10]) - date.fromisoformat(best[2][:10])).days > SX.SHARES_MAX_AGE:
+        return None
+    return best[1]
+
+
+def _iso(ts: float) -> str:
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(float(ts), tz=timezone.utc).date().isoformat()
 
 
 def si_ratio(si_issuer: float, shares: float, cover: str, settle: str, splits: Sequence[tuple]) -> float:
     """Short interest at settlement over cover shares restated to the settlement basis (NaN when unusable)."""
     if not (np.isfinite(si_issuer) and si_issuer >= 0 and shares and shares > 0):
         return float("nan")
-    return float(si_issuer / (shares * split_adj(splits, cover, settle)))
+    return float(si_issuer / (shares * split_adj(share_splits(splits), cover, settle)))
 
 
 def dollar_volume(C: np.ndarray, V: np.ndarray, i: int, win: int = DV_WIN, min_bars: int = DV_MIN_BARS) -> np.ndarray:
@@ -617,7 +672,7 @@ def issuer_si(rel: dict, sec: dict, member_f: set) -> dict:
         nm, cls, si, *_rest, ck = row
         if ck is None or ck not in sec["ciks"] or not (np.isfinite(si) and si >= 0):
             continue
-        if sym not in member_f and not SX.is_stock_row(cls, nm):
+        if not SX.is_stock_row(cls, nm):     # review fix: member rows too (funds/ETFs reusing a member ticker)
             continue
         if not ident_ok(nm, sec["cik_names"].get(ck, []), sym):
             continue
@@ -669,7 +724,7 @@ def build_sir(pr: dict, sec: dict, rels: list, mem_f: set) -> dict:
         iss = issuer_si(rel, sec, mem_f)
         ISS.append(iss)
         for ck, (si, _ncls, _ss) in iss.items():
-            sh = shares_known(sec["ser"].get(ck, ([], [])), tau)
+            sh = shares_known(sec["ser"].get(ck, ([], [])), tau, rel["settle"])
             if sh is None:
                 continue
             y = sec["cik_sym"].get(ck)
@@ -1028,7 +1083,12 @@ def svr_formation(Bc: dict, pr: dict, snaps, m: int) -> Optional[dict]:
     win = (max(0, i0 - T676_LO), i0 - T676_HI)
     return {"m": m, "e": e, "x": x, "label": cal.days[e], "U": int(U.sum()), "n": n, "k": k, "absent": int(U.sum()) - n,
             "fl": fl, "fs": fs, "elig": priced, "r": np.where(priced, r, np.nan), "dv": dv, "j": j,
-            "backfilled": bool(C["backfilled"][win[0]:win[1] + 1].any()) if win[1] >= win[0] else False}
+            # review fix: a backfilled window = one ending before the 2021-05 restatement period ended (scattered later
+            # flags no longer relabel post-2021 months)
+            "backfilled": bool(C["days"][max(win[1], 0)] < EV._ed(BACKFILL_END)) if win[1] >= win[0] else False}
+
+
+BACKFILL_END = "2021-05-01"
 
 
 def ls_cohort(f: dict, weight: str = "ew", sign: float = 1.0) -> Optional[dict]:
@@ -1233,7 +1293,7 @@ def b13_short_b_svr_xs_monthly(archive):
               f"{_pc(t['mean'])} per month (p {CAL._p(t['p_greater'])}); halves {_pc(hv[0])} / {_pc(hv[1])}; FF5+UMD alpha "
               f"t {_fmt(alpha['t'], 2)}; DSR {_fmt(dsr.get('dsr'))}; months 2-12 summed gross {_pc(rv['mean'])}. Reported: VW "
               f"(dollar-volume weights) {_pc(rep['vw']['mean'])}; DIX reading (opposite sign) net "
-              f"{_pc(rep['dix_reading_opposite_sign']['net_mean'])}; windows with backfilled files {bf.sum()} months "
+              f"{_pc(rep['dix_reading_opposite_sign']['net_mean'])}; windows ending before 2021-05 (restated files) {bf.sum()} months "
               f"{_pc(rep['backfilled_window_months']['mean'])} vs {_pc(rep['backfilled_window_months']['mean_other'])}; "
               f"without 2020-2021 {_pc(rep['retail_boom_2020_2021']['without'])}; long leg vs EW members "
               f"{_pc(rep['long_leg_vs_ew_members']['mean'])}; turnover-netted costs {_pc(rep['netted_cost_reading']['mean'])} "

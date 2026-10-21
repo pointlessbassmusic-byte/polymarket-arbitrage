@@ -80,7 +80,45 @@ def test_shares_known_point_in_time_and_dei_first():
     assert M.shares_known(ser2, 2500.0) == M.shares_known(ser, 2500.0)
     # us-gaap only when no dei value has been accepted
     g = M.share_series([_fact(90.0, "2023-12-31", "g1", 500.0, "us-gaap", "CommonStockSharesOutstanding")])
-    assert M.shares_known(g, 600.0) == (90.0, "2023-12-31", "gaap")
+    assert M.shares_known(g, 600.0) == (90.0, "1970-01-01", "gaap")   # us-gaap basis = acceptance date
+
+
+def _ep(d):
+    from datetime import datetime, timezone
+    return datetime.fromisoformat(d).replace(tzinfo=timezone.utc).timestamp()
+
+
+def test_spin_off_pseudo_split_does_not_move_sir():
+    # EXC 2022-02-02 Constellation spin-off stored as a 1.402 'split': FINRA SI is unchanged, so is the SIR
+    sp = [("2022-02-02", 1.402)]
+    assert not M.true_split(1.402) and not M.true_split(1.973) and not M.true_split(2.39)
+    assert M.true_split(20.0) and M.true_split(1.5) and M.true_split(0.1) and M.true_split(4 / 3)
+    assert M.si_ratio(1e7, 1e9, "2022-01-31", "2022-02-15", sp) == pytest.approx(0.01)
+
+
+def test_googl_2022_gaap_count_not_split_twice():
+    # Q2-2022 10-Q: balance-sheet date 2022-06-30, accepted 2022-07-26 after the 2022-07-18 20:1 split -> post-split count
+    sp = [("2022-07-18", 20.0)]
+    g = M.share_series([_fact(13e9, "2022-06-30", "q2", _ep("2022-07-26"), "us-gaap", "CommonStockSharesOutstanding")])
+    sh = M.shares_known(g, _ep("2022-08-01"), "2022-07-29")
+    assert sh == (13e9, "2022-07-26", "gaap")
+    assert M.si_ratio(6.5e7, sh[0], sh[1], "2022-07-29", sp) == pytest.approx(0.005)
+
+
+def test_fresher_gaap_beats_stale_dei_and_age_cap():
+    facts = [_fact(100.0, "2014-01-20", "d1", _ep("2014-02-01")),
+             _fact(300.0, "2024-03-31", "g1", _ep("2024-04-25"), "us-gaap", "CommonStockSharesOutstanding")]
+    ser = M.share_series(facts)
+    assert M.shares_known(ser, _ep("2024-05-01"), "2024-05-15")[0] == 300.0
+    assert M.shares_known(ser, _ep("2015-06-01"), "2015-06-15") is None        # only the 2014 dei: > 456 days old
+
+
+def test_identity_rejects_generic_token_and_fund_rows():
+    assert not M.ident_ok("BlackRock New York Municipal Income Trust", ["The Bank of New York Mellon Corporation"], "BNY")
+    assert not M.ident_ok("ARKO Petroleum Corp", ["Anadarko Petroleum Corporation"], "APC")
+    sec = {"ciks": {1}, "cik_names": {1: ["Meta Platforms, Inc.", "Facebook Inc"]}}
+    rel = {"rows": {"META": ("Roundhill Ball Metaverse ETF", "NMS", 1e5, 1e4, 0.0, False, False, 1)}}
+    assert M.issuer_si(rel, sec, {"META"}) == {}
 
 
 def test_dollar_volume_uses_only_the_window_ending_at_the_decision_row():

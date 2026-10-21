@@ -272,8 +272,7 @@ def slope_test(y, z, ctrl=None, block: int = T673_BLOCK, alpha: float = ALPHA_CE
 def diff_all_series(y, s) -> np.ndarray:
     """Series whose mean is mean(y[s]) - mean(y) (signal days minus all eligible days)."""
     y = np.asarray(y, float); s = np.asarray(s, bool)
-    p = s.mean()
-    return y * (s / p - 1.0)
+    return diff_overlap_series(y, s, np.ones_like(s))
 
 
 def diff_overlap_series(y, a, b) -> np.ndarray:
@@ -614,8 +613,15 @@ def member_prices(archive) -> dict:
             if chk["ok"] is False:
                 status[s] = "Yahoo volume disagrees with FINRA's (identity check)"
                 continue
+            if not chk["ok"]:
+                # reviewer: a <20-day overlap cannot rule out a reused ticker; treated as unpriced (conservative)
+                status[s] = "identity not checkable (treated as unpriced)"
+                continue
+            if not (bar & M[:, j]).any():
+                status[s] = "no daily-history bar on any member day"
+                continue
             PA[:, j], FF[:, j] = pa, np.where(bar, f, 1.0)
-            status[s] = "ok" if chk["ok"] else "ok (identity not checkable)"
+            status[s] = "ok"
         return {"PA": PA, "F": FF, "status": status}
     return CAL._cached(archive, ("b13_prices",), load)
 
@@ -865,6 +871,8 @@ def b13_short_a_dix_spy_60d(archive):
     rep["unpriced_share_of_member_offexchange_volume"] = {
         "mean": float(np.nanmean(sh)), "median": float(np.nanmedian(sh)), "max": float(np.nanmax(sh)),
         "min": float(np.nanmin(sh))}
+    rep["unpriced_share_per_day"] = {d: round(float(v), 4) for d, v, e in zip(C["iso"], D["share"], D["elig"]) if e}
+    rep["priced_members_per_day_series"] = {d: int(v) for d, v, e in zip(C["iso"], D["npriced"], D["elig"]) if e}
     rep["priced_members_per_day"] = {"min": int(D["npriced"][D["elig"]].min()), "median": float(np.median(D["npriced"][D["elig"]]))}
     rep["symbol_status"] = {k: sum(1 for v in st.values() if v == k) for k in sorted(set(st.values()))}
     rep["unpriced_symbols"] = unpriced

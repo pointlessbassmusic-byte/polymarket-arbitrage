@@ -367,3 +367,50 @@ def test_missing_bundles_inconclusive(name):
 def test_theory_map_covers_every_harness():
     assert set(M.THEORY_MAP.values()) == set(M.HARNESSES)
     assert set(M.THEORY_MAP) == {"T-680", "T-682", "T-683", "T-690"}
+
+
+# ================================================================== review fixes (filter sensitivity, RegSHO, lockbox) ==
+
+def test_positivity_filter_only_floors_nonpositive_and_counts_triggers():
+    n = 1500
+    days = _bdays(n, "2004-01-02")
+    lr = np.r_[np.nan, np.diff(np.log(_asset(n, 6)))]
+    T = M.fwd_sum(lr * lr)
+    X = M.har_design(lr, "SHAR")
+    dg = {}
+    fb, _ = M.har_forecasts_daily(days, X, T, 22, 500, diag=dg)
+    fp, _ = M.har_forecasts_daily(days, X, T, 22, 500, filt="pos")
+    assert dg["range"] + dg["nonpos"] >= 0
+    differ = np.isfinite(fb) & (np.abs(fb - fp) > 1e-15)
+    assert set(np.where(differ)[0]) <= set(dg["range_days"]) | set(dg["nonpos_days"])
+    assert np.all(fp[np.isfinite(fp)] > 0)
+
+
+def test_harv_iv_needs_250_rows_with_the_index():
+    n = 1500
+    days = _bdays(n, "2004-01-02")
+    lr = np.r_[np.nan, np.diff(np.log(_asset(n, 6)))]
+    T = M.fwd_sum(lr * lr)
+    X = M.har_design(lr, "HAR")
+    X[:900] = np.nan
+    me = M.month_end_idx(days)
+    f, _ = M.har_forecasts_daily(days, X, T, 22, M.T683_IV_ENTRY, refits=me)
+    first = np.where(np.isfinite(f))[0][0]
+    rows_by = np.isfinite(X).all(1)[:first - M.T683_H + 1].sum()
+    assert rows_by >= M.T683_IV_ENTRY
+
+
+def test_svr20_known_only_at_its_20th_file_and_ignores_later_shocks():
+    rows = [(1000 + i, 10.0 + i, 100.0) for i in range(30)]
+    e, x = M.svr20_events(rows)
+    assert e[0] == 1019 and x.size == 11
+    rows2 = rows[:25] + [(1000 + i, 99.0, 100.0) for i in range(25, 30)]
+    e2, x2 = M.svr20_events(rows2)
+    q = np.array([1022])                              # decision before the shocked files' available_at
+    assert _same(M.asof_values(e, x, q), M.asof_values(e2, x2, q))
+
+
+def test_lockbox_count_from_data():
+    d = _bdays(400, "2026-09-01")
+    assert M.lockbox_count(d[:30]) == 0
+    assert M.lockbox_count(d) >= 12

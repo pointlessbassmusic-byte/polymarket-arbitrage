@@ -967,9 +967,15 @@ def jm_good_flags(days: Sequence[str], x, lams: Sequence[float] = T684_LAMBDAS, 
         Zw = (X[s0:r1] - mu) / sd
         th = fit["theta"]
         lw = 0.5 * (((Zw[None, :, :] - th[:, 1, None, :]) ** 2).sum(-1) - ((Zw[None, :, :] - th[:, 0, None, :]) ** 2).sum(-1))
+        bad = ~np.isfinite(Zw).all(1)
+        lw = np.where(bad[None, :, None] if lw.ndim == 3 else bad[None, :], 0.0, lw)
         st = online_states(lw, lamv, train, J)
         g = (st == gs[:, None].astype(bool)).astype(np.int8)
         g[one] = 1
+        # a day whose trailing window holds a non-finite feature row is undefined, never a silent 0/1
+        cb = np.r_[0, np.cumsum(bad.astype(int))]
+        win_bad = (cb[train - 1 + np.arange(J) + 1] - cb[np.arange(J)]) > 0
+        g[:, win_bad] = -1
         good[:, r0:r1] = g
         info.append({"refit": days[r0], "iters": fit["iters"], "converged": fit["converged"], "one_regime": one.tolist()})
     return {"good": good, "refits": info, "first_refit": days[pts[0]] if pts else None, "features": X}
@@ -1352,10 +1358,27 @@ def vrp_spy_test(gdays, gclose, hilo: dict, vix: dict, spy_by_day: dict, B, n_bo
     rep["h21"] = {"slope": s_["slope"], "t": s_["t"], "oos_r2": o21["oos_r2"], "cw_p": o21["cw_p"]}
     early_spy = (dd >= T685_FIT_FROM[1]) & (dd < T685_WIN[0])
     rep["1993_2009_spy"] = _slope_hod(y_spy, vrp, a, T685_H, r_spy, early_spy)
-    m_sp = (dd >= T685_FIT_FROM[0]) & (dd < T685_WIN[0]) & np.isfinite(y_spl) & np.isfinite(vrp)
-    zz = (vrp[m_sp] - vrp[m_sp].mean()) / vrp[m_sp].std(ddof=1)
-    nw_sp = CAL.ols_nw(y_spl[m_sp], zz, 3)
-    rep["1990_2009_spliced_nw"] = {"n": int(m_sp.sum()), "slope": nw_sp["slope"], "t_nw": nw_sp["t"]}
+    m_sp = (dd >= T685_FIT_FROM[0]) & (dd < T685_WIN[0])
+    r_spl = np.where(np.isfinite(r_spy), r_spy, r_gs)
+    rep["1990_2009_spliced"] = _slope_hod(y_spl, vrp, a, T685_H, r_spl, m_sp)
+    # OOS R^2 decomposition (SPY-only fit): each decision's share of sum(em^2 - eb^2) / sum(eb^2)
+    fm, fb, _ = IMP.expanding_ols(vrp, y_spy, pos, e, spy_tr, oos)
+    ok_ = oos & np.isfinite(y_spy) & np.isfinite(fm) & np.isfinite(fb)
+    dl_ = (y_spy - fm) ** 2 - (y_spy - fb) ** 2
+    den_ = float(np.sum((y_spy[ok_] - fb[ok_]) ** 2))
+    if ok_.any() and den_ > 0:
+        cj = np.where(ok_, dl_, -np.inf)
+        k_ = int(np.argmax(cj))
+        tot_ = float(np.sum(dl_[ok_])) / den_
+        rep["oos_decomposition"] = {"total_neg_r2": tot_, "top_decision": mdays[k_], "top_contrib": float(dl_[k_]) / den_,
+                                    "top_share": (float(dl_[k_]) / den_ / tot_) if tot_ != 0 else None}
+    else:
+        rep["oos_decomposition"] = None
+    ex20w = ~((dd >= "2020-01") & (dd < "2020-07"))
+    s_ = _slope_hod(y_spy, vrp, a, T685_H, r_spy, oos & ex20w)
+    fm, fb, _ = IMP.expanding_ols(vrp, y_spy, pos, e, spy_tr & ex20w, oos & ex20w)
+    rep["ex_2020_target_overlap"] = {"slope": s_["slope"], "t": s_["t"],
+                                     "oos_r2": IMP.oos_stats(y_spy, fm, fb, oos & ex20w, T685_CW_LAG)["oos_r2"]}
     both = (dd >= T685_FIT_FROM[1]) & (dd <= T685_WIN[1]) & np.isfinite(y_spy) & np.isfinite(vrp)
     zb = (vrp[both] - vrp[both].mean()) / vrp[both].std(ddof=1)
     post = (dd[both] >= T685_WIN[0]).astype(float)
@@ -1408,7 +1431,14 @@ def vrp_spy_test(gdays, gclose, hilo: dict, vix: dict, spy_by_day: dict, B, n_bo
               f"12-month placebo t {_s(rep['placebo_12m']['t'], 2)} OOS {_s(rep['placebo_12m']['oos_r2'], 4)}; ex 2020-03..06 t "
               f"{_s(rep['ex_2020_03_06']['t'], 2)} OOS {_s(rep['ex_2020_03_06']['oos_r2'], 4)}; 21 sessions t {_s(rep['h21']['t'], 2)} "
               f"OOS {_s(rep['h21']['oos_r2'], 4)}; 1993-2009 (SPY) slope {_s(rep['1993_2009_spy']['slope'], 4)} Hodrick t "
-              f"{_s(rep['1993_2009_spy']['t'], 2)}; 1990-2009 spliced NW t {_s(rep['1990_2009_spliced_nw']['t_nw'], 2)}; post-minus-pre "
+              f"{_s(rep['1993_2009_spy']['t'], 2)}; 1990-2009 spliced slope {_s(rep['1990_2009_spliced']['slope'], 4)} Hodrick t "
+              f"{_s(rep['1990_2009_spliced']['t'], 2)} (one-sided p {_f(rep['1990_2009_spliced']['p'], 4)}; NW t "
+              f"{_s(rep['1990_2009_spliced'].get('t_nw'), 2)}, secondary); "
+              + (f"the SPY-only OOS R^2 is dominated by the {od['top_decision'][:7]} decision, which contributes "
+                 f"{_s(-od['top_contrib'], 4)} of {_s(-od['total_neg_r2'], 4)} ({_f(100 * od['top_share'], 0)}%); "
+                 if (od := rep['oos_decomposition']) and od['top_share'] is not None else "")
+              + f"dropping every decision whose target overlaps 2020-03..06 (2020-01..06 decisions) t "
+              f"{_s(rep['ex_2020_target_overlap']['t'], 2)} OOS {_s(rep['ex_2020_target_overlap']['oos_r2'], 4)}; post-minus-pre "
               f"slope (pooled sd units) {_s(rep['slope_difference_post_minus_pre']['d'], 4)} (Hodrick t "
               f"{_s(rep['slope_difference_post_minus_pre']['t_hodrick'], 2)}); "
               + (f"tercile trading arm Sharpe {_s(arm['sharpe_arm'])} vs {_s(arm['sharpe_bh'])}, diff {_s(arm['diff'])} {_ci(arm['ci'])}"

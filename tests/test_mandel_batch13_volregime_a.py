@@ -191,6 +191,28 @@ def test_jm_good_flags_and_penalty_choice_are_point_in_time():
     assert S["choice"][fm] == M.select_penalty(days, G["good"], x3, 1, years=1)["choice"][fm]
 
 
+def test_jm_good_flags_undefined_when_a_live_feature_row_is_nonfinite(monkeypatch):
+    n = 1400
+    days = _bdays(n, "1990-01-02")
+    rng = np.random.default_rng(9)
+    x = np.r_[np.nan, rng.normal(0.0003, 0.01, n - 1)]
+    kw = {"lams": (0.0, 5.0), "train": 300, "warmup": 20, "n_init": 2}
+    base = M.jm_good_flags(days, x, **kw)
+    live = np.where((base["good"][0] >= 0))[0]
+    k = int(live[len(live) // 2])
+    orig = M.jm_features
+
+    def feats(xx):
+        X = np.array(orig(xx), float)
+        X[k] = np.nan
+        return X
+    monkeypatch.setattr(M, "jm_features", feats)
+    G = M.jm_good_flags(days, x, **kw)
+    # every day whose trailing 300-session window holds row k is undefined; days before k unchanged
+    assert (G["good"][:, k:min(n, k + 300)] == -1).all()
+    assert np.array_equal(G["good"][:, :k], base["good"][:, :k])
+
+
 def test_lagged_positions_trade_at_the_close_after_the_signal():
     f = np.array([1, 0, 1, 1, -1, 0], np.int8)
     p = M.lagged_positions(f, 1)

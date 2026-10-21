@@ -66,7 +66,8 @@ and repeated in the harness reasons):
     each month-end on every row s >= window start + 22 whose target ended by that close (s + 21 <= t); window start =
     max(2004-01-02, first bar); a fit needs 500 rows (HAR-IV 250 rows with the index, counted from the index's first
     print, else it falls back to HAR). Insanity filter (Bollerslev-Patton-Quaedvlieg): a forecast outside [min, max]
-    of the fit's targets is replaced by their mean. EWMA(0.94) forecast = 21 x sigma^2_t (RiskMetrics, seeded with
+    of the fit's targets is replaced by their mean (the builder's addition; a positivity-only sensitivity, floor at the
+    smallest target and no range replacement, and the per-asset trigger counts are reported). EWMA(0.94) forecast = 21 x sigma^2_t (RiskMetrics, seeded with
     the first 22 sessions' mean). Position w_t = min(2, 0.10 / sqrt(252 F_t / 21)), held over session t+2 (filled at
     close t+1); excess return w x (simple excess over bills), leverage at the bill rate. Tracking: every 21-session
     window inside 2015-01..2026-09 (rule 10: the claim's non-overlapping grid has 21 phases, so all overlapping
@@ -81,9 +82,12 @@ and repeated in the harness reasons):
   * T-690: universe = mandel.ml.fetch's EQUITY_ETF + BOND_ETF + COMMOD_ETF less TQQQ, SQQQ, IBIT and ETHA (37), an
     ETF entering a decision once it has 252 local sessions and an entry open. On inspection the registered 20-day
     RegSHO short-volume ratio cannot be built: the finra-regsho-cnms bundles keep point-in-time S&P 500 members only,
-    no ETF row. That input stays an all-missing (constant) column, and because the model tested is then narrower
+    no ETF row. The gate is data-driven: every finra-regsho-cnms month is scanned, and an ETF with rows gets the
+    20-day ratio sum(short) / sum(total) over its last 20 file-days, entering at the file's available_at; when every
+    ETF has the input, the development row decides. Otherwise that input stays an all-missing (constant) column, and because the model tested is then narrower
     than the registered one, the development criterion is computed and reported but cannot decide (rule 9); the
-    lockbox (12 decisions from the 2026-10 month-end) does not exist yet, so the verdict is inconclusive whatever
+    lockbox (12 decisions from the 2026-10 month-end, counted from the local bars: a decision exists once its
+    63-session exit open is on file) does not exist yet, so the verdict is inconclusive whatever
     the development numbers say. Nothing after 2025-12-31 is loaded (the T-578 window and the lockbox stay out).
     Decision time = the 16:00 New York close of each month's last session; FINRA short interest (log level,
     changePercent, days to cover) enters at its available_at (23:59:59 UTC of publication), a Cboe close at its
@@ -1109,11 +1113,15 @@ def month_end_idx(days: Sequence[str]) -> np.ndarray:
     return np.array([i for i in range(len(days)) if i == len(days) - 1 or days[i][:7] != days[i + 1][:7]], int)
 
 
-def har_forecasts_daily(days: Sequence[str], X, T, start: int, min_rows: int, refits=None) -> tuple:
+def har_forecasts_daily(days: Sequence[str], X, T, start: int, min_rows: int, refits=None, filt: str = "bpq",
+                        diag: dict | None = None) -> tuple:
     """Daily forecasts x_t . beta, beta refitted at every month-end close e by OLS on rows s >= start whose target
     ended by e (s + 21 <= e), with at least ``min_rows`` of them; between refits the latest coefficients are used (the
     refit at close e already serves the forecast at e). Insanity filter: a forecast outside [min, max] of the fit's
-    targets (or not positive) is replaced by their mean. Returns (forecasts, refit coverage)."""
+    targets (or not positive) is replaced by their mean. ``filt="pos"`` (sensitivity) only floors a non-positive
+    forecast at the fit's smallest target, with no range replacement. ``diag`` (optional) receives trigger counts
+    {"range": forecasts outside [min, max] replaced, "nonpos": non-positive forecasts}. Returns (forecasts, refit
+    coverage)."""
     X, T = np.asarray(X, float), np.asarray(T, float)
     n = X.shape[0]
     row = np.isfinite(X).all(1) & np.isfinite(T) & (np.arange(n) >= start)
@@ -1143,7 +1151,18 @@ def har_forecasts_daily(days: Sequence[str], X, T, start: int, min_rows: int, re
             continue
         f = X[seg] @ beta
         lo_, hi_, mu = tmin[last], tmax[last], cs[last] / cnt[last]
-        f = np.where(np.isfinite(f) & ((f < lo_) | (f > hi_) | (f <= 0)), mu, f)
+        fin = np.isfinite(f)
+        nonpos = fin & (f <= 0)
+        rng = fin & ~nonpos & ((f < lo_) | (f > hi_))
+        if diag is not None:
+            diag["range"] = diag.get("range", 0) + int(rng.sum())
+            diag["nonpos"] = diag.get("nonpos", 0) + int(nonpos.sum())
+            diag.setdefault("range_days", []).extend(int(x) for x in seg[rng])
+            diag.setdefault("nonpos_days", []).extend(int(x) for x in seg[nonpos])
+        if filt == "pos":
+            f = np.where(nonpos, lo_, f)
+        else:
+            f = np.where(rng | nonpos, mu, f)
         out[seg] = f
     return out, fits
 
@@ -1272,9 +1291,13 @@ def asset_forecasts(days: Sequence[str], adj, iv_close: dict | None, msm: bool =
     T = fwd_sum(sq)
     start = max(0, int(np.searchsorted(np.array(days), T683_FIT_FROM))) + 22
     out = {"lr": lr, "T": T, "EWMA": ewma_forecast(lr)}
-    fits = {}
+    fits, diag = {}, {}
     for kind in ("HAR", "SHAR"):
-        out[kind], fits[kind] = har_forecasts_daily(days, har_design(lr, kind), T, start, T683_MIN_FIT)
+        diag[kind] = {}
+        out[kind], fits[kind] = har_forecasts_daily(days, har_design(lr, kind), T, start, T683_MIN_FIT,
+                                                    diag=diag[kind])
+    # sensitivity (reported only): positivity-only filter on SHAR, no range replacement
+    out["SHAR_pos"], _ = har_forecasts_daily(days, har_design(lr, "SHAR"), T, start, T683_MIN_FIT, filt="pos")
     if iv_close:
         ivd = VRA.vix_asof(iv_close, days)
         first = min(iv_close)
@@ -1283,9 +1306,11 @@ def asset_forecasts(days: Sequence[str], adj, iv_close: dict | None, msm: bool =
         Xiv[:i_first] = np.nan
         me = month_end_idx(days)
         me = me[(me >= i_first + T683_IV_ENTRY) & np.isfinite(out["HAR"][me])]   # the asset's own 500-row rule too
-        fiv, fits["HARIV"] = har_forecasts_daily(days, Xiv, T, max(start, i_first), 1, refits=me)
+        # 250 rows with a finite index value (the row mask needs finite X, and X is NaN before the first print)
+        fiv, fits["HARIV"] = har_forecasts_daily(days, Xiv, T, max(start, i_first), T683_IV_ENTRY, refits=me)
         out["HARIV"] = np.where(np.isfinite(fiv), fiv, out["HAR"])
-        out["iv_entry"] = days[me[0]] if me.size else None                         # the first HAR-IV refit
+        okf = me[np.isfinite(fiv[me])] if me.size else me
+        out["iv_entry"] = days[okf[0]] if okf.size else None                       # the first HAR-IV refit
     else:
         out["HARIV"] = out["HAR"].copy()
         out["iv_entry"] = None
@@ -1293,6 +1318,7 @@ def asset_forecasts(days: Sequence[str], adj, iv_close: dict | None, msm: bool =
         tm = np.array([T683_MSM_TRAIN[0] <= d <= T683_MSM_TRAIN[1] for d in days])
         out["MSM"] = msm_forecasts(lr, tm)
     out["fits"] = fits
+    out["filter_diag"] = diag
     return out
 
 
@@ -1400,6 +1426,37 @@ def risk_target_test(assets: dict, n_boot: int = T683_NBOOT, reps: int | None = 
     return res
 
 
+def pos_filter_sensitivity(per: dict, win: tuple = T683_WIN, n_boot: int = T683_NBOOT, reps: int | None = None) -> dict:
+    """Reported only: SHAR with the positivity-only filter (non-positive forecast floored at the fit's smallest
+    target, no range replacement) against EWMA, pooled tracking loss on the same windows as the registered test,
+    plus the per-asset count of insanity-filter triggers in the window."""
+    dsets, bsets, trig = [], [], {}
+    for sym, P_ in per.items():
+        d = np.array(P_["days"])
+        F = P_["F"]
+        if "SHAR_pos" not in F:
+            return {}
+        w = target_weights(F["SHAR_pos"])
+        _, pp, _ = position_returns(w, P_["e"], P_["r"], P_["rb"], T683_COST)
+        L = tracking_losses(pp, P_["lr"])
+        LB = P_["q"]["EWMA"]["loss"]
+        li = np.where(d <= win[1])[0][-1]
+        keep = (d >= win[0]) & (np.arange(d.size) + T683_H - 1 <= li)
+        dsets.append({dd: v for dd, v, k in zip(d, L, keep) if k})
+        bsets.append({dd: v for dd, v, k in zip(d, LB, keep) if k})
+        dg = (F.get("filter_diag") or {}).get("SHAR") or {}
+        inw = lambda ix, d=d: int(sum(1 for i in ix if win[0] <= d[i] <= win[1]))
+        trig[sym] = {"range": inw(dg.get("range_days", [])), "nonpos": inw(dg.get("nonpos_days", []))}
+    common = sorted(set.intersection(*(set(x) for x in dsets)))
+    L = np.array([[x[c] for c in common] for x in dsets], float)
+    B = np.array([[x[c] for c in common] for x in bsets], float)
+    ok = np.isfinite(L).all(0) & np.isfinite(B).all(0)
+    dl = (L - B)[:, ok].mean(0)
+    return {"n": int(ok.sum()), "loss": float(np.nanmean(L[:, ok])), "loss_ewma": float(np.nanmean(B[:, ok])),
+            "diff": float(dl.mean()) if dl.size else None, "test": mean_lt_test(dl, T683_BLOCK, n_boot, reps),
+            "triggers": trig}
+
+
 def gk_and_intraday(per: dict, rows: dict, win: tuple = T683_WIN) -> dict:
     """Reported only: SHAR - EWMA pooled QLIKE under two other variance proxies. (a) Garman-Klass plus the squared
     overnight return, on sessions whose open is not stale (open equal to the previous close or outside [low, high]
@@ -1481,6 +1538,10 @@ def b13_volregime_b_shar_risk_target(archive):
     if n < 30 or S["qlike"].get("p_less") is None:
         return _out({"n": n}, n, "inconclusive", "too few tracking windows / forecast origins in 2015-01..2026-09")
     try:
+        sens = pos_filter_sensitivity(R["_per"])
+    except (ValueError, KeyError, TypeError, IndexError) as exc:  # reported only
+        sens = {"error": repr(exc)}
+    try:
         cross = gk_and_intraday(R["_per"], rows)
     except (ValueError, KeyError, OSError, TypeError, IndexError) as exc:  # reported-only cross-checks never decide
         cross = {"error": repr(exc)}
@@ -1512,7 +1573,9 @@ def b13_volregime_b_shar_risk_target(archive):
             "early": {fn: {k: E[fn].get(k) for k in ("n", "diff", "qlike", "sharpe_diff", "util_gain_bp")}
                       | {"ci": E[fn].get("test", {}).get("ci")} for fn in fcs[1:]},
             "sharpe": W["sharpe"], "turnover": W["turnover"], "const": W["const"], "util": W["util"], "holm": R["holm"],
-            "fits": R["per"], "cross_checks": cross, "criteria": crit,
+            "fits": R["per"], "cross_checks": cross,
+            "pos_filter_sensitivity": {k: v for k, v in sens.items() if k != "test"}
+            | {"ci": (sens.get("test") or {}).get("ci"), "p_lt": (sens.get("test") or {}).get("p_lt")}, "criteria": crit,
             "rule10": "daily decisions; the 21-session tracking windows pool every one of the 21 phases"}
     def fc_txt(fn):
         x = W[fn]
@@ -1524,7 +1587,7 @@ def b13_volregime_b_shar_risk_target(archive):
     cst = W["const"]
     reason = ("Six ETFs (adjclose; DTB3 bills), 10% target min(2, 0.10 / sqrt(252 F / 21)), decided at close t and "
               "filled at close t+1, 2 bp per unit of turnover; forecasters refitted at every month-end on expanding "
-              "windows from 2004 (first bar + 500 rows; HAR-IV also from each index's first print + 250 sessions; first HAR-IV refits "
+              "windows from 2004 (first bar + 500 rows; HAR-IV also needs 250 rows with a finite index value, refits from the index's first print + 250 sessions; first HAR-IV refits "
               + ", ".join(f"{s_} {R['per'][s_]['iv_entry']}" for s_ in T683_ASSETS)
               + f"); {n} overlapping 21-session windows {T683_WIN[0]}..{T683_WIN[1]}. " + fc_txt("SHAR") + "; "
               + "; ".join(fc_txt(fn) for fn in fcs[1:] if fn != "SHAR")
@@ -1544,6 +1607,13 @@ def b13_volregime_b_shar_risk_target(archive):
                  f"{(cross['h60'].get('span') or ['n/a', 'n/a'])[0]}..{(cross['h60'].get('span') or ['n/a', 'n/a'])[1]} "
                  f"{_s((cross['h60'].get('pooled') or {}).get('mean'), 4)} (t {_s((cross['h60'].get('pooled') or {}).get('t'), 2)})"
                  if "gk" in cross else f"; cross-checks failed ({cross.get('error')})")
+              + (". Insanity filter (the builder's addition, not registered): range triggers in the window "
+                 + ", ".join(f"{k} {x['range']}" for k, x in sens["triggers"].items())
+                 + "; non-positive " + ", ".join(f"{k} {x['nonpos']}" for k, x in sens["triggers"].items())
+                 + f". Sensitivity, positivity-only filter (floor at the smallest target, no range replacement): SHAR "
+                 f"tracking loss {_f(sens['loss'], 4)} vs EWMA {_f(sens['loss_ewma'], 4)}, diff {_s(sens['diff'], 4)} "
+                 f"{_ci((sens.get('test') or {}).get('ci'), 4)} (reported, not decisive)"
+                 if "triggers" in sens else f". Positivity-only sensitivity failed ({sens.get('error')})")
               + ". A pass is risk control, not alpha — " + why)
     return _out(stat, n, v, reason)
 
@@ -1680,6 +1750,70 @@ def load_si(archive, syms: Sequence[str]) -> dict:
     return out
 
 
+CNMS_PREFIX = "finra-regsho-cnms-"
+T690_SVR_N = 20
+
+
+def cnms_names(archive) -> list:
+    """Every archived finra-regsho-cnms month, 2018-08 onwards."""
+    try:
+        ents = archive.entries()
+    except (AttributeError, TypeError):
+        ents = []
+    out = sorted({getattr(e, "name", "") for e in ents if str(getattr(e, "name", "")).startswith(CNMS_PREFIX)})
+    return out or [CNMS_PROBE]
+
+
+def svr20_events(rows: Sequence[tuple], n: int = T690_SVR_N) -> tuple:
+    """rows [(available_at epoch, short, total)] of one symbol -> (epochs, 20-file-day ratio sum short / sum total),
+    the ratio known at the available_at of its 20th file."""
+    a = np.array(sorted(rows), float)
+    if a.shape[0] < n:
+        return np.array([], np.int64), np.array([])
+    cs, ct = np.cumsum(a[:, 1]), np.cumsum(a[:, 2])
+    ss = cs[n - 1:] - np.r_[0.0, cs[:-n]]
+    tt = ct[n - 1:] - np.r_[0.0, ct[:-n]]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r = np.where(tt > 0, ss / tt, np.nan)
+    return a[n - 1:, 0].astype(np.int64), r
+
+
+def load_regsho(archive, syms: Sequence[str], end: str = T690_DATA_END) -> dict:
+    """{sym: (epochs, svr20)} for the universe's symbols that appear in any finra-regsho-cnms month up to ``end``."""
+    from mandel.experiments import batch6c_stockxs as SX
+    want = set(syms)
+    acc = {}
+    for nm in cnms_names(archive):
+        if nm[len(CNMS_PREFIX):] > end[:7] or not B7C._has(archive, nm):
+            continue
+        for r in CAL._rows(archive, nm):
+            if r.get("kind") != "short-volume":
+                continue
+            v = r.get("value") or {}
+            sy = v.get("symbol")
+            if sy not in want or str(v.get("day", "")) > end:
+                continue
+            try:
+                acc.setdefault(sy, []).append((int(SX._ts(r["available_at"])), float(v["short_volume"]),
+                                               float(v["total_volume"])))
+            except (KeyError, ValueError, TypeError):
+                continue
+    out = {}
+    for sy, rr in acc.items():
+        e, x = svr20_events(rr)
+        if e.size:
+            out[sy] = (e, x)
+    return out
+
+
+def lockbox_count(spy_days: Sequence[str], start: str = T690_LOCKBOX_FROM, h: int = T690_H) -> int:
+    """Lockbox decisions (month-ends from ``start``) whose exit open (decision + 1 + h sessions) is on file."""
+    d = sorted(set(spy_days))
+    me = month_end_sessions(d)
+    me = [i for i in me if d[i][:7] >= start and i != len(d) - 1]
+    return sum(1 for i in me if i + 1 + h < len(d))
+
+
 def load_iv_known(archive, sym: str) -> tuple | None:
     """(available_at epochs, log close) of a Cboe index history (closes are archived at 21:30 UTC)."""
     from mandel.experiments import batch6c_stockxs as SX
@@ -1732,7 +1866,7 @@ def adj_factors(archive, sym: str) -> dict | None:
 
 
 def build_t690_panel(bars: dict, factors: dict, si: dict, iv_known: dict, iv_map: dict, fomc_ts, cpi_ts, bill_logc_fn,
-                     end: str = T690_DATA_END) -> dict:
+                     end: str = T690_DATA_END, regsho: dict | None = None) -> dict:
     """Days x symbols matrices on the SPY session calendar (through ``end``): adjusted and raw opens, features at
     each close and the 63-session excess-return targets under both price readings. ``bars`` {sym: DataFrame o h l
     c v indexed by UTC bar stamp}; ``factors`` {sym: {day: adj/close} or None}."""
@@ -1777,6 +1911,9 @@ def build_t690_panel(bars: dict, factors: dict, si: dict, iv_known: dict, iv_map
             common["si_log"][:, j] = asof_values(a, lv, cts)
             common["si_chg"][:, j] = asof_values(a, ch, cts)
             common["si_dtc"][:, j] = asof_values(a, dtc, cts)
+        if regsho and s in regsho:
+            a, lv = regsho[s]
+            common["regsho_svr20"][:, j] = asof_values(a, lv, cts)
         k = iv_map.get(s)
         if k and iv_known.get(k) is not None:
             a, lv = iv_known[k]
@@ -2005,8 +2142,12 @@ def b13_volregime_b_ml_price_free_etf(archive):
         return _out({"missing": ["mandel/ml_data/bars/1d"]}, 0, "inconclusive",
                     "local daily bars (mandel/ml_data/bars/1d) are not on this machine: rule 9")
     # RegSHO: the registered 20-day short-volume ratio needs ETF rows; probe what the archive holds
-    cnms = [r.get("value", {}).get("symbol") for r in CAL._rows(archive, CNMS_PROBE) if r.get("kind") == "short-volume"]
-    regsho_etfs = sorted(set(cnms) & set(syms))
+    if not B7C._has(archive, CNMS_PROBE):
+        return _out({"missing": [CNMS_PROBE]}, 0, "inconclusive", f"{CNMS_PROBE} is not archived: rule 9")
+    regsho = load_regsho(archive, list(bars))
+    regsho_etfs = sorted(regsho)
+    regsho_all = set(regsho_etfs) >= set(bars)
+    n_lock = lockbox_count([t.strftime("%Y-%m-%d") for t in bars["SPY"].index.tz_convert("America/New_York")])
     acc = RATES.Accrual(CAL._series(archive, DTB3_B), "bey")
     bill_fn = lambda d: acc._c(VRA._ord(d))
     fomc = [r["value"] for r in CAL._rows(archive, FOMC_B)]
@@ -2016,7 +2157,7 @@ def b13_volregime_b_ml_price_free_etf(archive):
     ivk = {k: load_iv_known(archive, k) for k in sorted(set(ivm.values()))}
     fac = {s: adj_factors(archive, s) for s in bars}
     si = load_si(archive, list(bars))
-    Pn = build_t690_panel(bars, fac, si, ivk, ivm, fomc_ts, cpi_ts, bill_fn)
+    Pn = build_t690_panel(bars, fac, si, ivk, ivm, fomc_ts, cpi_ts, bill_fn, regsho=regsho)
     Pn["bill"] = np.array([bill_fn(d) for d in Pn["days"]])
     del bars
     nd = 0
@@ -2045,16 +2186,18 @@ def b13_volregime_b_ml_price_free_etf(archive):
     # criteria
     rows = [((f"every registered input archived for the universe: the 20-day RegSHO short-volume ratio has "
               f"{len(regsho_etfs)} of {len(Pn['syms'])} ETFs in finra-regsho-cnms (the bundles keep point-in-time "
-              f"S&P 500 members only) — rule 9"), None if not regsho_etfs else True, False),
+              f"S&P 500 members only) — rule 9"), True if regsho_all else None, False),
             ((f"some model with development DSR >= {DSR_PASS} (N = {T690_CELLS} ML-program cells, {nd} monthly decisions "
               f"{T690_DEV[0]}..{T690_DEV[1]}) under both price readings: "
               + "; ".join(f"{kind} adj {_f((res[('adj', kind)].get('stats') or {}).get('dsr'))} / raw "
                           f"{_f((res[('raw', kind)].get('stats') or {}).get('dsr'))}" for kind in ("ridge", "gbm"))
-              + " [computed on the model without the unarchived RegSHO input, so it cannot decide: rule 9]"),
-             None, False),
+              + ("" if regsho_all else " [computed on the model without the unarchived RegSHO input, so it cannot "
+                                       "decide: rule 9]")),
+             any_dev if regsho_all else None, regsho_all and not any_dev),
             ((f"a development survivor has a positive mean net return over the first {T690_LOCKBOX_N} lockbox decisions "
-              f"from {T690_LOCKBOX_FROM} (sealed: 0 of {T690_LOCKBOX_N} lockbox decisions exist, the first is the "
-              f"{T690_LOCKBOX_FROM} month-end; nothing after {T690_DATA_END} was loaded)"
+              f"from {T690_LOCKBOX_FROM} ({n_lock} of {T690_LOCKBOX_N} lockbox decisions have their exit on file in the "
+              f"local bars; " + ("sealed" if n_lock < T690_LOCKBOX_N else "complete but not opened by this harness: "
+                                 "a lockbox scorer must be added") + f"; nothing after {T690_DATA_END} was loaded)"
               + ("" if any_dev else "; no model survives development, so the lockbox would not be opened")), None, False)]
     v, why, crit = CAL._judge(rows, nd, T690_MIN_N, "monthly decisions")
     st = lambda r_: r_.get("stats") or {}
@@ -2062,7 +2205,7 @@ def b13_volregime_b_ml_price_free_etf(archive):
             "min_annual_sharpe_for_dsr": min_sr * math.sqrt(12.0), "min_monthly_sharpe_for_dsr": min_sr,
             "models": {f"{rd}|{kind}": {"stats": st(r_), "n_tranches": r_.get("n_tranches"), "n_train": r_.get("n_train"),
                                         "importance_last_fit": r_.get("importance_last")} for (rd, kind), r_ in res.items()},
-            "ablations": abl, "baselines": base, "dev_pass": passes, "regsho_etfs": regsho_etfs,
+            "ablations": abl, "baselines": base, "dev_pass": passes, "regsho_etfs": regsho_etfs, "lockbox_decisions_on_file": n_lock,
             "feature_coverage_symbols": cover, "iv_map": ivm, "no_dividend_factor": [s for s, f in fac.items() if not f],
             "data_end_loaded": last_day, "criteria": crit, "rule10": "calendar named by the claim (month-end decisions)"}
     def mtxt(rd, kind):
@@ -2086,6 +2229,9 @@ def b13_volregime_b_ml_price_free_etf(archive):
               + f"; baselines: always-long {_s(base['always_long'].get('sr_ann'), 2)}, days-to-cover sort "
               f"{_s(base['dtc_sort'].get('sr_ann'), 2)}; GBM gain shares (2025 fit) "
               + ", ".join(f"{k} {x:.2f}" for k, x in sorted(gimp.items(), key=lambda kv: -kv[1])[:6])
+              + (". The narrower model fails development decisively (best DSR "
+                 + _f(max([(st(r_).get("dsr") or 0.0) for r_ in res.values()]))
+                 + f" against {DSR_PASS}); the verdict is inconclusive only under rule 9" if not any_dev else "")
               + f". NOT JUDGED: the registered RegSHO input is absent for every ETF ({CNMS_PROBE} and its siblings keep "
               f"S&P 500 members only), so the development DSR above belongs to a narrower model; and the lockbox "
               f"({T690_LOCKBOX_FROM}..) has no decisions yet. The ETF list was chosen in 2026 (mild survivor bias). — " + why)
