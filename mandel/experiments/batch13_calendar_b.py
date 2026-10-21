@@ -541,7 +541,8 @@ def b13_calendar_b_threshold_rebalancing(archive):
     def one(lab):
         r = R[lab]
         s, pl, pa, tg = r["slope"], r["placebo"], r.get("partial", {}), r["trigger"]
-        return (f"({lab}) {r['n']} days {r['first']}..{r['last']}: slope {_bp(s['coef'])} bps per sd (HAC t {_f(s['t'], 2)}, "
+        tag = "b, primary: signal at close t-1" if lab == "b" else "a, MOC-optimistic: signal at the entry close t"
+        return (f"({tag}) {r['n']} days {r['first']}..{r['last']}: slope {_bp(s['coef'])} bps per sd (HAC t {_f(s['t'], 2)}, "
                 f"lag {r['lag']}; HAC p {_f(s['hac_p_less'], 4)}, stationary-bootstrap p {_mc(s['boot_p_less'], s['boot_draws'])}); "
                 f"partial over T-345 + T-59 dummies {_bp(pa.get('coef'))} (t {_f(pa.get('t'), 2)}, boot p "
                 f"{_mc(pa.get('boot_p_less'), pa.get('boot_draws', 0))}); placebo 4-6% {_bp(pl['coef'])} (t {_f(pl['t'], 2)}); "

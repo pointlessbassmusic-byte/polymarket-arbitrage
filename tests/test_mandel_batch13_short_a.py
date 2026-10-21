@@ -145,6 +145,27 @@ def test_t674_difference_series_have_the_differences_as_means():
     assert M.diff_overlap_series(y, s, d).mean() == pytest.approx(y[s].mean() - y[d].mean())
 
 
+def test_t674_as_traded_close_is_known_at_t_whatever_splits_follow():
+    # Yahoo's split-adjusted close embeds every later split; close x factor-after-day must give back the price that
+    # traded on the day, and a split announced after t (ex-date after t) must not move day t's as-traded price.
+    iso = ["2020-01-02", "2020-06-01", "2021-01-04", "2022-01-03"]
+    raw = np.array([100.0, 120.0, 50.0, 60.0])           # a 2:1 split with ex-date 2020-12-01
+    splits = [("2020-12-01", 2.0)]
+    adj = raw / M.after_split_factor(iso, splits)
+    assert np.allclose(adj * M.after_split_factor(iso, splits), raw)
+    late = splits + [("2021-06-01", 4.0)]                 # a later split rescales Yahoo's history again
+    adj2 = raw / M.after_split_factor(iso, late)
+    assert np.allclose(adj2 * M.after_split_factor(iso, late), raw)
+    assert M.after_split_factor(iso, late)[:2].tolist() == [8.0, 8.0]
+    # the DIX numerator/denominator at t then use only day-t prices and volumes
+    SV = np.array([[50.0, 40.0]] * 4); TV = np.array([[100.0, 100.0]] * 4); Mm = np.ones((4, 2), bool)
+    P = np.column_stack([raw, np.full(4, 30.0)])
+    x, _, _ = M.dw_ratio(SV, TV, Mm, P)
+    P2 = P.copy(); P2[2:, 0] *= 7.0
+    x2, _, _ = M.dw_ratio(SV, TV, Mm, P2)
+    assert np.allclose(x[:2], x2[:2]) and not np.allclose(x[2:], x2[2:])
+
+
 def test_touches_window():
     cal = np.array([M.EV._ed(d) for d in ("2020-01-02", "2020-01-30", "2020-02-03", "2020-07-01", "2020-07-02")], np.int64)
     t = M.touches(np.array([0, 3, 0]), np.array([1, 4, 2]), cal, "2020-02-01", "2020-06-30")
@@ -195,6 +216,55 @@ def test_t672_regex_excludes_declared_classes():
         assert M.SI_EXCLUDE.search(nm), nm
     for nm in ("Agilent Technologies Inc.", "Alcoa Corporation", "Apple Inc."):
         assert not M.SI_EXCLUDE.search(nm), nm
+
+
+class _Ent:
+    def __init__(self, name):
+        self.name, self.created_at, self.recipe = name, None, ""
+
+
+class RowsArchive:
+    """Stub archive serving in-memory rows per bundle."""
+
+    def __init__(self, bundles):
+        self.b = bundles
+
+    def entries(self, kind=None, tag=None):
+        return [_Ent(n) for n in self.b]
+
+    def get(self, name):
+        if name not in self.b:
+            raise KeyError(name)
+        return _Ent(name)
+
+    def load(self, name):
+        return iter(self.b[name])
+
+
+def _si_row(sym, name, cls, si, adv, av="2026-10-12T23:59:59+00:00", rev=None):
+    return {"kind": "short-interest", "available_at": av,
+            "value": {"symbolCode": sym, "issueName": name, "marketClassCode": cls, "currentShortPositionQuantity": si,
+                      "averageDailyVolumeQuantity": adv, "daysToCoverQuantity": 1.0, "revisionFlag": rev}}
+
+
+def test_t672_universes_raw_fields_and_release_time():
+    rows = [_si_row("AAA", "Alpha Corp", "NYSE", 50_000, 200_000),            # raw SI/ADV 0.25 (FINRA floors DTC at 1)
+            _si_row("BBB", "Beta Inc", "NNM", 600_000, 200_000, rev="R"),
+            _si_row("IBX", "iShares iBoxx $ Investment Gra", "ARCA", 900_000, 300_000),   # truncated fund name
+            _si_row("SPY", "SPDR S&P 500 ETF Trust", "ARCA", 1e8, 5e7),        # regex removes it in both universes
+            _si_row("TINY", "Tiny Corp", "NYSE", 10_000, 50_000),              # ADV below 100k
+            _si_row("LATE", "Late Corp", "NYSE", 1.0, 200_000, av="2026-10-13T23:59:59+00:00")]
+    M.CAL._CACHE.clear()
+    recs = M.si_releases(RowsArchive({"finra-short-interest-2026-09-30": rows}))
+    r = recs[0]
+    assert r["n_all"] == 4 and r["n_company"] == 3 and r["n_norev"] == 3
+    exp_company = np.mean([math.log1p(0.25), math.log1p(3.0), math.log1p(1.0 / 200_000)])
+    assert r["x_company"] == pytest.approx(exp_company)
+    assert r["x_all"] == pytest.approx(np.mean([math.log1p(0.25), math.log1p(3.0), math.log1p(3.0), math.log1p(5e-6)]))
+    assert r["v_company"] == pytest.approx(math.log(200_000))
+    # the decision time is the latest available_at in the release (never earlier than any row it uses)
+    assert r["av"] == M.SX._ts("2026-10-13T23:59:59+00:00")
+    M.CAL._CACHE.clear()
 
 
 def test_clark_west_detects_planted_predictability():

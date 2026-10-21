@@ -26,7 +26,8 @@ Batch 13, group ``short_a``: aggregate shorting flow and short interest as SPY t
            pre-declared fund/SPAC/ADR/warrant/unit/right/preferred/note regex; volume placebo v_r = mean log ADV of the
            same rows; each recursively detrended (OLS line on releases 1..r) and z-scored by the residual sd up to r.
            Decision at the release's available_at, entry at the next SPY close, y_r = log SPY total return entry r ->
-           entry r+1 minus DTB3. Pass (>= 120 OOS releases, first forecast after 72): Clark-West (NW 2 lags) one-sided
+           entry r+1 minus DTB3. Universe readings U1 (all listed classes) and U2 (company classes) are declared below.
+           Pass (>= 120 OOS releases, first forecast after 72): Clark-West (NW 2 lags) one-sided
            p < 0.05 vs the expanding prevailing mean; Clark-West p < 0.05 of the index-plus-placebo forecast vs the
            placebo-only forecast; the recursive slope negative in both OOS halves (2020-12..2023-10, 2023-11..2026-09).
 
@@ -66,7 +67,8 @@ Conventions and declared readings (fixed before any run)
     is no free phase either.
   * Survivorship. T-673 and T-672 use no single-stock prices (the FINRA rows include later-delisted names and the
     target is SPY). T-674's dollar weights need member closes, which come from the archive's 901-symbol daily-history
-    set: TODAY's universe, so removed, acquired and renamed members are under-represented in the weights (the unpriced
+    set (read through the shared ``panel_cache`` daily panel, value-identical to the per-bundle loaders; split factors
+    from each symbol's daily-events bundle): TODAY's universe, so removed, acquired and renamed members are under-represented in the weights (the unpriced
     share of member off-exchange volume is reported). The registration's pre-run fetch of the missing members Yahoo
     still serves has not been done (this harness may not write the archive), so T-674 carries one criterion that is
     not implemented: at best inconclusive until that fetch, and a failing criterion still fails.
@@ -84,8 +86,13 @@ Conventions and declared readings (fixed before any run)
     cell has the same sign (reported, not tested)" is read as a sign criterion with no significance test (it sits in
     the AND chain of the pass). T-672's claim reads "positive Clark-West OOS R^2", so the point OOS R^2 > 0 is a
     criterion beside the Clark-West p; "the recursive slope negative in both halves" is read as negative at every OOS
-    origin of each half (the strict reading). T-672's universe is every row of the listed-mode bundle (FINRA's listed
-    classes) minus the regex; the company-class-only universe is reported.
+    origin of each half (the strict reading). T-672's universe has two readings (declared on inspecting the rows,
+    before any run): U1, every row of the listed-mode bundle (FINRA's listed classes, the procedure's literal
+    universe) minus the regex; U2, the FINRA company classes (``public_history.FINRA_COMPANY_CLASSES``: NYSE, Nasdaq,
+    NYSE American; not the fund venues ARCA and BZX) minus the same regex. FINRA truncates issueName at 30
+    characters, so the regex alone leaves 7.6% (2017-12) rising to 15.4% (2026-09) of U1 rows as ARCA/BZX funds
+    ('iShares iBoxx $ Investment Gra'), against the claim's "exchange-listed common stocks". The regex itself is
+    unchanged. Each T-672 criterion is judged over the four readings U1/U2 x A/B (rules 11/12).
 """
 
 from __future__ import annotations
@@ -169,6 +176,7 @@ SI_COST = 2e-4                 # timing rule, per switch
 SI_ZTHR = 1.0
 SI_HORIZONS = (21, 63)         # reported 1- and 3-month horizons, sessions
 SI_EXCL = ("2020-02-01", "2020-06-30")
+SI_UNIVERSES = {"all": "U1", "company": "U2"}   # every listed class / FINRA company classes (no ARCA, BZX), both - regex
 
 
 # ================================================================================================= statistics ==
@@ -534,38 +542,79 @@ def base(archive) -> dict:
     return CAL._cached(archive, ("b13_base",), load)
 
 
+def stock_splits(archive, ysym_: str) -> list:
+    """[(ex_date, ratio)] from a symbol's daily-events bundle, parsed exactly as ``batch6c_stockxs._stock`` does."""
+    name = SX.de(ysym_)
+    if not SX._has(archive, name):
+        return []
+    out = []
+    for r in SX._stream(archive, name):
+        v = r.get("value") or {}
+        if r.get("kind") != "split" and v.get("type") != "split":
+            continue
+        try:
+            num, den = float(v.get("numerator")), float(v.get("denominator"))
+            ex = v.get("ex_date") or SX._bar_day(v["t"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if num > 0 and den > 0 and ex:
+            out.append((str(ex)[:10], num / den))
+    return sorted(out)
+
+
+def after_split_factor(iso: Sequence[str], splits: Sequence[tuple]) -> np.ndarray:
+    """Per day: the product of the split ratios with an ex-date after the day (``batch6c_stockxs.split_factor``), so
+    the as-traded close known on that day = split-adjusted close x factor."""
+    d = np.asarray(list(iso))
+    f = np.ones(d.size)
+    for ex, ratio in splits:
+        f[d < ex] *= ratio
+    return f
+
+
 def member_prices(archive) -> dict:
     """Per CNMS file day and symbol: Yahoo's split-adjusted close (NaN without a bar that day) and the split factor
     after the day (as-traded close = close x F), for symbols whose Yahoo series is an EQUITY and passes the FINRA-volume
-    identity check; status per symbol."""
+    identity check; status per symbol. Closes and volumes come from the shared daily panel (``panel_cache``, value-
+    identical to the per-bundle loaders), so the ~600 member bundles are never streamed one by one."""
     def load():
+        from mandel.experiments.panel_cache import daily_panel
         B = base(archive)
         C, M = B["C"], B["M"]
         D, S = C["days"].size, len(C["syms"])
+        P = daily_panel(archive)
+        prow = {str(d): i for i, d in enumerate(P.days.tolist())}
+        rows = np.array([prow.get(d, -1) for d in C["iso"]], int)
+        have = rows >= 0
+        pcol = {str(s): j for j, s in enumerate(P.symbols.tolist())}
         PA = np.full((D, S), np.nan)
         FF = np.ones((D, S))
         status = {}
         for j, s in enumerate(C["syms"]):
-            st = SX._stock(archive, EV.ysym(s))
-            if st is None:
+            ys = EV.ysym(s)
+            k = pcol.get(SX._safe(ys))
+            if k is None:
                 status[s] = "no archived daily history"
                 continue
-            if not SX.is_equity(st):
+            if (SX._meta(archive, SX.dh(ys)) or {}).get("instrumentType") != "EQUITY":
                 status[s] = "Yahoo series is not an EQUITY (reused ticker)"
                 continue
-            pos = {d: k for k, d in enumerate(st["days"])}
-            ks = np.array([pos.get(d, -1) for d in C["iso"]], int)
-            ok = ks >= 0
-            pa = np.full(D, np.nan); f = np.ones(D); yv = np.full(D, np.nan)
-            pa[ok] = st["close"][ks[ok]]
-            f[ok] = st["F"][ks[ok]]
+            pa = np.full(D, np.nan); vol = np.full(D, np.nan)
+            pa[have] = P.close[rows[have], k]
+            vol[have] = P.volume[rows[have], k]
+            bar = np.isfinite(pa)
+            if not bar.any():
+                status[s] = "no daily-history bar on any CNMS file day"
+                continue
+            f = after_split_factor(C["iso"], stock_splits(archive, ys))
+            yv = np.full(D, np.nan)
             with np.errstate(invalid="ignore", divide="ignore"):
-                yv[ok] = st["vol"][ks[ok]] / st["F"][ks[ok]]
+                yv[bar] = vol[bar] / f[bar]
             chk = EV.finra_identity(C["TV"][:, j], yv, M[:, j])
             if chk["ok"] is False:
                 status[s] = "Yahoo volume disagrees with FINRA's (identity check)"
                 continue
-            PA[:, j], FF[:, j] = pa, f
+            PA[:, j], FF[:, j] = pa, np.where(bar, f, 1.0)
             status[s] = "ok" if chk["ok"] else "ok (identity not checkable)"
         return {"PA": PA, "F": FF, "status": status}
     return CAL._cached(archive, ("b13_prices",), load)
@@ -803,10 +852,10 @@ def b13_short_a_dix_spy_60d(archive):
                  f"{_bp(ew.get('diff_dip_net'))})", ew_ok, False))
     st = pr["status"]
     unpriced = sorted(s for s, v in st.items() if not v.startswith("ok"))
+    rows = CAL._undecided(rows)
     rows.append((f"registered pre-run fetch of the members Yahoo still serves ({len(unpriced)} of {len(st)} member "
                  f"symbols without a usable archived close) [NOT IMPLEMENTED: the archive lacks them and this harness "
                  f"does not fetch]", None, False))
-    rows = CAL._undecided(rows)
     verdict, why, crit = CAL._judge(rows, n, T674_MIN_N, "eligible file days")
 
     # ---- reported only
@@ -1040,32 +1089,40 @@ def b13_short_a_aggregate_si(archive):
     x = np.array([r["x_all"] for r in recs]); v = np.array([r["v_all"] for r in recs])
     T = si_targets(archive, recs)
     y, real = T["y"], T["real"]
+    # readings: universe U1 (every listed class minus the regex) / U2 (FINRA company classes minus the regex) x detrend
+    # A (re-detrended at each origin) / B (fixed at publication); rules 11/12 over all four
     ev = {}
-    for rd in ("A", "B"):
-        ev[rd] = si_eval(si_oos(x, v, y, av, real, rd), settle)
+    for uni in SI_UNIVERSES:
+        xu = np.array([r[f"x_{uni}"] for r in recs]); vu = np.array([r[f"v_{uni}"] for r in recs])
+        for rd in ("A", "B"):
+            ev[f"{SI_UNIVERSES[uni]}/{rd}"] = si_eval(si_oos(xu, vu, y, av, real, rd), settle)
     n = min(e.get("n", 0) for e in ev.values())
-    rA, rB = _si_rows(ev["A"]), _si_rows(ev["B"])
-    EA, EB = ev["A"], ev["B"]
+    rr = {k: _si_rows(e) for k, e in ev.items()}
+    EA = ev["U1/A"]
 
     def cwtxt(key):
-        return " / ".join(f"t {_fmt((E.get(key) or {}).get('cw_t'), 2)}, p {_fmt((E.get(key) or {}).get('p'))}"
-                          for E in (EA, EB))
+        return "; ".join(f"{lab} t {_fmt((E.get(key) or {}).get('cw_t'), 2)}, p {_fmt((E.get(key) or {}).get('p'))}"
+                         for lab, E in ev.items())
 
-    sl = lambda E: "; ".join(f"{k}: {h['share_negative'] * 100:.0f}% negative, mean {h['mean'] * 1e4:+.2f} bps/z"
-                             for k, h in (E.get("slopes") or {}).items() if h.get("mean") is not None)
-    names = [f"Clark-West one-sided p < 0.05 vs the prevailing mean (re-detrended A / fixed-at-publication B: {cwtxt('cw_pm')})",
+    def sl(E):
+        return ", ".join(f"{k} {h['share_negative'] * 100:.0f}% neg (mean {h['mean'] * 1e4:+.2f} bps/z)"
+                         for k, h in (E.get("slopes") or {}).items() if h.get("mean") is not None)
+
+    names = [f"Clark-West one-sided p < 0.05 vs the prevailing mean ({cwtxt('cw_pm')})",
              f"Clark-West one-sided p < 0.05 of index + volume placebo vs the placebo-only forecast ({cwtxt('cw_placebo')})",
-             f"recursive slope negative at every OOS origin of both halves (A: {sl(EA)} | B: {sl(EB)})",
-             f"OOS R^2 vs the prevailing mean > 0, the claim's 'positive OOS R^2' (A {_fmt((EA.get('cw_pm') or {}).get('r2'))} "
-             f"CI {[round(c, 4) if c is not None else None for c in (EA.get('r2_ci') or [None, None])]} / B "
-             f"{_fmt((EB.get('cw_pm') or {}).get('r2'))})"]
-    rows = [(nm, CAL._agree([a[0], b[0]]), bool(a[1] and b[1])) for nm, a, b in zip(names, rA, rB)]
+             "recursive slope negative at every OOS origin of both halves ("
+             + " | ".join(f"{lab}: {sl(E)}" for lab, E in ev.items()) + ")",
+             "OOS R^2 vs the prevailing mean > 0, the claim's 'positive OOS R^2' ("
+             + "; ".join(f"{lab} {_fmt((E.get('cw_pm') or {}).get('r2'))} CI "
+                         f"{[round(c, 4) if c is not None else None for c in (E.get('r2_ci') or [None, None])]}"
+                         for lab, E in ev.items()) + ")"]
+    rows = [(nm, CAL._agree([rr[k][i][0] for k in rr]), all(rr[k][i][1] for k in rr)) for i, nm in enumerate(names)]
     rows = CAL._undecided(rows)
     verdict, why, crit = CAL._judge(rows, n, SI_MIN_N, "OOS releases")
 
     # ---- reported only
     rep = {}
-    for lab in ("norev", "company"):
+    for lab in ("norev",):
         xx = np.array([r[f"x_{lab}"] for r in recs]); vv = np.array([r[f"v_{lab}"] for r in recs])
         rep[lab] = si_eval(si_oos(xx, vv, y, av, real, "A"), settle, ci=False)
     xe = np.array([r["x_etf"] for r in recs]); ve = np.array([r["v_etf"] for r in recs])
@@ -1116,16 +1173,25 @@ def b13_short_a_aggregate_si(archive):
     rep["max_release_gap_days"] = int(gaps.max()) if gaps.size else None
     rep["sec_cover_shares_variant"] = "not computed (SEC cover-share mapping is outside this harness's 5-minute budget)"
     rep["goyal_sii_correlation"] = None
+    nc_ = [r["n_company"] for r in recs]
+    rep["names_per_release_company_classes"] = {"first": int(nc_[0]), "last": int(nc_[-1]), "median": float(np.median(nc_))}
+    rep["u1_rows_outside_company_classes_share"] = {"first": 1 - nc_[0] / nm_[0], "last": 1 - nc_[-1] / nm_[-1]}
+
+    def rd_txt(lab):
+        E = ev[lab]
+        return (f"{lab} CW vs prevailing mean t {_fmt((E.get('cw_pm') or {}).get('cw_t'), 2)}, OOS R^2 "
+                f"{_fmt((E.get('cw_pm') or {}).get('r2'))}, vs placebo t {_fmt((E.get('cw_placebo') or {}).get('cw_t'), 2)}")
+
     reason = (f"FINRA aggregate short-interest index (mean log(1 + SI/ADV), raw fields, ADV >= 100k, fund/SPAC/ADR/"
-              f"warrant/unit/right/preferred/note regex), {R} releases {settle[0]}..{settle[-1]} (names per release "
-              f"{rep['names_per_release']['first']}..{rep['names_per_release']['last']}, max gap {rep['max_release_gap_days']} "
-              f"days); y = SPY log excess return entry->next entry; {n} OOS releases from {EA.get('first')}: reading A "
-              f"(re-detrended at each origin) CW vs prevailing mean t {_fmt((EA.get('cw_pm') or {}).get('cw_t'), 2)}, OOS R^2 "
-              f"{_fmt((EA.get('cw_pm') or {}).get('r2'))}; vs placebo t {_fmt((EA.get('cw_placebo') or {}).get('cw_t'), 2)}; "
-              f"reading B (fixed at publication) t {_fmt((EB.get('cw_pm') or {}).get('cw_t'), 2)} / "
-              f"{_fmt((EB.get('cw_placebo') or {}).get('cw_t'), 2)}, R^2 {_fmt((EB.get('cw_pm') or {}).get('r2'))}. "
-              f"Reported: no-revision rows t {_fmt((rep['norev'].get('cw_pm') or {}).get('cw_t'), 2)}; company classes t "
-              f"{_fmt((rep['company'].get('cw_pm') or {}).get('cw_t'), 2)}; 1m t {_fmt((rep['h21'].get('cw_pm') or {}).get('cw_t'), 2)}, "
+              f"warrant/unit/right/preferred/note regex), {R} releases {settle[0]}..{settle[-1]} (names per release U1 "
+              f"{rep['names_per_release']['first']}..{rep['names_per_release']['last']}, U2 company classes "
+              f"{nc_[0]}..{nc_[-1]}; FINRA truncates issueName at 30 characters, so {rep['u1_rows_outside_company_classes_share']['first'] * 100:.1f}%"
+              f"..{rep['u1_rows_outside_company_classes_share']['last'] * 100:.1f}% of U1 rows are ARCA/BZX funds the regex "
+              f"cannot see; max gap {rep['max_release_gap_days']} days); y = SPY log excess return entry->next entry; {n} OOS "
+              f"releases from {EA.get('first')}: " + "; ".join(rd_txt(k) for k in ev) + " (A re-detrended at each origin, "
+              f"B fixed at publication). "
+              f"Reported (U1/A): no-revision rows t {_fmt((rep['norev'].get('cw_pm') or {}).get('cw_t'), 2)}; "
+              f"1m t {_fmt((rep['h21'].get('cw_pm') or {}).get('cw_t'), 2)}, "
               f"3m t {_fmt((rep['h63'].get('cw_pm') or {}).get('cw_t'), 2)}; training without 2020-02..06 t "
               f"{_fmt((rep['excl_2020_training'].get('cw_pm') or {}).get('cw_t'), 2)}; timing rule log excess "
               f"{_fmt((rep.get('timing_rule') or {}).get('sum_log_excess_rule'))} vs buy-and-hold "
