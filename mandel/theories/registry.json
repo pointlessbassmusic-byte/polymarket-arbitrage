@@ -17621,7 +17621,9 @@
     "pass": "Value-weighted Q1 - BTC mean weekly net has a one-sided 95% lower bound > 0, both halves are positive, and DSR > 0.95. The equal-weighted variant is reported, not judged.",
     "controls": "BTC, Q5 and equal-weight-universe benchmarks separate size from the alt-vs-BTC drift (T-546). One sort, one rebalance day, one volume floor, no grid. Survivorship stress (delisted -50%) and a count of uncovered coins. Bull/bear split reported (BTC above/below its 200-day average at entry), per Fieberg."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_cryptoderiv_b_small_cap_quintile"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -17924,7 +17926,9 @@
     "pass": "In at least one cell: one-sided 95% lower bound of the net mean > 0 after Bonferroni over 2 cells, the 2022-2023 mean of the same sign, and the result above the placebo's 95th percentile.",
     "controls": "Random-sign placebo. FOMC/CPI days reported separately. T-427, T-577 and Hurst's hourly rules as priors. One rule per cell, no grid. Cost stress at the retail taker."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_cryptoderiv_b_us_session_momentum"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -18417,7 +18421,9 @@
     "pass": "At least 30 non-overlapping events, event - control > 0.50% at +3 days with a week-clustered one-sided 95% lower bound > 0, and positive in both halves. Fewer than 30 events gives inconclusive.",
     "controls": "Drawdown-only controls (the T-320 base rate) and unconditional spike events (the T-402/T-464 base rate). 2-day lag, 50 bp round trip, fixed thresholds. T-402 and T-464 counted as prior trials. The netflow arm runs only once the data exist, with a pre-registered negative sign."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_cryptoderiv_b_stablecoin_mint"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -18522,7 +18528,9 @@
     "pass": "Fitted sign positive, full-window controlled NW t >= 2 after deflation, out-of-sample R2 > 0, and the rule's net Sharpe above buy-and-hold in the out-of-sample window.",
     "controls": "Trailing-return controls, DVOL and funding. Butterfly as a placebo regressor. One z threshold. Cost stress. The SPX skew failures (T-52, T-138, T-227) set the prior."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_cryptoderiv_b_rr25_weekly"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -19592,7 +19600,9 @@
     "pass": "All of: EW spread > 0 with one-sided p < 0.05; VW spread > 0; FF5+UMD alpha t >= 2; both halves positive; survivorship unable to flip the bound; DSR > 0.95 over the shorting-flow family (T-394's 4 trials plus this 1). A significantly negative spread is recorded as not_supported, not as a reversal.",
     "controls": "Baseline reported: the same sort on the 60-day level of total off-exchange volume / shares outstanding, to separate shorting from turnover. Sector-neutral version reported. One window (WYZ quarterly), one quintile threshold, one hold. The FINRA backfill vintage flag is reported."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_earnings_svr_quarterly_level"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -19684,7 +19694,9 @@
     "pass": "All of: intercept NW t >= 2; bootstrap lower bound > 0; positive intercept in both halves; DSR > 0.95 over the size family (T-385's 34 trials plus this one).",
     "controls": "Factor level only, so there is no survivorship issue. One specification. The French file date is recorded. A pass is not a funding signal: an executable long-small/short-junk book needs a stock-level quality screen."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_earnings_smb_ex_junk_oos"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -19776,7 +19788,9 @@
     "pass": "All of: one-sided lower 95% bound of the mean > 0; positive in both halves; calendar-time FF5+UMD alpha t >= 2; survivorship unable to flip the bound. With fewer than 60 events after cleaning, the verdict is inconclusive.",
     "controls": "One gap threshold (730 days), one horizon (252 sessions). Costs 10 bp/side. Placebo: the same firms entered 252 sessions after the real entry (the post-window), which should earn nothing. The dividend-month premium is not re-tested (T-374 stands)."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_earnings_dividend_initiation"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -20125,7 +20139,9 @@
     "pass": "beta < 0 with one-sided p < 0.05; a beta point estimate < 0 in each switch episode; and a secondary straddle-P&L coefficient > 0 (point estimate).",
     "controls": "Weekday and year-month FE. The exclusions in the claim. Placebo: the expiry dummy shifted one session later, which must not be significant at 5%. No trading cost (a volatility claim on the same index across days). One outcome, one window, no grid."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_flow_spxw_expiry_dampening"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -20251,7 +20267,9 @@
     "pass": "R > 1.05 with permutation p < 0.05; R > 1 in both 2005-2015 and 2016-2026; and R in the top dollar-volume tercile above R in the bottom tercile.",
     "controls": "The Friday/Thursday double difference removes weekday effects and round-number clustering. ETFs are excluded (T-502). Dollar-volume terciles stand in for option activity. No trading cost (a market-structure claim). A traded version (iron fly at the max-OI strike from capture-box OI, at captured mids plus half-spread) comes only after a pass. One band, one grid."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_flow_opex_strike_pinning"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -20745,7 +20763,9 @@
     "pass": "IC > 0 and residual IC > 0, with rule mean net > 0 at deflated p < 0.05 over 6 trials; both halves (2024-03..2025-06, 2025-07..2026-10) positive; still positive at a 20 bps round-trip sensitivity.",
     "controls": "Baselines: buy-and-hold, 1-day momentum and 1-day reversal. Reported splits: Deribit expiry Fridays, funding regime and DVOL tercile. Costs as stated. No cells beyond the 6."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_flow_deribit_signed_delta_flow"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -20853,7 +20873,9 @@
     "pass": "Primary difference > 0 with Holm one-sided p < 0.05; secondary (vs drawdown placebo) > 0; positive in both 2019-08..2021-12 and 2022-01..2026-10. Reported as provisional, with a forward checkpoint at 40 windows.",
     "controls": "Matched unconditional windows, the drawdown placebo, and 2 bps. One percentile threshold."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_flow_dix_rebuild_p80_60d"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -21899,7 +21921,9 @@
     "pass": "All of: Clark-West one-sided p < 0.05 at 63 sessions on the primary trailing-RV VRP; a Sharpe-difference lower 95% bound > 0; DSR >= 0.95 over the 6 trials.",
     "controls": "VIX-level-only and trailing-RV-only predictors (the VRP must beat both); the prevailing-mean benchmark; buy-and-hold at the same average exposure."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_implied_b_vrp_equity_premium"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -22014,7 +22038,9 @@
     "pass": "All of: Clark-West one-sided p < 0.05 at 126 sessions for COR1M; out-of-sample R^2 > 0 over 2019-01..2026-03; DSR >= 0.95 over the 6 trials. The 'incremental to VRP' claim is recorded only if the encompassing test also rejects the VRP-only forecast at p < 0.05.",
     "controls": "VIX level and VRP as competing predictors; the prevailing mean; buy-and-hold at equal average exposure; no variants of the correlation index."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_implied_b_cor1m_equity_premium"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -22112,7 +22138,9 @@
     "pass": "All of: pooled mean > 0 with one-sided p < 0.05 by Newey-West and the bootstrap; both half means > 0; DSR >= 0.95 over the VX family. Because Cboe CFE is not on the venue list, a pass licenses only a separately registered paper forward test of the ETP form.",
     "controls": "Unhedged; always-short F1; the ETP form (short signal = long SVXY, long signal = long VXX, SPY hedge, 5 bp per trade); results excluding 2018-02 and 2020-03, reported only; one threshold (0.10); the $60 cost sensitivity."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_implied_a_vx_roll_carry"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -22227,7 +22255,9 @@
     "pass": "(a) Slope > 0 with one-sided p < 0.05 and 1 inside the 95% CI, in both halves; and (b) both slopes <= 0 in both halves. A pass is a mechanism verdict only; any trading rule on P needs its own registration with DSR over the VX family.",
     "controls": "The raw basis in place of P; the HAR forecast; the ex-2020 crash run; the T-534/T-535 consistency report."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_implied_a_vix_premium_risk"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -22335,7 +22365,9 @@
     "pass": "All of: confirmation spread > 0 with Bonferroni one-sided p < 0.05 for (i) or (ii); the PC2 slope is negative with one-sided p < 0.05 controlling for log(VIX/VIX3M) and log VIX; trading-form DSR >= 0.95 over the VX family.",
     "controls": "VIX/VIX3M alone (T-435's gate); VIX level alone; PC1; a random placebo."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_implied_b_vix_curve_pc2"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -22444,7 +22476,9 @@
     "pass": "All of: (a) confirmation slope negative with one-sided p < 0.05; (b) conditional short-spread net P&L > 0 and top-minus-other difference > 0, both with bootstrap lower bound > 0; DSR >= 0.95.",
     "controls": "Unconditional every-week short spread; VIX-only and SKEW-only terciles (the analogue of T-229); unhedged put returns reported; a random-tercile placebo; bid/ask fills only; the defined-risk spread is executable on Alpaca."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_implied_a_vvix_put_hedge"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -22570,7 +22604,9 @@
     "pass": "Lower 95% bound of (bottom - top) in ratio terms > 0, with both halves positive. Forward confirmation on Hurst's IBIT surface captures is required before any capital.",
     "controls": "Shuffled-tercile placebo; middle tercile reported; T-256's opposite claim read on the same terciles; ETH DVOL as an out-of-asset check (T-67); a gate on IV minus trailing RV >= 5 points (Hurst's) as a comparison."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_implied_a_btc_vrp_ratio_tercile"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -22795,7 +22831,9 @@
     "pass": "On top-tercile-volume days, SPY's mean net > 0 with one-sided deflated p < 0.05 (66 trials); QQQ and IWM have the same sign; the complement days' mean net is not also > 0 (placebo).",
     "controls": "Placebo: complement days. Baseline: T-427 unconditional. One threshold per condition (top tercile), no grid. Costs: 2 bp round trip. The noise-area rule is registered separately as blocked, with a random-direction benchmark and 1 bp plus 1 tick per stop fill."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_c_volume_momentum"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23005,7 +23043,9 @@
     "pass": "On ES, the one-sided 95% lower bound of the mean net is above 0. NQ has the same sign, the mean net is positive in both halves of the window, and the conditional mean exceeds the complement-night mean.",
     "controls": "Placebos: complement nights and the adjacent hours 01:00-02:00 and 03:00-04:00 ET. Baseline: T-549's overnight-only hold. The maker variant is reported separately and expected to do worse (Hurst adverse-selection learning). One threshold (closing-hour return < 0), no grid. The Dukascopy 2012-2026 extension must agree before any forward test. Verdict goes to Hurst's H-us500-overnight."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_a_es_0200_drift"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23118,7 +23158,9 @@
     "pass": "Mean monthly net excess > 0 with one-sided deflated p < 0.05 (12 cells), positive separately in 2014-2019 and 2020-2026, and the coverage gate met.",
     "controls": "Benchmark: SPY overnight-only. Mirror: the bottom decile. Open spot-check on 28 stocks (median |Yahoo open - first 60m open| reported). Robustness: names present throughout. Costs per auction crossing. Long-only, so no borrow."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_a_overnight_persistence"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23227,7 +23269,9 @@
     "pass": "Long-only alpha > 0 with one-sided deflated p < 0.05, positive in 2018-2021 and in 2022-2026, and the coverage gate met.",
     "controls": "Placebo: positive-reversal intensity (overnight < 0, intraday > 0), which the paper says does not predict. Diagnostics: size and FINRA days-to-cover terciles. Costs scale with turnover. No grid."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_c_reversal_intensity"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23318,7 +23362,9 @@
     "pass": "Mean net excess > 0 with one-sided deflated p < 0.05 (6 cells), positive in each half of the window (split at 2025-05), and a negative Fama-MacBeth slope.",
     "controls": "Mirror: the top quintile. Placebo: a random quintile. Costs on the traded legs. No grid. A 500-name Alpaca IEX version is registered separately as blocked."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_b_eod_reversal"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23415,7 +23461,9 @@
     "pass": "Difference > 2 bp/day with Holm one-sided p < 0.05, positive in 2018-2021 and in 2022-2026, positive without Jan-Mar 2021, and the coverage gate met.",
     "controls": "Placebo: middle deciles. Value-weighted version reported. Ex-2021-squeeze run. No grid. If supported, an intraday-only short of high-DTC names must clear about 4 bp/day plus the locate before any build."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_b_dtc_overnight"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23507,7 +23555,9 @@
     "pass": "Slope < -0.5 with one-sided wild-cluster p < 0.05, slope < 0 in both halves of the sessions, and the stocks-only slope < 0.",
     "controls": "Robustness: SPY/QQQ/IWM/GLD excluded (partly seen through T-428's L). Placebo: the previous day's dev against today's close-to-open (expected about 0). |dev| winsorised above 20 bp. No grid."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_a_auction_reversal"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23604,7 +23654,9 @@
     "pass": "For both fixes, (pre minus post) > 0 with Holm one-sided p < 0.05 and positive in both halves of the window, with at least 5 of 7 currencies having the same sign. The trading-rule net is reported, not required.",
     "controls": "Placebo windows of the same lengths shifted by 6 hours. DXY as a check. The E-L window is reported as an expected-flat placebo. No grid over window edges. Framed as execution timing for FX conversions and hedges: both arms pay one spread."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_b_usd_fix"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23696,7 +23748,9 @@
     "pass": "Both the 09:30 and 15:30 slopes > 0 with Holm one-sided p < 0.05, positive in both halves of the window.",
     "controls": "Placebos: the 11:30 and 12:30 bars. Stocks-only and ETFs-only splits. No standalone trading claim, since the cost evidence says it is far below cost. No grid."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_c_same_hour_xs"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23889,7 +23943,9 @@
     "pass": "Holm one-sided p < 0.05, positive in both halves, in both IBIT periods and on Kraken. The net at CME micro / Coinbase nano fees is reported and pre-registered as expected <= 0.",
     "controls": "Placebos: the other 11 blocks. Second venue: Kraken. Costs: about 2 bp round trip on CME micro / Coinbase nano (to verify), 16-18 bp on Kalshi perps, Coinbase spot maker tier. Before building, ask Hurst for its BTC 22:00 and 23:00 UTC cells; if those cells already cover 2022-2026 Coinbase, record them under this registration instead of rerunning."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_c_btc_2200_block"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -23992,7 +24048,9 @@
     "pass": "FOMC difference > 0.2 with one-sided p < 0.05 and a lower 95% bound above 0, and the CPI/NFP placebo difference not significantly different from 0. Any pass is labelled partly in-sample (T-529) and must be confirmed on the next 8 FOMC days before it informs T-217/T-218.",
     "controls": "Robustness: VIX1D at the prior close (T-529's convention) with close-to-close realised variance. OPEX days kept separate (T-216). Random-date placebo. No grid. No trade claimed."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_a_vix1d_fomc_ratio"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -24197,7 +24255,9 @@
     "pass": "Mean < -10 bp with Holm one-sided p < 0.05, negative in both 2018-08..2022-06 and 2022-07..2026-09, the t-2 robustness of the same sign, and the coverage gate met.",
     "controls": "Placebo: the bottom attention decile. Earnings days reported separately. The execution comparison is cost-neutral (both arms cross one auction). The tradable overnight form is charged 3 bp per side. No grid."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_intraday_b_attention_open"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -24308,7 +24368,9 @@
     "pass": "Over >= 120 OOS releases, all of the following: Clark-West one-sided p < 0.05 vs the prevailing mean; Clark-West one-sided p < 0.05 vs the volume-placebo forecast; and the recursive slope negative in both halves of the OOS window (2020-12..2023-10 and 2023-11..2026-09).",
     "controls": "Benchmark: the prevailing mean. Volume placebo: aggregate DTC falls mechanically when turnover spikes, so the index must beat its own denominator. Composition: the SPAC/ADR/fund regex is fixed in advance, and names per release are reported. Point-in-time: available_at only; no survivorship. One construction, one horizon, no threshold; it supersedes T-454's 12-cell grid. Crisis dependence is reported. Run in one harness with the ETF-short-interest diagnostic. Expected result: underpowered null."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_short_a_aggregate_si"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -24410,7 +24472,9 @@
     "pass": "Over >= 1,500 file days: slope < 0 with one-sided p < 0.0125 (0.05 Bonferroni over the 4 CNMS cells) both with and without the trailing-return control, AND negative in both halves (2018-08..2022-09 and 2022-10..2026-10).",
     "controls": "Baseline: the unconditional mean. Price-only control: the trailing 10-session SPY return, because off-exchange SVR rises mechanically when wholesalers short into retail dip-buying. Drift: the 60-day z only, never the level (the EW level rose 0.42 to 0.52). Regimes: reported excluding 2020-02..2020-06 and 2021-01..2021-03. Costs: a timing rule (bills when z > +1, else SPY) at 1 bp per side, reported. One threshold. The rival sign is the DIX row's."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_short_a_svr_spy_10d"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -24497,7 +24561,9 @@
     "pass": "Over >= 1,500 eligible file days: both differences > 0 with one-sided p < 0.0125 (joint 4-cell CNMS Bonferroni), AND positive in both halves by entry date (2019-08..2022-12 and 2023-01..2026-08), AND positive excluding 2020-02..2020-06, AND the EW 60-session cell has the same sign (reported, not tested).",
     "controls": "Baselines: the unconditional mean and the price-only dip baseline (DIX must beat buying the dip). Trend: the trailing-252 rank removes the 0.42-to-0.52 drift that an expanding quintile would turn into a calendar dummy. Costs: 1 bp per side. One threshold. Deflation: joint with the EW 10-day cell."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_short_a_dix_spy_60d"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -24582,7 +24648,9 @@
     "pass": "Over >= 150 releases, all of the following: one-sided 95% lower bound of the mean excess > 0; FF5+UMD+BAB alpha t >= 2; both halves (2018-01..2021-12 and 2022-01..2026-09) positive; positive excluding 2021-01..2021-03; DSR >= 0.95 at 4 trials; and absent portfolio names would need an excess return worse than -5% per release to erase the pass.",
     "controls": "Benchmark: the same eligible liquid half (isolates the SI tilt from size, EW and coverage). Factors: FF5+UMD+BAB, because low-SI large caps load on quality and low beta, both dead after publication here. Split adjustment of shares. Costs: 10 bp per side. One quintile threshold. Point-in-time: FINRA at available_at, SEC at acceptance."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_short_b_low_si_long"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -24675,7 +24743,9 @@
     "pass": "Over >= 90 months, all of the following: one-sided 95% lower bound > 0; both halves (2018-11..2022-10 and 2022-11..2026-09) positive; FF5+UMD alpha t >= 2; DSR >= 0.95 at 2 trials; no significant reversal over months 2-12; and absent names would need worse than -5% per month to erase the pass.",
     "controls": "Window fixed from WYZ (no grid). Size and liquidity: dollar-volume residualisation. Factors: FF5+UMD. Costs: 10 bp per side plus 0.3%/yr borrow. Regime: 2020-2021 retail boom reported with and without. One quintile threshold."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_short_b_svr_xs_monthly"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -24748,7 +24818,9 @@
     "pass": "Over >= 84 monthly formations, all of the following: one-sided 95% lower bound of the mean net > 0; FF5+UMD alpha t >= 2; both halves (2019-01..2022-12 and 2023-01..2026-09) positive; DSR >= 0.95 at 4 trials; and absent names would need worse than -5% per month to erase the pass.",
     "controls": "Benchmark: EW members for the long leg. Factors: FF5+UMD. Costs: 10 bp per side plus 0.3%/yr borrow. One decile threshold and the paper's 12-month lookback (no window grid). Splits restated. Point-in-time: FINRA at available_at, SEC at acceptance."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_short_b_susi_monthly"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -24928,7 +25000,9 @@
     "pass": "Lower 95% bound of the 2000-01..2026-09 Sharpe difference > 0, AND the 2015-01..2026-09 point estimate > 0, AND DSR > 0.95 over the 40 counted trials.",
     "controls": "Buy-and-hold SPY on identical fills. A constant-weight SPY at the managed series' mean weight: the 15% target sits below SPY's average volatility, so the mean weight is < 1, and this control separates timing from lower exposure. Target and cap are ex ante; sigma comes from closed bars; all scaling turnover and leverage financing are costed. Both legs' means and volatilities are reported, so a gain that comes only from lower variance is labelled as such. Power is reported before the result."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volregime_a_vol_target_spy"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -25043,7 +25117,9 @@
     "pass": "Lower 95% bound of the pooled downside-minus-total Sharpe difference > 0 over 2019-01..2026-07, AND the pooled 50/50-mix-minus-unmanaged point estimate > 0, AND DSR > 0.95 over the counted trials.",
     "controls": "Unmanaged factors; total-RV-managed factors with the same cap; the upside-semivariance placebo; c_t from past data only; two cost levels. Paper factors are pre-cost, so only scaling turnover is charged (stated). The factor histories are not point-in-time (stated limitation)."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volregime_b_semivar_factors"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -25153,7 +25229,9 @@
     "pass": "Lower 95% bound of the 2012-01..2026-08 Sharpe difference > 0, AND the scaled annualised net mean > 0, AND DSR > 0.95.",
     "controls": "Unscaled UMD; a constant-weight UMD at the scaled series' mean weight; the bear-indicator comparator; the 12% target fixed ex ante; costs on scaling turnover. A pass is a paper-factor result: executing it needs a point-in-time long-short stock book with borrow, so it would justify that data unlock, not a trade."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volregime_a_vol_scaled_umd"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -25256,7 +25334,9 @@
     "pass": "DiD lower 95% bound > 0 over 2018-01..2026-09, AND DiD > 0 over 2007-07..2017-12.",
     "controls": "Unscaled positions on identical fills; constant-weight versions at each scaled series' mean weight; own-volatility target and 2x cap fixed ex ante; bill-rate financing in the primary, so leverage cost cannot drive the DiD; costs on all turnover. Tail and vol-of-vol changes are reported for every asset: Harvey et al. predict tail reduction everywhere, which is not the claim."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volregime_b_leverage_did"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -25349,7 +25429,9 @@
     "pass": "SHAR's pooled 21-day QLIKE is below EWMA's with one-sided DM p < 0.05, AND the upper 95% bound of the pooled tracking-loss difference (SHAR - EWMA) is < 0 over 2015-01..2026-09, AND the pooled net Sharpe difference point estimate is >= 0.",
     "controls": "EWMA baseline; constant weight at the same mean exposure; turnover per forecaster reported (a better forecast that trades more can lose net); expanding fits only; the result is labelled risk control, not alpha."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volregime_b_shar_risk_target"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -25454,7 +25536,9 @@
     "pass": "Lower 95% bound of the 1994-01..2026-09 Sharpe difference > 0, AND the 2015-01..2026-09 point estimate > 0, AND DSR > 0.95 over the counted trials.",
     "controls": "Buy-and-hold; T-561's frozen HMM; T-301's 10-month SMA; the random-timing drawdown null; no smoothed states; penalty grid fixed ex ante; 10 bp per switch. A drawdown-only result is recorded as a risk overlay, not an edge (as T-561)."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volregime_a_jump_model_spy"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -25559,7 +25643,9 @@
     "pass": "Over the 2010-01..2026-06 decisions: slope > 0 with Hodrick one-sided p < 0.05, AND OOS R^2 > 0 with Clark-West one-sided p < 0.05.",
     "controls": "VIX^2 and RV alone as competing predictors (reported; the VRP should beat each); historical-mean benchmark; placebo shift; next-close execution; the 1990-2009 half reported, so the ledger records which half carries the predictability (Dew-Becker-Giglio predict a post-2010 fail)."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volregime_a_vrp_predicts_spy"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -26052,7 +26138,9 @@
     "pass": "Some model with development DSR >= 0.95 (N = all ML-program cells) AND a positive lockbox mean net return over 12 lockbox decisions. A survivor goes to a separately pre-registered forward paper record, never directly live.",
     "controls": "Always-long and single-feature baselines on the same tranches; family ablations; costs per side and borrow; turnover reported; the T-578 window excluded from the evidence; the stock-level version stays blocked until a point-in-time universe exists (rule 9)."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volregime_b_ml_price_free_etf"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -26174,7 +26262,9 @@
     "pass": "At least 180 eligible months. Primary net mean > 0 with one-sided NW p < 0.05 and CBB 95% lower bound > 0. Mean > 0 over 2019-01..2026-09. Both halves positive. FF5+UMD alpha > 0. DSR >= 0.95 over the 4 trials. The MDE is reported with the verdict.",
     "controls": "Look-ahead: acceptance-time shares on the fetch-date split basis, membership as of t, next-close fills. Survivorship: the universe is declared as priced members, with the absent share and flip bound reported. One breakpoint (the median), no grid. Costs: 10 bps per side plus borrow, stressed at 20 bps. Baselines STREV and 12-1. Multiple testing: DSR over 4."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_a_stmom"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -26290,7 +26380,9 @@
     "pass": "At least 800 events. Mean net >= +50 bps with date-clustered 95% lower bound > 0. Block-shift placebo p < 0.01. Calendar-time HAC t >= 2. Both halves positive. DSR >= 0.95 counting T-419's 36 cells plus this one.",
     "controls": "Look-ahead: trailing windows, next-week open entry. Market-wide volume weeks removed by cross-sectional residualising. One decile cut and one hold. Costs: 10 bp round trip. Survivorship stated as favouring the claim. Earnings-window diagnostic reported."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_a_visibility"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -26400,7 +26492,9 @@
     "pass": "At least 240 out-of-sample months. IWM R^2_OS > 0 with Clark-West p < 0.05 after Holm over the 3 targets and the liquidity family. Slope > 0 in both halves. Timing-rule net Sharpe beats buy-and-hold with block-bootstrap p < 0.05.",
     "controls": "Look-ahead: month-end data only, AR fitted on the past. Split-invariant dollar volume. Survivorship: priced members only, counts reported. One tercile threshold. Costs: 5 bps per switch. MDE reported for power."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_a_amihud_iwm"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -26492,7 +26586,9 @@
     "pass": "At least 200 out-of-sample monthly forecasts. Slope < 0 with Hodrick p < 0.05. R^2_OS > 0 with Clark-West p < 0.05 after family Holm. Same sign excluding 2008-09 and excluding 2020.",
     "controls": "Look-ahead: per-name trailing detrending, month-end data. Structural trend and member-count drift removed by per-name detrending. Overlap handled by Hodrick SEs and non-overlapping fits. One reported threshold. Costs: 5 bps per switch. Multiple testing: family Holm."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_a_turnover_ew12"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -26580,7 +26676,9 @@
     "pass": "At least 180 months. Value-weighted net mean > 0 with one-sided NW p < 0.05. Both halves positive. FF5+UMD alpha > 0. Spread positive in at least 2 of 3 volume-level terciles.",
     "controls": "Look-ahead: trailing windows, next-close fills, acceptance-time shares. Price-path contamination removed by using share volume. Microcaps excluded by construction. One quintile cut. Costs: 10 bps per side plus 1%/yr borrow. Level and size by sequential sort. Counted in the volume-cluster deflation family."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_b_volume_cv"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -26758,7 +26856,9 @@
     "pass": "At least 500 confirmed-high events. Confirmed mean net > 0 with date-clustered 95% lower bound > 0. Confirmed minus unconfirmed >= 50 bps with lower bound > 0. Placebo p < 0.05. Both halves positive. DSR >= 0.95 counting T-309's and T-304's trials plus this one.",
     "controls": "Look-ahead: trailing windows and prior-event breakpoints, next-open entry. No dividend-manufactured crossings. Survivorship: lows flagged and not judged. One AV cutoff, one horizon. Costs: 10 bp round trip. Prior breakout trials counted."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_b_confirmed_high"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -26845,7 +26945,9 @@
     "pass": "At least 4,000 regression days. Top-tercile mean interaction < 0 with NW t < -2.8, AND bottom-tercile mean interaction > 0 with t > 2.8. Same signs in both halves.",
     "controls": "Look-ahead: trailing AV and terciles, next-open returns. Market volume days removed by demeaning. Survivorship: priced members. Search: a hurdle of |t| > 2.8. A correlation is not a trade: costs enter only in the separate trading claim."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_a_return_volume"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -26949,7 +27051,9 @@
     "pass": "At least 200 high-RVOL SPY sessions. Mean net > 0 with one-sided block-bootstrap p < 0.05. High minus low > 0 with p < 0.05. Placebo p < 0.05. Same sign on QQQ and IWM. Deflated p < 0.05 counting T-427's 60 cells.",
     "controls": "Look-ahead: completed bars only, trailing tercile. Seen window disclosed and deflated with T-427, with the unseen 2016-2023 replication required. One tercile cut. Costs: 2 bp round trip. The 16:00 print bar removed."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_b_rvol_momentum"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -27052,7 +27156,9 @@
     "pass": "At least 450 trading days. Mean same-slot minus other-slot slope > 0 with NW t > 2 in both halves.",
     "controls": "Look-ahead: known-at conversion, today excluded from lookbacks. Session mixing removed by asset-class restriction. The print bar removed. One lookback. Costs charged in the reported portfolio."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_b_same_slot"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -27219,7 +27325,9 @@
     "pass": "At least 300 weeks. Long-only excess net > 0 with CBB 95% lower bound > 0. Both halves positive. Low-activity minus high-activity spread > 0 with one-sided p < 0.05. Holds at the 100 bp stress. DSR >= 0.95 counting T-314's and T-546's trials.",
     "controls": "Look-ahead: a one-day skip between signal and entry, UTC alignment, trailing membership. Survivorship: dead products included. One quintile/tercile scheme. Costs stressed. Seen-data disclosure for T-546."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_volume_b_crypto_lal"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -28792,7 +28900,9 @@
     "pass": "All of: Clark-West one-sided p < 0.05 at 3 months; rule net Sharpe > 0 in both halves; DSR >= 0.95 counting the DOL-target family, which is T-605 (2), T-575 (1), us-equity-vrp-predicts-dol-1m (2) and this trial.",
     "controls": "AFD alone (vintage rates) and VIX level alone as competing predictors. An encompassing regression in which the GV coefficient must stay positive. Always-long and always-short DOL baselines. A 12-month-shifted placebo. 2008-09..2009-03, 2020-03 and 2022 reported excluded. One horizon judged."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_gaps_fx_global_rv_dol"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -28883,7 +28993,9 @@
     "pass": "All of: post-sample slope > 0 with Newey-West one-sided p < 0.05; Clark-West one-sided p < 0.05; slope positive in both halves; DSR >= 0.95 counting this trial's 1- and 3-month horizons plus T-605 (2), T-575 (1) and global-fx-rv-level-predicts-dol-3m (1).",
     "controls": "VIX^2 alone and RV alone as competing predictors (VP must beat both). A multiple regression with AFD (vintage rates), last-month DOL return (published fixes) and the VIX level, in which the VP coefficient must stay positive. 12-month-shifted and shuffled-month placebos. Costs on the trading arm. No threshold beyond the 60-month median in the reported arm."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_gaps_fx_equity_vrp_dol"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -29367,7 +29479,9 @@
     "pass": "All of: Sharpe gain > 0 with one-sided p < 0.05; gain positive in both halves; timed Sharpe above T-368's VIX > 30 filter on the same base; DSR >= 0.95 counting T-368 (6), T-431 (4), T-682 (1) and this trial.",
     "controls": "Untimed book. T-368's VIX > 30 filter on the same base. A random-switch placebo with the same number of flat months (1,000 draws). One threshold (80th percentile), no grid. Costs charged on every switch."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_gaps_fx_vol_innovation_carry"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -29636,7 +29750,9 @@
     "pass": "All of: net Sharpe > 0.3; bootstrap lower bound > 0; alpha HAC t > 2 vs carry and DOL; both halves positive; DSR counting T-368 (6), T-431 (4), T-478 (16) and this trial.",
     "controls": "Carry and DOL as alpha controls. A static (full-sample) beta ranking placebo. A shuffled-VIX-series placebo. Costs as in T-368/T-431. A fail on this proxy is recorded as not refuting the paper's put-based factor."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_gaps_fx_vix_beta_sort"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -30347,7 +30463,9 @@
     "pass": "Primary-window net mean > 0 with one-sided permutation p < 0.05, both halves' net means > 0 (2000-2014 and 2015-2026), and the placebo CI covering 0.",
     "controls": "One window (20 sessions), no grid, no thresholds; costs and borrow charged. The same-year permutation absorbs T-385's unconditional drift and earnings-season quality drift. Null windows exclude the recon pre-window and the S&P rebalance weeks. The post-2015 half is the out-of-sample check on the published claim. The July 4 pre-holiday session affects both legs."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_gaps_russell_ijr_iwm_post_recon"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
@@ -30765,7 +30883,9 @@
     "pass": "One-sided 95% lower bound of mean d_y > 0, both halves' means > 0, the opex-matched contrast's mean > 0, and the block-bootstrap alternative agreeing.",
     "controls": "No thresholds, no grid. RVX (RUT index IV) is applied to IWM, as in T-65, which is the unconditional baseline. The opex-matched contrast isolates June quad witching and FOMC from the recon itself. Per-year inference handles overlapping windows. A significantly negative d is reported but never re-tested as an inverse claim without a new registration."
    },
-   "experiments": [],
+   "experiments": [
+    "b13_gaps_russell_rvx_vrp_recon"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",
