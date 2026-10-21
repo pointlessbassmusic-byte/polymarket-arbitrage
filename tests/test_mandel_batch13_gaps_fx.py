@@ -282,3 +282,125 @@ def test_t728_vix_month_end_and_sort():
     assert list(out[:3]) == [11.0, 12.0, 13.0] and np.isnan(out[3])
     w = M.sort_weights(np.arange(11, dtype=float))
     assert np.allclose(w[:3], 1 / 3) and np.allclose(w[-3:], -1 / 3) and np.allclose(w[3:8], 0)
+
+
+def _t728_inputs(seed: int = 12):
+    days = _weekdays("2008-01-01", "2014-06-30")
+    spot = _spot(days, M.U11, seed)
+    rng = np.random.default_rng(seed)
+    vix = {d: float(v) for d, v in zip(days, 15 + 5 * np.abs(np.cumsum(rng.normal(0, 0.3, len(days)))) % 40)}
+    rmonths = M.mrange("2007-12", "2014-06")
+    R = {c: (rmonths, {m: float(rng.normal(3, 1)) for m in rmonths}) for c in ("USD",) + M.U11}
+    return spot, vix, R
+
+
+def _t728_beta(spot, vix, R, months, H):
+    P = M.common_panel(spot, M.U11)
+    vd = sorted(vix)
+    vv = np.array([vix[d] for d in vd])
+    _Rm, _dv, B = M.t728_betas(P, R, vd, vv, months)
+    midx = {m: i for i, m in enumerate(months)}
+    return M.t728_decision_beta(P, B, midx, H), B, midx
+
+
+def test_t728_pipeline_weights_for_h_ignore_month_h_minus_1_and_later():
+    spot, vix, R = _t728_inputs()
+    months = M.mrange("2008-01", "2014-05")
+    H = "2014-03"                                               # decided at the end of 2014-02; window 2009-02..2014-01
+    b0, B0, midx = _t728_beta(spot, vix, R, months, H)
+    assert b0 is not None and np.isfinite(b0).all()
+    w0 = M.sort_weights(b0)
+    cut = "2014-02-01"                                          # month H-1 and everything later
+    sp2 = {c: {d: (v * (1.5 if i % 2 else 0.6) if d >= cut else v) for i, (d, v) in enumerate(sorted(s.items()))}
+           for c, s in spot.items()}
+    vx2 = {d: (v * 3.0 + 7.0 if d >= cut else v) for d, v in vix.items()}
+    R2 = {c: (ms, {m: (v + 9.0 if m >= "2014-01" else v) for m, v in d.items()}) for c, (ms, d) in R.items()}
+    b1, B1, _ = _t728_beta(sp2, vx2, R2, months, H)
+    assert np.allclose(b1, b0)
+    assert np.array_equal(M.sort_weights(b1), w0)
+    # an off-by-one (row H instead of H-1) would put month H-1 in the window: that row does move
+    assert not np.allclose(B1[midx[H]], B0[midx[H]])
+    # and the window does reach month H-2: shocking only its fixes moves the betas
+    sp3 = {c: {d: (v * (1.5 if i % 2 else 0.6) if d[:7] == "2014-01" else v) for i, (d, v) in enumerate(sorted(s.items()))}
+           for c, s in spot.items()}
+    b3, _, _ = _t728_beta(sp3, vix, R, months, H)
+    assert not np.allclose(b3, b0)
+
+
+def test_t728_monthly_excess_runs_last_common_fix_to_last_common_fix():
+    spot, _vix, R = _t728_inputs(13)
+    del spot["ZAR"]["2014-01-31"]                               # the last common fix of 2014-01 becomes 01-30
+    P = M.common_panel(spot, M.U11)
+    months = M.mrange("2013-11", "2014-03")
+    Rm = M.monthly_excess(P, R, months)
+    j = months.index("2014-02")
+    a, b = "2014-01-30", "2014-02-28"
+    assert P["days"][P["last"]["2014-01"]] == a and P["days"][P["last"]["2014-02"]] == b
+    us = R["USD"][1]["2014-01"]
+    exp = np.array([spot[c][b] / spot[c][a] - 1.0 + (R[c][1]["2014-01"] - us) / 1200.0 for c in M.U11])
+    assert np.allclose(Rm[j], exp)
+
+
+def test_lag_rates_use_month_t_minus_2_only():
+    months = M.mrange("2017-01", "2017-12")
+    rng = np.random.default_rng(14)
+    R = {c: (months, {m: float(rng.normal(2, 1)) for m in months}) for c in M.G10U}
+    D = "2017-06-30"
+    lag = M.LagRates(R)
+    m, x, _ = lag.known("USD", D)
+    assert m == "2017-04" and x == pytest.approx(R["USD"][1]["2017-04"])
+    w = M.carry_weights(lag, D)
+    R2 = {c: (ms, {mm: (v + 40.0 * (k + 1) if mm > "2017-04" else v) for mm, v in d.items()})
+          for k, (c, (ms, d)) in enumerate(R.items())}
+    assert M.carry_weights(M.LagRates(R2), D) == w
+
+
+def test_gain_and_placebo_are_none_not_zero_when_a_sharpe_is_undefined():
+    rng = np.random.default_rng(15)
+    x = rng.normal(0, 0.02, 40)
+    assert M._gain(np.zeros(40), x) is None and M._gain(x, np.zeros(40)) is None
+    assert M._gain(x, x) == pytest.approx(0.0)
+    rows = [{"H": f"2015-{k + 1:02d}", "w": np.array([1 / 3, 1 / 3, 1 / 3, -1 / 3, -1 / 3, -1 / 3, 0, 0, 0, 0]),
+             "r": rng.normal(0, 0.02, 10)} for k in range(12)]
+    pl = M.placebo_gains(rows, M.G10U, 3, None, 5, rng)
+    assert np.isnan(pl).all()
+    assert M.placebo_summary(pl, 0.1) == {"n": 0, "p95": None, "mean": None, "pct_rank": None}
+    assert M.placebo_summary(np.array([0.1, np.nan, 0.3]), None)["pct_rank"] is None
+
+
+def test_tranche_positions_use_signs_decided_up_to_the_row():
+    s = np.array([1.0, -1.0, 1.0, 1.0, np.nan, 1.0, 1.0, 1.0])
+    J = [2, 3, 4, 5, 6, 7]
+    tr = M.tranche_positions(s, J)
+    assert np.allclose(tr[[0, 1, 5]], [1 / 3, 1 / 3, 1.0]) and np.isnan(tr[2:5]).all()
+    s2 = s.copy()
+    s2[4:] = -1.0
+    assert M.tranche_positions(s2, [2, 3]) == pytest.approx(tr[:2])
+
+
+def test_fe_panel_slope_recovers_the_slope_and_ignores_currency_constants():
+    rng = np.random.default_rng(16)
+    G, C = 150, 9
+    x = rng.normal(size=G)
+    Y = 0.5 * x[:, None] + rng.normal(0, 0.5, (G, C))
+    Y[rng.random((G, C)) < 0.05] = np.nan
+    r = M.fe_panel_slope(Y, x)
+    assert r["b"] == pytest.approx(0.5, abs=0.08) and r["t"] > 5 and r["n_months"] == G
+    r2 = M.fe_panel_slope(Y + np.arange(C)[None, :] * 3.0, x)
+    assert r2["b"] == pytest.approx(r["b"]) and r2["t"] == pytest.approx(r["t"])
+
+
+def test_t720_dtb3_us_leg_replaces_only_the_us_accrual():
+    days = _weekdays("2016-01-01", "2016-09-30")
+    spot = _spot(days, M.G9, 17)
+    months = M.mrange("2015-06", "2016-09")
+    R = {c: (months, {m: 1.0 for m in months}) for c in ("USD",) + M.G9}
+    dec = ["2016-03-31", "2016-04-29", "2016-05-31", "2016-06-30"]
+    P = M.common_panel(spot, M.G9)
+    a = M.t720_targets(P, R, None, dec)
+    b = M.t720_targets(P, R, None, dec, us_rate={m: 3.0 for m in months})
+    ok = np.isfinite(a["y1"])
+    assert ok.sum() >= 2
+    assert np.allclose(b["y1"][ok] - a["y1"][ok], (1.0 - 3.0) / 1200.0)
+    assert np.allclose(b["y1c"][ok] - a["y1c"][ok], (1.0 - 3.0) / 1200.0)
+    assert M.month_avg({"2020-01-02": 1.0, "2020-01-03": 3.0, "2020-02-03": 5.0}) == {"2020-01": 2.0, "2020-02": 5.0}
