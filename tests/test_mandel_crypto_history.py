@@ -183,6 +183,11 @@ def fake(monkeypatch):
     monkeypatch.setattr(om, "_sleep", lambda s: sleeps.append(s))
     monkeypatch.setattr(m, "_sleep", lambda s: sleeps.append(s))
     monkeypatch.setattr(m, "_now_s", lambda: NOW)
+    # the archive stamps created_at from the wall clock, and the hourly fetch reads a daily bundle's created_at to
+    # decide whether a product was still trading when fetched (within 7 days of its last bar): freeze it to NOW too,
+    # or the test goes stale once the real date passes NOW + 7 days (it did on 2026-10-22)
+    import mandel.archive as _arc
+    monkeypatch.setattr(_arc, "utcnow_iso", lambda: datetime.fromtimestamp(NOW, timezone.utc).isoformat())
     install.sleeps = sleeps
     return install
 
