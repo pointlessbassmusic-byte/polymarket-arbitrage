@@ -4,11 +4,11 @@
   "severity": "warning",
   "kind": "stream",
   "node": "stream:finra-short-interest",
-  "message": "finra-short-interest: no data since 2026-09-30 (20 days); it also holds back 8 blocked theories (T-636, T-637, T-641, T-643, T-644, T-645...)",
+  "message": "finra-short-interest: no data since 2026-09-30 (22 days); it also holds back 11 blocked theories (T-636, T-637, T-641, T-643, T-644, T-645...)",
   "affected": "",
   "n_affected": 0,
   "action": "restart the capture",
-  "theories_held": 8
+  "theories_held": 11
  },
  {
   "id": "account:account:alpaca-paper-1",
@@ -25,7 +25,7 @@
   "severity": "warning",
   "kind": "stream",
   "node": "stream:coinbase-products",
-  "message": "coinbase-products: no data since 2026-10-16 (4 days); it also holds back 1 blocked theory (T-609)",
+  "message": "coinbase-products: no data since 2026-10-16 (6 days); it also holds back 1 blocked theory (T-609)",
   "affected": "",
   "n_affected": 0,
   "action": "restart the capture",

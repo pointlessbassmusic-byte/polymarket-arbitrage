@@ -152,3 +152,56 @@ def test_sleeve_trades_fixed_capital_and_never_borrows():
     assert R.calendar_capital(97176.97, 50000, 0.0) == pytest.approx(3000)            # 60% of the fixed 5,000
     assert R.calendar_capital(97176.97, 100, 2900) == pytest.approx(3000)             # own holdings count back in
     assert R.calendar_capital(750, 750, 0.0) == pytest.approx(450)                    # small account: equity binds
+
+
+def test_spread_held_reads_the_short_leg():
+    pos = [{"symbol": "XSP261120P00729000", "qty": "-1"}, {"symbol": "XLF", "qty": "6"}]
+    assert A.spread_held(pos, "XSP261120P00729000")
+    assert not A.spread_held(pos, "XSP261120P00726000")       # the long leg alone is not the spread
+    assert not A.spread_held([], "XSP261120P00729000")
+    assert not A.spread_held([{"symbol": "XSP261120P00729000", "qty": "0"}], "XSP261120P00729000")
+
+
+def test_runner_options_discards_an_unfilled_spread_instead_of_closing_it(monkeypatch, tmp_path):
+    """2026-10-21: the XSP opening order of 10-20 expired unfilled, state still said 'open', and a close against it
+    would be rejected (the wide sleeve's TLT close was: 'position intent mismatch'). The runner must notice the
+    position is not held, journal it, drop the state and plan again."""
+    from mandel.live import runner as R
+    monkeypatch.setattr(R, "STATE", tmp_path); monkeypatch.setattr(R, "KILL", tmp_path / "KILL")
+    monkeypatch.setattr(R, "JOURNAL", tmp_path / "j.jsonl"); monkeypatch.setattr(R, "SPREAD_STATE", tmp_path / "spread.json")
+    monkeypatch.setattr(R, "USE_LEDGER", False)                 # the test must not write the repo's hash-chained ledger
+
+    class D:
+        @staticmethod
+        def now(tz=None):
+            import datetime as dt
+            return dt.datetime(2026, 10, 21, 15, 25, tzinfo=tz)
+    monkeypatch.setattr(R, "datetime", D)
+    st = {"expiry": "2026-11-20", "short": "XSP261120P00729000", "long": "XSP261120P00726000", "credit": 0.22, "opened": "2026-10-20"}
+    (tmp_path / "spread.json").write_text(json.dumps(st))
+
+    class Api(FakeApi):
+        def option_snapshots(self, syms):
+            assert st["short"] not in syms, "an unheld spread must not be quoted for exit"
+            return {}                                           # the planning pass quotes the (empty) chain
+
+        def option_contracts(self, *a):
+            return []                                           # nothing to plan today: the test is about the discard
+    api = Api(date(2026, 10, 21))
+    R.phase_options(api, dry=False)
+    assert api.sent == []
+    assert not (tmp_path / "spread.json").exists() and (tmp_path / "spread-unfilled-2026-10-21.json").exists()
+    kinds = [json.loads(l)["kind"] for l in (tmp_path / "j.jsonl").read_text().splitlines()]
+    assert kinds[0] == "spread.unfilled" and "spread.plan" in kinds
+
+    # held: the spread is managed, not discarded
+    (tmp_path / "spread.json").write_text(json.dumps(st))
+
+    class Held(Api):
+        def positions(self):
+            return [{"symbol": st["short"], "qty": "-1"}, {"symbol": st["long"], "qty": "1"}]
+
+        def option_snapshots(self, syms):
+            return {st["short"]: {"latestQuote": {"bp": 0.5, "ap": 0.6}}, st["long"]: {"latestQuote": {"bp": 0.3, "ap": 0.4}}}
+    R.phase_options(Held(date(2026, 10, 21)), dry=False)                 # buyback 0.20 > 50% of the 0.22 credit: keep
+    assert (tmp_path / "spread.json").exists()

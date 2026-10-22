@@ -1,5 +1,5 @@
 {
- "as_of": "2026-10-20T22:51:18+00:00",
+ "as_of": "2026-10-21T22:30:02+00:00",
  "families": {
   "social-reddit": {
    "latest": "2026-10-20",
@@ -3448,56 +3448,56 @@
  },
  "last_runs": {
   "daily": {
-   "ts": "2026-10-20T22:51:18+00:00",
+   "ts": "2026-10-21T22:30:02+00:00",
    "steps": [
     {
      "step": "options-fetch",
-     "rc": 0,
-     "seconds": 19.0,
+     "rc": 1,
+     "seconds": 0.5,
      "tail": [
-      "    \"ETH-surface\": 11",
-      "  }",
-      "}"
+      "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
+      "    import pandas as pd",
+      "ModuleNotFoundError: No module named 'pandas'"
      ]
     },
     {
      "step": "options-fetch --smile",
-     "rc": 0,
-     "seconds": 1.2,
+     "rc": 1,
+     "seconds": 0.4,
      "tail": [
-      "{",
-      "  \"2026-10-20\": \"no VIX close for quote date 2026-10-20\"",
-      "}"
+      "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
+      "    import pandas as pd",
+      "ModuleNotFoundError: No module named 'pandas'"
      ]
     },
     {
      "step": "options-fetch --history",
-     "rc": 0,
-     "seconds": 23.0,
+     "rc": 1,
+     "seconds": 0.3,
      "tail": [
-      "  \"DVOL-BTC\": 2037,",
-      "  \"DVOL-ETH\": 2037",
-      "}"
+      "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
+      "    import pandas as pd",
+      "ModuleNotFoundError: No module named 'pandas'"
      ]
     },
     {
      "step": "social-fetch",
-     "rc": 0,
-     "seconds": 1140.0,
+     "rc": 1,
+     "seconds": 0.3,
      "tail": [
-      "  ],",
-      "  \"wall_seconds\": 1139.5",
-      "}"
+      "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
+      "    import pandas as pd",
+      "ModuleNotFoundError: No module named 'pandas'"
      ]
     },
     {
      "step": "book-snapshot",
-     "rc": 0,
-     "seconds": 94.3,
+     "rc": 1,
+     "seconds": 0.3,
      "tail": [
-      "  \"markets\": 299,",
-      "  \"api_calls\": 600",
-      "}"
+      "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
+      "    import pandas as pd",
+      "ModuleNotFoundError: No module named 'pandas'"
      ]
     }
    ]

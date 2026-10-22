@@ -217,13 +217,19 @@ def _book(api, underlying: str, today: date) -> tuple:
 
 def phase_options(api, dry: bool) -> None:
     _guard("options")
-    from mandel.live.alpaca import spread_order
+    from mandel.live.alpaca import spread_held, spread_order
     today = datetime.now(ET).date()
     if today not in _calendar(api, today):
         print(f"{today} is not a session"); return
+    positions = api.positions()
     for u in SPREADS:
         path = STATE / f"spread-{u}.json"
         st = json.loads(path.read_text()) if path.exists() else None
+        if st and not spread_held(positions, st["short"]):   # the opening order expired or was rejected: never held
+            _journal("spread.unfilled", {"underlying": u, "day": today, "state": st}, dry)
+            if not dry:
+                path.rename(STATE / f"spread-{u}-unfilled-{today}.json")
+            st = None                        # fall through and plan again today
         if st:
             exp = date.fromisoformat(st["expiry"])
             sn = api.option_snapshots([st["short"], st["long"]])

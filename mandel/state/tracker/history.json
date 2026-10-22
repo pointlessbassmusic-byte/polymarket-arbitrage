@@ -262,5 +262,269 @@
   "n_now": null,
   "progress": null,
   "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-559",
+  "owner": "Mandel",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-560",
+  "owner": "Mandel",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-542",
+  "owner": "Mandel",
+  "n_now": 2,
+  "progress": 0.1,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-541",
+  "owner": "Mandel",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-543",
+  "owner": "Mandel",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-565",
+  "owner": "Mandel",
+  "n_now": 2,
+  "progress": 0.0556,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-566",
+  "owner": "Mandel",
+  "n_now": 2,
+  "progress": 0.01,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-573",
+  "owner": "Mandel",
+  "n_now": 2,
+  "progress": 0.01,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-576",
+  "owner": "Mandel",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-567",
+  "owner": "Mandel",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "T-568",
+  "owner": "Mandel",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-bounce-short",
+  "owner": "Hurst",
+  "n_now": 0,
+  "progress": null,
+  "pnl_usd": 0
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-orb-qqq",
+  "owner": "Hurst",
+  "n_now": 5,
+  "progress": 0.0833,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-2s10s-xlf",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-btc-us500-lead",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-book-imbalance",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-btc-favourite",
+  "owner": "Hurst",
+  "n_now": 8,
+  "progress": 0.1333,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-hype-fade",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-ibit-carry",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-ibit-ladder",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "K-maker-kalshi",
+  "owner": "Kelly",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": 0
+ },
+ {
+  "day": "2026-10-22",
+  "id": "K-tennis-longshot-no",
+  "owner": "Kelly",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "B-maker-pmus",
+  "owner": "Brier",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": 0
+ },
+ {
+  "day": "2026-10-22",
+  "id": "B-paper-book",
+  "owner": "Brier",
+  "n_now": 1,
+  "progress": null,
+  "pnl_usd": -1.0
+ },
+ {
+  "day": "2026-10-22",
+  "id": "S-fed-g10",
+  "owner": "Shannon",
+  "n_now": 0,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-btc-tom",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-us500-overnight",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "H-gold-perp-carry",
+  "owner": "Hurst",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "B-longshot-calibration",
+  "owner": "Brier",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "K-thin-queue-maker",
+  "owner": "Kelly",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "S-kalshi-crypto-short",
+  "owner": "Shannon",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "S-macro-buckets",
+  "owner": "Shannon",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "id": "K-queue-markov-fill",
+  "owner": "Kelly",
+  "n_now": null,
+  "progress": null,
+  "pnl_usd": null
  }
 ]

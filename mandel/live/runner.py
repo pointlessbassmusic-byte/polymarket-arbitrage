@@ -62,8 +62,8 @@ def _journal(kind: str, payload: dict, dry: bool) -> None:
     STATE.mkdir(parents=True, exist_ok=True)
     append_line(JOURNAL, json.dumps(rec, default=str))
     if USE_LEDGER:
-        Ledger().append("paper.decision", {"kind": kind, "summary": {k: payload[k] for k in list(payload)[:6]}},
-                        actor="mandel")
+        summary = json.loads(json.dumps({k: payload[k] for k in list(payload)[:6]}, default=str))   # dates -> text
+        Ledger().append("paper.decision", {"kind": kind, "summary": summary}, actor="mandel")
 
 
 def _guard(phase: str) -> None:
@@ -171,11 +171,16 @@ def _put_book(api, today: date) -> tuple[dict, dict]:
 
 def phase_options(api, dry: bool) -> None:
     _guard("options")
-    from mandel.live.alpaca import spread_order
+    from mandel.live.alpaca import spread_held, spread_order
     today = datetime.now(ET).date()
     if not _is_session(api, today):
         return
     st = json.loads(SPREAD_STATE.read_text()) if SPREAD_STATE.exists() else None
+    if st and not spread_held(api.positions(), st["short"]):   # the opening order expired or was rejected: never held
+        _journal("spread.unfilled", {"day": today, "state": st}, dry)
+        if not dry:
+            SPREAD_STATE.rename(STATE / f"spread-unfilled-{today}.json")
+        st = None                            # fall through and plan again today
     if st:                                   # manage the open spread
         exp = date.fromisoformat(st["expiry"])
         snaps = api.option_snapshots([st["short"], st["long"]])

@@ -120,6 +120,20 @@ def auction_order(symbol: str, qty: int, side: str, when: str, client_id: str, p
             "client_order_id": client_id}
 
 
+def spread_held(positions: list[dict], short_sym: str) -> bool:
+    """True when the account holds the spread's short leg. The runners write a spread to state when its opening 'mleg'
+    order is SENT, but a day limit order at the mid can expire unfilled (3 of the first 4 paper opens did, 2026-10-20);
+    a spread whose short leg is not in the positions list was never opened, and a close order against it is rejected
+    ('position intent mismatch')."""
+    for p in positions:
+        try:
+            if p.get("symbol") == short_sym and abs(float(p.get("qty") or 0)) > 0:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
 def spread_order(short_sym: str, long_sym: str, qty: int, limit: float, opening: bool, client_id: str) -> dict:
     """Put credit spread as one 'mleg' limit order. Opening: sell the short, buy the long (limit = credit, entered as
     a negative net price per Alpaca's convention for credits). Closing: buy back the short, sell the long."""
