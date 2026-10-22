@@ -1,57 +1,57 @@
 {
- "as_of": "2026-10-21T16:35:09-04:00",
+ "as_of": "2026-10-22T16:35:06-04:00",
  "models": {
   "spx_hmm": {
-   "scored_days": 1,
-   "ratio_mean_all": 0.5162968245367024,
-   "ratio_mean_60": 0.5162968245367024,
+   "scored_days": 2,
+   "ratio_mean_all": 1.5897041622828976,
+   "ratio_mean_60": 1.5897041622828976,
    "exceed_2sd_rate": 0.0,
-   "loss_diff_mean": 0.0005755406383833872,
+   "loss_diff_mean": -0.0008390352639060517,
    "loss_diff_t": null,
    "flags": [],
    "challenger_drift": {
     "daily_vol": [
-     -3.867368402719201e-06,
-     -5.379728167609343e-06
+     -1.6868088154545907e-06,
+     -3.2553860184296457e-06
     ],
-    "stay_high": 4.4440141114820975e-05
+    "stay_high": 5.031211859296558e-05
    }
   },
   "qqq_hmm": {
-   "scored_days": 1,
-   "ratio_mean_all": 0.9388536507916171,
-   "ratio_mean_60": 0.9388536507916171,
-   "exceed_2sd_rate": 0.0,
-   "loss_diff_mean": 0.00013599110679063386,
+   "scored_days": 2,
+   "ratio_mean_all": 3.983261416653902,
+   "ratio_mean_60": 3.983261416653902,
+   "exceed_2sd_rate": 0.5,
+   "loss_diff_mean": -0.0029256447131276175,
    "loss_diff_t": null,
    "flags": [],
    "challenger_drift": {
     "daily_vol": [
-     9.299720901894543e-06,
-     1.015381405487445e-05
+     8.843555802750744e-06,
+     9.62719352903818e-07
     ],
-    "stay_high": 1.1277876301396539e-05
+    "stay_high": -7.253304924814685e-05
    }
   },
   "qqq_msm": {
-   "scored_days": 1,
-   "ratio_mean_all": 0.6433835287648838,
-   "ratio_mean_60": 0.6433835287648838,
-   "exceed_2sd_rate": 0.0,
+   "scored_days": 2,
+   "ratio_mean_all": 2.5197602832446475,
+   "ratio_mean_60": 2.5197602832446475,
+   "exceed_2sd_rate": 0.5,
    "flags": []
   },
   "spx_ewma": {
-   "scored_days": 1,
-   "ratio_mean_all": 0.7210887102950506,
-   "ratio_mean_60": 0.7210887102950506,
+   "scored_days": 2,
+   "ratio_mean_all": 2.233255109853242,
+   "ratio_mean_60": 2.233255109853242,
    "exceed_2sd_rate": 0.0,
    "flags": []
   },
   "qqq_ewma": {
-   "scored_days": 1,
-   "ratio_mean_all": 1.005970179700355,
-   "ratio_mean_60": 1.005970179700355,
-   "exceed_2sd_rate": 0.0,
+   "scored_days": 2,
+   "ratio_mean_all": 3.892292706644178,
+   "ratio_mean_60": 3.892292706644178,
+   "exceed_2sd_rate": 0.5,
    "flags": []
   }
  }
