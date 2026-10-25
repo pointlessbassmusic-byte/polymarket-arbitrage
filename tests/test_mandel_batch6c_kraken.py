@@ -694,3 +694,39 @@ def test_every_harness_runs_json_safe_on_one_month():
         assert verdict in ("supported", "not_supported", "inconclusive")
         assert isinstance(n, int) and n >= 0 and " — " in reason
         assert "missing_bundles" not in stat and stat["missing_months"] == [M2]
+
+
+def test_imbalance_trades_unfilled_bid_does_not_block_the_next_signal():
+    """Review 2026-10-25: the one-position filter ran before the fill check, so a bid that never filled still blocked every
+    signal in the next h + 1 minutes. A missed bid opens nothing and must not suppress the fill that follows it."""
+    N, h = 3000, 5
+    c = np.full(N, 100.0)
+    slo = c * 1.05                                            # by default no seller reaches a bid at the prior close
+    bhi = c * 1.05                                            # the ask always fills
+    slo[1004] = 99.0                                          # the ONLY minute a sell prints through the bid at close_1003
+    z = np.zeros(N); z[1000] = 3.0; z[1003] = 3.0             # two signals in one burst
+    g = {"kr_close": c, "kr_slo": slo, "kr_bhi": bhi, "T0": 1_700_000_000 - (1_700_000_000 % 86400), "N": N}
+    tr = m.imbalance_trades(g, z, 0, N, h, 2.5, True)
+    assert tr["signals_taken"] == 2 and tr["unfilled"] == 1 and tr["entry"].tolist() == [1003]
+    # a FILLED position still blocks: a second signal inside the hold is not taken
+    slo[1001] = 99.0
+    tr2 = m.imbalance_trades(g, z, 0, N, h, 2.5, True)
+    assert tr2["signals_taken"] == 1 and tr2["entry"].tolist() == [1000]
+
+
+def test_daily_pnl_finances_only_days_quoted_on_both_venues():
+    """Review 2026-10-25: DTB3 financing was charged on every calendar day of the window, including months with no bundle
+    on one venue (gap NaN, no trigger possible) - pure drag that could fail the claim decisively from a data limit."""
+    class R:
+        def rate(self, day):
+            return 0.0365                                     # 2 x 3.65% / 365 = 2 bps a day
+    T0 = 1_700_000_000 - (1_700_000_000 % 86400)
+    N = 1440 * 10                                             # ten days
+    kr = np.full(N, 100.0); cb = np.full(N, 100.0)
+    cb[1440 * 3:1440 * 7] = np.nan                            # days 3-6 have no Coinbase bundle
+    g = {"kr_close": kr, "cb_close": cb, "T0": T0, "N": N}
+    dp = m._daily_pnl(g, np.array([1440 * 8 + 10]), np.array([0.001]), 0, N, R())
+    assert dp["days"].size == 6                               # 10 days minus the 4 uncovered
+    assert abs(dp["financing"].sum() - (-6 * 2 * 0.0365 / 365)) < 1e-12
+    assert abs(dp["trade"].sum() - 0.001) < 1e-12 and dp["net"].size == 6
+    assert dp["annual"][next(iter(dp["annual"]))]["triggers"] == 1

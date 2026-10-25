@@ -181,8 +181,10 @@ T459_GRID = [(w, h, thr, mk) for w in (1, 5, 15) for h in (5, 60) for thr in (2.
 T459_CLAIM = (5, 5, 2.0, True)
 Z_WINDOW = 1440
 Z_MIN = 720
-MIN_TRADES_DECIDE = 8          # out-of-sample trades, spanning
-MIN_DAYS_DECIDE = 4            # trade days: the minimum evidence for EITHER out-of-sample criterion (mean net, DSR row) to be decided
+MIN_TRADES_DECIDE = 30         # out-of-sample trades, spanning
+MIN_DAYS_DECIDE = 20           # trade days: the minimum evidence for EITHER out-of-sample criterion (mean net, DSR row) to be decided
+                               # (review 2026-10-25: 8 trades on 4 days let a 4-cluster bootstrap-t, which has at most 35 distinct
+                               # resamples, print p ~ 1e-4 and decide 'not supported' from a handful of trades)
 TERCILE_MIN_SIGNALS = 30       # in-sample claim-cell signal minutes needed for the volatility-tercile cutpoints
 
 # T-465
@@ -761,27 +763,35 @@ def _legs_txt(L: Optional[dict]) -> str:
 def _daily_pnl(g: dict, idx_exit: np.ndarray, pnl: np.ndarray, i0: int, i1: int, bills: Optional[Bills], financing: bool = True) -> dict:
     """Daily net P&L over the calendar days of [i0, i1): trade P&L by exit day, minus financing (2 x DTB3 / 365 per day)
     and the weekly transfer fee in weeks with a trade."""
-    d0, d1 = int(_day_of(g, i0)), int(_day_of(g, max(i1 - 1, i0)))
-    days = np.arange(d0, d1 + 1)
+    # the daily series covers only days with at least one minute quoted on BOTH venues: a month missing on either venue
+    # (gap NaN all day, no trigger possible) is not financed (review 2026-10-25: charging DTB3 on uncovered interior months
+    # turned a data limit into drag that could fail the claim decisively)
+    mins = np.arange(i0, max(i1, i0 + 1))
+    both = np.isfinite(g["kr_close"][mins]) & np.isfinite(g["cb_close"][mins])
+    days = np.unique(_day_of(g, mins[both])).astype(np.int64)
+    if days.size == 0:
+        days = np.array([int(_day_of(g, i0))], np.int64)
+    exit_days = _day_of(g, idx_exit).astype(np.int64) if idx_exit.size else np.array([], np.int64)
+    if exit_days.size and not np.isin(exit_days, days).all():          # an exit on an uncovered day cannot happen; keep it anyway
+        days = np.unique(np.concatenate([days, exit_days]))
+    pos = np.searchsorted(days, exit_days)
     trade = np.zeros(days.size)
     if idx_exit.size:
-        np.add.at(trade, (_day_of(g, idx_exit) - d0).astype(np.int64), pnl)
+        np.add.at(trade, pos, pnl)
     fin = np.zeros(days.size)
     if financing and bills is not None:
-        fin = -2.0 * np.array([bills.rate(_day_str(d)) for d in days]) / 365.0
-    # weekly transfer on Mondays when the previous 7 days had a trade
-    had = np.zeros(days.size, bool)
-    if idx_exit.size:
-        had[(_day_of(g, idx_exit) - d0).astype(np.int64)] = True
+        fin = -2.0 * np.array([bills.rate(_day_str(int(d))) for d in days]) / 365.0
+    # weekly transfer on Mondays when the previous 7 calendar days had a trade
+    had = {int(d) for d in exit_days}
     transfer = np.zeros(days.size)
     for q, d in enumerate(days):
-        if (d + 3) % 7 == 0 and had[max(0, q - 7):q].any():       # 1970-01-01 was a Thursday: (d + 3) % 7 == 0 -> Monday
+        if (d + 3) % 7 == 0 and any((d - k) in had for k in range(1, 8)):   # 1970-01-01 was a Thursday: (d + 3) % 7 == 0 -> Monday
             transfer[q] = -TRANSFER_FEE
     net = trade + fin + transfer
-    year_of_day = np.array([_day_str(d)[:4] for d in days])
+    year_of_day = np.array([_day_str(int(d))[:4] for d in days])
     trig = np.zeros(days.size, np.int64)
     if idx_exit.size:
-        np.add.at(trig, (_day_of(g, idx_exit) - d0).astype(np.int64), 1)
+        np.add.at(trig, pos, 1)
     annual = {}
     for y in sorted(set(year_of_day)):
         m = year_of_day == y
@@ -932,14 +942,23 @@ def b6c_kraken_inventory_arb(archive):
     best_p = boot[hv_m].get("p")
     best_ci = boot[hv_m].get("ci") or [None, None]
     best_ok = None if best_p is None else bool(best_p < ALPHA and cells[hv_m]["total_net"] > 0)
-    best_dec = best_ci[1] is not None and best_ci[1] < 0
+    # decisive failure needs every published tier pair x reading to have its one-sided 95% upper bound below zero: total
+    # P&L is not monotone in fees (a cheaper tier trades a lower threshold, hence a different trade set), so a failure at
+    # the most favourable pair alone does not imply failure at the user's unrecorded tier (review 2026-10-25)
+    ubs = {}
+    for k_, c_ in cells.items():
+        bq = boot.get(k_) or _mean_boot(c_["_daily"], 7)
+        ubs[k_] = (bq.get("ci") or [None, None])[1]
+    n_ub_neg = sum(1 for u_ in ubs.values() if u_ is not None and u_ < 0)
+    best_dec = bool(ubs) and all(u_ is not None and u_ < 0 for u_ in ubs.values())
     n_pos = sum(1 for t_ in totals.values() if t_ > 0)
     crit = [(f"net P&L > 0 with bootstrap p < 0.05 at the user's tier (the user's Coinbase / Kraken fee tier is not recorded in the repo; "
              f"{n_pos} of {len(totals)} tier pairs x fee readings have a positive total; least favourable pair {RETAIL_PAIR[0]} / {RETAIL_PAIR[1]} taker: "
              f"total {_pc(cells[retail_t]['total_net'])}, p {_f(worst_p, 4)})", None, False),
             (f"necessary for any tier: net P&L > 0 with bootstrap p < 0.05 at the most favourable published pair ({HIGHVOL_PAIR[0]} / {HIGHVOL_PAIR[1]}, maker): "
              f"total {_pc(cells[hv_m]['total_net'])}, daily mean {_pc(boot[hv_m].get('est'), 4)} with one-sided 95% bounds [{_pc(best_ci[0], 4)}, "
-             f"{_pc(best_ci[1], 4)}], p {_f(best_p, 4)}", best_ok, best_dec)]
+             f"{_pc(best_ci[1], 4)}], p {_f(best_p, 4)}; decisive only if every pair fails: {n_ub_neg} of {len(ubs)} pair x reading cells have a "
+             f"negative upper bound", best_ok, best_dec)]
     verdict, why = _judge(crit, n, MIN_N[tid], "aligned minutes", cov["missing"], cov["window"])
     rm, hm = cells[retail_m], cells[hv_m]
     reason = (f"Coinbase/Kraken BTC-USD 1-minute {cov['window']}: covered {_months_txt(cov['covered'])}, {n} aligned minutes; retail pair "
@@ -1001,20 +1020,27 @@ def imbalance_trades(g: dict, z: np.ndarray, i0: int, i1: int, h: int, thr: floa
     out = {"signals": int(cand.size), "entry": np.array([], np.int64), "net": np.array([]), "maker_exit": np.array([], bool), "unfilled": 0}
     if cand.size == 0:
         return out
+    # one position at a time: a signal is taken only when no position is open. A maker bid that never fills opens nothing,
+    # so it does not block the signals after it (review 2026-10-25: filtering before the fill check let unfilled bids
+    # suppress the fills that followed them in the same burst)
+    if maker:
+        bid = c[cand]
+        prints = slo[cand + 1]
+        fills = np.isfinite(prints) & ((prints < bid) if strict else (prints <= bid))
+    else:
+        fills = np.ones(cand.size, bool)
     keep = np.zeros(cand.size, bool)
     free = -1
     for q in range(cand.size):
         if cand[q] >= free:
             keep[q] = True
-            free = cand[q] + h + 2
-    cand = cand[keep]
+            if fills[q]:
+                free = cand[q] + h + 2
+    cand, fills = cand[keep], fills[keep]
     out["signals_taken"] = int(cand.size)
     if maker:
-        bid = c[cand]
-        prints = slo[cand + 1]
-        filled = np.isfinite(prints) & ((prints < bid) if strict else (prints <= bid))
-        out["unfilled"] = int((~filled).sum())
-        cand = cand[filled]
+        out["unfilled"] = int((~fills).sum())
+        cand = cand[fills]
         if cand.size == 0:
             return out
         entry_px = c[cand]
@@ -1042,9 +1068,9 @@ def imbalance_trades(g: dict, z: np.ndarray, i0: int, i1: int, h: int, thr: floa
 
 def forward_regression(g: dict, z: np.ndarray, i0: int, i1: int, h: int) -> dict:
     c = g["kr_close"]
-    i = np.arange(i0, min(i1, c.size - h))
+    i = np.arange(i0, min(i1, c.size - h - 1))
     with np.errstate(invalid="ignore", divide="ignore"):
-        y = np.log(c[i + h] / c[i])
+        y = np.log(c[i + 1 + h] / c[i + 1])                  # from the close after the signal bar: its own last print is inside the signal
     ok = np.isfinite(y) & np.isfinite(z[i])
     if ok.sum() < 100:
         return {"slope": None, "t": None, "n": int(ok.sum())}
@@ -1222,6 +1248,7 @@ def vpin_buckets(g: dict, frac: int) -> dict:
     for d in range(nd):
         lo = max(0, d - ADV_DAYS)
         hist = dvol[lo:d]
+        hist = hist[hist > 0]                                  # traded days only: a missing day is not a zero-volume day
         if hist.size < ADV_MIN_DAYS or not hist.mean() > 0:
             continue
         V = hist.mean() / frac
