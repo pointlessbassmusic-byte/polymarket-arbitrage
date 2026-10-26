@@ -8139,9 +8139,11 @@
     "b6c_kraken_cross_venue_gap"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-a7693dfd"
+   ],
    "notes": "from the underlying-library library: Cross-exchange crypto price gap reversion (Coinbase vs Kraken); harness suggestion: cross_venue_gap: dual-venue aligner, excursion counter, gap AR(1) and reversion rule; also feeds the Polymarket-Kalshi cross-venue harness | verifier: corrected claim/trial"
   },
   {
@@ -10916,10 +10918,12 @@
     "b6c_kraken_inventory_arb"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Cross-exchange BTC price discovery (Coinbase vs Kraken premium); harness suggestion: coinbase_candles() and kraken_ohlc() in mandel/data/fetch.py; information-share estimator shared across lead-lag entries; arbitrage trigger simulation with fee tiers as inputs in backtest_eval. | verifier: corrected claim/trial"
+   "results": [
+    "X-b87d935c"
+   ],
+   "notes": "from the underlying-library library: Cross-exchange BTC price discovery (Coinbase vs Kraken premium); harness suggestion: coinbase_candles() and kraken_ohlc() in mandel/data/fetch.py; information-share estimator shared across lead-lag entries; arbitrage trigger simulation with fee tiers as inputs in backtest_eval. | verifier: corrected claim/trial | 2026-10-26 first run (X-b87d935c), inconclusive by rule 9 (the user's fee tier is not recorded). Reading of the one positive cell: only the $400M+/month Coinbase x Pro 5 ($500M+) maker pair shows +153% total net 2023-26 (10,248 triggers, +0.018% each, p 0.0005); 70 of 72 tier x reading cells are negative, retail pays -35% (financing). At that tier the trigger is a 10 bp threshold and 110% of the gross sits in the Kraken leg, i.e. the rule harvests Kraken's own 1-minute print reversal (gap at trigger +0.115% -> +0.036% one minute later) under a fill-at-next-close assumption; on 5-minute bars the same pair loses -16%, 2026 alone is -5.9%, DSR 0.000. Not reachable at any tier the user can hold and not a cross-venue edge: a venue's own microstructure noise, consistent with T-331 (no excursions beyond staleness) and the children's Polymarket/Kalshi lag reading (follows, but a taker cannot be paid). Nothing to fund."
   },
   {
    "id": "T-426",
@@ -11931,10 +11935,12 @@
     "b6c_kraken_flow_imbalance"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "inconclusive",
    "blocked_on": "",
-   "results": [],
-   "notes": "from the underlying-library library: Crypto trade-flow imbalance predicts short-horizon returns; harness suggestion: kraken_trades() in mandel/data/fetch.py. Signed-volume bars plus P&L in a shared mandel/experiments/leadlag.py or crypto_micro.py. | added by the verifier pass"
+   "results": [
+    "X-317b528e"
+   ],
+   "notes": "from the underlying-library library: Crypto trade-flow imbalance predicts short-horizon returns; harness suggestion: kraken_trades() in mandel/data/fetch.py. Signed-volume bars plus P&L in a shared mandel/experiments/leadlag.py or crypto_micro.py. | added by the verifier pass | 2026-10-26 first run (X-317b528e), inconclusive by evidence: the claim cell fires 127 times out of sample 2025-01..2026-09 and yields 50 maker trades on 8 days (min_n 20,000), mean net -0.31%; every in-sample cell is negative too and the raw signed-volume reading (4,450 OOS trades) loses -0.35% per trade with p 1.0. The forward regression of the 5-minute return on the imbalance z is negative (HAC t -1.5). The claim cannot reach its own n at a 2-sigma threshold on this pair; the evidence that exists points the wrong way. Parked in effect: do not rebuild at a lower threshold (that is the alternative reading, and it loses)."
   },
   {
    "id": "T-460",
@@ -12095,9 +12101,11 @@
     "b6c_kraken_vpin_volatility"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-387ee640"
+   ],
    "notes": "from the underlying-library library: VPIN flow toxicity predicts crypto volatility; harness suggestion: VPIN builder in a crypto microstructure module. HAR and QLIKE shared with social-volume-volatility. | added by the verifier pass"
   },
   {
