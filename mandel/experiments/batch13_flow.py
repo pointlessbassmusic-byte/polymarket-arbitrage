@@ -128,8 +128,6 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Callable, Optional, Sequence
 
 import numpy as np
-from scipy.special import erf, ndtr
-from scipy.stats import rankdata
 
 from mandel.experiments import batch6c_cal as CAL
 from mandel.experiments import batch6c_events as EV
@@ -398,6 +396,7 @@ def gspc_ohlc(archive) -> dict:
 
 def atm_straddle(sigma, tau: float = T632_TAU) -> np.ndarray:
     """Black-Scholes ATM straddle per unit spot at r = q = 0: 2 (2 N(sigma sqrt(tau) / 2) - 1)."""
+    from scipy.special import erf  # lazy: no scipy on the capture box
     s = np.asarray(sigma, float)
     return 2.0 * erf(s * math.sqrt(tau) / (2.0 * math.sqrt(2.0)))
 
@@ -1108,6 +1107,7 @@ def b13_flow_dix_rebuild_p80_60d(archive):
 
 def b76_delta(F, K, T, sigma, is_put) -> np.ndarray:
     """Black-76 (undiscounted) delta: N(d1) for a call, N(d1) - 1 for a put."""
+    from scipy.special import ndtr  # lazy: no scipy on the capture box
     F, K, T, s = (np.asarray(v, float) for v in (F, K, T, sigma))
     d1 = (np.log(F / K) + 0.5 * s * s * T) / (s * np.sqrt(T))
     return ndtr(d1) - np.asarray(is_put, float)
@@ -1292,6 +1292,7 @@ def rule_net(pos, r_next, f_next, cost_side: float, funding: str) -> np.ndarray:
 
 def spearman_hac(x, y, lag: int = T638_HAC_LAG) -> dict:
     """Spearman IC as the mean of the product of standardised ranks, with its Newey-West t (``lag``)."""
+    from scipy.stats import rankdata  # lazy: no scipy on the capture box
     x, y = np.asarray(x, float), np.asarray(y, float)
     ok = np.isfinite(x) & np.isfinite(y)
     if ok.sum() < 10:
