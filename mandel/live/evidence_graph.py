@@ -265,7 +265,10 @@ def monitors(graph: dict, rows: list[dict], today: date) -> list[dict]:
                 else f"{n['label']}: {'no report from the child yet' if n['label'].startswith('child:') else 'not in the archive'}")
         act = ("pause the live strategies that read it until it is fresh (touch KILL / tell the child)" if live else
                "restart the capture" if not n["label"].startswith("child:") else "ask the child for its weekly status")
-        alerts.append(_alert(sev, "stream", n["id"], what, hit, act))
+        a = _alert(sev, "stream", n["id"], what, hit, act)
+        if n["state"] == "stale" and n["latest"] and not n["label"].startswith("child:"):
+            a["latest"] = n["latest"]                              # for collapse_outage
+        alerts.append(a)
     # 2. shared factor / account exposure
     for kind in ("factor", "account"):
         for n in (x for x in graph["nodes"] if x["kind"] == kind):
@@ -423,9 +426,39 @@ def stale_family_alerts(bundles: dict, reg: list, today: date, alerted: set) -> 
         age = (today - date.fromisoformat(last)).days
         if f"stream:{fam}" not in alerted and age > STREAM_STALE_OVERRIDE.get(fam, STREAM_STALE_DAYS) and \
                 any(t.get("status") == "blocked" and fam in str((t.get("trial") or {}).get("data", "")) for t in reg):
-            out.append(_alert("warning", "stream", f"stream:{fam}", f"{fam}: no data since {last} ({age} days)", [],
-                              "restart the capture"))
+            a = _alert("warning", "stream", f"stream:{fam}", f"{fam}: no data since {last} ({age} days)", [], "restart the capture")
+            a["latest"] = last
+            out.append(a)
     return out
+
+
+OUTAGE_MIN_FAMILIES = 5
+
+
+def collapse_outage(alerts: list[dict], min_families: int = OUTAGE_MIN_FAMILIES) -> list[dict]:
+    """Many capture families stale from the SAME date is one event, the box itself: raise one critical outage alert and
+    demote the per-family warnings to info. The 2026-10-21..23 options-fetch failure (import error on the box) showed
+    as fourteen warnings and read as noise; one line saying 'the box stopped on Oct 20' would not have."""
+    by_date: dict[str, list[dict]] = {}
+    for a in alerts:
+        if a.get("kind") == "stream" and a.get("latest"):
+            by_date.setdefault(a["latest"], []).append(a)
+    out = []
+    for latest, group in sorted(by_date.items()):
+        if len(group) < min_families:
+            continue
+        fams = sorted(a["node"].split(":", 1)[1] for a in group)
+        affected = sorted({s for a in group for s in a["affected"].split(", ") if s})
+        o = _alert("critical", "outage", f"capture:{latest}",
+                   f"capture outage: {len(fams)} families last captured {latest} ({', '.join(fams[:6])}{'...' if len(fams) > 6 else ''})",
+                   affected, "the capture box stopped: on the Linode run `tail -3 /root/mandel-capture-data/daily.jsonl` and "
+                             "`journalctl -u mandel-capture-daily -n 30`; a step with rc != 0 names the cause")
+        o["families"] = fams
+        out.append(o)
+        for a in group:
+            if a["severity"] != "critical":                        # a live strategy's feed stays critical on its own
+                a["severity"] = "info"
+    return out + alerts
 
 
 def run(today: date, out: Path = TRACKER) -> dict:
@@ -450,6 +483,7 @@ def run(today: date, out: Path = TRACKER) -> dict:
                                  "pre-register the parameter switch; it takes effect only at the test's checkpoint"))
     alerted = {a["node"] for a in alerts}
     alerts.extend(stale_family_alerts(bundles, reg, today, alerted))
+    alerts = collapse_outage(alerts)
     for a in alerts:                                            # a stale stream also holds back the theories it feeds
         if a["kind"] == "stream":
             fam = a["node"].split(":", 1)[1]

@@ -84,3 +84,22 @@ def test_stale_family_alerts_respect_each_streams_publication_cadence():
     out2 = {a["node"]: a for a in G.stale_family_alerts(b, reg, date(2026, 11, 2), set())}
     assert "stream:finra-short-interest" in out2                                                # 33 days: late
     assert not G.stale_family_alerts(b, [], date(2026, 11, 2), set())                           # no blocked theory needs it
+
+
+def test_many_families_stale_from_one_date_collapse_into_one_critical_outage():
+    """2026-10-21..23: the capture box's options-fetch died at import and fourteen 'no data since 2026-10-20' warnings read
+    as noise. Five or more families stale from the same date are one event: a critical outage, the rest demoted to info."""
+    def st(fam, latest):
+        a = G._alert("warning", "stream", f"stream:{fam}", f"{fam}: no data since {latest}", ["T-54"], "restart the capture")
+        a["latest"] = latest
+        return a
+    alerts = [st(f, "2026-10-20") for f in ("options-chain-SPX", "options-chain-SPY", "options-chain-VIX", "social-reddit",
+                                             "deribit-book-BTC", "polymarket-books")] + [st("finra-short-interest", "2026-09-30")]
+    alerts.append(G._alert("warning", "account", "account:x", "shared", [], ""))
+    out = G.collapse_outage(alerts)
+    o = [a for a in out if a["kind"] == "outage"]
+    assert len(o) == 1 and o[0]["severity"] == "critical" and o[0]["node"] == "capture:2026-10-20" and len(o[0]["families"]) == 6
+    assert "T-54" in o[0]["affected"]
+    assert all(a["severity"] == "info" for a in out if a.get("latest") == "2026-10-20")
+    assert next(a for a in out if a.get("latest") == "2026-09-30")["severity"] == "warning"     # a lone stale stream is not an outage
+    assert len(G.collapse_outage(alerts[:4])) == 4                                             # fewer than 5: unchanged

@@ -1,36 +1,28 @@
 [
  {
-  "id": "stream:stream:fred-DTB3",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:fred-DTB3",
-  "message": "fred-DTB3: no data since 2026-10-20 (6 days); it also holds back 30 blocked theories (T-111, T-112, T-117, T-542, T-552, T-553...)",
-  "affected": "H-gold-perp-carry",
-  "n_affected": 1,
-  "action": "restart the capture",
-  "theories_held": 30
- },
- {
-  "id": "stream:stream:options-chain-SPX",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:options-chain-SPX",
-  "message": "options-chain-SPX: no data since 2026-10-20 (6 days); it also holds back 5 blocked theories (T-111, T-112, T-117, T-542, T-640)",
-  "affected": "T-542",
-  "n_affected": 1,
-  "action": "restart the capture",
-  "theories_held": 5
- },
- {
-  "id": "stream:stream:options-chain-SPY",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:options-chain-SPY",
-  "message": "options-chain-SPY: no data since 2026-10-20 (6 days); it also holds back 6 blocked theories (T-108, T-117, T-118, T-120, T-122, T-537)",
-  "affected": "",
-  "n_affected": 0,
-  "action": "restart the capture",
-  "theories_held": 6
+  "id": "outage:capture:2026-10-20",
+  "severity": "critical",
+  "kind": "outage",
+  "node": "capture:2026-10-20",
+  "message": "capture outage: 13 families last captured 2026-10-20 (cboe-VVIX-history, deribit-dvol-BTC-history, fred-DTB3, options-chain-SPX, options-chain-SPY, options-chain-VIX...)",
+  "affected": "H-gold-perp-carry, T-541, T-542, T-543",
+  "n_affected": 4,
+  "action": "the capture box stopped: on the Linode run `tail -3 /root/mandel-capture-data/daily.jsonl` and `journalctl -u mandel-capture-daily -n 30`; a step with rc != 0 names the cause",
+  "families": [
+   "cboe-VVIX-history",
+   "deribit-dvol-BTC-history",
+   "fred-DTB3",
+   "options-chain-SPX",
+   "options-chain-SPY",
+   "options-chain-VIX",
+   "options-surface",
+   "social-crypto",
+   "social-derived",
+   "social-house-ptr",
+   "social-prices",
+   "social-reddit",
+   "social-stocktwits"
+  ]
  },
  {
   "id": "account:account:alpaca-paper-1",
@@ -43,39 +35,6 @@
   "action": "give each owner its own paper account"
  },
  {
-  "id": "stream:stream:cboe-VVIX-history",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:cboe-VVIX-history",
-  "message": "cboe-VVIX-history: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-541, T-708)",
-  "affected": "T-541",
-  "n_affected": 1,
-  "action": "restart the capture",
-  "theories_held": 2
- },
- {
-  "id": "stream:stream:deribit-dvol-BTC-history",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:deribit-dvol-BTC-history",
-  "message": "deribit-dvol-BTC-history: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-543, T-617)",
-  "affected": "T-543",
-  "n_affected": 1,
-  "action": "restart the capture",
-  "theories_held": 2
- },
- {
-  "id": "stream:stream:social-prices",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:social-prices",
-  "message": "social-prices: no data since 2026-10-20 (6 days); it also holds back 3 blocked theories (T-39, T-40, T-43)",
-  "affected": "",
-  "n_affected": 0,
-  "action": "restart the capture",
-  "theories_held": 3
- },
- {
   "id": "stream:stream:cboe-PUT-history",
   "severity": "warning",
   "kind": "stream",
@@ -84,84 +43,44 @@
   "affected": "T-565",
   "n_affected": 1,
   "action": "restart the capture",
+  "latest": "2026-10-15",
   "theories_held": 1
  },
  {
-  "id": "stream:stream:options-chain-VIX",
-  "severity": "warning",
+  "id": "stream:stream:fred-DTB3",
+  "severity": "info",
   "kind": "stream",
-  "node": "stream:options-chain-VIX",
-  "message": "options-chain-VIX: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-541)",
-  "affected": "T-541",
+  "node": "stream:fred-DTB3",
+  "message": "fred-DTB3: no data since 2026-10-20 (6 days); it also holds back 30 blocked theories (T-111, T-112, T-117, T-542, T-552, T-553...)",
+  "affected": "H-gold-perp-carry",
   "n_affected": 1,
   "action": "restart the capture",
-  "theories_held": 1
+  "latest": "2026-10-20",
+  "theories_held": 30
  },
  {
-  "id": "stream:stream:options-surface",
-  "severity": "warning",
+  "id": "stream:stream:options-chain-SPX",
+  "severity": "info",
   "kind": "stream",
-  "node": "stream:options-surface",
-  "message": "options-surface: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-376, T-626)",
+  "node": "stream:options-chain-SPX",
+  "message": "options-chain-SPX: no data since 2026-10-20 (6 days); it also holds back 5 blocked theories (T-111, T-112, T-117, T-542, T-640)",
+  "affected": "T-542",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 5
+ },
+ {
+  "id": "stream:stream:options-chain-SPY",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:options-chain-SPY",
+  "message": "options-chain-SPY: no data since 2026-10-20 (6 days); it also holds back 6 blocked theories (T-108, T-117, T-118, T-120, T-122, T-537)",
   "affected": "",
   "n_affected": 0,
   "action": "restart the capture",
-  "theories_held": 2
- },
- {
-  "id": "stream:stream:social-derived",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:social-derived",
-  "message": "social-derived: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-39, T-43)",
-  "affected": "",
-  "n_affected": 0,
-  "action": "restart the capture",
-  "theories_held": 2
- },
- {
-  "id": "stream:stream:social-stocktwits",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:social-stocktwits",
-  "message": "social-stocktwits: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-40, T-45)",
-  "affected": "",
-  "n_affected": 0,
-  "action": "restart the capture",
-  "theories_held": 2
- },
- {
-  "id": "stream:stream:social-crypto",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:social-crypto",
-  "message": "social-crypto: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-44)",
-  "affected": "",
-  "n_affected": 0,
-  "action": "restart the capture",
-  "theories_held": 1
- },
- {
-  "id": "stream:stream:social-house-ptr",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:social-house-ptr",
-  "message": "social-house-ptr: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-42)",
-  "affected": "",
-  "n_affected": 0,
-  "action": "restart the capture",
-  "theories_held": 1
- },
- {
-  "id": "stream:stream:social-reddit",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:social-reddit",
-  "message": "social-reddit: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-46)",
-  "affected": "",
-  "n_affected": 0,
-  "action": "restart the capture",
-  "theories_held": 1
+  "latest": "2026-10-20",
+  "theories_held": 6
  },
  {
   "id": "exposure:factor:us-equity-beta",
@@ -172,6 +91,42 @@
   "affected": "H-2s10s-xlf, H-orb-qqq, T-559, T-560, T-567",
   "n_affected": 5,
   "action": "within the cap; they move together"
+ },
+ {
+  "id": "stream:stream:cboe-VVIX-history",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:cboe-VVIX-history",
+  "message": "cboe-VVIX-history: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-541, T-708)",
+  "affected": "T-541",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:deribit-dvol-BTC-history",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:deribit-dvol-BTC-history",
+  "message": "deribit-dvol-BTC-history: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-543, T-617)",
+  "affected": "T-543",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:social-prices",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:social-prices",
+  "message": "social-prices: no data since 2026-10-20 (6 days); it also holds back 3 blocked theories (T-39, T-40, T-43)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 3
  },
  {
   "id": "contradiction:favourite-longshot",
@@ -212,5 +167,89 @@
   "affected": "T-560, T-568",
   "n_affected": 2,
   "action": "within the cap; they move together"
+ },
+ {
+  "id": "stream:stream:options-chain-VIX",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:options-chain-VIX",
+  "message": "options-chain-VIX: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-541)",
+  "affected": "T-541",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:options-surface",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:options-surface",
+  "message": "options-surface: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-376, T-626)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:social-derived",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:social-derived",
+  "message": "social-derived: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-39, T-43)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:social-stocktwits",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:social-stocktwits",
+  "message": "social-stocktwits: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-40, T-45)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:social-crypto",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:social-crypto",
+  "message": "social-crypto: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-44)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:social-house-ptr",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:social-house-ptr",
+  "message": "social-house-ptr: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-42)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:social-reddit",
+  "severity": "info",
+  "kind": "stream",
+  "node": "stream:social-reddit",
+  "message": "social-reddit: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-46)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "latest": "2026-10-20",
+  "theories_held": 1
  }
 ]
