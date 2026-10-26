@@ -135,6 +135,9 @@ class MacroBot:
                 self._save(self.open)
         if self.open is None and hasattr(ex, "positions"):
             held = (await ex.positions()).get(self.symbol, 0.0)
+            if held and hasattr(ex, "open_orders") and await ex.open_orders(self.symbol):
+                logger.warning("macro: %s has an order still working; not flattening again", self.symbol)
+                held = 0.0
             if held:                                       # a fill the pilot never recorded: flatten it
                 out_px = (await ex.close(self.symbol, abs(held), await ex.mid(self.symbol))).price
                 logger.warning("macro: flattened an unrecorded %s position of %+.0f shares at %.2f", self.symbol, held, out_px)

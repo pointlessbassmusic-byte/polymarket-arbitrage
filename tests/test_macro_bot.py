@@ -98,3 +98,19 @@ def test_execute_flattens_an_unrecorded_position(tmp_path):
     bot = M.MacroBot(tmp_path, {}, executor=ex, now=lambda: dt.datetime(2026, 10, 20, 13, 31, tzinfo=dt.timezone.utc))
     assert asyncio.run(bot.execute()) is None
     assert ex.orders == ["close"]
+
+
+def test_execute_does_not_flatten_twice_while_a_close_is_working(tmp_path):
+    import asyncio
+
+    class Ex(FakeExec):
+        async def positions(self):
+            return {"XLF": 6.0}
+
+        async def open_orders(self, symbol):
+            return [{"id": "c1", "side": "sell"}]
+
+    ex = Ex()
+    bot = M.MacroBot(tmp_path, {}, executor=ex, now=lambda: dt.datetime(2026, 10, 20, 13, 31, tzinfo=dt.timezone.utc))
+    asyncio.run(bot.execute())
+    assert ex.orders == []

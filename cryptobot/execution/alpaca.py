@@ -57,6 +57,7 @@ class AlpacaConfig:
     timeout_s: float = 20.0
     fill_polls: int = 40              # the paper engine can take several seconds to fill an IOC
     fill_poll_s: float = 0.5
+    close_polls: int = 360            # 3 minutes for a closing market order, never cancelled
 
 
 def _f(v: Any, default: float = 0.0) -> float:
@@ -190,7 +191,13 @@ class AlpacaExecutor:
             logger.info("DRY-RUN alpaca close %s x%.0f", symbol, abs(qty))
             return Fill(symbol, "close", abs(qty), mid, dry_run=True)
         d = await self._request("DELETE", f"/v2/positions/{symbol}")
-        return await self._await_fill(symbol, "close", d.get("id"), fallback_px=mid)
+        # a closing market order only reduces risk: never cancel it, give it time
+        return await self._await_fill(symbol, "close", d.get("id"), fallback_px=mid, cancel=False,
+                                      polls=self.cfg.close_polls)
+
+    async def open_orders(self, symbol: str) -> list[dict]:
+        """Orders still working on `symbol` (for example a slow closing order)."""
+        return list(await self._request("GET", "/v2/orders", params={"status": "open", "symbols": symbol}) or [])
 
     async def _order(self, symbol: str, side: str, n: int, limit: float, label: str) -> Fill:
         body = {"symbol": symbol, "qty": str(n), "side": side, "type": "limit",
@@ -200,14 +207,24 @@ class AlpacaExecutor:
         return await self._await_fill(symbol, label, d.get("id"), fallback_px=limit, first=d)
 
     async def _await_fill(self, symbol: str, label: str, order_id: Optional[str], *,
-                          fallback_px: float, first: Optional[dict] = None) -> Fill:
+                          fallback_px: float, first: Optional[dict] = None, cancel: bool = True,
+                          polls: Optional[int] = None) -> Fill:
         d = first or {}
-        for i in range(self.cfg.fill_polls):
+        polls = polls or self.cfg.fill_polls
+        for i in range(polls):
             if d.get("status") in TERMINAL:
                 break                                  # partially_filled is transient for an IOC: keep polling
             if i:
                 await asyncio.sleep(self.cfg.fill_poll_s)
             d = await self._request("GET", f"/v2/orders/{order_id}") if order_id else d
+        if d.get("status") not in TERMINAL and order_id and not cancel:
+            filled = _f(d.get("filled_qty"))
+            if filled <= 0:
+                raise RuntimeError(f"{symbol} {label}: order {order_id} still {d.get('status')} after "
+                                   f"{polls * self.cfg.fill_poll_s:.0f} s; left working")
+            logger.warning("%s %s: order %s still %s; %s filled so far, the rest left working",
+                           symbol, label, order_id, d.get("status"), filled)
+            return Fill(symbol, label, filled, _f(d.get("filled_avg_price"), fallback_px), order_id=order_id)
         if d.get("status") not in TERMINAL and order_id:
             # still working: cancel what is left and wait for the final state, so a late fill
             # can never leave a position the caller does not know about

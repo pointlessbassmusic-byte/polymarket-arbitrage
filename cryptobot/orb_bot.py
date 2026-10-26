@@ -111,6 +111,8 @@ class OrbBot:
         side = 1 if first.close > first.open else -1
         mid = await ex.mid(self.symbol)
         held = (await ex.positions()).get(self.symbol, 0.0) if hasattr(ex, "positions") else 0.0
+        if held and hasattr(ex, "open_orders") and await ex.open_orders(self.symbol):
+            raise RuntimeError(f"{self.symbol}: a leftover position has an order still working; no new trade today")
         if held:                                           # a leftover from an earlier session: flatten it first
             out = await ex.close(self.symbol, abs(held), mid)
             rec["flattened_leftover"] = {"shares": held, "price": out.price}

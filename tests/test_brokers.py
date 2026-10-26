@@ -277,3 +277,37 @@ def test_alpaca_cancels_a_slow_ioc_and_records_the_late_partial_fill():
         return f
     f = asyncio.run(run())
     assert calls["delete"] == 1 and f.qty == 97 and f.price == 739.82
+
+
+def test_alpaca_close_is_never_cancelled_and_waits():
+    import asyncio
+    import httpx
+    import pytest
+    from cryptobot.execution.alpaca import AlpacaConfig, AlpacaExecutor
+    calls = {"get": 0, "cancel": 0}
+
+    def handler(req: httpx.Request):
+        if req.method == "DELETE" and "/positions/" in req.url.path:
+            return httpx.Response(200, json={"id": "c1", "status": "accepted", "filled_qty": "0"})
+        if req.method == "DELETE":
+            calls["cancel"] += 1
+            return httpx.Response(204)
+        calls["get"] += 1
+        if calls["get"] < 8:                          # the paper engine is slow just after the open
+            return httpx.Response(200, json={"id": "c1", "status": "new", "filled_qty": "0"})
+        return httpx.Response(200, json={"id": "c1", "status": "filled", "filled_qty": "6", "filled_avg_price": "55.1"})
+
+    async def run(close_polls):
+        calls.update(get=0, cancel=0)
+        c = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        ex = AlpacaExecutor(AlpacaConfig(live=False, fill_polls=3, fill_poll_s=0.0, close_polls=close_polls), c,
+                            key_id="k", secret="s")
+        try:
+            return await ex.close("XLF", 6, 55.0)
+        finally:
+            await c.aclose()
+    f = asyncio.run(run(20))
+    assert f.qty == 6 and calls["cancel"] == 0
+    with pytest.raises(RuntimeError, match="left working"):
+        asyncio.run(run(4))
+    assert calls["cancel"] == 0
