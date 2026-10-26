@@ -2,7 +2,7 @@
 "generated_for": "Mandel signal map",
 "stats": {
 "nodes": 120,
-"edges": 1534,
+"edges": 1535,
 "documents": 34,
 "layers": {
 "substrate": 42,
@@ -3596,8 +3596,8 @@
 "detail": "A small-account, US-legal systematic trading desk and research registry: memecoin perp shorts on Kalshi perpetuals (the one live rule, armed with $1,000), Kalshi crypto event contracts (binaries at every horizon), Kalshi perp microstructure (maker/taker, order books, funding carry), the BTC volatility premium through IBIT options (data collection), Alpaca equity paper pilots (QQQ opening-range bre",
 "meta": {
 "status": "active",
-"report_count": 1,
-"guidance_count": 2
+"report_count": 2,
+"guidance_count": 3
 }
 },
 {
@@ -3610,7 +3610,7 @@
 "detail": "Sports and event-contract trading on Polymarket (paper), Polymarket US and Kalshi (US-legal live path): per-sport rating models (tennis, MLB, table tennis), sharp-line (Pinnacle) fair value, touch market-making, cross-venue lead-lag, weather and macro reference-price studies; plus a shadow-mode \"Substrate/Echo\" certification engine. Session created 2026-09-06, model claude-opus-5-5 (configured cla",
 "meta": {
 "status": "active",
-"report_count": 1,
+"report_count": 2,
 "guidance_count": 1
 }
 },
@@ -3624,7 +3624,7 @@
 "detail": "US-legal sports prediction-market trading (Kalshi, Polymarket US; international Polymarket read-only): pre-game moneyline touch-maker / fill-share measurement, model-vs-price evaluation (Elo/Markov vs venue mid), cross-venue lead-lag, Kalshi exchange-wide price-only strategy surveys, capital allocation and live-pilot plumbing. Session created 2026-09-06; status idle/completed; model claude-opus-5-",
 "meta": {
 "status": "active",
-"report_count": 1,
+"report_count": 2,
 "guidance_count": 2
 }
 },
@@ -3638,7 +3638,7 @@
 "detail": "Event-contract execution and microstructure research on Polymarket (main CLOB, read-only from the US), Polymarket US and Kalshi: sports moneyline rating models (MLB Elo + starting pitcher, tennis Elo/Markov, table tennis), touch-maker queue economics, informed-wallet flow, in-play score-feed latency, cross-venue lead-lag, central-bank decision buckets, Kalshi hourly BTC/ETH and S&P/NDX ladders, Ka",
 "meta": {
 "status": "active",
-"report_count": 1,
+"report_count": 2,
 "guidance_count": 1
 }
 },
@@ -14805,16 +14805,16 @@
 "t": "k:replication",
 "type": "evidence",
 "sign": 1,
-"w": 3.302585092994046,
-"label": "the child's reports mention it 9 times"
+"w": 3.4849066497880004,
+"label": "the child's reports mention it 11 times"
 },
 {
 "s": "child:Hurst",
 "t": "k:overfitting",
 "type": "evidence",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "the child's reports mention it 1 time"
+"w": 2.0986122886681096,
+"label": "the child's reports mention it 2 times"
 },
 {
 "s": "child:Hurst",
@@ -14829,8 +14829,8 @@
 "t": "k:multifractal",
 "type": "evidence",
 "sign": 1,
-"w": 2.6094379124341005,
-"label": "the child's reports mention it 4 times"
+"w": 2.9459101490553135,
+"label": "the child's reports mention it 6 times"
 },
 {
 "s": "child:Hurst",
@@ -14869,16 +14869,16 @@
 "t": "k:edge_vs_market",
 "type": "evidence",
 "sign": 1,
-"w": 3.5649493574615367,
-"label": "the child's reports mention it 12 times"
+"w": 3.70805020110221,
+"label": "the child's reports mention it 14 times"
 },
 {
 "s": "child:Hurst",
 "t": "k:backtest",
 "type": "evidence",
 "sign": 1,
-"w": 4.871201010907891,
-"label": "the child's reports mention it 47 times"
+"w": 4.970291913552122,
+"label": "the child's reports mention it 52 times"
 },
 {
 "s": "child:Hurst",
@@ -14893,16 +14893,16 @@
 "t": "k:fees_slippage",
 "type": "evidence",
 "sign": 1,
-"w": 3.4849066497880004,
-"label": "the child's reports mention it 11 times"
+"w": 3.639057329615259,
+"label": "the child's reports mention it 13 times"
 },
 {
 "s": "child:Hurst",
 "t": "k:prediction_market",
 "type": "evidence",
 "sign": 1,
-"w": 5.189654742026425,
-"label": "the child's reports mention it 65 times"
+"w": 5.219507705176107,
+"label": "the child's reports mention it 67 times"
 },
 {
 "s": "child:Hurst",
@@ -14917,8 +14917,8 @@
 "t": "k:volume",
 "type": "evidence",
 "sign": 1,
-"w": 2.386294361119891,
-"label": "the child's reports mention it 3 times"
+"w": 2.6094379124341005,
+"label": "the child's reports mention it 4 times"
 },
 {
 "s": "child:Hurst",
@@ -14965,8 +14965,8 @@
 "t": "k:intraday",
 "type": "evidence",
 "sign": 1,
-"w": 3.639057329615259,
-"label": "the child's reports mention it 13 times"
+"w": 3.70805020110221,
+"label": "the child's reports mention it 14 times"
 },
 {
 "s": "child:Hurst",
@@ -14981,16 +14981,16 @@
 "t": "k:lead_lag",
 "type": "evidence",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "the child's reports mention it 1 time"
+"w": 2.386294361119891,
+"label": "the child's reports mention it 3 times"
 },
 {
 "s": "child:Hurst",
 "t": "k:momentum",
 "type": "evidence",
 "sign": 1,
-"w": 3.0794415416798357,
-"label": "the child's reports mention it 7 times"
+"w": 3.1972245773362196,
+"label": "the child's reports mention it 8 times"
 },
 {
 "s": "child:Hurst",
@@ -15029,8 +15029,16 @@
 "t": "k:adverse_selection",
 "type": "evidence",
 "sign": 1,
-"w": 2.386294361119891,
-"label": "the child's reports mention it 3 times"
+"w": 2.6094379124341005,
+"label": "the child's reports mention it 4 times"
+},
+{
+"s": "child:Brier",
+"t": "k:shannon",
+"type": "evidence",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "the child's reports mention it 1 time"
 },
 {
 "s": "child:Brier",
@@ -15093,8 +15101,8 @@
 "t": "k:proper_scoring",
 "type": "evidence",
 "sign": 1,
-"w": 3.995732273553991,
-"label": "the child's reports mention it 19 times"
+"w": 4.091042453358316,
+"label": "the child's reports mention it 21 times"
 },
 {
 "s": "child:Brier",
@@ -15141,8 +15149,8 @@
 "t": "k:prediction_market",
 "type": "evidence",
 "sign": 1,
-"w": 5.356708826689592,
-"label": "the child's reports mention it 77 times"
+"w": 5.394449154672439,
+"label": "the child's reports mention it 80 times"
 },
 {
 "s": "child:Brier",
@@ -15173,8 +15181,8 @@
 "t": "k:lead_lag",
 "type": "evidence",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "the child's reports mention it 1 time"
+"w": 2.0986122886681096,
+"label": "the child's reports mention it 2 times"
 },
 {
 "s": "child:Brier",
@@ -15189,8 +15197,8 @@
 "t": "k:reference_price",
 "type": "evidence",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "the child's reports mention it 1 time"
+"w": 2.0986122886681096,
+"label": "the child's reports mention it 2 times"
 },
 {
 "s": "child:Brier",
@@ -15253,8 +15261,8 @@
 "t": "k:kelly",
 "type": "evidence",
 "sign": 1,
-"w": 2.386294361119891,
-"label": "the child's reports mention it 3 times"
+"w": 2.6094379124341005,
+"label": "the child's reports mention it 4 times"
 },
 {
 "s": "child:Kelly",
@@ -15293,8 +15301,8 @@
 "t": "k:prediction_market",
 "type": "evidence",
 "sign": 1,
-"w": 5.2626798770413155,
-"label": "the child's reports mention it 70 times"
+"w": 5.276666119016055,
+"label": "the child's reports mention it 71 times"
 },
 {
 "s": "child:Kelly",
@@ -15373,8 +15381,8 @@
 "t": "k:shannon",
 "type": "evidence",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "the child's reports mention it 2 times"
+"w": 2.386294361119891,
+"label": "the child's reports mention it 3 times"
 },
 {
 "s": "child:Shannon",
@@ -15469,8 +15477,8 @@
 "t": "k:lookahead",
 "type": "evidence",
 "sign": 1,
-"w": 2.9459101490553135,
-"label": "the child's reports mention it 6 times"
+"w": 3.0794415416798357,
+"label": "the child's reports mention it 7 times"
 },
 {
 "s": "child:Shannon",
@@ -15485,8 +15493,8 @@
 "t": "k:prediction_market",
 "type": "evidence",
 "sign": 1,
-"w": 5.442651256490317,
-"label": "the child's reports mention it 84 times"
+"w": 5.477336814478207,
+"label": "the child's reports mention it 87 times"
 },
 {
 "s": "child:Shannon",
