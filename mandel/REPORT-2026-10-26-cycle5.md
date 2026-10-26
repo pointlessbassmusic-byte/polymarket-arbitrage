@@ -63,6 +63,11 @@ The first overnight trip made +0.83 on paper and would have lost 4.12 at the pri
 - T-459 could not reach a tenth of its own min_n at a 2-sigma threshold (50 trades on 8 days) and the relaxed reading
   loses; parked in effect, not to be rebuilt at a lower threshold.
 - The weekly check-in's "FINRA stalled" alert was a false alarm: FINRA publishes 8 business days after settlement.
+- **The capture box lost three days (Oct 21-23).** Adding the learning program on Oct 20 put `import pandas` on the
+  CLI's import path (runner -> batch12_ml -> mandel.ml); the box's venv has numpy only, so every nightly `options-fetch`
+  died at import. Found on Oct 26 when the FINRA fix cleared the alert noise and 14 families showed stale at Oct 20.
+  Fixed by lazy imports and a test that imports the CLI with pandas blocked; ledgered as `capture.outage`. Lesson for the
+  evidence graph: a stale alert on every family at once is an outage, and should be `critical`, not fourteen warnings.
 
 ## Engineering
 

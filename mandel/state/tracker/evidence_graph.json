@@ -315,8 +315,8 @@
    "kind": "stream",
    "label": "child:Hurst:kalshi-perp-books",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "venue:kalshi-perps",
@@ -353,8 +353,8 @@
    "kind": "stream",
    "label": "child:Hurst:alpaca-bars",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "H-2s10s-xlf",
@@ -413,8 +413,8 @@
    "kind": "stream",
    "label": "child:Hurst:kalshi-settled-binaries",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "venue:kalshi",
@@ -440,8 +440,8 @@
    "kind": "stream",
    "label": "child:Hurst:hype-signals",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "H-ibit-carry",
@@ -461,16 +461,16 @@
    "kind": "stream",
    "label": "child:Hurst:perp-funding",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "stream:child:Hurst:ibit-surface",
    "kind": "stream",
    "label": "child:Hurst:ibit-surface",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "H-ibit-ladder",
@@ -509,8 +509,8 @@
    "kind": "stream",
    "label": "child:Kelly:kalshi-books",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "account:kalshi-kelly",
@@ -538,8 +538,8 @@
    "kind": "stream",
    "label": "child:Brier:pmus-books",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "venue:polymarket-us",
@@ -570,8 +570,8 @@
    "kind": "stream",
    "label": "child:Brier:polymarket-tape",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "venue:polymarket",
@@ -597,8 +597,8 @@
    "kind": "stream",
    "label": "child:Shannon:cb-watch",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "H-btc-tom",
@@ -667,8 +667,8 @@
    "kind": "stream",
    "label": "child:Shannon:kalshi-crypto-recorder",
    "state": "child",
-   "age_days": 6,
-   "latest": "2026-10-20"
+   "age_days": 0,
+   "latest": "2026-10-26"
   },
   {
    "id": "S-macro-buckets",

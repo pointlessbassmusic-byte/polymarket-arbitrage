@@ -11,17 +11,6 @@
   "theories_held": 30
  },
  {
-  "id": "stream:stream:finra-short-interest",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:finra-short-interest",
-  "message": "finra-short-interest: no data since 2026-09-30 (26 days); it also holds back 11 blocked theories (T-636, T-637, T-641, T-643, T-644, T-645...)",
-  "affected": "",
-  "n_affected": 0,
-  "action": "restart the capture",
-  "theories_held": 11
- },
- {
   "id": "stream:stream:options-chain-SPX",
   "severity": "warning",
   "kind": "stream",
@@ -140,17 +129,6 @@
   "n_affected": 0,
   "action": "restart the capture",
   "theories_held": 2
- },
- {
-  "id": "stream:stream:coinbase-products",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:coinbase-products",
-  "message": "coinbase-products: no data since 2026-10-16 (10 days); it also holds back 1 blocked theory (T-609)",
-  "affected": "",
-  "n_affected": 0,
-  "action": "restart the capture",
-  "theories_held": 1
  },
  {
   "id": "stream:stream:social-crypto",

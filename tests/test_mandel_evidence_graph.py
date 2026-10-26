@@ -71,3 +71,16 @@ def test_capture_status_freshens_streams():
     assert G.stream_health("options-chain-SPX", m, TODAY, None)["state"] == "ok"
     assert G.stream_health("fred-DTB3", m, TODAY, None)["state"] == "ok"
     assert G.stream_health("options-chain-SPX", b, TODAY, None)["state"] == "stale"
+
+
+def test_stale_family_alerts_respect_each_streams_publication_cadence():
+    """FINRA short interest settles twice a month and publishes 8 business days later: 23 quiet days are normal and were a
+    false 'restart the capture' alert on 2026-10-22. A daily capture family still alerts after 3 days."""
+    reg = [{"id": "T-636", "status": "blocked", "trial": {"data": "finra-short-interest-<date>"}},
+           {"id": "T-999", "status": "blocked", "trial": {"data": "options-chain-VIX-<date>"}}]
+    b = {"finra-short-interest-2026-09-30": {}, "options-chain-VIX-2026-10-14": {}}
+    out = {a["node"]: a for a in G.stale_family_alerts(b, reg, date(2026, 10, 23), set())}
+    assert "stream:finra-short-interest" not in out and "stream:options-chain-VIX" in out      # 23 days: within cadence
+    out2 = {a["node"]: a for a in G.stale_family_alerts(b, reg, date(2026, 11, 2), set())}
+    assert "stream:finra-short-interest" in out2                                                # 33 days: late
+    assert not G.stale_family_alerts(b, [], date(2026, 11, 2), set())                           # no blocked theory needs it

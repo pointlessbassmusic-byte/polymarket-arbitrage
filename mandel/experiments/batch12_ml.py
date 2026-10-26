@@ -21,8 +21,10 @@ import json
 
 from mandel.experiments import batch7_cal as B7C
 from mandel.experiments.batch6_surf import _out
-from mandel.ml import report as R
-from mandel.ml import train as TR
+
+# mandel.ml (pandas, scikit-learn) is imported inside the harnesses, not here: this module is imported by the runner and
+# so by every CLI command, and the Linode capture box has no pandas. Its nightly options-fetch died at this import from
+# 2026-10-21 to 2026-10-23 (three lost chain-capture days) before the imports were made lazy.
 
 
 # archive bundles the model runs read (the bars themselves are local vendor files, not bundles)
@@ -41,6 +43,7 @@ def _f(x, nd=2):
 
 
 def _model_theory(archive, tid: str):
+    from mandel.ml import report as R
     miss = _inputs(archive, tid)
     if miss:
         return miss
@@ -92,6 +95,7 @@ def b12_ml_implied(archive):
 
 
 def b12_ml_ic_scan(archive):
+    from mandel.ml import train as TR
     """T-579."""
     miss = _inputs(archive, "T-579")
     if miss:

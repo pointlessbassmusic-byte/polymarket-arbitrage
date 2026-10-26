@@ -108,7 +108,7 @@
 {"day": "2026-10-26", "id": "T-576", "owner": "Mandel", "n_now": 0, "progress": 0.0, "pnl_usd": null}
 {"day": "2026-10-26", "id": "T-567", "owner": "Mandel", "n_now": 0, "progress": 0.0, "pnl_usd": null}
 {"day": "2026-10-26", "id": "T-568", "owner": "Mandel", "n_now": 0, "progress": 0.0, "pnl_usd": null}
-{"day": "2026-10-26", "id": "H-bounce-short", "owner": "Hurst", "n_now": 0, "progress": null, "pnl_usd": 0}
+{"day": "2026-10-26", "id": "H-bounce-short", "owner": "Hurst", "n_now": 2, "progress": null, "pnl_usd": null}
 {"day": "2026-10-26", "id": "H-orb-qqq", "owner": "Hurst", "n_now": 5, "progress": 0.0833, "pnl_usd": null}
 {"day": "2026-10-26", "id": "H-2s10s-xlf", "owner": "Hurst", "n_now": null, "progress": null, "pnl_usd": null}
 {"day": "2026-10-26", "id": "H-btc-us500-lead", "owner": "Hurst", "n_now": null, "progress": null, "pnl_usd": null}
@@ -120,8 +120,8 @@
 {"day": "2026-10-26", "id": "K-maker-kalshi", "owner": "Kelly", "n_now": 0, "progress": 0.0, "pnl_usd": 0}
 {"day": "2026-10-26", "id": "K-tennis-longshot-no", "owner": "Kelly", "n_now": null, "progress": null, "pnl_usd": null}
 {"day": "2026-10-26", "id": "B-maker-pmus", "owner": "Brier", "n_now": 0, "progress": 0.0, "pnl_usd": 0}
-{"day": "2026-10-26", "id": "B-paper-book", "owner": "Brier", "n_now": 1, "progress": null, "pnl_usd": -1.0}
-{"day": "2026-10-26", "id": "S-fed-g10", "owner": "Shannon", "n_now": 0, "progress": null, "pnl_usd": null}
+{"day": "2026-10-26", "id": "B-paper-book", "owner": "Brier", "n_now": 2, "progress": null, "pnl_usd": -2.0}
+{"day": "2026-10-26", "id": "S-fed-g10", "owner": "Shannon", "n_now": 2, "progress": null, "pnl_usd": null}
 {"day": "2026-10-26", "id": "H-btc-tom", "owner": "Hurst", "n_now": null, "progress": null, "pnl_usd": null}
 {"day": "2026-10-26", "id": "H-us500-overnight", "owner": "Hurst", "n_now": null, "progress": null, "pnl_usd": null}
 {"day": "2026-10-26", "id": "H-gold-perp-carry", "owner": "Hurst", "n_now": null, "progress": null, "pnl_usd": null}

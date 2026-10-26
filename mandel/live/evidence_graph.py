@@ -131,7 +131,9 @@ FACTOR_CAP_USD = {"us-equity-beta": 8000, "short-volatility": 3500, "crypto-beta
 
 STREAM_STALE_DAYS = 3        # an archived daily stream older than this (in days) is stale
 STREAM_STALE_OVERRIDE = {"fomc-meetings": 120, "macro-release-cpi": 40,   # calendars: refreshed monthly at most
-                         "cboe-PUT-history": 10}                           # refreshed weekly by the capture box
+                         "cboe-PUT-history": 10,                           # refreshed weekly by the capture box
+                         "finra-short-interest": 30,                       # semi-monthly settlement, published 8 business days later
+                         "coinbase-products": 14}                          # the product list changes rarely; refreshed weekly
 CHILD_STALE_DAYS = 10        # a child's figures older than this are stale (weekly protocol + slack)
 
 STATUS_WEIGHT = {"inconclusive": 1.0, "untested": 0.8, "blocked": 0.5}
@@ -407,6 +409,25 @@ def next_tests(registry: list[dict], bundles: dict, top: int = 20, result_times:
 
 # ------------------------------------------------------------------------------------------------------- main --
 
+def stale_family_alerts(bundles: dict, reg: list, today: date, alerted: set) -> list[dict]:
+    """Dated capture families no tracked strategy reads but a blocked theory needs: stale past the family's own cadence
+    (STREAM_STALE_OVERRIDE: FINRA short interest publishes 8 business days after a semi-monthly settlement, so 23 quiet
+    days are normal; the default 3 days is for daily captures)."""
+    fams: dict[str, str] = {}
+    for k in bundles:
+        m = _DATED.match(k)
+        if m and m.group("day") > fams.get(m.group("family"), ""):
+            fams[m.group("family")] = m.group("day")
+    out = []
+    for fam, last in sorted(fams.items()):
+        age = (today - date.fromisoformat(last)).days
+        if f"stream:{fam}" not in alerted and age > STREAM_STALE_OVERRIDE.get(fam, STREAM_STALE_DAYS) and \
+                any(t.get("status") == "blocked" and fam in str((t.get("trial") or {}).get("data", "")) for t in reg):
+            out.append(_alert("warning", "stream", f"stream:{fam}", f"{fam}: no data since {last} ({age} days)", [],
+                              "restart the capture"))
+    return out
+
+
 def run(today: date, out: Path = TRACKER) -> dict:
     rows = _load(out / "strategies.json", [])
     if not rows:
@@ -428,17 +449,7 @@ def run(today: date, out: Path = TRACKER) -> dict:
                                  ["T-565"] if model.startswith("spx") else ["T-566"],
                                  "pre-register the parameter switch; it takes effect only at the test's checkpoint"))
     alerted = {a["node"] for a in alerts}
-    fams: dict[str, str] = {}
-    for k in bundles:                                           # daily capture families no tracked strategy reads
-        m = _DATED.match(k)
-        if m and m.group("day") > fams.get(m.group("family"), ""):
-            fams[m.group("family")] = m.group("day")
-    for fam, last in sorted(fams.items()):
-        age = (today - date.fromisoformat(last)).days
-        if f"stream:{fam}" not in alerted and age > STREAM_STALE_DAYS and \
-                any(t.get("status") == "blocked" and fam in str((t.get("trial") or {}).get("data", "")) for t in reg):
-            alerts.append(_alert("warning", "stream", f"stream:{fam}", f"{fam}: no data since {last} ({age} days)", [],
-                                 "restart the capture"))
+    alerts.extend(stale_family_alerts(bundles, reg, today, alerted))
     for a in alerts:                                            # a stale stream also holds back the theories it feeds
         if a["kind"] == "stream":
             fam = a["node"].split(":", 1)[1]
