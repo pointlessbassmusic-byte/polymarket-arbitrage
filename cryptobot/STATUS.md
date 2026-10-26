@@ -10,6 +10,7 @@ One page for the operator. Everything here is in the registry
 |---|---|---|---|
 | bounce-short on DOGE / SHIB (PEPE when Kalshi activates it) | Kalshi perps | paper until funded and armed | inconclusive: backtest +9–15%/yr on capital, deflated Sharpe 0.13–0.35, so run small and let live fills decide |
 | day trading bot (time-block scalper V1/V2) | paper only, inside the desk | backtest 2026-10-20: no edge on perps, spot or Kalshi binaries (96 trials); no variant killed (corrected 2026-10-26); the evening-bounce binary is a forward test to about 2027-05 |
+| day trading bot on stocks (SPY/QQQ/IWM) | not deployed | backtest 2026-10-26: inconclusive, best net +4.6 bp at t 0.6 over 105 trades; costs about 3 bp are no longer the problem, the rule has too little edge |
 | funding carry | shelved in the US | allocation 0 | funding on US venues averages about zero |
 
 The allocator sizes the bounce-short from its evidence and the live

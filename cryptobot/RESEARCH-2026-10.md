@@ -1771,3 +1771,41 @@ signal. On the rerun:
 - The evening-bounce pattern is unchanged: pooled UP 56.4% over 920
   entries.
 
+
+
+## Addendum, 2026-10-26 (32): the day trading bot on stocks
+
+The crypto version failed on costs: its gross edge of about 0 to +15 bp a
+trade sat below an 8-56 bp round trip. So `daytrade-stocks` (pre-registered
+before any data was pulled) moved the same EMA 9/21 rule to the cheapest
+market the desk can reach: SPY, QQQ and IWM. It trades both directions
+in 09:30-12:00 and 13:00-15:55 New York time, at about a 3 bp round trip
+(zero commission, the spread, 1 bp of slippage a side, sell-side fees).
+SPY was also tested on Kalshi's US500 perp. The data is two years of
+Alpaca IEX 5-minute bars, 16 trials.
+
+| | ETF cells (12) | SPY on the US500 perp (4) |
+|---|---|---|
+| round trip | 2.9-3.9 bp | 8.6 bp |
+| gross a trade | -4.4 to +7.7 bp | -4.4 to +5.6 bp |
+| net a trade | -7.3 to +4.6 bp | -13.0 to -3.0 bp |
+| best t | +0.6 | -0.7 |
+| best DSR at 16 | 0.20 | 0.01 |
+
+No candidate, and no variant killed: inconclusive. Cutting costs from
+crypto's 8-56 bp to about 3 bp was not enough, because the rule has only
+0-5 bp gross to give and that does not hold up by date half. The perp is
+the wrong way to trade SPY intraday: it costs three times the ETF.
+
+One split is worth noting, without weight. The afternoon window was
+positive on 10 of the 12 ETF cells and the morning on 1. The best was QQQ
+30-minute V2 at +16.1 bp, but over only 46 trades. That split was not
+registered, it was read after the result, and each cell holds about 45-240
+trades, so it is a lead for a future registration, not a result.
+
+Where the day trading bot stands after crypto, binaries, spot and stocks:
+the EMA time-block rule has no edge net of costs anywhere it was tried.
+The paper bot keeps running on crypto at no cost. The one forward lead
+is the evening-bounce binary (`daytrade-bear-cross-bounce`), read at 300
+entries.
+
