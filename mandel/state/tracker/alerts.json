@@ -1,14 +1,47 @@
 [
  {
+  "id": "stream:stream:fred-DTB3",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:fred-DTB3",
+  "message": "fred-DTB3: no data since 2026-10-20 (6 days); it also holds back 30 blocked theories (T-111, T-112, T-117, T-542, T-552, T-553...)",
+  "affected": "H-gold-perp-carry",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 30
+ },
+ {
   "id": "stream:stream:finra-short-interest",
   "severity": "warning",
   "kind": "stream",
   "node": "stream:finra-short-interest",
-  "message": "finra-short-interest: no data since 2026-09-30 (23 days); it also holds back 11 blocked theories (T-636, T-637, T-641, T-643, T-644, T-645...)",
+  "message": "finra-short-interest: no data since 2026-09-30 (26 days); it also holds back 11 blocked theories (T-636, T-637, T-641, T-643, T-644, T-645...)",
   "affected": "",
   "n_affected": 0,
   "action": "restart the capture",
   "theories_held": 11
+ },
+ {
+  "id": "stream:stream:options-chain-SPX",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:options-chain-SPX",
+  "message": "options-chain-SPX: no data since 2026-10-20 (6 days); it also holds back 5 blocked theories (T-111, T-112, T-117, T-542, T-640)",
+  "affected": "T-542",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 5
+ },
+ {
+  "id": "stream:stream:options-chain-SPY",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:options-chain-SPY",
+  "message": "options-chain-SPY: no data since 2026-10-20 (6 days); it also holds back 6 blocked theories (T-108, T-117, T-118, T-120, T-122, T-537)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 6
  },
  {
   "id": "account:account:alpaca-paper-1",
@@ -21,11 +54,132 @@
   "action": "give each owner its own paper account"
  },
  {
+  "id": "stream:stream:cboe-VVIX-history",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:cboe-VVIX-history",
+  "message": "cboe-VVIX-history: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-541, T-708)",
+  "affected": "T-541",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:deribit-dvol-BTC-history",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:deribit-dvol-BTC-history",
+  "message": "deribit-dvol-BTC-history: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-543, T-617)",
+  "affected": "T-543",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:social-prices",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-prices",
+  "message": "social-prices: no data since 2026-10-20 (6 days); it also holds back 3 blocked theories (T-39, T-40, T-43)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 3
+ },
+ {
+  "id": "stream:stream:cboe-PUT-history",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:cboe-PUT-history",
+  "message": "cboe-PUT-history: no data since 2026-10-15 (11 days); it also holds back 1 blocked theory (T-565)",
+  "affected": "T-565",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:options-chain-VIX",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:options-chain-VIX",
+  "message": "options-chain-VIX: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-541)",
+  "affected": "T-541",
+  "n_affected": 1,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:options-surface",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:options-surface",
+  "message": "options-surface: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-376, T-626)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:social-derived",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-derived",
+  "message": "social-derived: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-39, T-43)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 2
+ },
+ {
+  "id": "stream:stream:social-stocktwits",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-stocktwits",
+  "message": "social-stocktwits: no data since 2026-10-20 (6 days); it also holds back 2 blocked theories (T-40, T-45)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 2
+ },
+ {
   "id": "stream:stream:coinbase-products",
   "severity": "warning",
   "kind": "stream",
   "node": "stream:coinbase-products",
-  "message": "coinbase-products: no data since 2026-10-16 (7 days); it also holds back 1 blocked theory (T-609)",
+  "message": "coinbase-products: no data since 2026-10-16 (10 days); it also holds back 1 blocked theory (T-609)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:social-crypto",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-crypto",
+  "message": "social-crypto: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-44)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:social-house-ptr",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-house-ptr",
+  "message": "social-house-ptr: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-42)",
+  "affected": "",
+  "n_affected": 0,
+  "action": "restart the capture",
+  "theories_held": 1
+ },
+ {
+  "id": "stream:stream:social-reddit",
+  "severity": "warning",
+  "kind": "stream",
+  "node": "stream:social-reddit",
+  "message": "social-reddit: no data since 2026-10-20 (6 days); it also holds back 1 blocked theory (T-46)",
   "affected": "",
   "n_affected": 0,
   "action": "restart the capture",
