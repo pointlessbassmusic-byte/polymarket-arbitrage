@@ -101,20 +101,45 @@ def _rows_of(bundles: dict, name: str) -> list[dict]:
 def calendar_progress(journal: list[dict]) -> dict:
     """T-559 from the journal: sessions decided, fills, mean fill gap vs the modelled (snapshot) price, P&L."""
     days = {str(r.get("day")) for r in journal if r.get("kind") == "close.decision"}
-    fills = [r for r in journal if r.get("kind") == "order.fill" and str(r.get("client_order_id", "")).startswith("m-")
-             and not str(r.get("client_order_id", "")).startswith("m-xsp") and r.get("filled_avg_price")]
+    # one row per order: the reconcile phase re-journaled every fill for three sessions before 2026-10-26
+    by_id = {}
+    for r in journal:
+        if r.get("kind") == "order.fill" and str(r.get("client_order_id", "")).startswith("m-") \
+                and not str(r.get("client_order_id", "")).startswith("m-xsp") and r.get("filled_avg_price"):
+            by_id[r["client_order_id"]] = r
+    fills = list(by_id.values())
     rejected = sum(1 for r in journal if r.get("kind") == "order.rejected")
-    # Realised P&L from fills: sells minus buys, per symbol, over closed round trips (FIFO by quantity).
-    pnl, book = 0.0, {}
+    # official prints (print.official rows, Yahoo): the rules are defined on the close and the open, the paper venue
+    # fills at 15:44 ET and a few minutes after the open; every closed round trip is marked at both
+    prints = {(r.get("symbol"), str(r.get("day"))): r for r in journal if r.get("kind") == "print.official"}
+
+    def _print(cid: str) -> Optional[float]:
+        parts = str(cid).split("-")                        # m-<cls|opg>-<SYM>-<YYYY-MM-DD>-<hex>
+        if len(parts) < 7:
+            return None
+        when, sym, day = parts[1], parts[2], "-".join(parts[3:6])
+        p = prints.get((sym, day))
+        if not p:
+            return None
+        return p.get("close") if when == "cls" else p.get("open")
+    # Realised P&L from fills: sells minus buys, per symbol, over closed round trips (FIFO by quantity); the shadow P&L
+    # is the same round trips at the official prints, where both legs have one.
+    pnl, book, shadow, shadow_paper, n_trips, n_shadowed = 0.0, {}, 0.0, 0.0, 0, 0
     for r in sorted(fills, key=lambda r: str(r.get("filled_at"))):
         q, px, sym = float(r.get("filled_qty") or 0), float(r["filled_avg_price"]), r.get("symbol")
         lots = book.setdefault(sym, [])
         if r.get("side") == "buy":
-            lots.append([q, px])
+            lots.append([q, px, _print(r.get("client_order_id"))])
         else:
+            sell_print = _print(r.get("client_order_id"))
             while q > 0 and lots:
                 take = min(q, lots[0][0])
                 pnl += take * (px - lots[0][1])
+                n_trips += 1
+                if sell_print is not None and lots[0][2] is not None:
+                    shadow += take * (sell_print - lots[0][2])
+                    shadow_paper += take * (px - lots[0][1])
+                    n_shadowed += 1
                 lots[0][0] -= take; q -= take
                 if lots[0][0] <= 0:
                     lots.pop(0)
@@ -123,7 +148,10 @@ def calendar_progress(journal: list[dict]) -> dict:
     last = [r for r in journal if r.get("kind") == "close.decision"][-1:]
     old_code = bool(last and "SPLG" in (last[0].get("targets") or {}))        # the pre-2026-10-21 runner (SPLG, auction orders)
     return {"n_now": len(days), "fills": len(fills), "rejected": rejected, "expired": expired, "old_code": old_code,
-            "pnl_usd": round(pnl, 2) if fills else None}
+            "pnl_usd": round(pnl, 2) if fills else None, "round_trips": n_trips,
+            "shadow_pnl_usd": round(shadow, 2) if n_shadowed else None,          # the same trips at the official prints
+            "slippage_usd": round(shadow_paper - shadow, 2) if n_shadowed else None,   # paper minus official, those trips
+            "shadowed_trips": n_shadowed}
 
 
 def spread_progress(journal: list[dict]) -> dict:

@@ -263,11 +263,23 @@ def phase_options(api, dry: bool) -> None:
 def phase_reconcile(api) -> None:
     since = (datetime.now(ET) - timedelta(days=3)).isoformat()
     fills = [o for o in api.orders("closed", after=since) if str(o.get("client_order_id", "")).startswith("w-")]
-    for o in fills:
+    seen = set()
+    try:                                                   # never journal the same fill twice (reconcile covers 3 days)
+        for line in JOURNAL.read_text(encoding="utf-8").splitlines():
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if r.get("kind") == "order.fill" and not r.get("dry_run"):
+                seen.add((str(r.get("client_order_id")), str(r.get("status"))))
+    except OSError:
+        pass
+    new = [o for o in fills if (str(o.get("client_order_id")), str(o.get("status"))) not in seen]
+    for o in new:
         _journal("order.fill", {k: o.get(k) for k in ("client_order_id", "symbol", "side", "qty", "filled_qty",
                                                       "filled_avg_price", "time_in_force", "status", "filled_at",
                                                       "order_class")}, False)
-    print(f"{len(fills)} widened-sleeve orders reconciled")
+    print(f"{len(fills)} widened-sleeve orders reconciled ({len(new)} new)")
 
 
 def phase_status(api) -> None:

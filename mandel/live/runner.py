@@ -218,14 +218,58 @@ def phase_options(api, dry: bool) -> None:
                                                 "credit": plan.credit_mid, "opened": today.isoformat()}))
 
 
+def _journaled(kind: str, keys: tuple) -> set:
+    """Rows of ``kind`` already in the journal, keyed by ``keys``: reconcile runs daily over a 3-day window and must not
+    journal the same fill twice (the first three sessions did; the tracker also dedupes on read)."""
+    seen = set()
+    try:
+        for line in JOURNAL.read_text(encoding="utf-8").splitlines():
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if r.get("kind") == kind and not r.get("dry_run"):
+                seen.add(tuple(str(r.get(k)) for k in keys))
+    except OSError:
+        pass
+    return seen
+
+
+def journal_official_prints(fills: list[dict], prefix: str, fetch=None) -> int:
+    """One ``print.official`` row per (symbol, day) for every stock symbol with a filled order in ``fills``: Yahoo's official
+    open and close, the prints the calendar rules are defined on (see mandel/live/prints.py). Returns rows written."""
+    from mandel.live.prints import official_prints
+    syms = sorted({o["symbol"] for o in fills if o.get("status") == "filled" and o.get("symbol") and o.get("order_class") != "mleg"
+                   and str(o.get("client_order_id", "")).startswith(prefix)})
+    if not syms:
+        return 0
+    seen = _journaled("print.official", ("symbol", "day"))
+    n = 0
+    for sym, by_day in (fetch or official_prints)(syms).items():
+        for day in sorted(by_day)[-4:]:
+            if (sym, day) in seen:
+                continue
+            _journal("print.official", {"day": day, "symbol": sym, "open": by_day[day]["open"], "close": by_day[day]["close"],
+                                        "source": "yahoo"}, False)
+            n += 1
+    return n
+
+
 def phase_reconcile(api) -> None:
     since = (datetime.now(ET) - timedelta(days=3)).isoformat()
     fills = [o for o in api.orders("closed", after=since) if o.get("client_order_id", "").startswith("m-")]
-    for o in fills:
+    seen = _journaled("order.fill", ("client_order_id", "status"))
+    new = [o for o in fills if (str(o.get("client_order_id")), str(o.get("status"))) not in seen]
+    for o in new:
         _journal("order.fill", {k: o.get(k) for k in ("client_order_id", "symbol", "side", "qty", "filled_qty",
                                                       "filled_avg_price", "time_in_force", "status", "filled_at",
                                                       "order_class")}, False)
-    print(f"{len(fills)} Mandel orders reconciled")
+    try:
+        n_prints = journal_official_prints(fills, "m-")
+    except Exception as e:  # noqa: BLE001 - a Yahoo outage or odd body must not fail the reconcile
+        n_prints = 0
+        _journal("print.official.error", {"error": str(e)[:300]}, False)
+    print(f"{len(fills)} Mandel orders reconciled ({len(new)} new), {n_prints} official prints journaled")
 
 
 def phase_status(api) -> None:

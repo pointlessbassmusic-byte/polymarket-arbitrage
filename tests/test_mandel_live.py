@@ -138,7 +138,8 @@ def test_tracker_counts_journal_sessions_fills_and_round_trip_pnl(tmp_path):
              "filled_avg_price": "251.5", "filled_at": "2026-10-22T13:30:00Z"}]
     j.write_text("".join(json.dumps(r) + "\n" for r in recs))
     c = T.calendar_progress(T._journal(j))
-    assert c == {"n_now": 2, "fills": 2, "rejected": 0, "expired": 0, "old_code": False, "pnl_usd": 3.0}
+    assert c == {"n_now": 2, "fills": 2, "rejected": 0, "expired": 0, "old_code": False, "pnl_usd": 3.0, "round_trips": 1,
+                 "shadow_pnl_usd": None, "slippage_usd": None, "shadowed_trips": 0}        # no print.official rows: no shadow
     rows = T.build(date(2026, 10, 23), j)
     t559 = next(r for r in rows if r["id"] == "T-559")
     assert t559["state"] == "running" and t559["progress"] == pytest.approx(2 / 60, abs=1e-4)
@@ -205,3 +206,61 @@ def test_runner_options_discards_an_unfilled_spread_instead_of_closing_it(monkey
             return {st["short"]: {"latestQuote": {"bp": 0.5, "ap": 0.6}}, st["long"]: {"latestQuote": {"bp": 0.3, "ap": 0.4}}}
     R.phase_options(Held(date(2026, 10, 21)), dry=False)                 # buyback 0.20 > 50% of the 0.22 credit: keep
     assert (tmp_path / "spread.json").exists()
+
+
+def test_tracker_dedupes_rejournaled_fills_and_marks_round_trips_at_official_prints(tmp_path):
+    """Reconcile re-journaled every fill for three sessions (2026-10-22..24): a duplicate buy must not become a second lot.
+    With print.official rows, each closed trip is also marked at the official close/open the rules are defined on."""
+    from mandel.live import tracker as T
+    j = tmp_path / "journal.jsonl"
+    buy = {"kind": "order.fill", "client_order_id": "m-cls-QQQM-2026-10-22-aaaaaa", "symbol": "QQQM", "side": "buy",
+           "filled_qty": "4", "filled_avg_price": "289.26", "filled_at": "2026-10-22T19:44:01Z"}
+    sell = {"kind": "order.fill", "client_order_id": "m-opg-QQQM-2026-10-23-bbbbbb", "symbol": "QQQM", "side": "sell",
+            "filled_qty": "4", "filled_avg_price": "289.4675", "filled_at": "2026-10-23T13:32:57Z"}
+    recs = [{"kind": "close.decision", "day": "2026-10-22"}, buy, buy, sell, buy,          # the buy journaled three times
+            {"kind": "print.official", "day": "2026-10-22", "symbol": "QQQM", "open": 288.0, "close": 289.50, "source": "yahoo"},
+            {"kind": "print.official", "day": "2026-10-23", "symbol": "QQQM", "open": 289.90, "close": 290.10, "source": "yahoo"}]
+    j.write_text("".join(json.dumps(r) + "\n" for r in recs))
+    c = T.calendar_progress(T._journal(j))
+    assert c["fills"] == 2 and c["round_trips"] == 1 and c["pnl_usd"] == pytest.approx(0.83, abs=0.01)
+    assert c["shadow_pnl_usd"] == pytest.approx(4 * (289.90 - 289.50), abs=1e-6)       # official close -> official open
+    assert c["slippage_usd"] == pytest.approx(0.83 - 1.60, abs=0.01) and c["shadowed_trips"] == 1
+
+
+def test_runner_reconcile_skips_journaled_fills_and_journals_official_prints(monkeypatch, tmp_path):
+    from mandel.live import runner as R
+    monkeypatch.setattr(R, "STATE", tmp_path); monkeypatch.setattr(R, "JOURNAL", tmp_path / "j.jsonl")
+    monkeypatch.setattr(R, "USE_LEDGER", False)
+    closed = [{"client_order_id": "m-cls-SPYM-2026-10-22-0bac70", "symbol": "SPYM", "side": "buy", "qty": "10", "filled_qty": "10",
+               "filled_avg_price": "89.68", "time_in_force": "day", "status": "filled", "filled_at": "2026-10-22T19:44:02Z", "order_class": ""},
+              {"client_order_id": "m-xsp-open-2026-10-20", "symbol": "", "status": "expired", "order_class": "mleg"},
+              {"client_order_id": "w-USO-open-2026-10-20", "symbol": "", "status": "filled", "order_class": "mleg"}]
+
+    class Api(FakeApi):
+        def orders(self, status, after=None):
+            return closed
+    fetched = []
+
+    def fetch(syms):
+        fetched.append(list(syms))
+        return {"SPYM": {"2026-10-21": {"open": 89.0, "close": 89.2}, "2026-10-22": {"open": 89.9, "close": 89.7}}}
+    _jop = R.journal_official_prints
+    monkeypatch.setattr(R, "journal_official_prints", lambda fills, prefix: _jop(fills, prefix, fetch))
+    R.phase_reconcile(Api(date(2026, 10, 22)))
+    rows = [json.loads(l) for l in (tmp_path / "j.jsonl").read_text().splitlines()]
+    assert [r["kind"] for r in rows] == ["order.fill", "order.fill", "print.official", "print.official"]
+    assert fetched == [["SPYM"]]                                   # mleg legs carry no symbol; the w- order is not Mandel's
+    assert {(r["symbol"], r["day"]) for r in rows if r["kind"] == "print.official"} == {("SPYM", "2026-10-21"), ("SPYM", "2026-10-22")}
+    # second reconcile over the same window: nothing new
+    R.phase_reconcile(Api(date(2026, 10, 22)))
+    rows2 = [json.loads(l) for l in (tmp_path / "j.jsonl").read_text().splitlines()]
+    assert len(rows2) == len(rows)
+
+
+def test_official_prints_parse_yahoo_chart_by_exchange_date():
+    from mandel.live import prints as P
+    body = {"chart": {"result": [{"meta": {"exchangeTimezoneName": "America/New_York"},
+                                   "timestamp": [1792675800, 1792762200],              # 2026-10-22 and 10-23 09:30 ET
+                                   "indicators": {"quote": [{"open": [289.0, 290.0], "close": [289.5, None]}]}}]}}
+    out = P._parse(body)
+    assert out == {"2026-10-22": {"open": 289.0, "close": 289.5}}      # a bar without a close is skipped
