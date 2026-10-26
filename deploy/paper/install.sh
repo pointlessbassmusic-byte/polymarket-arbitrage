@@ -32,6 +32,7 @@ sudo apt-get install -y python3-venv >/dev/null
 python3 -m venv "$DIR/.venv"
 "$DIR/.venv/bin/pip" install -q "httpx>=0.25" "tzdata"
 "$DIR/.venv/bin/python" -m pytest -q "$DIR/tests/test_mandel_live.py" 2>/dev/null || "$DIR/.venv/bin/pip" install -q pytest
+(cd "$DIR" && "$DIR/.venv/bin/python" -c "import mandel.live.runner, mandel.live.wide")   # the runner must import in THIS venv
 "$DIR/.venv/bin/python" -m pytest -q "$DIR/tests/test_mandel_live.py"
 
 echo "== 3. keys (Alpaca PAPER account: dashboard -> Paper Trading -> API keys)"

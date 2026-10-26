@@ -139,7 +139,8 @@ def test_tracker_counts_journal_sessions_fills_and_round_trip_pnl(tmp_path):
     j.write_text("".join(json.dumps(r) + "\n" for r in recs))
     c = T.calendar_progress(T._journal(j))
     assert c == {"n_now": 2, "fills": 2, "rejected": 0, "expired": 0, "old_code": False, "pnl_usd": 3.0, "round_trips": 1,
-                 "shadow_pnl_usd": None, "slippage_usd": None, "shadowed_trips": 0}        # no print.official rows: no shadow
+                 "shadow_pnl_usd": None, "slippage_usd": None, "shadowed_trips": 0,
+                 "fill_gap_bp_mean": None, "fill_gap_bp_upper95": None, "fill_gap_n": 0}   # no print.official rows: no shadow
     rows = T.build(date(2026, 10, 23), j)
     t559 = next(r for r in rows if r["id"] == "T-559")
     assert t559["state"] == "running" and t559["progress"] == pytest.approx(2 / 60, abs=1e-4)
@@ -225,6 +226,10 @@ def test_tracker_dedupes_rejournaled_fills_and_marks_round_trips_at_official_pri
     assert c["fills"] == 2 and c["round_trips"] == 1 and c["pnl_usd"] == pytest.approx(0.83, abs=0.01)
     assert c["shadow_pnl_usd"] == pytest.approx(4 * (289.90 - 289.50), abs=1e-6)       # official close -> official open
     assert c["slippage_usd"] == pytest.approx(0.83 - 1.60, abs=0.01) and c["shadowed_trips"] == 1
+    # T-559 criterion (a): per-side |fill - official print| in bp over every filled order (buy vs close, sell vs open)
+    g1, g2 = abs(289.26 - 289.50) / 289.50 * 1e4, abs(289.4675 - 289.90) / 289.90 * 1e4
+    assert c["fill_gap_n"] == 2 and c["fill_gap_bp_mean"] == pytest.approx((g1 + g2) / 2, abs=0.01)
+    assert c["fill_gap_bp_upper95"] > c["fill_gap_bp_mean"]
 
 
 def test_runner_reconcile_skips_journaled_fills_and_journals_official_prints(monkeypatch, tmp_path):

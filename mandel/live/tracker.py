@@ -125,8 +125,12 @@ def calendar_progress(journal: list[dict]) -> dict:
     # Realised P&L from fills: sells minus buys, per symbol, over closed round trips (FIFO by quantity); the shadow P&L
     # is the same round trips at the official prints, where both legs have one.
     pnl, book, shadow, shadow_paper, n_trips, n_shadowed = 0.0, {}, 0.0, 0.0, 0, 0
+    gaps_bp = []                                           # T-559 criterion (a): |fill - official print| per side, bp, every filled order
     for r in sorted(fills, key=lambda r: str(r.get("filled_at"))):
         q, px, sym = float(r.get("filled_qty") or 0), float(r["filled_avg_price"]), r.get("symbol")
+        ref = _print(r.get("client_order_id"))
+        if ref:
+            gaps_bp.append(abs(px - ref) / ref * 1e4)
         lots = book.setdefault(sym, [])
         if r.get("side") == "buy":
             lots.append([q, px, _print(r.get("client_order_id"))])
@@ -151,7 +155,19 @@ def calendar_progress(journal: list[dict]) -> dict:
             "pnl_usd": round(pnl, 2) if fills else None, "round_trips": n_trips,
             "shadow_pnl_usd": round(shadow, 2) if n_shadowed else None,          # the same trips at the official prints
             "slippage_usd": round(shadow_paper - shadow, 2) if n_shadowed else None,   # paper minus official, those trips
-            "shadowed_trips": n_shadowed}
+            "shadowed_trips": n_shadowed,
+            # the registered execution statistic: mean |fill - official auction print| per side in bp, 95% upper bound
+            # (pass at 60 sessions: mean <= 1.5 bp, upper <= 2.5 bp). On Alpaca paper the fill is a 15:44 / 09:33 print,
+            # so this measures the paper venue, not an auction; only live auction orders can pass it.
+            "fill_gap_bp_mean": round(sum(gaps_bp) / len(gaps_bp), 2) if gaps_bp else None,
+            "fill_gap_bp_upper95": (round(sum(gaps_bp) / len(gaps_bp) + 1.645 * _sd(gaps_bp) / len(gaps_bp) ** 0.5, 2)
+                                    if len(gaps_bp) > 1 else None),
+            "fill_gap_n": len(gaps_bp)}
+
+
+def _sd(x: list) -> float:
+    m = sum(x) / len(x)
+    return (sum((v - m) ** 2 for v in x) / (len(x) - 1)) ** 0.5
 
 
 def spread_progress(journal: list[dict]) -> dict:

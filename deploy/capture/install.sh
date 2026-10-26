@@ -37,6 +37,7 @@ $SUDO apt-get install -y python3-venv >/dev/null
 python3 -m venv "$DIR/.venv"
 "$DIR/.venv/bin/pip" install -q "httpx>=0.25" numpy tzdata pytest
 "$DIR/.venv/bin/python" -m pytest -q "$DIR/tests/test_mandel_wide_shadow_capture.py" "$DIR/tests/test_mandel_batch8_markov.py"
+(cd "$DIR" && "$DIR/.venv/bin/python" -m mandel --help > /dev/null)   # the CLI must import in THIS venv (2026-10-21..23: pandas/scipy on the import path killed every nightly capture)
 
 echo "== 2. data directories in $DATA"
 mkdir -p "$DATA/archive" "$DATA/state" "$DATA/capture" "$DATA/wide"
