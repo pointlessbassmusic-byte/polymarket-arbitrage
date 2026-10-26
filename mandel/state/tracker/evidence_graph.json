@@ -208,9 +208,9 @@
    "id": "stream:cboe-PUT-history",
    "kind": "stream",
    "label": "cboe-PUT-history",
-   "state": "stale",
-   "age_days": 11,
-   "latest": "2026-10-15",
+   "state": "ok",
+   "age_days": 1,
+   "latest": "2026-10-25",
    "captures": null
   },
   {

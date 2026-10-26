@@ -1,5 +1,5 @@
 {
- "as_of": "2026-10-23T22:30:05+00:00",
+ "as_of": "2026-10-26T22:30:09+00:00",
  "families": {
   "social-reddit": {
    "latest": "2026-10-20",
@@ -241,7 +241,6 @@
   "hourly--VIX": "2026-10-15T08:36:05",
   "fx-spot-g10": "2026-10-15T08:37:09",
   "fx-rates-3m": "2026-10-15T08:37:09",
-  "cboe-BXM-history": "2026-10-15T14:27:39",
   "cboe-BXMD-history": "2026-10-15T14:27:39",
   "cboe-BXY-history": "2026-10-15T14:27:40",
   "cboe-BXMC-history": "2026-10-15T14:27:41",
@@ -265,7 +264,6 @@
   "cboe-BXTB-history": "2026-10-15T14:27:53",
   "cboe-BXGBTCA-history": "2026-10-15T14:27:54",
   "cboe-BXGBTCT-history": "2026-10-15T14:27:55",
-  "cboe-PUT-history": "2026-10-15T14:27:55",
   "cboe-PUTY-history": "2026-10-15T14:27:56",
   "cboe-WPUT-history": "2026-10-15T14:27:57",
   "cboe-PUTD-history": "2026-10-15T14:27:57",
@@ -3444,16 +3442,18 @@
   "fred-DGS2": "2026-10-20T22:30:36",
   "fred-DFF": "2026-10-20T22:30:37",
   "deribit-dvol-BTC-history": "2026-10-20T22:30:40",
-  "deribit-dvol-ETH-history": "2026-10-20T22:30:44"
+  "deribit-dvol-ETH-history": "2026-10-20T22:30:44",
+  "cboe-PUT-history": "2026-10-25T11:30:04",
+  "cboe-BXM-history": "2026-10-25T11:30:05"
  },
  "last_runs": {
   "daily": {
-   "ts": "2026-10-23T22:30:05+00:00",
+   "ts": "2026-10-26T22:30:09+00:00",
    "steps": [
     {
      "step": "options-fetch",
      "rc": 1,
-     "seconds": 0.6,
+     "seconds": 0.5,
      "tail": [
       "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
       "    import pandas as pd",
@@ -3463,7 +3463,7 @@
     {
      "step": "options-fetch --smile",
      "rc": 1,
-     "seconds": 0.3,
+     "seconds": 0.4,
      "tail": [
       "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
       "    import pandas as pd",
@@ -3473,7 +3473,7 @@
     {
      "step": "options-fetch --history",
      "rc": 1,
-     "seconds": 0.3,
+     "seconds": 0.6,
      "tail": [
       "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
       "    import pandas as pd",
@@ -3483,7 +3483,7 @@
     {
      "step": "social-fetch",
      "rc": 1,
-     "seconds": 0.3,
+     "seconds": 0.4,
      "tail": [
       "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
       "    import pandas as pd",
@@ -3499,6 +3499,27 @@
       "    import pandas as pd",
       "ModuleNotFoundError: No module named 'pandas'"
      ]
+    }
+   ]
+  },
+  "weekly": {
+   "ts": "2026-10-25T11:30:05+00:00",
+   "steps": [
+    {
+     "step": "unlock-fetch all",
+     "rc": 1,
+     "seconds": 0.5,
+     "tail": [
+      "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
+      "    import pandas as pd",
+      "ModuleNotFoundError: No module named 'pandas'"
+     ]
+    },
+    {
+     "step": "-c from mandel.archive import Archive; from mandel.data.cboe_strategy import fetch_cboe_strategy as f; f(Archive(), symb",
+     "rc": 0,
+     "seconds": 1.4,
+     "tail": []
     }
    ]
   }

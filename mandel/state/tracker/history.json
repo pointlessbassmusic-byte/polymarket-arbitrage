@@ -795,9 +795,9 @@
   "day": "2026-10-26",
   "id": "T-559",
   "owner": "Mandel",
-  "n_now": 4,
-  "progress": 0.0667,
-  "pnl_usd": -1.37
+  "n_now": 5,
+  "progress": 0.0833,
+  "pnl_usd": 2.9
  },
  {
   "day": "2026-10-26",
@@ -835,24 +835,24 @@
   "day": "2026-10-26",
   "id": "T-565",
   "owner": "Mandel",
-  "n_now": 4,
-  "progress": 0.1111,
+  "n_now": 5,
+  "progress": 0.1389,
   "pnl_usd": null
  },
  {
   "day": "2026-10-26",
   "id": "T-566",
   "owner": "Mandel",
-  "n_now": 4,
-  "progress": 0.02,
+  "n_now": 5,
+  "progress": 0.025,
   "pnl_usd": null
  },
  {
   "day": "2026-10-26",
   "id": "T-573",
   "owner": "Mandel",
-  "n_now": 4,
-  "progress": 0.02,
+  "n_now": 5,
+  "progress": 0.025,
   "pnl_usd": null
  },
  {

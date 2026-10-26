@@ -108,6 +108,18 @@
   "note": ""
  },
  {
+  "id": "T-592",
+  "status": "inconclusive",
+  "claim": "Over 2007-06-20..2026-10, using live PUT marks, the Cboe PUT index's mean residual return over Friday-close-to-Monday-close intervals exceeds 1.5 times its mean residual over singl",
+  "data_ready": 1.0,
+  "new_data": true,
+  "missing": "",
+  "min_n": 500,
+  "score": 0.597,
+  "unblocked": false,
+  "note": ""
+ },
+ {
   "id": "T-367",
   "status": "inconclusive",
   "claim": "From February 2023 to September 2026, the TVL-weighted mean spread of the 7-day base APY of US-accessible Ethereum USDC lending pools (Aave v3, Spark, Maple) over DTB3 is below the",
@@ -219,18 +231,6 @@
   "id": "T-623",
   "status": "blocked",
   "claim": "For AAPL, GOOG(L) and AMZN quarterly earnings releases 2011-04 to 2026-10 (8-K Item 2.02), the pooled variance ratio VR = sum(R^2) / sum(IEV) is below 1. Definitions: R = ln(C_reac",
-  "data_ready": 1.0,
-  "new_data": null,
-  "missing": "",
-  "min_n": 150,
-  "score": 0.324,
-  "unblocked": true,
-  "note": "data present: check its coverage before running"
- },
- {
-  "id": "T-635",
-  "status": "blocked",
-  "claim": "Over 2019-10 to 2026-10, on weeks with no monthly expiration in either the signal week or the prior week, the Friday-to-Friday change in log(SPX+SPXW call OI) minus log(SPX+SPXW pu",
   "data_ready": 1.0,
   "new_data": null,
   "missing": "",

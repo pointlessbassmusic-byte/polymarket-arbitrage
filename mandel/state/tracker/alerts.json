@@ -35,18 +35,6 @@
   "action": "give each owner its own paper account"
  },
  {
-  "id": "stream:stream:cboe-PUT-history",
-  "severity": "warning",
-  "kind": "stream",
-  "node": "stream:cboe-PUT-history",
-  "message": "cboe-PUT-history: no data since 2026-10-15 (11 days); it also holds back 1 blocked theory (T-565)",
-  "affected": "T-565",
-  "n_affected": 1,
-  "action": "restart the capture",
-  "latest": "2026-10-15",
-  "theories_held": 1
- },
- {
   "id": "stream:stream:fred-DTB3",
   "severity": "info",
   "kind": "stream",

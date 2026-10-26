@@ -635,7 +635,7 @@
   "kind": "reads",
   "target": "cboe-PUT-history",
   "target_kind": "stream",
-  "health": "stale",
+  "health": "ok",
   "key": "T-565|stream:cboe-PUT-history"
  },
  {
