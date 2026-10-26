@@ -23,7 +23,8 @@ Instruments (amendment of 2026-10-20): every trade is also scored as
   bin60    the same over the 60 minutes from the entry bar's open
 Binary results are per dollar staked, in bp.
 
-Fills: the signal is read on a closed bar; entry at the next bar's open;
+Fills: the signal is read on a closed bar; entry at the next bar's open,
+only if that bar is inside a window and follows the signal bar directly;
 stops and targets on later bars (a bar touching both is the stop; a gap
 through a level fills at the open); at the first bar outside the windows
 the position is closed at that bar's open.
@@ -100,6 +101,21 @@ def window(ts: float) -> Optional[str]:
     return None
 
 
+def stock_window(ts: float) -> Optional[str]:
+    """US session windows (New York time): 'am' 09:30-12:00, 'pm' 13:00-15:55,
+    weekdays; both directions are traded inside them (daytrade-stocks)."""
+    from zoneinfo import ZoneInfo
+    t = dt.datetime.fromtimestamp(ts, ZoneInfo("America/New_York"))
+    if t.weekday() >= 5:
+        return None
+    m = t.hour * 60 + t.minute
+    if 9 * 60 + 30 <= m < 12 * 60:
+        return "am"
+    if 13 * 60 <= m < 15 * 60 + 55:
+        return "pm"
+    return None
+
+
 def ema(xs: list[float], n: int) -> list[float]:
     k = 2 / (n + 1)
     out, e = [], None
@@ -153,9 +169,15 @@ class Engine:
     """Bar-by-bar state machine. Feed closed bars in order with `on_bar`;
     it returns any trade that closed on that bar."""
 
-    def __init__(self, variant: str = "V0", asset: str = "BTC"):
+    def __init__(self, variant: str = "V0", asset: str = "BTC", window_fn=None, cost: Optional[float] = None):
+        """window_fn: ts -> window label (default: the crypto windows);
+        stock_window switches V2 to the opening-range filter on both sides.
+        cost: round trip in bp (default: Kalshi perps for `asset`)."""
         assert variant in VARIANTS
         self.variant, self.asset = variant, asset
+        self._win = window_fn or window
+        self.stock = window_fn is stock_window
+        self._cost = cost_bp(asset) if cost is None else cost
         self.bars: list[Bar] = []
         self.pos: Optional[Position] = None
         self.pending: Optional[tuple[int, str, Optional[float]]] = None   # side, window, atr at the signal bar
@@ -165,7 +187,7 @@ class Engine:
         i = len(b) - 1
         if i < 30:
             return None
-        w = window(b[i][0])
+        w = self._win(b[i][0])
         if w is None:
             return None
         closes = [x[4] for x in b[-200:]]
@@ -173,6 +195,24 @@ class Engine:
         up = f[-2] <= s[-2] and f[-1] > s[-1]
         down = f[-2] >= s[-2] and f[-1] < s[-1]
         a = atr(b[-200:])[-1]
+        if self.stock:
+            side = 1 if up else (-1 if down else 0)
+            if not side:
+                return None
+            if self.variant == "V2":
+                from zoneinfo import ZoneInfo
+                et = ZoneInfo("America/New_York")
+                now = dt.datetime.fromtimestamp(b[i][0], et)
+                day = now.date()
+                orng = [x for x in b[-60:] if dt.datetime.fromtimestamp(x[0], et).date() == day
+                        and dt.time(9, 30) <= dt.datetime.fromtimestamp(x[0], et).time() < dt.time(10, 0)]
+                if not orng or now.time() < dt.time(10, 0):
+                    return None
+                if side > 0 and b[i][4] <= max(x[2] for x in orng):
+                    return None
+                if side < 0 and b[i][4] >= min(x[3] for x in orng):
+                    return None
+            return (side, w, a)
         if w == "bull" and up:
             if self.variant == "V2":
                 day = dt.datetime.fromtimestamp(b[i][0], dt.timezone.utc).date()
@@ -207,12 +247,14 @@ class Engine:
         if self.pending and self.pos is None:
             side, w, a = self.pending
             self.pending = None
-            ex = exits_for(self.variant, side, o, a)
+            prev = self.bars[-2][0] if len(self.bars) > 1 else ts
+            # enter only inside a window and on the bar right after the signal (never across a session gap)
+            ex = exits_for(self.variant, side, o, a) if self._win(ts) is not None and ts - prev <= 7200 else None
             if ex is not None:
                 self.pos = Position(side, o, ex[0], ex[1], ts, w)
         if self.pos is not None:
             p = self.pos
-            if window(ts) is None and ts > p.entry_ts:
+            if self._win(ts) is None and ts > p.entry_ts:
                 closed = self._close(o, ts, "flat_out_of_hours")
             else:
                 hit_stop = (l <= p.stop) if p.side > 0 else (h >= p.stop)
@@ -235,7 +277,7 @@ class Engine:
         gross = p.side * (px / p.entry - 1) * 1e4
         return {"asset": self.asset, "variant": self.variant, "side": p.side, "window": p.window,
                 "entry_ts": p.entry_ts, "exit_ts": ts, "entry": p.entry, "exit": px, "reason": reason,
-                "gross_bp": gross, "net_bp": gross - cost_bp(self.asset)}
+                "gross_bp": gross, "net_bp": gross - self._cost}
 
 
 def resample(bars: list[Bar], seconds: int) -> list[Bar]:
@@ -250,8 +292,8 @@ def resample(bars: list[Bar], seconds: int) -> list[Bar]:
     return [tuple(out[k]) for k in sorted(out)]
 
 
-def backtest(bars: list[Bar], variant: str, asset: str) -> list[dict]:
-    e = Engine(variant, asset)
+def backtest(bars: list[Bar], variant: str, asset: str, window_fn=None, cost: Optional[float] = None) -> list[dict]:
+    e = Engine(variant, asset, window_fn, cost)
     trades = []
     for b in bars:
         t = e.on_bar(b)

@@ -1756,3 +1756,18 @@ carries its spot result, and each entry is scored as a 15-minute and an
 hourly binary (`state/daytrade/binaries.jsonl`), so the instrument
 comparison continues forward at no cost.
 
+Correction, 2026-10-26: the engine let a signal on the last bar of a
+window enter at the next bar's open even when that bar was outside the
+window. That broke the registered rule "flat outside the windows", and
+for stocks it would have carried a signal across the overnight gap. Now
+fixed: the engine enters only inside a window, on the bar right after the
+signal. On the rerun:
+
+- No cell is a candidate, before or after the fix.
+- V0 on BTC 30-minute bars on the perp moved from -1.9 to +0.2 bp a
+  trade. V0 is therefore not negative on every cell, so under the
+  registered rule it is inconclusive rather than killed. The paper bot
+  runs V0 again.
+- The evening-bounce pattern is unchanged: pooled UP 56.4% over 920
+  entries.
+

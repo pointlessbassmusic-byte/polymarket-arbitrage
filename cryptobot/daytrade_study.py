@@ -59,7 +59,7 @@ def load(scratch: Path, asset: str):
     return [tuple(r) for r in json.loads(p.read_text())] if p.exists() else []
 
 
-def summarize(tr: list[dict], key: str = "net_bp") -> dict:
+def summarize(tr: list[dict], key: str = "net_bp", windows: tuple = ("bull", "bear")) -> dict:
     tr = [t for t in tr if t.get(key) is not None]
     if len(tr) < 5:
         return {"n": len(tr)}
@@ -72,7 +72,7 @@ def summarize(tr: list[dict], key: str = "net_bp") -> dict:
            "h2": statistics.fmean([x for x, d in zip(nets, days) if d >= mid] or [0.0]),
            "sr": statistics.fmean(nets) / statistics.pstdev(nets) if statistics.pstdev(nets) > 0 else 0.0,
            "exits": {k: sum(1 for t in tr if t["reason"] == k) / len(tr) for k in ("target", "stop", "flat_out_of_hours")}}
-    for w in ("bull", "bear"):
+    for w in windows:
         x = [t[key] for t in tr if t["window"] == w]
         out[w] = (len(x), statistics.fmean(x) if x else None)
     out["per_day"] = len(tr) / max(1, len(set(days)))

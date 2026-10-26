@@ -298,5 +298,5 @@ collectors:
 daytrade:
   enabled: true
   assets: [BTC, ETH, SOL, DOGE]
-  variants: [V1, V2]          # V0 (the template as written) killed by the backtest 2026-10-20; V1 feeds daytrade-bear-cross-bounce
+  variants: [V0, V1, V2]      # all inconclusive after the 2026-10-26 correction; V1 feeds daytrade-bear-cross-bounce
   notional_usd: 250

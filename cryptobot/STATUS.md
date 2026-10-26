@@ -9,7 +9,7 @@ One page for the operator. Everything here is in the registry
 | strategy | venue | status | evidence |
 |---|---|---|---|
 | bounce-short on DOGE / SHIB (PEPE when Kalshi activates it) | Kalshi perps | paper until funded and armed | inconclusive: backtest +9–15%/yr on capital, deflated Sharpe 0.13–0.35, so run small and let live fills decide |
-| day trading bot (time-block scalper V1/V2) | paper only, inside the desk | backtest 2026-10-20: no edge on perps, spot or Kalshi binaries (96 trials); V0 killed; the evening-bounce binary is a forward test to about 2027-05 |
+| day trading bot (time-block scalper V1/V2) | paper only, inside the desk | backtest 2026-10-20: no edge on perps, spot or Kalshi binaries (96 trials); no variant killed (corrected 2026-10-26); the evening-bounce binary is a forward test to about 2027-05 |
 | funding carry | shelved in the US | allocation 0 | funding on US venues averages about zero |
 
 The allocator sizes the bounce-short from its evidence and the live
