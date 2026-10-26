@@ -29,7 +29,7 @@ sudo apt update && sudo apt install -y git python3 python3-venv nginx
 git clone https://github.com/pointlessbassmusic-byte/polymarket-arbitrage.git ~/mandel
 cd ~/mandel && git checkout main
 python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
-python -m pytest tests/test_mandel_*.py -q          # the engine's own tests
+python -m pytest tests/test_mandel_*.py -q -n 4     # the engine's own tests (4 workers: ~5 min instead of 14)
 python -m mandel status                              # ledger integrity and counts
 python -m mandel graph                               # rebuild viz/graph.json and viz/index.html
 ```
@@ -102,7 +102,7 @@ git clone https://github.com/pointlessbassmusic-byte/polymarket-arbitrage.git
 cd polymarket-arbitrage
 py -m venv .venv; .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-py -m pytest tests\test_mandel_*.py -q
+py -m pytest tests\test_mandel_*.py -q -n 4
 py -m mandel status
 py -m mandel graph; start .\mandel\viz\index.html     # opens the map locally
 ```
