@@ -102,3 +102,13 @@ def test_evidence_overlay_tallies_verdicts(tmp_path):
     k = next(n for n in g["nodes"] if n["id"] == "k:vrp")
     assert k["meta"]["verdicts"]["Mandel's tested theories"] == {"supported": 2, "not_supported": 1}
     assert all(e["s"] in ids and e["t"] in ids for e in g["edges"])
+
+
+def test_lexicon_compiles_to_one_scan_per_concept_and_counts_a_span_once():
+    """Efficiency review 2026-10-26: 272 patterns ran as 272 scans of every document (14 of the map's 16 build seconds).
+    One alternation per concept scans once; a span matching two of a concept's patterns is one mention, not two."""
+    from mandel import graph as G
+    rx = G._compile()
+    assert set(rx) == set(G.LEXICON) and all(len(v) == 1 for v in rx.values())
+    rxs = [__import__("re").compile("|".join(f"(?:{p})" for p in (r"\bfoo bar\b", r"\bfoo\b")), 2)]
+    assert G._count_mentions("foo bar and foo again, no f00", rxs) == 2

@@ -188,7 +188,9 @@ class Edge:
 
 
 def _compile() -> dict[str, list[re.Pattern]]:
-    return {cid: [re.compile(p, re.I) for p in pats] for cid, (_, _, pats) in LEXICON.items()}
+    """One alternation pattern per concept (a list of one, so callers iterate as before): the 272 lexicon patterns run as
+    58 scans of each document instead of 272, which took 14 of the map's 16 build seconds (efficiency review 2026-10-26)."""
+    return {cid: [re.compile("|".join(f"(?:{p})" for p in pats), re.I)] for cid, (_, _, pats) in LEXICON.items()}
 
 
 def _section(text: str, heading_rx: str) -> str:
@@ -213,12 +215,12 @@ def _display_path(f: Path, repo_root: Path, knowledge_root: Path) -> str:
 
 
 def _count_mentions(text: str, rxs: Iterable[re.Pattern]) -> int:
-    return sum(len(rx.findall(text)) for rx in rxs)
+    return sum(1 for rx in rxs for _ in rx.finditer(text))
 
 
-def _excerpt(text: str, rxs: Iterable[re.Pattern], width: int = 230) -> str:
+def _excerpt(text: str, rxs: Iterable[re.Pattern], width: int = 230, lines: Optional[list[str]] = None) -> str:
     """First bullet or sentence in the file that mentions the concept, trimmed."""
-    for line in text.splitlines():
+    for line in (text.splitlines() if lines is None else lines):
         if not line.strip() or line.startswith("#"):
             continue
         if any(r.search(line) for r in rxs):
@@ -280,10 +282,11 @@ def build_graph(knowledge_root: Path = KNOWLEDGE_ROOT, mandel_root: Path = MANDE
         # at least as often as the adopting section does
         skeptical_hits[sid] = {cid for cid, r in rx.items()
                                if _count_mentions(skept, r) > 0 and _count_mentions(skept, r) >= _count_mentions(adopt, r)}
+        lines = text.splitlines()
         for cid in counts:
             excerpts.setdefault(cid, [])
             if len(excerpts[cid]) < 8:
-                ex = _excerpt(text, rx[cid])
+                ex = _excerpt(text, rx[cid], lines=lines)
                 if ex:
                     excerpts[cid].append({"src": sid, "text": ex})
 
@@ -398,14 +401,14 @@ def _verdict_overlay(nodes, edges, rx, rows, sid, label, detail, text_of, status
     if not rows:
         return
     nodes[sid] = Node(sid, label, 0, "stream", size=2.2, group="streams", detail=detail, meta={"rows": len(rows)})
+    texts = [(text_of(t), status_of(t) or "unknown") for t in rows]     # built once, not once per concept
     for cid, r in rx.items():
         k = f"k:{cid}"
         if k not in nodes:
             continue
         tally: dict[str, int] = {}
-        for t in rows:
-            if _count_mentions(text_of(t), r):
-                st = status_of(t) or "unknown"
+        for text, st in texts:
+            if _count_mentions(text, r):
                 tally[st] = tally.get(st, 0) + 1
         if not tally:
             continue
@@ -417,8 +420,8 @@ def _verdict_overlay(nodes, edges, rx, rows, sid, label, detail, text_of, status
                           f"{desc} ({g} of {tested} decided passed)" if tested else desc))
 
 
-def write_graph(out_path: Optional[Path] = None, **kw) -> Path:
-    g = build_graph(**kw)
+def write_graph(out_path: Optional[Path] = None, graph: Optional[dict] = None, **kw) -> Path:
+    g = graph if graph is not None else build_graph(**kw)
     out = Path(out_path) if out_path else MANDEL_ROOT / "viz" / "graph.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(g, ensure_ascii=False, indent=0), encoding="utf-8")

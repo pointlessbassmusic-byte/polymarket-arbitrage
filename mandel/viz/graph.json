@@ -1453,11 +1453,11 @@
 "label": "Resource cost & budgets",
 "layer": 1,
 "kind": "concept",
-"size": 3.1356005054539455,
+"size": 3.125073800855029,
 "group": "substrate",
 "detail": "Substrate",
 "meta": {
-"mentions": 47,
+"mentions": 46,
 "documents": 17,
 "excerpts": [
 {
@@ -1659,11 +1659,11 @@
 "label": "Evaluation is the bottleneck",
 "layer": 1,
 "kind": "concept",
-"size": 2.239720770839918,
+"size": 2.0958797346140274,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 7,
+"mentions": 5,
 "documents": 3,
 "excerpts": [
 {
@@ -1886,11 +1886,11 @@
 "label": "Gradient descent",
 "layer": 1,
 "kind": "concept",
-"size": 2.745521226679158,
+"size": 2.7222612188617115,
 "group": "learning",
 "detail": "Learning",
 "meta": {
-"mentions": 21,
+"mentions": 20,
 "documents": 6,
 "excerpts": [
 {
@@ -2007,11 +2007,11 @@
 "label": "Information as physical",
 "layer": 1,
 "kind": "concept",
-"size": 2.6978661367769954,
+"size": 2.645185878948082,
 "group": "information",
 "detail": "Information",
 "meta": {
-"mentions": 19,
+"mentions": 17,
 "documents": 4,
 "excerpts": [
 {
@@ -2893,11 +2893,11 @@
 "label": "Proper scoring rules",
 "layer": 1,
 "kind": "concept",
-"size": 3.3653666701431657,
+"size": 3.352032546602085,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 75,
+"mentions": 73,
 "documents": 20,
 "excerpts": [
 {
@@ -3230,11 +3230,11 @@
 "label": "Recursive self-improvement",
 "layer": 1,
 "kind": "concept",
-"size": 3.2554369320866554,
+"size": 3.125073800855029,
 "group": "learning",
 "detail": "Learning",
 "meta": {
-"mentions": 60,
+"mentions": 46,
 "documents": 19,
 "excerpts": [
 {
@@ -3479,11 +3479,11 @@
 "label": "Volume & liquidity",
 "layer": 1,
 "kind": "concept",
-"size": 3.831345094452443,
+"size": 3.7992485156329128,
 "group": "variables",
 "detail": "Market variables",
 "meta": {
-"mentions": 192,
+"mentions": 180,
 "documents": 18,
 "excerpts": [
 {
@@ -3949,8 +3949,8 @@
 "t": "k:information",
 "type": "provenance",
 "sign": 1,
-"w": 3.772588722239781,
-"label": "15 mentions"
+"w": 3.639057329615259,
+"label": "13 mentions"
 },
 {
 "s": "src:01",
@@ -4501,8 +4501,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 4.178053830347945,
-"label": "23 mentions"
+"w": 3.995732273553991,
+"label": "19 mentions"
 },
 {
 "s": "src:04",
@@ -4517,8 +4517,8 @@
 "t": "k:evaluation_bottleneck",
 "type": "provenance",
 "sign": 1,
-"w": 2.791759469228055,
-"label": "5 mentions"
+"w": 2.386294361119891,
+"label": "3 mentions"
 },
 {
 "s": "src:04",
@@ -4749,8 +4749,8 @@
 "t": "k:gradient_descent",
 "type": "provenance",
 "sign": 1,
-"w": 2.6094379124341005,
-"label": "4 mentions"
+"w": 2.386294361119891,
+"label": "3 mentions"
 },
 {
 "s": "src:05",
@@ -4917,8 +4917,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "2 mentions"
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "src:06",
@@ -5061,8 +5061,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "2 mentions"
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "src:07",
@@ -5173,8 +5173,8 @@
 "t": "k:proper_scoring",
 "type": "provenance",
 "sign": 1,
-"w": 3.5649493574615367,
-"label": "12 mentions"
+"w": 3.4849066497880004,
+"label": "11 mentions"
 },
 {
 "s": "src:07",
@@ -5293,8 +5293,8 @@
 "t": "k:rsi",
 "type": "skeptical",
 "sign": -1,
-"w": 2.386294361119891,
-"label": "3 mentions (held loosely)"
+"w": 2.0986122886681096,
+"label": "2 mentions (held loosely)"
 },
 {
 "s": "src:08",
@@ -5437,8 +5437,8 @@
 "t": "k:rsi",
 "type": "skeptical",
 "sign": -1,
-"w": 2.6094379124341005,
-"label": "4 mentions (held loosely)"
+"w": 2.386294361119891,
+"label": "3 mentions (held loosely)"
 },
 {
 "s": "src:09",
@@ -5597,8 +5597,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.386294361119891,
-"label": "3 mentions"
+"w": 2.0986122886681096,
+"label": "2 mentions"
 },
 {
 "s": "src:10",
@@ -5797,8 +5797,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "2 mentions"
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "src:11",
@@ -5989,8 +5989,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "2 mentions"
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "src:12",
@@ -6069,8 +6069,8 @@
 "t": "k:proper_scoring",
 "type": "provenance",
 "sign": 1,
-"w": 2.791759469228055,
-"label": "5 mentions"
+"w": 2.6094379124341005,
+"label": "4 mentions"
 },
 {
 "s": "src:12",
@@ -6253,8 +6253,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "2 mentions"
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "src:13",
@@ -6469,8 +6469,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "2 mentions"
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "src:14",
@@ -6821,8 +6821,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.386294361119891,
-"label": "3 mentions"
+"w": 2.0986122886681096,
+"label": "2 mentions"
 },
 {
 "s": "src:16",
@@ -7045,8 +7045,8 @@
 "t": "k:cost_budget",
 "type": "skeptical",
 "sign": -1,
-"w": 2.0986122886681096,
-"label": "2 mentions (held loosely)"
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
 },
 {
 "s": "adj:A10",
@@ -7165,8 +7165,8 @@
 "t": "k:volume",
 "type": "provenance",
 "sign": 1,
-"w": 5.477336814478207,
-"label": "87 mentions"
+"w": 5.418840607796598,
+"label": "82 mentions"
 },
 {
 "s": "adj:A10",
@@ -7693,8 +7693,8 @@
 "t": "k:volume",
 "type": "skeptical",
 "sign": -1,
-"w": 3.3978952727983707,
-"label": "10 mentions (held loosely)"
+"w": 3.302585092994046,
+"label": "9 mentions (held loosely)"
 },
 {
 "s": "adj:A13",
@@ -8213,8 +8213,8 @@
 "t": "k:volume",
 "type": "provenance",
 "sign": 1,
-"w": 3.639057329615259,
-"label": "13 mentions"
+"w": 3.4849066497880004,
+"label": "11 mentions"
 },
 {
 "s": "adj:A16",
@@ -8413,8 +8413,8 @@
 "t": "k:volume",
 "type": "provenance",
 "sign": 1,
-"w": 2.791759469228055,
-"label": "5 mentions"
+"w": 2.6094379124341005,
+"label": "4 mentions"
 },
 {
 "s": "adj:A17",
@@ -9357,8 +9357,8 @@
 "t": "k:volume",
 "type": "provenance",
 "sign": 1,
-"w": 3.1972245773362196,
-"label": "8 mentions"
+"w": 3.0794415416798357,
+"label": "7 mentions"
 },
 {
 "s": "adj:A7",
@@ -9765,8 +9765,8 @@
 "t": "k:volume",
 "type": "provenance",
 "sign": 1,
-"w": 2.9459101490553135,
-"label": "6 mentions"
+"w": 2.6094379124341005,
+"label": "4 mentions"
 },
 {
 "s": "adj:A9",

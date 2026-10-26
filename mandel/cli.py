@@ -502,7 +502,7 @@ def cmd_graph(args) -> int:
     kids = [{"name": ch.name, "domain": ch.domain, "status": ch.status, "report_count": ch.report_count,
              "guidance_count": ch.guidance_count, "text": ev["texts"].get(ch.name.lower(), "")} for ch in reg.all()]
     g = build_graph(children=kids, theories=ev["theories"], child_ledger=ev["child_ledger"])
-    out = write_graph(children=kids, theories=ev["theories"], child_ledger=ev["child_ledger"])
+    out = write_graph(graph=g)                     # the graph just built, not a second build
     print(f"graph: {g['stats']} -> {out}")
     if TEMPLATE_PATH.exists() and not args.json_only:
         html = write_html(g)
