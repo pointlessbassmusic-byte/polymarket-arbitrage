@@ -1,5 +1,5 @@
 {
- "as_of": "2026-10-27",
+ "as_of": "2026-10-28",
  "nodes": [
   {
    "id": "T-559",
@@ -104,7 +104,7 @@
    "kind": "stream",
    "label": "options-chain-SPX",
    "state": "stale",
-   "age_days": 7,
+   "age_days": 8,
    "latest": "2026-10-20",
    "captures": 3
   },
@@ -132,7 +132,7 @@
    "kind": "stream",
    "label": "options-chain-VIX",
    "state": "stale",
-   "age_days": 7,
+   "age_days": 8,
    "latest": "2026-10-20",
    "captures": 3
   },
@@ -141,7 +141,7 @@
    "kind": "stream",
    "label": "cboe-VVIX-history",
    "state": "stale",
-   "age_days": 7,
+   "age_days": 8,
    "latest": "2026-10-20",
    "captures": null
   },
@@ -163,7 +163,7 @@
    "kind": "stream",
    "label": "deribit-dvol-BTC-history",
    "state": "stale",
-   "age_days": 7,
+   "age_days": 8,
    "latest": "2026-10-20",
    "captures": null
   },
@@ -172,7 +172,7 @@
    "kind": "stream",
    "label": "fomc-meetings",
    "state": "ok",
-   "age_days": 12,
+   "age_days": 13,
    "latest": "2026-10-15",
    "captures": null
   },
@@ -181,7 +181,7 @@
    "kind": "stream",
    "label": "macro-release-cpi",
    "state": "ok",
-   "age_days": 12,
+   "age_days": 13,
    "latest": "2026-10-15",
    "captures": null
   },
@@ -209,7 +209,7 @@
    "kind": "stream",
    "label": "cboe-PUT-history",
    "state": "ok",
-   "age_days": 2,
+   "age_days": 3,
    "latest": "2026-10-25",
    "captures": null
   },
@@ -315,7 +315,7 @@
    "kind": "stream",
    "label": "child:Hurst:kalshi-perp-books",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -353,7 +353,7 @@
    "kind": "stream",
    "label": "child:Hurst:alpaca-bars",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -413,7 +413,7 @@
    "kind": "stream",
    "label": "child:Hurst:kalshi-settled-binaries",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -440,7 +440,7 @@
    "kind": "stream",
    "label": "child:Hurst:hype-signals",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -461,7 +461,7 @@
    "kind": "stream",
    "label": "child:Hurst:perp-funding",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -469,7 +469,7 @@
    "kind": "stream",
    "label": "child:Hurst:ibit-surface",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -509,7 +509,7 @@
    "kind": "stream",
    "label": "child:Kelly:kalshi-books",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -538,7 +538,7 @@
    "kind": "stream",
    "label": "child:Brier:pmus-books",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -570,7 +570,7 @@
    "kind": "stream",
    "label": "child:Brier:polymarket-tape",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -597,7 +597,7 @@
    "kind": "stream",
    "label": "child:Shannon:cb-watch",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
@@ -629,7 +629,7 @@
    "kind": "stream",
    "label": "fred-DTB3",
    "state": "stale",
-   "age_days": 7,
+   "age_days": 8,
    "latest": "2026-10-20",
    "captures": null
   },
@@ -667,7 +667,7 @@
    "kind": "stream",
    "label": "child:Shannon:kalshi-crypto-recorder",
    "state": "child",
-   "age_days": 1,
+   "age_days": 2,
    "latest": "2026-10-26"
   },
   {
