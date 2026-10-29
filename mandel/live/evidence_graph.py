@@ -327,6 +327,16 @@ def _need_count(blocked_on: str) -> Optional[int]:
     return max(found) if found else None
 
 
+FETCH_MARKERS = ("to fetch", "re-fetch", "refetch", "to archive", "to capture", "new:", "(free, via", "free socrata fetch", "re-fetched with")
+
+
+def needs_fetch(text: str) -> bool:
+    """The theory's own words say a fetch is still owed: matching bundle prefixes do not make it ready (2026-10-29: thirteen
+    blocked theories read data-present because 'sec-submissions-b*' existed while their text asked for a re-fetch with 'items')."""
+    t = (text or "").lower()
+    return any(k in t for k in FETCH_MARKERS)
+
+
 def out_of_reach(text: str) -> bool:
     """A data field or blocked_on that names paid or barred data: never 'ready' however many bundle names match."""
     t = (text or "").lower()
@@ -345,6 +355,8 @@ def data_readiness(data_field: str, bundles: dict, blocked_on: str = "") -> tupl
     need = _need_count(blocked_on)
     if out_of_reach(data_field) or out_of_reach(blocked_on):
         return 0.0, ["out of reach: paid or barred data named"]
+    if needs_fetch(data_field) or needs_fetch(blocked_on):      # names a bundle that exists but says it must be (re-)fetched
+        return 0.5, ["a fetch or re-fetch is still named"]
     for nm in names:
         prefix = re.split(r"<|\*", nm)[0]
         if prefix == nm:

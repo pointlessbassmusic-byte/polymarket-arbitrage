@@ -127,3 +127,11 @@ def test_blocked_theory_with_its_data_present_ranks_like_an_inconclusive_one():
     out = {x["id"]: x for x in G.next_tests(reg, b, result_times={"X-1": "2026-10-15"})}
     assert out["T-2"]["unblocked"] is True and out["T-2"]["score"] > out["T-1"]["score"]        # data arrived: full weight; T-1 has no new data
     assert out["T-3"]["score"] == pytest.approx(out["T-2"]["score"] * 0.5 * 0.5, abs=0.01)     # half the data, blocked weight
+
+
+def test_a_named_fetch_or_refetch_keeps_a_blocked_theory_from_reading_ready():
+    b = {"sec-submissions-b1": {}, "fja-sp500-components": {}}
+    r, miss = G.data_readiness("sec-submissions-b* (re-fetched with items), fja-sp500-components", b, "8-K acceptance datetimes (free submissions re-fetch with 'items')")
+    assert r == 0.5 and "fetch" in miss[0]
+    r2, _ = G.data_readiness("sec-submissions-b*, fja-sp500-components", b, "")
+    assert r2 == 1.0
