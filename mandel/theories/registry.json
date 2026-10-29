@@ -14333,12 +14333,14 @@
     "pass": "one-sided 95% studentized lower bound of the mean > 0 and DSR > 0.95 over 11 trials",
     "controls": "NOT independent of T-362: its control (exit at the mean of the 15:00 and 16:00 London index: +1.01%, lower +0.35%) was seen; this successor tests whether a faithful settlement replication, rather than a seen alternative, changes the verdict; Bitstamp, Gemini, itBit and LMAX are missing from the replication (reported)"
    },
-   "experiments": [],
-   "testable_now": false,
-   "status": "blocked",
-   "blocked_on": "kraken-trades-1m-XBTUSD through 2026-09 (the fetch chain is at 2025-01)",
+   "experiments": [
+    "carry_cme_brr_exit"
+   ],
+   "testable_now": true,
+   "status": "untested",
+   "blocked_on": "",
    "results": [],
-   "notes": "pre-registered salvage successor of T-362 on 2026-10-20: T-362's test-window loss came from settlement slippage (+0.103% of spot) at a 16:00-London proxy exit; the real CME settlement is the BRR over 15:00-16:00, which the archived 1-minute venue data can replicate. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands."
+   "notes": "pre-registered salvage successor of T-362 on 2026-10-20: T-362's test-window loss came from settlement slippage (+0.103% of spot) at a 16:00-London proxy exit; the real CME settlement is the BRR over 15:00-16:00, which the archived 1-minute venue data can replicate. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-29: unblocked - kraken-trades-1m-XBTUSD now archived through 2026-09 (fetched 2026-10-26); the harness carry_cme_brr_exit replicates the BRR from Coinbase + Kraken 1-minute bars. First run (X-09f0f769) was recorded before the registry carried the harness id, so its verdict did not attach; re-run attaches it."
   },
   {
    "id": "T-553",
@@ -31184,7 +31186,9 @@
     "pass": "for TLT under BOTH readings: one-sided 95% lower bound of the difference > 0 net of 1 bp a side, both halves positive; IEF reported; disagreement between readings is undecided",
     "controls": "discovered by the 2026-10-20 IC scan (2,254 triples; bond_etf 5d/20d rows: own r20 inverse, DGS10-proxy r20 positive, confirmation IC 0.31-0.46 on 8-9 periods of 2024-2026). The bond-ETF cross-section is ~one factor (duration), so the scan's IC is a time-series duration call, not breadth; this replication uses pre-discovery years only and counts as one trial for its own DSR, with the scan disclosed as the discovery family. Yield-level and 2008/2020 crisis months reported as sensitivity."
    },
-   "experiments": [],
+   "experiments": [
+    "b14_treasury_20d_reversal"
+   ],
    "testable_now": true,
    "status": "untested",
    "blocked_on": "",

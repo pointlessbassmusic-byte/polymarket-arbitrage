@@ -1868,6 +1868,86 @@ def carry_cme_cash_and_carry(archive):
     return _wrap(cme_cash_and_carry(tab))
 
 
+BRR_PARTS = 12                 # the CME CF BRR: median of twelve 5-minute volume-weighted partitions, 15:00-16:00 London
+BRR_MIN_PARTS = 6
+
+
+def brr_replication(archive, expiry_days) -> dict:
+    """{expiry day: (brr, partitions used)} from the archived Coinbase and Kraken 1-minute bars: each 5-minute partition's
+    price is the volume-weighted mean of the two venues' bar closes x volumes (a close x volume proxy for the trade-level
+    VWAP the index uses; Bitstamp, Gemini, itBit and LMAX are not archived), the replication is the median of the
+    partitions with volume. NaN when fewer than BRR_MIN_PARTS partitions have volume."""
+    from mandel.experiments import batch6c_kraken as K
+    months = sorted({str(d)[:7] for d in expiry_days})
+    kr = K.stored_months(archive, K.KR_PREFIX, months)
+    cb = K.stored_months(archive, K.CB_PREFIX, months)
+    if not kr and not cb:
+        return {}
+    g = K.grid(archive, kr, cb)
+    out = {}
+    for d in expiry_days:
+        t16 = brr_ts(d)
+        i0 = (t16 - HOUR - g["T0"]) // 60
+        if i0 < 0 or i0 + 60 > g["N"]:
+            out[d] = (float("nan"), 0)
+            continue
+        parts = []
+        for p in range(BRR_PARTS):
+            sl = slice(i0 + 5 * p, i0 + 5 * p + 5)
+            kv, cv = np.nan_to_num(g["kr_vol"][sl]), np.nan_to_num(g["cb_vol"][sl])
+            kp, cp = np.nan_to_num(g["kr_close"][sl] * g["kr_vol"][sl]), np.nan_to_num(g["cb_close"][sl] * g["cb_vol"][sl])
+            vol = float(kv.sum() + cv.sum())
+            if vol > 0:
+                parts.append(float((kp.sum() + cp.sum()) / vol))
+        out[d] = (float(np.median(parts)) if len(parts) >= BRR_MIN_PARTS else float("nan"), len(parts))
+    return out
+
+
+def carry_cme_brr_exit(archive):
+    """T-552: T-362's cash-and-carry with the exit spot at a replication of the CME CF BRR (median of twelve 5-minute
+    volume-weighted partitions of Coinbase + Kraken 1-minute bars, 15:00-16:00 London) instead of the 16:00 London
+    index; DSR over T-362's 10 trials plus this one."""
+    miss = _missing(archive, [FUNDING, "daily-history-BTC-F", "fred-DTB3"])
+    if miss:
+        return miss
+    days, F, std = _btcf(archive)
+    tab = cme_contract_table(days, F, std, _spot_fn(archive), cme_expiries(), _index(archive, "fred-DTB3"))
+    brr = brr_replication(archive, [c["expiry"] for c in tab])
+    rows, replicated, fallback = [], 0, 0
+    for c in tab:
+        r = dict(c)
+        b, nparts = brr.get(c["expiry"], (float("nan"), 0))
+        r["S_exit_16_london"] = c["S_exit"]
+        r["brr_partitions"] = nparts
+        if math.isfinite(b):
+            r["S_exit"] = b
+            replicated += 1
+        else:
+            fallback += 1                                   # the 16:00 proxy stands in; counted and capped below
+        rows.append(r)
+    rep = cme_cash_and_carry(rows, n_trials=11, claim=("2022-01", "2026-09"))   # T-552's claim window (T-362's was 2018-01..)
+    test_rows = [r for r in rows if "2022-01" <= r["contract"] <= "2026-09"]
+    missing_test = [r["contract"] for r in test_rows if not math.isfinite(brr.get(r["expiry"], (float("nan"), 0))[0])]
+    slip = {}
+    for key, lab in (("S_exit", "brr_replication"), ("S_exit_16_london", "london_16_proxy")):
+        v = [abs(r["F_final"] - r[key]) / r["S0"] for r in test_rows if math.isfinite(r["F_final"]) and math.isfinite(r.get(key, float("nan")))]
+        slip[lab] = {"mean_abs_pct": float(np.mean(v)) * 100 if v else None, "n": len(v)}
+    rep["brr"] = {"replicated": replicated, "fallback_to_16_london": fallback, "test_months_without_replication": missing_test,
+                  "settlement_gap_vs_final_print": slip,
+                  "construction": "median of 12 five-minute VWAP partitions, Coinbase + Kraken 1-minute close x volume, 15:00-16:00 London; "
+                                  "Bitstamp, Gemini, itBit, LMAX missing"}
+    note = (f"BRR replication on {replicated} of {len(rows)} contract-months ({fallback} before the 1-minute archive keep the 16:00 "
+            f"London proxy; test months 2022-01..2026-09 without a replication: {len(missing_test)}); |final settlement - exit| "
+            f"{slip['brr_replication']['mean_abs_pct']:.3f}% of spot with the replication vs "
+            f"{slip['london_16_proxy']['mean_abs_pct']:.3f}% with the proxy. " if slip["brr_replication"]["mean_abs_pct"] is not None else
+            f"BRR replication on {replicated} expiries ({fallback} fell back to the proxy). ")
+    if missing_test and rep.get("verdict") == "supported":
+        rep["verdict"] = "inconclusive"
+        note += f"Rule 9: {len(missing_test)} test months lack the replication, so a pass cannot be decided. "
+    rep["reason"] = note + rep["reason"]
+    return _wrap(rep)
+
+
 def carry_perp_funding_threshold(archive):
     """T-363: long BTC / short BTC-PERPETUAL while 7-day annualised funding > DTB3 + 4%, 2023-01..2026-09."""
     miss = _missing(archive, [FUNDING, "fred-DTB3"])
@@ -1908,6 +1988,7 @@ HARNESSES = {
     "carry_trend_funding_filter": carry_trend_funding_filter,
     "carry_cme_basis_spike": carry_cme_basis_spike,
     "carry_cme_cash_and_carry": carry_cme_cash_and_carry,
+    "carry_cme_brr_exit": carry_cme_brr_exit,
     "carry_perp_funding_threshold": carry_perp_funding_threshold,
     "carry_basis_crash_predictor": carry_basis_crash_predictor,
     "carry_funding_sentiment": carry_funding_sentiment,
@@ -1919,6 +2000,7 @@ THEORY_MAP = {
     "T-303": "carry_trend_funding_filter",
     "T-329": "carry_cme_basis_spike",
     "T-362": "carry_cme_cash_and_carry",
+    "T-552": "carry_cme_brr_exit",
     "T-363": "carry_perp_funding_threshold",
     "T-364": "carry_basis_crash_predictor",
     "T-423": "carry_funding_sentiment",

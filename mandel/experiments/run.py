@@ -43,6 +43,7 @@ from mandel.experiments import batch6c_stockxs
 from mandel.experiments import batch6c_cryptovenue, batch6c_cryptoxs
 from mandel.experiments import batch6c_pmcal, batch6c_pmmicro, batch6c_pmxv
 from mandel.experiments import batch6c_kraken, batch6c_stocktwits
+from mandel.experiments import batch14_review
 from mandel.experiments import batch7_cal, batch7_crypto, batch7_pm, batch7_vol
 from mandel.experiments import batch8_markov
 from mandel.experiments import batch9_signal
@@ -1003,10 +1004,12 @@ BATCH_MODULES = (batch4_fomc, batch4_fact, batch4_carry, batch4_ohlc, batch4_vx,
                  batch9_signal, batch10_calib, batch11_xasset, batch12_ml, batch13_calendar_a, batch13_calendar_b, batch13_crossasset_a,
                  batch13_crossasset_b, batch13_cryptoderiv_a, batch13_cryptoderiv_b, batch13_earnings, batch13_flow, batch13_gaps_fx, batch13_gaps_russell,
                  batch13_implied_a, batch13_implied_b, batch13_intraday_a, batch13_intraday_b, batch13_intraday_c, batch13_short_a, batch13_short_b,
-                 batch13_volregime_a, batch13_volregime_b, batch13_volume_a, batch13_volume_b)
+                 batch13_volregime_a, batch13_volregime_b, batch13_volume_a, batch13_volume_b, batch14_review)
 BATCH_HARNESSES = {h: fn for m in BATCH_MODULES for h, fn in m.HARNESSES.items()}
 BATCH_THEORY = {h: tid for m in BATCH_MODULES for tid, h in m.THEORY_MAP.items()}
 BATCH_BUNDLES = {
+    "b14_treasury_20d_reversal": ["daily-history-TLT", "daily-history-IEF", "fred-DGS10"],
+    "carry_cme_brr_exit": ["daily-history-BTC-F", "deribit-funding-BTC-PERPETUAL", "fred-DTB3", "coinbase-1m-BTC-USD-*", "kraken-trades-1m-XBTUSD-*"],
     "fomc_btc_event_straddle": ["cboe-VIX-history", "daily-history-BTC-USD", "deribit-dvol-BTC-history", "fomc-meetings", "macro-release-cpi"],
     "fomc_cycle_even_weeks": ["daily-history-EFA", "daily-history-SPY", "fomc-meetings"],
     "fomc_gvz_event_change": ["cboe-GVZ-history", "cboe-VIX-history", "fomc-meetings", "macro-release-cpi"],
