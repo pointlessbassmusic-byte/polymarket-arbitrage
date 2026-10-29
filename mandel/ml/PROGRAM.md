@@ -73,3 +73,24 @@ Results only are pushed; the bars stay on the box.
    drift, realised hit rate against the backtest's band).
 9. **Cross-sectional ranking** within an asset class (long the top decile of predicted return, short the bottom),
    which removes the market's own direction and is usually where intraday models earn whatever they earn.
+
+## Re-weighting check, 2026-10-29
+
+The IC scan's 2,254 feature x class x horizon triples (2,135 with a confirmation read) were re-aggregated under five
+weightings: discovery share, confirmation share among discovered, sign stability (|t| > 1 both sides, same sign),
+confirmation-n-weighted |IC|, and the share with disc_t x conf_t > 1. What is stable across all five:
+
+- **Horizon:** 5d and 20d, then 1d; every intraday horizon ranks below every daily one on every weighting.
+- **Family:** F2 (technical/price-path) and F3 (options-implied) tie, F1 (cross-asset) close, F0 (volume) last by a wide
+  margin under every weighting (F0 confirmation share 0.08).
+- **Class:** `future` and `bond_etf` are top-3 under four of five weightings; bond ETFs carry the largest confirmation
+  ICs in the scan (TLT trailing 20-day return, inverse, IC -0.40 to -0.44, t -3.9 to -7.3; 10-year-yield trailing
+  20-day change, positive, IC +0.31 to +0.46, t 3.6 to 7.0; 8-9 confirmation periods). The bond-ETF cross-section
+  is roughly one factor (duration), so these ICs are a time-series duration call with high |IC| and little breadth; the
+  swing program's bond_etf trading cells at h = 20 (9 periods, 52-63 trades) reached SR 0.8-1.9 but DSR <= 0.03
+  against 306 trials and could not decide anything. Registered as a single pre-discovery replication, T-743
+  (2002-07..2023-12, TLT and IEF, both readings under rule 11).
+- **Relationship type:** inverse relationships keep their sign on the confirmation periods 73% of the time (n 1,262),
+  positive ones 59% (n 873): the reversal structure T-579 found is the stable part of the scan.
+
+Nothing here reverses T-577/T-578/T-580: the re-weighting ranks where signal concentrates, not whether it pays a taker.

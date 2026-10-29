@@ -31139,6 +31139,58 @@
     }
    },
    "notes": "pre-registered from the 2026-10-20 web sweep before any run; the adversarial verifier's notes are in web_sweep."
+  },
+  {
+   "id": "T-742",
+   "slug": "cb-decision-bucket-reference-price-forward",
+   "kind": "market-structure",
+   "claim": "From 2026-10-13 onward, a central-bank decision bucket on Polymarket or Kalshi priced >= 0.90 within 7 days of the decision, when the other venue agrees (two_venue fires of the children's recorder: Fed and the G10 banks ECB, BoE, BoJ, BoC, RBA, RBNZ), settles YES often enough that buying at the first price seen nets a positive mean return per $1 after a 1-cent spread: the reference-price class's one member (OIS / fed-funds futures lead the book) holds out of sample.",
+   "origin": [
+    "weighting review 2026-10-29: the reference-price class's only confirmed member had no Mandel theory (the map showed the class as 12 failures and 5 child FAILs); it lived in CLAUDE.md and the children's recorders",
+    "docs/EDGE_VERDICT Result 20; arb-scanner fed_watch / cb_watch"
+   ],
+   "trial": {
+    "statistic": "mean net return per $1 over settled two_venue fires (entry = first price the recorder saw, exit = settlement, minus 0.01), and the count of losses",
+    "null": "mean net return <= 0, or more than 1 loss in the first 60 settled two_venue fires (a loss costs ~90% of the stake; 2.4% is breakeven)",
+    "procedure": "read the children's recorder files (pointless-repo arb-scanner docs/fed_signals.csv and docs/cb_signals.csv) at the read date; two_venue rows only; single_venue rows reported apart; per-fire net = (1 - entry - 0.01) if YES else (-entry - 0.01); one-sided 95% percentile bootstrap of the mean clustered by meeting; loss count; G10 and non-G10 reported apart but the claim is G10 + Fed",
+    "data": "pointless-repo arb-scanner docs/fed_signals.csv, docs/cb_signals.csv (Shannon's forward record, settled from Kalshi)",
+    "min_n": 60,
+    "pass": "at >= 60 settled two_venue fires: one-sided 95% bootstrap lower bound of the mean net return > 0 AND at most 1 loss; decided once, at the first read with n >= 60",
+    "controls": "the 2024-2026 retrospective (18 FOMC meetings 0 losses; 87 fires across 15 banks, 3 losses outside the G10; 57 G10 fires 0 losses) is the prior and was seen before this registration; the G10 split was drawn after those losses, so only this forward record can confirm it. Mandel never trades it: recorder only (children's rule)."
+   },
+   "experiments": [],
+   "testable_now": false,
+   "status": "blocked",
+   "blocked_on": "the forward record: 2 settled two_venue fires as of 2026-10-29 (ECB Oct 29 hold, RBNZ Oct 27 hike), ~30 a year expected -> read about 2028-H2",
+   "results": [],
+   "parent": "",
+   "notes": "registered so the map's reference-price node carries the member, not only the eight non-members; the read is of the children's record (forward_tests.json S-fed-g10)"
+  },
+  {
+   "id": "T-743",
+   "slug": "treasury-etf-20d-reversal-replication",
+   "kind": "underlying-strategy",
+   "claim": "Over 2002-07..2023-12 (before the learning program's confirmation periods), TLT's 20-trading-day forward return is higher after a bottom-quintile trailing 20-day return than after a top-quintile one (reversal), and higher after a top-quintile trailing 20-day rise in the 10-year yield (DGS10) than after a bottom-quintile one, net of 1 bp a side; IEF the same.",
+   "origin": [
+    "weighting review 2026-10-29: bond ETFs at 5-20 days top every re-weighting of the IC scan (discovery share, confirmation share, sign stability, n-weighted |IC|, t-product) while the swing program's trading cells (9 periods, 52-63 trades, DSR <= 0.03 over 306 trials) could not decide them",
+    "mandel/ml/PROGRAM.md"
+   ],
+   "trial": {
+    "statistic": "mean 20-day forward net return, bottom-quintile minus top-quintile of the signal, non-overlapping 20-day decisions (one per 20 sessions, start-day grid pooled per rule 10)",
+    "null": "difference <= 0",
+    "procedure": "daily-history-TLT / IEF adjclose and fred-DGS10; signal quintiles from the trailing 250-day window of the signal (no look-ahead); two readings per rule 11: (i) own trailing 20-day return, long bottom / short top; (ii) DGS10 trailing 20-day change, long top / short bottom; studentized block bootstrap (block 3 decisions) one-sided 95% lower bound; halves 2002-07..2012-12 and 2013-01..2023-12",
+    "data": "daily-history-TLT, daily-history-IEF, fred-DGS10",
+    "min_n": 250,
+    "pass": "for TLT under BOTH readings: one-sided 95% lower bound of the difference > 0 net of 1 bp a side, both halves positive; IEF reported; disagreement between readings is undecided",
+    "controls": "discovered by the 2026-10-20 IC scan (2,254 triples; bond_etf 5d/20d rows: own r20 inverse, DGS10-proxy r20 positive, confirmation IC 0.31-0.46 on 8-9 periods of 2024-2026). The bond-ETF cross-section is ~one factor (duration), so the scan's IC is a time-series duration call, not breadth; this replication uses pre-discovery years only and counts as one trial for its own DSR, with the scan disclosed as the discovery family. Yield-level and 2008/2020 crisis months reported as sensitivity."
+   },
+   "experiments": [],
+   "testable_now": true,
+   "status": "untested",
+   "blocked_on": "",
+   "results": [],
+   "parent": "",
+   "notes": "pre-registered before any run on the 2002-2023 window; the 2024-2026 confirmation periods were seen and are excluded from the pass"
   }
  ]
 }
