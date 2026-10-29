@@ -1,11 +1,9 @@
 {
 "generated_for": "Mandel signal map",
-"theories_unmatched": [
-"T-523"
-],
+"theories_unmatched": [],
 "stats": {
 "nodes": 126,
-"edges": 1735,
+"edges": 1739,
 "documents": 34,
 "layers": {
 "substrate": 42,
@@ -2861,12 +2859,12 @@
 "label": "Option structures",
 "layer": 1,
 "kind": "concept",
-"size": 2.9005986908310777,
+"size": 2.9631802623080805,
 "group": "variables",
 "detail": "Market variables",
 "meta": {
-"mentions": 29,
-"documents": 12,
+"mentions": 33,
+"documents": 13,
 "excerpts": [
 {
 "src": "src:02",
@@ -2898,15 +2896,15 @@
 },
 {
 "src": "adj:A11",
-"text": "Cross-sectional family, blocked on the DoltHub fetch: `rv-minus-iv-spread-sp500-xs`, `t531-call-put-iv-spread-dolthub` (with the verdict recorded on T-531), `call-put-iv-change-xs`, `single-stock-iv-term-slope-xs` (excluding …"
+"text": "Testable now (archived data), pre-registered: `spx-vrp-predicts-equity-premium-oos` (expanding out-of-sample 2008-2026, one primary RV definition); `cor1m-predicts-equity-premium-oos` (126-session horizon, sign-restricted, must …"
 }
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"inconclusive": 24,
-"not_supported": 80,
-"blocked": 47,
-"supported": 26,
+"inconclusive": 26,
+"not_supported": 88,
+"blocked": 54,
+"supported": 30,
 "parked": 1
 }
 }
@@ -8070,8 +8068,8 @@
 "t": "k:option_structure",
 "type": "provenance",
 "sign": 1,
-"w": 2.791759469228055,
-"label": "5 mentions"
+"w": 3.0794415416798357,
+"label": "7 mentions"
 },
 {
 "s": "adj:A11",
@@ -9406,8 +9404,8 @@
 "t": "k:option_structure",
 "type": "provenance",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "1 mention"
+"w": 2.0986122886681096,
+"label": "2 mentions"
 },
 {
 "s": "adj:A18",
@@ -10472,6 +10470,14 @@
 "sign": -1,
 "w": 2.386294361119891,
 "label": "3 mentions (held loosely)"
+},
+{
+"s": "adj:A8",
+"t": "k:option_structure",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "adj:A8",
@@ -11790,8 +11796,8 @@
 "t": "k:option_structure",
 "type": "cooccur",
 "sign": 1,
-"w": 1.0024573740954739,
-"label": "co-occur in 7/34 files, PMI +0.50"
+"w": 0.9224146664219377,
+"label": "co-occur in 7/34 files, PMI +0.42"
 },
 {
 "s": "k:anticipation",
@@ -11966,8 +11972,8 @@
 "t": "k:option_structure",
 "type": "cooccur",
 "sign": 1,
-"w": 1.541453874828161,
-"label": "co-occur in 3/34 files, PMI +1.04"
+"w": 1.4614111671546248,
+"label": "co-occur in 3/34 files, PMI +0.96"
 },
 {
 "s": "k:arbitrage_bounds",
@@ -13166,8 +13172,8 @@
 "t": "k:option_structure",
 "type": "cooccur",
 "sign": 1,
-"w": 1.0714502455824255,
-"label": "co-occur in 5/34 files, PMI +0.57"
+"w": 0.9914075379088891,
+"label": "co-occur in 5/34 files, PMI +0.49"
 },
 {
 "s": "k:earnings",
@@ -13582,8 +13588,8 @@
 "t": "k:option_structure",
 "type": "cooccur",
 "sign": 1,
-"w": 1.3183103235139513,
-"label": "co-occur in 4/34 files, PMI +0.82"
+"w": 1.2382676158404151,
+"label": "co-occur in 4/34 files, PMI +0.74"
 },
 {
 "s": "k:factor_tilt",
@@ -13926,8 +13932,8 @@
 "t": "k:option_structure",
 "type": "cooccur",
 "sign": 1,
-"w": 1.2537718023763802,
-"label": "co-occur in 6/34 files, PMI +0.75"
+"w": 1.173729094702844,
+"label": "co-occur in 6/34 files, PMI +0.67"
 },
 {
 "s": "k:forking_paths",
@@ -14238,8 +14244,8 @@
 "t": "k:option_structure",
 "type": "cooccur",
 "sign": 1,
-"w": 1.1359887667199966,
-"label": "co-occur in 2/34 files, PMI +0.64"
+"w": 1.0559460590464604,
+"label": "co-occur in 2/34 files, PMI +0.56"
 },
 {
 "s": "k:idealism",
@@ -14750,8 +14756,8 @@
 "t": "k:option_structure",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9536672099260421,
-"label": "co-occur in 5/34 files, PMI +0.45"
+"w": 1.0559460590464604,
+"label": "co-occur in 6/34 files, PMI +0.56"
 },
 {
 "s": "k:lead_lag",
@@ -15179,6 +15185,14 @@
 },
 {
 "s": "k:momentum",
+"t": "k:option_structure",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 8/34 files, PMI +0.27"
+},
+{
+"s": "k:momentum",
 "t": "k:positioning",
 "type": "cooccur",
 "sign": 1,
@@ -15414,8 +15428,8 @@
 "t": "k:option_structure",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7682639865946795,
-"label": "co-occur in 6/34 files, PMI +0.27"
+"w": 0.8423719587484013,
+"label": "co-occur in 7/34 files, PMI +0.34"
 },
 {
 "s": "k:option_flow",
@@ -15486,48 +15500,64 @@
 "t": "k:prediction_market",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9224146664219377,
-"label": "co-occur in 7/34 files, PMI +0.42"
+"w": 0.9759033513729238,
+"label": "co-occur in 8/34 files, PMI +0.48"
 },
 {
 "s": "k:option_structure",
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 0.8483066942682156,
-"label": "co-occur in 6/34 files, PMI +0.35"
+"w": 0.9224146664219377,
+"label": "co-occur in 7/34 files, PMI +0.42"
 },
 {
 "s": "k:option_structure",
 "t": "k:replication",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7682639865946795,
-"label": "co-occur in 12/34 files, PMI +0.27"
+"w": 0.7682639865946794,
+"label": "co-occur in 13/34 files, PMI +0.27"
 },
 {
 "s": "k:option_structure",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9353180712578455,
-"label": "co-occur in 6/34 files, PMI +0.44"
+"w": 0.8552753635843091,
+"label": "co-occur in 6/34 files, PMI +0.36"
 },
 {
 "s": "k:option_structure",
-"t": "k:sentiment",
+"t": "k:short_interest",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7682639865946795,
-"label": "co-occur in 6/34 files, PMI +0.27"
+"w": 0.7682639865946794,
+"label": "co-occur in 5/34 files, PMI +0.27"
 },
 {
 "s": "k:option_structure",
 "t": "k:size",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7529965144638908,
-"label": "co-occur in 5/34 files, PMI +0.25"
+"w": 0.8552753635843091,
+"label": "co-occur in 6/34 files, PMI +0.36"
+},
+{
+"s": "k:option_structure",
+"t": "k:vol_regime",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8736245022525058,
+"label": "co-occur in 5/34 files, PMI +0.37"
+},
+{
+"s": "k:option_structure",
+"t": "k:vrp",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 5/34 files, PMI +0.27"
 },
 {
 "s": "k:positioning",
@@ -17767,7 +17797,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 6.0,
-"label": "80 not supported, 47 blocked, 26 supported, 24 inconclusive, 1 parked (26 of 106 decided passed)"
+"label": "88 not supported, 54 blocked, 30 supported, 26 inconclusive, 1 parked (30 of 118 decided passed)"
 },
 {
 "s": "stream:theories",
