@@ -2,7 +2,7 @@
 "generated_for": "Mandel signal map",
 "stats": {
 "nodes": 120,
-"edges": 1535,
+"edges": 1544,
 "documents": 34,
 "layers": {
 "substrate": 42,
@@ -14735,6 +14735,78 @@
 "sign": -1,
 "w": 1.5,
 "label": "Crypto funding and basis carry as a structural premium (A8: He-Manela-Ross, BIS crypto carry) versus funding pinned at its 0.01% baseline mo"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:lead_lag",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Cross-exchange price discovery and arbitrage between crypto venues (A8's lead-lag literature; T-425's one positive cell at a $400M maker tie"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:momentum",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Cross-exchange price discovery and arbitrage between crypto venues (A8's lead-lag literature; T-425's one positive cell at a $400M maker tie"
+},
+{
+"s": "k:edge_vs_market",
+"t": "k:reference_price",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Cross-exchange price discovery and arbitrage between crypto venues (A8's lead-lag literature; T-425's one positive cell at a $400M maker tie"
+},
+{
+"s": "k:lead_lag",
+"t": "k:momentum",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Cross-exchange price discovery and arbitrage between crypto venues (A8's lead-lag literature; T-425's one positive cell at a $400M maker tie"
+},
+{
+"s": "k:lead_lag",
+"t": "k:reference_price",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Cross-exchange price discovery and arbitrage between crypto venues (A8's lead-lag literature; T-425's one positive cell at a $400M maker tie"
+},
+{
+"s": "k:momentum",
+"t": "k:reference_price",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Cross-exchange price discovery and arbitrage between crypto venues (A8's lead-lag literature; T-425's one positive cell at a $400M maker tie"
+},
+{
+"s": "k:multifractal",
+"t": "k:bayes",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "The children as independent channels whose agreement adds evidence (principle 7) versus the same null reached twice from a shared prior and "
+},
+{
+"s": "k:multifractal",
+"t": "k:backtest",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "The children as independent channels whose agreement adds evidence (principle 7) versus the same null reached twice from a shared prior and "
+},
+{
+"s": "k:bayes",
+"t": "k:backtest",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "The children as independent channels whose agreement adds evidence (principle 7) versus the same null reached twice from a shared prior and "
 },
 {
 "s": "child:Hurst",
