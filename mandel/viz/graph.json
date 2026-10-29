@@ -1396,7 +1396,8 @@
 "supported": 4,
 "not_supported": 34,
 "blocked": 13,
-"inconclusive": 6
+"inconclusive": 5,
+"parked": 1
 }
 }
 }
@@ -2305,9 +2306,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 28,
+"not_supported": 29,
 "blocked": 23,
-"inconclusive": 3
+"inconclusive": 2
 }
 }
 }
@@ -2710,8 +2711,8 @@
 "Mandel's tested theories": {
 "supported": 2,
 "blocked": 16,
-"not_supported": 9,
-"inconclusive": 2
+"not_supported": 10,
+"inconclusive": 1
 }
 }
 }
@@ -3523,7 +3524,8 @@
 "Mandel's tested theories": {
 "not_supported": 34,
 "blocked": 17,
-"inconclusive": 6
+"inconclusive": 5,
+"parked": 1
 },
 "Children's research ledger": {
 "FAIL": 1
@@ -15782,7 +15784,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.007333185232471,
-"label": "28 not supported, 23 blocked, 3 inconclusive (0 of 28 decided passed)"
+"label": "29 not supported, 23 blocked, 2 inconclusive (0 of 29 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15838,7 +15840,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.060443010546419,
-"label": "34 not supported, 17 blocked, 6 inconclusive (0 of 34 decided passed)"
+"label": "34 not supported, 17 blocked, 5 inconclusive, 1 parked (0 of 34 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15862,7 +15864,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 4.401197381662156,
-"label": "16 blocked, 9 not supported, 2 supported, 2 inconclusive (2 of 11 decided passed)"
+"label": "16 blocked, 10 not supported, 2 supported, 1 inconclusive (2 of 12 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15926,7 +15928,7 @@
 "type": "evidence",
 "sign": -1,
 "w": 5.060443010546419,
-"label": "34 not supported, 13 blocked, 6 inconclusive, 4 supported (4 of 38 decided passed)"
+"label": "34 not supported, 13 blocked, 5 inconclusive, 4 supported, 1 parked (4 of 38 decided passed)"
 },
 {
 "s": "stream:theories",
