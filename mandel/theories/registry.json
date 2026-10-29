@@ -14337,10 +14337,12 @@
     "carry_cme_brr_exit"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "supported",
    "blocked_on": "",
-   "results": [],
-   "notes": "pre-registered salvage successor of T-362 on 2026-10-20: T-362's test-window loss came from settlement slippage (+0.103% of spot) at a 16:00-London proxy exit; the real CME settlement is the BRR over 15:00-16:00, which the archived 1-minute venue data can replicate. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-29: unblocked - kraken-trades-1m-XBTUSD now archived through 2026-09 (fetched 2026-10-26); the harness carry_cme_brr_exit replicates the BRR from Coinbase + Kraken 1-minute bars. First run (X-09f0f769) was recorded before the registry carried the harness id, so its verdict did not attach; re-run attaches it."
+   "results": [
+    "X-87957809"
+   ],
+   "notes": "pre-registered salvage successor of T-362 on 2026-10-20: T-362's test-window loss came from settlement slippage (+0.103% of spot) at a 16:00-London proxy exit; the real CME settlement is the BRR over 15:00-16:00, which the archived 1-minute venue data can replicate. The observation that motivated it is evidence for registering it, not for supporting it; the parent's verdict stands. | 2026-10-29: unblocked - kraken-trades-1m-XBTUSD now archived through 2026-09 (fetched 2026-10-26); the harness carry_cme_brr_exit replicates the BRR from Coinbase + Kraken 1-minute bars. First run (X-09f0f769) was recorded before the registry carried the harness id, so its verdict did not attach; re-run attaches it. | Refutation 2026-10-29 (verdict stands): Coinbase-only +1.088%/yr (lb +0.47%), Kraken-only +1.048% (lb +0.46%); post-FTX +1.31% vs pre-FTX +0.06% (10 months); h = 5% +0.91% (lb +0.29%), h = 0 +0.77% (lb +0.07%). A small basis premium with custody/exchange risk, not a directional edge; micro CME contracts track the same BRR. Not funded."
   },
   {
    "id": "T-553",
@@ -31190,9 +31192,11 @@
     "b14_treasury_20d_reversal"
    ],
    "testable_now": true,
-   "status": "untested",
+   "status": "not_supported",
    "blocked_on": "",
-   "results": [],
+   "results": [
+    "X-0061ea37"
+   ],
    "parent": "",
    "notes": "pre-registered before any run on the 2002-2023 window; the 2024-2026 confirmation periods were seen and are excluded from the pass"
   }

@@ -42,3 +42,15 @@ the archive. Buckets:
   check), T-558 (by design; see D).
 
 Parked this pass: T-459, T-365 (its trigger has not occurred in 3.5 years).
+
+## Addendum, the same day: what the weighting review found in the ranking itself
+
+- `next_tests` weighted blocked theories at 0.5 and so buried T-552, whose blocking data (Kraken 1-minute through
+  2026-09) had arrived on 2026-10-26. Re-run with a BRR-replication exit it passed and survived refutation. A blocked
+  theory whose data has arrived should rank with the inconclusive ones.
+- `data_readiness` reads 1.0 for T-376 (needs 60 SPX chain captures, 1 exists) and T-717 (paid CME FX settlements):
+  it counts bundle names, not coverage. Both are false "unblocked" flags; coverage counts in `blocked_on` ("60 daily
+  captures") should feed the score.
+- The runner moves no theory out of `blocked` by itself (UPDATABLE excludes it) and attaches results only through the
+  registry's `experiments` field: a newly built harness must be written there, or its first run records an orphan row
+  (X-ffe459bb, X-09f0f769 are such rows; their re-runs X-0061ea37 and X-87957809 carry the ids).
