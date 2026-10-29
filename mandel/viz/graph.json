@@ -1,86 +1,26 @@
 {
 "generated_for": "Mandel signal map",
 "theories_unmatched": [
-"T-111",
-"T-112",
-"T-117",
-"T-119",
-"T-120",
-"T-121",
-"T-122",
 "T-13",
-"T-161",
-"T-166",
-"T-167",
-"T-169",
-"T-182",
-"T-184",
-"T-187",
-"T-191",
-"T-194",
-"T-20",
-"T-201",
-"T-21",
-"T-212",
-"T-22",
-"T-230",
-"T-244",
-"T-260",
-"T-274",
 "T-30",
-"T-321",
-"T-322",
-"T-324",
-"T-328",
-"T-350",
-"T-354",
-"T-357",
-"T-37",
-"T-376",
-"T-386",
-"T-387",
 "T-39",
-"T-397",
 "T-40",
-"T-401",
 "T-41",
 "T-414",
 "T-416",
 "T-42",
-"T-439",
 "T-44",
-"T-442",
 "T-45",
 "T-461",
-"T-464",
-"T-467",
-"T-50",
-"T-506",
-"T-507",
-"T-509",
-"T-51",
-"T-511",
-"T-513",
-"T-518",
-"T-523",
-"T-526",
-"T-538",
-"T-539",
-"T-60",
-"T-61",
-"T-62",
-"T-63",
-"T-64",
-"T-65",
-"T-66"
+"T-523"
 ],
 "stats": {
-"nodes": 120,
-"edges": 1550,
+"nodes": 125,
+"edges": 1702,
 "documents": 34,
 "layers": {
 "substrate": 42,
-"concepts": 58,
+"concepts": 63,
 "principles": 13,
 "centres": 7
 }
@@ -1073,6 +1013,40 @@
 }
 },
 {
+"id": "k:arbitrage_bounds",
+"label": "Parity & arbitrage bounds",
+"layer": 1,
+"kind": "concept",
+"size": 2.239720770839918,
+"group": "markets",
+"detail": "Markets",
+"meta": {
+"mentions": 7,
+"documents": 3,
+"excerpts": [
+{
+"src": "adj:A11",
+"text": "Call-minus-put IV spread (Cremers-Weinbaum). Informed demand pushes the favoured side's IV off put-call parity. Expensive-call stocks beat expensive-put stocks by about 50 bp/week over 1996-2005, with decay inside that sample. A …"
+},
+{
+"src": "adj:A18",
+"text": "Not US-executable as published: OTC variance swaps and FVAs. Mandel uses CME options on 6E, 6J, 6B, 6A, 6C and 6S (none exist on DKK, NOK or SEK), CME futures and OANDA."
+},
+{
+"src": "adj:A7",
+"text": "`low-short-interest-long-sp500`. This is the executable, borrow-free half, and MPP's fee critique does not touch it. Controls: FF5+UMD+BAB, since low-SI large caps load on quality and low volatility, both dead in T-383 and T-384. …"
+}
+],
+"verdicts": {
+"Mandel's tested theories": {
+"blocked": 18,
+"not_supported": 17,
+"inconclusive": 10
+}
+}
+}
+},
+{
 "id": "k:attention",
 "label": "Attention / transformers",
 "layer": 1,
@@ -1316,12 +1290,12 @@
 "label": "Calendar & macro events",
 "layer": 1,
 "kind": "concept",
-"size": 3.309753852588053,
+"size": 3.455429753258425,
 "group": "variables",
 "detail": "Market variables",
 "meta": {
-"mentions": 67,
-"documents": 10,
+"mentions": 90,
+"documents": 11,
 "excerpts": [
 {
 "src": "adj:A12",
@@ -1352,16 +1326,16 @@
 "text": "`eur-evz-gap-predicts-eurusd-week` is registered with an expected null, since EUR is insignificant in its source. FOMC, ECB and CPI weeks are reported separately."
 },
 {
-"src": "adj:A7",
-"text": "`persistent-offexchange-svr-xs-monthly` (WYZ's window, formed at month-end, residualised on dollar volume) and `short-interest-surprise-susi-sp500-monthly` (monthly, split-restated). Both are distinct from T-394."
+"src": "adj:A6",
+"text": "Expiry-day dampening (Adams et al.). Exception Tuesdays and Thursdays before May 2022 show 61 bps (about 7%) lower 10-minute realised volatility on days with an expiring 0DTE, driven by older positions that become 0DTE; the …"
 }
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"supported": 7,
-"blocked": 21,
-"not_supported": 41,
-"inconclusive": 6
+"supported": 10,
+"not_supported": 54,
+"blocked": 25,
+"inconclusive": 7
 }
 }
 }
@@ -1739,12 +1713,12 @@
 "label": "Evaluation is the bottleneck",
 "layer": 1,
 "kind": "concept",
-"size": 2.0958797346140274,
+"size": 2.3989476363991855,
 "group": "validation",
 "detail": "Validation",
 "meta": {
-"mentions": 5,
-"documents": 3,
+"mentions": 10,
+"documents": 6,
 "excerpts": [
 {
 "src": "src:01",
@@ -1757,8 +1731,68 @@
 {
 "src": "src:05",
 "text": "Multi-head, scale, and the context bottleneck. [Ch6] 96 heads run in parallel, each proposing a ΔE for every token; all proposals are summed and added to the embedding. Cross-attention (translation) takes keys and queries from …"
+},
+{
+"src": "src:16",
+"text": "A1 (Darwin Gödel Machine) and A2 (AlphaEvolve): A1's archive with lineage is the root/bifurcation record of regions; A2's evaluation cascade and A1's staged evaluation are the critical-orbit probe with escape time; A1's transfer …"
+},
+{
+"src": "adj:A1",
+"text": "Stepping stones: the best agents descended through ancestors that were temporarily worse; pruning losers would have cut those paths. This is the empirical case for the archive."
+},
+{
+"src": "adj:A2",
+"text": "Evaluation cascade. Candidates are tested at small scale first to filter faulty programs and advance to harder stages only if they do well enough at every earlier stage."
 }
-]
+],
+"verdicts": {
+"Mandel's tested theories": {
+"not_supported": 1,
+"blocked": 2
+}
+}
+}
+},
+{
+"id": "k:factor_tilt",
+"label": "Factor tilts",
+"layer": 1,
+"kind": "concept",
+"size": 2.239720770839918,
+"group": "variables",
+"detail": "Market variables",
+"meta": {
+"mentions": 7,
+"documents": 5,
+"excerpts": [
+{
+"src": "src:12",
+"text": "His backtesting procedure, from the 25,000-strategy test: take a discretionary methodology (ICT \"Silver Bullet\": liquidity sweep, displacement, fair value gap), convert every judgment call into an explicit adjustable parameter …"
+},
+{
+"src": "src:14",
+"text": "Note on the research hint. The hint asked for \"the architecture (data, signal, execution, risk)\" and explicit skepticism about profitability. Both are below. One correction: the title says \"Claude AI Trading Bot\", but Claude does …"
+},
+{
+"src": "adj:A11",
+"text": "RVIV: it carries a low-vol tilt (T-384, T-448 failed)."
+},
+{
+"src": "adj:A12",
+"text": "SMB alpha after junk controls, out-of-sample from 2013, testable now. It asks whether T-385 failed through junk exposure (RMW loading t 4.68)."
+},
+{
+"src": "adj:A7",
+"text": "`low-short-interest-long-sp500`. This is the executable, borrow-free half, and MPP's fee critique does not touch it. Controls: FF5+UMD+BAB, since low-SI large caps load on quality and low volatility, both dead in T-383 and T-384. …"
+}
+],
+"verdicts": {
+"Mandel's tested theories": {
+"not_supported": 7,
+"inconclusive": 1,
+"blocked": 1
+}
+}
 }
 },
 {
@@ -2550,7 +2584,7 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"blocked": 1
+"blocked": 3
 }
 }
 }
@@ -2748,6 +2782,37 @@
 }
 },
 {
+"id": "k:onchain_flow",
+"label": "On-chain & stablecoin flows",
+"layer": 1,
+"kind": "concept",
+"size": 2.3512925464970227,
+"group": "variables",
+"detail": "Market variables",
+"meta": {
+"mentions": 9,
+"documents": 2,
+"excerpts": [
+{
+"src": "adj:A16",
+"text": "Migrants' volatility and turnover shift against total-cap-matched stayers; the implied volatility leg is forward-only on chain captures."
+},
+{
+"src": "adj:A8",
+"text": "Stablecoin issuance after drawdowns (Griffin-Shams). In 2017-2018, Tether purchases followed downturns and came before price rises. The sample is from the manipulation era."
+}
+],
+"verdicts": {
+"Mandel's tested theories": {
+"supported": 1,
+"not_supported": 3,
+"inconclusive": 2,
+"blocked": 2
+}
+}
+}
+},
+{
 "id": "k:option_flow",
 "label": "Dealer gamma & option flow",
 "layer": 1,
@@ -2798,6 +2863,62 @@
 "supported": 2,
 "blocked": 17,
 "inconclusive": 1
+}
+}
+}
+},
+{
+"id": "k:option_structure",
+"label": "Option structures",
+"layer": 1,
+"kind": "concept",
+"size": 2.9005986908310777,
+"group": "variables",
+"detail": "Market variables",
+"meta": {
+"mentions": 29,
+"documents": 12,
+"excerpts": [
+{
+"src": "src:02",
+"text": "*Adversarial pass*: for every proposal, run the identical pipeline on label-shuffled and synthetic-random-walk data; adoption requires the effect to vanish under both nulls. The pass is a required ledger event before …"
+},
+{
+"src": "src:03",
+"text": "*Sandbox loop for speculative hypotheses.* A proposal can be filed with `tier == \"sandbox\"`, a cost cap and a kill criterion; it runs on synthetic or paper data only; survivors graduate to a normal proposal, failures are recorded …"
+},
+{
+"src": "src:06",
+"text": "10 (Batra, seven linear-algebra ideas): Embeddings and cosine similarity are the machinery of level 3 in Herk's ladder; this file records why Mandel does not reach for them yet and what evidence would justify it."
+},
+{
+"src": "src:07",
+"text": "Positive and negative controls before any real run. Because \"train on a tiny portion ... and make sure you can achieve zero cost\" catches broken pipelines, and a model that also fits shuffled labels has learned nothing; a child's …"
+},
+{
+"src": "src:12",
+"text": "Dashboard contents (what \"monitoring\" means concretely): net asset value, active alerts, per-position theta decay, a strike ladder (bid, ask, IV, volume, open interest), aggregate Greeks, macro indicators (VIX, breadth, credit …"
+},
+{
+"src": "src:13",
+"text": "Baselines ladder. Every regime proposal is compared against three baselines on the same splits: no regime; counted transition matrix on a hand-labelled series (the genre's simplest version); and a rolling-volatility threshold (a …"
+},
+{
+"src": "src:15",
+"text": "How the examples were produced (from the source, not stated on screen). The Britain and Norway outlines in the video are passed through a `fractalify(shape, dimension=...)` routine that adds synthetic roughness to the stated …"
+},
+{
+"src": "adj:A11",
+"text": "Cross-sectional family, blocked on the DoltHub fetch: `rv-minus-iv-spread-sp500-xs`, `t531-call-put-iv-spread-dolthub` (with the verdict recorded on T-531), `call-put-iv-change-xs`, `single-stock-iv-term-slope-xs` (excluding …"
+}
+],
+"verdicts": {
+"Mandel's tested theories": {
+"inconclusive": 24,
+"not_supported": 80,
+"blocked": 47,
+"supported": 26,
+"parked": 1
 }
 }
 }
@@ -3139,6 +3260,61 @@
 },
 "Children's research ledger": {
 "FAIL": 5
+}
+}
+}
+},
+{
+"id": "k:relative_value",
+"label": "Relative value & convergence",
+"layer": 1,
+"kind": "concept",
+"size": 3.3653666701431657,
+"group": "markets",
+"detail": "Markets",
+"meta": {
+"mentions": 75,
+"documents": 17,
+"excerpts": [
+{
+"src": "src:02",
+"text": "*What is genuinely solid.* The community's methodological toolkit (true RNGs, sampling with replacement, pre/post symmetric analysis, fail-safe N, trim-and-fill, Copas, p-curve, permutation tests respecting autocorrelation, …"
+},
+{
+"src": "src:05",
+"text": "Cheap noisy steps to explore, one exact step to adopt. Because mini-batch SGD trades per-step accuracy for many more steps and still converges; Mandel's cycles should run many cheap partial-data checks to steer, but the gate's …"
+},
+{
+"src": "src:06",
+"text": "Router-first entry: the first file a fresh session reads is a map with explicit paths, not an essay. Because Mandel's context resets every session and a fresh session's first read decides what it can find; Herk, Karpathy and the …"
+},
+{
+"src": "src:07",
+"text": "Why ReLU, and its one failure mode. [title][bg] Pros: it \"greatly accelerate[s]\" convergence, \"(e.g. a factor of 6 in Krizhevsky et al.)\", it is cheap, and it \"is less susceptible to the vanishing gradient problem\" (Google). Con: …"
+},
+{
+"src": "src:08",
+"text": "[textbook] The deterministic construction (Examples 11–12). Choose *any* nonempty closed bounded S₀; set S_n = T₁(S_{n−1}) ∪ … ∪ T_k(S_{n−1}). The sequence converges to the S of the theorem. Example 11 builds the carpet from the …"
+},
+{
+"src": "src:09",
+"text": "Algorithm 1 (deterministic construction). Step 0: choose an *arbitrary* nonempty closed bounded set S₀. Step n: S_n = T(S_{n−1}) = ∪_i T_i(S_{n−1}). The sequence S₀, S₁, S₂, ... converges to the S of the theorem. Example 11 …"
+},
+{
+"src": "src:10",
+"text": "Eigenvectors are the directions a matrix can't turn. Av = λv; \"the eigenvalue is what A does instead of turning it\" (stretch factor; λ < 0 flips; a rotation has no real eigenvectors). Characteristic polynomial worked on 2×2 only; …"
+},
+{
+"src": "src:11",
+"text": "Markov's counterexample (1906). Andrey Markov (St. Petersburg, atheist, \"Andrew the Furious\" for his temper, per Hayes) constructed sequences of *dependent* random variables whose averages still converge, and wrote: \"independence …"
+}
+],
+"verdicts": {
+"Mandel's tested theories": {
+"not_supported": 9,
+"parked": 2,
+"blocked": 4,
+"inconclusive": 1
 }
 }
 }
@@ -3640,11 +3816,11 @@
 "label": "Variance risk premium",
 "layer": 1,
 "kind": "concept",
-"size": 3.2302215052732093,
+"size": 3.3023463096954826,
 "group": "variables",
 "detail": "Market variables",
 "meta": {
-"mentions": 57,
+"mentions": 66,
 "documents": 10,
 "excerpts": [
 {
@@ -3661,11 +3837,11 @@
 },
 {
 "src": "adj:A14",
-"text": "`putwrite-weekend-decay-excess` unblocks T-526 on archived PUT marks with a 1.5x variance-ratio null from T-511 (weekend variance 1.27 weeknights), net of the variance risk premium PUT always carries. It agrees with T-216 and …"
+"text": "Date researched: 2026-10-20. How much was read: full text for nine papers and Cboe's PutWrite methodology, every data claim checked against the archive; abstracts only for Kurov-Wolfe-Gilbert, Savor-Wilson, Wachter-Zhu, …"
 },
 {
 "src": "adj:A16",
-"text": "Two testable-now trials, pre-registered before measurement. `ijr-minus-iwm-post-russell-recon` (recon close to +20 sessions; within-year permutation null avoiding recon and S&P rebalance weeks; post-2015 half positive) joins …"
+"text": "RVX in recon windows. Cboe (2022): RVX mostly sat below its annual average in May-June since 2015. No statistics."
 },
 {
 "src": "adj:A17",
@@ -3682,10 +3858,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"supported": 11,
-"inconclusive": 3,
-"not_supported": 14,
-"blocked": 5
+"supported": 21,
+"not_supported": 28,
+"inconclusive": 9,
+"blocked": 12
 }
 }
 }
@@ -4425,6 +4601,22 @@
 "label": "3 mentions"
 },
 {
+"s": "src:02",
+"t": "k:option_structure",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:02",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "src:03",
 "t": "k:information",
 "type": "provenance",
@@ -4595,6 +4787,14 @@
 {
 "s": "src:03",
 "t": "k:reference_price",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:03",
+"t": "k:option_structure",
 "type": "provenance",
 "sign": 1,
 "w": 1.6931471805599454,
@@ -5009,6 +5209,14 @@
 "label": "6 mentions"
 },
 {
+"s": "src:05",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "src:06",
 "t": "k:entropy",
 "type": "provenance",
@@ -5143,6 +5351,22 @@
 "sign": 1,
 "w": 1.6931471805599454,
 "label": "1 mention"
+},
+{
+"s": "src:06",
+"t": "k:option_structure",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:06",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
 },
 {
 "s": "src:07",
@@ -5401,6 +5625,22 @@
 "label": "1 mention"
 },
 {
+"s": "src:07",
+"t": "k:option_structure",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "src:07",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 2.791759469228055,
+"label": "5 mentions"
+},
+{
 "s": "src:08",
 "t": "k:compression",
 "type": "provenance",
@@ -5535,6 +5775,14 @@
 "sign": 1,
 "w": 2.791759469228055,
 "label": "5 mentions"
+},
+{
+"s": "src:08",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 3.772588722239781,
+"label": "15 mentions"
 },
 {
 "s": "src:09",
@@ -5687,6 +5935,14 @@
 "sign": -1,
 "w": 1.6931471805599454,
 "label": "1 mention (held loosely)"
+},
+{
+"s": "src:09",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 3.3978952727983707,
+"label": "10 mentions"
 },
 {
 "s": "src:10",
@@ -5887,6 +6143,14 @@
 "sign": 1,
 "w": 2.0986122886681096,
 "label": "2 mentions"
+},
+{
+"s": "src:10",
+"t": "k:relative_value",
+"type": "skeptical",
+"sign": -1,
+"w": 3.1972245773362196,
+"label": "8 mentions (held loosely)"
 },
 {
 "s": "src:11",
@@ -6095,6 +6359,14 @@
 "sign": -1,
 "w": 2.0986122886681096,
 "label": "2 mentions (held loosely)"
+},
+{
+"s": "src:11",
+"t": "k:relative_value",
+"type": "skeptical",
+"sign": -1,
+"w": 3.772588722239781,
+"label": "15 mentions (held loosely)"
 },
 {
 "s": "src:12",
@@ -6345,6 +6617,30 @@
 "label": "2 mentions"
 },
 {
+"s": "src:12",
+"t": "k:option_structure",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:12",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
+"s": "src:12",
+"t": "k:factor_tilt",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "src:13",
 "t": "k:entropy",
 "type": "provenance",
@@ -6577,6 +6873,22 @@
 "label": "1 mention"
 },
 {
+"s": "src:13",
+"t": "k:option_structure",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "src:13",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
 "s": "src:14",
 "t": "k:entropy",
 "type": "provenance",
@@ -6785,6 +7097,14 @@
 "label": "2 mentions"
 },
 {
+"s": "src:14",
+"t": "k:factor_tilt",
+"type": "skeptical",
+"sign": -1,
+"w": 2.0986122886681096,
+"label": "2 mentions (held loosely)"
+},
+{
 "s": "src:15",
 "t": "k:anticipation",
 "type": "provenance",
@@ -6953,6 +7273,22 @@
 "label": "2 mentions"
 },
 {
+"s": "src:15",
+"t": "k:option_structure",
+"type": "skeptical",
+"sign": -1,
+"w": 2.9459101490553135,
+"label": "6 mentions (held loosely)"
+},
+{
+"s": "src:15",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "src:16",
 "t": "k:replication",
 "type": "skeptical",
@@ -6967,6 +7303,14 @@
 "sign": 1,
 "w": 2.0986122886681096,
 "label": "2 mentions"
+},
+{
+"s": "src:16",
+"t": "k:evaluation_bottleneck",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "src:16",
@@ -7137,12 +7481,28 @@
 "label": "1 mention"
 },
 {
+"s": "src:16",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 2.6094379124341005,
+"label": "4 mentions"
+},
+{
 "s": "adj:A1",
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
 "w": 2.791759469228055,
 "label": "5 mentions"
+},
+{
+"s": "adj:A1",
+"t": "k:evaluation_bottleneck",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
 },
 {
 "s": "adj:A1",
@@ -7401,6 +7761,14 @@
 "label": "1 mention (held loosely)"
 },
 {
+"s": "adj:A10",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "adj:A11",
 "t": "k:replication",
 "type": "provenance",
@@ -7485,8 +7853,8 @@
 "t": "k:vrp",
 "type": "provenance",
 "sign": 1,
-"w": 3.5649493574615367,
-"label": "12 mentions"
+"w": 3.639057329615259,
+"label": "13 mentions"
 },
 {
 "s": "adj:A11",
@@ -7575,6 +7943,30 @@
 "sign": 1,
 "w": 2.6094379124341005,
 "label": "4 mentions"
+},
+{
+"s": "adj:A11",
+"t": "k:option_structure",
+"type": "provenance",
+"sign": 1,
+"w": 2.791759469228055,
+"label": "5 mentions"
+},
+{
+"s": "adj:A11",
+"t": "k:arbitrage_bounds",
+"type": "skeptical",
+"sign": -1,
+"w": 2.6094379124341005,
+"label": "4 mentions (held loosely)"
+},
+{
+"s": "adj:A11",
+"t": "k:factor_tilt",
+"type": "skeptical",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
 },
 {
 "s": "adj:A12",
@@ -7677,8 +8069,8 @@
 "t": "k:vrp",
 "type": "provenance",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "1 mention"
+"w": 2.0986122886681096,
+"label": "2 mentions"
 },
 {
 "s": "adj:A12",
@@ -7743,6 +8135,22 @@
 "sign": 1,
 "w": 3.3978952727983707,
 "label": "10 mentions"
+},
+{
+"s": "adj:A12",
+"t": "k:option_structure",
+"type": "skeptical",
+"sign": -1,
+"w": 2.6094379124341005,
+"label": "4 mentions (held loosely)"
+},
+{
+"s": "adj:A12",
+"t": "k:factor_tilt",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "adj:A13",
@@ -7953,6 +8361,22 @@
 "label": "4 mentions (held loosely)"
 },
 {
+"s": "adj:A13",
+"t": "k:option_structure",
+"type": "skeptical",
+"sign": -1,
+"w": 2.386294361119891,
+"label": "3 mentions (held loosely)"
+},
+{
+"s": "adj:A13",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "adj:A14",
 "t": "k:replication",
 "type": "provenance",
@@ -8061,8 +8485,8 @@
 "t": "k:vrp",
 "type": "provenance",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "1 mention"
+"w": 2.386294361119891,
+"label": "3 mentions"
 },
 {
 "s": "adj:A14",
@@ -8085,8 +8509,8 @@
 "t": "k:calendar",
 "type": "provenance",
 "sign": 1,
-"w": 4.465735902799727,
-"label": "31 mentions"
+"w": 4.761200115693562,
+"label": "42 mentions"
 },
 {
 "s": "adj:A14",
@@ -8373,8 +8797,8 @@
 "t": "k:vrp",
 "type": "provenance",
 "sign": 1,
-"w": 2.386294361119891,
-"label": "3 mentions"
+"w": 3.1972245773362196,
+"label": "8 mentions"
 },
 {
 "s": "adj:A16",
@@ -8447,6 +8871,14 @@
 "sign": -1,
 "w": 2.6094379124341005,
 "label": "4 mentions (held loosely)"
+},
+{
+"s": "adj:A16",
+"t": "k:onchain_flow",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "adj:A17",
@@ -8665,6 +9097,14 @@
 "label": "1 mention"
 },
 {
+"s": "adj:A17",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
 "s": "adj:A18",
 "t": "k:replication",
 "type": "provenance",
@@ -8841,6 +9281,22 @@
 "label": "2 mentions"
 },
 {
+"s": "adj:A18",
+"t": "k:option_structure",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A18",
+"t": "k:arbitrage_bounds",
+"type": "skeptical",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
+},
+{
 "s": "adj:A2",
 "t": "k:rsi",
 "type": "skeptical",
@@ -8851,6 +9307,14 @@
 {
 "s": "adj:A2",
 "t": "k:feedback_loop",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A2",
+"t": "k:evaluation_bottleneck",
 "type": "provenance",
 "sign": 1,
 "w": 1.6931471805599454,
@@ -9137,6 +9601,14 @@
 "label": "1 mention"
 },
 {
+"s": "adj:A4",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "adj:A5",
 "t": "k:attention",
 "type": "provenance",
@@ -9370,6 +9842,14 @@
 },
 {
 "s": "adj:A6",
+"t": "k:calendar",
+"type": "provenance",
+"sign": 1,
+"w": 2.9459101490553135,
+"label": "6 mentions"
+},
+{
+"s": "adj:A6",
 "t": "k:momentum",
 "type": "provenance",
 "sign": 1,
@@ -9593,6 +10073,30 @@
 "label": "1 mention (held loosely)"
 },
 {
+"s": "adj:A7",
+"t": "k:option_structure",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "adj:A7",
+"t": "k:arbitrage_bounds",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "adj:A7",
+"t": "k:factor_tilt",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
 "s": "adj:A8",
 "t": "k:replication",
 "type": "skeptical",
@@ -9765,8 +10269,8 @@
 "t": "k:calendar",
 "type": "provenance",
 "sign": 1,
-"w": 2.386294361119891,
-"label": "3 mentions"
+"w": 3.302585092994046,
+"label": "9 mentions"
 },
 {
 "s": "adj:A8",
@@ -9823,6 +10327,22 @@
 "sign": -1,
 "w": 2.386294361119891,
 "label": "3 mentions (held loosely)"
+},
+{
+"s": "adj:A8",
+"t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
+"s": "adj:A8",
+"t": "k:onchain_flow",
+"type": "provenance",
+"sign": 1,
+"w": 3.1972245773362196,
+"label": "8 mentions"
 },
 {
 "s": "adj:A9",
@@ -10490,6 +11010,14 @@
 },
 {
 "s": "k:adverse_selection",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1931471805599454,
+"label": "co-occur in 2/34 files, PMI +0.69"
+},
+{
+"s": "k:adverse_selection",
 "t": "k:replication",
 "type": "cooccur",
 "sign": 1,
@@ -10626,6 +11154,14 @@
 },
 {
 "s": "k:affine_ifs",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9700036292457355,
+"label": "co-occur in 8/34 files, PMI +0.47"
+},
+{
+"s": "k:affine_ifs",
 "t": "k:renormalization",
 "type": "cooccur",
 "sign": 1,
@@ -10674,6 +11210,14 @@
 },
 {
 "s": "k:agent_tools",
+"t": "k:calendar",
+"type": "cooccur",
+"sign": -1,
+"w": 1.0,
+"label": "never co-occur despite 11 and 11 files (inverse)"
+},
+{
+"s": "k:agent_tools",
 "t": "k:cost_budget",
 "type": "cooccur",
 "sign": 1,
@@ -10687,6 +11231,14 @@
 "sign": 1,
 "w": 1.291993015196578,
 "label": "co-occur in 5/34 files, PMI +0.79"
+},
+{
+"s": "k:agent_tools",
+"t": "k:evaluation_bottleneck",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2230001437096263,
+"label": "co-occur in 4/34 files, PMI +0.72"
 },
 {
 "s": "k:agent_tools",
@@ -10786,11 +11338,19 @@
 },
 {
 "s": "k:anomaly_decay",
+"t": "k:arbitrage_bounds",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9818380868927383,
+"label": "co-occur in 3/34 files, PMI +0.48"
+},
+{
+"s": "k:anomaly_decay",
 "t": "k:calendar",
 "type": "cooccur",
 "sign": 1,
 "w": 0.9818380868927383,
-"label": "co-occur in 10/34 files, PMI +0.48"
+"label": "co-occur in 11/34 files, PMI +0.48"
 },
 {
 "s": "k:anomaly_decay",
@@ -10799,6 +11359,14 @@
 "sign": 1,
 "w": 0.9818380868927383,
 "label": "co-occur in 8/34 files, PMI +0.48"
+},
+{
+"s": "k:anomaly_decay",
+"t": "k:factor_tilt",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9818380868927383,
+"label": "co-occur in 5/34 files, PMI +0.48"
 },
 {
 "s": "k:anomaly_decay",
@@ -10847,6 +11415,14 @@
 "sign": 1,
 "w": 0.9818380868927383,
 "label": "co-occur in 16/34 files, PMI +0.48"
+},
+{
+"s": "k:anomaly_decay",
+"t": "k:onchain_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9818380868927383,
+"label": "co-occur in 2/34 files, PMI +0.48"
 },
 {
 "s": "k:anomaly_decay",
@@ -10938,6 +11514,14 @@
 },
 {
 "s": "k:anticipation",
+"t": "k:calendar",
+"type": "cooccur",
+"sign": -1,
+"w": 1.0,
+"label": "never co-occur despite 12 and 11 files (inverse)"
+},
+{
+"s": "k:anticipation",
 "t": "k:calibration",
 "type": "cooccur",
 "sign": 1,
@@ -10967,14 +11551,6 @@
 "sign": 1,
 "w": 1.387303195000903,
 "label": "co-occur in 6/34 files, PMI +0.89"
-},
-{
-"s": "k:anticipation",
-"t": "k:evaluation_bottleneck",
-"type": "cooccur",
-"sign": 1,
-"w": 1.1359887667199966,
-"label": "co-occur in 2/34 files, PMI +0.64"
 },
 {
 "s": "k:anticipation",
@@ -11058,6 +11634,14 @@
 },
 {
 "s": "k:anticipation",
+"t": "k:option_structure",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0024573740954739,
+"label": "co-occur in 7/34 files, PMI +0.50"
+},
+{
+"s": "k:anticipation",
 "t": "k:positioning",
 "type": "cooccur",
 "sign": -1,
@@ -11082,6 +11666,14 @@
 },
 {
 "s": "k:anticipation",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9054651081081644,
+"label": "co-occur in 9/34 files, PMI +0.41"
+},
+{
+"s": "k:anticipation",
 "t": "k:renormalization",
 "type": "cooccur",
 "sign": 1,
@@ -11103,6 +11695,182 @@
 "sign": 1,
 "w": 1.0819215454497209,
 "label": "co-occur in 12/34 files, PMI +0.58"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:calendar",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2230001437096263,
+"label": "co-occur in 2/34 files, PMI +0.72"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:carry",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9818380868927383,
+"label": "co-occur in 3/34 files, PMI +0.48"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:earnings",
+"type": "cooccur",
+"sign": 1,
+"w": 1.541453874828161,
+"label": "co-occur in 2/34 files, PMI +1.04"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:factor_tilt",
+"type": "cooccur",
+"sign": 1,
+"w": 2.0114575040738965,
+"label": "co-occur in 2/34 files, PMI +1.51"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:fees_slippage",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9818380868927383,
+"label": "co-occur in 3/34 files, PMI +0.48"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:implied_vol",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0559460590464604,
+"label": "co-occur in 2/34 files, PMI +0.56"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:lead_lag",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4236708391717776,
+"label": "co-occur in 2/34 files, PMI +0.92"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:linear_algebra",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8483066942682156,
+"label": "co-occur in 2/34 files, PMI +0.35"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946795,
+"label": "co-occur in 3/34 files, PMI +0.27"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:momentum",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2537718023763802,
+"label": "co-occur in 3/34 files, PMI +0.75"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:monte_carlo",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7876820724517808,
+"label": "co-occur in 2/34 files, PMI +0.29"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:multifractal",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8483066942682156,
+"label": "co-occur in 2/34 files, PMI +0.35"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:option_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4614111671546248,
+"label": "co-occur in 3/34 files, PMI +0.96"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:option_structure",
+"type": "cooccur",
+"sign": 1,
+"w": 1.541453874828161,
+"label": "co-occur in 3/34 files, PMI +1.04"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:positioning",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4614111671546248,
+"label": "co-occur in 3/34 files, PMI +0.96"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4614111671546248,
+"label": "co-occur in 3/34 files, PMI +0.96"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:reference_price",
+"type": "cooccur",
+"sign": 1,
+"w": 1.541453874828161,
+"label": "co-occur in 3/34 files, PMI +1.04"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:replication",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946795,
+"label": "co-occur in 3/34 files, PMI +0.27"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:short_interest",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3183103235139513,
+"label": "co-occur in 2/34 files, PMI +0.82"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:size",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2230001437096263,
+"label": "co-occur in 2/34 files, PMI +0.72"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:vol_regime",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4236708391717776,
+"label": "co-occur in 2/34 files, PMI +0.92"
+},
+{
+"s": "k:arbitrage_bounds",
+"t": "k:vrp",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3183103235139513,
+"label": "co-occur in 2/34 files, PMI +0.82"
 },
 {
 "s": "k:attention",
@@ -11165,8 +11933,8 @@
 "t": "k:evaluation_bottleneck",
 "type": "cooccur",
 "sign": 1,
-"w": 1.628465251817791,
-"label": "co-occur in 3/34 files, PMI +1.13"
+"w": 0.9353180712578455,
+"label": "co-occur in 3/34 files, PMI +0.44"
 },
 {
 "s": "k:attention",
@@ -11335,6 +12103,14 @@
 "sign": 1,
 "w": 0.9818380868927383,
 "label": "co-occur in 7/34 files, PMI +0.48"
+},
+{
+"s": "k:attractor",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1931471805599454,
+"label": "co-occur in 7/34 files, PMI +0.69"
 },
 {
 "s": "k:attractor",
@@ -11514,6 +12290,14 @@
 },
 {
 "s": "k:backprop",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1931471805599454,
+"label": "co-occur in 4/34 files, PMI +0.69"
+},
+{
+"s": "k:backprop",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
@@ -11578,19 +12362,19 @@
 },
 {
 "s": "k:calendar",
-"t": "k:carry",
+"t": "k:calibration",
 "type": "cooccur",
-"sign": 1,
-"w": 0.7586945355785285,
-"label": "co-occur in 8/34 files, PMI +0.26"
+"sign": -1,
+"w": 1.0,
+"label": "never co-occur despite 11 and 12 files (inverse)"
 },
 {
 "s": "k:calendar",
 "t": "k:earnings",
 "type": "cooccur",
 "sign": 1,
-"w": 1.2537718023763802,
-"label": "co-occur in 5/34 files, PMI +0.75"
+"w": 1.1584616225720552,
+"label": "co-occur in 5/34 files, PMI +0.66"
 },
 {
 "s": "k:calendar",
@@ -11598,71 +12382,103 @@
 "type": "cooccur",
 "sign": 1,
 "w": 0.9818380868927383,
-"label": "co-occur in 10/34 files, PMI +0.48"
+"label": "co-occur in 11/34 files, PMI +0.48"
 },
 {
 "s": "k:calendar",
 "t": "k:forking_paths",
 "type": "cooccur",
 "sign": 1,
-"w": 1.0306282510621703,
-"label": "co-occur in 4/34 files, PMI +0.53"
+"w": 0.9353180712578455,
+"label": "co-occur in 4/34 files, PMI +0.44"
+},
+{
+"s": "k:calendar",
+"t": "k:fractal_dimension",
+"type": "cooccur",
+"sign": -1,
+"w": 1.0,
+"label": "never co-occur despite 11 and 17 files (inverse)"
 },
 {
 "s": "k:calendar",
 "t": "k:implied_vol",
 "type": "cooccur",
 "sign": 1,
-"w": 1.3560506514967985,
-"label": "co-occur in 9/34 files, PMI +0.86"
+"w": 1.3661009873503,
+"label": "co-occur in 10/34 files, PMI +0.87"
 },
 {
 "s": "k:calendar",
 "t": "k:intraday",
 "type": "cooccur",
 "sign": 1,
-"w": 1.4053217005035807,
-"label": "co-occur in 8/34 files, PMI +0.91"
+"w": 1.4277945563556398,
+"label": "co-occur in 9/34 files, PMI +0.93"
 },
 {
 "s": "k:calendar",
 "t": "k:kelly",
 "type": "cooccur",
 "sign": 1,
-"w": 1.0306282510621703,
-"label": "co-occur in 2/34 files, PMI +0.53"
+"w": 0.9353180712578455,
+"label": "co-occur in 2/34 files, PMI +0.44"
 },
 {
 "s": "k:calendar",
 "t": "k:lead_lag",
 "type": "cooccur",
 "sign": 1,
-"w": 1.3183103235139515,
-"label": "co-occur in 6/34 files, PMI +0.82"
+"w": 1.2230001437096263,
+"label": "co-occur in 6/34 files, PMI +0.72"
 },
 {
 "s": "k:calendar",
 "t": "k:lookahead",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7682639865946794,
-"label": "co-occur in 10/34 files, PMI +0.27"
+"w": 0.7682639865946795,
+"label": "co-occur in 11/34 files, PMI +0.27"
+},
+{
+"s": "k:calendar",
+"t": "k:mandelbrot_set",
+"type": "cooccur",
+"sign": -1,
+"w": 1.0,
+"label": "never co-occur despite 11 and 13 files (inverse)"
 },
 {
 "s": "k:calendar",
 "t": "k:momentum",
 "type": "cooccur",
 "sign": 1,
-"w": 1.1484112867185536,
-"label": "co-occur in 9/34 files, PMI +0.65"
+"w": 1.1584616225720552,
+"label": "co-occur in 10/34 files, PMI +0.66"
+},
+{
+"s": "k:calendar",
+"t": "k:multifractal",
+"type": "cooccur",
+"sign": 1,
+"w": 0.801786678633323,
+"label": "co-occur in 7/34 files, PMI +0.30"
+},
+{
+"s": "k:calendar",
+"t": "k:onchain_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 1.628465251817791,
+"label": "co-occur in 2/34 files, PMI +1.13"
 },
 {
 "s": "k:calendar",
 "t": "k:option_flow",
 "type": "cooccur",
 "sign": 1,
-"w": 1.2382676158404151,
-"label": "co-occur in 8/34 files, PMI +0.74"
+"w": 1.2607404716924737,
+"label": "co-occur in 9/34 files, PMI +0.76"
 },
 {
 "s": "k:calendar",
@@ -11670,43 +12486,51 @@
 "type": "cooccur",
 "sign": 1,
 "w": 1.4614111671546248,
-"label": "co-occur in 10/34 files, PMI +0.96"
+"label": "co-occur in 11/34 files, PMI +0.96"
 },
 {
 "s": "k:calendar",
 "t": "k:prediction_market",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7682639865946794,
-"label": "co-occur in 5/34 files, PMI +0.27"
+"w": 0.8552753635843091,
+"label": "co-occur in 6/34 files, PMI +0.36"
 },
 {
 "s": "k:calendar",
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 0.8483066942682156,
-"label": "co-occur in 5/34 files, PMI +0.35"
+"w": 0.9353180712578455,
+"label": "co-occur in 6/34 files, PMI +0.44"
 },
 {
 "s": "k:calendar",
-"t": "k:replication",
+"t": "k:representation",
+"type": "cooccur",
+"sign": -1,
+"w": 1.0,
+"label": "never co-occur despite 11 and 11 files (inverse)"
+},
+{
+"s": "k:calendar",
+"t": "k:risk",
 "type": "cooccur",
 "sign": 1,
-"w": 0.7682639865946794,
-"label": "co-occur in 10/34 files, PMI +0.27"
+"w": 0.7811673914305874,
+"label": "co-occur in 6/34 files, PMI +0.28"
+},
+{
+"s": "k:calendar",
+"t": "k:rsi",
+"type": "cooccur",
+"sign": -1,
+"w": 1.0,
+"label": "never co-occur despite 11 and 19 files (inverse)"
 },
 {
 "s": "k:calendar",
 "t": "k:short_interest",
-"type": "cooccur",
-"sign": 1,
-"w": 1.3671004876833832,
-"label": "co-occur in 7/34 files, PMI +0.87"
-},
-{
-"s": "k:calendar",
-"t": "k:size",
 "type": "cooccur",
 "sign": 1,
 "w": 1.4053217005035807,
@@ -11714,27 +12538,35 @@
 },
 {
 "s": "k:calendar",
+"t": "k:size",
+"type": "cooccur",
+"sign": 1,
+"w": 1.310011520699256,
+"label": "co-occur in 8/34 files, PMI +0.81"
+},
+{
+"s": "k:calendar",
 "t": "k:vol_regime",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9128452154057869,
-"label": "co-occur in 4/34 files, PMI +0.41"
+"w": 1.0406785869156718,
+"label": "co-occur in 5/34 files, PMI +0.54"
 },
 {
 "s": "k:calendar",
 "t": "k:volume",
 "type": "cooccur",
 "sign": 1,
-"w": 1.0306282510621703,
-"label": "co-occur in 9/34 files, PMI +0.53"
+"w": 1.0406785869156718,
+"label": "co-occur in 10/34 files, PMI +0.54"
 },
 {
 "s": "k:calendar",
 "t": "k:vrp",
 "type": "cooccur",
 "sign": 1,
-"w": 1.500631880307906,
-"label": "co-occur in 8/34 files, PMI +1.00"
+"w": 1.5231047361599643,
+"label": "co-occur in 9/34 files, PMI +1.02"
 },
 {
 "s": "k:calibration",
@@ -11749,8 +12581,8 @@
 "t": "k:evaluation_bottleneck",
 "type": "cooccur",
 "sign": 1,
-"w": 1.541453874828161,
-"label": "co-occur in 3/34 files, PMI +1.04"
+"w": 1.1359887667199966,
+"label": "co-occur in 4/34 files, PMI +0.64"
 },
 {
 "s": "k:calibration",
@@ -11885,8 +12717,8 @@
 "t": "k:evaluation_bottleneck",
 "type": "cooccur",
 "sign": 1,
-"w": 1.541453874828161,
-"label": "co-occur in 2/34 files, PMI +1.04"
+"w": 0.8483066942682156,
+"label": "co-occur in 2/34 files, PMI +0.35"
 },
 {
 "s": "k:compression",
@@ -11962,6 +12794,14 @@
 },
 {
 "s": "k:compression",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0596157879354227,
+"label": "co-occur in 7/34 files, PMI +0.56"
+},
+{
+"s": "k:compression",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
@@ -11998,7 +12838,15 @@
 "type": "cooccur",
 "sign": 1,
 "w": 1.1931471805599454,
-"label": "co-occur in 3/34 files, PMI +0.69"
+"label": "co-occur in 6/34 files, PMI +0.69"
+},
+{
+"s": "k:cost_budget",
+"t": "k:factor_tilt",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9700036292457355,
+"label": "co-occur in 4/34 files, PMI +0.47"
 },
 {
 "s": "k:cost_budget",
@@ -12055,6 +12903,14 @@
 "sign": 1,
 "w": 0.8136575588550414,
 "label": "co-occur in 13/34 files, PMI +0.31"
+},
+{
+"s": "k:earnings",
+"t": "k:factor_tilt",
+"type": "cooccur",
+"sign": 1,
+"w": 1.7237754316221154,
+"label": "co-occur in 4/34 files, PMI +1.22"
 },
 {
 "s": "k:earnings",
@@ -12138,6 +12994,14 @@
 },
 {
 "s": "k:earnings",
+"t": "k:option_structure",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0714502455824255,
+"label": "co-occur in 5/34 files, PMI +0.57"
+},
+{
+"s": "k:earnings",
 "t": "k:positioning",
 "type": "cooccur",
 "sign": 1,
@@ -12218,6 +13082,14 @@
 },
 {
 "s": "k:edge_vs_market",
+"t": "k:onchain_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8074846997479606,
+"label": "co-occur in 2/34 files, PMI +0.31"
+},
+{
+"s": "k:edge_vs_market",
 "t": "k:renormalization",
 "type": "cooccur",
 "sign": 1,
@@ -12229,8 +13101,8 @@
 "t": "k:evaluation_bottleneck",
 "type": "cooccur",
 "sign": 1,
-"w": 1.6749852674526835,
-"label": "co-occur in 2/34 files, PMI +1.17"
+"w": 0.9818380868927383,
+"label": "co-occur in 2/34 files, PMI +0.48"
 },
 {
 "s": "k:entropy",
@@ -12314,6 +13186,14 @@
 },
 {
 "s": "k:entropy",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8566749439387324,
+"label": "co-occur in 5/34 files, PMI +0.36"
+},
+{
+"s": "k:entropy",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
@@ -12338,11 +13218,19 @@
 },
 {
 "s": "k:evaluation_bottleneck",
+"t": "k:feedback_loop",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9818380868927383,
+"label": "co-occur in 2/34 files, PMI +0.48"
+},
+{
+"s": "k:evaluation_bottleneck",
 "t": "k:fractal_dimension",
 "type": "cooccur",
 "sign": 1,
-"w": 1.1931471805599454,
-"label": "co-occur in 3/34 files, PMI +0.69"
+"w": 0.7876820724517808,
+"label": "co-occur in 4/34 files, PMI +0.29"
 },
 {
 "s": "k:evaluation_bottleneck",
@@ -12350,15 +13238,15 @@
 "type": "cooccur",
 "sign": 1,
 "w": 1.8291359472799418,
-"label": "co-occur in 2/34 files, PMI +1.33"
+"label": "co-occur in 4/34 files, PMI +1.33"
 },
 {
 "s": "k:evaluation_bottleneck",
 "t": "k:information",
 "type": "cooccur",
 "sign": 1,
-"w": 2.234601055388106,
-"label": "co-occur in 2/34 files, PMI +1.73"
+"w": 1.541453874828161,
+"label": "co-occur in 2/34 files, PMI +1.04"
 },
 {
 "s": "k:evaluation_bottleneck",
@@ -12366,11 +13254,11 @@
 "type": "cooccur",
 "sign": 1,
 "w": 0.8483066942682156,
-"label": "co-occur in 2/34 files, PMI +0.35"
+"label": "co-occur in 4/34 files, PMI +0.35"
 },
 {
 "s": "k:evaluation_bottleneck",
-"t": "k:lookahead",
+"t": "k:mandelbrot_set",
 "type": "cooccur",
 "sign": 1,
 "w": 0.7682639865946795,
@@ -12378,51 +13266,35 @@
 },
 {
 "s": "k:evaluation_bottleneck",
-"t": "k:mandelbrot_set",
-"type": "cooccur",
-"sign": 1,
-"w": 1.0559460590464604,
-"label": "co-occur in 2/34 files, PMI +0.56"
-},
-{
-"s": "k:evaluation_bottleneck",
 "t": "k:memory",
 "type": "cooccur",
 "sign": 1,
-"w": 1.0306282510621703,
-"label": "co-occur in 3/34 files, PMI +0.53"
-},
-{
-"s": "k:evaluation_bottleneck",
-"t": "k:monte_carlo",
-"type": "cooccur",
-"sign": 1,
-"w": 0.7876820724517808,
-"label": "co-occur in 2/34 files, PMI +0.29"
+"w": 0.8483066942682156,
+"label": "co-occur in 5/34 files, PMI +0.35"
 },
 {
 "s": "k:evaluation_bottleneck",
 "t": "k:proper_scoring",
 "type": "cooccur",
 "sign": 1,
-"w": 1.0306282510621703,
-"label": "co-occur in 3/34 files, PMI +0.53"
+"w": 0.8483066942682156,
+"label": "co-occur in 5/34 files, PMI +0.35"
 },
 {
 "s": "k:evaluation_bottleneck",
 "t": "k:provenance",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9818380868927383,
-"label": "co-occur in 3/34 files, PMI +0.48"
+"w": 0.7995165300987837,
+"label": "co-occur in 5/34 files, PMI +0.30"
 },
 {
 "s": "k:evaluation_bottleneck",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
-"w": 1.2230001437096263,
-"label": "co-occur in 2/34 files, PMI +0.72"
+"w": 0.9353180712578455,
+"label": "co-occur in 3/34 files, PMI +0.44"
 },
 {
 "s": "k:evaluation_bottleneck",
@@ -12430,15 +13302,167 @@
 "type": "cooccur",
 "sign": 1,
 "w": 1.0819215454497209,
-"label": "co-occur in 3/34 files, PMI +0.58"
+"label": "co-occur in 6/34 files, PMI +0.58"
 },
 {
 "s": "k:evaluation_bottleneck",
 "t": "k:shannon",
 "type": "cooccur",
 "sign": 1,
-"w": 1.8291359472799418,
-"label": "co-occur in 2/34 files, PMI +1.33"
+"w": 1.1359887667199966,
+"label": "co-occur in 2/34 files, PMI +0.64"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:feedback_loop",
+"type": "cooccur",
+"sign": 1,
+"w": 1.164159643686693,
+"label": "co-occur in 2/34 files, PMI +0.66"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:fees_slippage",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9818380868927383,
+"label": "co-occur in 5/34 files, PMI +0.48"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:forking_paths",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4360933591703349,
+"label": "co-occur in 3/34 files, PMI +0.94"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:implied_vol",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2382676158404151,
+"label": "co-occur in 4/34 files, PMI +0.74"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:lead_lag",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9128452154057869,
+"label": "co-occur in 2/34 files, PMI +0.41"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:lookahead",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 5/34 files, PMI +0.27"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:momentum",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0306282510621703,
+"label": "co-occur in 4/34 files, PMI +0.53"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:monte_carlo",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9700036292457355,
+"label": "co-occur in 4/34 files, PMI +0.47"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:multifractal",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0306282510621703,
+"label": "co-occur in 4/34 files, PMI +0.53"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:option_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2382676158404151,
+"label": "co-occur in 4/34 files, PMI +0.74"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:option_structure",
+"type": "cooccur",
+"sign": 1,
+"w": 1.3183103235139513,
+"label": "co-occur in 4/34 files, PMI +0.82"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:positioning",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9505855433886339,
+"label": "co-occur in 3/34 files, PMI +0.45"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9505855433886339,
+"label": "co-occur in 3/34 files, PMI +0.45"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:reference_price",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0306282510621703,
+"label": "co-occur in 3/34 files, PMI +0.53"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:replication",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 5/34 files, PMI +0.27"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:short_interest",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2129498078561252,
+"label": "co-occur in 3/34 files, PMI +0.71"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:size",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4053217005035807,
+"label": "co-occur in 4/34 files, PMI +0.91"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:volume",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9128452154057869,
+"label": "co-occur in 4/34 files, PMI +0.41"
+},
+{
+"s": "k:factor_tilt",
+"t": "k:vrp",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8074846997479606,
+"label": "co-occur in 2/34 files, PMI +0.31"
 },
 {
 "s": "k:feedback_loop",
@@ -12570,6 +13594,14 @@
 },
 {
 "s": "k:fees_slippage",
+"t": "k:onchain_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9818380868927383,
+"label": "co-occur in 2/34 files, PMI +0.48"
+},
+{
+"s": "k:fees_slippage",
 "t": "k:option_flow",
 "type": "cooccur",
 "sign": 1,
@@ -12687,6 +13719,14 @@
 "sign": 1,
 "w": 0.7682639865946794,
 "label": "co-occur in 4/34 files, PMI +0.27"
+},
+{
+"s": "k:forking_paths",
+"t": "k:option_structure",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2537718023763802,
+"label": "co-occur in 6/34 files, PMI +0.75"
 },
 {
 "s": "k:forking_paths",
@@ -12834,6 +13874,14 @@
 },
 {
 "s": "k:fractal_dimension",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 0.924883193965266,
+"label": "co-occur in 13/34 files, PMI +0.42"
+},
+{
+"s": "k:fractal_dimension",
 "t": "k:renormalization",
 "type": "cooccur",
 "sign": 1,
@@ -12914,6 +13962,14 @@
 },
 {
 "s": "k:gradient_descent",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7876820724517808,
+"label": "co-occur in 4/34 files, PMI +0.29"
+},
+{
+"s": "k:gradient_descent",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
@@ -12967,6 +14023,14 @@
 "sign": 1,
 "w": 1.1931471805599454,
 "label": "co-occur in 3/34 files, PMI +0.69"
+},
+{
+"s": "k:idealism",
+"t": "k:option_structure",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1359887667199966,
+"label": "co-occur in 2/34 files, PMI +0.64"
 },
 {
 "s": "k:idealism",
@@ -13055,6 +14119,14 @@
 "sign": 1,
 "w": 0.7682639865946794,
 "label": "co-occur in 8/34 files, PMI +0.27"
+},
+{
+"s": "k:implied_vol",
+"t": "k:onchain_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4614111671546248,
+"label": "co-occur in 2/34 files, PMI +0.96"
 },
 {
 "s": "k:implied_vol",
@@ -13231,6 +14303,14 @@
 "sign": 1,
 "w": 0.9353180712578455,
 "label": "co-occur in 8/34 files, PMI +0.44"
+},
+{
+"s": "k:intraday",
+"t": "k:onchain_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 1.628465251817791,
+"label": "co-occur in 2/34 files, PMI +1.13"
 },
 {
 "s": "k:intraday",
@@ -13442,6 +14522,14 @@
 },
 {
 "s": "k:lead_lag",
+"t": "k:option_structure",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9536672099260421,
+"label": "co-occur in 5/34 files, PMI +0.45"
+},
+{
+"s": "k:lead_lag",
 "t": "k:positioning",
 "type": "cooccur",
 "sign": 1,
@@ -13530,6 +14618,14 @@
 },
 {
 "s": "k:linear_algebra",
+"t": "k:onchain_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2537718023763802,
+"label": "co-occur in 2/34 files, PMI +0.75"
+},
+{
+"s": "k:linear_algebra",
 "t": "k:proper_scoring",
 "type": "cooccur",
 "sign": 1,
@@ -13571,6 +14667,14 @@
 {
 "s": "k:lookahead",
 "t": "k:noisy_channel",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 2/34 files, PMI +0.27"
+},
+{
+"s": "k:lookahead",
+"t": "k:onchain_flow",
 "type": "cooccur",
 "sign": 1,
 "w": 0.7682639865946794,
@@ -13666,6 +14770,14 @@
 },
 {
 "s": "k:mandelbrot_set",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0260930958967793,
+"label": "co-occur in 11/34 files, PMI +0.53"
+},
+{
+"s": "k:mandelbrot_set",
 "t": "k:renormalization",
 "type": "cooccur",
 "sign": 1,
@@ -13730,6 +14842,14 @@
 },
 {
 "s": "k:markov",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8829922522561059,
+"label": "co-occur in 11/34 files, PMI +0.38"
+},
+{
+"s": "k:markov",
 "t": "k:renormalization",
 "type": "cooccur",
 "sign": 1,
@@ -13770,6 +14890,14 @@
 },
 {
 "s": "k:memory",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7623642644674908,
+"label": "co-occur in 13/34 files, PMI +0.26"
+},
+{
+"s": "k:memory",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
@@ -13783,6 +14911,14 @@
 "sign": 1,
 "w": 0.858777994135511,
 "label": "co-occur in 16/34 files, PMI +0.36"
+},
+{
+"s": "k:momentum",
+"t": "k:onchain_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2537718023763802,
+"label": "co-occur in 2/34 files, PMI +0.75"
 },
 {
 "s": "k:momentum",
@@ -13863,6 +14999,14 @@
 "sign": 1,
 "w": 0.7876820724517808,
 "label": "co-occur in 4/34 files, PMI +0.29"
+},
+{
+"s": "k:multifractal",
+"t": "k:onchain_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 1.2537718023763802,
+"label": "co-occur in 2/34 files, PMI +0.75"
 },
 {
 "s": "k:multifractal",
@@ -13961,6 +15105,70 @@
 "label": "co-occur in 2/34 files, PMI +0.58"
 },
 {
+"s": "k:onchain_flow",
+"t": "k:option_flow",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4614111671546248,
+"label": "co-occur in 2/34 files, PMI +0.96"
+},
+{
+"s": "k:onchain_flow",
+"t": "k:positioning",
+"type": "cooccur",
+"sign": 1,
+"w": 1.4614111671546248,
+"label": "co-occur in 2/34 files, PMI +0.96"
+},
+{
+"s": "k:onchain_flow",
+"t": "k:replication",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 2/34 files, PMI +0.27"
+},
+{
+"s": "k:onchain_flow",
+"t": "k:short_interest",
+"type": "cooccur",
+"sign": 1,
+"w": 1.7237754316221154,
+"label": "co-occur in 2/34 files, PMI +1.22"
+},
+{
+"s": "k:onchain_flow",
+"t": "k:size",
+"type": "cooccur",
+"sign": 1,
+"w": 1.628465251817791,
+"label": "co-occur in 2/34 files, PMI +1.13"
+},
+{
+"s": "k:onchain_flow",
+"t": "k:volume",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1359887667199968,
+"label": "co-occur in 2/34 files, PMI +0.64"
+},
+{
+"s": "k:onchain_flow",
+"t": "k:vrp",
+"type": "cooccur",
+"sign": 1,
+"w": 1.7237754316221154,
+"label": "co-occur in 2/34 files, PMI +1.22"
+},
+{
+"s": "k:option_flow",
+"t": "k:option_structure",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946795,
+"label": "co-occur in 6/34 files, PMI +0.27"
+},
+{
 "s": "k:option_flow",
 "t": "k:positioning",
 "type": "cooccur",
@@ -14023,6 +15231,46 @@
 "sign": 1,
 "w": 1.3560506514967985,
 "label": "co-occur in 9/34 files, PMI +0.86"
+},
+{
+"s": "k:option_structure",
+"t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9224146664219377,
+"label": "co-occur in 7/34 files, PMI +0.42"
+},
+{
+"s": "k:option_structure",
+"t": "k:reference_price",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8483066942682156,
+"label": "co-occur in 6/34 files, PMI +0.35"
+},
+{
+"s": "k:option_structure",
+"t": "k:replication",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946795,
+"label": "co-occur in 12/34 files, PMI +0.27"
+},
+{
+"s": "k:option_structure",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9353180712578455,
+"label": "co-occur in 6/34 files, PMI +0.44"
+},
+{
+"s": "k:option_structure",
+"t": "k:size",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7529965144638908,
+"label": "co-occur in 5/34 files, PMI +0.25"
 },
 {
 "s": "k:positioning",
@@ -14138,6 +15386,14 @@
 },
 {
 "s": "k:proper_scoring",
+"t": "k:relative_value",
+"type": "cooccur",
+"sign": 1,
+"w": 0.836472236621213,
+"label": "co-occur in 14/34 files, PMI +0.34"
+},
+{
+"s": "k:proper_scoring",
 "t": "k:renormalization",
 "type": "cooccur",
 "sign": 1,
@@ -14199,6 +15455,30 @@
 "sign": 1,
 "w": 0.8483066942682156,
 "label": "co-occur in 5/34 files, PMI +0.35"
+},
+{
+"s": "k:relative_value",
+"t": "k:renormalization",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1931471805599454,
+"label": "co-occur in 3/34 files, PMI +0.69"
+},
+{
+"s": "k:relative_value",
+"t": "k:representation",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8746934494414106,
+"label": "co-occur in 8/34 files, PMI +0.37"
+},
+{
+"s": "k:relative_value",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0108256237659905,
+"label": "co-occur in 5/34 files, PMI +0.51"
 },
 {
 "s": "k:renormalization",
@@ -14641,8 +15921,32 @@
 "label": "Deflated Sharpe with skew and kurtosis corrections (code, 14) versus the claim that standard-deviation metrics are unreliable under fat tail"
 },
 {
+"s": "k:multifractal",
+"t": "k:relative_value",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Deflated Sharpe with skew and kurtosis corrections (code, 14) versus the claim that standard-deviation metrics are unreliable under fat tail"
+},
+{
 "s": "k:backtest",
 "t": "k:implied_vol",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Deflated Sharpe with skew and kurtosis corrections (code, 14) versus the claim that standard-deviation metrics are unreliable under fat tail"
+},
+{
+"s": "k:backtest",
+"t": "k:relative_value",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Deflated Sharpe with skew and kurtosis corrections (code, 14) versus the claim that standard-deviation metrics are unreliable under fat tail"
+},
+{
+"s": "k:implied_vol",
+"t": "k:relative_value",
 "type": "tension",
 "sign": -1,
 "w": 1.5,
@@ -15173,8 +16477,8 @@
 "t": "k:calendar",
 "type": "evidence",
 "sign": 1,
-"w": 2.791759469228055,
-"label": "the child's reports mention it 5 times"
+"w": 3.302585092994046,
+"label": "the child's reports mention it 9 times"
 },
 {
 "s": "child:Hurst",
@@ -15231,6 +16535,14 @@
 "sign": 1,
 "w": 2.6094379124341005,
 "label": "the child's reports mention it 4 times"
+},
+{
+"s": "child:Hurst",
+"t": "k:option_structure",
+"type": "evidence",
+"sign": 1,
+"w": 3.5649493574615367,
+"label": "the child's reports mention it 12 times"
 },
 {
 "s": "child:Brier",
@@ -15409,6 +16721,14 @@
 "label": "the child's reports mention it 2 times"
 },
 {
+"s": "child:Brier",
+"t": "k:option_structure",
+"type": "evidence",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "the child's reports mention it 1 time"
+},
+{
 "s": "child:Kelly",
 "t": "k:replication",
 "type": "evidence",
@@ -15535,6 +16855,14 @@
 "sign": 1,
 "w": 2.0986122886681096,
 "label": "the child's reports mention it 2 times"
+},
+{
+"s": "child:Kelly",
+"t": "k:vrp",
+"type": "evidence",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "the child's reports mention it 1 time"
 },
 {
 "s": "child:Kelly",
@@ -15777,6 +17105,22 @@
 "label": "the child's reports mention it 18 times"
 },
 {
+"s": "child:Shannon",
+"t": "k:arbitrage_bounds",
+"type": "evidence",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "the child's reports mention it 1 time"
+},
+{
+"s": "child:Shannon",
+"t": "k:relative_value",
+"type": "evidence",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "the child's reports mention it 1 time"
+},
+{
 "s": "stream:theories",
 "t": "k:information",
 "type": "evidence",
@@ -15799,6 +17143,14 @@
 "sign": -1,
 "w": 6.0,
 "label": "94 blocked, 93 not supported, 12 supported, 12 inconclusive (12 of 105 decided passed)"
+},
+{
+"s": "stream:theories",
+"t": "k:evaluation_bottleneck",
+"type": "evidence",
+"sign": -1,
+"w": 2.386294361119891,
+"label": "2 blocked, 1 not supported (0 of 1 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15949,8 +17301,8 @@
 "t": "k:memory",
 "type": "evidence",
 "sign": -1,
-"w": 1.6931471805599454,
-"label": "1 blocked"
+"w": 2.386294361119891,
+"label": "3 blocked"
 },
 {
 "s": "stream:theories",
@@ -15989,8 +17341,8 @@
 "t": "k:vrp",
 "type": "evidence",
 "sign": -1,
-"w": 4.526360524616162,
-"label": "14 not supported, 11 supported, 5 blocked, 3 inconclusive (11 of 25 decided passed)"
+"w": 5.2626798770413155,
+"label": "28 not supported, 21 supported, 12 blocked, 9 inconclusive (21 of 49 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -16037,8 +17389,8 @@
 "t": "k:calendar",
 "type": "evidence",
 "sign": -1,
-"w": 5.330733340286331,
-"label": "41 not supported, 21 blocked, 7 supported, 6 inconclusive (7 of 48 decided passed)"
+"w": 5.574710978503383,
+"label": "54 not supported, 25 blocked, 10 supported, 7 inconclusive (10 of 64 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -16103,6 +17455,46 @@
 "sign": -1,
 "w": 1.6931471805599454,
 "label": "1 not supported (0 of 1 decided passed)"
+},
+{
+"s": "stream:theories",
+"t": "k:option_structure",
+"type": "evidence",
+"sign": -1,
+"w": 6.0,
+"label": "80 not supported, 47 blocked, 26 supported, 24 inconclusive, 1 parked (26 of 106 decided passed)"
+},
+{
+"s": "stream:theories",
+"t": "k:arbitrage_bounds",
+"type": "evidence",
+"sign": -1,
+"w": 4.828641396489095,
+"label": "18 blocked, 17 not supported, 10 inconclusive (0 of 17 decided passed)"
+},
+{
+"s": "stream:theories",
+"t": "k:relative_value",
+"type": "evidence",
+"sign": -1,
+"w": 3.833213344056216,
+"label": "9 not supported, 4 blocked, 2 parked, 1 inconclusive (0 of 9 decided passed)"
+},
+{
+"s": "stream:theories",
+"t": "k:factor_tilt",
+"type": "evidence",
+"sign": -1,
+"w": 3.302585092994046,
+"label": "7 not supported, 1 inconclusive, 1 blocked (0 of 7 decided passed)"
+},
+{
+"s": "stream:theories",
+"t": "k:onchain_flow",
+"type": "evidence",
+"sign": -1,
+"w": 3.1972245773362196,
+"label": "3 not supported, 2 inconclusive, 2 blocked, 1 supported (1 of 4 decided passed)"
 },
 {
 "s": "stream:child-ledger",

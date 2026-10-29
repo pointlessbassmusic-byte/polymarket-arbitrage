@@ -22,13 +22,13 @@
   ],
   "by_tests": [
    "replication",
+   "option_structure",
    "implied_vol",
    "backtest",
    "momentum",
-   "monte_carlo",
    "calendar",
-   "lookahead",
-   "volume"
+   "monte_carlo",
+   "vrp"
   ],
   "by_pass_share": [
    "multifractal",
@@ -36,19 +36,19 @@
    "vrp",
    "implied_vol",
    "calibration",
+   "option_structure",
    "markov",
-   "edge_vs_market",
-   "prediction_market"
+   "edge_vs_market"
   ],
   "by_fail_share": [
    "adverse_selection",
    "cost_budget",
    "monte_carlo",
    "lead_lag",
+   "factor_tilt",
    "calibration",
    "kelly",
-   "risk",
-   "backtest"
+   "risk"
   ],
   "by_tensions": [
    "overfitting",
@@ -65,20 +65,20 @@
    "agent_tools",
    "attractor",
    "entropy",
-   "memory",
    "representation",
    "rsi",
-   "mandelbrot_set"
+   "mandelbrot_set",
+   "fractal_dimension"
   ],
   "tested_untalked": [
+   "option_structure",
+   "arbitrage_bounds",
    "prediction_market",
    "monte_carlo",
    "replication",
    "bayes",
    "implied_vol",
-   "calendar",
-   "vol_regime",
-   "momentum"
+   "factor_tilt"
   ],
   "zero_tests": [
    "affine_ifs",
@@ -87,7 +87,6 @@
    "backprop",
    "compression",
    "entropy",
-   "evaluation_bottleneck",
    "feedback_loop",
    "forking_paths",
    "gradient_descent",
@@ -100,78 +99,18 @@
    "shannon"
   ],
   "theories_unmatched": [
-   "T-111",
-   "T-112",
-   "T-117",
-   "T-119",
-   "T-120",
-   "T-121",
-   "T-122",
    "T-13",
-   "T-161",
-   "T-166",
-   "T-167",
-   "T-169",
-   "T-182",
-   "T-184",
-   "T-187",
-   "T-191",
-   "T-194",
-   "T-20",
-   "T-201",
-   "T-21",
-   "T-212",
-   "T-22",
-   "T-230",
-   "T-244",
-   "T-260",
-   "T-274",
    "T-30",
-   "T-321",
-   "T-322",
-   "T-324",
-   "T-328",
-   "T-350",
-   "T-354",
-   "T-357",
-   "T-37",
-   "T-376",
-   "T-386",
-   "T-387",
    "T-39",
-   "T-397",
    "T-40",
-   "T-401",
    "T-41",
    "T-414",
    "T-416",
    "T-42",
-   "T-439",
    "T-44",
-   "T-442",
    "T-45",
    "T-461",
-   "T-464",
-   "T-467",
-   "T-50",
-   "T-506",
-   "T-507",
-   "T-509",
-   "T-51",
-   "T-511",
-   "T-513",
-   "T-518",
-   "T-523",
-   "T-526",
-   "T-538",
-   "T-539",
-   "T-60",
-   "T-61",
-   "T-62",
-   "T-63",
-   "T-64",
-   "T-65",
-   "T-66"
+   "T-523"
   ]
  },
  "next_tests": {
@@ -182,10 +121,10 @@
    "T-55",
    "T-56",
    "T-57",
-   "T-340",
    "T-538",
    "T-551",
-   "T-102"
+   "T-102",
+   "T-592"
   ],
   "alternatives": {
    "blocked_weight_1.0": {
@@ -196,10 +135,10 @@
      "T-55",
      "T-56",
      "T-57",
-     "T-340",
      "T-538",
      "T-551",
-     "T-102"
+     "T-102",
+     "T-592"
     ],
     "enters": []
    },
@@ -211,10 +150,10 @@
      "T-55",
      "T-56",
      "T-57",
-     "T-340",
      "T-538",
      "T-551",
-     "T-102"
+     "T-102",
+     "T-592"
     ],
     "enters": []
    },
@@ -226,10 +165,10 @@
      "T-55",
      "T-56",
      "T-57",
-     "T-340",
      "T-538",
      "T-551",
-     "T-102"
+     "T-102",
+     "T-592"
     ],
     "enters": []
    },
@@ -255,9 +194,7 @@
     ]
    }
   },
-  "unblocked_with_data": [
-   "T-340"
-  ]
+  "unblocked_with_data": []
  },
  "scan": {
   "family": {

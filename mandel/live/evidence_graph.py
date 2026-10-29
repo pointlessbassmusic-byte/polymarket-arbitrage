@@ -327,7 +327,8 @@ def _need_count(blocked_on: str) -> Optional[int]:
     return max(found) if found else None
 
 
-FETCH_MARKERS = ("to fetch", "re-fetch", "refetch", "to archive", "to capture", "new:", "(free, via", "free socrata fetch", "re-fetched with")
+FETCH_MARKERS = ("to fetch", "re-fetch", "refetch", "to archive", "to capture", "new:", "(free, via", "free socrata fetch", "re-fetched with",
+                 "not tested from this host", "lack prices", "not archived")
 
 
 def needs_fetch(text: str) -> bool:
