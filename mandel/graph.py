@@ -56,9 +56,9 @@ LEXICON: dict[str, tuple[str, str, list[str]]] = {
     "idealism":        ("Mind / idealism framing", "framing", [r"\bidealis(m|t)\b", r"\bconsciousness\b", r"\bmind[- ]body\b"]),
     "forking_paths":   ("Forking paths / p-hacking", "validation", [r"\bforking paths?\b", r"\bp-hack", r"\bgarden of forking\b", r"\bpost[- ]hoc\b", r"\bmultiple comparisons?\b"]),
     "replication":     ("Replication & pre-registration", "validation", [r"\breplicat(e|ion|ions)\b", r"\bpre-?regist(er|ered|ration)\b"]),
-    "rsi":             ("Recursive self-improvement", "learning", [r"\brecursive self-?improvement\b", r"\bself-?improv", r"\bseed ai\b", r"\bintelligence explosion\b", r"\bgödel machine\b", r"\bgodel machine\b"]),
+    "rsi":             ("Recursive self-improvement", "learning", [r"\brecursive self-?improvement\b", r"\bself-?improv", r"\bseed ai\b", r"\bintelligence explosion\b", r"\bgödel machine\b", r"\bgodel machine\b", r"\bself[- ]modif"]),
     "feedback_loop":   ("Feedback loops", "learning", [r"\bfeedback loops?\b", r"\bcompounding\b", r"\bcloses? the loop\b"]),
-    "evaluation_bottleneck": ("Evaluation is the bottleneck", "validation", [r"\bevaluation (is|as) the (bottleneck|hard part)\b", r"\bverif(y|ication) (is|as) the bottleneck\b", r"\bbottleneck\b", r"\bevaluation[- ]cascade\b", r"\bvalidated hit[- ]rate\b", r"\bskill rises\b", r"\bstepping[- ]stones?\b"]),
+    "evaluation_bottleneck": ("Evaluation is the bottleneck", "validation", [r"\bevaluation (is|as) the (bottleneck|hard part)\b", r"\bverif(y|ication) (is|as) the bottleneck\b", r"\bbottleneck\b", r"\bevaluation[- ]cascade\b", r"\bvalidated hit[- ]rate\b", r"\bskill rises\b", r"\bstepping[- ]stones?\b", r"\bskill[- ]rises\b", r"\bvalidated[- ]hit[- ]rate\b"]),
     "gradient_descent":("Gradient descent", "learning", [r"\bgradient descent\b", r"\bloss (function|landscape|surface)\b", r"\bstochastic gradient\b"]),
     "backprop":        ("Backpropagation", "learning", [r"\bback-?propagat", r"\bchain rule\b"]),
     "overfitting":     ("Overfitting & generalisation", "validation", [r"\boverfit", r"\bgeneralis", r"\bgeneraliz", r"\bregulari[sz]", r"\bvalidation (set|split)\b", r"\bheld-?out\b", r"\bout[- ]of[- ]sample\b"]),
@@ -101,7 +101,7 @@ LEXICON: dict[str, tuple[str, str, list[str]]] = {
     "lead_lag":        ("Cross-asset lead-lag", "variables", [r"\blead[- ]lag\b", r"\bcross[- ]asset\b", r"\beconomic links?\b", r"\bspill-?overs?\b", r"\bleading indicator"]),
     "momentum":        ("Momentum & reversal", "variables", [r"\bmomentum\b", r"\breversal\b", r"\btrend[- ]following\b", r"\bmean[- ]revers"]),
     "carry":           ("Carry, basis & funding", "variables", [r"\bcarry\b", r"\bbasis\b", r"\bfunding rates?\b", r"\broll yield\b", r"\bcontango\b", r"\bbackwardation\b"]),
-    "positioning":     ("Positioning & flows", "variables", [r"\bcommitments of traders\b", r"\bcot\b", r"\bhedging pressure\b", r"\b(fund|etf) flows?\b", r"\brebalanc", r"\bliquidations?\b"]),
+    "positioning":     ("Positioning & flows", "variables", [r"\bcommitments of traders\b", r"\bcot\b", r"\bhedging pressure\b", r"\b(fund|etf) flows?\b", r"\brebalanc", r"\bliquidations?\b", r"\bptr\b", r"\bcongress", r"\binsider", r"\b13f\b"]),
     "vol_regime":      ("Volatility regimes & timing", "variables", [r"\bvolatility[- ]managed\b", r"\bvolatility timing\b", r"\bregime[- ]switch", r"\breali[sz]ed (vol|skew|kurt)", r"\bhar[- ]rv\b"]),
     "anomaly_decay":   ("Anomaly decay after publication", "validation", [r"\bpost[- ]publication\b", r"\banomal(y|ies) (decay|disappear)", r"\bdecay(ed|s)?\b", r"\barbitraged away\b", r"\bno longer (works|pays)\b"]),
     "reference_price": ("Reference-price edge", "markets", [r"\breference[- ](price|class)\b", r"\bsharper (public )?source\b", r"\bleads? the (book|market|price|venue)\b",
@@ -115,6 +115,7 @@ LEXICON: dict[str, tuple[str, str, list[str]]] = {
     "relative_value":  ("Relative value & convergence", "markets", [r"\bpairs?[- ]trad", r"\bcointegrat", r"\bpremium[- /]discount\b", r"\bnav\b", r"\bcross[- ]listed\b", r"\bratio\b.*\brevert", r"\bspread\b.*\brevert", r"\bconverge(nce|s)?\b", r"\bdistance\b.*\bpairs?\b", r"\bgold[- ]silver ratio\b"]),
     "factor_tilt":     ("Factor tilts", "variables", [r"\bprofitability\b", r"\brmw\b", r"\bbetting[- ]against[- ]beta\b", r"\bbab\b", r"\besg\b", r"\bsin (stocks?|premium)\b", r"\bquality (factor|tilt)\b", r"\bvalue (factor|tilt|premium)\b", r"\blow[- ]vol(atility)? (anomaly|tilt|factor)\b", r"\bfama[- ]french\b", r"\bpiotroski\b", r"\bfactor (tilt|premium|exposure)\b"]),
     "onchain_flow":    ("On-chain & stablecoin flows", "variables", [r"\bsopr\b", r"\bnetflows?\b", r"\bexchange (in|out)?flows?\b", r"\bstablecoin\b", r"\bon[- ]chain\b", r"\bmint(ing|s)?\b", r"\bsupply (change|growth)\b", r"\bwhale\b"]),
+    "sentiment":       ("Sentiment & retail flow", "variables", [r"\bsentiment\b", r"\bbullish[- ]ratio\b", r"\bfear[- ](&|and)?[- ]?greed\b", r"\btrending\b", r"\bretail[- ](order[- ])?(imbalance|flow)\b", r"\blexicon\b", r"\bstocktwits\b", r"\breddit\b", r"\bmentions?\b", r"\bcontrarian\b"]),
 }
 
 CONCEPT_GROUP_LABELS = {

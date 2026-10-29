@@ -1,26 +1,15 @@
 {
 "generated_for": "Mandel signal map",
 "theories_unmatched": [
-"T-13",
-"T-30",
-"T-39",
-"T-40",
-"T-41",
-"T-414",
-"T-416",
-"T-42",
-"T-44",
-"T-45",
-"T-461",
 "T-523"
 ],
 "stats": {
-"nodes": 125,
-"edges": 1702,
+"nodes": 126,
+"edges": 1735,
 "documents": 34,
 "layers": {
 "substrate": 42,
-"concepts": 63,
+"concepts": 64,
 "principles": 13,
 "centres": 7
 }
@@ -1747,8 +1736,8 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 1,
-"blocked": 2
+"not_supported": 2,
+"blocked": 3
 }
 }
 }
@@ -2984,11 +2973,11 @@
 "label": "Positioning & flows",
 "layer": 1,
 "kind": "concept",
-"size": 3.287193634947818,
+"size": 3.3719027109268422,
 "group": "variables",
 "detail": "Market variables",
 "meta": {
-"mentions": 64,
+"mentions": 76,
 "documents": 13,
 "excerpts": [
 {
@@ -3026,7 +3015,7 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"blocked": 12,
+"blocked": 18,
 "not_supported": 6,
 "inconclusive": 1,
 "supported": 1,
@@ -3508,16 +3497,16 @@
 "label": "Recursive self-improvement",
 "layer": 1,
 "kind": "concept",
-"size": 3.125073800855029,
+"size": 3.185145956776061,
 "group": "learning",
 "detail": "Learning",
 "meta": {
-"mentions": 46,
+"mentions": 52,
 "documents": 19,
 "excerpts": [
 {
 "src": "src:01",
-"text": "Propose → cost → isolate → test → account → commit. Every self-improvement proposal states expected information gain and expected cost up front; it runs only against an unretired held-out set; acceptance requires net-edge …"
+"text": "Information conservation as audit policy. Knowledge is never silently deleted; deprecations are tombstoned with a reason and the superseding entry, because the ability to reconstruct how a belief arose is the only way to validate …"
 },
 {
 "src": "src:02",
@@ -3547,7 +3536,67 @@
 "src": "src:08",
 "text": "Reject the IFS as a model of learning or \"self-expansion\". Once the maps are fixed, iteration produces detail and no information; learning is the inverse problem (choosing maps from data), which the collage theorem bounds but …"
 }
-]
+],
+"verdicts": {
+"Mandel's tested theories": {
+"blocked": 1
+}
+}
+}
+},
+{
+"id": "k:sentiment",
+"label": "Sentiment & retail flow",
+"layer": 1,
+"kind": "concept",
+"size": 2.9005986908310777,
+"group": "variables",
+"detail": "Market variables",
+"meta": {
+"mentions": 29,
+"documents": 13,
+"excerpts": [
+{
+"src": "src:03",
+"text": "Forecasting and traders. [ep99] She runs a team called \"intuitive forecasting\"; remote-viewing accuracy tracks \"what your interest is, what your expertise is.\" She cites a London trading-floor study to argue strong day traders …"
+},
+{
+"src": "src:05",
+"text": "Learning is minimising a declared cost. [Ch2] Initialise all 13,002 parameters at random (\"the output layer just looks like a mess\"). For one example, cost = Σ_j (a_j^(L) − y_j)^2, the squared gap between the output activations …"
+},
+{
+"src": "src:06",
+"text": "*Lint* (new, `python -m mandel lint`, scheduled weekly and run before any readiness report): orphans (files not in `INDEX.md`, or in the index but missing); broken cross-links (references to `NN` with no file); contradictions …"
+},
+{
+"src": "src:11",
+"text": "Coverage confidence: 0.75. The watch page and transcript APIs are blocked from this container, so the video was not viewed. Confirmed from Veritasium's own page: title, chapter list with timestamps, credited experts, that a …"
+},
+{
+"src": "src:12",
+"text": "Coverage confidence: 0.40. YouTube's watch page and transcript APIs are blocked here. Across two passes, eight transcript or summary mirrors were behind login, Cloudflare or bot walls, four Invidious/Piped instances returned …"
+},
+{
+"src": "src:13",
+"text": "Creator: AI Pathways (YouTube @AIPathwaysChannel), hosted by Brendan Li: UCLA graduate, former technology investment banker, runs the paid Skool community \"AI Pathways\" ($149/month, 428 members on the day of research; the …"
+},
+{
+"src": "src:14",
+"text": "What to expect: the creator's own humility clauses. [meta, sibling] Chapter 27:13 \"What You Should Realistically Expect\". In the sibling's \"real talk\" section: LLMs learn from Reddit and books \"where most traders lose money\" (he …"
+},
+{
+"src": "src:15",
+"text": "Attempted and failed (recorded so they are not retried blindly): YouTube watch page and transcript APIs (blocked by policy here, not attempted beyond the one-line check); …"
+}
+],
+"verdicts": {
+"Mandel's tested theories": {
+"not_supported": 5,
+"inconclusive": 4,
+"blocked": 11,
+"parked": 2
+}
+}
 }
 },
 {
@@ -4277,8 +4326,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "1 mention"
+"w": 2.386294361119891,
+"label": "3 mentions"
 },
 {
 "s": "src:01",
@@ -4801,6 +4850,14 @@
 "label": "1 mention"
 },
 {
+"s": "src:03",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
 "s": "src:04",
 "t": "k:anticipation",
 "type": "provenance",
@@ -4821,8 +4878,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 3.995732273553991,
-"label": "19 mentions"
+"w": 4.044522437723423,
+"label": "20 mentions"
 },
 {
 "s": "src:04",
@@ -5217,6 +5274,14 @@
 "label": "1 mention"
 },
 {
+"s": "src:05",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "src:06",
 "t": "k:entropy",
 "type": "provenance",
@@ -5367,6 +5432,14 @@
 "sign": 1,
 "w": 2.0986122886681096,
 "label": "2 mentions"
+},
+{
+"s": "src:06",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "src:07",
@@ -5981,8 +6054,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "2 mentions"
+"w": 2.386294361119891,
+"label": "3 mentions"
 },
 {
 "s": "src:10",
@@ -6369,6 +6442,14 @@
 "label": "15 mentions (held loosely)"
 },
 {
+"s": "src:11",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
 "s": "src:12",
 "t": "k:anticipation",
 "type": "provenance",
@@ -6641,6 +6722,14 @@
 "label": "1 mention"
 },
 {
+"s": "src:12",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 2.791759469228055,
+"label": "5 mentions"
+},
+{
 "s": "src:13",
 "t": "k:entropy",
 "type": "provenance",
@@ -6889,6 +6978,14 @@
 "label": "3 mentions"
 },
 {
+"s": "src:13",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 2.6094379124341005,
+"label": "4 mentions"
+},
+{
 "s": "src:14",
 "t": "k:entropy",
 "type": "provenance",
@@ -7105,6 +7202,14 @@
 "label": "2 mentions (held loosely)"
 },
 {
+"s": "src:14",
+"t": "k:sentiment",
+"type": "skeptical",
+"sign": -1,
+"w": 2.386294361119891,
+"label": "3 mentions (held loosely)"
+},
+{
 "s": "src:15",
 "t": "k:anticipation",
 "type": "provenance",
@@ -7283,6 +7388,14 @@
 {
 "s": "src:15",
 "t": "k:relative_value",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
+"s": "src:15",
+"t": "k:sentiment",
 "type": "provenance",
 "sign": 1,
 "w": 1.6931471805599454,
@@ -7493,8 +7606,8 @@
 "t": "k:rsi",
 "type": "provenance",
 "sign": 1,
-"w": 2.791759469228055,
-"label": "5 mentions"
+"w": 3.0794415416798357,
+"label": "7 mentions"
 },
 {
 "s": "adj:A1",
@@ -7767,6 +7880,14 @@
 "sign": 1,
 "w": 1.6931471805599454,
 "label": "1 mention"
+},
+{
+"s": "adj:A10",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 2.6094379124341005,
+"label": "4 mentions"
 },
 {
 "s": "adj:A11",
@@ -8123,10 +8244,10 @@
 {
 "s": "adj:A12",
 "t": "k:positioning",
-"type": "provenance",
-"sign": 1,
-"w": 1.6931471805599454,
-"label": "1 mention"
+"type": "skeptical",
+"sign": -1,
+"w": 2.9459101490553135,
+"label": "6 mentions (held loosely)"
 },
 {
 "s": "adj:A12",
@@ -8533,8 +8654,8 @@
 "t": "k:positioning",
 "type": "provenance",
 "sign": 1,
-"w": 2.791759469228055,
-"label": "5 mentions"
+"w": 3.302585092994046,
+"label": "9 mentions"
 },
 {
 "s": "adj:A14",
@@ -9713,6 +9834,14 @@
 "label": "1 mention"
 },
 {
+"s": "adj:A5",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "adj:A6",
 "t": "k:overfitting",
 "type": "provenance",
@@ -9889,6 +10018,14 @@
 "label": "1 mention (held loosely)"
 },
 {
+"s": "adj:A6",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
 "s": "adj:A7",
 "t": "k:forking_paths",
 "type": "skeptical",
@@ -10053,8 +10190,8 @@
 "t": "k:positioning",
 "type": "skeptical",
 "sign": -1,
-"w": 1.6931471805599454,
-"label": "1 mention (held loosely)"
+"w": 2.6094379124341005,
+"label": "4 mentions (held loosely)"
 },
 {
 "s": "adj:A7",
@@ -10095,6 +10232,14 @@
 "sign": 1,
 "w": 2.0986122886681096,
 "label": "2 mentions"
+},
+{
+"s": "adj:A7",
+"t": "k:sentiment",
+"type": "skeptical",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 mention (held loosely)"
 },
 {
 "s": "adj:A8",
@@ -10527,6 +10672,14 @@
 "sign": -1,
 "w": 3.1972245773362196,
 "label": "8 mentions (held loosely)"
+},
+{
+"s": "adj:A9",
+"t": "k:sentiment",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "k:provenance",
@@ -11697,6 +11850,14 @@
 "label": "co-occur in 12/34 files, PMI +0.58"
 },
 {
+"s": "k:anticipation",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 1.0559460590464604,
+"label": "co-occur in 8/34 files, PMI +0.56"
+},
+{
 "s": "k:arbitrage_bounds",
 "t": "k:calendar",
 "type": "cooccur",
@@ -12311,6 +12472,14 @@
 "sign": 1,
 "w": 1.081921545449721,
 "label": "co-occur in 4/34 files, PMI +0.58"
+},
+{
+"s": "k:backprop",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 2/34 files, PMI +0.27"
 },
 {
 "s": "k:backprop",
@@ -13026,6 +13195,14 @@
 },
 {
 "s": "k:earnings",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 4/34 files, PMI +0.27"
+},
+{
+"s": "k:earnings",
 "t": "k:short_interest",
 "type": "cooccur",
 "sign": 1,
@@ -13207,6 +13384,14 @@
 "sign": 1,
 "w": 1.0819215454497209,
 "label": "co-occur in 7/34 files, PMI +0.58"
+},
+{
+"s": "k:entropy",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1249389305334119,
+"label": "co-occur in 5/34 files, PMI +0.62"
 },
 {
 "s": "k:entropy",
@@ -13434,6 +13619,14 @@
 },
 {
 "s": "k:factor_tilt",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9505855433886339,
+"label": "co-occur in 3/34 files, PMI +0.45"
+},
+{
+"s": "k:factor_tilt",
 "t": "k:short_interest",
 "type": "cooccur",
 "sign": 1,
@@ -13551,6 +13744,14 @@
 "sign": 1,
 "w": 1.0819215454497209,
 "label": "co-occur in 7/34 files, PMI +0.58"
+},
+{
+"s": "k:feedback_loop",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.9017953792192022,
+"label": "co-occur in 4/34 files, PMI +0.40"
 },
 {
 "s": "k:fees_slippage",
@@ -13775,6 +13976,14 @@
 "sign": 1,
 "w": 0.9172995657551672,
 "label": "co-occur in 5/34 files, PMI +0.42"
+},
+{
+"s": "k:forking_paths",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 4/34 files, PMI +0.27"
 },
 {
 "s": "k:forking_paths",
@@ -14266,6 +14475,14 @@
 },
 {
 "s": "k:information",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 2/34 files, PMI +0.27"
+},
+{
+"s": "k:information",
 "t": "k:shannon",
 "type": "cooccur",
 "sign": 1,
@@ -14443,6 +14660,14 @@
 {
 "s": "k:kelly",
 "t": "k:prediction_market",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 2/34 files, PMI +0.27"
+},
+{
+"s": "k:kelly",
+"t": "k:sentiment",
 "type": "cooccur",
 "sign": 1,
 "w": 0.7682639865946794,
@@ -14810,6 +15035,14 @@
 },
 {
 "s": "k:mandelbrot_set",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8423719587484013,
+"label": "co-occur in 7/34 files, PMI +0.34"
+},
+{
+"s": "k:mandelbrot_set",
 "t": "k:shannon",
 "type": "cooccur",
 "sign": 1,
@@ -14881,6 +15114,14 @@
 "label": "co-occur in 12/34 files, PMI +0.36"
 },
 {
+"s": "k:markov",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8328025077322506,
+"label": "co-occur in 8/34 files, PMI +0.33"
+},
+{
 "s": "k:memory",
 "t": "k:provenance",
 "type": "cooccur",
@@ -14911,6 +15152,14 @@
 "sign": 1,
 "w": 0.858777994135511,
 "label": "co-occur in 16/34 files, PMI +0.36"
+},
+{
+"s": "k:memory",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946794,
+"label": "co-occur in 10/34 files, PMI +0.27"
 },
 {
 "s": "k:momentum",
@@ -15266,6 +15515,14 @@
 },
 {
 "s": "k:option_structure",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946795,
+"label": "co-occur in 6/34 files, PMI +0.27"
+},
+{
+"s": "k:option_structure",
 "t": "k:size",
 "type": "cooccur",
 "sign": 1,
@@ -15522,11 +15779,27 @@
 },
 {
 "s": "k:risk",
+"t": "k:sentiment",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946795,
+"label": "co-occur in 7/34 files, PMI +0.27"
+},
+{
+"s": "k:risk",
 "t": "k:volume",
 "type": "cooccur",
 "sign": 1,
 "w": 0.7995165300987839,
 "label": "co-occur in 10/34 files, PMI +0.30"
+},
+{
+"s": "k:sentiment",
+"t": "k:shannon",
+"type": "cooccur",
+"sign": 1,
+"w": 0.7682639865946795,
+"label": "co-occur in 3/34 files, PMI +0.27"
 },
 {
 "s": "k:short_interest",
@@ -15711,6 +15984,14 @@
 "sign": -1,
 "w": 1.5,
 "label": "Open-ended novelty as a selection bonus with no class ever abandoned (A1, 09's chaos game, 11's teleportation) versus a cascade that must re"
+},
+{
+"s": "k:rsi",
+"t": "k:provenance",
+"type": "tension",
+"sign": -1,
+"w": 1.5,
+"label": "Archive everything with lineage (A1, 04) versus prune stale knowledge and delete rules whose counters reach zero (06, cand: ExpeL) versus ne"
 },
 {
 "s": "k:replication",
@@ -16545,6 +16826,14 @@
 "label": "the child's reports mention it 12 times"
 },
 {
+"s": "child:Hurst",
+"t": "k:sentiment",
+"type": "evidence",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "the child's reports mention it 2 times"
+},
+{
 "s": "child:Brier",
 "t": "k:shannon",
 "type": "evidence",
@@ -16913,6 +17202,14 @@
 "label": "the child's reports mention it 17 times"
 },
 {
+"s": "child:Kelly",
+"t": "k:sentiment",
+"type": "evidence",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "the child's reports mention it 2 times"
+},
+{
 "s": "child:Shannon",
 "t": "k:shannon",
 "type": "evidence",
@@ -17146,11 +17443,19 @@
 },
 {
 "s": "stream:theories",
+"t": "k:rsi",
+"type": "evidence",
+"sign": -1,
+"w": 1.6931471805599454,
+"label": "1 blocked"
+},
+{
+"s": "stream:theories",
 "t": "k:evaluation_bottleneck",
 "type": "evidence",
 "sign": -1,
-"w": 2.386294361119891,
-"label": "2 blocked, 1 not supported (0 of 1 decided passed)"
+"w": 2.791759469228055,
+"label": "3 blocked, 2 not supported (0 of 2 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -17421,8 +17726,8 @@
 "t": "k:positioning",
 "type": "evidence",
 "sign": -1,
-"w": 4.13549421592915,
-"label": "12 blocked, 6 not supported, 2 parked, 1 inconclusive, 1 supported (1 of 7 decided passed)"
+"w": 4.367295829986475,
+"label": "18 blocked, 6 not supported, 2 parked, 1 inconclusive, 1 supported (1 of 7 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -17495,6 +17800,14 @@
 "sign": -1,
 "w": 3.1972245773362196,
 "label": "3 not supported, 2 inconclusive, 2 blocked, 1 supported (1 of 4 decided passed)"
+},
+{
+"s": "stream:theories",
+"t": "k:sentiment",
+"type": "evidence",
+"sign": -1,
+"w": 4.13549421592915,
+"label": "11 blocked, 5 not supported, 4 inconclusive, 2 parked (0 of 5 decided passed)"
 },
 {
 "s": "stream:child-ledger",
