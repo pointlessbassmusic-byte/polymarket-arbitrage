@@ -2,7 +2,7 @@
 "generated_for": "Mandel signal map",
 "stats": {
 "nodes": 120,
-"edges": 1544,
+"edges": 1550,
 "documents": 34,
 "layers": {
 "substrate": 42,
@@ -934,9 +934,11 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 8,
+"not_supported": 12,
 "inconclusive": 2,
-"blocked": 1
+"parked": 1,
+"supported": 2,
+"blocked": 2
 },
 "Children's research ledger": {
 "FAIL": 1
@@ -1171,10 +1173,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 57,
-"supported": 4,
-"inconclusive": 7,
-"blocked": 15,
+"not_supported": 69,
+"supported": 7,
+"inconclusive": 8,
+"blocked": 18,
 "parked": 1
 }
 }
@@ -1282,10 +1284,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"supported": 5,
-"not_supported": 39,
-"inconclusive": 5,
-"blocked": 20
+"supported": 7,
+"blocked": 21,
+"not_supported": 41,
+"inconclusive": 6
 }
 }
 }
@@ -1337,8 +1339,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 1,
-"blocked": 1
+"not_supported": 7,
+"blocked": 1,
+"supported": 2
 },
 "Children's research ledger": {
 "FAIL": 1
@@ -1393,10 +1396,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"supported": 4,
-"not_supported": 34,
-"blocked": 13,
-"inconclusive": 5,
+"supported": 6,
+"not_supported": 38,
+"blocked": 15,
+"inconclusive": 6,
 "parked": 1
 }
 }
@@ -1548,7 +1551,8 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"blocked": 25
+"blocked": 29,
+"not_supported": 3
 }
 }
 }
@@ -1601,8 +1605,9 @@
 "verdicts": {
 "Mandel's tested theories": {
 "parked": 2,
-"not_supported": 3,
-"blocked": 6,
+"not_supported": 6,
+"blocked": 9,
+"supported": 3,
 "inconclusive": 4
 },
 "Children's research ledger": {
@@ -1772,9 +1777,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 17,
-"blocked": 11,
-"inconclusive": 5
+"not_supported": 18,
+"blocked": 13,
+"inconclusive": 5,
+"supported": 1
 },
 "Children's research ledger": {
 "FAIL": 2
@@ -1877,7 +1883,8 @@
 "verdicts": {
 "Mandel's tested theories": {
 "blocked": 1,
-"parked": 1
+"parked": 1,
+"supported": 2
 }
 }
 }
@@ -1995,10 +2002,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"supported": 26,
-"not_supported": 88,
-"inconclusive": 10,
-"blocked": 16
+"supported": 30,
+"not_supported": 95,
+"inconclusive": 14,
+"blocked": 18
 }
 }
 }
@@ -2086,9 +2093,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"blocked": 15,
-"not_supported": 17,
-"supported": 1
+"blocked": 16,
+"not_supported": 19,
+"supported": 2
 }
 }
 }
@@ -2124,7 +2131,7 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"blocked": 1,
+"blocked": 2,
 "not_supported": 5
 }
 }
@@ -2196,7 +2203,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 3
+"not_supported": 10,
+"inconclusive": 2,
+"supported": 1
 },
 "Children's research ledger": {
 "FAIL": 1
@@ -2252,7 +2261,7 @@
 "verdicts": {
 "Mandel's tested theories": {
 "blocked": 9,
-"not_supported": 6,
+"not_supported": 9,
 "inconclusive": 1,
 "supported": 1
 }
@@ -2306,9 +2315,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 29,
-"blocked": 23,
-"inconclusive": 2
+"not_supported": 33,
+"blocked": 28,
+"inconclusive": 4,
+"supported": 3
 }
 }
 }
@@ -2413,7 +2423,7 @@
 "verdicts": {
 "Mandel's tested theories": {
 "parked": 2,
-"not_supported": 2,
+"not_supported": 4,
 "supported": 1
 }
 }
@@ -2519,9 +2529,9 @@
 "verdicts": {
 "Mandel's tested theories": {
 "supported": 5,
-"not_supported": 39,
-"blocked": 23,
-"inconclusive": 6,
+"not_supported": 58,
+"blocked": 24,
+"inconclusive": 7,
 "parked": 2
 }
 }
@@ -2574,10 +2584,11 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 45,
-"supported": 4,
-"blocked": 5,
-"inconclusive": 1
+"not_supported": 71,
+"inconclusive": 5,
+"supported": 5,
+"blocked": 8,
+"parked": 1
 },
 "Children's research ledger": {
 "FAIL": 1
@@ -2709,9 +2720,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
+"not_supported": 15,
 "supported": 2,
-"blocked": 16,
-"not_supported": 10,
+"blocked": 17,
 "inconclusive": 1
 }
 }
@@ -2764,11 +2775,11 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"parked": 3,
-"supported": 2,
+"parked": 5,
+"supported": 4,
 "blocked": 7,
 "inconclusive": 1,
-"not_supported": 13
+"not_supported": 21
 }
 }
 }
@@ -2820,11 +2831,11 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
+"blocked": 12,
+"not_supported": 6,
 "inconclusive": 1,
 "supported": 1,
-"blocked": 11,
-"parked": 1,
-"not_supported": 4
+"parked": 2
 }
 }
 }
@@ -2876,10 +2887,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"inconclusive": 2,
-"not_supported": 14,
-"blocked": 11,
-"supported": 4
+"inconclusive": 4,
+"not_supported": 16,
+"blocked": 14,
+"supported": 6
 },
 "Children's research ledger": {
 "FAIL": 11,
@@ -2936,9 +2947,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"supported": 1,
+"supported": 2,
 "not_supported": 2,
-"blocked": 8
+"blocked": 9
 },
 "Children's research ledger": {
 "FAIL": 3
@@ -2993,9 +3004,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
+"not_supported": 3,
 "parked": 1,
-"inconclusive": 1,
-"not_supported": 1
+"blocked": 2,
+"inconclusive": 1
 }
 }
 }
@@ -3005,42 +3017,56 @@
 "label": "Reference-price edge",
 "layer": 1,
 "kind": "concept",
-"size": 2.3989476363991855,
+"size": 2.916993602242573,
 "group": "markets",
 "detail": "Markets",
 "meta": {
-"mentions": 10,
-"documents": 7,
+"mentions": 30,
+"documents": 12,
 "excerpts": [
+{
+"src": "src:02",
+"text": "Symmetric pre/post lead-lag test. Before claiming any signal \"anticipates\" an event, require (i) a clear post-event response in the same channel and (ii) a pre-event differential measured with the same statistic, (iii) under a …"
+},
+{
+"src": "src:03",
+"text": "11-14 (trading modeling): Kandasamy's interoception result motivates self-state features and stand-down rules; survivorship on the trading floor is the same bias as survivorship among backtested strategies; \"read the first chunk …"
+},
+{
+"src": "src:07",
+"text": "Walk-forward is the only splitter. `walk_forward_splits(n, n_splits, min_train, embargo)` remains the single supported splitter; add a validation that `embargo >= label_horizon` and a `GroupedWalkForward` variant whose groups are …"
+},
+{
+"src": "src:10",
+"text": "Cross-venue price matrices (Polymarket vs Kalshi, same underlying question, over time) are modelled as rank-1 plus residual; the residual, not the raw spread, is the arbitrage candidate, and a persistent residual that does not …"
+},
+{
+"src": "src:14",
+"text": "No signal may read information that was not available at decision time (the multi-timeframe rule, generalised). Because repainting is look-ahead, and in Mandel's domain the analogues are using a later order-book snapshot, a …"
+},
 {
 "src": "adj:A11",
 "text": "Lessons from the children: a reference-price source must lead the market; option-to-stock lead-lag exists only where informed flow trades options first. Deribit DVOL is a measured non-member for Polymarket BTC digitals. The …"
 },
 {
 "src": "adj:A14",
-"text": "The children set the expectation. The event-contract children's learnings class these as risk or flow premia, not reference-price leads, judged as cost-charged return tilts; their Fed bucket rule shows a telegraphed regime …"
+"text": "Post-FOMC Treasury drift (Brooks-Katz-Lustig). 157 meetings 1989-2008: a 10 bp fed funds surprise moves the 10-year yield 1.7 bps on the day and 14 bps after 50 days, mostly after positive surprises; slow bond fund flows."
 },
 {
 "src": "adj:A15",
 "text": "Industries lead the market (HTV). Financial, retail, print and real-estate returns forecast the market by up to two months (1946-2002); gross Sharpe barely beats buy-and-hold. Tse: 1 to 7 of 48 industries significant to 2013. …"
-},
-{
-"src": "adj:A18",
-"text": "`kalshi-eurusd-hourly-vs-spot-digital`, a reference-price test (net of the taker fee, with Brier reported) expected to be the eighth non-member. Kalshi's index ladders (Result 22), BTC/ETH ladders (21d) and T-544 (-5.21 cents) …"
-},
-{
-"src": "adj:A6",
-"text": "Flow-following. T-463 (Kalshi taker flow), T-423 (Deribit funding, DSR 0.000) and Hurst's Kalshi perps taker flow (|t| <= 2.5) all failed, and copying informed wallets loses the fee at any delay (EDGE_VERDICT Result 18). \"Unusual …"
-},
-{
-"src": "adj:A7",
-"text": "Children (EDGE_VERDICT Result 18, reference-price learnings). Informed footprints point to a source; they are not signals to copy. Positioning every desk reads is a consensus, not a leading reference, so the prior is low."
-},
-{
-"src": "adj:A8",
-"text": "`btc-weekend-drop-monday-equity-session`: BTC as a cross-asset leader for SPY/QQQ/IWM open-to-close, with the target's own price kept out of the inputs. It has the reference-price shape the children require (a market that trades …"
 }
-]
+],
+"verdicts": {
+"Mandel's tested theories": {
+"blocked": 3,
+"not_supported": 7,
+"inconclusive": 2
+},
+"Children's research ledger": {
+"FAIL": 5
+}
+}
 }
 },
 {
@@ -3117,10 +3143,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"blocked": 10,
-"not_supported": 8,
-"supported": 1,
-"inconclusive": 2
+"blocked": 95,
+"not_supported": 92,
+"supported": 11,
+"inconclusive": 12
 }
 }
 }
@@ -3220,7 +3246,8 @@
 "verdicts": {
 "Mandel's tested theories": {
 "inconclusive": 4,
-"not_supported": 13,
+"not_supported": 16,
+"supported": 1,
 "blocked": 2
 }
 }
@@ -3413,9 +3440,9 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"blocked": 7,
-"not_supported": 3,
-"inconclusive": 2
+"blocked": 10,
+"not_supported": 4,
+"inconclusive": 3
 }
 }
 }
@@ -3468,8 +3495,8 @@
 "verdicts": {
 "Mandel's tested theories": {
 "inconclusive": 3,
-"supported": 1,
-"not_supported": 14,
+"supported": 2,
+"not_supported": 16,
 "blocked": 6
 }
 }
@@ -3522,10 +3549,11 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"not_supported": 34,
-"blocked": 17,
+"not_supported": 39,
+"blocked": 20,
 "inconclusive": 5,
-"parked": 1
+"parked": 1,
+"supported": 1
 },
 "Children's research ledger": {
 "FAIL": 1
@@ -3580,10 +3608,10 @@
 ],
 "verdicts": {
 "Mandel's tested theories": {
-"supported": 7,
+"supported": 11,
 "inconclusive": 3,
-"not_supported": 6,
-"blocked": 4
+"not_supported": 14,
+"blocked": 5
 }
 }
 }
@@ -4315,6 +4343,14 @@
 "label": "5 mentions"
 },
 {
+"s": "src:02",
+"t": "k:reference_price",
+"type": "provenance",
+"sign": 1,
+"w": 2.386294361119891,
+"label": "3 mentions"
+},
+{
 "s": "src:03",
 "t": "k:information",
 "type": "provenance",
@@ -4481,6 +4517,14 @@
 "sign": -1,
 "w": 2.0986122886681096,
 "label": "2 mentions (held loosely)"
+},
+{
+"s": "src:03",
+"t": "k:reference_price",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
 },
 {
 "s": "src:04",
@@ -5275,6 +5319,14 @@
 "label": "4 mentions"
 },
 {
+"s": "src:07",
+"t": "k:reference_price",
+"type": "provenance",
+"sign": 1,
+"w": 1.6931471805599454,
+"label": "1 mention"
+},
+{
 "s": "src:08",
 "t": "k:compression",
 "type": "provenance",
@@ -5753,6 +5805,14 @@
 "sign": 1,
 "w": 3.639057329615259,
 "label": "13 mentions"
+},
+{
+"s": "src:10",
+"t": "k:reference_price",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
 },
 {
 "s": "src:11",
@@ -6643,6 +6703,14 @@
 "label": "3 mentions"
 },
 {
+"s": "src:14",
+"t": "k:reference_price",
+"type": "provenance",
+"sign": 1,
+"w": 2.0986122886681096,
+"label": "2 mentions"
+},
+{
 "s": "src:15",
 "t": "k:anticipation",
 "type": "provenance",
@@ -7431,8 +7499,8 @@
 "t": "k:reference_price",
 "type": "provenance",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "2 mentions"
+"w": 2.6094379124341005,
+"label": "4 mentions"
 },
 {
 "s": "adj:A12",
@@ -7983,8 +8051,8 @@
 "t": "k:reference_price",
 "type": "provenance",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "1 mention"
+"w": 2.0986122886681096,
+"label": "2 mentions"
 },
 {
 "s": "adj:A15",
@@ -8151,8 +8219,8 @@
 "t": "k:reference_price",
 "type": "provenance",
 "sign": 1,
-"w": 2.386294361119891,
-"label": "3 mentions"
+"w": 3.1972245773362196,
+"label": "8 mentions"
 },
 {
 "s": "adj:A16",
@@ -8695,8 +8763,8 @@
 "t": "k:reference_price",
 "type": "provenance",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "1 mention"
+"w": 2.0986122886681096,
+"label": "2 mentions"
 },
 {
 "s": "adj:A2",
@@ -9677,10 +9745,10 @@
 {
 "s": "adj:A8",
 "t": "k:reference_price",
-"type": "provenance",
-"sign": 1,
-"w": 1.6931471805599454,
-"label": "1 mention"
+"type": "skeptical",
+"sign": -1,
+"w": 2.386294361119891,
+"label": "3 mentions (held loosely)"
 },
 {
 "s": "adj:A9",
@@ -10735,8 +10803,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 0.9818380868927383,
-"label": "co-occur in 7/34 files, PMI +0.48"
+"w": 0.7995165300987837,
+"label": "co-occur in 10/34 files, PMI +0.30"
 },
 {
 "s": "k:anomaly_decay",
@@ -11364,6 +11432,14 @@
 },
 {
 "s": "k:backprop",
+"t": "k:reference_price",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8483066942682156,
+"label": "co-occur in 2/34 files, PMI +0.35"
+},
+{
+"s": "k:backprop",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
@@ -11535,8 +11611,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 1.387303195000903,
-"label": "co-occur in 5/34 files, PMI +0.89"
+"w": 0.8483066942682156,
+"label": "co-occur in 5/34 files, PMI +0.35"
 },
 {
 "s": "k:calendar",
@@ -11711,8 +11787,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 0.82768740706548,
-"label": "co-occur in 6/34 files, PMI +0.33"
+"w": 0.7995165300987837,
+"label": "co-occur in 10/34 files, PMI +0.30"
 },
 {
 "s": "k:carry",
@@ -12444,14 +12520,6 @@
 },
 {
 "s": "k:fees_slippage",
-"t": "k:reference_price",
-"type": "cooccur",
-"sign": 1,
-"w": 0.9818380868927383,
-"label": "co-occur in 7/34 files, PMI +0.48"
-},
-{
-"s": "k:fees_slippage",
 "t": "k:short_interest",
 "type": "cooccur",
 "sign": 1,
@@ -12561,6 +12629,14 @@
 "sign": 1,
 "w": 0.7682639865946794,
 "label": "co-occur in 4/34 files, PMI +0.27"
+},
+{
+"s": "k:forking_paths",
+"t": "k:reference_price",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8483066942682156,
+"label": "co-occur in 4/34 files, PMI +0.35"
 },
 {
 "s": "k:forking_paths",
@@ -12836,6 +12912,14 @@
 },
 {
 "s": "k:idealism",
+"t": "k:reference_price",
+"type": "cooccur",
+"sign": 1,
+"w": 1.1359887667199966,
+"label": "co-occur in 2/34 files, PMI +0.64"
+},
+{
+"s": "k:idealism",
 "t": "k:representation",
 "type": "cooccur",
 "sign": 1,
@@ -12927,8 +13011,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 1.3072604873273665,
-"label": "co-occur in 6/34 files, PMI +0.81"
+"w": 0.9224146664219377,
+"label": "co-occur in 7/34 files, PMI +0.42"
 },
 {
 "s": "k:implied_vol",
@@ -13009,6 +13093,14 @@
 "sign": 1,
 "w": 0.9818380868927383,
 "label": "co-occur in 4/34 files, PMI +0.48"
+},
+{
+"s": "k:information",
+"t": "k:reference_price",
+"type": "cooccur",
+"sign": 1,
+"w": 0.8483066942682156,
+"label": "co-occur in 2/34 files, PMI +0.35"
 },
 {
 "s": "k:information",
@@ -13095,8 +13187,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 1.291993015196578,
-"label": "co-occur in 5/34 files, PMI +0.79"
+"w": 0.7529965144638908,
+"label": "co-occur in 5/34 files, PMI +0.25"
 },
 {
 "s": "k:intraday",
@@ -13295,8 +13387,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 1.2695201593445193,
-"label": "co-occur in 4/34 files, PMI +0.77"
+"w": 1.1359887667199968,
+"label": "co-occur in 6/34 files, PMI +0.64"
 },
 {
 "s": "k:lead_lag",
@@ -13432,7 +13524,7 @@
 "type": "cooccur",
 "sign": 1,
 "w": 0.7682639865946795,
-"label": "co-occur in 7/34 files, PMI +0.27"
+"label": "co-occur in 12/34 files, PMI +0.27"
 },
 {
 "s": "k:lookahead",
@@ -13647,8 +13739,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 1.2537718023763802,
-"label": "co-occur in 7/34 files, PMI +0.75"
+"w": 1.0714502455824255,
+"label": "co-occur in 10/34 files, PMI +0.57"
 },
 {
 "s": "k:momentum",
@@ -13815,8 +13907,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 1.3072604873273665,
-"label": "co-occur in 6/34 files, PMI +0.81"
+"w": 0.7682639865946795,
+"label": "co-occur in 6/34 files, PMI +0.27"
 },
 {
 "s": "k:option_flow",
@@ -13871,8 +13963,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 1.4614111671546248,
-"label": "co-occur in 7/34 files, PMI +0.96"
+"w": 0.9224146664219377,
+"label": "co-occur in 7/34 files, PMI +0.42"
 },
 {
 "s": "k:positioning",
@@ -13935,8 +14027,8 @@
 "t": "k:reference_price",
 "type": "cooccur",
 "sign": 1,
-"w": 1.3072604873273665,
-"label": "co-occur in 6/34 files, PMI +0.81"
+"w": 1.0559460590464604,
+"label": "co-occur in 8/34 files, PMI +0.56"
 },
 {
 "s": "k:prediction_market",
@@ -14028,51 +14120,11 @@
 },
 {
 "s": "k:reference_price",
-"t": "k:risk",
-"type": "cooccur",
-"sign": 1,
-"w": 0.82768740706548,
-"label": "co-occur in 4/34 files, PMI +0.33"
-},
-{
-"s": "k:reference_price",
-"t": "k:short_interest",
-"type": "cooccur",
-"sign": 1,
-"w": 1.164159643686693,
-"label": "co-occur in 4/34 files, PMI +0.66"
-},
-{
-"s": "k:reference_price",
-"t": "k:size",
-"type": "cooccur",
-"sign": 1,
-"w": 1.0688494638823682,
-"label": "co-occur in 4/34 files, PMI +0.57"
-},
-{
-"s": "k:reference_price",
-"t": "k:vol_regime",
-"type": "cooccur",
-"sign": 1,
-"w": 1.2695201593445193,
-"label": "co-occur in 4/34 files, PMI +0.77"
-},
-{
-"s": "k:reference_price",
-"t": "k:volume",
-"type": "cooccur",
-"sign": 1,
-"w": 0.7995165300987839,
-"label": "co-occur in 5/34 files, PMI +0.30"
-},
-{
-"s": "k:reference_price",
 "t": "k:vrp",
 "type": "cooccur",
 "sign": 1,
-"w": 1.387303195000903,
-"label": "co-occur in 5/34 files, PMI +0.89"
+"w": 0.8483066942682156,
+"label": "co-occur in 5/34 files, PMI +0.35"
 },
 {
 "s": "k:renormalization",
@@ -15271,8 +15323,8 @@
 "t": "k:reference_price",
 "type": "evidence",
 "sign": 1,
-"w": 2.0986122886681096,
-"label": "the child's reports mention it 2 times"
+"w": 4.044522437723423,
+"label": "the child's reports mention it 20 times"
 },
 {
 "s": "child:Brier",
@@ -15441,6 +15493,14 @@
 "sign": 1,
 "w": 2.0986122886681096,
 "label": "the child's reports mention it 2 times"
+},
+{
+"s": "child:Kelly",
+"t": "k:reference_price",
+"type": "evidence",
+"sign": 1,
+"w": 2.9459101490553135,
+"label": "the child's reports mention it 6 times"
 },
 {
 "s": "child:Kelly",
@@ -15639,8 +15699,8 @@
 "t": "k:reference_price",
 "type": "evidence",
 "sign": 1,
-"w": 1.6931471805599454,
-"label": "the child's reports mention it 1 time"
+"w": 3.9444389791664403,
+"label": "the child's reports mention it 18 times"
 },
 {
 "s": "stream:theories",
@@ -15663,16 +15723,16 @@
 "t": "k:replication",
 "type": "evidence",
 "sign": -1,
-"w": 4.091042453358316,
-"label": "10 blocked, 8 not supported, 2 inconclusive, 1 supported (1 of 9 decided passed)"
+"w": 6.0,
+"label": "95 blocked, 92 not supported, 12 inconclusive, 11 supported (11 of 103 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:overfitting",
 "type": "evidence",
 "sign": -1,
-"w": 4.295836866004329,
-"label": "13 not supported, 7 blocked, 3 parked, 2 supported, 1 inconclusive (2 of 15 decided passed)"
+"w": 4.663561646129646,
+"label": "21 not supported, 7 blocked, 5 parked, 4 supported, 1 inconclusive (4 of 25 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15687,16 +15747,16 @@
 "t": "k:linear_algebra",
 "type": "evidence",
 "sign": -1,
-"w": 3.8903717578961645,
-"label": "9 blocked, 6 not supported, 1 inconclusive, 1 supported (1 of 7 decided passed)"
+"w": 4.044522437723423,
+"label": "9 blocked, 9 not supported, 1 inconclusive, 1 supported (1 of 10 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:fractal_dimension",
 "type": "evidence",
-"sign": -1,
-"w": 2.0986122886681096,
-"label": "1 blocked, 1 parked"
+"sign": 1,
+"w": 2.6094379124341005,
+"label": "2 supported, 1 blocked, 1 parked (2 of 2 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15719,16 +15779,16 @@
 "t": "k:markov",
 "type": "evidence",
 "sign": -1,
-"w": 2.791759469228055,
-"label": "2 parked, 2 not supported, 1 supported (1 of 3 decided passed)"
+"w": 3.0794415416798357,
+"label": "4 not supported, 2 parked, 1 supported (1 of 5 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:monte_carlo",
 "type": "evidence",
 "sign": -1,
-"w": 5.02535169073515,
-"label": "45 not supported, 5 blocked, 4 supported, 1 inconclusive (4 of 49 decided passed)"
+"w": 5.51085950651685,
+"label": "71 not supported, 8 blocked, 5 inconclusive, 5 supported, 1 parked (5 of 76 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15742,73 +15802,73 @@
 "s": "stream:theories",
 "t": "k:proper_scoring",
 "type": "evidence",
-"sign": -1,
-"w": 3.4849066497880004,
-"label": "8 blocked, 2 not supported, 1 supported (1 of 3 decided passed)"
+"sign": 1,
+"w": 3.639057329615259,
+"label": "9 blocked, 2 supported, 2 not supported (2 of 4 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:calibration",
 "type": "evidence",
 "sign": -1,
-"w": 2.0986122886681096,
-"label": "1 not supported, 1 blocked (0 of 1 decided passed)"
+"w": 3.3978952727983707,
+"label": "7 not supported, 2 supported, 1 blocked (2 of 9 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:kelly",
 "type": "evidence",
 "sign": -1,
-"w": 2.9459101490553135,
-"label": "5 not supported, 1 blocked (0 of 5 decided passed)"
+"w": 3.0794415416798357,
+"label": "5 not supported, 2 blocked (0 of 5 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:edge_vs_market",
 "type": "evidence",
 "sign": -1,
-"w": 3.772588722239781,
-"label": "6 blocked, 4 inconclusive, 3 not supported, 2 parked (0 of 3 decided passed)"
+"w": 4.218875824868201,
+"label": "9 blocked, 6 not supported, 4 inconclusive, 3 supported, 2 parked (3 of 9 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:backtest",
 "type": "evidence",
 "sign": -1,
-"w": 5.442651256490317,
-"label": "57 not supported, 15 blocked, 7 inconclusive, 4 supported, 1 parked (4 of 61 decided passed)"
+"w": 5.6443908991413725,
+"label": "69 not supported, 18 blocked, 8 inconclusive, 7 supported, 1 parked (7 of 76 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:lookahead",
 "type": "evidence",
 "sign": -1,
-"w": 5.007333185232471,
-"label": "29 not supported, 23 blocked, 2 inconclusive (0 of 29 decided passed)"
+"w": 5.23410650459726,
+"label": "33 not supported, 28 blocked, 4 inconclusive, 3 supported (3 of 36 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:fees_slippage",
 "type": "evidence",
 "sign": -1,
-"w": 4.526360524616162,
-"label": "17 not supported, 11 blocked, 5 inconclusive (0 of 17 decided passed)"
+"w": 4.637586159726386,
+"label": "18 not supported, 13 blocked, 5 inconclusive, 1 supported (1 of 19 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:prediction_market",
 "type": "evidence",
 "sign": -1,
-"w": 4.465735902799727,
-"label": "14 not supported, 11 blocked, 4 supported, 2 inconclusive (4 of 18 decided passed)"
+"w": 4.713572066704308,
+"label": "16 not supported, 14 blocked, 6 supported, 4 inconclusive (6 of 22 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:risk",
 "type": "evidence",
 "sign": -1,
-"w": 3.995732273553991,
-"label": "13 not supported, 4 inconclusive, 2 blocked (0 of 13 decided passed)"
+"w": 4.178053830347945,
+"label": "16 not supported, 4 inconclusive, 2 blocked, 1 supported (1 of 17 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15823,8 +15883,8 @@
 "t": "k:provenance",
 "type": "evidence",
 "sign": -1,
-"w": 2.386294361119891,
-"label": "1 parked, 1 inconclusive, 1 not supported (0 of 1 decided passed)"
+"w": 3.0794415416798357,
+"label": "3 not supported, 2 blocked, 1 parked, 1 inconclusive (0 of 3 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15839,32 +15899,32 @@
 "t": "k:volume",
 "type": "evidence",
 "sign": -1,
-"w": 5.060443010546419,
-"label": "34 not supported, 17 blocked, 5 inconclusive, 1 parked (0 of 34 decided passed)"
+"w": 5.204692619390966,
+"label": "39 not supported, 20 blocked, 5 inconclusive, 1 parked, 1 supported (1 of 40 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:implied_vol",
 "type": "evidence",
 "sign": -1,
-"w": 5.948759890378168,
-"label": "88 not supported, 26 supported, 16 blocked, 10 inconclusive (26 of 114 decided passed)"
+"w": 6.0,
+"label": "95 not supported, 30 supported, 18 blocked, 14 inconclusive (30 of 125 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:vrp",
 "type": "evidence",
-"sign": 1,
-"w": 4.044522437723423,
-"label": "7 supported, 6 not supported, 4 blocked, 3 inconclusive (7 of 13 decided passed)"
+"sign": -1,
+"w": 4.526360524616162,
+"label": "14 not supported, 11 supported, 5 blocked, 3 inconclusive (11 of 25 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:option_flow",
 "type": "evidence",
 "sign": -1,
-"w": 4.401197381662156,
-"label": "16 blocked, 10 not supported, 2 supported, 1 inconclusive (2 of 12 decided passed)"
+"w": 4.58351893845611,
+"label": "17 blocked, 15 not supported, 2 supported, 1 inconclusive (2 of 17 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -15879,80 +15939,88 @@
 "t": "k:earnings",
 "type": "evidence",
 "sign": -1,
-"w": 4.258096538021482,
-"label": "25 blocked"
+"w": 4.49650756146648,
+"label": "29 blocked, 3 not supported (0 of 3 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:size",
 "type": "evidence",
 "sign": -1,
-"w": 3.5649493574615367,
-"label": "7 blocked, 3 not supported, 2 inconclusive (0 of 3 decided passed)"
+"w": 3.8903717578961645,
+"label": "10 blocked, 4 not supported, 3 inconclusive (0 of 4 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:intraday",
 "type": "evidence",
 "sign": -1,
-"w": 4.526360524616162,
-"label": "17 not supported, 15 blocked, 1 supported (1 of 18 decided passed)"
+"w": 4.637586159726386,
+"label": "19 not supported, 16 blocked, 2 supported (2 of 21 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:calendar",
 "type": "evidence",
 "sign": -1,
-"w": 5.248495242049359,
-"label": "39 not supported, 20 blocked, 5 supported, 5 inconclusive (5 of 44 decided passed)"
+"w": 5.330733340286331,
+"label": "41 not supported, 21 blocked, 7 supported, 6 inconclusive (7 of 48 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:lead_lag",
 "type": "evidence",
 "sign": -1,
-"w": 2.386294361119891,
-"label": "3 not supported (0 of 3 decided passed)"
+"w": 3.639057329615259,
+"label": "10 not supported, 2 inconclusive, 1 supported (1 of 11 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:momentum",
 "type": "evidence",
 "sign": -1,
-"w": 5.330733340286331,
-"label": "39 not supported, 23 blocked, 6 inconclusive, 5 supported, 2 parked (5 of 44 decided passed)"
+"w": 5.574710978503383,
+"label": "58 not supported, 24 blocked, 7 inconclusive, 5 supported, 2 parked (5 of 63 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:carry",
 "type": "evidence",
 "sign": -1,
-"w": 5.060443010546419,
-"label": "34 not supported, 13 blocked, 5 inconclusive, 4 supported, 1 parked (4 of 38 decided passed)"
+"w": 5.204692619390966,
+"label": "38 not supported, 15 blocked, 6 supported, 6 inconclusive, 1 parked (6 of 44 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:positioning",
 "type": "evidence",
 "sign": -1,
-"w": 3.9444389791664403,
-"label": "11 blocked, 4 not supported, 1 inconclusive, 1 supported, 1 parked (1 of 5 decided passed)"
+"w": 4.13549421592915,
+"label": "12 blocked, 6 not supported, 2 parked, 1 inconclusive, 1 supported (1 of 7 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:vol_regime",
 "type": "evidence",
 "sign": -1,
-"w": 4.218875824868201,
-"label": "14 not supported, 6 blocked, 3 inconclusive, 1 supported (1 of 15 decided passed)"
+"w": 4.332204510175204,
+"label": "16 not supported, 6 blocked, 3 inconclusive, 2 supported (2 of 18 decided passed)"
 },
 {
 "s": "stream:theories",
 "t": "k:anomaly_decay",
 "type": "evidence",
 "sign": -1,
-"w": 3.4849066497880004,
-"label": "8 not supported, 2 inconclusive, 1 blocked (0 of 8 decided passed)"
+"w": 3.995732273553991,
+"label": "12 not supported, 2 inconclusive, 2 supported, 2 blocked, 1 parked (2 of 14 decided passed)"
+},
+{
+"s": "stream:theories",
+"t": "k:reference_price",
+"type": "evidence",
+"sign": -1,
+"w": 3.5649493574615367,
+"label": "7 not supported, 3 blocked, 2 inconclusive (0 of 7 decided passed)"
 },
 {
 "s": "stream:theories",
@@ -16033,6 +16101,14 @@
 "sign": -1,
 "w": 1.6931471805599454,
 "label": "1 fail (0 of 1 decided passed)"
+},
+{
+"s": "stream:child-ledger",
+"t": "k:reference_price",
+"type": "evidence",
+"sign": -1,
+"w": 2.791759469228055,
+"label": "5 fail (0 of 5 decided passed)"
 },
 {
 "s": "stream:child-ledger",

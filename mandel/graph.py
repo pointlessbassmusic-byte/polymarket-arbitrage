@@ -104,7 +104,11 @@ LEXICON: dict[str, tuple[str, str, list[str]]] = {
     "positioning":     ("Positioning & flows", "variables", [r"\bcommitments of traders\b", r"\bcot\b", r"\bhedging pressure\b", r"\b(fund|etf) flows?\b", r"\brebalanc", r"\bliquidations?\b"]),
     "vol_regime":      ("Volatility regimes & timing", "variables", [r"\bvolatility[- ]managed\b", r"\bvolatility timing\b", r"\bregime[- ]switch", r"\breali[sz]ed (vol|skew|kurt)", r"\bhar[- ]rv\b"]),
     "anomaly_decay":   ("Anomaly decay after publication", "validation", [r"\bpost[- ]publication\b", r"\banomal(y|ies) (decay|disappear)", r"\bdecay(ed|s)?\b", r"\barbitraged away\b", r"\bno longer (works|pays)\b"]),
-    "reference_price": ("Reference-price edge", "markets", [r"\breference[- ]price\b", r"\bsharper (public )?source\b", r"\bleads? the (book|market)\b"]),
+    "reference_price": ("Reference-price edge", "markets", [r"\breference[- ](price|class)\b", r"\bsharper (public )?source\b", r"\bleads? the (book|market|price|venue)\b",
+                                                        r"\bnowcast", r"\bfed[- ]?funds\b", r"\bclosing line\b", r"\bsportsbook\b", r"\bcross[- ]venue\b",
+                                                        r"\b(leads?|lags?|follows?)\b[^.]{0,60}\b(polymarket|kalshi|coinbase|kraken|deribit|cme)\b",
+                                                        r"\bderibit\b[^.]{0,60}\bdigital", r"\bdigital\b[^.]{0,60}\bderibit\b", r"\b(price discovery|lead[- ]lag)\b",
+                                                        r"\bnon-member\b"]),
     "adverse_selection": ("Adverse selection & markouts", "markets", [r"\badverse(ly)? select", r"\bmarkouts?\b", r"\bqueue position\b", r"\bmaker fills?\b"]),
 }
 
@@ -373,7 +377,7 @@ def build_graph(knowledge_root: Path = KNOWLEDGE_ROOT, mandel_root: Path = MANDE
                                   f"the child's reports mention it {n} time{'s' if n != 1 else ''}"))
     _verdict_overlay(nodes, edges, rx, theories, "stream:theories", "Mandel's tested theories",
                      "pre-registered theories and their verdicts (theories/registry.json)",
-                     lambda t: f"{t.get('slug', '')} {t.get('claim', '')}", lambda t: t.get("status", ""),
+                     lambda t: f"{t.get('slug', '')} {t.get('claim', '')} {t.get('notes', '')}", lambda t: t.get("status", ""),   # notes carry the readings
                      ("supported",), ("not_supported",))
     _verdict_overlay(nodes, edges, rx, child_ledger, "stream:child-ledger", "Children's research ledger",
                      "the children's pre-registered tests (child repo docs/research_ledger.json)",
