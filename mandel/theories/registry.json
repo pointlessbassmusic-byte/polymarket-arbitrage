@@ -9172,12 +9172,14 @@
     "b6c_cryptovenue_steth_discount_carry"
    ],
    "testable_now": true,
-   "status": "inconclusive",
+   "status": "parked",
    "blocked_on": "",
    "results": [
     "X-62d64270"
    ],
-   "notes": "from the underlying-library library: Liquid-staking-token discount carry (stETH / cbETH); harness suggestion: mandel/experiments/carry.py: discount_episodes(ratio_series, threshold, horizon) | verifier: corrected claim/trial | 2026-10-19 batch 6c: inconclusive: no post-Shapella stETH discount episode reached the 1.5% threshold (maximum 1.30% on 2024-01-29; 0 of min_n 15 episodes under every threshold). The pre-Shapella regime (31 episodes, +1.05% net) is reported, not pooled: withdrawals changed the mechanism."
+   "notes": "from the underlying-library library: Liquid-staking-token discount carry (stETH / cbETH); harness suggestion: mandel/experiments/carry.py: discount_episodes(ratio_series, threshold, horizon) | verifier: corrected claim/trial | 2026-10-19 batch 6c: inconclusive: no post-Shapella stETH discount episode reached the 1.5% threshold (maximum 1.30% on 2024-01-29; 0 of min_n 15 episodes under every threshold). The pre-Shapella regime (31 episodes, +1.05% net) is reported, not pooled: withdrawals changed the mechanism.",
+   "status_before_park": "inconclusive",
+   "parked_reason": "2026-10-29 triage: the trigger (stETH discount > 1.5% on two consecutive days) never occurred post-Shapella in 3.5 years (max 1.30%); 0 of 15 episodes; kept, not pursued"
   },
   {
    "id": "T-366",
@@ -11935,12 +11937,14 @@
     "b6c_kraken_flow_imbalance"
    ],
    "testable_now": true,
-   "status": "inconclusive",
+   "status": "parked",
    "blocked_on": "",
    "results": [
     "X-317b528e"
    ],
-   "notes": "from the underlying-library library: Crypto trade-flow imbalance predicts short-horizon returns; harness suggestion: kraken_trades() in mandel/data/fetch.py. Signed-volume bars plus P&L in a shared mandel/experiments/leadlag.py or crypto_micro.py. | added by the verifier pass | 2026-10-26 first run (X-317b528e), inconclusive by evidence: the claim cell fires 127 times out of sample 2025-01..2026-09 and yields 50 maker trades on 8 days (min_n 20,000), mean net -0.31%; every in-sample cell is negative too and the raw signed-volume reading (4,450 OOS trades) loses -0.35% per trade with p 1.0. The forward regression of the 5-minute return on the imbalance z is negative (HAC t -1.5). The claim cannot reach its own n at a 2-sigma threshold on this pair; the evidence that exists points the wrong way. Parked in effect: do not rebuild at a lower threshold (that is the alternative reading, and it loses)."
+   "notes": "from the underlying-library library: Crypto trade-flow imbalance predicts short-horizon returns; harness suggestion: kraken_trades() in mandel/data/fetch.py. Signed-volume bars plus P&L in a shared mandel/experiments/leadlag.py or crypto_micro.py. | added by the verifier pass | 2026-10-26 first run (X-317b528e), inconclusive by evidence: the claim cell fires 127 times out of sample 2025-01..2026-09 and yields 50 maker trades on 8 days (min_n 20,000), mean net -0.31%; every in-sample cell is negative too and the raw signed-volume reading (4,450 OOS trades) loses -0.35% per trade with p 1.0. The forward regression of the 5-minute return on the imbalance z is negative (HAC t -1.5). The claim cannot reach its own n at a 2-sigma threshold on this pair; the evidence that exists points the wrong way. Parked in effect: do not rebuild at a lower threshold (that is the alternative reading, and it loses).",
+   "status_before_park": "inconclusive",
+   "parked_reason": "2026-10-29 triage: the claim's own min_n (20,000 out-of-sample trades) is unreachable at its 2-sigma threshold (127 signals in 21 months); every cell negative and the relaxed reading loses -0.35%/trade with p 1.0; kept, not pursued, not to be rebuilt at a lower threshold"
   },
   {
    "id": "T-460",
@@ -20339,10 +20343,11 @@
     "b13_flow_opex_strike_pinning"
    ],
    "testable_now": true,
-   "status": "inconclusive",
+   "status": "not_supported",
    "blocked_on": "",
    "results": [
-    "X-c9947b82"
+    "X-c9947b82",
+    "X-ce3a7e0d"
    ],
    "parent": "",
    "web_sweep": {

@@ -796,7 +796,7 @@ def b13_flow_opex_strike_pinning(archive):
     pg, pl, nd = perm_R(hf, hb, o, years, R, bar=T633_BAR, adjust=True)        # registered permutation at R = 1.05
     sg_, sl_, snd = perm_R(hf, hb, o, years, R, bar=T633_BAR, adjust=False)
     psi = month_psi(hf, hb, o, months)
-    bg, bl, bd = boot_p(psi, T633_BLOCK, stop_side("greater"))
+    bg, _bl, bd = boot_p(psi, T633_BLOCK, stop_side("greater"))      # the check: reported, not decided on
     early = np.array([d < T633_SPLIT for d in day])
     R1, R2 = ratio_R(hf, hb, o, early), ratio_R(hf, hb, o, ~early)
     Rt = ratio_R(T["hf_top"], T["hb_top"], o)
@@ -806,10 +806,11 @@ def b13_flow_opex_strike_pinning(archive):
     boot_ok = SA.sig(R - T633_BAR, bg, bd, ALPHA, "pos")
     rows = [((f"R > 1.05 with permutation p < 0.05 (R {_fmt(R)}; within-year permutation tested at the null boundary "
               f"R = 1.05: opex Friday hits / 1.05 then permuted p {CAL._mc(pg, nd)}, draws x 1.05 vs R p "
-              f"{CAL._mc(sg_, snd)}; registered month block bootstrap of H0 R <= 1.05, 12-month blocks, p "
-              f"{CAL._mc(bg, bd)}: every reading must pass (rule 11), disagreement is undecided)"),
-             CAL._agree([perm_ok, perm_ok_s, boot_ok]),
-             bool(CAL.decide_p(pl, nd) is True and CAL.decide_p(sl_, snd) is True and CAL.decide_p(bl, bd) is True)),
+              f"{CAL._mc(sg_, snd)}: both permutation constructions must pass (rule 11); the registered month block "
+              f"bootstrap of H0 R <= 1.05, 12-month blocks, p {CAL._mc(bg, bd)}, is the registration's 'check' and is "
+              f"reported (reading ruling 2026-10-29: the pass names the permutation as the test))"),
+             CAL._agree([perm_ok, perm_ok_s]),
+             bool(CAL.decide_p(pl, nd) is True and CAL.decide_p(sl_, snd) is True)),
             (f"R > 1 in 2005-2015 and in 2016-2026 ({_fmt(R1)} / {_fmt(R2)})",
              None if R1 is None or R2 is None else bool(R1 > 1 and R2 > 1), False),
             (f"R in the top dollar-volume tercile above R in the bottom tercile ({_fmt(Rt)} vs {_fmt(Rb)})",
@@ -818,9 +819,8 @@ def b13_flow_opex_strike_pinning(archive):
     lit_note = ""
     if perm_ok is False and perm_ok_s is False and boot_ok is True:
         lit_note = ("READING: the registered permutation fails at the null boundary under both constructions while the "
-                    "month bootstrap (the registration's 'check') passes, so under the declared rule-11 reading criterion 1 "
-                    "is undecided; read literally (the permutation is the pass test and the bootstrap only its check, which "
-                    "cannot rescue it), criterion 1 fails and the verdict would be not_supported. Not supported either way. ")
+                    "month bootstrap (the registration's 'check') passes; by the 2026-10-29 reading ruling the permutation "
+                    "decides and the check is reported, so criterion 1 fails. ")
 
     # ---- reported
     by_year = {}
