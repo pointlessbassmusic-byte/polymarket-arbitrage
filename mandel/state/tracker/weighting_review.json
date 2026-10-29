@@ -1,0 +1,751 @@
+{
+ "map": {
+  "by_size": [
+   "backtest",
+   "overfitting",
+   "linear_algebra",
+   "fractal_dimension",
+   "provenance",
+   "volume",
+   "replication",
+   "markov"
+  ],
+  "by_documents": [
+   "overfitting",
+   "backtest",
+   "lookahead",
+   "replication",
+   "edge_vs_market",
+   "anomaly_decay",
+   "carry",
+   "fees_slippage"
+  ],
+  "by_tests": [
+   "replication",
+   "implied_vol",
+   "backtest",
+   "momentum",
+   "monte_carlo",
+   "calendar",
+   "lookahead",
+   "volume"
+  ],
+  "by_pass_share": [
+   "multifractal",
+   "fractal_dimension",
+   "vrp",
+   "implied_vol",
+   "calibration",
+   "markov",
+   "edge_vs_market",
+   "prediction_market"
+  ],
+  "by_fail_share": [
+   "adverse_selection",
+   "cost_budget",
+   "monte_carlo",
+   "lead_lag",
+   "calibration",
+   "kelly",
+   "risk",
+   "backtest"
+  ],
+  "by_tensions": [
+   "overfitting",
+   "edge_vs_market",
+   "momentum",
+   "backtest",
+   "calibration",
+   "multifractal",
+   "fractal_dimension",
+   "provenance"
+  ],
+  "talked_untested": [
+   "affine_ifs",
+   "agent_tools",
+   "attractor",
+   "entropy",
+   "memory",
+   "representation",
+   "rsi",
+   "mandelbrot_set"
+  ],
+  "tested_untalked": [
+   "prediction_market",
+   "monte_carlo",
+   "replication",
+   "bayes",
+   "implied_vol",
+   "calendar",
+   "vol_regime",
+   "momentum"
+  ],
+  "zero_tests": [
+   "affine_ifs",
+   "agent_tools",
+   "attractor",
+   "backprop",
+   "compression",
+   "entropy",
+   "evaluation_bottleneck",
+   "feedback_loop",
+   "forking_paths",
+   "gradient_descent",
+   "idealism",
+   "law_large_numbers",
+   "noisy_channel",
+   "renormalization",
+   "representation",
+   "rsi",
+   "shannon"
+  ],
+  "theories_unmatched": [
+   "T-111",
+   "T-112",
+   "T-117",
+   "T-119",
+   "T-120",
+   "T-121",
+   "T-122",
+   "T-13",
+   "T-161",
+   "T-166",
+   "T-167",
+   "T-169",
+   "T-182",
+   "T-184",
+   "T-187",
+   "T-191",
+   "T-194",
+   "T-20",
+   "T-201",
+   "T-21",
+   "T-212",
+   "T-22",
+   "T-230",
+   "T-244",
+   "T-260",
+   "T-274",
+   "T-30",
+   "T-321",
+   "T-322",
+   "T-324",
+   "T-328",
+   "T-350",
+   "T-354",
+   "T-357",
+   "T-37",
+   "T-376",
+   "T-386",
+   "T-387",
+   "T-39",
+   "T-397",
+   "T-40",
+   "T-401",
+   "T-41",
+   "T-414",
+   "T-416",
+   "T-42",
+   "T-439",
+   "T-44",
+   "T-442",
+   "T-45",
+   "T-461",
+   "T-464",
+   "T-467",
+   "T-50",
+   "T-506",
+   "T-507",
+   "T-509",
+   "T-51",
+   "T-511",
+   "T-513",
+   "T-518",
+   "T-523",
+   "T-526",
+   "T-538",
+   "T-539",
+   "T-60",
+   "T-61",
+   "T-62",
+   "T-63",
+   "T-64",
+   "T-65",
+   "T-66"
+  ]
+ },
+ "next_tests": {
+  "current": [
+   "T-38",
+   "T-66",
+   "T-54",
+   "T-55",
+   "T-56",
+   "T-57",
+   "T-624",
+   "T-688",
+   "T-340",
+   "T-623"
+  ],
+  "alternatives": {
+   "blocked_weight_1.0": {
+    "top": [
+     "T-38",
+     "T-66",
+     "T-54",
+     "T-55",
+     "T-56",
+     "T-57",
+     "T-624",
+     "T-688",
+     "T-340",
+     "T-623"
+    ],
+    "enters": []
+   },
+   "blocked_weight_0.1": {
+    "top": [
+     "T-38",
+     "T-66",
+     "T-54",
+     "T-55",
+     "T-56",
+     "T-57",
+     "T-624",
+     "T-688",
+     "T-340",
+     "T-623"
+    ],
+    "enters": []
+   },
+   "untested_weight_1.0": {
+    "top": [
+     "T-38",
+     "T-66",
+     "T-54",
+     "T-55",
+     "T-56",
+     "T-57",
+     "T-624",
+     "T-688",
+     "T-340",
+     "T-623"
+    ],
+    "enters": []
+   },
+   "ignore_new_data": {
+    "top": [
+     "T-741",
+     "T-38",
+     "T-615",
+     "T-66",
+     "T-550",
+     "T-690",
+     "T-603",
+     "T-54",
+     "T-55",
+     "T-56"
+    ],
+    "enters": [
+     "T-741",
+     "T-615",
+     "T-550",
+     "T-690",
+     "T-603"
+    ]
+   }
+  },
+  "unblocked_with_data": [
+   "T-624",
+   "T-688",
+   "T-340",
+   "T-623",
+   "T-635",
+   "T-656",
+   "T-703",
+   "T-599",
+   "T-588",
+   "T-625",
+   "T-689",
+   "T-587",
+   "T-620"
+  ]
+ },
+ "scan": {
+  "family": {
+   "ranks": {
+    "disc": [
+     "F2",
+     "F3",
+     "F1",
+     "F0"
+    ],
+    "conf_of_disc": [
+     "F3",
+     "F1",
+     "F2",
+     "F0"
+    ],
+    "stable": [
+     "F2",
+     "F3",
+     "F1",
+     "F0"
+    ],
+    "w_abs_ic": [
+     "F1",
+     "F3",
+     "F2",
+     "F0"
+    ],
+    "tprod": [
+     "F2",
+     "F3",
+     "F1",
+     "F0"
+    ]
+   },
+   "consensus_top3": [
+    "F2",
+    "F3",
+    "F1"
+   ],
+   "groups": {
+    "F0": {
+     "n": 516,
+     "disc": 0.04844961240310078,
+     "conf_of_disc": 0.08,
+     "stable": 0.07364341085271318,
+     "w_abs_ic": 0.03274643675412958,
+     "tprod": 0.13178294573643412
+    },
+    "F2": {
+     "n": 632,
+     "disc": 0.564873417721519,
+     "conf_of_disc": 0.38095238095238093,
+     "stable": 0.42563291139240506,
+     "w_abs_ic": 0.05448158258114165,
+     "tprod": 0.6107594936708861
+    },
+    "F1": {
+     "n": 714,
+     "disc": 0.31092436974789917,
+     "conf_of_disc": 0.3918918918918919,
+     "stable": 0.3123249299719888,
+     "w_abs_ic": 0.06904173676520242,
+     "tprod": 0.43977591036414565
+    },
+    "F3": {
+     "n": 273,
+     "disc": 0.4945054945054945,
+     "conf_of_disc": 0.4148148148148148,
+     "stable": 0.4249084249084249,
+     "w_abs_ic": 0.0642269188855012,
+     "tprod": 0.5567765567765568
+    }
+   }
+  },
+  "class": {
+   "ranks": {
+    "disc": [
+     "equity_etf",
+     "stock",
+     "future",
+     "crypto",
+     "bond_etf"
+    ],
+    "conf_of_disc": [
+     "commodity_etf",
+     "bond_etf",
+     "future",
+     "crypto",
+     "equity_etf"
+    ],
+    "stable": [
+     "future",
+     "equity_etf",
+     "bond_etf",
+     "fx",
+     "crypto"
+    ],
+    "w_abs_ic": [
+     "bond_etf",
+     "commodity_etf",
+     "future",
+     "equity_etf",
+     "crypto"
+    ],
+    "tprod": [
+     "equity_etf",
+     "future",
+     "bond_etf",
+     "crypto",
+     "stock"
+    ]
+   },
+   "consensus_top3": [
+    "future",
+    "bond_etf"
+   ],
+   "groups": {
+    "equity_etf": {
+     "n": 312,
+     "disc": 0.4423076923076923,
+     "conf_of_disc": 0.3333333333333333,
+     "stable": 0.36538461538461536,
+     "w_abs_ic": 0.0521372647280246,
+     "tprod": 0.4807692307692308
+    },
+    "bond_etf": {
+     "n": 312,
+     "disc": 0.2980769230769231,
+     "conf_of_disc": 0.4946236559139785,
+     "stable": 0.3557692307692308,
+     "w_abs_ic": 0.12714472368324675,
+     "tprod": 0.47115384615384615
+    },
+    "commodity_etf": {
+     "n": 312,
+     "disc": 0.20512820512820512,
+     "conf_of_disc": 0.5,
+     "stable": 0.20512820512820512,
+     "w_abs_ic": 0.07791426566662019,
+     "tprod": 0.3173076923076923
+    },
+    "stock": {
+     "n": 312,
+     "disc": 0.40705128205128205,
+     "conf_of_disc": 0.23622047244094488,
+     "stable": 0.23397435897435898,
+     "w_abs_ic": 0.03379452821927704,
+     "tprod": 0.4230769230769231
+    },
+    "future": {
+     "n": 306,
+     "disc": 0.40522875816993464,
+     "conf_of_disc": 0.45161290322580644,
+     "stable": 0.3758169934640523,
+     "w_abs_ic": 0.05562730421518002,
+     "tprod": 0.4803921568627451
+    },
+    "fx": {
+     "n": 280,
+     "disc": 0.28214285714285714,
+     "conf_of_disc": 0.3291139240506329,
+     "stable": 0.3,
+     "w_abs_ic": 0.037057805616176526,
+     "tprod": 0.40714285714285714
+    },
+    "crypto": {
+     "n": 301,
+     "disc": 0.3787375415282392,
+     "conf_of_disc": 0.39473684210526316,
+     "stable": 0.2823920265780731,
+     "w_abs_ic": 0.050561142342725615,
+     "tprod": 0.43521594684385384
+    }
+   }
+  },
+  "horizon": {
+   "ranks": {
+    "disc": [
+     "20d",
+     "5d",
+     "1d",
+     "5m x1",
+     "45m x1"
+    ],
+    "conf_of_disc": [
+     "5d",
+     "30m x1",
+     "1d",
+     "5m x1",
+     "15m x1"
+    ],
+    "stable": [
+     "5d",
+     "1d",
+     "20d",
+     "5m x1",
+     "60m x1"
+    ],
+    "w_abs_ic": [
+     "5d",
+     "20d",
+     "60m x1",
+     "1d",
+     "45m x1"
+    ],
+    "tprod": [
+     "5d",
+     "20d",
+     "1d",
+     "60m x1",
+     "5m x1"
+    ]
+   },
+   "consensus_top3": [
+    "20d",
+    "5d",
+    "1d"
+   ],
+   "groups": {
+    "5m x1": {
+     "n": 184,
+     "disc": 0.33152173913043476,
+     "conf_of_disc": 0.3770491803278688,
+     "stable": 0.2391304347826087,
+     "w_abs_ic": 0.018655337547335976,
+     "tprod": 0.358695652173913
+    },
+    "15m x1": {
+     "n": 184,
+     "disc": 0.21195652173913043,
+     "conf_of_disc": 0.358974358974359,
+     "stable": 0.15217391304347827,
+     "w_abs_ic": 0.028677300600332724,
+     "tprod": 0.266304347826087
+    },
+    "30m x1": {
+     "n": 184,
+     "disc": 0.25,
+     "conf_of_disc": 0.41304347826086957,
+     "stable": 0.22826086956521738,
+     "w_abs_ic": 0.04812079485658717,
+     "tprod": 0.3423913043478261
+    },
+    "45m x1": {
+     "n": 184,
+     "disc": 0.27717391304347827,
+     "conf_of_disc": 0.3137254901960784,
+     "stable": 0.22826086956521738,
+     "w_abs_ic": 0.05333339274610212,
+     "tprod": 0.33152173913043476
+    },
+    "60m x1": {
+     "n": 184,
+     "disc": 0.266304347826087,
+     "conf_of_disc": 0.3469387755102041,
+     "stable": 0.2391304347826087,
+     "w_abs_ic": 0.06812928028493694,
+     "tprod": 0.3641304347826087
+    },
+    "1d": {
+     "n": 405,
+     "disc": 0.36790123456790125,
+     "conf_of_disc": 0.38926174496644295,
+     "stable": 0.3432098765432099,
+     "w_abs_ic": 0.05420372696347027,
+     "tprod": 0.47901234567901235
+    },
+    "5d": {
+     "n": 405,
+     "disc": 0.4148148148148148,
+     "conf_of_disc": 0.4880952380952381,
+     "stable": 0.4246913580246914,
+     "w_abs_ic": 0.09238893931506258,
+     "tprod": 0.528395061728395
+    },
+    "20d": {
+     "n": 405,
+     "disc": 0.4345679012345679,
+     "conf_of_disc": 0.29545454545454547,
+     "stable": 0.3333333333333333,
+     "w_abs_ic": 0.07197867231384765,
+     "tprod": 0.508641975308642
+    }
+   }
+  },
+  "scope": {
+   "ranks": {
+    "disc": [
+     "daily",
+     "intraday"
+    ],
+    "conf_of_disc": [
+     "daily",
+     "intraday"
+    ],
+    "stable": [
+     "daily",
+     "intraday"
+    ],
+    "w_abs_ic": [
+     "daily",
+     "intraday"
+    ],
+    "tprod": [
+     "daily",
+     "intraday"
+    ]
+   },
+   "consensus_top3": [
+    "daily",
+    "intraday"
+   ],
+   "groups": {
+    "intraday": {
+     "n": 920,
+     "disc": 0.2673913043478261,
+     "conf_of_disc": 0.3617886178861789,
+     "stable": 0.21739130434782608,
+     "w_abs_ic": 0.0426495157934518,
+     "tprod": 0.33260869565217394
+    },
+    "daily": {
+     "n": 1215,
+     "disc": 0.405761316872428,
+     "conf_of_disc": 0.3894523326572008,
+     "stable": 0.36707818930041153,
+     "w_abs_ic": 0.07361676046472938,
+     "tprod": 0.5053497942386831
+    }
+   }
+  },
+  "sign_stability": {
+   "inverse": {
+    "share": 0.7305863708399366,
+    "n": 1262
+   },
+   "positive": {
+    "share": 0.5876288659793815,
+    "n": 873
+   }
+  },
+  "strongest_confirmed": [
+   {
+    "scope": "daily",
+    "cls": "bond_etf",
+    "horizon": "20d",
+    "feature": "x_IDX_TNX_r20",
+    "family": "F1",
+    "sign": "positive",
+    "conf_ic": 0.4606050663407757,
+    "conf_t": 6.988627289594352,
+    "conf_n": 8
+   },
+   {
+    "scope": "daily",
+    "cls": "bond_etf",
+    "horizon": "20d",
+    "feature": "x_TLT_r20",
+    "family": "F1",
+    "sign": "inverse",
+    "conf_ic": -0.4420231637567078,
+    "conf_t": -3.8810365830935765,
+    "conf_n": 8
+   },
+   {
+    "scope": "daily",
+    "cls": "bond_etf",
+    "horizon": "5d",
+    "feature": "x_TLT_r20",
+    "family": "F1",
+    "sign": "inverse",
+    "conf_ic": -0.4011513850537825,
+    "conf_t": -7.293911994118872,
+    "conf_n": 9
+   },
+   {
+    "scope": "daily",
+    "cls": "bond_etf",
+    "horizon": "20d",
+    "feature": "r20",
+    "family": "F2",
+    "sign": "inverse",
+    "conf_ic": -0.3579297371797646,
+    "conf_t": -4.196139448791777,
+    "conf_n": 8
+   },
+   {
+    "scope": "daily",
+    "cls": "fx",
+    "horizon": "20d",
+    "feature": "ma200_dist",
+    "family": "F2",
+    "sign": "inverse",
+    "conf_ic": -0.33214596300051713,
+    "conf_t": -3.9836458703473463,
+    "conf_n": 8
+   },
+   {
+    "scope": "daily",
+    "cls": "bond_etf",
+    "horizon": "20d",
+    "feature": "r60",
+    "family": "F2",
+    "sign": "inverse",
+    "conf_ic": -0.31823620149746207,
+    "conf_t": -2.405231636196536,
+    "conf_n": 8
+   },
+   {
+    "scope": "daily",
+    "cls": "bond_etf",
+    "horizon": "5d",
+    "feature": "x_IDX_TNX_r20",
+    "family": "F1",
+    "sign": "positive",
+    "conf_ic": 0.30977687706902163,
+    "conf_t": 3.648023011002862,
+    "conf_n": 9
+   },
+   {
+    "scope": "daily",
+    "cls": "bond_etf",
+    "horizon": "20d",
+    "feature": "ma50_dist",
+    "family": "F2",
+    "sign": "inverse",
+    "conf_ic": -0.29917830383218746,
+    "conf_t": -2.565998228434832,
+    "conf_n": 8
+   },
+   {
+    "scope": "intraday",
+    "cls": "bond_etf",
+    "horizon": "60m x1",
+    "feature": "vwap_dist",
+    "family": "F2",
+    "sign": "inverse",
+    "conf_ic": -0.29155710584600175,
+    "conf_t": -5.108589655885514,
+    "conf_n": 14
+   },
+   {
+    "scope": "intraday",
+    "cls": "bond_etf",
+    "horizon": "60m x1",
+    "feature": "r_sess",
+    "family": "F2",
+    "sign": "inverse",
+    "conf_ic": -0.27371949326678724,
+    "conf_t": -4.660477415454798,
+    "conf_n": 14
+   },
+   {
+    "scope": "intraday",
+    "cls": "bond_etf",
+    "horizon": "45m x1",
+    "feature": "r6",
+    "family": "F2",
+    "sign": "inverse",
+    "conf_ic": -0.26757112917251474,
+    "conf_t": -4.7505702008129385,
+    "conf_n": 14
+   },
+   {
+    "scope": "daily",
+    "cls": "bond_etf",
+    "horizon": "5d",
+    "feature": "ma50_dist",
+    "family": "F2",
+    "sign": "inverse",
+    "conf_ic": -0.26090962215697505,
+    "conf_t": -5.157864741342479,
+    "conf_n": 9
+   }
+  ],
+  "note": "a group that tops every weighting is where signal concentrates, not evidence it pays; register it as a replication on years the scan never saw (harness rule 13; T-743 failed that test)"
+ }
+}

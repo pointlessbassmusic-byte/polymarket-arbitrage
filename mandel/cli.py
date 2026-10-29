@@ -496,6 +496,14 @@ def _graph_evidence() -> dict:
     return out
 
 
+def cmd_weighting_review(args) -> int:
+    from mandel.experiments.weighting_review import OUT, run, summary
+    rep = run()
+    print(summary(rep))
+    print(f"-> {OUT}")
+    return 0
+
+
 def cmd_graph(args) -> int:
     reg = Ctx().children
     ev = _graph_evidence()
@@ -504,6 +512,9 @@ def cmd_graph(args) -> int:
     g = build_graph(children=kids, theories=ev["theories"], child_ledger=ev["child_ledger"])
     out = write_graph(graph=g)                     # the graph just built, not a second build
     print(f"graph: {g['stats']} -> {out}")
+    um = g.get("theories_unmatched") or []
+    if um:
+        print(f"theories no concept matches ({len(um)}; the evidence overlay is blind to them): {', '.join(um[:12])}{'...' if len(um) > 12 else ''}")
     if TEMPLATE_PATH.exists() and not args.json_only:
         html = write_html(g)
         print(f"html: {html} ({html.stat().st_size // 1024} KB)")
@@ -606,6 +617,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--kind"); p.add_argument("-v", "--verbose", action="store_true")
     add("ingest", cmd_ingest, "Turn knowledge/*.md adopt / skeptical / design bullets into candidate insights (idempotent).")
     p = add("graph", cmd_graph, "Rebuild viz/graph.json and viz/index.html (the signal map)."); p.add_argument("--json-only", action="store_true")
+    add("weighting-review", cmd_weighting_review, "Re-rank the map, the next-test score and the IC scan under alternative weightings; report what moves.")
     return ap
 
 

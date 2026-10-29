@@ -103,3 +103,27 @@ def test_many_families_stale_from_one_date_collapse_into_one_critical_outage():
     assert all(a["severity"] == "info" for a in out if a.get("latest") == "2026-10-20")
     assert next(a for a in out if a.get("latest") == "2026-09-30")["severity"] == "warning"     # a lone stale stream is not an outage
     assert len(G.collapse_outage(alerts[:4])) == 4                                             # fewer than 5: unchanged
+
+
+def test_need_count_prefers_the_stated_requirement_and_out_of_reach_data_is_never_ready():
+    """2026-10-29: T-376 ('Needs at least 60 daily SPX chain captures; 1 day exists') scored data-ready on the '1 day', and
+    T-717 (paid CME DataMine settlements) scored ready because its bundle names matched."""
+    assert G._need_count("Needs at least 60 daily SPX chain captures; 1 day exists (2026-10-14)") == 60
+    assert G._need_count("daily chain capture, 30 days") == 30
+    assert G._need_count("12 intraday 0DTE capture days; 3 so far") == 12
+    assert G._need_count("the user's fee tier") is None
+    b = {"options-surface-2026-10-14": {}, "fred-DTB3": {}}
+    r, miss = G.data_readiness("options-surface-<day> for _SPX, fred-DTB3", b, "Needs at least 60 daily SPX chain captures; 1 day exists")
+    assert r == pytest.approx((1 / 60 + 1) / 2) and miss == ["options-surface-<day> (1/60)"]
+    r2, miss2 = G.data_readiness("cme-fx-option-settlements-<ccy> (DataMine, paid), fred-DTB3", b, "")
+    assert r2 == 0.0 and "out of reach" in miss2[0]
+
+
+def test_blocked_theory_with_its_data_present_ranks_like_an_inconclusive_one():
+    b = {"daily-history-SPY": {"created_at": "2026-10-14T00:00:00"}}
+    reg = [{"id": "T-1", "status": "inconclusive", "trial": {"data": "daily-history-SPY", "min_n": 100}, "results": ["X-1"]},
+           {"id": "T-2", "status": "blocked", "blocked_on": "", "trial": {"data": "daily-history-SPY", "min_n": 100}},
+           {"id": "T-3", "status": "blocked", "blocked_on": "", "trial": {"data": "daily-history-SPY, daily-history-QQQ", "min_n": 100}}]
+    out = {x["id"]: x for x in G.next_tests(reg, b, result_times={"X-1": "2026-10-15"})}
+    assert out["T-2"]["unblocked"] is True and out["T-2"]["score"] > out["T-1"]["score"]        # data arrived: full weight; T-1 has no new data
+    assert out["T-3"]["score"] == pytest.approx(out["T-2"]["score"] * 0.5 * 0.5, abs=0.01)     # half the data, blocked weight

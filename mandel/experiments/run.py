@@ -1008,8 +1008,8 @@ BATCH_MODULES = (batch4_fomc, batch4_fact, batch4_carry, batch4_ohlc, batch4_vx,
 BATCH_HARNESSES = {h: fn for m in BATCH_MODULES for h, fn in m.HARNESSES.items()}
 BATCH_THEORY = {h: tid for m in BATCH_MODULES for tid, h in m.THEORY_MAP.items()}
 BATCH_BUNDLES = {
-    "b14_treasury_20d_reversal": ["daily-history-TLT", "daily-history-IEF", "fred-DGS10"],
-    "carry_cme_brr_exit": ["daily-history-BTC-F", "deribit-funding-BTC-PERPETUAL", "fred-DTB3", "coinbase-1m-BTC-USD-*", "kraken-trades-1m-XBTUSD-*"],
+    "b14_treasury_20d_reversal": ["daily-history-IEF", "daily-history-TLT", "fred-DGS10"],
+    "carry_cme_brr_exit": ["coinbase-1m-BTC-USD-*", "daily-history-BTC-F", "deribit-funding-BTC-PERPETUAL", "fred-DTB3", "kraken-trades-1m-XBTUSD-*"],
     "fomc_btc_event_straddle": ["cboe-VIX-history", "daily-history-BTC-USD", "deribit-dvol-BTC-history", "fomc-meetings", "macro-release-cpi"],
     "fomc_cycle_even_weeks": ["daily-history-EFA", "daily-history-SPY", "fomc-meetings"],
     "fomc_gvz_event_change": ["cboe-GVZ-history", "cboe-VIX-history", "fomc-meetings", "macro-release-cpi"],
@@ -1489,6 +1489,13 @@ def _scored_theories(reg: Optional[dict]) -> dict[str, list[str]]:
         for h in exps[t["id"]]:
             if h not in shared:
                 out.setdefault(h, []).append(t["id"])
+    # a harness a batch module maps to a theory scores it even when the registry's experiments field was not updated
+    # (2026-10-29: T-743 and T-552's first runs were recorded as orphan rows); the field is written so the next run is explicit
+    by_id = {t["id"]: t for t in reg["theories"]}
+    for h, tid in BATCH_THEORY.items():
+        if tid in by_id and h not in exps.get(tid, []) and h not in out:
+            out[h] = [tid]
+            by_id[tid].setdefault("experiments", []).append(h)
     return out
 
 
@@ -1517,6 +1524,9 @@ def _apply_result(reg: Optional[dict], ids: list[str], res_id: str, verdict: str
             elif t["status"] == "untested":
                 t["status"] = "inconclusive"
             t.setdefault("results", []).append(res_id)
+        elif t["id"] in ids and t.get("status") == "blocked":
+            print(f"  note: {t['id']} is blocked; {res_id} is recorded but its status stays blocked until it is unblocked "
+                  f"(its data arrived: clear blocked_on and set status untested, then re-run)")
 
 
 def run_all(only: Optional[list[str]] = None, ledger: Optional[Ledger] = None, archive: Optional[Archive] = None,

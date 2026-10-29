@@ -139,6 +139,10 @@ refutation passes on every new 'supported' result. A harness that breaks one is 
 12. **One information set per decision.** A gate, a strike choice and a price used at the same decision must all be
     known at the same time. When the archive stamps a value after the fill, use the previous close for all of them or
     the entry-day close as the live proxy for all of them; if the two readings disagree, the result is undecided (T-220).
+13. **A scan finding is a hypothesis, not a result.** A pattern that a scan, a re-weighting or a model search surfaces
+    is registered as a replication on data the search never saw (earlier years, another market), with the search's
+    trial count disclosed; only that replication can support it. The re-weighted IC scan's strongest cell (bond ETFs at
+    5-20 days, confirmation IC 0.46) failed its pre-discovery replication by 36 bp a decision (T-743, 2026-10-29).
 
 ## 3. The improvement loop
 

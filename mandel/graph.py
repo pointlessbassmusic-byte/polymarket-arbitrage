@@ -389,6 +389,7 @@ def build_graph(knowledge_root: Path = KNOWLEDGE_ROOT, mandel_root: Path = MANDE
 
     return {
         "generated_for": "Mandel signal map",
+        "theories_unmatched": sorted(t.get("id") for t in (theories or []) if not any(_count_mentions(f"{t.get('slug', '')} {t.get('claim', '')} {t.get('notes', '')}", r) for r in rx.values())),
         "stats": {"nodes": len(nodes), "edges": len(edges), "documents": N,
                   "layers": {"substrate": sum(1 for n in nodes.values() if n.layer == 0),
                              "concepts": sum(1 for n in nodes.values() if n.layer == 1),

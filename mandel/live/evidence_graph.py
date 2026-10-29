@@ -310,9 +310,27 @@ def monitors(graph: dict, rows: list[dict], today: date) -> list[dict]:
 _TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]*(?:-<[^>]+>|\*)?(?:[A-Za-z0-9_.\-]*)$")
 
 
+OUT_OF_REACH = ("paid", "datamine", "bloomberg", "subscription", "not accessible", "out of reach", "not archived and not fetchable",
+                "licence forbids", "license forbids",
+                "binance", "bybit", "okx", "hyperliquid")     # offshore venues barred to US persons: Mandel never fetches them
+
+
 def _need_count(blocked_on: str) -> Optional[int]:
-    m = re.search(r"(\d+)\s*(?:\w+\s+)?(?:capture\s+)?days?", blocked_on or "")
-    return int(m.group(1)) if m else None
+    """The capture-day (or session) count a blocked theory needs. 'at least 60 daily SPX chain captures; 1 day exists' must read
+    60, not 1 (2026-10-29: T-376 scored data-ready on the '1 day'), so a stated requirement wins and otherwise the largest count
+    attached to days / captures / sessions is taken."""
+    txt = blocked_on or ""
+    m = re.search(r"(?:at least|needs?|requires?|>=)\s*(\d+)\s*(?:\w+\s+){0,3}?(?:capture|chain|daily)?\s*(?:days?|captures?|sessions?)", txt, re.I)
+    if m:
+        return int(m.group(1))
+    found = [int(x) for x in re.findall(r"(\d+)\s*(?:\w+\s+){0,2}?(?:capture\s+)?(?:days?|captures?|sessions?)\b", txt, re.I)]
+    return max(found) if found else None
+
+
+def out_of_reach(text: str) -> bool:
+    """A data field or blocked_on that names paid or barred data: never 'ready' however many bundle names match."""
+    t = (text or "").lower()
+    return any(k in t for k in OUT_OF_REACH)
 
 
 def data_readiness(data_field: str, bundles: dict, blocked_on: str = "") -> tuple[Optional[float], list[str]]:
@@ -325,6 +343,8 @@ def data_readiness(data_field: str, bundles: dict, blocked_on: str = "") -> tupl
         return None, []
     missing, have = [], 0.0
     need = _need_count(blocked_on)
+    if out_of_reach(data_field) or out_of_reach(blocked_on):
+        return 0.0, ["out of reach: paid or barred data named"]
     for nm in names:
         prefix = re.split(r"<|\*", nm)[0]
         if prefix == nm:
@@ -388,6 +408,9 @@ def next_tests(registry: list[dict], bundles: dict, top: int = 20, result_times:
         ready, missing = data_readiness(str(trial.get("data", "")), bundles, str(t.get("blocked_on") or ""))
         if ready is None:
             continue
+        # a blocked theory whose data has arrived is worth as much as an inconclusive one (2026-10-29: the 0.5 weight hid
+        # T-552 for three days after its Kraken months landed)
+        w = STATUS_WEIGHT[st] if not (st == "blocked" and ready >= 1.0) else STATUS_WEIGHT["inconclusive"]
         fresh = 1.0
         if st == "inconclusive":
             last = max((result_times.get(x, "") for x in (t.get("results") or [])), default="")
@@ -401,7 +424,7 @@ def next_tests(registry: list[dict], bundles: dict, top: int = 20, result_times:
         text = (str(trial) + " " + str(t.get("notes", ""))).lower()
         us = 0.5 if ("not accessible to us" in text or "not us-accessible" in text) else 1.0
         cheap = 1.0 / (1.0 + math.log10(max(min_n, 10)) / 4)
-        score = STATUS_WEIGHT[st] * ready * fresh * cheap * us
+        score = w * ready * fresh * cheap * us
         out.append({"id": t["id"], "status": st, "claim": str(t.get("claim", ""))[:180], "data_ready": round(ready, 2),
                     "new_data": fresh == 1.0 if st == "inconclusive" else None,
                     "missing": ", ".join(missing[:4]), "min_n": int(min_n), "score": round(score, 3),
