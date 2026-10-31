@@ -89,7 +89,7 @@ calendar-month statistic (entry on day 1 of each month). T-362 follows the CME m
 the first session after the previous expiry, held to expiry). T-303 and T-363 are daily series. T-329 enters on its own
 signal days (event-driven, no grid; its block-shifted signal null is a reported diagnostic). T-423 is a daily event
 study with overlapping windows.
-"""
+""" T-552 (the BRR-exit successor of T-362) uses T-362's calendar unchanged: one decision per contract month on the first standard session after the previous expiry, a fixed calendar with no grid phase; only the exit price changes.
 
 from __future__ import annotations
 

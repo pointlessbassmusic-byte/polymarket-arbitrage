@@ -411,7 +411,7 @@ def test_t423_null_no_predictability_not_supported():
 # ------------------------------------------------------------------------------------------- contract --
 
 def test_registry_contract():
-    assert set(cy.THEORY_MAP) == {"T-198", "T-258", "T-303", "T-329", "T-362", "T-363", "T-364", "T-423"}
+    assert set(cy.THEORY_MAP) == {"T-198", "T-258", "T-303", "T-329", "T-362", "T-363", "T-364", "T-423", "T-552"}
     assert all(h in cy.HARNESSES and h.startswith("carry_") for h in cy.THEORY_MAP.values())
 
 
