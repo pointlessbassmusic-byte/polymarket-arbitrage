@@ -31168,7 +31168,7 @@
    "blocked_on": "the forward record: 2 settled two_venue fires as of 2026-10-29 (ECB Oct 29 hold, RBNZ Oct 27 hike), ~30 a year expected -> read about 2028-H2",
    "results": [],
    "parent": "",
-   "notes": "registered so the map's reference-price node carries the member, not only the eight non-members; the read is of the children's record (forward_tests.json S-fed-g10)"
+   "notes": "registered so the map's reference-price node carries the member, not only the eight non-members; the read is of the children's record (forward_tests.json S-fed-g10) | 2026-11-02 tally: 4 two_venue fires (Fed Oct hold, ECB Oct 29 hold, BoJ hold, RBNZ Oct 27 hike-25), 0 settled in the recorder files yet"
   },
   {
    "id": "T-743",

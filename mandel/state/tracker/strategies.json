@@ -23,7 +23,7 @@
   "group": "Paper",
   "progress": 0.15,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-560",
@@ -48,7 +48,7 @@
   "group": "Paper",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-542",
@@ -73,7 +73,7 @@
   "group": "Forward record",
   "progress": 0.1,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-541",
@@ -98,7 +98,7 @@
   "group": "Forward record",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-543",
@@ -123,7 +123,7 @@
   "group": "Forward record",
   "progress": 0.0333,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-565",
@@ -148,7 +148,7 @@
   "group": "Forward record",
   "progress": 0.25,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-566",
@@ -173,7 +173,7 @@
   "group": "Forward record",
   "progress": 0.045,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-573",
@@ -198,7 +198,7 @@
   "group": "Forward record",
   "progress": 0.045,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-576",
@@ -223,7 +223,7 @@
   "group": "Paper",
   "progress": 0.0417,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-567",
@@ -248,7 +248,7 @@
   "group": "Paper",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "T-568",
@@ -273,7 +273,7 @@
   "group": "Paper",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-bounce-short",
@@ -299,7 +299,7 @@
   "group": "Live money",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-orb-qqq",
@@ -325,7 +325,7 @@
   "group": "Paper",
   "progress": 0.0833,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-2s10s-xlf",
@@ -351,7 +351,7 @@
   "group": "Paper",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-btc-us500-lead",
@@ -376,8 +376,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 5,
-  "as_of": "2026-10-31"
+  "days_to_read": 3,
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-book-imbalance",
@@ -402,8 +402,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 12,
-  "as_of": "2026-10-31"
+  "days_to_read": 10,
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-btc-favourite",
@@ -412,7 +412,7 @@
   "venue": "Kalshi",
   "mode": "forward",
   "unit": "days",
-  "n_now": 17,
+  "n_now": 19,
   "n_target": 60,
   "read_date": "2026-12-13",
   "pnl_usd": null,
@@ -427,9 +427,9 @@
   "source": "R-831322fc73",
   "state": "running",
   "group": "Forward record",
-  "progress": 0.2833,
-  "days_to_read": 43,
-  "as_of": "2026-10-31"
+  "progress": 0.3167,
+  "days_to_read": 41,
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-hype-fade",
@@ -454,8 +454,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 73,
-  "as_of": "2026-10-31"
+  "days_to_read": 71,
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-ibit-carry",
@@ -480,8 +480,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 104,
-  "as_of": "2026-10-31"
+  "days_to_read": 102,
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-ibit-ladder",
@@ -506,8 +506,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 335,
-  "as_of": "2026-10-31"
+  "days_to_read": 333,
+  "as_of": "2026-11-02"
  },
  {
   "id": "K-maker-kalshi",
@@ -533,7 +533,7 @@
   "group": "Live money",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "K-tennis-longshot-no",
@@ -559,7 +559,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "B-maker-pmus",
@@ -585,7 +585,7 @@
   "group": "Live money",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "B-paper-book",
@@ -611,7 +611,7 @@
   "group": "Paper",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "S-fed-g10",
@@ -637,7 +637,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-btc-tom",
@@ -663,7 +663,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-us500-overnight",
@@ -689,7 +689,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "H-gold-perp-carry",
@@ -715,7 +715,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "B-longshot-calibration",
@@ -741,7 +741,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "K-thin-queue-maker",
@@ -767,7 +767,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "S-kalshi-crypto-short",
@@ -793,7 +793,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "S-macro-buckets",
@@ -819,7 +819,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  },
  {
   "id": "K-queue-markov-fill",
@@ -845,6 +845,6 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-10-31"
+  "as_of": "2026-11-02"
  }
 ]

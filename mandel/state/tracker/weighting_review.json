@@ -57,8 +57,8 @@
    "backtest",
    "calibration",
    "multifractal",
-   "fractal_dimension",
-   "provenance"
+   "provenance",
+   "fractal_dimension"
   ],
   "talked_untested": [
    "affine_ifs",
@@ -66,9 +66,9 @@
    "attractor",
    "entropy",
    "representation",
-   "rsi",
    "mandelbrot_set",
-   "fractal_dimension"
+   "fractal_dimension",
+   "compression"
   ],
   "tested_untalked": [
    "option_structure",
@@ -95,23 +95,9 @@
    "noisy_channel",
    "renormalization",
    "representation",
-   "rsi",
    "shannon"
   ],
-  "theories_unmatched": [
-   "T-13",
-   "T-30",
-   "T-39",
-   "T-40",
-   "T-41",
-   "T-414",
-   "T-416",
-   "T-42",
-   "T-44",
-   "T-45",
-   "T-461",
-   "T-523"
-  ]
+  "theories_unmatched": []
  },
  "next_tests": {
   "current": [
