@@ -1,0 +1,249 @@
+<style>
+.mt { font-family: var(--font-anthropic-sans); font-variant-numeric: tabular-nums; }
+.mt .hd { display: flex; flex-direction: column; gap: var(--cds-gap-xs); margin-bottom: var(--cds-gap-lg); }
+.mt h1 { font: 400 var(--cds-font-size-title) var(--font-anthropic-serif); margin: 0; }
+.mt .take { color: var(--color-fg-muted); font-size: var(--cds-font-size-body); margin: 0; }
+.mt h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: var(--cds-gap-xl) 0 var(--cds-gap-sm); }
+.mt .note { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 0 0 var(--cds-gap-sm); }
+.mt .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: var(--cds-gap-md); }
+.mt .tile { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+.mt .tile .lab { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); letter-spacing: .02em; text-transform: uppercase; }
+.mt .tile .big { font: 400 var(--cds-font-size-title) var(--font-anthropic-serif); margin: var(--cds-gap-xs) 0 0; line-height: 1.1; }
+.mt .tile .sub { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-top: var(--cds-gap-xs); }
+.mt .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: var(--cds-gap-md); }
+.mt .card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+.mt .card h3 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-xs); }
+.mt .chart { position: relative; min-height: 220px; }
+.mt .chart svg { display: block; width: 100%; height: auto; }
+.mt .tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); display: none; }
+.mt .tip .k { color: var(--cds-text-secondary); }
+.mt table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); }
+.mt .tbl { max-height: 26rem; overflow: auto; }
+.mt th { position: sticky; top: 0; background: var(--color-panel); text-align: left; font-weight: var(--cds-font-weight-medium); padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); cursor: pointer; white-space: nowrap; }
+.mt td { padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+.mt td.num, .mt th.num { text-align: right; }
+.mt .pill { display: inline-block; padding: 0 .5em; border-radius: 999px; font-size: var(--cds-font-size-caption); border: 1px solid var(--color-border-line); color: var(--color-fg-muted); white-space: nowrap; }
+.mt .pill.ok { color: var(--color-ok); border-color: var(--color-ok); }
+.mt .pill.warn { color: var(--color-warn); border-color: var(--color-warn); }
+.mt .pill.bad { color: var(--color-bad); border-color: var(--color-bad); }
+.mt .pos { color: var(--color-ok); } .mt .neg { color: var(--color-bad); }
+.mt .bar { position: relative; height: .5rem; background: var(--cds-chart-grid); border-radius: var(--cds-radius); overflow: hidden; min-width: 4rem; }
+.mt .bar > i { position: absolute; inset: 0 auto 0 0; background: var(--cds-chart-muted); border-radius: var(--cds-radius); }
+.mt .bar > i.live { background: var(--color-warn); }
+.mt .alerts { display: flex; flex-direction: column; gap: var(--cds-gap-xs); }
+.mt .al { display: grid; grid-template-columns: auto 1fr; gap: var(--cds-gap-sm); align-items: start; font-size: var(--cds-font-size-caption); }
+.mt .strip { display: flex; gap: 3px; flex-wrap: wrap; }
+.mt .strip > div { width: 1.6rem; height: 1.6rem; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--color-fg-muted); border: 1px solid var(--color-border-line); }
+.mt .strip > div.ok { background: color-mix(in srgb, var(--color-ok) 25%, transparent); }
+.mt .strip > div.bad { background: color-mix(in srgb, var(--color-bad) 25%, transparent); }
+.mt [data-dash-source-state=empty] { color: transparent; }
+.mt [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+.mt .err { display: flex; align-items: center; justify-content: center; gap: .4em; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); min-height: 220px; }
+.mt .err::before { content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); }
+</style>
+<div class="mt" id="top">
+  <div class="hd">
+    <h1>Paper &amp; Test Progress</h1>
+    <p class="take" id="takeaway">—</p>
+  </div>
+
+  <div class="tiles" id="headline">
+    <div class="tile" data-fetchpriority="high"><div class="lab">Paper P&amp;L, realised</div><div class="big dash-skeleton" data-source="paper_total" data-field="pnl_usd">—</div><div class="sub">T-559 calendar sleeve, closed round trips, <span data-source="paper_total" data-field="sessions">—</span> sessions</div></div>
+    <div class="tile"><div class="lab">Round trips</div><div class="big dash-skeleton" data-source="paper_total" data-field="trips">—</div><div class="sub"><span data-source="paper_total" data-field="wins">—</span> won · mean <span data-source="paper_total" data-field="mean_usd">—</span> per trip</div></div>
+    <div class="tile"><div class="lab">Official-print shadow</div><div class="big dash-skeleton" data-source="paper_total" data-field="shadow_usd">—</div><div class="sub">same trips at the official close/open; <span data-source="paper_total" data-field="shadowed">—</span> trips priced</div></div>
+    <div class="tile"><div class="lab">Theories decided</div><div class="big dash-skeleton" data-source="reg_total" data-field="decided">—</div><div class="sub">of <span data-source="reg_total" data-field="total">—</span> registered · <span data-source="reg_total" data-field="supported">—</span> supported</div></div>
+    <div class="tile"><div class="lab">Forward tests tracked</div><div class="big dash-skeleton" data-source="child_total" data-field="tests">—</div><div class="sub"><span data-source="child_total" data-field="live">—</span> live · <span data-source="child_total" data-field="paper">—</span> paper · <span data-source="child_total" data-field="forward">—</span> forward</div></div>
+    <div class="tile"><div class="lab">Capture box</div><div class="big dash-skeleton" data-source="box_total" data-field="last_status">—</div><div class="sub">last run <span data-source="box_total" data-field="last_day">—</span> · <span data-source="box_total" data-field="failed_days">—</span> failed days of <span data-source="box_total" data-field="days">—</span></div></div>
+  </div>
+
+  <h2 id="paper">Paper trading</h2>
+  <p class="note">The calendar sleeve on Alpaca paper (QQQM overnight; SPYM on IBS &lt; 0.2 and the turn of the month). Paper fills land at 15:44 and ~09:33 ET; the official-print shadow marks the same trips at the auction prints the rules are defined on. Both columns appear once the runner's reconcile records prints (from 2026-11-03).</p>
+  <div class="grid">
+    <div class="card"><h3>Realised P&amp;L by session</h3><p class="note">Bars: round trips closed that day. Line: running total.</p><div class="chart" id="pnl-chart" data-source="paper_sessions paper_by_day"><svg viewBox="0 0 640 240"></svg><div class="tip"></div></div></div>
+    <div class="card"><h3>Round trips</h3><p class="note">Paper fill vs the official print where one exists.</p><div class="tbl"><table id="trips" data-source="paper_round_trips" data-row-key="entry_day,symbol,exit_day"><thead><tr><th data-field="exit_day">Exit</th><th data-field="symbol">Symbol</th><th data-field="rule">Rule</th><th class="num" data-field="qty">Qty</th><th class="num" data-field="entry">Entry</th><th class="num" data-field="exit">Exit px</th><th class="num" data-field="pnl_usd">Paper $</th><th class="num" data-field="shadow_pnl_usd">Official $</th></tr></thead><tbody></tbody></table></div></div>
+  </div>
+  <div class="grid" style="margin-top: var(--cds-gap-md)">
+    <div class="card"><h3>Fills</h3><p class="note">Every filled stock order, with the gap to the official print in basis points once recorded.</p><div class="tbl"><table id="fills" data-source="paper_fills" data-row-key="filled_at"><thead><tr><th data-field="filled_at">Filled (UTC)</th><th data-field="symbol">Symbol</th><th data-field="phase">Phase</th><th data-field="side">Side</th><th class="num" data-field="qty">Qty</th><th class="num" data-field="price">Price</th><th class="num" data-field="official_print">Official</th><th class="num" data-field="gap_bp">Gap bp</th></tr></thead><tbody></tbody></table></div></div>
+    <div class="card"><h3>Widened sleeves</h3><p class="note">Capture-box orders: IWM pre-holiday, IEF, and the GLD / TLT / USO put spreads (T-567, T-568). Expired rows are opening orders the paper venue never filled.</p><div class="tbl"><table id="wide" data-source="wide_orders" data-row-key="order"><thead><tr><th data-field="day">Day</th><th data-field="underlying">Underlying</th><th data-field="kind">Kind</th><th data-field="side">Side</th><th class="num" data-field="qty">Qty</th><th class="num" data-field="price">Price</th><th data-field="status">Status</th></tr></thead><tbody></tbody></table></div></div>
+  </div>
+
+  <h2 id="children">Forward tests across Mandel and the children</h2>
+  <p class="note">Each test counts toward its registered decision sample. Figures the children report are theirs, unverified; Mandel's are from its journals. Rows with no target are read on a locked date.</p>
+  <div class="grid">
+    <div class="card"><h3>Progress to decision</h3><p class="note">Share of the decision sample reached. Live tests in the warning color.</p><div class="chart" id="prog-chart" data-source="children_forward_tests"><svg viewBox="0 0 640 520"></svg><div class="tip"></div></div></div>
+    <div class="card"><h3>Every tracked test</h3><p class="note">Owner, mode, where it stands and the next step.</p><div class="tbl"><table id="ft" data-source="children_forward_tests" data-row-key="id"><thead><tr><th data-field="id">Id</th><th data-field="owner">Owner</th><th data-field="mode">Mode</th><th class="num" data-field="n_now">Now</th><th class="num" data-field="n_target">Target</th><th class="num" data-field="pnl_usd">P&amp;L $</th><th data-field="status">Status</th></tr></thead><tbody></tbody></table></div></div>
+  </div>
+
+  <h2 id="registry">Registry: what the tests say</h2>
+  <p class="note">Every theory is pre-registered before its harness runs; a verdict is never edited, a new row is added. Supported means the registered pass criteria held and an independent refutation pass found nothing; it is not an after-cost edge.</p>
+  <div class="grid">
+    <div class="card"><h3>Status today</h3><p class="note">All registered theories.</p><div class="chart" id="status-chart" data-source="registry_status"><svg viewBox="0 0 640 200"></svg><div class="tip"></div></div></div>
+    <div class="card"><h3>Verdicts over time</h3><p class="note">Cumulative experiments by verdict; the dotted line is theories pre-registered.</p><div class="chart" id="timeline-chart" data-source="registry_timeline"><svg viewBox="0 0 640 240"></svg><div class="tip"></div></div></div>
+    <div class="card"><h3>By kind</h3><p class="note">Where the supported column comes from.</p><div class="tbl"><table id="kinds" data-source="kind_pivot" data-row-key="kind"><thead><tr><th data-field="kind">Kind</th><th class="num" data-field="supported">Supported</th><th class="num" data-field="not_supported">Not supported</th><th class="num" data-field="inconclusive">Inconclusive</th><th class="num" data-field="blocked">Blocked</th><th class="num" data-field="parked">Parked</th><th class="num" data-field="total">Total</th></tr></thead><tbody></tbody></table></div></div>
+    <div class="card"><h3>What to test next</h3><p class="note">Ranked by data readiness, new data and sample size needed; a blocked theory whose data arrived ranks like an inconclusive one.</p><div class="tbl"><table id="next" data-source="next_tests" data-row-key="id"><thead><tr><th data-field="id">Id</th><th data-field="status">Status</th><th class="num" data-field="score">Score</th><th class="num" data-field="data_ready">Data</th><th class="num" data-field="min_n">min n</th><th data-field="missing">Missing</th></tr></thead><tbody></tbody></table></div></div>
+  </div>
+
+  <h2 id="box">Capture box and alerts</h2>
+  <p class="note">The Linode's nightly captures feed the options overlays and the shadow tests; a failed night is a lost day of chains. Alerts come from the evidence graph (stale streams, shared accounts, factor exposure, contradictions, tests at a checkpoint).</p>
+  <div class="grid">
+    <div class="card"><h3>Nightly capture runs</h3><p class="note">One cell per run day: green ran clean, red at least one step failed.</p><div class="strip" id="strip" data-source="capture_health"></div><p class="note" style="margin-top: var(--cds-gap-sm)">Freshest capture per family: <span data-source="box_total" data-field="fresh_families">—</span> of <span data-source="box_total" data-field="families">—</span> families within 3 days of the last run.</p></div>
+    <div class="card"><h3>Alerts</h3><p class="note">Critical first.</p><div class="alerts" id="alerts" data-source="alerts"></div></div>
+  </div>
+  <h2 id="all-tests">Every test the tracker follows</h2>
+  <p class="note">Mandel's paper, forward and shadow tests with the children's, as the tracker ranks them: state, progress and next step.</p>
+  <div class="card"><div class="tbl"><table id="all" data-source="strategies" data-row-key="id"><thead><tr><th data-field="id">Id</th><th data-field="owner">Owner</th><th data-field="strategy">Strategy</th><th data-field="mode">Mode</th><th data-field="state">State</th><th class="num" data-field="progress">Progress</th><th data-field="next_step">Next step</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+<script>
+(function () {
+  const fmtUsd = d3.format('+,.2f'), fmtInt = d3.format(','), fmtPct = d3.format('.0%'), fmtDay = d3.utcFormat('%b %-d');
+  const num = (x) => (x === null || x === undefined || x === '' ? null : Number(x));
+
+  dash.calc('paper_by_day', {
+    title: 'Paper P&L by exit day', description: 'Round-trip P&L summed by exit day, with the running total.',
+    inputs: ['paper_round_trips', 'paper_sessions'],
+    fn: (paper_round_trips, paper_sessions) => {
+      const by = {}; paper_round_trips.forEach(t => { by[t.exit_day] = (by[t.exit_day] || 0) + Number(t.pnl_usd); });
+      let cum = 0; return paper_sessions.map(s => { const p = by[s.day] || 0; cum += p; return {day: s.day, pnl_usd: p, cum_usd: cum}; });
+    }
+  });
+  dash.calc('paper_total', {
+    title: 'Paper totals', description: 'Realised P&L, round trips, winners, sessions and the official-print shadow where prints exist.',
+    inputs: ['paper_round_trips', 'paper_sessions'],
+    fn: (paper_round_trips, paper_sessions) => {
+      const pnl = paper_round_trips.reduce((a, t) => a + Number(t.pnl_usd), 0);
+      const sh = paper_round_trips.filter(t => t.shadow_pnl_usd !== null && t.shadow_pnl_usd !== undefined);
+      return [{pnl_usd: pnl, trips: paper_round_trips.length, wins: paper_round_trips.filter(t => Number(t.pnl_usd) > 0).length,
+               mean_usd: paper_round_trips.length ? pnl / paper_round_trips.length : null, sessions: paper_sessions.length,
+               shadow_usd: sh.length ? sh.reduce((a, t) => a + Number(t.shadow_pnl_usd), 0) : null, shadowed: sh.length}];
+    }
+  });
+  dash.calc('reg_total', {
+    title: 'Registry totals', description: 'Theories registered, decided (supported or not supported) and supported.',
+    inputs: ['registry_status'],
+    fn: (registry_status) => { const g = {}; registry_status.forEach(r => { g[r.status] = Number(r.count); });
+      const total = Object.values(g).reduce((a, b) => a + b, 0);
+      return [{total, decided: (g.supported || 0) + (g.not_supported || 0), supported: g.supported || 0, not_supported: g.not_supported || 0, inconclusive: g.inconclusive || 0, blocked: g.blocked || 0, parked: g.parked || 0}]; }
+  });
+  dash.calc('kind_pivot', {
+    title: 'Registry by kind', description: 'Theory counts per kind and status.',
+    inputs: ['registry_by_kind'],
+    fn: (registry_by_kind) => { const g = {}; registry_by_kind.forEach(r => { const k = g[r.kind] || (g[r.kind] = {kind: r.kind, supported: 0, not_supported: 0, inconclusive: 0, blocked: 0, parked: 0, total: 0}); k[r.status] = (k[r.status] || 0) + Number(r.count); k.total += Number(r.count); });
+      return Object.values(g).sort((a, b) => b.total - a.total); }
+  });
+  dash.calc('child_total', {
+    title: 'Forward-test counts', description: 'Tracked tests by mode.',
+    inputs: ['children_forward_tests'],
+    fn: (children_forward_tests) => [{tests: children_forward_tests.length, live: children_forward_tests.filter(r => r.mode === 'live').length,
+      paper: children_forward_tests.filter(r => r.mode === 'paper').length, forward: children_forward_tests.filter(r => r.mode === 'forward').length}]
+  });
+  dash.calc('box_total', {
+    title: 'Capture box summary', description: 'The last run day and its status, failed run days, and how many data families are fresh.',
+    inputs: ['capture_health', 'capture_families'],
+    fn: (capture_health, capture_families) => { const last = capture_health[capture_health.length - 1]; const lastDay = last ? last.day : null;
+      const fresh = lastDay ? capture_families.filter(f => f.latest && (new Date(lastDay) - new Date(f.latest)) / 86400000 <= 3).length : 0;
+      return [{last_day: lastDay, last_status: last ? (last.ok ? 'ran clean' : last.failed + ' of ' + last.steps + ' steps failed') : null,
+               failed_days: capture_health.filter(d => !d.ok).length, days: capture_health.length, fresh_families: fresh, families: capture_families.length}]; }
+  });
+
+  const root = document.querySelector('.mt');
+  const sortState = {};
+  function fillTable(id, rows, cols, fmt, keyf) {
+    const tb = root.querySelector('#' + id + ' tbody'); tb.replaceChildren();
+    if (!rows) return;
+    const st = sortState[id]; let r = rows.slice();
+    if (st) r.sort((a, b) => { const x = a[st.col], y = b[st.col]; const nx = Number(x), ny = Number(y); const c = (!isNaN(nx) && !isNaN(ny) && x !== '' && y !== '') ? nx - ny : String(x ?? '').localeCompare(String(y ?? '')); return st.dir * c; });
+    r.forEach(row => { const tr = document.createElement('tr'); if (keyf) tr.dataset.key = keyf(row);
+      cols.forEach(c => { const td = document.createElement('td'); const v = row[c]; const f = fmt[c]; if (f && f.cls) td.className = f.cls;
+        if (f && f.pill) { const s = document.createElement('span'); s.className = 'pill ' + (f.pill(v, row) || ''); s.textContent = v ?? '—'; td.appendChild(s); }
+        else if (f && f.bar) { const b = document.createElement('div'); b.className = 'bar'; const i = document.createElement('i'); const p = num(v); i.style.width = (p === null ? 0 : Math.min(1, p) * 100) + '%'; if (row.mode === 'live') i.classList.add('live'); b.appendChild(i); b.title = p === null ? '' : fmtPct(p); td.appendChild(b); td.appendChild(document.createTextNode(' ' + (p === null ? '—' : fmtPct(p)))); td.className = 'num'; }
+        else { const txt = f && f.fmt ? f.fmt(v, row) : (v === null || v === undefined || v === '' ? '—' : String(v)); td.textContent = txt; if (f && f.sign) td.classList.add(num(v) > 0 ? 'pos' : num(v) < 0 ? 'neg' : ''); }
+        tr.appendChild(td); }); tb.appendChild(tr); });
+  }
+  root.querySelectorAll('table th').forEach(th => th.addEventListener('click', () => { const t = th.closest('table'); const col = th.dataset.field; const st = sortState[t.id]; sortState[t.id] = {col, dir: st && st.col === col ? -st.dir : 1}; dash.onData(() => {}); redraw(); }));
+
+  const money = {fmt: v => num(v) === null ? '—' : fmtUsd(num(v)), sign: true, cls: 'num'};
+  const price = {fmt: v => num(v) === null ? '—' : d3.format(',.2f')(num(v)), cls: 'num'};
+  const plain = {};
+  function errBox(el, g) { el.querySelectorAll('.err').forEach(e => e.remove()); if (g.status === 'error') { const e = document.createElement('div'); e.className = 'err'; e.textContent = 'Failed to load'; el.appendChild(e); } }
+
+  function drawPnl() {
+    const box = root.querySelector('#pnl-chart'); const g = dash.data('paper_by_day'); const svg = d3.select(box).select('svg'); svg.selectAll('*').remove(); errBox(box, g);
+    if (g.status !== 'ok' || !g.data.length) return;
+    const W = 640, H = 240, m = {t: 12, r: 44, b: 28, l: 44}; const rows = g.data;
+    const x = d3.scaleBand(rows.map(r => r.day), [m.l, W - m.r]).padding(0.25);
+    const ext = d3.extent(rows.flatMap(r => [r.pnl_usd, r.cum_usd, 0])); const y = d3.scaleLinear(ext, [H - m.b, m.t]).nice();
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('+,.0f'))).attr('font-size', null).attr('font-family', null).call(a => a.select('.domain').remove()).selectAll('text').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)');
+    svg.append('g').selectAll('line').data(y.ticks(5)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(0)).attr('y2', y(0)).attr('stroke', 'var(--cds-chart-axis)');
+    svg.append('g').selectAll('rect').data(rows).join('rect').attr('x', d => x(d.day)).attr('width', x.bandwidth()).attr('y', d => Math.min(y(0), y(d.pnl_usd))).attr('height', d => Math.abs(y(d.pnl_usd) - y(0))).attr('rx', 2).attr('fill', d => d.pnl_usd >= 0 ? dash.colors[0] : 'var(--cds-chart-status-critical)');
+    svg.append('path').datum(rows).attr('fill', 'none').attr('stroke', dash.colors[1]).attr('stroke-width', 2).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round').attr('d', d3.line().x(d => x(d.day) + x.bandwidth() / 2).y(d => y(d.cum_usd)));
+    const last = rows[rows.length - 1]; svg.append('text').attr('x', x(last.day) + x.bandwidth() / 2 + 6).attr('y', y(last.cum_usd) + 4).attr('fill', dash.colors[1]).attr('font-size', 'var(--cds-font-size-caption)').text(fmtUsd(last.cum_usd));
+    const step = Math.ceil(rows.length / 6); svg.append('g').selectAll('text').data(rows.filter((_, i) => i % step === 0)).join('text').attr('x', d => x(d.day) + x.bandwidth() / 2).attr('y', H - 8).attr('text-anchor', 'middle').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => fmtDay(new Date(d.day)));
+    const tip = box.querySelector('.tip');
+    svg.on('pointermove', (ev) => { const [px] = d3.pointer(ev); const d = rows.find(r => px >= x(r.day) - x.step() * 0.125 && px <= x(r.day) + x.bandwidth() + x.step() * 0.125); if (!d) { tip.style.display = 'none'; return; } tip.style.display = 'block'; tip.replaceChildren(); const k = document.createElement('div'); k.className = 'k'; k.textContent = fmtDay(new Date(d.day)); tip.appendChild(k); const a = document.createElement('div'); a.textContent = 'Day ' + fmtUsd(d.pnl_usd); tip.appendChild(a); const b = document.createElement('div'); b.textContent = 'Running ' + fmtUsd(d.cum_usd); tip.appendChild(b); const r = box.getBoundingClientRect(); tip.style.left = Math.min(ev.clientX - r.left + 12, r.width - 140) + 'px'; tip.style.top = (ev.clientY - r.top - 10) + 'px'; }).on('pointerleave', () => { tip.style.display = 'none'; });
+  }
+  function drawProgress() {
+    const box = root.querySelector('#prog-chart'); const g = dash.data('children_forward_tests'); const svg = d3.select(box).select('svg'); svg.selectAll('*').remove(); errBox(box, g);
+    if (g.status !== 'ok') return;
+    const rows = g.data.filter(r => r.n_target).map(r => ({...r, p: Math.min(1, Number(r.n_now || 0) / Number(r.n_target))})).sort((a, b) => b.p - a.p);
+    const W = 640, rowH = 22, m = {t: 8, r: 60, b: 8, l: 150}; const H = m.t + m.b + rows.length * rowH; svg.attr('viewBox', `0 0 ${W} ${Math.max(H, 60)}`);
+    const x = d3.scaleLinear([0, 1], [m.l, W - m.r]);
+    svg.append('g').selectAll('line').data([0.25, 0.5, 0.75, 1]).join('line').attr('x1', d => x(d)).attr('x2', d => x(d)).attr('y1', m.t).attr('y2', H - m.b).attr('stroke', 'var(--cds-chart-grid)');
+    const rg = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (d, i) => `translate(0,${m.t + i * rowH})`);
+    rg.append('text').attr('x', m.l - 8).attr('y', rowH / 2 + 4).attr('text-anchor', 'end').attr('fill', 'var(--color-fg)').attr('font-size', 'var(--cds-font-size-caption)').text(d => d.id + ' · ' + d.owner);
+    rg.append('rect').attr('x', x(0)).attr('y', 5).attr('height', rowH - 10).attr('width', x(1) - x(0)).attr('rx', 3).attr('fill', 'var(--cds-chart-grid)');
+    rg.append('rect').attr('x', x(0)).attr('y', 5).attr('height', rowH - 10).attr('width', d => Math.max(0, x(d.p) - x(0))).attr('rx', 3).attr('fill', d => d.mode === 'live' ? 'var(--color-warn)' : d.mode === 'paper' ? dash.colors[0] : 'var(--cds-chart-muted)');
+    rg.append('text').attr('x', W - m.r + 6).attr('y', rowH / 2 + 4).attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => fmtInt(Number(d.n_now || 0)) + ' / ' + fmtInt(Number(d.n_target)));
+  }
+  function drawStatus() {
+    const box = root.querySelector('#status-chart'); const g = dash.data('registry_status'); const svg = d3.select(box).select('svg'); svg.selectAll('*').remove(); errBox(box, g);
+    if (g.status !== 'ok') return;
+    const order = ['supported', 'inconclusive', 'not_supported', 'blocked', 'parked', 'untested']; const rows = order.map(s => ({status: s, count: Number((g.data.find(r => r.status === s) || {}).count || 0)})).filter(r => r.count);
+    const W = 640, rowH = 30, m = {t: 6, r: 56, b: 6, l: 110}; const H = m.t + m.b + rows.length * rowH; svg.attr('viewBox', `0 0 ${W} ${H}`);
+    const x = d3.scaleLinear([0, d3.max(rows, r => r.count)], [m.l, W - m.r]);
+    const color = {supported: 'var(--color-ok)', not_supported: 'var(--cds-chart-muted)', inconclusive: dash.colors[1], blocked: dash.colors[2], parked: dash.colors[3], untested: dash.colors[4]};
+    const rg = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (d, i) => `translate(0,${m.t + i * rowH})`);
+    rg.append('text').attr('x', m.l - 8).attr('y', rowH / 2 + 4).attr('text-anchor', 'end').attr('fill', 'var(--color-fg)').attr('font-size', 'var(--cds-font-size-caption)').text(d => d.status.replace('_', ' '));
+    rg.append('rect').attr('x', x(0)).attr('y', 6).attr('height', rowH - 12).attr('width', d => x(d.count) - x(0)).attr('rx', 3).attr('fill', d => color[d.status]);
+    rg.append('text').attr('x', d => x(d.count) + 6).attr('y', rowH / 2 + 4).attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text(d => fmtInt(d.count));
+  }
+  function drawTimeline() {
+    const box = root.querySelector('#timeline-chart'); const g = dash.data('registry_timeline'); const svg = d3.select(box).select('svg'); svg.selectAll('*').remove(); errBox(box, g);
+    if (g.status !== 'ok' || !g.data.length) return;
+    const rows = g.data.map(r => ({...r, d: new Date(r.day)})); const W = 640, H = 240, m = {t: 12, r: 110, b: 28, l: 44};
+    const x = d3.scaleUtc(d3.extent(rows, r => r.d), [m.l, W - m.r]); const y = d3.scaleLinear([0, d3.max(rows, r => Math.max(r.preregistered_cum, r.experiments_cum))], [H - m.b, m.t]).nice();
+    svg.append('g').selectAll('line').data(y.ticks(5)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', d => y(d)).attr('y2', d => y(d)).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d3.format(','))).attr('font-size', null).attr('font-family', null).call(a => a.select('.domain').remove()).selectAll('text').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)');
+    svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(5).tickFormat(d3.utcFormat('%b %-d'))).attr('font-size', null).attr('font-family', null).call(a => a.select('.domain').attr('stroke', 'var(--cds-chart-axis)')).selectAll('text').attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)');
+    const series = [['not_supported_cum', 'not supported', 'var(--cds-chart-muted)'], ['inconclusive_cum', 'inconclusive', dash.colors[1]], ['supported_cum', 'supported', 'var(--color-ok)'], ['experiments_cum', 'experiments', dash.colors[0]]];
+    series.forEach(([k, lab, col]) => { svg.append('path').datum(rows).attr('fill', 'none').attr('stroke', col).attr('stroke-width', 2).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round').attr('d', d3.line().x(d => x(d.d)).y(d => y(d[k]))); const l = rows[rows.length - 1]; svg.append('text').attr('x', x(l.d) + 6).attr('y', y(l[k]) + 4).attr('fill', col).attr('font-size', 'var(--cds-font-size-caption)').text(lab + ' ' + fmtInt(l[k])); });
+    svg.append('path').datum(rows).attr('fill', 'none').attr('stroke', 'var(--cds-chart-reference)').attr('stroke-width', 1.5).attr('stroke-dasharray', '3 3').attr('d', d3.line().x(d => x(d.d)).y(d => y(d.preregistered_cum)));
+    const l = rows[rows.length - 1]; svg.append('text').attr('x', x(l.d) + 6).attr('y', y(l.preregistered_cum) - 6).attr('fill', 'var(--color-fg-muted)').attr('font-size', 'var(--cds-font-size-caption)').text('registered ' + fmtInt(l.preregistered_cum));
+  }
+  function drawStrip() {
+    const el = root.querySelector('#strip'); const g = dash.data('capture_health'); el.replaceChildren(); if (g.status !== 'ok') return;
+    g.data.forEach(d => { const c = document.createElement('div'); c.className = d.ok ? 'ok' : 'bad'; c.title = d.day + (d.ok ? ': ran clean' : ': ' + d.failed + ' of ' + d.steps + ' steps failed — ' + d.first_error); c.textContent = fmtDay(new Date(d.day)).split(' ')[1]; el.appendChild(c); });
+  }
+  function drawAlerts() {
+    const el = root.querySelector('#alerts'); const g = dash.data('alerts'); el.replaceChildren(); if (g.status !== 'ok') return;
+    const order = {critical: 0, action: 1, warning: 2, info: 3};
+    g.data.slice().sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9)).forEach(a => { const row = document.createElement('div'); row.className = 'al'; const p = document.createElement('span'); p.className = 'pill ' + (a.severity === 'critical' ? 'bad' : a.severity === 'action' || a.severity === 'warning' ? 'warn' : ''); p.textContent = a.severity; const t = document.createElement('span'); t.textContent = a.message; row.appendChild(p); row.appendChild(t); el.appendChild(row); });
+  }
+  function redraw() {
+    const take = root.querySelector('#takeaway'); const pt = dash.data('paper_total'), rt = dash.data('reg_total'), bx = dash.data('box_total');
+    if (pt.status === 'ok' && rt.status === 'ok' && bx.status === 'ok') { const p = pt.data[0], r = rt.data[0], b = bx.data[0];
+      take.textContent = `Paper: ${fmtUsd(p.pnl_usd)} over ${p.trips} round trips in ${p.sessions} sessions. Registry: ${fmtInt(r.decided)} of ${fmtInt(r.total)} theories decided, ${fmtInt(r.supported)} supported. Capture box: ${b.last_status || '—'} on ${b.last_day || '—'}.`; }
+    root.querySelectorAll('[data-source][data-field]').forEach(el => { const g = dash.data(el.dataset.source); el.classList.remove('dash-skeleton'); if (g.status !== 'ok' || !g.data.length) { el.textContent = '—'; return; } const v = g.data[0][el.dataset.field]; const f = el.dataset.field;
+      el.textContent = v === null || v === undefined ? '—' : (f.endsWith('_usd') ? fmtUsd(Number(v)) : typeof v === 'number' ? fmtInt(v) : String(v)); if (f.endsWith('_usd')) { el.classList.toggle('pos', Number(v) > 0); el.classList.toggle('neg', Number(v) < 0); } });
+    drawPnl(); drawProgress(); drawStatus(); drawTimeline(); drawStrip(); drawAlerts();
+    const tr = dash.data('paper_round_trips'); fillTable('trips', tr.status === 'ok' ? tr.data.slice().reverse() : null, ['exit_day', 'symbol', 'rule', 'qty', 'entry', 'exit', 'pnl_usd', 'shadow_pnl_usd'], {qty: {cls: 'num'}, entry: price, exit: price, pnl_usd: money, shadow_pnl_usd: money}, r => [r.entry_day, r.symbol, r.exit_day].map(encodeURIComponent).join(','));
+    const fl = dash.data('paper_fills'); fillTable('fills', fl.status === 'ok' ? fl.data.slice().reverse() : null, ['filled_at', 'symbol', 'phase', 'side', 'qty', 'price', 'official_print', 'gap_bp'], {qty: {cls: 'num'}, price: price, official_print: price, gap_bp: {fmt: v => num(v) === null ? '—' : d3.format('.1f')(num(v)), cls: 'num'}});
+    const wd = dash.data('wide_orders'); fillTable('wide', wd.status === 'ok' ? wd.data.slice().reverse() : null, ['day', 'underlying', 'kind', 'side', 'qty', 'price', 'status'], {qty: {cls: 'num'}, price: price, status: {pill: v => v === 'filled' ? 'ok' : v === 'expired' ? 'warn' : v === 'rejected' ? 'bad' : ''}});
+    const ft = dash.data('children_forward_tests'); fillTable('ft', ft.status === 'ok' ? ft.data : null, ['id', 'owner', 'mode', 'n_now', 'n_target', 'pnl_usd', 'status'], {n_now: {cls: 'num'}, n_target: {cls: 'num'}, pnl_usd: money, mode: {pill: v => v === 'live' ? 'warn' : ''}});
+    const kp = dash.data('kind_pivot'); fillTable('kinds', kp.status === 'ok' ? kp.data : null, ['kind', 'supported', 'not_supported', 'inconclusive', 'blocked', 'parked', 'total'], {supported: {cls: 'num'}, not_supported: {cls: 'num'}, inconclusive: {cls: 'num'}, blocked: {cls: 'num'}, parked: {cls: 'num'}, total: {cls: 'num'}});
+    const nt = dash.data('next_tests'); fillTable('next', nt.status === 'ok' ? nt.data.slice(0, 12) : null, ['id', 'status', 'score', 'data_ready', 'min_n', 'missing'], {score: {cls: 'num'}, data_ready: {fmt: v => num(v) === null ? '—' : fmtPct(num(v)), cls: 'num'}, min_n: {fmt: v => fmtInt(Number(v)), cls: 'num'}, status: {pill: v => v === 'blocked' ? 'warn' : ''}});
+    const st = dash.data('strategies'); fillTable('all', st.status === 'ok' ? st.data : null, ['id', 'owner', 'strategy', 'mode', 'state', 'progress', 'next_step'], {progress: {bar: true}, mode: {pill: v => v === 'live' ? 'warn' : ''}, state: {pill: v => v === 'running' ? 'ok' : v === 'stalled' || v === 'blocked' ? 'warn' : ''}});
+  }
+  dash.onData(redraw);
+})();
+</script>

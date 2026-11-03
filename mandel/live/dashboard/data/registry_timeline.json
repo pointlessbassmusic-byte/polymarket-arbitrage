@@ -1,0 +1,74 @@
+[
+{
+"day": "2026-10-14",
+"preregistered_cum": 1,
+"experiments_cum": 127,
+"supported_cum": 40,
+"not_supported_cum": 73,
+"inconclusive_cum": 11,
+"experiments_today": 127
+},
+{
+"day": "2026-10-15",
+"preregistered_cum": 3,
+"experiments_cum": 640,
+"supported_cum": 142,
+"not_supported_cum": 423,
+"inconclusive_cum": 71,
+"experiments_today": 513
+},
+{
+"day": "2026-10-16",
+"preregistered_cum": 3,
+"experiments_cum": 669,
+"supported_cum": 142,
+"not_supported_cum": 452,
+"inconclusive_cum": 71,
+"experiments_today": 29
+},
+{
+"day": "2026-10-19",
+"preregistered_cum": 3,
+"experiments_cum": 702,
+"supported_cum": 143,
+"not_supported_cum": 475,
+"inconclusive_cum": 80,
+"experiments_today": 33
+},
+{
+"day": "2026-10-20",
+"preregistered_cum": 163,
+"experiments_cum": 732,
+"supported_cum": 152,
+"not_supported_cum": 491,
+"inconclusive_cum": 85,
+"experiments_today": 30
+},
+{
+"day": "2026-10-21",
+"preregistered_cum": 201,
+"experiments_cum": 814,
+"supported_cum": 152,
+"not_supported_cum": 564,
+"inconclusive_cum": 94,
+"experiments_today": 82
+},
+{
+"day": "2026-10-26",
+"preregistered_cum": 201,
+"experiments_cum": 818,
+"supported_cum": 152,
+"not_supported_cum": 566,
+"inconclusive_cum": 96,
+"experiments_today": 4
+},
+{
+"day": "2026-10-29",
+"preregistered_cum": 203,
+"experiments_cum": 824,
+"supported_cum": 154,
+"not_supported_cum": 569,
+"inconclusive_cum": 97,
+"experiments_today": 6
+}
+]

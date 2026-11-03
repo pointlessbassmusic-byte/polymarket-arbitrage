@@ -1,0 +1,62 @@
+[
+{
+"order": "w-USO-open-2026-10-20",
+"underlying": "USO",
+"kind": "spread",
+"side": "open spread",
+"qty": "1",
+"price": "-0.55",
+"status": "filled",
+"day": "2026-10-20"
+},
+{
+"order": "w-TLT-open-2026-10-20",
+"underlying": "TLT",
+"kind": "spread",
+"side": "open spread",
+"qty": "0",
+"price": null,
+"status": "expired",
+"day": "2026-10-22"
+},
+{
+"order": "w-GLD-open-2026-10-20",
+"underlying": "GLD",
+"kind": "spread",
+"side": "open spread",
+"qty": "0",
+"price": null,
+"status": "expired",
+"day": "2026-10-22"
+},
+{
+"order": "w-cls-IEF-2026-10-29-afaefd",
+"underlying": "cls",
+"kind": "stock",
+"side": "buy",
+"qty": "16",
+"price": "91.31",
+"status": "filled",
+"day": "2026-10-29"
+},
+{
+"order": "w-USO-close-2026-10-30",
+"underlying": "USO",
+"kind": "spread",
+"side": "close spread",
+"qty": "0",
+"price": null,
+"status": "expired",
+"day": "2026-10-30"
+},
+{
+"order": "w-cls-IEF-2026-10-30-56e9bc",
+"underlying": "cls",
+"kind": "stock",
+"side": "sell",
+"qty": "16",
+"price": "91.65",
+"status": "filled",
+"day": "2026-10-30"
+}
+]
