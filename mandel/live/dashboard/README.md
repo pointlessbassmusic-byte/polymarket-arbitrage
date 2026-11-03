@@ -25,7 +25,8 @@ an asset of the artifact and named by a `datasets/<id>` document whose
 
 ## Refreshing
 
-1. Rebuild the files here from the journals, registry and ledger.
+1. `python -m mandel.live.import_linode` (fetches the box's status and the paper journal, rebuilds the
+   tracker and the evidence graph), then `python -m mandel.live.dashboard_export` rebuilds every file here.
 2. Upload each changed file as an asset of the artifact (Artifact publish with
    `asset: true`); the result gives the new `/_blob/...` url.
 3. Update the matching `datasets/<id>` document: `source.url`, `source.name`

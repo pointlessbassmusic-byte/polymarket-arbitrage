@@ -1,101 +1,112 @@
 [
-{
-"day": "2026-10-20",
-"equity_usd": 96460.79,
-"realised_pnl_to_date_usd": 0.0,
-"round_trips_closed": 0,
-"ibs_15_45": 0.007,
-"ibs_fired": true,
-"tom_window": false,
-"target_qqqm_usd": 1200.0,
-"target_spym_usd": null
-},
-{
-"day": "2026-10-21",
-"equity_usd": 96389.72,
-"realised_pnl_to_date_usd": 0.0,
-"round_trips_closed": 0,
-"ibs_15_45": 0.007,
-"ibs_fired": true,
-"tom_window": false,
-"target_qqqm_usd": 1200.0,
-"target_spym_usd": null
-},
-{
-"day": "2026-10-22",
-"equity_usd": 96197.77,
-"realised_pnl_to_date_usd": 0.0,
-"round_trips_closed": 0,
-"ibs_15_45": 0.1,
-"ibs_fired": true,
-"tom_window": false,
-"target_qqqm_usd": 1200.0,
-"target_spym_usd": 900.0
-},
-{
-"day": "2026-10-23",
-"equity_usd": 96318.08,
-"realised_pnl_to_date_usd": -1.37,
-"round_trips_closed": 2,
-"ibs_15_45": 0.327,
-"ibs_fired": false,
-"tom_window": false,
-"target_qqqm_usd": 1200.0,
-"target_spym_usd": 0.0
-},
-{
-"day": "2026-10-26",
-"equity_usd": 96113.22,
-"realised_pnl_to_date_usd": 2.9,
-"round_trips_closed": 1,
-"ibs_15_45": 0.662,
-"ibs_fired": false,
-"tom_window": true,
-"target_qqqm_usd": 1200.0,
-"target_spym_usd": 900.0
-},
-{
-"day": "2026-10-27",
-"equity_usd": 95934.61,
-"realised_pnl_to_date_usd": 5.54,
-"round_trips_closed": 1,
-"ibs_15_45": 0.985,
-"ibs_fired": false,
-"tom_window": true,
-"target_qqqm_usd": 1200.0,
-"target_spym_usd": 900.0
-},
-{
-"day": "2026-10-28",
-"equity_usd": 95757.96,
-"realised_pnl_to_date_usd": 8.73,
-"round_trips_closed": 1,
-"ibs_15_45": 0.4,
-"ibs_fired": false,
-"tom_window": true,
-"target_qqqm_usd": 1200.0,
-"target_spym_usd": 900.0
-},
-{
-"day": "2026-10-29",
-"equity_usd": 95728.64,
-"realised_pnl_to_date_usd": -5.24,
-"round_trips_closed": 1,
-"ibs_15_45": 0.395,
-"ibs_fired": false,
-"tom_window": true,
-"target_qqqm_usd": 1200.0,
-"target_spym_usd": 900.0
-},
-{
-"day": "2026-10-30",
-"equity_usd": 95499.89,
-"realised_pnl_to_date_usd": -34.21,
-"round_trips_closed": 1,
-"ibs_15_45": 0.26,
-"ibs_fired": false,
-"tom_window": true,
-"target_qqqm_usd": 1200.0,
-"target_spym_usd": 900.0
-}
+ {
+  "day": "2026-10-20",
+  "equity_usd": 96460.79,
+  "realised_pnl_to_date_usd": 0.0,
+  "round_trips_closed": 0,
+  "ibs_15_45": 0.007,
+  "ibs_fired": true,
+  "tom_window": false,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": null
+ },
+ {
+  "day": "2026-10-21",
+  "equity_usd": 96389.72,
+  "realised_pnl_to_date_usd": 0.0,
+  "round_trips_closed": 0,
+  "ibs_15_45": 0.007,
+  "ibs_fired": true,
+  "tom_window": false,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": null
+ },
+ {
+  "day": "2026-10-22",
+  "equity_usd": 96197.77,
+  "realised_pnl_to_date_usd": 0.0,
+  "round_trips_closed": 0,
+  "ibs_15_45": 0.1,
+  "ibs_fired": true,
+  "tom_window": false,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 900.0
+ },
+ {
+  "day": "2026-10-23",
+  "equity_usd": 96318.08,
+  "realised_pnl_to_date_usd": -1.37,
+  "round_trips_closed": 2,
+  "ibs_15_45": 0.327,
+  "ibs_fired": false,
+  "tom_window": false,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 0.0
+ },
+ {
+  "day": "2026-10-26",
+  "equity_usd": 96113.22,
+  "realised_pnl_to_date_usd": 2.9,
+  "round_trips_closed": 1,
+  "ibs_15_45": 0.662,
+  "ibs_fired": false,
+  "tom_window": true,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 900.0
+ },
+ {
+  "day": "2026-10-27",
+  "equity_usd": 95934.61,
+  "realised_pnl_to_date_usd": 5.54,
+  "round_trips_closed": 1,
+  "ibs_15_45": 0.985,
+  "ibs_fired": false,
+  "tom_window": true,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 900.0
+ },
+ {
+  "day": "2026-10-28",
+  "equity_usd": 95757.96,
+  "realised_pnl_to_date_usd": 8.73,
+  "round_trips_closed": 1,
+  "ibs_15_45": 0.4,
+  "ibs_fired": false,
+  "tom_window": true,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 900.0
+ },
+ {
+  "day": "2026-10-29",
+  "equity_usd": 95728.64,
+  "realised_pnl_to_date_usd": -5.24,
+  "round_trips_closed": 1,
+  "ibs_15_45": 0.395,
+  "ibs_fired": false,
+  "tom_window": true,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 900.0
+ },
+ {
+  "day": "2026-10-30",
+  "equity_usd": 95499.89,
+  "realised_pnl_to_date_usd": -34.21,
+  "round_trips_closed": 1,
+  "ibs_15_45": 0.26,
+  "ibs_fired": false,
+  "tom_window": true,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 900.0
+ },
+ {
+  "day": "2026-11-02",
+  "equity_usd": 95456.61,
+  "realised_pnl_to_date_usd": -22.96,
+  "round_trips_closed": 1,
+  "ibs_15_45": 0.0,
+  "ibs_fired": true,
+  "tom_window": true,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 1800.0
+ }
 ]

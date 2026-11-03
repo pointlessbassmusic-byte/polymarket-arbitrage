@@ -1,5 +1,6 @@
 """Live evidence graph: wiring, stream health propagation, shared exposure, readiness and checkpoint sizing."""
 
+import json
 from datetime import date
 
 import pytest
@@ -135,3 +136,49 @@ def test_a_named_fetch_or_refetch_keeps_a_blocked_theory_from_reading_ready():
     assert r == 0.5 and "fetch" in miss[0]
     r2, _ = G.data_readiness("sec-submissions-b*, fja-sp500-components", b, "")
     assert r2 == 1.0
+
+
+def _daily(tmp_path, runs):
+    p = tmp_path / "daily.jsonl"
+    p.write_text("\n".join(json.dumps(r) for r in runs) + "\n")
+    return p
+
+
+def _ledger(tmp_path, rows):
+    p = tmp_path / "ledger.jsonl"
+    p.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    return p
+
+
+FAIL = {"step": "options-fetch", "rc": 1, "tail": ["  import pandas as pd", "ModuleNotFoundError: No module named 'pandas'"]}
+OK = {"step": "options-fetch", "rc": 0, "tail": []}
+
+
+def test_outage_alert_reads_the_box_log_and_the_ledgered_remediation(tmp_path):
+    """The alert used to say 'tail the log on the Linode'; the log is imported, so the alert names the failing step and
+    cause itself. A ledgered fix is unverified until a run after deployed_at is clean; severity stays critical."""
+    daily = _daily(tmp_path, [{"ts": "2026-10-20T22:30:00+00:00", "steps": [OK]},
+                              {"ts": "2026-10-21T22:30:00+00:00", "steps": [FAIL]},
+                              {"ts": "2026-10-22T22:30:00+00:00", "steps": [FAIL]}])
+    empty = _ledger(tmp_path, [])
+    d = G.outage_diagnosis("2026-10-20", daily, empty)
+    assert d["runs_failed"] == 2 and d["failing_steps"] == ["options-fetch"] and d["cause"].startswith("ModuleNotFoundError")
+    assert d["remediation"] is None and not d["verified"]
+    a = G.annotate_outage(G._alert("critical", "outage", "capture:2026-10-20", "capture outage", ["T-541"], "old"), d)
+    assert "cause: ModuleNotFoundError" in a["message"] and "re-pin" in a["action"] and a["severity"] == "critical"
+    # fix ledgered after the last run: deployed but unverified, the next run decides
+    led = _ledger(tmp_path, [{"kind": "capture.remediation", "payload": {"outage": "capture:2026-10-20", "commit": "e1ab912",
+                                                                          "deployed_at": "2026-10-23T01:37:00Z", "next_run": "2026-10-23T23:30Z"}}])
+    d = G.outage_diagnosis("2026-10-20", daily, led)
+    assert d["remediation"]["commit"] == "e1ab912" and not d["after_fix"] and not d["verified"]
+    a = G.annotate_outage(G._alert("critical", "outage", "capture:2026-10-20", "capture outage", [], "old"), d)
+    assert "unverified" in a["message"] and "2026-10-23T23:30Z" in a["action"] and a["severity"] == "critical"
+    # a run after the fix that fails again
+    daily2 = _daily(tmp_path, [{"ts": "2026-10-22T22:30:00+00:00", "steps": [FAIL]}, {"ts": "2026-10-23T22:30:00+00:00", "steps": [FAIL]}])
+    d = G.outage_diagnosis("2026-10-20", daily2, led)
+    assert d["after_fix"] and not d["verified"]
+    assert "did not hold" in G.annotate_outage(G._alert("critical", "outage", "capture:2026-10-20", "m", [], "old"), d)["message"]
+    # a clean run after the fix
+    daily3 = _daily(tmp_path, [{"ts": "2026-10-22T22:30:00+00:00", "steps": [FAIL]}, {"ts": "2026-10-23T22:30:00+00:00", "steps": [OK]}])
+    d = G.outage_diagnosis("2026-10-20", daily3, led)
+    assert d["verified"] and d["runs_failed"] == 0 and d["cause"] == ""

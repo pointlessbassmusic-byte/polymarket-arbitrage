@@ -1,79 +1,90 @@
 [
-{
-"symbol": "QQQM",
-"rule": "overnight QQQM",
-"entry_day": "2026-10-22",
-"exit_day": "2026-10-23",
-"qty": 4,
-"entry": 289.26,
-"exit": 289.4675,
-"pnl_usd": 0.83,
-"shadow_pnl_usd": null
-},
-{
-"symbol": "SPYM",
-"rule": "IBS / turn-of-month SPYM",
-"entry_day": "2026-10-22",
-"exit_day": "2026-10-23",
-"qty": 10,
-"entry": 89.68,
-"exit": 89.46,
-"pnl_usd": -2.2,
-"shadow_pnl_usd": null
-},
-{
-"symbol": "QQQM",
-"rule": "overnight QQQM",
-"entry_day": "2026-10-23",
-"exit_day": "2026-10-26",
-"qty": 4,
-"entry": 290.03,
-"exit": 291.0975,
-"pnl_usd": 4.27,
-"shadow_pnl_usd": null
-},
-{
-"symbol": "QQQM",
-"rule": "overnight QQQM",
-"entry_day": "2026-10-26",
-"exit_day": "2026-10-27",
-"qty": 4,
-"entry": 293.75,
-"exit": 294.41,
-"pnl_usd": 2.64,
-"shadow_pnl_usd": null
-},
-{
-"symbol": "QQQM",
-"rule": "overnight QQQM",
-"entry_day": "2026-10-27",
-"exit_day": "2026-10-28",
-"qty": 4,
-"entry": 297.46,
-"exit": 298.2575,
-"pnl_usd": 3.19,
-"shadow_pnl_usd": null
-},
-{
-"symbol": "QQQM",
-"rule": "overnight QQQM",
-"entry_day": "2026-10-28",
-"exit_day": "2026-10-29",
-"qty": 4,
-"entry": 298.0425,
-"exit": 294.55,
-"pnl_usd": -13.97,
-"shadow_pnl_usd": null
-},
-{
-"symbol": "QQQM",
-"rule": "overnight QQQM",
-"entry_day": "2026-10-29",
-"exit_day": "2026-10-30",
-"qty": 4,
-"entry": 293.75,
-"exit": 286.5075,
-"pnl_usd": -28.97,
-"shadow_pnl_usd": null
-}
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-10-22",
+  "exit_day": "2026-10-23",
+  "qty": 4,
+  "entry": 289.26,
+  "exit": 289.4675,
+  "pnl_usd": 0.83,
+  "shadow_pnl_usd": null
+ },
+ {
+  "symbol": "SPYM",
+  "rule": "IBS SPYM",
+  "entry_day": "2026-10-22",
+  "exit_day": "2026-10-23",
+  "qty": 10,
+  "entry": 89.68,
+  "exit": 89.46,
+  "pnl_usd": -2.2,
+  "shadow_pnl_usd": null
+ },
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-10-23",
+  "exit_day": "2026-10-26",
+  "qty": 4,
+  "entry": 290.03,
+  "exit": 291.0975,
+  "pnl_usd": 4.27,
+  "shadow_pnl_usd": null
+ },
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-10-26",
+  "exit_day": "2026-10-27",
+  "qty": 4,
+  "entry": 293.75,
+  "exit": 294.41,
+  "pnl_usd": 2.64,
+  "shadow_pnl_usd": null
+ },
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-10-27",
+  "exit_day": "2026-10-28",
+  "qty": 4,
+  "entry": 297.46,
+  "exit": 298.2575,
+  "pnl_usd": 3.19,
+  "shadow_pnl_usd": null
+ },
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-10-28",
+  "exit_day": "2026-10-29",
+  "qty": 4,
+  "entry": 298.0425,
+  "exit": 294.55,
+  "pnl_usd": -13.97,
+  "shadow_pnl_usd": null
+ },
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-10-29",
+  "exit_day": "2026-10-30",
+  "qty": 4,
+  "entry": 293.75,
+  "exit": 286.5075,
+  "pnl_usd": -28.97,
+  "shadow_pnl_usd": null
+ },
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-10-30",
+  "exit_day": "2026-11-02",
+  "qty": 4,
+  "entry": 283.3,
+  "exit": 286.1125,
+  "pnl_usd": 11.25,
+  "shadow_pnl_usd": null
+ }
 ]

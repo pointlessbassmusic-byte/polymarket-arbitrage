@@ -45,6 +45,8 @@ from typing import Optional
 from mandel.paths import MANDEL_ROOT
 
 TRACKER = MANDEL_ROOT / "state" / "tracker"
+DAILY_LOG = MANDEL_ROOT / "state" / "linode" / "capture_status" / "daily.jsonl"   # the box's own run log (import_linode)
+LEDGER_PATH = MANDEL_ROOT / "state" / "ledger.jsonl"
 REGISTRY = MANDEL_ROOT / "theories" / "registry.json"
 ARCHIVE_INDEX = MANDEL_ROOT / "archive" / "INDEX.json"
 CHILD_TESTS = MANDEL_ROOT / "state" / "children" / "forward_tests.json"
@@ -497,6 +499,84 @@ def collapse_outage(alerts: list[dict], min_families: int = OUTAGE_MIN_FAMILIES)
     return out + alerts
 
 
+def _jsonl_rows(path: Path) -> list[dict]:
+    try:
+        return [json.loads(l) for l in Path(path).read_text().splitlines() if l.strip()]
+    except (OSError, ValueError):
+        return []
+
+
+def _ts(s) -> Optional[datetime]:
+    try:
+        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
+def outage_diagnosis(latest: str, daily_path: Path = DAILY_LOG, ledger_path: Path = LEDGER_PATH) -> dict:
+    """What the box's own run log (daily.jsonl, pushed with capture/status) says about an outage whose families stopped
+    on `latest`, and what the ledger says has been done about it. The alert used to tell the operator to tail that log
+    on the Linode; the log is already here, so the alert reads it: the failing steps, the last traceback line, how many
+    runs in a row failed. A `capture.remediation` ledger row for the same outage node ({outage: "capture:<day>", commit,
+    deployed_at, next_run}) marks the fix deployed; it counts as verified only once a run AFTER deployed_at is clean.
+    An outage stays critical until then: a deployed fix is a claim, a clean run is the evidence."""
+    runs = _jsonl_rows(daily_path)
+    out = {"runs_failed": 0, "last_run": None, "failing_steps": [], "cause": "", "remediation": None,
+           "after_fix": False, "verified": False}
+    for r in reversed(runs):
+        steps = r.get("steps") or []
+        if steps and all(s.get("rc") == 0 for s in steps):
+            break
+        out["runs_failed"] += 1
+    if runs:
+        last = runs[-1]
+        out["last_run"] = last.get("ts")
+        bad = [s for s in last.get("steps") or [] if s.get("rc") != 0]
+        out["failing_steps"] = [str(s.get("step")) for s in bad]
+        if bad:
+            tail = bad[0].get("tail") or [""]
+            out["cause"] = str(tail[-1]).strip()[:160]
+    rem = None
+    for row in _jsonl_rows(ledger_path):
+        if row.get("kind") == "capture.remediation" and (row.get("payload") or {}).get("outage") == f"capture:{latest}":
+            rem = row["payload"]
+    if rem:
+        out["remediation"] = {k: rem.get(k) for k in ("commit", "deployed_at", "next_run", "note")}
+        dep, last_ts = _ts(rem.get("deployed_at")), _ts(out["last_run"])
+        out["after_fix"] = bool(dep and last_ts and last_ts > dep)
+        out["verified"] = out["after_fix"] and not out["failing_steps"]
+    return out
+
+
+def annotate_outage(alert: dict, diag: dict) -> dict:
+    """Write the diagnosis into the outage alert's message and action. Severity is untouched."""
+    alert["diagnosis"] = diag
+    bits, act = [], []
+    if diag.get("cause"):
+        bits.append(f"cause: {diag['cause']}")
+        act.append(f"the box's run log names it: {', '.join(diag['failing_steps'][:3])} failed with `{diag['cause']}`, "
+                   f"{diag['runs_failed']} run{'s' if diag['runs_failed'] != 1 else ''} in a row to {str(diag.get('last_run'))[:16]}Z")
+    rem = diag.get("remediation")
+    if not rem:
+        act.append("fix the code, re-pin the box (deploy/capture/install.sh with PIN=<commit>, which smoke-imports the CLI "
+                   "in the box's venv) and ledger a capture.remediation row naming the commit and deployed_at")
+    elif not diag.get("after_fix"):
+        bits.append(f"fix {rem.get('commit')} deployed {str(rem.get('deployed_at'))[:16]}Z, unverified")
+        act.append(f"fix {rem.get('commit')} is deployed; no run since, so it is unverified: the next run "
+                   f"({rem.get('next_run')}) decides, nothing to do until then")
+    elif diag.get("verified"):
+        bits.append(f"the run at {str(diag.get('last_run'))[:16]}Z was clean, yet these families are still stale")
+        act.append("the fixed code ran clean but captured nothing for these families: read that run's step output on the box")
+    else:
+        bits.append(f"fix {rem.get('commit')} did not hold: the run at {str(diag.get('last_run'))[:16]}Z failed again")
+        act.append(f"fix {rem.get('commit')} deployed {str(rem.get('deployed_at'))[:16]}Z did not hold; the run after it failed: {diag.get('cause')}")
+    if bits:
+        alert["message"] += "; " + "; ".join(bits)
+    if act:
+        alert["action"] = "; ".join(act)
+    return alert
+
+
 def run(today: date, out: Path = TRACKER) -> dict:
     rows = _load(out / "strategies.json", [])
     if not rows:
@@ -520,6 +600,9 @@ def run(today: date, out: Path = TRACKER) -> dict:
     alerted = {a["node"] for a in alerts}
     alerts.extend(stale_family_alerts(bundles, reg, today, alerted))
     alerts = collapse_outage(alerts)
+    for a in alerts:                                            # the outage alert reads the box's own log and the ledger
+        if a["kind"] == "outage":
+            annotate_outage(a, outage_diagnosis(a["node"].split(":", 1)[1]))
     for a in alerts:                                            # a stale stream also holds back the theories it feeds
         if a["kind"] == "stream":
             fam = a["node"].split(":", 1)[1]
