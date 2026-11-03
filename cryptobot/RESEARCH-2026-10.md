@@ -1809,3 +1809,44 @@ The paper bot keeps running on crypto at no cost. The one forward lead
 is the evening-bounce binary (`daytrade-bear-cross-bounce`), read at 300
 entries.
 
+## Addendum, 2026-11-03 (33): a memecoin launch judge, paper only
+
+The operator asked for a test of an X post's design: six Grok agents and
+a "judge" that answers closed questions, credited with $500 to $11,101 in
+5 days. That number cannot be checked and is the kind that gets posted
+after a lucky week. The design itself is sound, because fixed code
+decides, not a persuasive model. It was built with rules in place of the
+chat model and registered as `meme-judge-forward`, a forward test.
+
+Free data has no history of new pools with their early order flow, so
+no backtest was possible. How it works:
+
+- **First sight:** every 2 minutes the desk records GeckoTerminal's newest
+  Solana and Base pools.
+- **Decision, 30 minutes later:** it re-reads each pool and builds a
+  facts-only dossier. It never acts at launch, so it is not racing the
+  sniper bots.
+- **RISK:** liquidity of at least $10k; a GoPlus check for honeypots,
+  sell tax, and mint or freeze authority. A token GoPlus has not
+  analysed fails.
+- **JUDGE:** the post's four questions as rules: organic buying, late to
+  the move, exit risk at $250, and BUY / WATCH / PASS.
+- **Outcome:** price 1, 4 and 24 hours after each decision, net of swap
+  fees and price impact. A drained pool counts as -100%.
+
+Setting it up turned up two problems:
+
+- GoPlus's free tier answers only the first token of a batched request.
+- Tokens only minutes old on Base are mostly not analysed yet.
+
+So lookups are one token at a time, and an unanalysed token fails RISK.
+That rule was added before any outcome was recorded. On the first live
+pass, 31 of 38 pools died on the liquidity rule, which is the base rate
+the post's "59 of 78 rugged" describes.
+
+It is read at 200 BUYs and 45 days. Real money needs a mean net return
+above zero, with a day-clustered lower bound above zero, that also beats
+the average RISK-clean pool. Even then it would start with a dedicated
+wallet and $250 a trade, and the trade execution would be built only at
+that point.
+

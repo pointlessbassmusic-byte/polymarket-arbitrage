@@ -23,6 +23,7 @@
 #   ./desk.sh polyus      your Polymarket US API key id and secret (typed hidden, stored in .env)
 #   ./desk.sh orbcheck    test every Alpaca call the ORB pilot makes (paper; one share if the market is open)
 #   ./desk.sh stocks      the stock day-trading backtest (daytrade-stocks): pulls 2 years of SPY/QQQ/IWM bars, about 5 minutes
+#   ./desk.sh meme        the memecoin judge's paper record (meme-judge-forward)
 #   ./desk.sh polyhistory your Polymarket US record: where the losses came from, and the opposite side
 #
 # `keys`, `arm` and `disarm` edit files only; the restart is skipped when
@@ -357,9 +358,10 @@ case "${1:-}" in
   rotate) cmd_rotate ;;
   orbcheck) dc run --rm desk python -m cryptobot.orb_bot --state /data --check ;;
   stocks) dc run --rm desk python -m cryptobot.daytrade_stocks_study --cache /data/stocks --fetch ;;
+  meme) dc run --rm desk python -m cryptobot.meme_judge --state /data --report ;;
   review) dc run --rm desk python -m cryptobot.review --state /data ;;
   polyus) cmd_polyus ;;
   polyhistory) dc run --rm desk python -m cryptobot.polymarket_us_history --out /data/polymarket_us_record.json ;;
   digest) dc run --rm desk python -m cryptobot.desk --digest --state-dir /data ;;
-  *) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//' ;;
 esac

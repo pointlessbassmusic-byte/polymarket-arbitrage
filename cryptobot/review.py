@@ -42,6 +42,7 @@ FORWARD = (
     ("orb-qqq-pilot", "QQQ opening-range paper pilot", None, "60 traded sessions"),
     ("daytrade-timeblock", "day trading bot, time-block scalper V0-V2 (paper; backtest: no edge on any instrument)", None, "100 paper trades per variant"),
     ("daytrade-bear-cross-bounce", "UP 15-minute binary after the evening down-cross", None, "300 forward entries (about 2027-05)"),
+    ("meme-judge-forward", "memecoin launch judge (paper, new solana/base pools)", None, "200 BUYs with a 4h outcome and 45 days"),
     ("macro pilot (2s10s -> XLF)", "macro paper pilot", None, "20 closed trades"),
 )
 
@@ -175,6 +176,12 @@ def render(state: Path, bench: dict, today: Optional[dt.date] = None) -> str:
     if per.get("real", {}).get("n") and per.get("sim", {}).get("n"):
         o.append(f"  real minus sim, per trade: {per['real']['mean'] - per['sim']['mean']:+.2%} (execution cost the paper book does not pay)")
     o.append("  " + fills_line(state))
+    try:
+        from .meme_judge import render as meme_render, report as meme_report
+        if (Path(state) / "meme" / "verdicts.jsonl").exists():
+            o.append("  " + meme_render(meme_report(state)).replace("\n", "\n  "))
+    except Exception:                                  # the review never fails on a research line
+        pass
     o.append("forward tests:")
     for rid, what, when, need in FORWARD:
         if when:

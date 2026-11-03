@@ -300,3 +300,7 @@ daytrade:
   assets: [BTC, ETH, SOL, DOGE]
   variants: [V0, V1, V2]      # all inconclusive after the 2026-10-26 correction; V1 feeds daytrade-bear-cross-bounce
   notional_usd: 250
+
+# meme-judge-forward: the memecoin launch judge, PAPER ONLY (public data, no keys, no wallet)
+meme_judge:
+  enabled: true

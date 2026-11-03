@@ -1053,6 +1053,10 @@ async def _main(args) -> int:
         d = cfg.get("desk", {}).get("digest_utc", "00:30")
         hh, mm = (int(x) for x in str(d).split(":"))
         tasks.append(digest_loop(bots, alerter, hh, mm, state_dir=args.state_dir))
+    if (cfg.get("meme_judge") or {}).get("enabled") and args.state_dir:
+        from .meme_judge import MemeJudge
+        tasks.append(MemeJudge(Path(args.state_dir)).run_forever())
+        logger.info("meme judge on (PAPER ONLY): new solana/base pools, verdicts in state/meme")
     dtc = cfg.get("daytrade") or {}
     if dtc.get("enabled") and args.state_dir:
         from .daytrade_bot import DayTradeBot
