@@ -30,11 +30,16 @@ class LiveRefused(RuntimeError):
 
 class Alpaca:
     def __init__(self, live: bool = False, client: Optional[httpx.Client] = None, key: Optional[str] = None,
-                 secret: Optional[str] = None):
-        if live and os.environ.get("MANDEL_ALPACA_LIVE") != "I-UNDERSTAND":
+                 secret: Optional[str] = None, read_only: bool = False):
+        """``read_only=True`` opens the live endpoint for reads only (account, positions, orders, market data: the dry
+        runs and the reconcile before the user has typed the switch); ``submit`` then refuses. Placing a live order still
+        needs both live=True and MANDEL_ALPACA_LIVE=I-UNDERSTAND in the environment."""
+        armed = os.environ.get("MANDEL_ALPACA_LIVE") == "I-UNDERSTAND"
+        if live and not armed and not read_only:
             raise LiveRefused("live trading needs live=True and MANDEL_ALPACA_LIVE=I-UNDERSTAND (the user's switch)")
         self.base = LIVE if live else PAPER
         self.live = live
+        self.read_only = bool(live and not armed)
         key = key or os.environ.get("ALPACA_API_KEY_ID")
         secret = secret or os.environ.get("ALPACA_API_SECRET_KEY")
         if not key or not secret:
@@ -65,6 +70,8 @@ class Alpaca:
         return self._req("GET", f"{self.base}/v2/orders", params=p)
 
     def submit(self, order: dict) -> dict:
+        if self.read_only:
+            raise LiveRefused("read-only live client: MANDEL_ALPACA_LIVE=I-UNDERSTAND is not set, no order placed")
         return self._req("POST", f"{self.base}/v2/orders", json=order)
 
     def option_contracts(self, underlying: str, kind: str, exp_gte: str, exp_lte: str) -> list[dict]:

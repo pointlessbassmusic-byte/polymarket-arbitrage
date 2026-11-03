@@ -91,6 +91,16 @@
   "theories_held": 29
  },
  {
+  "id": "exposure:factor:us-equity-beta",
+  "severity": "info",
+  "kind": "exposure",
+  "node": "factor:us-equity-beta",
+  "message": "6 strategies carry us-equity-beta: $7,400 gross, $7,400 net against a $8,000 cap",
+  "affected": "H-2s10s-xlf, H-orb-qqq, T-559, T-560, T-567, T-744",
+  "n_affected": 6,
+  "action": "within the cap; they move together"
+ },
+ {
   "id": "stream:stream:options-chain-SPX",
   "severity": "info",
   "kind": "stream",
@@ -113,16 +123,6 @@
   "action": "restart the capture",
   "latest": "2026-10-20",
   "theories_held": 6
- },
- {
-  "id": "exposure:factor:us-equity-beta",
-  "severity": "info",
-  "kind": "exposure",
-  "node": "factor:us-equity-beta",
-  "message": "5 strategies carry us-equity-beta: $7,000 gross, $7,000 net against a $8,000 cap",
-  "affected": "H-2s10s-xlf, H-orb-qqq, T-559, T-560, T-567",
-  "n_affected": 5,
-  "action": "within the cap; they move together"
  },
  {
   "id": "stream:stream:cboe-VVIX-history",

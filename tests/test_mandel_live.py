@@ -269,3 +269,124 @@ def test_official_prints_parse_yahoo_chart_by_exchange_date():
                                    "indicators": {"quote": [{"open": [289.0, 290.0], "close": [289.5, None]}]}}]}}
     out = P._parse(body)
     assert out == {"2026-10-22": {"open": 289.0, "close": 289.5}}      # a bar without a close is skipped
+
+
+# ------------------------------------------------------------------------------- live arm (T-744) --
+
+def test_live_client_is_read_only_without_the_switch_and_refuses_orders(monkeypatch):
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "k"); monkeypatch.setenv("ALPACA_API_SECRET_KEY", "s")
+    monkeypatch.delenv("MANDEL_ALPACA_LIVE", raising=False)
+    api = A.Alpaca(live=True, read_only=True)                      # dry runs and reads before the user types the switch
+    assert api.base == A.LIVE and api.read_only
+    with pytest.raises(A.LiveRefused):
+        api.submit({"symbol": "QQQM"})
+    monkeypatch.setenv("MANDEL_ALPACA_LIVE", "I-UNDERSTAND")
+    assert not A.Alpaca(live=True).read_only                      # armed: orders allowed
+
+
+class LiveFake(FakeApi):
+    live = True
+    read_only = False
+    base = A.LIVE
+
+    def account(self):
+        return {"equity": "1000", "cash": "1000"}
+
+
+def _freeze(monkeypatch, R, tmp_path, hour=15, minute=40):
+    monkeypatch.setattr(R, "STATE", tmp_path); monkeypatch.setattr(R, "KILL", tmp_path / "KILL")
+    monkeypatch.setattr(R, "HALT", tmp_path / "HALT"); monkeypatch.setattr(R, "JOURNAL", tmp_path / "j.jsonl")
+    monkeypatch.setattr(R, "USE_LEDGER", False)
+
+    class D:
+        @staticmethod
+        def now(tz=None):
+            import datetime as dt
+            return dt.datetime(2026, 10, 14, hour, minute, tzinfo=tz)
+    monkeypatch.setattr(R, "datetime", D)
+
+
+def test_live_close_places_one_share_auction_orders_and_journals_the_arming(monkeypatch, tmp_path):
+    from mandel.live import runner as R
+    _freeze(monkeypatch, R, tmp_path)
+    api = LiveFake(date(2026, 10, 14))
+    R.phase_close(api, dry=False)
+    assert [(o["symbol"], o["qty"], o["side"], o["time_in_force"]) for o in api.sent] == \
+        [("QQQM", "1", "buy", "cls"), ("SPYM", "1", "buy", "cls")]           # IBS 0.05 fired: one share each, real MOC orders
+    rows = [json.loads(l) for l in (tmp_path / "j.jsonl").read_text().splitlines()]
+    kinds = [r["kind"] for r in rows]
+    assert kinds[0] == "live.armed" and rows[0]["shares_per_symbol"] == 1 and rows[0]["max_loss_usd"] == 40.0
+    assert "close.decision" in kinds and rows[kinds.index("close.decision")]["live"] is True
+
+
+def test_live_close_never_borrows(monkeypatch, tmp_path):
+    from mandel.live import runner as R
+    _freeze(monkeypatch, R, tmp_path)
+
+    class Poor(LiveFake):
+        def account(self):
+            return {"equity": "300", "cash": "300"}             # one QQQM share at 250, then SPYM at 92 is not covered
+    api = Poor(date(2026, 10, 14))
+    R.phase_close(api, dry=False)
+    assert [o["symbol"] for o in api.sent] == ["QQQM"]
+    dec = [json.loads(l) for l in (tmp_path / "j.jsonl").read_text().splitlines() if '"close.decision"' in l][0]
+    assert "SPYM" in dec["skipped"] and "never borrow" in dec["skipped"]["SPYM"]
+
+
+def test_live_arm_halts_on_the_realised_loss_cap_and_refuses_options(monkeypatch, tmp_path):
+    from mandel.live import runner as R
+    _freeze(monkeypatch, R, tmp_path)
+    j = tmp_path / "j.jsonl"
+    fill = lambda cid, side, px, at: json.dumps({"kind": "order.fill", "client_order_id": cid, "symbol": "QQQM", "side": side,  # noqa: E731
+                                                "qty": "1", "filled_qty": "1", "filled_avg_price": px, "status": "filled", "filled_at": at})
+    j.write_text("\n".join([fill("m-cls-QQQM-2026-10-12-a", "buy", 300.0, "2026-10-12T20:00:00Z"),
+                            fill("m-opg-QQQM-2026-10-13-b", "sell", 255.0, "2026-10-13T13:30:00Z")]) + "\n")   # -45 realised
+    api = LiveFake(date(2026, 10, 14))
+    with pytest.raises(SystemExit):
+        R.phase_close(api, dry=False)
+    assert api.sent == [] and (tmp_path / "HALT").exists()
+    assert any('"live.halted"' in l for l in j.read_text().splitlines())
+    with pytest.raises(SystemExit):                              # HALT stands until the user removes it
+        R.phase_open(api, dry=False)
+    (tmp_path / "HALT").unlink()
+    with pytest.raises(SystemExit):                              # the options sleeve never runs live
+        R.phase_options(api, dry=False)
+    paper = FakeApi(date(2026, 10, 14))                          # the paper arm never sees the live guard
+    R.phase_close(paper, dry=True)
+
+
+def test_configure_separates_live_state(monkeypatch, tmp_path):
+    from mandel.live import runner as R
+    monkeypatch.setenv("MANDEL_LIVE_STATE", str(tmp_path / "live"))
+    monkeypatch.setenv("MANDEL_PAPER_STATE", str(tmp_path / "paper"))
+    R.configure(live=True)
+    assert R.STATE == tmp_path / "live" and R.JOURNAL == tmp_path / "live" / "journal.jsonl" and R.HALT == tmp_path / "live" / "HALT"
+    monkeypatch.setattr(R, "STATE", tmp_path / "paper")
+    R.configure(live=False)
+    assert R.JOURNAL == tmp_path / "paper" / "journal.jsonl"
+
+
+def test_tracker_live_row_and_ledger_mirror_of_arming(tmp_path):
+    from mandel.live import tracker as T
+    from mandel.live import import_linode as I
+    from mandel.ledger import Ledger
+    live = tmp_path / "live.jsonl"
+    live.write_text("\n".join(json.dumps(r) for r in [
+        {"ts": "2026-11-04T19:40:00+00:00", "kind": "live.armed", "phase": "close", "switch": False, "read_only": True, "shares_per_symbol": 1, "max_loss_usd": 40.0},
+        {"ts": "2026-11-05T19:40:00+00:00", "kind": "live.armed", "phase": "close", "switch": True, "read_only": False, "shares_per_symbol": 1, "max_loss_usd": 40.0},
+        {"kind": "order.fill", "client_order_id": "m-cls-QQQM-2026-11-05-a", "symbol": "QQQM", "side": "buy", "qty": "1", "filled_qty": "1",
+         "filled_avg_price": 290.0, "status": "filled", "filled_at": "2026-11-05T20:00:00Z"},
+        {"kind": "print.official", "symbol": "QQQM", "day": "2026-11-05", "close": 290.1, "open": 289.0},
+    ]) + "\n")
+    p = T.live_progress(T._journal(live))
+    assert p["fill_days"] == 1 and p["switch_on"] and p["first_armed"] == "2026-11-05" and not p["halted"]
+    assert p["fill_gap_n"] == 1 and p["fill_gap_bp_mean"] == round(abs(290 - 290.1) / 290.1 * 1e4, 2)
+    rows = {r["id"]: r for r in T.build(date(2026, 11, 6), tmp_path / "none.jsonl", out=tmp_path, live_journal_path=live)}
+    assert rows["T-744"]["mode"] == "live" and rows["T-744"]["n_now"] == 1 and rows["T-744"]["status"].startswith("running")
+    rows = {r["id"]: r for r in T.build(date(2026, 11, 6), tmp_path / "none.jsonl", out=tmp_path, live_journal_path=tmp_path / "no.jsonl")}
+    assert rows["T-744"]["status"].startswith("waiting on the user")
+    led = Ledger(tmp_path / "ledger.jsonl")
+    assert I.mirror_live_arming(live, led) == 1                   # the read-only run is not an arming; the armed one is
+    ev = list(led._iter_raw())[-1]
+    assert ev.kind == "live.armed" and ev.actor == "human" and ev.payload["box_ts"] == "2026-11-05T19:40:00+00:00"
+    assert I.mirror_live_arming(live, led) == 0                   # once

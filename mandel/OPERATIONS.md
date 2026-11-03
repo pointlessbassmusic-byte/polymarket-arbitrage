@@ -161,6 +161,13 @@ Cron on the Linode, in New York time (`CRON_TZ=America/New_York`), weekdays:
 Closing-auction orders must reach Alpaca by 15:50 ET and opening-auction orders by 09:28 ET. Run each phase
 with `--dry-run` once by hand first; `status` prints equity, positions and the open spread.
 
+### Live execution test (T-744), added 2026-11-03
+
+The user's decision. `deploy/live/install.sh` installs a separate checkout, env file (`/etc/mandel-live.env`, live keys,
+no switch), timers (open 08:30, close 15:40, reconcile 16:20, journal push 17:00 ET to branch `live/journal`) and runs
+read-only dry runs. It is armed only by the user adding `MANDEL_ALPACA_LIVE=I-UNDERSTAND` to that file. One share per
+symbol, no borrowing, $40 realised-loss halt, `KILL` and `HALT` files. Full text: `mandel/live/LIVE_EXECUTION_TEST.md`.
+
 ### Paper strategy tracker
 
 `python -m mandel.live.tracker --journal <copy of the Linode's paper journal>` rebuilds

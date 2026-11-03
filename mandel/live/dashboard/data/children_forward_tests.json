@@ -176,6 +176,22 @@
   "progress": 0.0
  },
  {
+  "id": "T-744",
+  "owner": "Mandel",
+  "strategy": "Calendar sleeve LIVE execution test (1 share QQQM / SPYM, auction orders)",
+  "venue": "Alpaca live",
+  "mode": "live",
+  "started": null,
+  "unit": "sessions with a fill",
+  "n_now": 0,
+  "n_target": 60,
+  "read_date": null,
+  "pnl_usd": null,
+  "status": "waiting on the user: install deploy/live/install.sh, fund the live account, type the switch",
+  "next_step": "echo MANDEL_ALPACA_LIVE=I-UNDERSTAND | sudo tee -a /etc/mandel-live.env (the user's switch)",
+  "progress": 0.0
+ },
+ {
   "id": "H-bounce-short",
   "owner": "Hurst",
   "strategy": "Memecoin bounce-short (DOGE, SHIB)",

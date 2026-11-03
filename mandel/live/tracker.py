@@ -56,9 +56,14 @@ MANDEL_TESTS = {
               "unit": "holiday events", "n_target": 27, "decision": "fills <= 1.5 bp at 10 events; mean net > 0 at 27"},
     "T-568": {"strategy": "GLD / TLT / USO put spreads (9-24 day holds)", "venue": "Alpaca paper", "mode": "paper",
               "unit": "closed spreads", "n_target": 36, "decision": "mean P&L per spread > 0, no loss beyond max"},
+    "T-744": {"strategy": "Calendar sleeve LIVE execution test (1 share QQQM / SPYM, auction orders)", "venue": "Alpaca live",
+              "mode": "live", "unit": "sessions with a fill", "n_target": 60,
+              "decision": "fill gap <= 1.5 bp/side, upper95 <= 2.5 bp, >= 95% of auction orders filled at 60 sessions; P&L reported only"},
 }
 REGISTERED = {"T-541": "2026-10-15", "T-542": "2026-10-14", "T-543": "2026-10-15", "T-559": "2026-10-20", "T-560": "2026-10-20",
-              "T-565": "2026-10-20", "T-566": "2026-10-20", "T-567": "2026-10-20", "T-568": "2026-10-20", "T-573": "2026-10-20", "T-576": "2026-10-20"}
+              "T-565": "2026-10-20", "T-566": "2026-10-20", "T-567": "2026-10-20", "T-568": "2026-10-20", "T-573": "2026-10-20", "T-576": "2026-10-20",
+              "T-744": "2026-11-03"}
+LIVE_JOURNAL = MANDEL_ROOT / "state" / "linode" / "live_journal" / "journal.jsonl"      # branch live/journal (import_linode)
 
 
 def _registry() -> dict:
@@ -238,9 +243,22 @@ def _days_since(d: Optional[str], today: date) -> Optional[int]:
     return (today - date.fromisoformat(d)).days if d else None
 
 
-def build(today: date, journal_path: Path, out: Path = OUT) -> list[dict]:
+def live_progress(journal: list[dict]) -> dict:
+    """T-744 from the live journal: the calendar accounting plus the arming and halt records."""
+    cal = calendar_progress(journal)
+    armed = [r for r in journal if r.get("kind") == "live.armed"]
+    cal.update(armed_rows=len(armed), switch_on=any(r.get("switch") for r in armed),
+               first_armed=min((str(r.get("ts"))[:10] for r in armed if r.get("switch")), default=None),
+               halted=any(r.get("kind") == "live.halted" for r in journal),
+               fill_days=len({str(r.get("filled_at"))[:10] for r in journal if r.get("kind") == "order.fill"
+                              and r.get("status") == "filled" and r.get("filled_avg_price")}))
+    return cal
+
+
+def build(today: date, journal_path: Path, out: Path = OUT, live_journal_path: Path = LIVE_JOURNAL) -> list[dict]:
     reg = _registry()
     journal = _journal(journal_path)
+    live = live_progress(_journal(live_journal_path))
     bundles = _bundles()
     arch = archive_progress(bundles, today)
     cal, spr = calendar_progress(journal), spread_progress(journal)
@@ -302,6 +320,21 @@ def build(today: date, journal_path: Path, out: Path = OUT) -> list[dict]:
                                                                     else "installed: first record after tonight's run"),
                        next_step="none: runs on its timers", started=REGISTERED.get(tid) if p["filled"] else None,
                        source="capture box wide-journal.jsonl")
+        elif tid == "T-744":
+            gap = live["fill_gap_bp_mean"]
+            row.update(n_now=live["fill_days"], fills=live["fills"], pnl_usd=live["pnl_usd"], capital_usd=400,
+                       fill_gap_bp_mean=gap, fill_gap_bp_upper95=live["fill_gap_bp_upper95"], fill_gap_n=live["fill_gap_n"],
+                       status=("HALTED: realised loss passed the cap; the user decides whether it resumes" if live["halted"] else
+                               f"running: {live['fill_days']} session(s) with a fill, {live['fills']} auction fills"
+                               + (f", mean gap {gap} bp" if gap is not None else "") if live["fills"] else
+                               "armed: the switch is set, no fill yet" if live["switch_on"] else
+                               "installed, not armed: timers run and place nothing" if live["armed_rows"] else
+                               "waiting on the user: install deploy/live/install.sh, fund the live account, type the switch"),
+                       next_step=("remove the HALT file only after reading the journal" if live["halted"] else
+                                  "reconcile fills daily; read at 60 sessions" if live["fills"] else
+                                  "first auction orders at the next 15:40 ET close" if live["switch_on"] else
+                                  "echo MANDEL_ALPACA_LIVE=I-UNDERSTAND | sudo tee -a /etc/mandel-live.env (the user's switch)"),
+                       started=live["first_armed"], source="live journal (branch live/journal)")
         elif tid == "T-543":
             row.update(n_now=arch["T-543"]["n_now"], status="recording",
                        next_step=f"next FOMC {arch['T-543']['next_fomc']}", source="archive calendars")
@@ -319,6 +352,8 @@ def build(today: date, journal_path: Path, out: Path = OUT) -> list[dict]:
         st = (r.get("status") or "").lower()
         r["state"] = ("stalled" if "stalled" in st else "waiting" if "waiting" in st else "proposed" if "proposed" in st else "running")
         r["group"] = {"live": "Live money", "paper": "Paper", "forward": "Forward record"}[r["mode"]]
+        if "halted" in st:
+            r["state"] = "halted"
         r["progress"] = round(min(1.0, r["n_now"] / r["n_target"]), 4) if r.get("n_now") is not None and r.get("n_target") else None
         r["days_to_read"] = (date.fromisoformat(r["read_date"]) - today).days if r.get("read_date") else None
         r["as_of"] = today.isoformat()
@@ -328,10 +363,11 @@ def build(today: date, journal_path: Path, out: Path = OUT) -> list[dict]:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python -m mandel.live.tracker")
     p.add_argument("--journal", type=Path, default=Path(os.environ.get("MANDEL_PAPER_STATE") or (MANDEL_ROOT / "state" / "paper")) / "journal.jsonl")
+    p.add_argument("--live-journal", type=Path, default=LIVE_JOURNAL)
     p.add_argument("--out", type=Path, default=OUT)
     p.add_argument("--today", type=date.fromisoformat, default=date.today())
     a = p.parse_args(argv)
-    rows = build(a.today, a.journal)
+    rows = build(a.today, a.journal, live_journal_path=a.live_journal)
     a.out.mkdir(parents=True, exist_ok=True)
     (a.out / "strategies.json").write_text(json.dumps(rows, indent=1))
     hist = a.out / "history.jsonl"

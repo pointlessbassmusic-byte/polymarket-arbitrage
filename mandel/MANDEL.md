@@ -313,3 +313,6 @@ First-contact protocol, for when the user introduces a child:
   now writes every bundle whole and renames it into place, so a killed fetch
   cannot truncate a stored bundle. Batch 6c (underlying library) triaged: 17
   testable now, 65 after a free fetch, 4 blocked on survivorship-free stock data.
+- 2026-11-03  T-744 registered: the minimum-size live execution test of the calendar sleeve
+  (1 share QQQM / SPYM, auction orders, $40 halt), the user's decision; Mandel never
+  sets the switch (`mandel/live/LIVE_EXECUTION_TEST.md`).

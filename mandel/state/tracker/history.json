@@ -2201,6 +2201,14 @@
  },
  {
   "day": "2026-11-03",
+  "id": "T-744",
+  "owner": "Mandel",
+  "n_now": 0,
+  "progress": 0.0,
+  "pnl_usd": null
+ },
+ {
+  "day": "2026-11-03",
   "id": "H-bounce-short",
   "owner": "Hurst",
   "n_now": 2,

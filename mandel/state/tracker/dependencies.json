@@ -225,6 +225,33 @@
   "key": "T-568|factor:short-volatility"
  },
  {
+  "strategy": "T-744",
+  "owner": "Mandel",
+  "kind": "trades_on",
+  "target": "alpaca",
+  "target_kind": "venue",
+  "health": null,
+  "key": "T-744|venue:alpaca"
+ },
+ {
+  "strategy": "T-744",
+  "owner": "Mandel",
+  "kind": "in",
+  "target": "alpaca-live-1",
+  "target_kind": "account",
+  "health": null,
+  "key": "T-744|account:alpaca-live-1"
+ },
+ {
+  "strategy": "T-744",
+  "owner": "Mandel",
+  "kind": "exposed_to",
+  "target": "us-equity-beta",
+  "target_kind": "factor",
+  "health": null,
+  "key": "T-744|factor:us-equity-beta"
+ },
+ {
   "strategy": "H-bounce-short",
   "owner": "Hurst",
   "kind": "trades_on",
@@ -556,6 +583,15 @@
   "target_kind": "stream",
   "health": "broker",
   "key": "T-576|stream:alpaca-iex-bars"
+ },
+ {
+  "strategy": "T-744",
+  "owner": "Mandel",
+  "kind": "reads",
+  "target": "alpaca-iex-bars",
+  "target_kind": "stream",
+  "health": "broker",
+  "key": "T-744|stream:alpaca-iex-bars"
  },
  {
   "strategy": "T-560",

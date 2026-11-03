@@ -273,6 +273,7 @@
 {"day": "2026-11-03", "id": "T-576", "owner": "Mandel", "n_now": 1, "progress": 0.0417, "pnl_usd": null}
 {"day": "2026-11-03", "id": "T-567", "owner": "Mandel", "n_now": 0, "progress": 0.0, "pnl_usd": null}
 {"day": "2026-11-03", "id": "T-568", "owner": "Mandel", "n_now": 0, "progress": 0.0, "pnl_usd": null}
+{"day": "2026-11-03", "id": "T-744", "owner": "Mandel", "n_now": 0, "progress": 0.0, "pnl_usd": null}
 {"day": "2026-11-03", "id": "H-bounce-short", "owner": "Hurst", "n_now": 2, "progress": null, "pnl_usd": null}
 {"day": "2026-11-03", "id": "H-orb-qqq", "owner": "Hurst", "n_now": 5, "progress": 0.0833, "pnl_usd": null}
 {"day": "2026-11-03", "id": "H-2s10s-xlf", "owner": "Hurst", "n_now": null, "progress": null, "pnl_usd": null}

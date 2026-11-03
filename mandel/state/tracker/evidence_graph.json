@@ -298,6 +298,19 @@
    "cap_usd": 1000
   },
   {
+   "id": "T-744",
+   "kind": "strategy",
+   "owner": "Mandel",
+   "label": "Calendar sleeve LIVE execution test (1 share QQQM / SPYM, auction orders)",
+   "mode": "live",
+   "state": "waiting"
+  },
+  {
+   "id": "account:alpaca-live-1",
+   "kind": "account",
+   "label": "alpaca-live-1"
+  },
+  {
    "id": "H-bounce-short",
    "kind": "strategy",
    "owner": "Hurst",
@@ -1085,6 +1098,67 @@
    "kind": "exposed_to",
    "sign": 1,
    "capital_usd": 500
+  },
+  {
+   "from": "T-744",
+   "to": "signal:overnight-gap",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:overnight-gap",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-744"
+  },
+  {
+   "from": "T-744",
+   "to": "signal:ibs",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:ibs",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-744"
+  },
+  {
+   "from": "T-744",
+   "to": "signal:turn-of-month",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:turn-of-month",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-744"
+  },
+  {
+   "from": "T-744",
+   "to": "signal:spy-tlt-monthend",
+   "kind": "reads"
+  },
+  {
+   "from": "signal:spy-tlt-monthend",
+   "to": "stream:alpaca-iex-bars",
+   "kind": "from",
+   "strategy": "T-744"
+  },
+  {
+   "from": "T-744",
+   "to": "venue:alpaca",
+   "kind": "trades_on"
+  },
+  {
+   "from": "T-744",
+   "to": "account:alpaca-live-1",
+   "kind": "in"
+  },
+  {
+   "from": "T-744",
+   "to": "factor:us-equity-beta",
+   "kind": "exposed_to",
+   "sign": 1,
+   "capital_usd": 400
   },
   {
    "from": "H-bounce-short",

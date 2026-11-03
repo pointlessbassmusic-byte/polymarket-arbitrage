@@ -58,6 +58,8 @@ CHILD_TESTS = MANDEL_ROOT / "state" / "children" / "forward_tests.json"
 WIRING: dict[str, dict] = {
     "T-559": {"signals": ["overnight-gap", "ibs", "turn-of-month", "spy-tlt-monthend"], "streams": ["alpaca-iex-bars"],
               "venue": "alpaca", "account": "alpaca-paper-1", "factors": {"us-equity-beta": 1}, "capital_usd": 3000},
+    "T-744": {"signals": ["overnight-gap", "ibs", "turn-of-month", "spy-tlt-monthend"], "streams": ["alpaca-iex-bars"],
+              "venue": "alpaca", "account": "alpaca-live-1", "factors": {"us-equity-beta": 1}, "capital_usd": 400},
     "T-560": {"signals": ["trend-10m-sma", "put-premium"], "streams": ["alpaca-option-quotes", "alpaca-iex-bars"],
               "venue": "alpaca", "account": "alpaca-paper-1", "factors": {"us-equity-beta": 1, "short-volatility": 1},
               "capital_usd": 2000},

@@ -9,7 +9,17 @@ Paper runner for the forward tests T-559 (calendar sleeve) and T-560 (XSP put sp
     python -m mandel.live.runner status
 
 Paper account only unless the user sets the live switch (see mandel.live.alpaca). A file mandel/state/paper/KILL
-stops every order-placing phase. Every decision, order and fill is appended to mandel/state/paper/journal.jsonl and
+stops every order-placing phase.
+
+Live arm (T-744, the minimum-size execution test of the calendar sleeve), ``--live``:
+  * its own state directory (MANDEL_LIVE_STATE, journal + KILL), never the paper one;
+  * FIXED size: MANDEL_LIVE_SHARES whole shares (default 1) per symbol whose rule fires, never a capital fraction, and
+    never more than the account's cash (no borrowing);
+  * true auction orders ('cls' by 15:50 ET, 'opg' by 09:28 ET), the thing the paper venue could not measure;
+  * a realised-loss halt: once the journal's closed round trips lose more than MANDEL_LIVE_MAX_LOSS_USD (default 40)
+    no further order is placed until the user removes the HALT file; the options sleeve never runs live;
+  * every order-placing phase journals a 'live.armed' row (the switch, the size, the halt) before it acts, which
+    import_linode mirrors into the ledger with actor "human": the user created the switch, not Mandel. Every decision, order and fill is appended to mandel/state/paper/journal.jsonl and
 summarised in the ledger ('paper.decision'), so the forward tests are scored from records written before outcomes.
 """
 
@@ -43,6 +53,18 @@ CAPITAL_SPLIT = {"calendar": 0.60, "spread_risk": 0.40}   # of the sleeve capita
 # The sleeves trade a FIXED capital, not the account's equity: a paper account can be shared (the crypto child's QQQ and
 # XLF pilots ran in the one this was installed on) and the forward test rehearses a small live account.
 SLEEVE_CAPITAL = float(os.environ.get("MANDEL_PAPER_CAPITAL") or 5000)
+LIVE_SHARES = max(1, int(os.environ.get("MANDEL_LIVE_SHARES") or 1))           # per symbol whose rule fires
+LIVE_MAX_LOSS_USD = float(os.environ.get("MANDEL_LIVE_MAX_LOSS_USD") or 40)    # realised, cumulative; then HALT
+HALT = STATE / "HALT"
+
+
+def configure(live: bool) -> None:
+    """Point the module at the live arm's own state (journal, KILL, HALT) when running --live. The paper state is never
+    shared with real money: two journals, two kill files, two trackers rows (T-559 paper, T-744 live)."""
+    global STATE, JOURNAL, KILL, SPREAD_STATE, HALT
+    if live:
+        STATE = Path(os.environ.get("MANDEL_LIVE_STATE") or (MANDEL_ROOT / "state" / "live"))
+    JOURNAL, KILL, SPREAD_STATE, HALT = STATE / "journal.jsonl", STATE / "KILL", STATE / "spread.json", STATE / "HALT"
 
 
 def sleeve_capital(equity: float) -> float:
@@ -71,6 +93,32 @@ def _guard(phase: str) -> None:
         sys.exit(f"{phase}: KILL file present at {KILL}: no orders")
 
 
+def realised_loss(journal_path: Path) -> float:
+    """Cumulative realised P&L of the closed round trips in a journal (negative = loss), the tracker's accounting."""
+    from mandel.live import tracker as T
+    rows = T._journal(journal_path)
+    return float(T.calendar_progress(rows).get("pnl_usd") or 0.0)
+
+
+def _live_guard(api, phase: str, dry: bool) -> None:
+    """Real money only: refuse while HALT stands, halt (and journal why) once realised losses pass the cap, and record
+    the arming state before any order. The paper arm never reaches this."""
+    if not getattr(api, "live", False):
+        return
+    if HALT.exists():
+        sys.exit(f"{phase}: HALT file present at {HALT} (realised loss cap reached earlier): no orders until the user removes it")
+    pnl = realised_loss(JOURNAL)
+    if pnl < -LIVE_MAX_LOSS_USD:
+        _journal("live.halted", {"phase": phase, "realised_pnl_usd": round(pnl, 2), "max_loss_usd": LIVE_MAX_LOSS_USD}, dry)
+        if not dry:
+            STATE.mkdir(parents=True, exist_ok=True)
+            HALT.write_text(f"realised {pnl:.2f} < -{LIVE_MAX_LOSS_USD:.2f} at {utcnow_iso()}\n")
+        sys.exit(f"{phase}: realised loss {pnl:.2f} passed the cap {LIVE_MAX_LOSS_USD:.2f}: HALT written, no orders")
+    _journal("live.armed", {"phase": phase, "switch": os.environ.get("MANDEL_ALPACA_LIVE") == "I-UNDERSTAND",
+                            "read_only": bool(getattr(api, "read_only", False)), "shares_per_symbol": LIVE_SHARES,
+                            "max_loss_usd": LIVE_MAX_LOSS_USD, "realised_pnl_usd": round(pnl, 2), "endpoint": api.base}, dry)
+
+
 def _sessions(api, around: date) -> list[date]:
     cal = api.calendar((around - timedelta(days=45)).isoformat(), (around + timedelta(days=75)).isoformat())
     return [date.fromisoformat(c["date"]) for c in cal]
@@ -89,6 +137,7 @@ def _mtd(bars: list[dict], before: date) -> Optional[float]:
 
 def phase_close(api, dry: bool) -> None:
     _guard("close")
+    _live_guard(api, "close", dry)
     today = datetime.now(ET).date()
     sessions = _sessions(api, today)
     if today not in sessions:
@@ -104,14 +153,25 @@ def phase_close(api, dry: bool) -> None:
     capital = calendar_capital(equity, cash, own_value)
     dec = S.close_decision(today, sessions, capital, bar, _mtd(bars.get("SPY", []), today), _mtd(bars.get("TLT", []), today))
     orders = []
+    skipped = {}
+    spend = 0.0
     for sym, usd in dec.targets.items():
         px = snap[sym]["latestTrade"]["p"]
-        want = S.shares_for(usd, px)
+        if api.live:                                       # T-744: fixed minimum size, never more than cash allows
+            want = LIVE_SHARES if usd > 0 else 0
+            if want and cash - spend < want * px * 1.01:
+                skipped[sym] = f"cash {cash - spend:.2f} < {want} x {px:.2f}: no buy (never borrow)"
+                want = held.get(sym, 0)
+        else:
+            want = S.shares_for(usd, px)
         delta = want - held.get(sym, 0)
+        if delta > 0:
+            spend += delta * px
         if delta:
             orders.append(api_order(sym, delta, "cls", today, not api.live))
     _journal("close.decision", {"day": today, "equity": equity, "cash": cash, "sleeve_capital": SLEEVE_CAPITAL,
-                                "capital": capital, "snapshot_splg": bar,
+                                "capital": capital, "snapshot_splg": bar, "live": bool(api.live),
+                                "shares_per_symbol": LIVE_SHARES if api.live else None, "skipped": skipped or None,
                                 "targets": dec.targets, "reasons": dec.reasons, "held": held, "orders": orders}, dry)
     for o in orders:
         _send(api, o, dry)
@@ -126,6 +186,7 @@ def _is_session(api, today: date) -> bool:
 
 def phase_open(api, dry: bool) -> None:
     _guard("open")
+    _live_guard(api, "open", dry)
     today = datetime.now(ET).date()
     if not _is_session(api, today):
         return
@@ -171,6 +232,8 @@ def _put_book(api, today: date) -> tuple[dict, dict]:
 
 def phase_options(api, dry: bool) -> None:
     _guard("options")
+    if getattr(api, "live", False):
+        sys.exit("options: the XSP spread sleeve is paper-only (T-560); the live arm is the calendar sleeve alone (T-744)")
     from mandel.live.alpaca import spread_held, spread_order
     today = datetime.now(ET).date()
     if not _is_session(api, today):
@@ -274,10 +337,16 @@ def phase_reconcile(api) -> None:
 
 def phase_status(api) -> None:
     a = api.account()
-    print(json.dumps({"paper": not api.live, "equity": a.get("equity"), "cash": a.get("cash"),
-                      "positions": [(p["symbol"], p["qty"], p.get("unrealized_pl")) for p in api.positions()],
-                      "spread": json.loads(SPREAD_STATE.read_text()) if SPREAD_STATE.exists() else None,
-                      "kill": KILL.exists()}, indent=1))
+    out = {"paper": not api.live, "equity": a.get("equity"), "cash": a.get("cash"),
+           "positions": [(p["symbol"], p["qty"], p.get("unrealized_pl")) for p in api.positions()],
+           "spread": json.loads(SPREAD_STATE.read_text()) if SPREAD_STATE.exists() else None,
+           "kill": KILL.exists(), "state": str(STATE)}
+    if api.live:
+        out.update(live=True, armed=not getattr(api, "read_only", False), halt=HALT.exists(), shares_per_symbol=LIVE_SHARES,
+                   max_loss_usd=LIVE_MAX_LOSS_USD, realised_pnl_usd=round(realised_loss(JOURNAL), 2),
+                   account_blocked=bool(a.get("trading_blocked") or a.get("account_blocked")),
+                   pattern_day_trader=a.get("pattern_day_trader"))
+    print(json.dumps(out, indent=1))
 
 
 def main(argv=None) -> int:
@@ -286,8 +355,10 @@ def main(argv=None) -> int:
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--live", action="store_true", help="real money: also needs MANDEL_ALPACA_LIVE=I-UNDERSTAND")
     a = p.parse_args(argv)
+    configure(a.live)
     from mandel.live.alpaca import Alpaca
-    api = Alpaca(live=a.live)
+    # reads and dry runs may open the live endpoint before the switch is typed; an order never can
+    api = Alpaca(live=a.live, read_only=a.live and (a.dry_run or a.phase in ("reconcile", "status")))
     {"close": lambda: phase_close(api, a.dry_run), "open": lambda: phase_open(api, a.dry_run),
      "options": lambda: phase_options(api, a.dry_run), "reconcile": lambda: phase_reconcile(api),
      "status": lambda: phase_status(api)}[a.phase]()

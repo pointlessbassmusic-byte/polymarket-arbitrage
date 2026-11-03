@@ -70,5 +70,14 @@
   "not_supported_cum": 569,
   "inconclusive_cum": 97,
   "experiments_today": 6
+ },
+ {
+  "day": "2026-11-03",
+  "preregistered_cum": 204,
+  "experiments_cum": 824,
+  "supported_cum": 154,
+  "not_supported_cum": 569,
+  "inconclusive_cum": 97,
+  "experiments_today": 0
  }
 ]
