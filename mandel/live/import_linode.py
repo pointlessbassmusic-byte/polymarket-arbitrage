@@ -48,9 +48,11 @@ def fetch() -> dict:
 
 
 def mirror_live_arming(journal: Path, ledger=None) -> int:
-    """Copy the live runner's 'live.armed' and 'live.halted' rows into Mandel's ledger, once each, with actor "human":
-    the switch those rows record exists only because the user wrote it into /etc/mandel-live.env (MANDEL.md rule 13 and
-    the executor rule: no ledger event that changes live-money configuration lacks actor="human"). Returns rows added."""
+    """Copy the live runner's 'live.armed' and 'live.halted' rows into Mandel's ledger, once each, as the BOX's report
+    (actor "box"): the switch they record exists only because the user wrote it into /etc/mandel-live.env, but a row on
+    branch live/journal is the box's self-report, not a witnessed act, and anyone who can push that branch could forge
+    one (review 2026-11-04, item 6). The ledger therefore never claims actor "human" for these; the payload says what the
+    row attests. Returns rows added."""
     from mandel.ledger import Ledger
     if not journal.exists():
         return 0
@@ -70,8 +72,9 @@ def mirror_live_arming(journal: Path, ledger=None) -> int:
             continue
         payload = {k: v for k, v in r.items() if k not in ("ts", "kind", "dry_run")}
         payload["box_ts"] = r.get("ts")
-        payload["source"] = "live journal (branch live/journal); the switch was written by the user on the Linode"
-        led.append(r["kind"], payload, actor="human")
+        payload["source"] = "live journal (branch live/journal): the box's own report"
+        payload["attests"] = "MANDEL_ALPACA_LIVE=I-UNDERSTAND was present in the box's environment; only the user writes it"
+        led.append(r["kind"], payload, actor="box")
         seen.add((r["kind"], r.get("ts")))
         n += 1
     return n

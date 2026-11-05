@@ -152,11 +152,15 @@ def calendar_progress(journal: list[dict]) -> dict:
                 lots[0][0] -= take; q -= take
                 if lots[0][0] <= 0:
                     lots.pop(0)
+    # an auction order that did not fill ends 'expired' on paper and 'canceled' (after the auction) or 'rejected'
+    # (outside the acceptance window) on Alpaca live: all three are unfilled (T-744 criterion (b))
     expired = sum(1 for r in journal if r.get("kind") == "order.fill" and str(r.get("client_order_id", "")).startswith("m-")
-                  and not str(r.get("client_order_id", "")).startswith("m-xsp") and r.get("status") == "expired")
+                  and not str(r.get("client_order_id", "")).startswith("m-xsp")
+                  and str(r.get("status")) in ("expired", "canceled", "cancelled", "rejected"))
     last = [r for r in journal if r.get("kind") == "close.decision"][-1:]
     old_code = bool(last and "SPLG" in (last[0].get("targets") or {}))        # the pre-2026-10-21 runner (SPLG, auction orders)
     return {"n_now": len(days), "fills": len(fills), "rejected": rejected, "expired": expired, "old_code": old_code,
+            "auction_fill_share": round(len(fills) / (len(fills) + expired), 4) if (len(fills) + expired) else None,
             "pnl_usd": round(pnl, 2) if fills else None, "round_trips": n_trips,
             "shadow_pnl_usd": round(shadow, 2) if n_shadowed else None,          # the same trips at the official prints
             "slippage_usd": round(shadow_paper - shadow, 2) if n_shadowed else None,   # paper minus official, those trips
@@ -251,6 +255,8 @@ def live_progress(journal: list[dict]) -> dict:
     cal.update(armed_rows=len(armed) + len(not_armed), switch_on=any(r.get("switch") for r in armed),
                first_armed=min((str(r.get("ts"))[:10] for r in armed if r.get("switch")), default=None),
                halted=any(r.get("kind") == "live.halted" for r in journal),
+               skipped=sum(1 for r in journal if r.get("kind") == "live.skipped"),
+               blocked=any(r.get("kind") == "live.blocked" for r in journal),
                fill_days=len({str(r.get("filled_at"))[:10] for r in journal if r.get("kind") == "order.fill"
                               and r.get("status") == "filled" and r.get("filled_avg_price")}))
     return cal
@@ -325,7 +331,9 @@ def build(today: date, journal_path: Path, out: Path = OUT, live_journal_path: P
             gap = live["fill_gap_bp_mean"]
             row.update(n_now=live["fill_days"], fills=live["fills"], pnl_usd=live["pnl_usd"], capital_usd=400,
                        fill_gap_bp_mean=gap, fill_gap_bp_upper95=live["fill_gap_bp_upper95"], fill_gap_n=live["fill_gap_n"],
-                       status=("HALTED: realised loss passed the cap; the user decides whether it resumes" if live["halted"] else
+                       auction_fill_share=live["auction_fill_share"], unfilled=live["expired"],
+                       status=("BLOCKED: the live account refuses to trade" if live["blocked"] else
+                               "HALTED: marked loss passed the cap; buys stopped, held shares sell by their rule; the user decides" if live["halted"] else
                                f"running: {live['fill_days']} session(s) with a fill, {live['fills']} auction fills"
                                + (f", mean gap {gap} bp" if gap is not None else "") if live["fills"] else
                                "armed: the switch is set, no fill yet" if live["switch_on"] else

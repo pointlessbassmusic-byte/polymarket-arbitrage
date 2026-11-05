@@ -39,7 +39,7 @@ class Alpaca:
             raise LiveRefused("live trading needs live=True and MANDEL_ALPACA_LIVE=I-UNDERSTAND (the user's switch)")
         self.base = LIVE if live else PAPER
         self.live = live
-        self.read_only = bool(live and not armed)
+        self.read_only = bool(read_only or (live and not armed))      # asked-for read-only stays read-only once armed
         key = key or os.environ.get("ALPACA_API_KEY_ID")
         secret = secret or os.environ.get("ALPACA_API_SECRET_KEY")
         if not key or not secret:

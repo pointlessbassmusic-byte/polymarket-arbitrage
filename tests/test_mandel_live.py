@@ -288,9 +288,18 @@ class LiveFake(FakeApi):
     live = True
     read_only = False
     base = A.LIVE
+    open_orders: list = []
+    closed_orders: list = []
+    held: dict = {}
 
     def account(self):
         return {"equity": "1000", "cash": "1000"}
+
+    def orders(self, status="all", after=None, limit=200):
+        return list(self.open_orders) if status == "open" else list(self.closed_orders)
+
+    def positions(self):
+        return [{"symbol": s, "qty": str(q), "unrealized_pl": "0"} for s, q in self.held.items()]
 
 
 def _freeze(monkeypatch, R, tmp_path, hour=15, minute=40):
@@ -333,7 +342,9 @@ def test_live_close_never_borrows(monkeypatch, tmp_path):
     assert "SPYM" in dec["skipped"] and "never borrow" in dec["skipped"]["SPYM"]
 
 
-def test_live_arm_halts_on_the_realised_loss_cap_and_refuses_options(monkeypatch, tmp_path):
+def test_live_halt_stops_buys_but_still_sells_and_refuses_options(monkeypatch, tmp_path):
+    """Review 2026-11-04 item 1: a halt that exits before the open phase strands the QQQM bought the night before. A
+    halt forbids buys; every sell its rule calls for still goes out."""
     from mandel.live import runner as R
     _freeze(monkeypatch, R, tmp_path)
     j = tmp_path / "j.jsonl"
@@ -341,18 +352,120 @@ def test_live_arm_halts_on_the_realised_loss_cap_and_refuses_options(monkeypatch
                                                 "qty": "1", "filled_qty": "1", "filled_avg_price": px, "status": "filled", "filled_at": at})
     j.write_text("\n".join([fill("m-cls-QQQM-2026-10-12-a", "buy", 300.0, "2026-10-12T20:00:00Z"),
                             fill("m-opg-QQQM-2026-10-13-b", "sell", 255.0, "2026-10-13T13:30:00Z")]) + "\n")   # -45 realised
-    api = LiveFake(date(2026, 10, 14))
-    with pytest.raises(SystemExit):
-        R.phase_close(api, dry=False)
-    assert api.sent == [] and (tmp_path / "HALT").exists()
-    assert any('"live.halted"' in l for l in j.read_text().splitlines())
-    with pytest.raises(SystemExit):                              # HALT stands until the user removes it
-        R.phase_open(api, dry=False)
-    (tmp_path / "HALT").unlink()
-    with pytest.raises(SystemExit):                              # the options sleeve never runs live
+
+    class Holding(LiveFake):
+        held = {"QQQM": 1}
+    api = Holding(date(2026, 10, 14))
+    R.phase_close(api, dry=False)                                 # 15:40: halt written, SPYM buy (IBS fired) refused, QQQM kept
+    assert (tmp_path / "HALT").exists() and api.sent == []
+    rows = [json.loads(l) for l in j.read_text().splitlines()]
+    assert any(r["kind"] == "live.halted" for r in rows)
+    dec = [r for r in rows if r["kind"] == "close.decision"][-1]
+    assert dec["halted"] is True and "HALT" in dec["skipped"]["SPYM"]
+    _freeze(monkeypatch, R, tmp_path, hour=8, minute=30)
+    api = Holding(date(2026, 10, 14))
+    R.phase_open(api, dry=False)                                  # 08:30 next day: the sale still goes out under HALT
+    assert [(o["symbol"], o["side"], o["qty"], o["time_in_force"]) for o in api.sent] == [("QQQM", "sell", "1", "opg")]
+    with pytest.raises(SystemExit):                               # the options sleeve never runs live
         R.phase_options(api, dry=False)
-    paper = FakeApi(date(2026, 10, 14))                          # the paper arm never sees the live guard
+    _freeze(monkeypatch, R, tmp_path)
+    paper = FakeApi(date(2026, 10, 14))                           # the paper arm never sees the live guard
     R.phase_close(paper, dry=True)
+
+
+def test_live_loss_cap_sees_unjournaled_fills_and_unrealised_loss(monkeypatch, tmp_path):
+    """Review item 5: the journal is written by the 16:20 reconcile, so the 15:40 guard must fold in today's fills from the
+    broker and the unrealised P&L of what is held."""
+    from mandel.live import runner as R
+    _freeze(monkeypatch, R, tmp_path)
+
+    class Bleeding(LiveFake):
+        closed_orders = [{"client_order_id": "m-cls-QQQM-2026-10-13-a", "symbol": "QQQM", "side": "buy", "qty": "1", "filled_qty": "1",
+                          "filled_avg_price": "300.0", "status": "filled", "filled_at": "2026-10-13T20:00:00Z"},
+                         {"client_order_id": "m-opg-QQQM-2026-10-14-b", "symbol": "QQQM", "side": "sell", "qty": "1", "filled_qty": "1",
+                          "filled_avg_price": "270.0", "status": "filled", "filled_at": "2026-10-14T13:30:00Z"}]     # -30 today, unjournaled
+        held = {"SPYM": 1}
+
+        def positions(self):
+            return [{"symbol": "SPYM", "qty": "1", "unrealized_pl": "-15.0"}]                                     # -15 marked
+    api = Bleeding(date(2026, 10, 14))
+    R.phase_close(api, dry=False)
+    assert (tmp_path / "HALT").exists() and api.sent == []       # -45 marked: no QQQM buy; SPYM (IBS fires) is kept, not re-bought
+    halted = [json.loads(l) for l in (tmp_path / "j.jsonl").read_text().splitlines() if '"live.halted"' in l][0]
+    assert halted["realised_pnl_usd"] == -30.0 and halted["unrealised_pnl_usd"] == -15.0
+
+
+def test_live_refuses_a_second_run_with_open_orders_and_an_oversized_position(monkeypatch, tmp_path):
+    """Review items 2 and 3: a second close run inside the window must not double the position, and a position larger than
+    the sleeve's size is not the sleeve's to sell."""
+    from mandel.live import runner as R
+    _freeze(monkeypatch, R, tmp_path)
+
+    class Busy(LiveFake):
+        open_orders = [{"client_order_id": "m-cls-QQQM-2026-10-14-zz", "symbol": "QQQM", "side": "buy", "qty": "1", "status": "accepted"}]
+    api = Busy(date(2026, 10, 14))
+    R.phase_close(api, dry=False)
+    assert api.sent == []
+    rows = [json.loads(l) for l in (tmp_path / "j.jsonl").read_text().splitlines()]
+    assert rows[-1]["kind"] == "live.skipped" and "double" in rows[-1]["reason"]
+
+    class Big(LiveFake):
+        held = {"QQQM": 3}
+    api = Big(date(2026, 10, 14))
+    R.phase_close(api, dry=False)
+    assert api.sent == []
+    _freeze(monkeypatch, R, tmp_path, hour=8, minute=30)
+    api = Big(date(2026, 10, 14))
+    R.phase_open(api, dry=False)                                  # never sells the user's 3 shares
+    assert api.sent == []
+    rows = [json.loads(l) for l in (tmp_path / "j.jsonl").read_text().splitlines()]
+    assert sum(1 for r in rows if r["kind"] == "live.skipped" and "exceeds" in r["reason"]) == 2
+
+
+def test_live_refuses_orders_outside_alpaca_acceptance_windows_and_blocked_accounts(monkeypatch, tmp_path):
+    """Review item 7: a 'cls' order after 19:00 ET is queued for TOMORROW's auction; 'opg' after 09:28 is rejected."""
+    from mandel.live import runner as R
+    _freeze(monkeypatch, R, tmp_path, hour=19, minute=5)
+    api = LiveFake(date(2026, 10, 14))
+    R.phase_close(api, dry=False)
+    assert api.sent == []
+    _freeze(monkeypatch, R, tmp_path, hour=9, minute=45)
+    class Holding(LiveFake):
+        held = {"QQQM": 1}
+    api = Holding(date(2026, 10, 14))
+    R.phase_open(api, dry=False)
+    assert api.sent == []
+    rows = [json.loads(l) for l in (tmp_path / "j.jsonl").read_text().splitlines()]
+    assert sum(1 for r in rows if r["kind"] == "live.skipped" and "window" in r["reason"]) == 2
+    _freeze(monkeypatch, R, tmp_path)
+
+    class Blocked(LiveFake):
+        def account(self):
+            return {"equity": "1000", "cash": "1000", "trading_blocked": True}
+    with pytest.raises(SystemExit):
+        R.phase_close(Blocked(date(2026, 10, 14)), dry=False)
+    assert any('"live.blocked"' in l for l in (tmp_path / "j.jsonl").read_text().splitlines())
+
+
+def test_read_only_client_stays_read_only_once_armed(monkeypatch):
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "k"); monkeypatch.setenv("ALPACA_API_SECRET_KEY", "s")
+    monkeypatch.setenv("MANDEL_ALPACA_LIVE", "I-UNDERSTAND")
+    api = A.Alpaca(live=True, read_only=True)                     # review item 9: the reconcile's client must never be able to submit
+    assert api.read_only
+    with pytest.raises(A.LiveRefused):
+        api.submit({"symbol": "QQQM"})
+
+
+def test_tracker_counts_canceled_and_rejected_auction_orders_as_unfilled():
+    from mandel.live import tracker as T
+    j = [{"kind": "order.fill", "client_order_id": "m-cls-QQQM-2026-11-05-a", "symbol": "QQQM", "side": "buy", "qty": "1", "filled_qty": "1",
+          "filled_avg_price": 290.0, "status": "filled", "filled_at": "2026-11-05T20:00:00Z"},
+         {"kind": "order.fill", "client_order_id": "m-opg-QQQM-2026-11-06-b", "symbol": "QQQM", "side": "sell", "qty": "1", "filled_qty": "0",
+          "filled_avg_price": None, "status": "canceled", "filled_at": None},
+         {"kind": "order.fill", "client_order_id": "m-cls-SPYM-2026-11-06-c", "symbol": "SPYM", "side": "buy", "qty": "1", "filled_qty": "0",
+          "filled_avg_price": None, "status": "rejected", "filled_at": None}]
+    p = T.calendar_progress(j)
+    assert p["fills"] == 1 and p["expired"] == 2 and p["auction_fill_share"] == round(1 / 3, 4)
 
 
 def test_configure_separates_live_state(monkeypatch, tmp_path):
@@ -388,7 +501,8 @@ def test_tracker_live_row_and_ledger_mirror_of_arming(tmp_path):
     led = Ledger(tmp_path / "ledger.jsonl")
     assert I.mirror_live_arming(live, led) == 1                   # the read-only run is not an arming; the armed one is
     ev = list(led._iter_raw())[-1]
-    assert ev.kind == "live.armed" and ev.actor == "human" and ev.payload["box_ts"] == "2026-11-05T19:40:00+00:00"
+    assert ev.kind == "live.armed" and ev.actor == "box" and ev.payload["box_ts"] == "2026-11-05T19:40:00+00:00"
+    assert "only the user writes it" in ev.payload["attests"]       # the ledger never claims a human act it did not witness
     assert I.mirror_live_arming(live, led) == 0                   # once
 
 

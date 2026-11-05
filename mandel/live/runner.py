@@ -93,30 +93,98 @@ def _guard(phase: str) -> None:
         sys.exit(f"{phase}: KILL file present at {KILL}: no orders")
 
 
-def realised_loss(journal_path: Path) -> float:
-    """Cumulative realised P&L of the closed round trips in a journal (negative = loss), the tracker's accounting."""
+SLEEVE_SYMS = (S.SPX_ETF, "QQQM")
+UNFILLED = ("expired", "canceled", "cancelled", "rejected")                    # Alpaca's end states for an unfilled auction order
+LIVE_WINDOWS = {"cls": ((15, 30), (15, 50)), "opg": ((7, 0), (9, 28))}         # ET; Alpaca rejects 'cls' 15:50-19:00 and 'opg'
+                                                                               # 09:28-19:00, and QUEUES either for the next
+                                                                               # day's auction after 19:00 (docs: orders-at-alpaca)
+
+
+def in_window(when: str, now_et: datetime) -> bool:
+    (h0, m0), (h1, m1) = LIVE_WINDOWS[when]
+    t = (now_et.hour, now_et.minute)
+    return (h0, m0) <= t <= (h1, m1)
+
+
+def realised_loss(journal_path: Path, api=None) -> float:
+    """Cumulative realised P&L of the closed round trips (negative = loss), the tracker's accounting. With ``api`` the
+    fills the reconcile has not journaled yet (today's) are folded in, so the 15:40 guard sees that morning's sale."""
     from mandel.live import tracker as T
     rows = T._journal(journal_path)
+    if api is not None:
+        seen = {str(r.get("client_order_id")) for r in rows if r.get("kind") == "order.fill"}
+        since = (datetime.now(ET) - timedelta(days=3)).isoformat()
+        try:
+            closed = api.orders("closed", after=since)
+        except Exception:                      # noqa: BLE001 - a failed read must not hide the journal's own figure
+            closed = []
+        for o in closed:
+            cid = str(o.get("client_order_id", ""))
+            if cid.startswith("m-") and cid not in seen and o.get("filled_avg_price"):
+                rows.append({"kind": "order.fill", **{k: o.get(k) for k in ("client_order_id", "symbol", "side", "qty", "filled_qty",
+                                                                             "filled_avg_price", "status", "filled_at")}})
     return float(T.calendar_progress(rows).get("pnl_usd") or 0.0)
 
 
-def _live_guard(api, phase: str, dry: bool) -> None:
-    """Real money only: refuse while HALT stands, halt (and journal why) once realised losses pass the cap, and record
-    the arming state before any order. The paper arm never reaches this."""
+def _live_state(api) -> dict:
+    """What a live order phase must know before it acts: sleeve shares held, resting m- orders, cash, blocked flags,
+    unrealised P&L on the sleeve's positions."""
+    positions = api.positions()
+    held = {p["symbol"]: int(float(p["qty"])) for p in positions if p["symbol"] in SLEEVE_SYMS}
+    unreal = sum(float(p.get("unrealized_pl") or 0) for p in positions if p["symbol"] in SLEEVE_SYMS)
+    try:
+        open_orders = [o for o in api.orders("open") if str(o.get("client_order_id", "")).startswith("m-")]
+    except Exception:                          # noqa: BLE001 - treat an unreadable order book as busy: no new orders
+        open_orders = [{"client_order_id": "unreadable"}]
+    acct = api.account()
+    return {"held": held, "unrealised": round(unreal, 2), "open_orders": [str(o.get("client_order_id")) for o in open_orders],
+            "acct": acct, "blocked": bool(acct.get("trading_blocked") or acct.get("account_blocked"))}
+
+
+def _live_guard(api, phase: str, dry: bool) -> dict:
+    """Real money only. Never exits on a loss: a halt forbids BUYS and lets every sell through, so a position is never
+    stranded (review 2026-11-04, item 1). Exits only when the account itself refuses to trade. Records the arming state
+    before any order. Returns the live state with ``halted``; the paper arm gets {halted: False}."""
     if not getattr(api, "live", False):
-        return
-    if HALT.exists():
-        sys.exit(f"{phase}: HALT file present at {HALT} (realised loss cap reached earlier): no orders until the user removes it")
-    pnl = realised_loss(JOURNAL)
-    if pnl < -LIVE_MAX_LOSS_USD:
-        _journal("live.halted", {"phase": phase, "realised_pnl_usd": round(pnl, 2), "max_loss_usd": LIVE_MAX_LOSS_USD}, dry)
+        return {"halted": False}
+    st = _live_state(api)
+    if st["blocked"]:
+        _journal("live.blocked", {"phase": phase, "trading_blocked": st["acct"].get("trading_blocked"),
+                                  "account_blocked": st["acct"].get("account_blocked")}, dry)
+        sys.exit(f"{phase}: the live account reports itself blocked: no orders")
+    pnl = realised_loss(JOURNAL, api)
+    marked = pnl + st["unrealised"]
+    halted = HALT.exists()
+    if not halted and marked < -LIVE_MAX_LOSS_USD:
+        _journal("live.halted", {"phase": phase, "realised_pnl_usd": round(pnl, 2), "unrealised_pnl_usd": st["unrealised"],
+                                 "marked_pnl_usd": round(marked, 2), "max_loss_usd": LIVE_MAX_LOSS_USD,
+                                 "effect": "no further buys; held shares are still sold by their rule"}, dry)
         if not dry:
             STATE.mkdir(parents=True, exist_ok=True)
-            HALT.write_text(f"realised {pnl:.2f} < -{LIVE_MAX_LOSS_USD:.2f} at {utcnow_iso()}\n")
-        sys.exit(f"{phase}: realised loss {pnl:.2f} passed the cap {LIVE_MAX_LOSS_USD:.2f}: HALT written, no orders")
+            HALT.write_text(f"marked {marked:.2f} < -{LIVE_MAX_LOSS_USD:.2f} at {utcnow_iso()}: buys stopped, sells continue\n")
+        halted = True
     _journal("live.armed", {"phase": phase, "switch": os.environ.get("MANDEL_ALPACA_LIVE") == "I-UNDERSTAND",
                             "read_only": bool(getattr(api, "read_only", False)), "shares_per_symbol": LIVE_SHARES,
-                            "max_loss_usd": LIVE_MAX_LOSS_USD, "realised_pnl_usd": round(pnl, 2), "endpoint": api.base}, dry)
+                            "max_loss_usd": LIVE_MAX_LOSS_USD, "realised_pnl_usd": round(pnl, 2), "unrealised_pnl_usd": st["unrealised"],
+                            "halted": halted, "held": st["held"], "open_orders": st["open_orders"], "endpoint": api.base}, dry)
+    return {**st, "halted": halted, "realised": pnl}
+
+
+def _live_refuses(st: dict, phase: str, when: str, dry: bool) -> Optional[str]:
+    """Reasons a live order phase places nothing this run: a resting m- order (a second run inside the window would
+    double the position), a sleeve position above the fixed size (something outside the sleeve happened: the user
+    decides), or a clock outside Alpaca's acceptance window for that auction order (after 19:00 ET the order would be
+    queued for tomorrow's auction)."""
+    if st["open_orders"]:
+        why = f"open sleeve order(s) {st['open_orders']}: a second order now would double the position"
+    elif any(q > LIVE_SHARES for q in st["held"].values()):
+        why = f"held {st['held']} exceeds {LIVE_SHARES} share(s) per symbol: not the sleeve's position, nothing touched"
+    elif not in_window(when, datetime.now(ET)):
+        why = f"{datetime.now(ET).strftime('%H:%M')} ET is outside the '{when}' acceptance window {LIVE_WINDOWS[when]}"
+    else:
+        return None
+    _journal("live.skipped", {"phase": phase, "reason": why}, dry)
+    return why
 
 
 def _sessions(api, around: date) -> list[date]:
@@ -141,8 +209,10 @@ def phase_close(api, dry: bool) -> None:
     sessions = _sessions(api, today)
     if today not in sessions:
         print("not a session"); return
-    _live_guard(api, "close", dry)
-    acct = api.account()
+    lv = _live_guard(api, "close", dry)
+    if api.live and _live_refuses(lv, "close", "cls", dry):
+        return
+    acct = lv["acct"] if api.live else api.account()
     equity, cash = float(acct["equity"]), float(acct.get("cash") or 0)
     snap = api.stock_snapshots([S.SPX_ETF, "QQQM"])
     db = snap[S.SPX_ETF]["dailyBar"]
@@ -159,7 +229,10 @@ def phase_close(api, dry: bool) -> None:
         px = snap[sym]["latestTrade"]["p"]
         if api.live:                                       # T-744: fixed minimum size, never more than cash allows
             want = LIVE_SHARES if usd > 0 else 0
-            if want and cash - spend < want * px * 1.01:
+            if want > held.get(sym, 0) and lv["halted"]:
+                skipped[sym] = "HALT: no new buys (held shares still sell by their rule)"
+                want = held.get(sym, 0)
+            elif want > held.get(sym, 0) and cash - spend < want * px * 1.01:
                 skipped[sym] = f"cash {cash - spend:.2f} < {want} x {px:.2f}: no buy (never borrow)"
                 want = held.get(sym, 0)
         else:
@@ -172,6 +245,7 @@ def phase_close(api, dry: bool) -> None:
     _journal("close.decision", {"day": today, "equity": equity, "cash": cash, "sleeve_capital": SLEEVE_CAPITAL,
                                 "capital": capital, "snapshot_splg": bar, "live": bool(api.live),
                                 "shares_per_symbol": LIVE_SHARES if api.live else None, "skipped": skipped or None,
+                                "halted": lv["halted"] if api.live else None,
                                 "targets": dec.targets, "reasons": dec.reasons, "held": held, "orders": orders}, dry)
     for o in orders:
         _send(api, o, dry)
@@ -189,11 +263,14 @@ def phase_open(api, dry: bool) -> None:
     today = datetime.now(ET).date()
     if not _is_session(api, today):
         return
-    _live_guard(api, "open", dry)
-    held = {p["symbol"]: int(float(p["qty"])) for p in api.positions()}
-    q = held.get("QQQM", 0)
+    lv = _live_guard(api, "open", dry)
+    if api.live and _live_refuses(lv, "open", "opg", dry):
+        return
+    held = lv["held"] if api.live else {p["symbol"]: int(float(p["qty"])) for p in api.positions()}
+    q = held.get("QQQM", 0)                                # live: q <= LIVE_SHARES here, and a halt never stops this sale
     orders = [api_order("QQQM", -q, "opg", today, not api.live)] if q > 0 else []
-    _journal("open.decision", {"day": today, "held": held, "orders": orders}, dry)
+    _journal("open.decision", {"day": today, "held": held, "orders": orders, "live": bool(api.live),
+                               "halted": lv["halted"] if api.live else None}, dry)
     for o in orders:
         _send(api, o, dry)
 

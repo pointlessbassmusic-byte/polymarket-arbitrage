@@ -27,15 +27,24 @@ MAX_LOSS=${MAX_LOSS:-40}
 USER_NAME=$(id -un)
 
 echo "== 1. checkout ($BRANCH) into $DIR"
+# An ARMED install (the switch is in the env file) never moves its code to the branch tip by accident: a re-run must
+# name the commit (PIN=...) or be disarmed first. The new commit is tested before the running checkout moves to it.
+if [ -f /etc/mandel-live.env ] && sudo grep -q '^MANDEL_ALPACA_LIVE=I-UNDERSTAND$' /etc/mandel-live.env && [ -z "$PIN" ]; then
+  echo "refusing: this install is ARMED; re-run with PIN=<commit> to move its code, or remove the switch line first"; exit 1
+fi
 if [ ! -d "$DIR/.git" ]; then git clone --branch "$BRANCH" "$REPO" "$DIR"; fi
+OLD=$(git -C "$DIR" rev-parse HEAD)
 git -C "$DIR" fetch -q origin "$BRANCH"
-if [ -n "$PIN" ]; then git -C "$DIR" checkout -q --detach "$PIN"; else git -C "$DIR" checkout -q --detach "origin/$BRANCH"; fi
+TARGET=${PIN:-origin/$BRANCH}
+git -C "$DIR" checkout -q --detach "$TARGET"
 COMMIT=$(git -C "$DIR" rev-parse --short HEAD); echo "   pinned at $COMMIT"
 sudo apt-get install -y python3-venv >/dev/null
 python3 -m venv "$DIR/.venv"
 "$DIR/.venv/bin/pip" install -q "httpx>=0.25" tzdata pytest
-(cd "$DIR" && "$DIR/.venv/bin/python" -c "import mandel.live.runner")        # the runner must import in THIS venv
-"$DIR/.venv/bin/python" -m pytest -q "$DIR/tests/test_mandel_live.py"
+if ! (cd "$DIR" && "$DIR/.venv/bin/python" -c "import mandel.live.runner" && "$DIR/.venv/bin/python" -m pytest -q "$DIR/tests/test_mandel_live.py"); then
+  echo "   tests failed at $COMMIT: restoring the previous checkout $(git -C "$DIR" rev-parse --short "$OLD")"
+  git -C "$DIR" checkout -q --detach "$OLD"; exit 1
+fi
 
 echo "== 2. keys (Alpaca LIVE account: dashboard -> Live Trading -> API keys). Never the paper keys."
 ENV_OK='^ALPACA_API_KEY_ID=[A-Za-z0-9]+$'
@@ -102,14 +111,16 @@ OnCalendar=Mon..Fri 17:00:00 America/New_York
 WantedBy=timers.target
 UNIT
 sudo systemctl daemon-reload
-for t in open close reconcile journal; do sudo systemctl enable --now mandel-live-$t.timer; done
 
-echo "== 4. read-only status and dry runs against the LIVE account (nothing can be placed: the switch is not set)"
+echo "== 4. read-only status and dry runs against the LIVE account (nothing can be placed: the switch is unset here)"
 set -a; . /etc/mandel-live.env; set +a
 unset MANDEL_ALPACA_LIVE
 cd "$DIR"
-.venv/bin/python -m mandel.live.runner status --live
+.venv/bin/python -m mandel.live.runner status --live        # a failure here (bad keys) stops the install before any timer
 for phase in open close; do .venv/bin/python -m mandel.live.runner $phase --live --dry-run || true; done
+
+echo "== 5. timers (enabled only now that the keys and the code have been exercised)"
+for t in open close reconcile journal; do sudo systemctl enable --now mandel-live-$t.timer; done
 systemctl list-timers 'mandel-live-*' --no-pager
 cat <<MSG
 
@@ -119,6 +130,6 @@ Installed at commit $COMMIT, NOT ARMED. Every timer runs; no order can be placed
 
 Before you do: the live account should hold about \$1,000 cash (the sleeve uses at most ~\$400: $SHARES share of QQQM
 every night, $SHARES of SPYM when IBS or the turn of the month fires; the rest is a settlement buffer), as a margin
-account so overnight round trips do not trip good-faith violations; nothing is ever borrowed. The realised-loss halt is
-\$$MAX_LOSS. Disarm: remove that line, or touch $STATE/KILL. Logs: journalctl -u 'mandel-live@*'
+account so overnight round trips do not trip good-faith violations; nothing is ever borrowed. The loss halt is
+\$$MAX_LOSS marked (realised plus unrealised): it stops new buys, held shares still sell by their rule. Disarm: remove that line, or touch $STATE/KILL. Logs: journalctl -u 'mandel-live@*'
 MSG

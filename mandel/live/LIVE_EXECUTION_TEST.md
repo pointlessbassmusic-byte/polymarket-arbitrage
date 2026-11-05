@@ -28,12 +28,25 @@ auction orders filled. The tracker reports `fill_gap_bp_mean`, `fill_gap_bp_uppe
 - Real orders need `--live` **and** `MANDEL_ALPACA_LIVE=I-UNDERSTAND` in the environment. The installer never writes
   the switch; the user types it. Without it the client is read-only and `submit` refuses.
 - Fixed size `MANDEL_LIVE_SHARES` (1); a buy is skipped and journalled when cash does not cover it: nothing is borrowed.
-- Realised-loss halt `MANDEL_LIVE_MAX_LOSS_USD` (40): once the journal's closed round trips lose more, a `HALT` file is
-  written and every order phase exits until the user removes it. `KILL` stops every order phase at once.
+- Loss halt `MANDEL_LIVE_MAX_LOSS_USD` (40), on the MARKED loss (realised round trips, including today's fills read from
+  the broker, plus the unrealised P&L of what is held): a `HALT` file is written and no further BUY is placed until the
+  user removes it; every sell a rule calls for still goes out, so a halt never strands a position. `KILL` stops every
+  order phase at once (then the user closes any position by hand).
+- A phase places nothing, and journals why (`live.skipped`), when a sleeve order is still open (a second run inside the
+  window would double the position), when the account holds more than the fixed size of a sleeve symbol (not the
+  sleeve's position: nothing is touched), or when the clock is outside Alpaca's acceptance window for that auction order
+  (`cls` 15:30-15:50 ET, `opg` 07:00-09:28 ET; after 19:00 ET Alpaca would queue the order for the next day's auction).
+  An account that reports itself blocked places nothing (`live.blocked`).
 - Own state directory and journal (`~/mandel-live-state`), own systemd units, own branch `live/journal`. The options
   sleeve never runs live.
-- Every order phase journals a `live.armed` row (switch, size, cap, realised P&L) before acting; `import_linode`
-  mirrors armed and halted rows into Mandel's ledger with `actor="human"`.
+- Every order phase journals a `live.armed` row (switch, size, cap, realised and unrealised P&L, held, open orders)
+  before acting; `import_linode` mirrors armed and halted rows into Mandel's ledger as the box's report (`actor="box"`,
+  with what the row attests). The ledger never claims a human act it did not witness: a branch anyone with push could
+  write is not evidence of the user's hand, only the env file on the box is.
+- Unfilled auction orders end `canceled` (after the auction) or `rejected` (outside the window) on Alpaca; the tracker
+  counts both, with `expired`, as unfilled for criterion (b).
+- Re-running the installer on an armed install refuses to move the code unless `PIN=<commit>` is given, and the new
+  commit's tests must pass before the running checkout moves; timers are enabled only after the keys were exercised.
 
 ## Procedure for the user (Linode)
 
@@ -52,5 +65,8 @@ auction orders filled. The tracker reports `fill_gap_bp_mean`, `fill_gap_bp_uppe
    ```
    The first real orders go at the next 15:40 ET close.
 4. Disarm at any time: remove that line, or `touch ~/mandel-live-state/KILL`.
+
+Known gap: a nightly journal push that fails (no deploy key, network) is silent; the tracker then shows the live row
+stale. Check `journalctl -u mandel-live-journal` if the row stops moving.
 
 Mandel's part is done when the code is pushed and T-744 is registered. Mandel does not and cannot arm it.
