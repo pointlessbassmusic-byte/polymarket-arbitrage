@@ -108,5 +108,16 @@
   "tom_window": true,
   "target_qqqm_usd": 1200.0,
   "target_spym_usd": 1800.0
+ },
+ {
+  "day": "2026-11-03",
+  "equity_usd": 95436.41,
+  "realised_pnl_to_date_usd": -29.88,
+  "round_trips_closed": 3,
+  "ibs_15_45": 0.364,
+  "ibs_fired": false,
+  "tom_window": true,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 900.0
  }
 ]

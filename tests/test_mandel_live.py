@@ -390,3 +390,31 @@ def test_tracker_live_row_and_ledger_mirror_of_arming(tmp_path):
     ev = list(led._iter_raw())[-1]
     assert ev.kind == "live.armed" and ev.actor == "human" and ev.payload["box_ts"] == "2026-11-05T19:40:00+00:00"
     assert I.mirror_live_arming(live, led) == 0                   # once
+
+
+def test_live_timer_before_the_switch_exits_cleanly_and_journals_not_armed(monkeypatch, tmp_path):
+    from mandel.live import runner as R
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "k"); monkeypatch.setenv("ALPACA_API_SECRET_KEY", "s")
+    monkeypatch.delenv("MANDEL_ALPACA_LIVE", raising=False)
+    monkeypatch.setenv("MANDEL_LIVE_STATE", str(tmp_path))
+    monkeypatch.setattr(R, "USE_LEDGER", False)
+    assert R.main(["close", "--live"]) == 0                        # the systemd unit on install day: no traceback, no order
+    rows = [json.loads(l) for l in (tmp_path / "journal.jsonl").read_text().splitlines()]
+    assert rows[-1]["kind"] == "live.not_armed" and rows[-1]["phase"] == "close"
+    from mandel.live import tracker as T
+    p = T.live_progress(T._journal(tmp_path / "journal.jsonl"))
+    assert p["armed_rows"] == 1 and not p["switch_on"] and p["fills"] == 0
+    rows = {r["id"]: r for r in T.build(date(2026, 11, 6), tmp_path / "none.jsonl", out=tmp_path, live_journal_path=tmp_path / "journal.jsonl")}
+    assert rows["T-744"]["status"].startswith("installed, not armed")
+
+
+def test_live_arming_row_is_written_only_on_sessions(monkeypatch, tmp_path):
+    from mandel.live import runner as R
+    _freeze(monkeypatch, R, tmp_path)
+
+    class Weekend(LiveFake):
+        def calendar(self, start, end):
+            return []                                                # no sessions at all
+    R.phase_close(Weekend(date(2026, 10, 14)), dry=False)
+    R.phase_open(Weekend(date(2026, 10, 14)), dry=False)
+    assert not (tmp_path / "j.jsonl").exists()

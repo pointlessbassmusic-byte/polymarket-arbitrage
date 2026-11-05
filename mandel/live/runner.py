@@ -137,11 +137,11 @@ def _mtd(bars: list[dict], before: date) -> Optional[float]:
 
 def phase_close(api, dry: bool) -> None:
     _guard("close")
-    _live_guard(api, "close", dry)
     today = datetime.now(ET).date()
     sessions = _sessions(api, today)
     if today not in sessions:
         print("not a session"); return
+    _live_guard(api, "close", dry)
     acct = api.account()
     equity, cash = float(acct["equity"]), float(acct.get("cash") or 0)
     snap = api.stock_snapshots([S.SPX_ETF, "QQQM"])
@@ -186,10 +186,10 @@ def _is_session(api, today: date) -> bool:
 
 def phase_open(api, dry: bool) -> None:
     _guard("open")
-    _live_guard(api, "open", dry)
     today = datetime.now(ET).date()
     if not _is_session(api, today):
         return
+    _live_guard(api, "open", dry)
     held = {p["symbol"]: int(float(p["qty"])) for p in api.positions()}
     q = held.get("QQQM", 0)
     orders = [api_order("QQQM", -q, "opg", today, not api.live)] if q > 0 else []
@@ -356,9 +356,16 @@ def main(argv=None) -> int:
     p.add_argument("--live", action="store_true", help="real money: also needs MANDEL_ALPACA_LIVE=I-UNDERSTAND")
     a = p.parse_args(argv)
     configure(a.live)
-    from mandel.live.alpaca import Alpaca
+    from mandel.live.alpaca import Alpaca, LiveRefused
     # reads and dry runs may open the live endpoint before the switch is typed; an order never can
-    api = Alpaca(live=a.live, read_only=a.live and (a.dry_run or a.phase in ("reconcile", "status")))
+    try:
+        api = Alpaca(live=a.live, read_only=a.live and (a.dry_run or a.phase in ("reconcile", "status")))
+    except LiveRefused as e:
+        # the live timers run from install day; until the user writes the switch each order phase records that it
+        # placed nothing and exits cleanly (the tracker shows 'installed, not armed')
+        _journal("live.not_armed", {"phase": a.phase, "reason": str(e)}, a.dry_run)
+        print(f"{a.phase}: not armed, nothing placed ({e})")
+        return 0
     {"close": lambda: phase_close(api, a.dry_run), "open": lambda: phase_open(api, a.dry_run),
      "options": lambda: phase_options(api, a.dry_run), "reconcile": lambda: phase_reconcile(api),
      "status": lambda: phase_status(api)}[a.phase]()

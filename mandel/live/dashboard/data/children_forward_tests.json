@@ -7,13 +7,13 @@
   "mode": "paper",
   "started": "2026-10-20",
   "unit": "sessions",
-  "n_now": 10,
+  "n_now": 11,
   "n_target": 60,
   "read_date": null,
-  "pnl_usd": -22.96,
+  "pnl_usd": -29.88,
   "status": "running",
   "next_step": "reconcile fills daily",
-  "progress": 0.1667
+  "progress": 0.1833
  },
  {
   "id": "T-560",
@@ -27,8 +27,8 @@
   "n_target": 12,
   "read_date": null,
   "pnl_usd": null,
-  "status": "running: 1 opening order(s), 0 filled, 3 expired at the mid",
-  "next_step": "no monthly expiry 30-45 days out",
+  "status": "running: 2 opening order(s), 1 filled, 3 expired at the mid",
+  "next_step": "open",
   "progress": 0.0
  },
  {
@@ -43,8 +43,8 @@
   "n_target": 20,
   "read_date": null,
   "pnl_usd": null,
-  "status": "stalled: last capture 2026-10-20",
-  "next_step": "restart the daily options capture on the Linode (options-fetch job)",
+  "status": "recording: chains captured through 2026-11-03 (4 on the box)",
+  "next_step": "none: the capture box records daily",
   "progress": 0.1
  },
  {
@@ -59,8 +59,8 @@
   "n_target": 200,
   "read_date": null,
   "pnl_usd": null,
-  "status": "stalled: last capture 2026-10-20",
-  "next_step": "restart the daily options capture on the Linode (options-fetch job)",
+  "status": "recording: chains captured through 2026-11-03 (4 on the box)",
+  "next_step": "first settlements follow the November VIX expiry",
   "progress": 0.0
  },
  {
@@ -87,13 +87,13 @@
   "mode": "forward",
   "started": "2026-10-20",
   "unit": "month-end decisions",
-  "n_now": 10,
+  "n_now": 11,
   "n_target": 36,
   "read_date": null,
   "pnl_usd": null,
-  "status": "recording: 10 shadow day(s), first 2026-10-20",
+  "status": "recording: 11 shadow day(s), first 2026-10-20",
   "next_step": "none: runs on its timers",
-  "progress": 0.2778
+  "progress": 0.3056
  },
  {
   "id": "T-566",
@@ -103,13 +103,13 @@
   "mode": "forward",
   "started": "2026-10-20",
   "unit": "weighted nights",
-  "n_now": 10,
+  "n_now": 11,
   "n_target": 200,
   "read_date": null,
   "pnl_usd": null,
-  "status": "recording: 10 shadow day(s), first 2026-10-20",
+  "status": "recording: 11 shadow day(s), first 2026-10-20",
   "next_step": "none: runs on its timers",
-  "progress": 0.05
+  "progress": 0.055
  },
  {
   "id": "T-573",
@@ -119,13 +119,13 @@
   "mode": "forward",
   "started": "2026-10-20",
   "unit": "weighted nights",
-  "n_now": 10,
+  "n_now": 11,
   "n_target": 200,
   "read_date": null,
   "pnl_usd": null,
-  "status": "recording: 10 shadow day(s), first 2026-10-20",
+  "status": "recording: 11 shadow day(s), first 2026-10-20",
   "next_step": "none: runs on its timers",
-  "progress": 0.05
+  "progress": 0.055
  },
  {
   "id": "T-576",
@@ -139,7 +139,7 @@
   "n_target": 24,
   "read_date": null,
   "pnl_usd": null,
-  "status": "running: 10 session(s) decided, 1 signal day(s) so far",
+  "status": "running: 11 session(s) decided, 1 signal day(s) so far",
   "next_step": "none: runs on its timers",
   "progress": 0.0417
  },
@@ -155,7 +155,7 @@
   "n_target": 27,
   "read_date": null,
   "pnl_usd": null,
-  "status": "running: 10 session(s) decided, 0 signal day(s) so far",
+  "status": "running: 11 session(s) decided, 0 signal day(s) so far",
   "next_step": "none: runs on its timers",
   "progress": 0.0
  },
@@ -171,7 +171,7 @@
   "n_target": 36,
   "read_date": null,
   "pnl_usd": null,
-  "status": "running: 3 spread(s) open, 6 opening order(s) expired at the mid",
+  "status": "running: 4 spread(s) open, 8 opening order(s) expired at the mid",
   "next_step": "none: runs on its timers",
   "progress": 0.0
  },
@@ -279,13 +279,13 @@
   "mode": "forward",
   "started": "2026-10-14",
   "unit": "days",
-  "n_now": 20,
+  "n_now": 21,
   "n_target": 60,
   "read_date": "2026-12-13",
   "pnl_usd": null,
   "status": "recording",
   "next_step": "read on the locked date (+3.2% per $1, t 1.8 in sample)",
-  "progress": 0.3333
+  "progress": 0.35
  },
  {
   "id": "H-hype-fade",

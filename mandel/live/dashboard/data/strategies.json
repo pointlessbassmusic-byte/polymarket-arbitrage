@@ -11,19 +11,19 @@
   "decision": "fill gap <= 1.5 bp/side at 60 sessions; return at 250",
   "started": "2026-10-20",
   "read_date": null,
-  "pnl_usd": -22.96,
-  "fills": 20,
+  "pnl_usd": -29.88,
+  "fills": 23,
   "verified": "Mandel records",
   "source": "paper journal",
-  "n_now": 10,
+  "n_now": 11,
   "capital_usd": null,
   "status": "running",
   "next_step": "reconcile fills daily",
   "state": "running",
   "group": "Paper",
-  "progress": 0.1667,
+  "progress": 0.1833,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-560",
@@ -42,13 +42,13 @@
   "verified": "Mandel records",
   "source": "paper journal",
   "n_now": 0,
-  "status": "running: 1 opening order(s), 0 filled, 3 expired at the mid",
-  "next_step": "no monthly expiry 30-45 days out",
+  "status": "running: 2 opening order(s), 1 filled, 3 expired at the mid",
+  "next_step": "open",
   "state": "running",
   "group": "Paper",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-542",
@@ -67,13 +67,13 @@
   "verified": "Mandel records",
   "source": "capture box + archive captures",
   "n_now": 2,
-  "status": "stalled: last capture 2026-10-20",
-  "next_step": "restart the daily options capture on the Linode (options-fetch job)",
-  "state": "stalled",
+  "status": "recording: chains captured through 2026-11-03 (4 on the box)",
+  "next_step": "none: the capture box records daily",
+  "state": "running",
   "group": "Forward record",
   "progress": 0.1,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-541",
@@ -92,13 +92,13 @@
   "verified": "Mandel records",
   "source": "capture box + archive captures",
   "n_now": 0,
-  "status": "stalled: last capture 2026-10-20",
-  "next_step": "restart the daily options capture on the Linode (options-fetch job)",
-  "state": "stalled",
+  "status": "recording: chains captured through 2026-11-03 (4 on the box)",
+  "next_step": "first settlements follow the November VIX expiry",
+  "state": "running",
   "group": "Forward record",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-543",
@@ -123,7 +123,7 @@
   "group": "Forward record",
   "progress": 0.0333,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-565",
@@ -141,14 +141,14 @@
   "fills": null,
   "verified": "Mandel records",
   "source": "capture box shadow.jsonl",
-  "n_now": 10,
-  "status": "recording: 10 shadow day(s), first 2026-10-20",
+  "n_now": 11,
+  "status": "recording: 11 shadow day(s), first 2026-10-20",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Forward record",
-  "progress": 0.2778,
+  "progress": 0.3056,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-566",
@@ -166,14 +166,14 @@
   "fills": null,
   "verified": "Mandel records",
   "source": "capture box shadow.jsonl",
-  "n_now": 10,
-  "status": "recording: 10 shadow day(s), first 2026-10-20",
+  "n_now": 11,
+  "status": "recording: 11 shadow day(s), first 2026-10-20",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Forward record",
-  "progress": 0.05,
+  "progress": 0.055,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-573",
@@ -191,14 +191,14 @@
   "fills": null,
   "verified": "Mandel records",
   "source": "capture box shadow.jsonl",
-  "n_now": 10,
-  "status": "recording: 10 shadow day(s), first 2026-10-20",
+  "n_now": 11,
+  "status": "recording: 11 shadow day(s), first 2026-10-20",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Forward record",
-  "progress": 0.05,
+  "progress": 0.055,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-576",
@@ -217,13 +217,13 @@
   "verified": "Mandel records",
   "source": "capture box wide-journal.jsonl",
   "n_now": 1,
-  "status": "running: 10 session(s) decided, 1 signal day(s) so far",
+  "status": "running: 11 session(s) decided, 1 signal day(s) so far",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Paper",
   "progress": 0.0417,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-567",
@@ -242,13 +242,13 @@
   "verified": "Mandel records",
   "source": "capture box wide-journal.jsonl",
   "n_now": 0,
-  "status": "running: 10 session(s) decided, 0 signal day(s) so far",
+  "status": "running: 11 session(s) decided, 0 signal day(s) so far",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Paper",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-568",
@@ -263,17 +263,17 @@
   "started": "2026-10-20",
   "read_date": null,
   "pnl_usd": null,
-  "fills": 3,
+  "fills": 4,
   "verified": "Mandel records",
   "source": "capture box wide-journal.jsonl",
   "n_now": 0,
-  "status": "running: 3 spread(s) open, 6 opening order(s) expired at the mid",
+  "status": "running: 4 spread(s) open, 8 opening order(s) expired at the mid",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Paper",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "T-744",
@@ -302,7 +302,7 @@
   "group": "Live money",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-bounce-short",
@@ -328,7 +328,7 @@
   "group": "Live money",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-orb-qqq",
@@ -354,7 +354,7 @@
   "group": "Paper",
   "progress": 0.0833,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-2s10s-xlf",
@@ -380,7 +380,7 @@
   "group": "Paper",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-btc-us500-lead",
@@ -405,8 +405,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 2,
-  "as_of": "2026-11-03"
+  "days_to_read": 1,
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-book-imbalance",
@@ -431,8 +431,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 9,
-  "as_of": "2026-11-03"
+  "days_to_read": 8,
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-btc-favourite",
@@ -441,7 +441,7 @@
   "venue": "Kalshi",
   "mode": "forward",
   "unit": "days",
-  "n_now": 20,
+  "n_now": 21,
   "n_target": 60,
   "read_date": "2026-12-13",
   "pnl_usd": null,
@@ -456,9 +456,9 @@
   "source": "R-831322fc73",
   "state": "running",
   "group": "Forward record",
-  "progress": 0.3333,
-  "days_to_read": 40,
-  "as_of": "2026-11-03"
+  "progress": 0.35,
+  "days_to_read": 39,
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-hype-fade",
@@ -483,8 +483,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 70,
-  "as_of": "2026-11-03"
+  "days_to_read": 69,
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-ibit-carry",
@@ -509,8 +509,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 101,
-  "as_of": "2026-11-03"
+  "days_to_read": 100,
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-ibit-ladder",
@@ -535,8 +535,8 @@
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 332,
-  "as_of": "2026-11-03"
+  "days_to_read": 331,
+  "as_of": "2026-11-04"
  },
  {
   "id": "K-maker-kalshi",
@@ -562,7 +562,7 @@
   "group": "Live money",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "K-tennis-longshot-no",
@@ -588,7 +588,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "B-maker-pmus",
@@ -614,7 +614,7 @@
   "group": "Live money",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "B-paper-book",
@@ -640,7 +640,7 @@
   "group": "Paper",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "S-fed-g10",
@@ -666,7 +666,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-btc-tom",
@@ -692,7 +692,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-us500-overnight",
@@ -718,7 +718,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "H-gold-perp-carry",
@@ -744,7 +744,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "B-longshot-calibration",
@@ -770,7 +770,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "K-thin-queue-maker",
@@ -796,7 +796,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "S-kalshi-crypto-short",
@@ -822,7 +822,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "S-macro-buckets",
@@ -848,7 +848,7 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  },
  {
   "id": "K-queue-markov-fill",
@@ -874,6 +874,6 @@
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-03"
+  "as_of": "2026-11-04"
  }
 ]

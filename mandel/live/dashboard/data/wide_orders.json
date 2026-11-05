@@ -128,5 +128,35 @@
   "price": 91.65,
   "status": "filled",
   "day": "2026-10-30"
+ },
+ {
+  "order": "w-GLD-open-2026-11-03",
+  "underlying": "GLD",
+  "kind": "spread",
+  "side": "open spread",
+  "qty": 1,
+  "price": -0.85,
+  "status": "filled",
+  "day": "2026-11-03"
+ },
+ {
+  "order": "w-TLT-open-2026-11-03",
+  "underlying": "TLT",
+  "kind": "spread",
+  "side": "open spread",
+  "qty": 1,
+  "price": null,
+  "status": "expired",
+  "day": "2026-11-03"
+ },
+ {
+  "order": "w-USO-open-2026-11-03",
+  "underlying": "USO",
+  "kind": "spread",
+  "side": "open spread",
+  "qty": 1,
+  "price": null,
+  "status": "expired",
+  "day": "2026-11-03"
  }
 ]

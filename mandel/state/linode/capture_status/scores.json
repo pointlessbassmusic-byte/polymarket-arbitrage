@@ -1,6 +1,40 @@
 {
- "as_of": "2026-10-20T22:51:19+00:00",
+ "as_of": "2026-11-03T23:51:45+00:00",
  "T-542": {
-  "error": "MissingData: not on this machine: options-chain-SPX-2026-10-14, options-chain-SPX-2026-10-15"
+  "n_days": 2,
+  "verdict": "inconclusive",
+  "reason": "day one 2026-10-20: 0.2% of 600 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 0.5%; needs < 2%); later days: 2026-11-03 0.3% (the claim makes day one decisive)",
+  "per_day": null,
+  "days": [
+   {
+    "day": "2026-10-20",
+    "pairs": 600,
+    "share": 0.0016666666666666668,
+    "upper95": 0.005,
+    "pass": true,
+    "bill": {
+     "bill_day": "2026-10-19",
+     "dtb3_discount_pct": 4.1,
+     "bill_cont_bp": 417.86354988887825
+    }
+   },
+   {
+    "day": "2026-11-03",
+    "pairs": 590,
+    "share": 0.003389830508474576,
+    "upper95": 0.006779661016949152,
+    "pass": true,
+    "bill": {
+     "bill_day": "2026-11-02",
+     "dtb3_discount_pct": 4.03,
+     "bill_cont_bp": 410.69264359773547
+    }
+   }
+  ],
+  "pre_box_days": {
+   "2026-10-14": 0.022,
+   "2026-10-15": 0.005
+  },
+  "note": "parity_v2 (T-505's construction) on this box's captures; T-542 counts days below 2% among the first 20, the two pre-box days included at their registered values"
  }
 }

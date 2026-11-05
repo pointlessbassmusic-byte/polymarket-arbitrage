@@ -152,8 +152,8 @@
   "qty": 4,
   "price": 294.55,
   "filled_at": "2026-10-29 13:32:24Z",
-  "official_print": null,
-  "gap_bp": null
+  "official_print": 295.0199890136719,
+  "gap_bp": 15.93
  },
  {
   "day": "2026-10-29",
@@ -164,8 +164,8 @@
   "qty": 4,
   "price": 293.75,
   "filled_at": "2026-10-29 19:44:05Z",
-  "official_print": null,
-  "gap_bp": null
+  "official_print": 294.5299987792969,
+  "gap_bp": 26.48
  },
  {
   "day": "2026-10-30",
@@ -176,8 +176,8 @@
   "qty": 4,
   "price": 286.5075,
   "filled_at": "2026-10-30 13:33:55Z",
-  "official_print": null,
-  "gap_bp": null
+  "official_print": 287.05999755859375,
+  "gap_bp": 19.25
  },
  {
   "day": "2026-10-30",
@@ -188,8 +188,8 @@
   "qty": 1,
   "price": 88.68,
   "filled_at": "2026-10-30 19:44:09Z",
-  "official_print": null,
-  "gap_bp": null
+  "official_print": 88.94999694824219,
+  "gap_bp": 30.35
  },
  {
   "day": "2026-10-30",
@@ -200,8 +200,8 @@
   "qty": 4,
   "price": 283.3,
   "filled_at": "2026-10-30 19:44:09Z",
-  "official_print": null,
-  "gap_bp": null
+  "official_print": 284.3399963378906,
+  "gap_bp": 36.58
  },
  {
   "day": "2026-11-02",
@@ -212,8 +212,8 @@
   "qty": 4,
   "price": 286.1125,
   "filled_at": "2026-11-02 14:36:30Z",
-  "official_print": null,
-  "gap_bp": null
+  "official_print": 286.29998779296875,
+  "gap_bp": 6.55
  },
  {
   "day": "2026-11-02",
@@ -224,8 +224,8 @@
   "qty": 4,
   "price": 280.53,
   "filled_at": "2026-11-02 20:44:06Z",
-  "official_print": null,
-  "gap_bp": null
+  "official_print": 280.489990234375,
+  "gap_bp": 1.43
  },
  {
   "day": "2026-11-02",
@@ -236,7 +236,43 @@
   "qty": 10,
   "price": 88.58,
   "filled_at": "2026-11-02 20:44:07Z",
-  "official_print": null,
-  "gap_bp": null
+  "official_print": 88.5199966430664,
+  "gap_bp": 6.78
+ },
+ {
+  "day": "2026-11-03",
+  "phase": "open",
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "side": "sell",
+  "qty": 4,
+  "price": 281.84,
+  "filled_at": "2026-11-03 14:34:00Z",
+  "official_print": 281.7300109863281,
+  "gap_bp": 3.9
+ },
+ {
+  "day": "2026-11-03",
+  "phase": "close",
+  "symbol": "SPYM",
+  "rule": "IBS SPYM + turn-of-month SPYM",
+  "side": "sell",
+  "qty": 10,
+  "price": 88.76,
+  "filled_at": "2026-11-03 20:44:08Z",
+  "official_print": 88.77999877929688,
+  "gap_bp": 2.25
+ },
+ {
+  "day": "2026-11-03",
+  "phase": "close",
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "side": "buy",
+  "qty": 4,
+  "price": 282.32,
+  "filled_at": "2026-11-03 20:44:09Z",
+  "official_print": 282.2300109863281,
+  "gap_bp": 3.19
  }
 ]

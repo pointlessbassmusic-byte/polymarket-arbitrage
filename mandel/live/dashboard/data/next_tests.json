@@ -1,5 +1,17 @@
 [
  {
+  "id": "T-741",
+  "status": "inconclusive",
+  "claim": "Over 2010-2026, define the 21-session variance gap g_t = (RVX_t/100)^2 - (252/21) x the sum of squared IWM daily log returns over sessions t+1..t+21. It is larger on entry days who",
+  "data_ready": 1.0,
+  "new_data": true,
+  "missing": "",
+  "min_n": 15,
+  "score": 0.773,
+  "unblocked": false,
+  "note": ""
+ },
+ {
   "id": "T-38",
   "status": "inconclusive",
   "claim": "Retail attention (standardised mention count per ticker-day on Reddit and StockTwits) rank-correlates positively with the next day's absolute return.",
@@ -20,6 +32,30 @@
   "missing": "",
   "min_n": 30,
   "score": 0.73,
+  "unblocked": false,
+  "note": ""
+ },
+ {
+  "id": "T-690",
+  "status": "inconclusive",
+  "claim": "On the ML program's non-leveraged US-listed ETFs (local daily bars; TQQQ, SQQQ, IBIT and ETHA excluded), a ridge or gradient-boosting model refit each January on an expanding windo",
+  "data_ready": 1.0,
+  "new_data": true,
+  "missing": "",
+  "min_n": 80,
+  "score": 0.678,
+  "unblocked": false,
+  "note": ""
+ },
+ {
+  "id": "T-603",
+  "status": "inconclusive",
+  "claim": "Over 2019-01 to 2026-09, among point-in-time S&P 500 non-financial members (fja-sp500-components; SIC 6000-6999 excluded as in the paper) with usable prices and point-in-time share",
+  "data_ready": 1.0,
+  "new_data": true,
+  "missing": "",
+  "min_n": 90,
+  "score": 0.672,
   "unblocked": false,
   "note": ""
  },
@@ -68,6 +104,30 @@
   "missing": "",
   "min_n": 100,
   "score": 0.667,
+  "unblocked": false,
+  "note": ""
+ },
+ {
+  "id": "T-654",
+  "status": "inconclusive",
+  "claim": "Weekly 2019-02..2026-10 on dolt-chain-SPY, entering at each week's last quote day and exiting at the next week's last quote day, with z(VVIX) from the session before the entry quot",
+  "data_ready": 1.0,
+  "new_data": true,
+  "missing": "",
+  "min_n": 150,
+  "score": 0.648,
+  "unblocked": false,
+  "note": ""
+ },
+ {
+  "id": "T-691",
+  "status": "inconclusive",
+  "claim": "Universe: point-in-time S&P 500 members with archived Yahoo prices and point-in-time SEC shares, 2010-01 to 2026-09. At each month-end, form independent median splits on the month'",
+  "data_ready": 1.0,
+  "new_data": true,
+  "missing": "",
+  "min_n": 180,
+  "score": 0.639,
   "unblocked": false,
   "note": ""
  },
@@ -176,66 +236,6 @@
   "missing": "options-chain-SPX-<date> (3/30)",
   "min_n": 30,
   "score": 0.201,
-  "unblocked": false,
-  "note": ""
- },
- {
-  "id": "T-112",
-  "status": "blocked",
-  "claim": "On captured SPX chains, the reverse iron condor bought at the ask is cheaper than the same-strike short call condor sold at the bid (after PV of the width) on at least 80% of captu",
-  "data_ready": 0.55,
-  "new_data": null,
-  "missing": "options-chain-SPX-<date> (3/30)",
-  "min_n": 30,
-  "score": 0.201,
-  "unblocked": false,
-  "note": ""
- },
- {
-  "id": "T-355",
-  "status": "blocked",
-  "claim": "Across halvings, BTC-USD's 365-day log return after a halving exceeds its 365-day log return before it.",
-  "data_ready": 0.5,
-  "new_data": null,
-  "missing": "LTC-USD",
-  "min_n": 8,
-  "score": 0.2,
-  "unblocked": false,
-  "note": ""
- },
- {
-  "id": "T-734",
-  "status": "blocked",
-  "claim": "For the June Russell reconstitutions 2013-2026 (out of CHL's 2005-2012 sample at this cutoff), take the stocks FTSE Russell's preliminary list moves from the Russell Microcap into ",
-  "data_ready": 0.5,
-  "new_data": null,
-  "missing": "a fetch or re-fetch is still named",
-  "min_n": 10,
-  "score": 0.2,
-  "unblocked": false,
-  "note": ""
- },
- {
-  "id": "T-735",
-  "status": "blocked",
-  "claim": "For annual cohorts formed at each June recon close 2005-2025 (out of Cai-Houge's 1979-2004 sample), an equal-weighted buy-and-hold portfolio is held 12 months. It is long Russell 2",
-  "data_ready": 0.5,
-  "new_data": null,
-  "missing": "a fetch or re-fetch is still named",
-  "min_n": 15,
-  "score": 0.193,
-  "unblocked": false,
-  "note": ""
- },
- {
-  "id": "T-593",
-  "status": "blocked",
-  "claim": "Over 2013Q3-2026Q3, among point-in-time S&P 500 members with archived prices, the top-minus-bottom quartile of hedge-fund 13F ownership share (from the latest filings accepted befo",
-  "data_ready": 0.5,
-  "new_data": null,
-  "missing": "a fetch or re-fetch is still named",
-  "min_n": 50,
-  "score": 0.175,
   "unblocked": false,
   "note": ""
  }

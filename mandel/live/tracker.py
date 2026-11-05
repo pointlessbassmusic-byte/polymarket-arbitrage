@@ -247,7 +247,8 @@ def live_progress(journal: list[dict]) -> dict:
     """T-744 from the live journal: the calendar accounting plus the arming and halt records."""
     cal = calendar_progress(journal)
     armed = [r for r in journal if r.get("kind") == "live.armed"]
-    cal.update(armed_rows=len(armed), switch_on=any(r.get("switch") for r in armed),
+    not_armed = [r for r in journal if r.get("kind") == "live.not_armed"]
+    cal.update(armed_rows=len(armed) + len(not_armed), switch_on=any(r.get("switch") for r in armed),
                first_armed=min((str(r.get("ts"))[:10] for r in armed if r.get("switch")), default=None),
                halted=any(r.get("kind") == "live.halted" for r in journal),
                fill_days=len({str(r.get("filled_at"))[:10] for r in journal if r.get("kind") == "order.fill"

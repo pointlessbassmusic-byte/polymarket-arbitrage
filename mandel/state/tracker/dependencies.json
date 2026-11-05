@@ -617,7 +617,7 @@
   "kind": "reads",
   "target": "options-chain-SPX",
   "target_kind": "stream",
-  "health": "stale",
+  "health": "ok",
   "key": "T-542|stream:options-chain-SPX"
  },
  {
@@ -626,7 +626,7 @@
   "kind": "reads",
   "target": "options-chain-VIX",
   "target_kind": "stream",
-  "health": "stale",
+  "health": "ok",
   "key": "T-541|stream:options-chain-VIX"
  },
  {
@@ -635,7 +635,7 @@
   "kind": "reads",
   "target": "cboe-VVIX-history",
   "target_kind": "stream",
-  "health": "stale",
+  "health": "ok",
   "key": "T-541|stream:cboe-VVIX-history"
  },
  {
@@ -644,7 +644,7 @@
   "kind": "reads",
   "target": "deribit-dvol-BTC-history",
   "target_kind": "stream",
-  "health": "stale",
+  "health": "ok",
   "key": "T-543|stream:deribit-dvol-BTC-history"
  },
  {
@@ -878,7 +878,7 @@
   "kind": "reads",
   "target": "fred-DTB3",
   "target_kind": "stream",
-  "health": "stale",
+  "health": "ok",
   "key": "H-gold-perp-carry|stream:fred-DTB3"
  },
  {
