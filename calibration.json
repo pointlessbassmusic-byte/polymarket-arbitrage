@@ -1,57 +1,57 @@
 {
- "as_of": "2026-11-04T16:35:10-05:00",
+ "as_of": "2026-11-05T16:35:10-05:00",
  "models": {
   "spx_hmm": {
-   "scored_days": 11,
-   "ratio_mean_all": 1.476058340833449,
-   "ratio_mean_60": 1.476058340833449,
-   "exceed_2sd_rate": 0.18181818181818182,
-   "loss_diff_mean": -0.0006915997584136978,
-   "loss_diff_t": -0.6907473193203729,
+   "scored_days": 12,
+   "ratio_mean_all": 2.996962305234527,
+   "ratio_mean_60": 2.996962305234527,
+   "exceed_2sd_rate": 0.25,
+   "loss_diff_mean": -0.007890349472612948,
+   "loss_diff_t": -1.087343040579362,
    "flags": [],
    "challenger_drift": {
     "daily_vol": [
-     5.887618330635384e-06,
-     5.8778813130447305e-06
+     -3.1987680560617224e-06,
+     9.8807764168235e-06
     ],
-    "stay_high": 8.827781794673584e-05
+    "stay_high": -0.0002064660841757382
    }
   },
   "qqq_hmm": {
-   "scored_days": 11,
-   "ratio_mean_all": 1.8233379742443923,
-   "ratio_mean_60": 1.8233379742443923,
-   "exceed_2sd_rate": 0.18181818181818182,
-   "loss_diff_mean": -0.005704809005881712,
-   "loss_diff_t": -0.848364108616655,
+   "scored_days": 12,
+   "ratio_mean_all": 2.370798659257346,
+   "ratio_mean_60": 2.370798659257346,
+   "exceed_2sd_rate": 0.25,
+   "loss_diff_mean": -0.0056763970781129975,
+   "loss_diff_t": -0.9246979967929737,
    "flags": [],
    "challenger_drift": {
     "daily_vol": [
-     7.294913330620906e-06,
-     -3.3431162073441906e-05
+     2.0745630705601426e-06,
+     -1.3919036819503433e-05
     ],
-    "stay_high": -0.00012226452160046808
+    "stay_high": -6.140643451091332e-05
    }
   },
   "qqq_msm": {
-   "scored_days": 11,
-   "ratio_mean_all": 1.2816737867220256,
-   "ratio_mean_60": 1.2816737867220256,
-   "exceed_2sd_rate": 0.18181818181818182,
+   "scored_days": 12,
+   "ratio_mean_all": 2.532378118897432,
+   "ratio_mean_60": 2.532378118897432,
+   "exceed_2sd_rate": 0.25,
    "flags": []
   },
   "spx_ewma": {
-   "scored_days": 11,
-   "ratio_mean_all": 1.9758484729873809,
-   "ratio_mean_60": 1.9758484729873809,
-   "exceed_2sd_rate": 0.18181818181818182,
+   "scored_days": 12,
+   "ratio_mean_all": 4.361200668033978,
+   "ratio_mean_60": 4.361200668033978,
+   "exceed_2sd_rate": 0.25,
    "flags": []
   },
   "qqq_ewma": {
-   "scored_days": 11,
-   "ratio_mean_all": 1.904248615641215,
-   "ratio_mean_60": 1.904248615641215,
-   "exceed_2sd_rate": 0.18181818181818182,
+   "scored_days": 12,
+   "ratio_mean_all": 3.539364675090669,
+   "ratio_mean_60": 3.539364675090669,
+   "exceed_2sd_rate": 0.25,
    "flags": []
   }
  }
