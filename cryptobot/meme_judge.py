@@ -160,13 +160,23 @@ def judge(d: dict) -> dict:
     return {"organic": organic, "late": late, "exit_risk": er, "action": action, "why": why}
 
 
+SCORING_VERSION = 2       # v1 (2026-11-03..06) priced exits linearly and let a sale pay more than the pool held
+
+
 def net_return(entry: float, px: Optional[float], liq_now: Optional[float], liq_entry: float,
                dead: bool = False, size: float = SIZE_USD) -> float:
-    """Net return of a $size round trip; a dead pool is -100%."""
-    if dead or px is None or liq_now is None or liq_now < DEAD_LIQ:
+    """Net return of a $size round trip through constant-product pools.
+    Each side of a pool holds about half its reported liquidity, so a buy
+    of S into quote reserve Q gets tokens worth S*Q/(Q+S) at the mid, and
+    selling tokens worth V into reserve Q pays Q*V/(Q+V): never more than
+    the pool holds. A dead pool is -100%."""
+    if dead or px is None or liq_now is None or liq_now < DEAD_LIQ or not entry or not liq_entry:
         return -1.0
-    impact = 0.5 * size / liq_entry + 0.5 * size / liq_now
-    return px / entry - 1 - 2 * SWAP_FEE - impact - 2 * NETWORK_USD / size
+    q0, q1 = liq_entry / 2, liq_now / 2
+    held = size * (1 - SWAP_FEE) * q0 / (q0 + size * (1 - SWAP_FEE))          # value at the entry mid
+    v = held * px / entry
+    proceeds = q1 * v / (q1 + v) * (1 - SWAP_FEE)
+    return (proceeds - 2 * NETWORK_USD) / size - 1
 
 
 # ------------------------------------------------------------------ collector
@@ -292,13 +302,15 @@ class MemeJudge:
         h = p["next"]
         r = net_return(e["price"], snap["price"] if snap else None, snap["liq"] if snap else None, e["liq"])
         p["out"][h] = r
+        p.setdefault("raw", {})[h] = {"price": snap["price"] if snap else None, "liq": snap["liq"] if snap else None}
         i = [x[0] for x in HORIZONS].index(h)
         if i + 1 < len(HORIZONS):
             nh, sec_ = HORIZONS[i + 1]
             p.update(next=nh, due=e["ts"] + sec_)
         else:
             self._log({"id": f"{chain}:{p['first']['pool']}", "ts": self._now(), "stage": "outcome",
-                       "action": e["action"], "entry_ts": e["ts"], "out": p["out"]})
+                       "action": e["action"], "entry_ts": e["ts"], "out": p["out"], "v": SCORING_VERSION,
+                       "entry": {"price": e["price"], "liq": e["liq"]}, "raw": p.get("raw", {})})
             p.update(next=None, due=None, pending=False)
 
     async def run_forever(self) -> None:
@@ -330,7 +342,8 @@ def report(state: Path) -> dict:
     p = Path(state) / "meme" / "verdicts.jsonl"
     rows = [json.loads(l) for l in p.open() if l.strip()] if p.exists() else []
     dec = [r for r in rows if r.get("stage") in ("risk", "judge")]
-    outs = [r for r in rows if r.get("stage") == "outcome"]
+    all_outs = [r for r in rows if r.get("stage") == "outcome"]
+    outs = [r for r in all_outs if r.get("v", 1) >= SCORING_VERSION]
     final = [r for r in dec if r["action"] != "watch"]
     kills: dict = {}
     for r in final:
@@ -339,21 +352,24 @@ def report(state: Path) -> dict:
     out = {"judged": len(final), "risk_clean": sum(1 for r in final if r.get("risk_clean")),
            "buy": sum(1 for r in final if r["action"] == "buy"), "pass": sum(1 for r in final if r["action"] == "pass"),
            "watch_asked": sum(1 for r in dec if r["action"] == "watch"), "kills": kills,
+           "old_scoring": len(all_outs) - len(outs),
            "first": dt.datetime.fromtimestamp(min(r["ts"] for r in rows), dt.timezone.utc).date().isoformat() if rows else None}
     for grp, sel in (("buys", lambda r: r["action"] == "buy"), ("clean", lambda r: True)):
         x = [r for r in outs if sel(r) and r["out"].get("4h") is not None]
         if x:
             rets = [r["out"]["4h"] for r in x]
             days = [dt.datetime.fromtimestamp(r["entry_ts"], dt.timezone.utc).date().isoformat() for r in x]
-            out[grp] = {"n": len(x), "mean4h": statistics.fmean(rets), "win": statistics.fmean(1.0 if v > 0 else 0.0 for v in rets),
+            out[grp] = {"n": len(x), "mean4h": statistics.fmean(rets), "median4h": statistics.median(rets),
+                        "top": sorted(((r["out"]["4h"], r["id"]) for r in x), reverse=True)[:3], "win": statistics.fmean(1.0 if v > 0 else 0.0 for v in rets),
                         "dead": statistics.fmean(1.0 if v <= -0.999 else 0.0 for v in rets), "lo95": _boot_lower(rets, days),
                         "mean1h": statistics.fmean([r["out"]["1h"] for r in x if r["out"].get("1h") is not None] or [0.0]),
                         "mean24h": statistics.fmean([r["out"]["24h"] for r in x if r["out"].get("24h") is not None] or [0.0]),
                         "days": len(set(days))}
     b = out.get("buys")
     if not b or b["n"] < READ_BUYS or b["days"] < READ_DAYS:
-        out["verdict"] = ("collecting", f"{b['n'] if b else 0} of {READ_BUYS} BUYs with a 4h outcome, "
-                                        f"{b['days'] if b else 0} of {READ_DAYS} days")
+        n, d = (b["n"], b["days"]) if b else (0, 0)
+        out["verdict"] = ("collecting", f"{min(n, READ_BUYS)} of {READ_BUYS} BUYs with a 4h outcome"
+                                        + (f" ({n} so far)" if n > READ_BUYS else "") + f", {d} of {READ_DAYS} days")
     elif b["mean4h"] <= 0:
         out["verdict"] = ("killed", f"BUY mean {b['mean4h']:+.1%} over {b['n']}")
     elif (b["lo95"] or -1) > 0 and b["mean4h"] > out["clean"]["mean4h"]:
@@ -371,8 +387,12 @@ def render(r: dict) -> str:
     for g, label in (("buys", "BUYs"), ("clean", "all RISK-clean (baseline)")):
         s = r.get(g)
         if s:
-            o.append(f"  {label}: {s['n']} with 4h outcome, net 1h {s['mean1h']:+.1%} / 4h {s['mean4h']:+.1%} / 24h {s['mean24h']:+.1%}, "
-                     f"win {s['win']:.0%}, dead {s['dead']:.0%}" + (f", 4h 95% low {s['lo95']:+.1%}" if s["lo95"] is not None else ""))
+            o.append(f"  {label}: {s['n']} with 4h outcome, mean net 1h {s['mean1h']:+.1%} / 4h {s['mean4h']:+.1%} / 24h {s['mean24h']:+.1%}, "
+                     f"median 4h {s['median4h']:+.1%}, win {s['win']:.0%}, dead {s['dead']:.0%}"
+                     + (f", 4h 95% low {s['lo95']:+.1%}" if s["lo95"] is not None else ""))
+            o.append("    best 4h: " + ", ".join(f"{v:+.0%} {k}" for v, k in s["top"]))
+    if r.get("old_scoring"):
+        o.append(f"  ({r['old_scoring']} outcomes scored before the 2026-11-06 exit-model fix are excluded)")
     v, why = r["verdict"]
     o.append(f"  verdict: {v} ({why})")
     return "\n".join(o)

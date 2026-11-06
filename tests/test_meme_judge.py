@@ -76,3 +76,17 @@ def test_lifecycle_first_sight_judge_and_outcomes(tmp_path):
     rep = M.report(tmp_path)
     assert rep["buy"] == 1 and rep["kills"] == {"liquidity < $10k": 1} and rep["buys"]["n"] == 1
     assert "collecting" in M.render(rep)
+
+
+def test_exit_can_never_take_more_than_the_pool_holds_and_old_scoring_is_excluded(tmp_path):
+    assert M.net_return(1.0, 7e5, 20_000, 20_000) < 10_000 / M.SIZE_USD      # at most the pool's quote side
+    assert -0.04 < M.net_return(1.0, 1.0, 50_000, 50_000) < -0.02             # a flat round trip costs fees + impact
+    d = tmp_path / "meme"
+    d.mkdir()
+    rows = [{"stage": "judge", "action": "buy", "ts": T0, "risk_clean": True},
+            {"stage": "outcome", "action": "buy", "ts": T0, "entry_ts": T0, "id": "solana:A", "out": {"1h": 7000.0, "4h": 7000.0, "24h": 1.0}},
+            {"stage": "outcome", "action": "buy", "ts": T0, "entry_ts": T0, "id": "solana:B", "out": {"1h": -1.0, "4h": -1.0, "24h": -1.0}, "v": 2}]
+    (d / "verdicts.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    rep = M.report(tmp_path)
+    assert rep["old_scoring"] == 1 and rep["buys"]["n"] == 1 and rep["buys"]["mean4h"] == -1.0
+    assert "excluded" in M.render(rep)
