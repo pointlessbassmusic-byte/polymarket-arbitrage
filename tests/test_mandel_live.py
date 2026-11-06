@@ -138,7 +138,7 @@ def test_tracker_counts_journal_sessions_fills_and_round_trip_pnl(tmp_path):
              "filled_avg_price": "251.5", "filled_at": "2026-10-22T13:30:00Z"}]
     j.write_text("".join(json.dumps(r) + "\n" for r in recs))
     c = T.calendar_progress(T._journal(j))
-    assert c == {"n_now": 2, "fills": 2, "rejected": 0, "expired": 0, "old_code": False, "pnl_usd": 3.0, "round_trips": 1,
+    assert c == {"n_now": 2, "fills": 2, "rejected": 0, "expired": 0, "old_code": False, "pnl_usd": 3.0, "round_trips": 1, "auction_fill_share": 1.0,
                  "shadow_pnl_usd": None, "slippage_usd": None, "shadowed_trips": 0,
                  "fill_gap_bp_mean": None, "fill_gap_bp_upper95": None, "fill_gap_n": 0}   # no print.official rows: no shadow
     rows = T.build(date(2026, 10, 23), j)
