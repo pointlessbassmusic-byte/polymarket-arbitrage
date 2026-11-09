@@ -49,7 +49,9 @@ if [ ! -f /etc/mandel-paper.env ]; then
   KEY=$(printf '%s' "$KEY" | tr -d '[:space:]'); SECRET=$(printf '%s' "$SECRET" | tr -d '[:space:]')
   echo "   read a key id of ${#KEY} characters and a secret of ${#SECRET} characters (Alpaca: about 20 and 40)"
   [[ "$KEY" =~ ^[A-Za-z0-9]+$ ]] || { echo "refusing: the key id is empty or has characters other than letters and digits"; exit 1; }
-  [[ "$SECRET" =~ ^[!-~]+$ ]] || { echo "refusing: the secret is empty (nothing was pasted at the hidden prompt?)"; exit 1; }
+  # [:graph:] not a !-~ range: in a UTF-8 locale glibc orders ranges by collation and a secret with / or + failed it (2026-11-09)
+  [ -n "$SECRET" ] || { echo "refusing: the secret is empty (nothing was pasted at the hidden prompt?)"; exit 1; }
+  [[ "$SECRET" =~ [^[:graph:]] ]] && { echo "refusing: the secret has a character that is not printable ASCII"; exit 1; }
   [[ "$KEY" == PK* ]] || echo "   warning: Alpaca paper key ids usually start with PK; check you copied the PAPER key"
   sudo install -m 600 -o "$USER_NAME" /dev/null /etc/mandel-paper.env
   printf 'ALPACA_API_KEY_ID=%s\nALPACA_API_SECRET_KEY=%s\nMANDEL_PAPER_STATE=%s\nMANDEL_PAPER_LEDGER=0\n' "$KEY" "$SECRET" "$STATE" | sudo tee /etc/mandel-paper.env >/dev/null

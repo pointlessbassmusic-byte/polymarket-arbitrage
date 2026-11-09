@@ -57,7 +57,9 @@ if [ ! -f /etc/mandel-live.env ]; then
   KEY=$(printf '%s' "$KEY" | tr -d '[:space:]'); SECRET=$(printf '%s' "$SECRET" | tr -d '[:space:]')
   echo "   read a key id of ${#KEY} characters and a secret of ${#SECRET} characters"
   [[ "$KEY" =~ ^[A-Za-z0-9]+$ ]] || { echo "refusing: the key id is empty or has characters other than letters and digits"; exit 1; }
-  [[ "$SECRET" =~ ^[!-~]+$ ]] || { echo "refusing: the secret is empty"; exit 1; }
+  # [:graph:] not a !-~ range: in a UTF-8 locale glibc orders ranges by collation and a secret with / or + failed it (2026-11-09)
+  [ -n "$SECRET" ] || { echo "refusing: the secret is empty (nothing was pasted at the hidden prompt?)"; exit 1; }
+  [[ "$SECRET" =~ [^[:graph:]] ]] && { echo "refusing: the secret has a character that is not printable ASCII"; exit 1; }
   [[ "$KEY" == PK* ]] && { echo "refusing: PK... is a PAPER key id; the live test needs the live account's keys (AK...)"; exit 1; }
   if [ -f /etc/mandel-paper.env ] && sudo grep -q "ALPACA_API_KEY_ID=$KEY\$" /etc/mandel-paper.env; then
     echo "refusing: these are the paper runner's keys"; exit 1
