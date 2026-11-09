@@ -118,7 +118,14 @@ echo "== 4. read-only status and dry runs against the LIVE account (nothing can 
 set -a; . /etc/mandel-live.env; set +a
 unset MANDEL_ALPACA_LIVE
 cd "$DIR"
-.venv/bin/python -m mandel.live.runner status --live        # a failure here (bad keys) stops the install before any timer
+if ! .venv/bin/python -m mandel.live.runner status --live; then   # a failure here (bad keys) stops the install before any timer
+  echo
+  echo "   the LIVE endpoint (api.alpaca.markets) refused these keys. Common causes: keys generated on the paper dashboard"
+  echo "   (paper ids start with PK, live ids with AK), a live account not yet approved/active, or a stray character"
+  echo "   in the paste. The key file is removed so the next run asks again; no timer was enabled."
+  sudo rm -f /etc/mandel-live.env
+  exit 1
+fi
 for phase in open close; do .venv/bin/python -m mandel.live.runner $phase --live --dry-run || true; done
 
 echo "== 5. timers (enabled only now that the keys and the code have been exercised)"
