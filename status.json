@@ -1,140 +1,140 @@
 {
- "as_of": "2026-11-06T23:51:05+00:00",
+ "as_of": "2026-11-09T23:50:39+00:00",
  "families": {
   "social-reddit": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 2186822
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 2540265
   },
   "social-stocktwits": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 278381
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 317153
   },
   "social-crypto": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 52370
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 59864
   },
   "social-prices": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 155225
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 177366
   },
   "social-house-ptr": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 69463
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 79748
   },
   "social-derived": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 42735
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 49627
   },
   "options-chain-SPY": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 4575506
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 5232500
   },
   "options-chain-QQQ": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 3831747
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 4414963
   },
   "options-chain-IWM": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 1870248
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 2131699
   },
   "options-chain-TLT": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 1051142
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 1197016
   },
   "options-chain-GLD": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 2539299
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 2892448
   },
   "options-chain-SLV": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 1588767
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 1809479
   },
   "options-chain-USO": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 2231146
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 2552273
   },
   "options-chain-IBIT": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 1108701
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 1264234
   },
   "options-chain-ETHA": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 379442
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 438449
   },
   "options-chain-TSLA": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 1881260
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 2151410
   },
   "options-chain-NVDA": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 1537905
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 1758903
   },
   "options-chain-AAPL": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 1289549
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 1472526
   },
   "options-chain-SPX": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 10919680
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 12572911
   },
   "options-chain-VIX": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 547118
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 628039
   },
   "options-surface": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 235547
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 269306
   },
   "deribit-book-BTC": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 220480
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 251032
   },
   "deribit-surface-BTC": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 4191
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 4776
   },
   "deribit-book-ETH": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 177083
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 201490
   },
   "deribit-surface-ETH": {
-   "latest": "2026-11-06",
-   "count": 7,
-   "bytes": 4034
+   "latest": "2026-11-09",
+   "count": 8,
+   "bytes": 4598
   },
   "polymarket-books": {
-   "latest": "2026-11-06",
-   "count": 6,
-   "bytes": 1557307
+   "latest": "2026-11-09",
+   "count": 7,
+   "bytes": 1817594
   },
   "spy-smile": {
-   "latest": "2026-11-05",
-   "count": 6,
-   "bytes": 8819
+   "latest": "2026-11-06",
+   "count": 7,
+   "bytes": 10323
   },
   "coinbase-products": {
    "latest": "2026-10-16",
@@ -168,79 +168,13 @@
   "polymarket-closed-markets": "2026-10-14T09:32:34",
   "polymarket-price-history-daily": "2026-10-14T09:34:42",
   "polymarket-books-snapshot": "2026-10-14T09:36:16",
-  "french-ff3-daily": "2026-10-15T07:55:37",
-  "french-ff5-daily": "2026-10-15T07:55:38",
-  "french-momentum-daily": "2026-10-15T07:55:39",
-  "french-industry49-daily": "2026-10-15T07:55:44",
-  "cboe-vx-futures": "2026-10-15T08:00:08",
   "aqr-bab-daily": "2026-10-15T08:00:15",
-  "fomc-meetings": "2026-10-15T08:01:05",
-  "daily-history--GSPC": "2026-10-15T08:01:15",
-  "daily-history--RUT": "2026-10-15T08:01:15",
-  "daily-history-SPY": "2026-10-15T08:01:17",
-  "daily-history-QQQ": "2026-10-15T08:01:18",
-  "daily-history-IWM": "2026-10-15T08:01:20",
-  "daily-history-TLT": "2026-10-15T08:01:21",
-  "daily-history-GLD": "2026-10-15T08:01:23",
-  "daily-history-SLV": "2026-10-15T08:01:24",
-  "daily-history-USO": "2026-10-15T08:01:26",
-  "daily-history-IBIT": "2026-10-15T08:01:27",
-  "daily-history-BTC-USD": "2026-10-15T08:01:29",
-  "daily-history-ETH-USD": "2026-10-15T08:01:30",
-  "daily-history-EFA": "2026-10-15T08:01:32",
-  "daily-history-AGG": "2026-10-15T08:01:33",
-  "daily-history-SPLV": "2026-10-15T08:01:35",
-  "daily-history-SPHB": "2026-10-15T08:01:36",
-  "daily-history-USMV": "2026-10-15T08:01:38",
-  "daily-history-SVXY": "2026-10-15T08:01:39",
-  "daily-history-GC-F": "2026-10-15T08:01:41",
-  "daily-history-SI-F": "2026-10-15T08:01:42",
-  "daily-history-XLB": "2026-10-15T08:01:44",
-  "daily-history-XLE": "2026-10-15T08:01:45",
-  "daily-history-XLF": "2026-10-15T08:01:47",
-  "daily-history-XLI": "2026-10-15T08:01:48",
-  "daily-history-XLK": "2026-10-15T08:01:50",
-  "daily-history-XLP": "2026-10-15T08:01:51",
-  "daily-history-XLU": "2026-10-15T08:01:53",
-  "daily-history-XLV": "2026-10-15T08:01:54",
-  "daily-history-XLY": "2026-10-15T08:01:56",
-  "daily-history-IVV": "2026-10-15T08:01:57",
-  "daily-history-TQQQ": "2026-10-15T08:01:59",
-  "daily-history-SQQQ": "2026-10-15T08:02:00",
-  "daily-history-IJR": "2026-10-15T08:02:02",
-  "daily-history-IWD": "2026-10-15T08:02:03",
-  "daily-history-IWF": "2026-10-15T08:02:05",
-  "daily-history-QUAL": "2026-10-15T08:02:06",
-  "daily-history-COWZ": "2026-10-15T08:02:08",
-  "daily-history-PKW": "2026-10-15T08:02:09",
-  "daily-history-DBC": "2026-10-15T08:02:11",
-  "daily-history-IEF": "2026-10-15T08:02:12",
-  "daily-history-VNQ": "2026-10-15T08:02:14",
-  "daily-history-CL-F": "2026-10-15T08:02:15",
-  "daily-history-ES-F": "2026-10-15T08:02:17",
-  "deribit-funding-BTC-PERPETUAL": "2026-10-15T08:03:28",
-  "deribit-delivery-prices-btc": "2026-10-15T08:03:34",
-  "deribit-quarterly-futures-btc": "2026-10-15T08:03:43",
   "french-accruals-monthly": "2026-10-15T08:05:28",
   "french-net-issuance-monthly": "2026-10-15T08:05:28",
-  "crypto-fear-greed-history": "2026-10-15T08:05:30",
   "daily-history-BTC-F": "2026-10-15T08:05:31",
   "daily-history-VXX": "2026-10-15T08:05:32",
   "daily-history--VIX": "2026-10-15T08:05:34",
   "daily-history-MBB": "2026-10-15T08:05:35",
-  "macro-release-cpi": "2026-10-15T08:35:35",
-  "macro-release-employment-situation": "2026-10-15T08:35:35",
-  "macro-release-gdp": "2026-10-15T08:35:37",
-  "hourly-SPY": "2026-10-15T08:35:57",
-  "hourly-QQQ": "2026-10-15T08:35:58",
-  "hourly-IWM": "2026-10-15T08:35:58",
-  "hourly-TLT": "2026-10-15T08:35:59",
-  "hourly-GLD": "2026-10-15T08:36:01",
-  "hourly-BTC-USD": "2026-10-15T08:36:02",
-  "hourly-ETH-USD": "2026-10-15T08:36:03",
-  "hourly--VIX": "2026-10-15T08:36:05",
-  "fx-spot-g10": "2026-10-15T08:37:09",
-  "fx-rates-3m": "2026-10-15T08:37:09",
   "cboe-BXMD-history": "2026-10-15T14:27:39",
   "cboe-BXY-history": "2026-10-15T14:27:40",
   "cboe-BXMC-history": "2026-10-15T14:27:41",
@@ -3418,44 +3352,110 @@
   "kraken-trades-1m-XBTUSD-2025-08": "2026-10-20T05:22:22",
   "kraken-trades-1m-XBTUSD-2025-09": "2026-10-20T05:38:49",
   "kraken-trades-1m-XBTUSD-2025-10": "2026-10-20T06:06:09",
-  "cboe-PUT-history": "2026-11-01T12:30:05",
-  "cboe-BXM-history": "2026-11-01T12:30:05",
-  "cboe-VIX-history": "2026-11-06T23:30:28",
-  "cboe-VIX9D-history": "2026-11-06T23:30:29",
-  "cboe-VIX3M-history": "2026-11-06T23:30:29",
-  "cboe-VIX6M-history": "2026-11-06T23:30:30",
-  "cboe-VIX1D-history": "2026-11-06T23:30:31",
-  "cboe-VVIX-history": "2026-11-06T23:30:31",
-  "cboe-SKEW-history": "2026-11-06T23:30:32",
-  "cboe-GVZ-history": "2026-11-06T23:30:33",
-  "cboe-OVX-history": "2026-11-06T23:30:34",
-  "cboe-VXN-history": "2026-11-06T23:30:34",
-  "cboe-RVX-history": "2026-11-06T23:30:35",
-  "cboe-VXD-history": "2026-11-06T23:30:36",
-  "cboe-VXTLT-history": "2026-11-06T23:30:36",
-  "cboe-VXEEM-history": "2026-11-06T23:30:37",
-  "cboe-COR1M-history": "2026-11-06T23:30:38",
-  "cboe-DSPX-history": "2026-11-06T23:30:38",
-  "cboe-VXAPL-history": "2026-11-06T23:30:39",
-  "cboe-VXGOG-history": "2026-11-06T23:30:40",
-  "cboe-VXAZN-history": "2026-11-06T23:30:41",
-  "fred-DTB3": "2026-11-06T23:30:42",
-  "fred-DGS10": "2026-11-06T23:30:42",
-  "fred-DGS2": "2026-11-06T23:30:43",
-  "fred-DFF": "2026-11-06T23:30:44",
-  "deribit-dvol-BTC-history": "2026-11-06T23:30:47",
-  "deribit-dvol-ETH-history": "2026-11-06T23:30:50"
+  "crypto-fear-greed-history": "2026-11-08T12:30:04",
+  "daily-history--GSPC": "2026-11-08T12:30:06",
+  "daily-history--RUT": "2026-11-08T12:30:07",
+  "daily-history-SPY": "2026-11-08T12:30:08",
+  "daily-history-QQQ": "2026-11-08T12:30:09",
+  "daily-history-IWM": "2026-11-08T12:30:11",
+  "daily-history-TLT": "2026-11-08T12:30:12",
+  "daily-history-GLD": "2026-11-08T12:30:14",
+  "daily-history-SLV": "2026-11-08T12:30:15",
+  "daily-history-USO": "2026-11-08T12:30:17",
+  "daily-history-IBIT": "2026-11-08T12:30:18",
+  "daily-history-BTC-USD": "2026-11-08T12:30:20",
+  "daily-history-ETH-USD": "2026-11-08T12:30:21",
+  "daily-history-EFA": "2026-11-08T12:30:23",
+  "daily-history-AGG": "2026-11-08T12:30:24",
+  "daily-history-SPLV": "2026-11-08T12:30:26",
+  "daily-history-SPHB": "2026-11-08T12:30:27",
+  "daily-history-USMV": "2026-11-08T12:30:29",
+  "daily-history-SVXY": "2026-11-08T12:30:30",
+  "daily-history-GC-F": "2026-11-08T12:30:32",
+  "daily-history-SI-F": "2026-11-08T12:30:33",
+  "daily-history-XLB": "2026-11-08T12:30:35",
+  "daily-history-XLE": "2026-11-08T12:30:37",
+  "daily-history-XLF": "2026-11-08T12:30:38",
+  "daily-history-XLI": "2026-11-08T12:30:39",
+  "daily-history-XLK": "2026-11-08T12:30:41",
+  "daily-history-XLP": "2026-11-08T12:30:43",
+  "daily-history-XLU": "2026-11-08T12:30:44",
+  "daily-history-XLV": "2026-11-08T12:30:46",
+  "daily-history-XLY": "2026-11-08T12:30:47",
+  "daily-history-IVV": "2026-11-08T12:30:49",
+  "daily-history-TQQQ": "2026-11-08T12:30:50",
+  "daily-history-SQQQ": "2026-11-08T12:30:51",
+  "daily-history-IJR": "2026-11-08T12:30:53",
+  "daily-history-IWD": "2026-11-08T12:30:55",
+  "daily-history-IWF": "2026-11-08T12:30:56",
+  "daily-history-QUAL": "2026-11-08T12:30:57",
+  "daily-history-COWZ": "2026-11-08T12:30:59",
+  "daily-history-PKW": "2026-11-08T12:31:00",
+  "daily-history-DBC": "2026-11-08T12:31:02",
+  "daily-history-IEF": "2026-11-08T12:31:03",
+  "daily-history-VNQ": "2026-11-08T12:31:05",
+  "daily-history-CL-F": "2026-11-08T12:31:06",
+  "daily-history-ES-F": "2026-11-08T12:31:08",
+  "french-ff3-daily": "2026-11-08T12:31:09",
+  "french-ff5-daily": "2026-11-08T12:31:10",
+  "french-momentum-daily": "2026-11-08T12:31:11",
+  "french-industry49-daily": "2026-11-08T12:31:16",
+  "fomc-meetings": "2026-11-08T12:31:43",
+  "deribit-funding-BTC-PERPETUAL": "2026-11-08T12:32:44",
+  "deribit-delivery-prices-btc": "2026-11-08T12:32:51",
+  "deribit-quarterly-futures-btc": "2026-11-08T12:33:01",
+  "cboe-vx-futures": "2026-11-08T12:34:15",
+  "macro-release-cpi": "2026-11-08T12:34:16",
+  "macro-release-employment-situation": "2026-11-08T12:34:16",
+  "macro-release-gdp": "2026-11-08T12:34:18",
+  "fx-spot-g10": "2026-11-08T12:34:38",
+  "fx-rates-3m": "2026-11-08T12:34:38",
+  "hourly-SPY": "2026-11-08T12:34:39",
+  "hourly-QQQ": "2026-11-08T12:34:40",
+  "hourly-IWM": "2026-11-08T12:34:41",
+  "hourly-TLT": "2026-11-08T12:34:42",
+  "hourly-GLD": "2026-11-08T12:34:43",
+  "hourly-BTC-USD": "2026-11-08T12:34:44",
+  "hourly-ETH-USD": "2026-11-08T12:34:46",
+  "hourly--VIX": "2026-11-08T12:34:47",
+  "cboe-PUT-history": "2026-11-08T12:34:48",
+  "cboe-BXM-history": "2026-11-08T12:34:49",
+  "cboe-VIX-history": "2026-11-09T23:30:22",
+  "cboe-VIX9D-history": "2026-11-09T23:30:23",
+  "cboe-VIX3M-history": "2026-11-09T23:30:24",
+  "cboe-VIX6M-history": "2026-11-09T23:30:24",
+  "cboe-VIX1D-history": "2026-11-09T23:30:25",
+  "cboe-VVIX-history": "2026-11-09T23:30:26",
+  "cboe-SKEW-history": "2026-11-09T23:30:27",
+  "cboe-GVZ-history": "2026-11-09T23:30:27",
+  "cboe-OVX-history": "2026-11-09T23:30:28",
+  "cboe-VXN-history": "2026-11-09T23:30:29",
+  "cboe-RVX-history": "2026-11-09T23:30:29",
+  "cboe-VXD-history": "2026-11-09T23:30:30",
+  "cboe-VXTLT-history": "2026-11-09T23:30:31",
+  "cboe-VXEEM-history": "2026-11-09T23:30:31",
+  "cboe-COR1M-history": "2026-11-09T23:30:32",
+  "cboe-DSPX-history": "2026-11-09T23:30:33",
+  "cboe-VXAPL-history": "2026-11-09T23:30:33",
+  "cboe-VXGOG-history": "2026-11-09T23:30:34",
+  "cboe-VXAZN-history": "2026-11-09T23:30:35",
+  "fred-DTB3": "2026-11-09T23:30:36",
+  "fred-DGS10": "2026-11-09T23:30:37",
+  "fred-DGS2": "2026-11-09T23:30:37",
+  "fred-DFF": "2026-11-09T23:30:38",
+  "deribit-dvol-BTC-history": "2026-11-09T23:30:41",
+  "deribit-dvol-ETH-history": "2026-11-09T23:30:45"
  },
  "last_runs": {
   "daily": {
-   "ts": "2026-11-06T23:51:05+00:00",
+   "ts": "2026-11-09T23:50:39+00:00",
    "steps": [
     {
      "step": "options-fetch",
      "rc": 0,
-     "seconds": 18.3,
+     "seconds": 19.1,
      "tail": [
-      "    \"ETH-surface\": 12",
+      "    \"ETH-surface\": 11",
       "  }",
       "}"
      ]
@@ -3463,10 +3463,10 @@
     {
      "step": "options-fetch --smile",
      "rc": 0,
-     "seconds": 2.2,
+     "seconds": 2.7,
      "tail": [
       "  },",
-      "  \"2026-11-06\": \"no VIX close for quote date 2026-11-06\"",
+      "  \"2026-11-09\": \"no VIX close for quote date 2026-11-09\"",
       "}"
      ]
     },
@@ -3475,25 +3475,25 @@
      "rc": 0,
      "seconds": 23.3,
      "tail": [
-      "  \"DVOL-BTC\": 2054,",
-      "  \"DVOL-ETH\": 2054",
+      "  \"DVOL-BTC\": 2057,",
+      "  \"DVOL-ETH\": 2057",
       "}"
      ]
     },
     {
      "step": "social-fetch",
      "rc": 0,
-     "seconds": 1119.9,
+     "seconds": 1100.0,
      "tail": [
       "  ],",
-      "  \"wall_seconds\": 1119.4",
+      "  \"wall_seconds\": 1099.4",
       "}"
      ]
     },
     {
      "step": "book-snapshot",
      "rc": 0,
-     "seconds": 94.2,
+     "seconds": 94.3,
      "tail": [
       "  \"markets\": 299,",
       "  \"api_calls\": 600",
@@ -3503,22 +3503,22 @@
    ]
   },
   "weekly": {
-   "ts": "2026-11-01T12:30:05+00:00",
+   "ts": "2026-11-08T12:34:49+00:00",
    "steps": [
     {
      "step": "unlock-fetch all",
-     "rc": 1,
-     "seconds": 0.6,
+     "rc": 0,
+     "seconds": 284.2,
      "tail": [
-      "  File \"/root/mandel-capture/mandel/ml/train.py\", line 23, in <module>",
-      "    import pandas as pd",
-      "ModuleNotFoundError: No module named 'pandas'"
+      "    }",
+      "  }",
+      "}"
      ]
     },
     {
      "step": "-c from mandel.archive import Archive; from mandel.data.cboe_strategy import fetch_cboe_strategy as f; f(Archive(), symb",
      "rc": 0,
-     "seconds": 1.3,
+     "seconds": 1.4,
      "tail": []
     }
    ]
