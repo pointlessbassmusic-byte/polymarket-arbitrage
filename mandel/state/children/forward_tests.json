@@ -1,6 +1,6 @@
 {
  "note": "Paper, live and forward tests run by the children, as their own records state them. Read-only transcription from the first-contact reports of 2026-10-20 (state/children/*/reports.jsonl); every figure is the child's own and unverified by Mandel unless 'mandel_check' names a theory. Update 'as_of' and the counts when a child reports again.",
- "as_of": "2026-11-02",
+ "as_of": "2026-11-09",
  "tests": [
   {
    "id": "H-bounce-short",
@@ -15,8 +15,8 @@
    "n_target": null,
    "read_date": null,
    "pnl_usd": null,
-   "status": "2 closed at the 14-day time exit on 2026-10-23: DOGE +7.7%, kSHIB +8.8% net (mean +8.29% vs backtest +3.36%, 57% winners); the replay's own line: too few to judge (72% chance the backtest does this well or worse); no open position",
-   "next_step": "wait for the next signal; judge at the child's MinTRL, not on 2 trades; weekly routine's push is blocked (repo not in its sources) - operator fix",
+   "status": "2 closed at the 14-day time exit on 2026-10-23: DOGE +7.7%, kSHIB +8.8% net; no new signal or weekly entry reported through 2026-11-09",
+   "next_step": "wait for the next signal; judge at the child's MinTRL (32-104 months), not on 2 trades",
    "decision": "no read date set by the child; MinTRL 32-104 months",
    "mandel_check": "T-556",
    "source": "R-831322fc73"
@@ -72,8 +72,8 @@
    "n_target": null,
    "read_date": "2026-11-05",
    "pnl_usd": null,
-   "status": "recording",
-   "next_step": "read on the locked date",
+   "status": "read date 2026-11-05 passed; no result published on the branch (WEEKLY.md unchanged since Oct 20)",
+   "next_step": "Hurst runs python -m cryptobot.intraday_leadlag --fetch and writes the read; the weekly routine needs the repo attached",
    "decision": "pre-registered forward test",
    "mandel_check": null,
    "source": "R-831322fc73"
@@ -239,15 +239,15 @@
    "capital_usd": 100,
    "started": null,
    "unit": "settled bets",
-   "n_now": 4,
+   "n_now": 9,
    "n_target": null,
    "read_date": null,
-   "pnl_usd": -4.0,
-   "status": "4 settled, 4 losses (two Oct 31 front-of-queue-only fills included), equity 96.00; CLV ungraded since the 11-01 settlement fix (no book seen after entry)",
-   "next_step": "paper fills credit a print AT the order price; only the live $1 touch test measures queue position",
+   "pnl_usd": 2.61,
+   "status": "9 settled (4 losses to Nov 4; Nov 8 soccer +4.26, esports +0.33, tennis -1.00; Nov 9 void +0.02, soccer -1.00), realised +2.61, equity 102.61; every fill front-of-queue-only, CLV n 0 (once-a-day scans leave no later book)",
+   "next_step": "keep the sandbox sim daily; strict fills stay 0; CLV needs a later book read",
    "decision": "CLV against the close",
    "mandel_check": null,
-   "source": "R-e9b3472e1c"
+   "source": "daily check-in PR #135"
   },
   {
    "id": "S-fed-g10",
@@ -257,16 +257,16 @@
    "mode": "forward",
    "capital_usd": 0,
    "started": null,
-   "unit": "fires",
-   "n_now": 4,
+   "unit": "meetings settled",
+   "n_now": 6,
    "n_target": null,
    "read_date": null,
-   "pnl_usd": null,
-   "status": "recording: 4 two_venue fires in October (Fed hold 0.91/0.92, ECB hold 0.97/0.966, BoJ hold 0.96/0.97, RBNZ hike-25 0.92/0.94); 0 settled rows as of 11-02 although three decisions have passed",
-   "next_step": "settlement pass must write result/settled_at; T-742 reads at 60 settled two_venue fires",
+   "pnl_usd": -37.41,
+   "status": "6 meetings settled, 12 two_venue rows: 10 paid, 2 lost (RBNZ Oct hike-25 at 0.92/0.94, the bank held); fed_watch +9.0%/row, cb_watch -16.8%/row, pooled -12.5%/row; ten winners average +5.0%",
+   "next_step": "record only; the record is negative at 6 meetings and nothing clears the pre-live gate; ~130 forward fires to beat the 2.4% breakeven",
    "decision": "fed_watch / cb_watch forward recorders",
    "mandel_check": null,
-   "source": "R-4b062fe004"
+   "source": "PR #132, arb-scanner/docs/cb_signals.csv + fed_signals.csv"
   },
   {
    "id": "H-btc-tom",
@@ -419,6 +419,24 @@
    "decision": "top predicted-fill quintile fills > 3x the overall share, markout no worse",
    "mandel_check": null,
    "source": "G-90c3346389"
+  },
+  {
+   "id": "H-meme-judge",
+   "owner": "Hurst",
+   "strategy": "Memecoin launch judge (rules in place of a chat model), paper",
+   "venue": "GeckoTerminal new Solana/Base pools (paper)",
+   "mode": "paper",
+   "capital_usd": null,
+   "started": "2026-11-03",
+   "unit": "judged pools",
+   "n_now": null,
+   "n_target": null,
+   "read_date": null,
+   "pnl_usd": null,
+   "status": "registered meme-judge-forward 2026-11-03; scoring versioned after the constant-product exit fix and the count restarted; no outcome count published yet",
+   "next_step": "child to publish the decision count and 1h/4h/24h outcomes in the weekly review; Mandel reads it as a paper record only",
+   "decision": "none registered by the child yet",
+   "source": "crypto branch addendum 33"
   }
  ]
 }

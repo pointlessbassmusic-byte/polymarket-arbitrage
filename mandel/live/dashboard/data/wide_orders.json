@@ -158,5 +158,55 @@
   "price": null,
   "status": "expired",
   "day": "2026-11-03"
+ },
+ {
+  "order": "w-TLT-open-2026-11-04",
+  "underlying": "TLT",
+  "kind": "spread",
+  "side": "open spread",
+  "qty": 1,
+  "price": -0.1,
+  "status": "filled",
+  "day": "2026-11-04"
+ },
+ {
+  "order": "w-USO-open-2026-11-04",
+  "underlying": "USO",
+  "kind": "spread",
+  "side": "open spread",
+  "qty": 1,
+  "price": null,
+  "status": "expired",
+  "day": "2026-11-04"
+ },
+ {
+  "order": "w-GLD-close-2026-11-05",
+  "underlying": "GLD",
+  "kind": "spread",
+  "side": "close spread",
+  "qty": 1,
+  "price": null,
+  "status": "expired",
+  "day": "2026-11-05"
+ },
+ {
+  "order": "w-USO-open-2026-11-05",
+  "underlying": "USO",
+  "kind": "spread",
+  "side": "open spread",
+  "qty": 1,
+  "price": null,
+  "status": "expired",
+  "day": "2026-11-05"
+ },
+ {
+  "order": "w-USO-open-2026-11-06",
+  "underlying": "USO",
+  "kind": "spread",
+  "side": "open spread",
+  "qty": 1,
+  "price": null,
+  "status": "expired",
+  "day": "2026-11-06"
  }
 ]

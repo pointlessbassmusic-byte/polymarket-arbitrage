@@ -31168,7 +31168,7 @@
    "blocked_on": "the forward record: 2 settled two_venue fires as of 2026-10-29 (ECB Oct 29 hold, RBNZ Oct 27 hike), ~30 a year expected -> read about 2028-H2",
    "results": [],
    "parent": "",
-   "notes": "registered so the map's reference-price node carries the member, not only the eight non-members; the read is of the children's record (forward_tests.json S-fed-g10) | 2026-11-02 tally: 4 two_venue fires (Fed Oct hold, ECB Oct 29 hold, BoJ hold, RBNZ Oct 27 hike-25), 0 settled in the recorder files yet"
+   "notes": "registered so the map's reference-price node carries the member, not only the eight non-members; the read is of the children's record (forward_tests.json S-fed-g10) | 2026-11-02 tally: 4 two_venue fires (Fed Oct hold, ECB Oct 29 hold, BoJ hold, RBNZ Oct 27 hike-25), 0 settled in the recorder files yet | 2026-11-09 tally (children's recorders, two_venue): 6 meetings settled, 12 rows, 10 paid, 2 lost; Fed Oct hold paid (+9.0%/row), ECB and BoJ Oct holds paid, RBA Nov hike-25 paid, BoE Nov hike-25 paid, RBNZ Oct hike-25 LOST at 0.92/0.94 (the bank held); pooled mean -12.5%/row, so the record is net negative: two whole stakes lost against ten wins averaging +5.0%. The first loss came on a move, not a hold. Forward only; the registered read needs ~130 fires"
   },
   {
    "id": "T-743",

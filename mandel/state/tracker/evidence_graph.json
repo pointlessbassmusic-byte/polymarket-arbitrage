@@ -1,5 +1,5 @@
 {
- "as_of": "2026-11-04",
+ "as_of": "2026-11-09",
  "nodes": [
   {
    "id": "T-559",
@@ -104,8 +104,8 @@
    "kind": "stream",
    "label": "options-chain-SPX",
    "state": "ok",
-   "age_days": 1,
-   "latest": "2026-11-03",
+   "age_days": 3,
+   "latest": "2026-11-06",
    "captures": 3
   },
   {
@@ -132,8 +132,8 @@
    "kind": "stream",
    "label": "options-chain-VIX",
    "state": "ok",
-   "age_days": 1,
-   "latest": "2026-11-03",
+   "age_days": 3,
+   "latest": "2026-11-06",
    "captures": 3
   },
   {
@@ -141,8 +141,8 @@
    "kind": "stream",
    "label": "cboe-VVIX-history",
    "state": "ok",
-   "age_days": 1,
-   "latest": "2026-11-03",
+   "age_days": 3,
+   "latest": "2026-11-06",
    "captures": null
   },
   {
@@ -163,8 +163,8 @@
    "kind": "stream",
    "label": "deribit-dvol-BTC-history",
    "state": "ok",
-   "age_days": 1,
-   "latest": "2026-11-03",
+   "age_days": 3,
+   "latest": "2026-11-06",
    "captures": null
   },
   {
@@ -172,7 +172,7 @@
    "kind": "stream",
    "label": "fomc-meetings",
    "state": "ok",
-   "age_days": 20,
+   "age_days": 25,
    "latest": "2026-10-15",
    "captures": null
   },
@@ -181,7 +181,7 @@
    "kind": "stream",
    "label": "macro-release-cpi",
    "state": "ok",
-   "age_days": 20,
+   "age_days": 25,
    "latest": "2026-10-15",
    "captures": null
   },
@@ -209,7 +209,7 @@
    "kind": "stream",
    "label": "cboe-PUT-history",
    "state": "ok",
-   "age_days": 3,
+   "age_days": 8,
    "latest": "2026-11-01",
    "captures": null
   },
@@ -328,8 +328,8 @@
    "kind": "stream",
    "label": "child:Hurst:kalshi-perp-books",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "venue:kalshi-perps",
@@ -366,8 +366,8 @@
    "kind": "stream",
    "label": "child:Hurst:alpaca-bars",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "H-2s10s-xlf",
@@ -426,8 +426,8 @@
    "kind": "stream",
    "label": "child:Hurst:kalshi-settled-binaries",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "venue:kalshi",
@@ -453,8 +453,8 @@
    "kind": "stream",
    "label": "child:Hurst:hype-signals",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "H-ibit-carry",
@@ -474,16 +474,16 @@
    "kind": "stream",
    "label": "child:Hurst:perp-funding",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "stream:child:Hurst:ibit-surface",
    "kind": "stream",
    "label": "child:Hurst:ibit-surface",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "H-ibit-ladder",
@@ -522,8 +522,8 @@
    "kind": "stream",
    "label": "child:Kelly:kalshi-books",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "account:kalshi-kelly",
@@ -551,8 +551,8 @@
    "kind": "stream",
    "label": "child:Brier:pmus-books",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "venue:polymarket-us",
@@ -583,8 +583,8 @@
    "kind": "stream",
    "label": "child:Brier:polymarket-tape",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "venue:polymarket",
@@ -610,8 +610,8 @@
    "kind": "stream",
    "label": "child:Shannon:cb-watch",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "H-btc-tom",
@@ -642,8 +642,8 @@
    "kind": "stream",
    "label": "fred-DTB3",
    "state": "ok",
-   "age_days": 1,
-   "latest": "2026-11-03",
+   "age_days": 3,
+   "latest": "2026-11-06",
    "captures": null
   },
   {
@@ -680,8 +680,8 @@
    "kind": "stream",
    "label": "child:Shannon:kalshi-crypto-recorder",
    "state": "child",
-   "age_days": 2,
-   "latest": "2026-11-02"
+   "age_days": 0,
+   "latest": "2026-11-09"
   },
   {
    "id": "S-macro-buckets",
@@ -698,6 +698,14 @@
    "label": "Markov queue model of maker fill probability",
    "mode": "forward",
    "state": "proposed"
+  },
+  {
+   "id": "H-meme-judge",
+   "kind": "strategy",
+   "owner": "Hurst",
+   "label": "Memecoin launch judge (rules in place of a chat model), paper",
+   "mode": "paper",
+   "state": "running"
   },
   {
    "id": "T-557",

@@ -1,10 +1,20 @@
 [
  {
+  "id": "checkpoint:H-btc-us500-lead",
+  "severity": "action",
+  "kind": "checkpoint",
+  "node": "H-btc-us500-lead",
+  "message": "BTC perp leads US500 perp off-session has reached its decision point (None/None days; read 2026-11-05)",
+  "affected": "H-btc-us500-lead",
+  "n_affected": 1,
+  "action": "run the pre-registered read; size only through checkpoint_size on its result"
+ },
+ {
   "id": "stream:stream:finra-short-interest",
   "severity": "warning",
   "kind": "stream",
   "node": "stream:finra-short-interest",
-  "message": "finra-short-interest: no data since 2026-09-30 (35 days); it also holds back 11 blocked theories (T-636, T-637, T-641, T-643, T-644, T-645...)",
+  "message": "finra-short-interest: no data since 2026-09-30 (40 days); it also holds back 11 blocked theories (T-636, T-637, T-641, T-643, T-644, T-645...)",
   "affected": "",
   "n_affected": 0,
   "action": "restart the capture",
@@ -26,7 +36,7 @@
   "severity": "warning",
   "kind": "stream",
   "node": "stream:coinbase-products",
-  "message": "coinbase-products: no data since 2026-10-16 (19 days); it also holds back 1 blocked theory (T-609)",
+  "message": "coinbase-products: no data since 2026-10-16 (24 days); it also holds back 1 blocked theory (T-609)",
   "affected": "",
   "n_affected": 0,
   "action": "restart the capture",

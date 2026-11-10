@@ -16,23 +16,23 @@
  },
  {
   "family": "deribit-book-BTC",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "deribit-book-ETH",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "deribit-surface-BTC",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "deribit-surface-ETH",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "finra-short-interest",
@@ -41,118 +41,118 @@
  },
  {
   "family": "options-chain-AAPL",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-ETHA",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-GLD",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-IBIT",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-IWM",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-NVDA",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-QQQ",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-SLV",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-SPX",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-SPY",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-TLT",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-TSLA",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-USO",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-chain-VIX",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "options-surface",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "polymarket-books",
-  "latest": "2026-11-03",
-  "count": 3
+  "latest": "2026-11-06",
+  "count": 6
  },
  {
   "family": "social-crypto",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "social-derived",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "social-house-ptr",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "social-prices",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "social-reddit",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "social-stocktwits",
-  "latest": "2026-11-03",
-  "count": 4
+  "latest": "2026-11-06",
+  "count": 7
  },
  {
   "family": "spy-smile",
-  "latest": "2026-10-20",
-  "count": 3
+  "latest": "2026-11-05",
+  "count": 6
  },
  {
   "family": "ssga-spy-holdings",

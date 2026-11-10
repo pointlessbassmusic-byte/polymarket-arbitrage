@@ -119,5 +119,38 @@
   "tom_window": true,
   "target_qqqm_usd": 1200.0,
   "target_spym_usd": 900.0
+ },
+ {
+  "day": "2026-11-04",
+  "equity_usd": 95459.57,
+  "realised_pnl_to_date_usd": -5.64,
+  "round_trips_closed": 2,
+  "ibs_15_45": 0.781,
+  "ibs_fired": false,
+  "tom_window": false,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 0.0
+ },
+ {
+  "day": "2026-11-05",
+  "equity_usd": 95399.02,
+  "realised_pnl_to_date_usd": -21.02,
+  "round_trips_closed": 1,
+  "ibs_15_45": 0.029,
+  "ibs_fired": true,
+  "tom_window": false,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 900.0
+ },
+ {
+  "day": "2026-11-06",
+  "equity_usd": 95413.08,
+  "realised_pnl_to_date_usd": -6.97,
+  "round_trips_closed": 2,
+  "ibs_15_45": 0.31,
+  "ibs_fired": false,
+  "tom_window": false,
+  "target_qqqm_usd": 1200.0,
+  "target_spym_usd": 0.0
  }
 ]

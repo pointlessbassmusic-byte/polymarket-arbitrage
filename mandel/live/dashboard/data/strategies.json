@@ -11,19 +11,19 @@
   "decision": "fill gap <= 1.5 bp/side at 60 sessions; return at 250",
   "started": "2026-10-20",
   "read_date": null,
-  "pnl_usd": -29.88,
-  "fills": 23,
+  "pnl_usd": -6.97,
+  "fills": 32,
   "verified": "Mandel records",
   "source": "paper journal",
-  "n_now": 11,
+  "n_now": 14,
   "capital_usd": null,
   "status": "running",
   "next_step": "reconcile fills daily",
   "state": "running",
   "group": "Paper",
-  "progress": 0.1833,
+  "progress": 0.2333,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-560",
@@ -48,7 +48,7 @@
   "group": "Paper",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-542",
@@ -67,13 +67,13 @@
   "verified": "Mandel records",
   "source": "capture box + archive captures",
   "n_now": 2,
-  "status": "recording: chains captured through 2026-11-03 (4 on the box)",
+  "status": "recording: chains captured through 2026-11-06 (7 on the box)",
   "next_step": "none: the capture box records daily",
   "state": "running",
   "group": "Forward record",
   "progress": 0.1,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-541",
@@ -92,13 +92,13 @@
   "verified": "Mandel records",
   "source": "capture box + archive captures",
   "n_now": 0,
-  "status": "recording: chains captured through 2026-11-03 (4 on the box)",
+  "status": "recording: chains captured through 2026-11-06 (7 on the box)",
   "next_step": "first settlements follow the November VIX expiry",
   "state": "running",
   "group": "Forward record",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-543",
@@ -123,7 +123,7 @@
   "group": "Forward record",
   "progress": 0.0333,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-565",
@@ -141,14 +141,14 @@
   "fills": null,
   "verified": "Mandel records",
   "source": "capture box shadow.jsonl",
-  "n_now": 11,
-  "status": "recording: 11 shadow day(s), first 2026-10-20",
+  "n_now": 14,
+  "status": "recording: 14 shadow day(s), first 2026-10-20",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Forward record",
-  "progress": 0.3056,
+  "progress": 0.3889,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-566",
@@ -166,14 +166,14 @@
   "fills": null,
   "verified": "Mandel records",
   "source": "capture box shadow.jsonl",
-  "n_now": 11,
-  "status": "recording: 11 shadow day(s), first 2026-10-20",
+  "n_now": 14,
+  "status": "recording: 14 shadow day(s), first 2026-10-20",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Forward record",
-  "progress": 0.055,
+  "progress": 0.07,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-573",
@@ -191,14 +191,14 @@
   "fills": null,
   "verified": "Mandel records",
   "source": "capture box shadow.jsonl",
-  "n_now": 11,
-  "status": "recording: 11 shadow day(s), first 2026-10-20",
+  "n_now": 14,
+  "status": "recording: 14 shadow day(s), first 2026-10-20",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Forward record",
-  "progress": 0.055,
+  "progress": 0.07,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-576",
@@ -217,13 +217,13 @@
   "verified": "Mandel records",
   "source": "capture box wide-journal.jsonl",
   "n_now": 1,
-  "status": "running: 11 session(s) decided, 1 signal day(s) so far",
+  "status": "running: 14 session(s) decided, 1 signal day(s) so far",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Paper",
   "progress": 0.0417,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-567",
@@ -242,13 +242,13 @@
   "verified": "Mandel records",
   "source": "capture box wide-journal.jsonl",
   "n_now": 0,
-  "status": "running: 11 session(s) decided, 0 signal day(s) so far",
+  "status": "running: 14 session(s) decided, 0 signal day(s) so far",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Paper",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-568",
@@ -263,17 +263,17 @@
   "started": "2026-10-20",
   "read_date": null,
   "pnl_usd": null,
-  "fills": 4,
+  "fills": 5,
   "verified": "Mandel records",
   "source": "capture box wide-journal.jsonl",
   "n_now": 0,
-  "status": "running: 4 spread(s) open, 8 opening order(s) expired at the mid",
+  "status": "running: 5 spread(s) open, 11 opening order(s) expired at the mid",
   "next_step": "none: runs on its timers",
   "state": "running",
   "group": "Paper",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "T-744",
@@ -296,13 +296,15 @@
   "fill_gap_bp_mean": null,
   "fill_gap_bp_upper95": null,
   "fill_gap_n": 0,
+  "auction_fill_share": null,
+  "unfilled": 0,
   "status": "waiting on the user: install deploy/live/install.sh, fund the live account, type the switch",
   "next_step": "echo MANDEL_ALPACA_LIVE=I-UNDERSTAND | sudo tee -a /etc/mandel-live.env (the user's switch)",
   "state": "waiting",
   "group": "Live money",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-bounce-short",
@@ -315,20 +317,20 @@
   "n_target": null,
   "read_date": null,
   "pnl_usd": null,
-  "status": "2 closed at the 14-day time exit on 2026-10-23: DOGE +7.7%, kSHIB +8.8% net (mean +8.29% vs backtest +3.36%, 57% winners); the replay's own line: too few to judge (72% chance the backtest does this well or worse); no open position",
-  "next_step": "wait for the next signal; judge at the child's MinTRL, not on 2 trades; weekly routine's push is blocked (repo not in its sources) - operator fix",
+  "status": "2 closed at the 14-day time exit on 2026-10-23: DOGE +7.7%, kSHIB +8.8% net; no new signal or weekly entry reported through 2026-11-09",
+  "next_step": "wait for the next signal; judge at the child's MinTRL (32-104 months), not on 2 trades",
   "decision": "no read date set by the child; MinTRL 32-104 months",
   "started": "2026-10-15",
   "capital_usd": 1000,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02; Mandel check T-556",
+  "verified": "child's own figures as of 2026-11-09; Mandel check T-556",
   "source": "R-831322fc73",
   "state": "running",
   "group": "Live money",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-orb-qqq",
@@ -348,13 +350,13 @@
   "capital_usd": null,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-831322fc73; session status 2026-10-20",
   "state": "running",
   "group": "Paper",
   "progress": 0.0833,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-2s10s-xlf",
@@ -374,13 +376,13 @@
   "capital_usd": null,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-831322fc73",
   "state": "running",
   "group": "Paper",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-btc-us500-lead",
@@ -393,20 +395,20 @@
   "n_target": null,
   "read_date": "2026-11-05",
   "pnl_usd": null,
-  "status": "recording",
-  "next_step": "read on the locked date",
+  "status": "read date 2026-11-05 passed; no result published on the branch (WEEKLY.md unchanged since Oct 20)",
+  "next_step": "Hurst runs python -m cryptobot.intraday_leadlag --fetch and writes the read; the weekly routine needs the repo attached",
   "decision": "pre-registered forward test",
   "started": null,
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-831322fc73",
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 1,
-  "as_of": "2026-11-04"
+  "days_to_read": -4,
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-book-imbalance",
@@ -426,13 +428,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-831322fc73",
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 8,
-  "as_of": "2026-11-04"
+  "days_to_read": 3,
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-btc-favourite",
@@ -441,7 +443,7 @@
   "venue": "Kalshi",
   "mode": "forward",
   "unit": "days",
-  "n_now": 21,
+  "n_now": 26,
   "n_target": 60,
   "read_date": "2026-12-13",
   "pnl_usd": null,
@@ -452,13 +454,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-831322fc73",
   "state": "running",
   "group": "Forward record",
-  "progress": 0.35,
-  "days_to_read": 39,
-  "as_of": "2026-11-04"
+  "progress": 0.4333,
+  "days_to_read": 34,
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-hype-fade",
@@ -478,13 +480,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-831322fc73",
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 69,
-  "as_of": "2026-11-04"
+  "days_to_read": 64,
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-ibit-carry",
@@ -504,13 +506,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-831322fc73",
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 100,
-  "as_of": "2026-11-04"
+  "days_to_read": 95,
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-ibit-ladder",
@@ -530,13 +532,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-831322fc73",
   "state": "running",
   "group": "Forward record",
   "progress": null,
-  "days_to_read": 331,
-  "as_of": "2026-11-04"
+  "days_to_read": 326,
+  "as_of": "2026-11-09"
  },
  {
   "id": "K-maker-kalshi",
@@ -556,13 +558,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-35bea78f15",
   "state": "waiting",
   "group": "Live money",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "K-tennis-longshot-no",
@@ -582,13 +584,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-35bea78f15",
   "state": "running",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "B-maker-pmus",
@@ -608,13 +610,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "R-e9b3472e1c",
   "state": "waiting",
   "group": "Live money",
   "progress": 0.0,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "B-paper-book",
@@ -623,24 +625,24 @@
   "venue": "Polymarket (paper)",
   "mode": "paper",
   "unit": "settled bets",
-  "n_now": 4,
+  "n_now": 9,
   "n_target": null,
   "read_date": null,
-  "pnl_usd": -4.0,
-  "status": "4 settled, 4 losses (two Oct 31 front-of-queue-only fills included), equity 96.00; CLV ungraded since the 11-01 settlement fix (no book seen after entry)",
-  "next_step": "paper fills credit a print AT the order price; only the live $1 touch test measures queue position",
+  "pnl_usd": 2.61,
+  "status": "9 settled (4 losses to Nov 4; Nov 8 soccer +4.26, esports +0.33, tennis -1.00; Nov 9 void +0.02, soccer -1.00), realised +2.61, equity 102.61; every fill front-of-queue-only, CLV n 0 (once-a-day scans leave no later book)",
+  "next_step": "keep the sandbox sim daily; strict fills stay 0; CLV needs a later book read",
   "decision": "CLV against the close",
   "started": null,
   "capital_usd": 100,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
-  "source": "R-e9b3472e1c",
+  "verified": "child's own figures as of 2026-11-09",
+  "source": "daily check-in PR #135",
   "state": "running",
   "group": "Paper",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "S-fed-g10",
@@ -648,25 +650,25 @@
   "strategy": "Central-bank bucket >= 0.90, G10",
   "venue": "Kalshi / Polymarket",
   "mode": "forward",
-  "unit": "fires",
-  "n_now": 4,
+  "unit": "meetings settled",
+  "n_now": 6,
   "n_target": null,
   "read_date": null,
-  "pnl_usd": null,
-  "status": "recording: 4 two_venue fires in October (Fed hold 0.91/0.92, ECB hold 0.97/0.966, BoJ hold 0.96/0.97, RBNZ hike-25 0.92/0.94); 0 settled rows as of 11-02 although three decisions have passed",
-  "next_step": "settlement pass must write result/settled_at; T-742 reads at 60 settled two_venue fires",
+  "pnl_usd": -37.41,
+  "status": "6 meetings settled, 12 two_venue rows: 10 paid, 2 lost (RBNZ Oct hike-25 at 0.92/0.94, the bank held); fed_watch +9.0%/row, cb_watch -16.8%/row, pooled -12.5%/row; ten winners average +5.0%",
+  "next_step": "record only; the record is negative at 6 meetings and nothing clears the pre-live gate; ~130 forward fires to beat the 2.4% breakeven",
   "decision": "fed_watch / cb_watch forward recorders",
   "started": null,
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
-  "source": "R-4b062fe004",
+  "verified": "child's own figures as of 2026-11-09",
+  "source": "PR #132, arb-scanner/docs/cb_signals.csv + fed_signals.csv",
   "state": "running",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-btc-tom",
@@ -686,13 +688,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "G-bde6c8d0a8",
   "state": "proposed",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-us500-overnight",
@@ -712,13 +714,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "G-bde6c8d0a8",
   "state": "proposed",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "H-gold-perp-carry",
@@ -738,13 +740,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "G-bde6c8d0a8",
   "state": "proposed",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "B-longshot-calibration",
@@ -764,13 +766,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "G-5f4b67f8c4",
   "state": "proposed",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "K-thin-queue-maker",
@@ -790,13 +792,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "G-a0b8df9f14",
   "state": "proposed",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "S-kalshi-crypto-short",
@@ -816,13 +818,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "G-82466b5e44",
   "state": "proposed",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "S-macro-buckets",
@@ -842,13 +844,13 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "G-82466b5e44",
   "state": "proposed",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
  },
  {
   "id": "K-queue-markov-fill",
@@ -868,12 +870,38 @@
   "capital_usd": 0,
   "registry_status": null,
   "fills": null,
-  "verified": "child's own figures as of 2026-11-02",
+  "verified": "child's own figures as of 2026-11-09",
   "source": "G-90c3346389",
   "state": "proposed",
   "group": "Forward record",
   "progress": null,
   "days_to_read": null,
-  "as_of": "2026-11-04"
+  "as_of": "2026-11-09"
+ },
+ {
+  "id": "H-meme-judge",
+  "owner": "Hurst",
+  "strategy": "Memecoin launch judge (rules in place of a chat model), paper",
+  "venue": "GeckoTerminal new Solana/Base pools (paper)",
+  "mode": "paper",
+  "unit": "judged pools",
+  "n_now": null,
+  "n_target": null,
+  "read_date": null,
+  "pnl_usd": null,
+  "status": "registered meme-judge-forward 2026-11-03; scoring versioned after the constant-product exit fix and the count restarted; no outcome count published yet",
+  "next_step": "child to publish the decision count and 1h/4h/24h outcomes in the weekly review; Mandel reads it as a paper record only",
+  "decision": "none registered by the child yet",
+  "started": "2026-11-03",
+  "capital_usd": null,
+  "registry_status": null,
+  "fills": null,
+  "verified": "child's own figures as of 2026-11-09",
+  "source": "crypto branch addendum 33",
+  "state": "running",
+  "group": "Paper",
+  "progress": null,
+  "days_to_read": null,
+  "as_of": "2026-11-09"
  }
 ]

@@ -119,5 +119,60 @@
   "exit": 88.76,
   "pnl_usd": 0.08,
   "shadow_pnl_usd": -0.17
+ },
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-11-03",
+  "exit_day": "2026-11-04",
+  "qty": 4,
+  "entry": 282.32,
+  "exit": 284.055,
+  "pnl_usd": 6.94,
+  "shadow_pnl_usd": 5.28
+ },
+ {
+  "symbol": "SPYM",
+  "rule": "IBS SPYM + turn-of-month SPYM",
+  "entry_day": "2026-11-02",
+  "exit_day": "2026-11-04",
+  "qty": 10,
+  "entry": 88.58,
+  "exit": 90.31,
+  "pnl_usd": 17.3,
+  "shadow_pnl_usd": 17.3
+ },
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-11-04",
+  "exit_day": "2026-11-05",
+  "qty": 4,
+  "entry": 284.855,
+  "exit": 281.01,
+  "pnl_usd": -15.38,
+  "shadow_pnl_usd": -14.52
+ },
+ {
+  "symbol": "QQQM",
+  "rule": "overnight QQQM",
+  "entry_day": "2026-11-05",
+  "exit_day": "2026-11-06",
+  "qty": 4,
+  "entry": 267.7225,
+  "exit": 270.485,
+  "pnl_usd": 11.05,
+  "shadow_pnl_usd": 17.16
+ },
+ {
+  "symbol": "SPYM",
+  "rule": "IBS SPYM",
+  "entry_day": "2026-11-05",
+  "exit_day": "2026-11-06",
+  "qty": 10,
+  "entry": 86.44,
+  "exit": 86.74,
+  "pnl_usd": 3.0,
+  "shadow_pnl_usd": 2.7
  }
 ]

@@ -75,5 +75,26 @@
   "failed": 0,
   "ok": true,
   "first_error": ""
+ },
+ {
+  "day": "2026-11-04",
+  "steps": 5,
+  "failed": 0,
+  "ok": true,
+  "first_error": ""
+ },
+ {
+  "day": "2026-11-05",
+  "steps": 5,
+  "failed": 0,
+  "ok": true,
+  "first_error": ""
+ },
+ {
+  "day": "2026-11-06",
+  "steps": 5,
+  "failed": 0,
+  "ok": true,
+  "first_error": ""
  }
 ]
