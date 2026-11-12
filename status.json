@@ -1,140 +1,140 @@
 {
- "as_of": "2026-11-10T23:51:53+00:00",
+ "as_of": "2026-11-11T23:51:22+00:00",
  "families": {
   "social-reddit": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 2890455
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 3236550
   },
   "social-stocktwits": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 357751
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 390934
   },
   "social-crypto": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 67354
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 74841
   },
   "social-prices": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 199501
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 221644
   },
   "social-house-ptr": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 90090
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 100497
   },
   "social-derived": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 55901
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 62058
   },
   "options-chain-SPY": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 5890859
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 6554313
   },
   "options-chain-QQQ": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 4996658
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 5577432
   },
   "options-chain-IWM": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 2394743
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 2655775
   },
   "options-chain-TLT": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 1343475
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 1490250
   },
   "options-chain-GLD": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 3247143
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 3603790
   },
   "options-chain-SLV": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 2030682
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 2251084
   },
   "options-chain-USO": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 2881622
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 3211232
   },
   "options-chain-IBIT": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 1419543
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 1575639
   },
   "options-chain-ETHA": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 497650
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 556343
   },
   "options-chain-TSLA": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 2421724
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 2693869
   },
   "options-chain-NVDA": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 1982087
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 2214127
   },
   "options-chain-AAPL": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 1655755
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 1839768
   },
   "options-chain-SPX": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 14214144
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 15844818
   },
   "options-chain-VIX": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 708503
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 787549
   },
   "options-surface": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 302967
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 336730
   },
   "deribit-book-BTC": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 281512
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 311898
   },
   "deribit-surface-BTC": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 5354
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 5942
   },
   "deribit-book-ETH": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 226447
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 250717
   },
   "deribit-surface-ETH": {
-   "latest": "2026-11-10",
-   "count": 9,
-   "bytes": 5157
+   "latest": "2026-11-11",
+   "count": 10,
+   "bytes": 5716
   },
   "polymarket-books": {
-   "latest": "2026-11-10",
-   "count": 8,
-   "bytes": 2081026
+   "latest": "2026-11-11",
+   "count": 9,
+   "bytes": 2349025
   },
   "spy-smile": {
-   "latest": "2026-11-09",
-   "count": 8,
-   "bytes": 11725
+   "latest": "2026-11-10",
+   "count": 9,
+   "bytes": 13138
   },
   "coinbase-products": {
    "latest": "2026-10-16",
@@ -3420,40 +3420,40 @@
   "hourly--VIX": "2026-11-08T12:34:47",
   "cboe-PUT-history": "2026-11-08T12:34:48",
   "cboe-BXM-history": "2026-11-08T12:34:49",
-  "cboe-VIX-history": "2026-11-10T23:30:30",
-  "cboe-VIX9D-history": "2026-11-10T23:30:31",
-  "cboe-VIX3M-history": "2026-11-10T23:30:31",
-  "cboe-VIX6M-history": "2026-11-10T23:30:32",
-  "cboe-VIX1D-history": "2026-11-10T23:30:33",
-  "cboe-VVIX-history": "2026-11-10T23:30:33",
-  "cboe-SKEW-history": "2026-11-10T23:30:34",
-  "cboe-GVZ-history": "2026-11-10T23:30:35",
-  "cboe-OVX-history": "2026-11-10T23:30:35",
-  "cboe-VXN-history": "2026-11-10T23:30:36",
-  "cboe-RVX-history": "2026-11-10T23:30:37",
-  "cboe-VXD-history": "2026-11-10T23:30:38",
-  "cboe-VXTLT-history": "2026-11-10T23:30:38",
-  "cboe-VXEEM-history": "2026-11-10T23:30:39",
-  "cboe-COR1M-history": "2026-11-10T23:30:40",
-  "cboe-DSPX-history": "2026-11-10T23:30:40",
-  "cboe-VXAPL-history": "2026-11-10T23:30:41",
-  "cboe-VXGOG-history": "2026-11-10T23:30:42",
-  "cboe-VXAZN-history": "2026-11-10T23:30:42",
-  "fred-DTB3": "2026-11-10T23:30:43",
-  "fred-DGS10": "2026-11-10T23:30:44",
-  "fred-DGS2": "2026-11-10T23:30:45",
-  "fred-DFF": "2026-11-10T23:30:46",
-  "deribit-dvol-BTC-history": "2026-11-10T23:30:48",
-  "deribit-dvol-ETH-history": "2026-11-10T23:30:52"
+  "cboe-VIX-history": "2026-11-11T23:30:25",
+  "cboe-VIX9D-history": "2026-11-11T23:30:25",
+  "cboe-VIX3M-history": "2026-11-11T23:30:26",
+  "cboe-VIX6M-history": "2026-11-11T23:30:27",
+  "cboe-VIX1D-history": "2026-11-11T23:30:27",
+  "cboe-VVIX-history": "2026-11-11T23:30:28",
+  "cboe-SKEW-history": "2026-11-11T23:30:29",
+  "cboe-GVZ-history": "2026-11-11T23:30:30",
+  "cboe-OVX-history": "2026-11-11T23:30:30",
+  "cboe-VXN-history": "2026-11-11T23:30:31",
+  "cboe-RVX-history": "2026-11-11T23:30:32",
+  "cboe-VXD-history": "2026-11-11T23:30:32",
+  "cboe-VXTLT-history": "2026-11-11T23:30:33",
+  "cboe-VXEEM-history": "2026-11-11T23:30:34",
+  "cboe-COR1M-history": "2026-11-11T23:30:34",
+  "cboe-DSPX-history": "2026-11-11T23:30:35",
+  "cboe-VXAPL-history": "2026-11-11T23:30:36",
+  "cboe-VXGOG-history": "2026-11-11T23:30:36",
+  "cboe-VXAZN-history": "2026-11-11T23:30:37",
+  "fred-DTB3": "2026-11-11T23:30:38",
+  "fred-DGS10": "2026-11-11T23:30:39",
+  "fred-DGS2": "2026-11-11T23:30:39",
+  "fred-DFF": "2026-11-11T23:30:40",
+  "deribit-dvol-BTC-history": "2026-11-11T23:30:43",
+  "deribit-dvol-ETH-history": "2026-11-11T23:30:47"
  },
  "last_runs": {
   "daily": {
-   "ts": "2026-11-10T23:51:53+00:00",
+   "ts": "2026-11-11T23:51:22+00:00",
    "steps": [
     {
      "step": "options-fetch",
      "rc": 0,
-     "seconds": 19.5,
+     "seconds": 19.7,
      "tail": [
       "    \"ETH-surface\": 11",
       "  }",
@@ -3463,39 +3463,39 @@
     {
      "step": "options-fetch --smile",
      "rc": 0,
-     "seconds": 2.8,
+     "seconds": 2.9,
      "tail": [
       "  },",
-      "  \"2026-11-10\": \"no VIX close for quote date 2026-11-10\"",
+      "  \"2026-11-11\": \"no VIX close for quote date 2026-11-11\"",
       "}"
      ]
     },
     {
      "step": "options-fetch --history",
      "rc": 0,
-     "seconds": 23.1,
+     "seconds": 23.0,
      "tail": [
-      "  \"DVOL-BTC\": 2058,",
-      "  \"DVOL-ETH\": 2058",
+      "  \"DVOL-BTC\": 2059,",
+      "  \"DVOL-ETH\": 2059",
       "}"
      ]
     },
     {
      "step": "social-fetch",
      "rc": 0,
-     "seconds": 1120.0,
+     "seconds": 1160.6,
      "tail": [
       "  ],",
-      "  \"wall_seconds\": 1119.3",
+      "  \"wall_seconds\": 1160.0",
       "}"
      ]
     },
     {
      "step": "book-snapshot",
      "rc": 0,
-     "seconds": 140.3,
+     "seconds": 74.1,
      "tail": [
-      "  \"markets\": 297,",
+      "  \"markets\": 300,",
       "  \"api_calls\": 600",
       "}"
      ]
