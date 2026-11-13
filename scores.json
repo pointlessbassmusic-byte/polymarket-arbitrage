@@ -1,9 +1,9 @@
 {
- "as_of": "2026-11-11T23:51:22+00:00",
+ "as_of": "2026-11-12T23:51:00+00:00",
  "T-542": {
-  "n_days": 8,
+  "n_days": 9,
   "verdict": "inconclusive",
-  "reason": "day one 2026-10-20: 0.2% of 600 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 0.5%; needs < 2%); later days: 2026-11-03 0.3%, 2026-11-04 0.0%, 2026-11-05 0.0%, 2026-11-06 0.0%, 2026-11-09 0.0%, 2026-11-10 0.0%, 2026-11-11 0.0% (the claim makes day one decisive)",
+  "reason": "day one 2026-10-20: 0.2% of 600 SPX/SPXW (K,T) pairs have an implied forward outside the half-spread band around the expiry median (one-sided 95% bound 0.5%; needs < 2%); later days: 2026-11-03 0.3%, 2026-11-04 0.0%, 2026-11-05 0.0%, 2026-11-06 0.0%, 2026-11-09 0.0%, 2026-11-10 0.0%, 2026-11-11 0.0%, 2026-11-12 0.2% (the claim makes day one decisive)",
   "per_day": null,
   "days": [
    {
@@ -97,9 +97,21 @@
     "upper95": 0.0,
     "pass": true,
     "bill": {
-     "bill_day": "2026-11-09",
-     "dtb3_discount_pct": 4.06,
-     "bill_cont_bp": 413.7657321697184
+     "bill_day": "2026-11-10",
+     "dtb3_discount_pct": 4.12,
+     "bill_cont_bp": 419.9126157538794
+    }
+   },
+   {
+    "day": "2026-11-12",
+    "pairs": 610,
+    "share": 0.001639344262295082,
+    "upper95": 0.004918032786885246,
+    "pass": true,
+    "bill": {
+     "bill_day": "2026-11-10",
+     "dtb3_discount_pct": 4.12,
+     "bill_cont_bp": 419.9126157538794
     }
    }
   ],
